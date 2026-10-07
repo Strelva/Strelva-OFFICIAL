@@ -146,3 +146,91 @@
     transform: none;
   }
 }
+
+/* October 6, 2026: the compact glass composer on Home's dusk band. */
+.wrap[data-tone="glass"] .composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 7px 7px 7px 22px;
+  border: 1px solid var(--home-glass-line);
+  border-radius: 999px;
+  background: var(--home-glass-fill);
+  box-shadow: var(--home-glass-shadow);
+  -webkit-backdrop-filter: blur(20px) saturate(1.15);
+  backdrop-filter: blur(20px) saturate(1.15);
+}
+
+.wrap[data-tone="glass"] .composer:focus-within {
+  border-color: var(--home-composer-focus);
+  box-shadow: 0 0 0 3px var(--home-composer-focus-ring), var(--home-glass-shadow);
+  transform: none;
+}
+
+.wrap[data-tone="glass"] .composer textarea {
+  min-height: 40px;
+  max-height: 160px;
+  padding: 8px 0;
+  color: var(--home-dusk-text);
+  font-size: 16px;
+  line-height: 24px;
+  letter-spacing: 0;
+}
+
+.wrap[data-tone="glass"] .composer textarea::placeholder {
+  color: var(--home-dusk-muted);
+}
+
+.wrap[data-tone="glass"] .tools {
+  flex-shrink: 0;
+  padding-top: 0;
+}
+
+.wrap[data-tone="glass"] .tools > button:first-child {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
+.wrap[data-tone="glass"] .tools > button:first-child,
+.wrap[data-tone="glass"] .clear {
+  color: var(--home-dusk-muted);
+}
+
+.wrap[data-tone="glass"] .tools > button:first-child:hover,
+.wrap[data-tone="glass"] .clear:hover {
+  background: var(--home-glass-strong);
+  color: var(--home-dusk-text);
+}
+
+.wrap[data-tone="glass"] .send button[type="submit"] {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  padding: 0;
+  background: var(--home-aurora);
+  color: var(--home-ink-panel);
+}
+
+.wrap[data-tone="glass"] .hint {
+  margin: 10px 22px 0;
+  color: var(--home-dusk-muted);
+}
+
+.wrap[data-tone="glass"] .hint span {
+  display: none;
+}
+
+.wrap[data-tone="glass"] .error {
+  margin-inline: 22px;
+  color: var(--home-dusk-text);
+}
+
+@media (max-width: 640px) {
+  .wrap[data-tone="glass"] .composer {
+    padding-left: 16px;
+    border-radius: 24px;
+  }
+
+}

@@ -22,6 +22,10 @@ describe("workspace places", () => {
     expect(isRetiredView("customers")).toBe(true);
     for (const view of [null, undefined, "", "home", "requests", "apps"]) expect(isRetiredView(view)).toBe(false);
     expect(sectionFromView("apps")).toBe("apps");
+    // October 6: Needs you is its own place (the layout opens Home while its release is off).
+    expect(sectionFromView("needs-you")).toBe("needs-you");
+    expect(sectionTitle("needs-you")).toBe("Needs you");
+    expect(workspaceSectionHref("needs-you", "", "b1")).toBe("/workspace?view=needs-you&workspaceId=b1");
   });
 
   it("falls back to Home for missing, unknown or unsafe views", () => {

@@ -35,6 +35,9 @@
   }
 
   .button.small { padding-inline: 0.75rem; }
+  /* October 6, 2026: buttons are pills in the linen workspace. */
+  :global([data-workspace-theme="linen"]) .button { border-radius: 999px; }
+  :global([data-workspace-theme="linen"]) .button.small { padding-inline: 0.875rem; }
   .outlined { box-shadow: inset 0 0 0 1px var(--gray-border); }
   .icon { display: inline-flex; flex-shrink: 0; align-items: center; }
 

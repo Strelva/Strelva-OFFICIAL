@@ -81,7 +81,7 @@ async function mockEditorApi(page: Page, options: { denyDrafts?: boolean } = {})
 
 test("shared navigation remains available while opening and finding work", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=free");
-  await expect(page.getByRole("heading", { name: "What should happen next?" })).toBeVisible();
+  await expect(page.locator("h1#business-start-title")).toBeVisible();
   await page.getByRole("button", { name: "Open Harbor Dental", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Harbor Dental", exact: true })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Main", exact: true })).toBeVisible();

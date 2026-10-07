@@ -16,6 +16,8 @@
  * October 6: the Customers page is retired in both states (systems-catalog
  * spec §9.6). Only its old address survives: `view=customers` opens Home, and
  * the workspace rewrites the URL. Contacts live in the business record.
+ * October 6 (1.0): Needs you is its own place, the deck of decisions, shown
+ * only while STRELVA_NEEDS_YOU_RELEASE is on; off, `view=needs-you` opens Home.
  * The rest of October 4 and 5 is behind STRELVA_SYSTEMS_RELEASE. Off, the list
  * is called "Apps", as before.
  * Every caller that needs to know which place a view belongs to, what it is
@@ -24,14 +26,15 @@
  */
 import { SYSTEMS_LABEL } from "@/experience/systems/model";
 
-export type StrelvaSection = "home" | "requests" | "ongoing" | "apps" | "work" | "access" | "settings" | "products" | "help" | "account" | "system" | "ask";
+export type StrelvaSection = "home" | "needs-you" | "requests" | "ongoing" | "apps" | "work" | "access" | "settings" | "products" | "help" | "account" | "system" | "ask";
 
 const APP_VIEWS: ReadonlySet<StrelvaSection> = new Set(["apps", "work", "products"]);
-const DIRECT_VIEWS: ReadonlySet<string> = new Set(["requests", "apps", "work", "ongoing", "products", "access", "settings", "help", "system", "ask"]);
+const DIRECT_VIEWS: ReadonlySet<string> = new Set(["needs-you", "requests", "apps", "work", "ongoing", "products", "access", "settings", "help", "system", "ask"]);
 const WORK_DETAIL_VIEWS: ReadonlySet<string> = new Set(["tracker", "inquiries", "document", "plan"]);
 
 const TITLES: Record<StrelvaSection, string> = {
   home: "Home",
+  "needs-you": "Needs you",
   requests: "Requests",
   ongoing: "Running",
   apps: SYSTEMS_LABEL,

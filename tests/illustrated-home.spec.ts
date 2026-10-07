@@ -8,7 +8,8 @@ test("request-first Home opens saved work on desktop and mobile", async ({ page 
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 960 });
     await page.goto("/preview/strelva?scenario=free");
-    await expect(page.getByRole("heading", { name: "What should happen next?", exact: true })).toBeVisible();
+    // October 6: Home opens on the dusk band, greeting first.
+    await expect(page.locator("h1#business-start-title")).toBeVisible();
     const composer = page.getByLabel("What do you want to accomplish?", { exact: true });
     await expect(composer).toBeVisible();
     expect((await composer.boundingBox())!.y).toBeLessThan(400);

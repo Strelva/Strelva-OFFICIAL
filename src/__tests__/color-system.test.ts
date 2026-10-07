@@ -15,7 +15,7 @@ describe("color system", () => {
     const source = files.map(path => readFileSync(path, "utf8")).join("\n");
     const declarations = new Set([...source.matchAll(/["']?(--[\w-]+)["']?\s*:/g)].map(match => match[1]));
     // Next font variables and dimensions set by JavaScript at runtime.
-    const runtime = new Set(["--font-body", "--font-display", "--app-frame-height", "--i", "--motion-delay", "--pct"]);
+    const runtime = new Set(["--font-body", "--font-display", "--font-outcome", "--app-frame-height", "--i", "--motion-delay", "--pct"]);
     const missing: string[] = [];
     for (const path of files.filter(path => path.endsWith(".css"))) {
       for (const match of readFileSync(path, "utf8").matchAll(/var\((--[\w-]+)\s*([,)])/g)) {

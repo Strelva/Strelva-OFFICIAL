@@ -283,12 +283,34 @@ describe("production readiness snapshot", () => {
 });
 
 
-
 describe("head-only table counts", () => {
   it("accepts a real zero but never treats an absent count as a present table", () => {
     expect(countResult({ count: 0, error: null, status: 200 })).toEqual({ ok: true, count: 0 });
     expect(countResult({ count: null, error: null, status: 204 })).toMatchObject({ ok: false, missing: false });
     expect(countResult({ count: null, error: null, status: 404 })).toMatchObject({ ok: false, missing: true });
     expect(countResult({ count: null, error: { code: "PGRST205", message: "missing table" } })).toMatchObject({ ok: false, missing: true });
+  });
+});
+
+describe("countResult", () => {
+  it("never reads a head-only 404 as a present table", () => {
+    expect(countResult({ count: null, error: null, status: 404 })).toEqual({ ok: false, missing: true, reason: "404: table not found" });
+  });
+
+  it("treats a missing count as unknown, not as zero rows", () => {
+    expect(countResult({ count: null, error: null, status: 200 })).toMatchObject({ ok: false, missing: false });
+  });
+
+  it("reads a head-only 404 with an empty error as missing", () => {
+    expect(countResult({ count: null, error: { message: "" }, status: 404 })).toMatchObject({ ok: false, missing: true });
+  });
+
+  it("reads PostgREST's missing-table error as missing", () => {
+    expect(countResult({ count: null, error: { code: "PGRST205", message: "Could not find the table" }, status: 404 })).toMatchObject({ ok: false, missing: true });
+  });
+
+  it("returns a real count, including zero", () => {
+    expect(countResult({ count: 0, error: null, status: 200 })).toEqual({ ok: true, count: 0 });
+    expect(countResult({ count: 12, error: null, status: 206 })).toEqual({ ok: true, count: 12 });
   });
 });

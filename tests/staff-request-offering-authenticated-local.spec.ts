@@ -32,7 +32,7 @@ test("an owner publishes, shares, updates, and resumes the staff request offerin
     const page = await owner.context.newPage();
     page.setDefaultTimeout(20_000);
     await page.goto(`/workspace?workspaceId=${workspaceId}`, { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: "What should happen next?", exact: true })).toBeVisible();
+    await expect(page.locator("h1#business-start-title")).toBeVisible();
 
     const navigation = page.getByRole("complementary", { name: "Strelva navigation", exact: true });
     await navigation.getByRole("link", { name: "All apps and files", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
@@ -60,7 +60,7 @@ test("an owner publishes, shares, updates, and resumes the staff request offerin
     // The offering stays in draft until the connected application is released
     // and the owner explicitly activates it.
     await navigation.getByRole("link", { name: "Home", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "What should happen next?", exact: true })).toBeVisible();
+    await expect(page.locator("h1#business-start-title")).toBeVisible();
     await navigation.getByRole("link", { name: "All apps and files", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
     const draftStaffRequestOffering = page.locator('[class*="discoveryRow"]').filter({ hasText: "Staff request application" }).first();

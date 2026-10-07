@@ -5,7 +5,16 @@
   --motion-ease: cubic-bezier(.2,.8,.2,1);
   /* Soft overshoot for material shape; never use on text scale. */
   --motion-gooey: linear(0, .14 10%, .46 22%, .79 38%, .96 55%, 1.035 72%, 1.012 88%, 1);
+  /* Data surfaces: entry of blocks, drawn marks and counted numerals. */
+  --motion-reveal: 280ms;
+  --motion-reveal-stagger: 40ms;
+  --motion-draw: 600ms;
+  --motion-draw-ease: cubic-bezier(.65,0,.35,1);
+  --motion-count: 600ms;
 }
 @media (prefers-reduced-motion: reduce) {
-  :root { --motion-feedback: 0ms; --motion-disclosure: 0ms; --motion-exit: 0ms; }
+  :root {
+    --motion-feedback: 0ms; --motion-disclosure: 0ms; --motion-exit: 0ms;
+    --motion-reveal: 0ms; --motion-reveal-stagger: 0ms; --motion-draw: 0ms; --motion-count: 0ms;
+  }
 }
