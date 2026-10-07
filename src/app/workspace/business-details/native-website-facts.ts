@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { readBusinessRecord, patchBusinessRecord } from "@/platform/business-record/service";
-import { factValueSchemas, type BusinessRecord } from "@/platform/business-record/contracts";
+import { readBusinessRecord, readConfirmedBusinessFacts, patchBusinessRecord } from "@/platform/business-record/service";
+import { factValueSchemas, type ConfirmedBusinessFacts } from "@/platform/business-record/contracts";
 import { systemsReleasedFor, systemsReleaseMayBeOn } from "@/platform/systems-release";
 import { listBusinessSystems } from "@/platform/systems/from-existing";
 import { createSupabaseSystemStore } from "@/platform/systems/supabase-store";
@@ -20,14 +20,14 @@ import type { WorkspaceActor } from "@/platform/workspaces/types";
 
 const CONTACT_KEYS = ["phone", "email", "address", "hours"] as const;
 
-/** Only changed confirmed public contact facts. Every other approved contact
- * field stays intact; deletion/unconfirmed facts require manual review. */
-export function nativeContactFacts(record: BusinessRecord, changed: readonly string[], current: Record<string, unknown>): Record<string, unknown> {
+/** Only changed confirmed public contact facts: what the owner wrote or
+ * decided, never a pending operator or agency edit (#509). Every other
+ * approved contact field stays intact; deletions require manual review. */
+export function nativeContactFacts(confirmed: ConfirmedBusinessFacts, changed: readonly string[], current: Record<string, unknown>): Record<string, unknown> {
   const next = { ...current };
   for (const key of CONTACT_KEYS.filter(key => changed.includes(key))) {
-    const fact = record.facts[key];
-    if (!fact || !(fact.verified || fact.source === "owner" || fact.source === "operator")) continue;
-    const parsed = factValueSchemas[key].safeParse(fact.value);
+    if (confirmed.facts[key] === undefined) continue;
+    const parsed = factValueSchemas[key].safeParse(confirmed.facts[key]);
     if (!parsed.success) continue;
     if (key === "phone" || key === "email") next[key] = parsed.data;
     if (key === "address") {
@@ -68,6 +68,7 @@ const live = {
   enabled: () => process.env.STRELVA_WEBSITE_NATIVE_FACTS_ENABLED === "1" && systemsReleaseMayBeOn(),
   released: systemsReleasedFor,
   record: readBusinessRecord,
+  confirmed: readConfirmedBusinessFacts,
   sites: (actor: WorkspaceActor, workspaceId: string) => listBusinessSystems(actor, workspaceId, { store: createSupabaseSystemStore() }),
   tenant: getTenantConfig,
   allowed: async (tenantId: string) => !(await requireTenantPermission(tenantId, "content:write")) && !(await requireActiveSubscription(tenantId)),
@@ -99,7 +100,7 @@ export function createNativeWebsiteFactService(ports: NativeWebsiteFactPorts = l
       const [template, manifest] = await Promise.all([ports.template(tenantId), ports.manifest(tenantId)]);
       if (!template.contentSections.includes("contact") || !manifestAllowsAction(manifest, "contact", "draft") || !ports.queueAvailable()) continue;
       const current = await ports.current(tenantId);
-      const next = nativeContactFacts(record, changed, current as unknown as Record<string, unknown>);
+      const next = nativeContactFacts(await ports.confirmed(actor, workspaceId), changed, current as unknown as Record<string, unknown>);
       if (JSON.stringify(next) === JSON.stringify(current)) continue;
       const token = randomUUID();
       try {
@@ -124,7 +125,7 @@ export function createNativeWebsiteFactService(ports: NativeWebsiteFactPorts = l
           await ports.reviews.record(token, "blocked", null); continue;
         }
         const latestCurrent = await ports.current(tenantId);
-        const latestNext = nativeContactFacts(latestRecord, changed, latestCurrent as unknown as Record<string, unknown>);
+        const latestNext = nativeContactFacts(await ports.confirmed(actor, workspaceId), changed, latestCurrent as unknown as Record<string, unknown>);
         if (JSON.stringify(latestNext) === JSON.stringify(latestCurrent)) { await ports.reviews.record(token, "blocked", null); continue; }
         const result = await ports.apply({ tenantId, section: "contact", data: latestNext, tenantConfig: latest, siteManifest: latestManifest, forceReview: true, requestId: `business-facts:${workspaceId}:${revision}` });
         await ports.reviews.record(token, result.status === "queued" ? "queued" : "blocked", result.status === "queued" ? result.eventId : null);

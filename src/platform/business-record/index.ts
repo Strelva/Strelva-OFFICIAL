@@ -5,6 +5,7 @@ export {
   readBusinessContacts,
   readBusinessRecord,
   readBusinessRecordHistory,
+  readConfirmedBusinessFacts,
   readTenantWorkspaceLink,
   resolveOwnerRecipient,
   resolveTenantOwnerRecipient,

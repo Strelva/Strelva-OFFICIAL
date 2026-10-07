@@ -687,6 +687,15 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010115500_web
 psql "${psql_args[@]}" --file="$repo_root/tests/website-business-facts-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010115700_website_native_fact_reviews.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/website-native-fact-reviews-schema.sql"
+# #509: provider and operator facts reach client sites only by owner decision.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011133700_business_facts_owner_decision.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-business-facts-owner-decision.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-business-facts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011133700_business_facts_owner_decision.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-business-facts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/website-cutover-undo-schema.sql"
 # Wave 6 catalog: additive submit/contact RPCs, report receipts, newsletter
 # projection and delegated Make authority. Run after all required flag names,

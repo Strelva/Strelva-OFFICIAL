@@ -168,6 +168,16 @@ nothing that wasn't theirs did.
    each. A fact Strelva inferred or extracted routes to `owner_decides` until
    the owner confirms it. This moves the "high-risk facts" review from every
    copy of a fact to the one place it lives.
+   *Built for client sites (#509, ADR 0012):* a fact or service written by
+   anyone but a verified owner (a Strelva operator, any agency including
+   Strelva's, an admin, an import or a model) stays out of the confirmed copy
+   (`business_record_confirmed`) that hosted and connected sites read. All of
+   a business's pending changes form one `business_facts` item
+   (`fact.inferred`, `owner_decides`, admins never decide).
+   `confirm_business_facts` applies it only for the owner's session or a
+   signed link to a trusted recipient: the confirmed `owner_recipient`, else
+   the imported one, else `tenants.owner_email`. A recipient a provider wrote
+   is itself pending and never approves.
 6. **Needs you items are one shape.** Each item has the business, System,
    change kind, a plain title, what happens on Approve, what happens on Not
    yet, its source lifecycle and source id, a revision hash, when it opened,

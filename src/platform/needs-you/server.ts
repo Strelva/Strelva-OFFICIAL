@@ -17,6 +17,7 @@ import { createNeedsYouService } from "./service";
 import { systemsSourceAdapters } from "./systems-sources";
 import { deliverySourceAdapters } from "./sources/live-delivery";
 import { productSourceAdapters } from "./sources/live-products";
+import { businessFactsAdapter, createBusinessFactReviewStore } from "./sources/business-facts";
 import { bookingRequestAdapter, bookingRequestItem } from "@/platform/bookings/needs-you-adapter";
 import { decideBookingRequest, readWorkspaceBooking, readWorkspaceBookingRequests, readNativeBookingWorkspaces } from "@/platform/bookings/store";
 import { bookingStoreWriteEnabled, bookingOwnerNoticeEnabled, bookingReadSource } from "@/platform/bookings/flags";
@@ -69,6 +70,8 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
       ...deliverySourceAdapters(),
       ...productSourceAdapters(),
       bookingSettingsAdapter(),
+      // Provider and operator edits to business details wait for the owner (#509).
+      businessFactsAdapter(createBusinessFactReviewStore()),
       // Booking requests in the one booking store (empty until request mode is used).
       bookingRequestAdapter({
         // Nothing to read until the store receives writes (and its migration exists).
