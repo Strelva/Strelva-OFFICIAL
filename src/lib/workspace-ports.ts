@@ -230,7 +230,8 @@ export type TenantReplyDepsHandle = object;
 
 export type TenantReplyAuthority =
   | { kind: "auto_reply_policy"; rating: number }
-  | { kind: "owner_approval"; actor: string; approvalRef: string };
+  | { kind: "owner_approval"; actor: string; approvalRef: string }
+  | { kind: "operator_instruction"; actor: string; instructionRef: string };
 
 export interface TenantReviewRepliesPort {
   defaultTenantReplyDeps(): Promise<TenantReplyDepsHandle>;

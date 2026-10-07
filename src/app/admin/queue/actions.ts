@@ -6,7 +6,8 @@
  * POST) and passes the verified identity to the SQL boundary, which checks the
  * active super_admins row again.
  *
- * Nothing here writes outside Strelva or to a source: approvals, retries and
+ * Draft decisions run the governed approve path as the operator, never as
+ * the owner, and write audit_logs rows (../operator-audit.ts). Retries and
  * quotes stay on the screens each row links to, through their governed paths.
  */
 import { revalidatePath } from "next/cache";
@@ -24,21 +25,31 @@ import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
 import { getEventRaw } from "@/lib/events";
 import { resolveEventAction, escalateEventToOwner } from "@/lib/event-actions";
 import { isPortfolioApprovable } from "../actions/portfolio-actions";
+import { auditOperatorDecision, operatorStillActive, verifiedOperator } from "../operator-audit";
 
 export type QueueActionResult = { ok: boolean; message: string };
 
 /** Derive all source identities server-side. Owner calls are never approved
- * by an operator, and every effect uses the existing governed dispatcher. */
+ * by an operator, and every effect uses the existing governed dispatcher under
+ * the operator's own actor id, with an audit row before and after it. */
 export async function resolveQueueDraftsAction(input: { keys: string[]; action: "approve" | "skip" | "escalate" }): Promise<QueueActionResult & { results: { key: string; changed: boolean; reason?: string }[] }> {
   const results: { key: string; changed: boolean; reason?: string }[] = [];
   if (!operatorQueueReleaseEnabled()) return { ok: false, message: "Queue actions are not enabled.", results };
   try {
-    const actor = await operator();
-    if (!actor) throw new OperatorQueueAccessError();
+    const signedIn = await verifiedOperator();
+    if (!signedIn) throw new OperatorQueueAccessError();
+    const actor: QueueActor = { userId: signedIn.userId, verifiedEmail: signedIn.verifiedEmail };
     if (!["approve", "skip", "escalate"].includes(input.action) || !Array.isArray(input.keys) || input.keys.length > 100) throw new OperatorQueueValidationError();
     const find = await finder(actor);
+    const auditAction = `queue.draft.${input.action}`;
+    let revoked = false;
     for (const key of [...new Set(input.keys)]) {
+      let attempt: { tenantId: string; eventId: string } | null = null;
       try {
+        if (revoked || !(await operatorStillActive(signedIn))) {
+          revoked = true;
+          results.push({ key, changed: false, reason: "Your operator access changed. Nothing more was done." }); continue;
+        }
         const item = await find(key);
         const tenantId = item?.business.kind === "workspace" || item?.business.kind === "tenant" ? item.business.tenantId : null;
         if (!item || item.kind !== "draft_review" || item.move !== "strelva" || !tenantId || !item.sourceRef.startsWith("event:")) {
@@ -49,11 +60,26 @@ export async function resolveQueueDraftsAction(input: { keys: string[]; action: 
         if (!event || event.tenantId !== tenantId || event.metadata?.reviewAudience === "owner" || !isPortfolioApprovable(event)) {
           results.push({ key, changed: false, reason: "The draft changed or needs the owner's decision." }); continue;
         }
+        const detail = { queueKey: key, eventType: event.type, eventKind: typeof event.metadata?.kind === "string" ? event.metadata.kind : null };
+        try {
+          await auditOperatorDecision({ operator: signedIn, tenantId, eventId, action: auditAction, phase: "attempt", detail });
+        } catch {
+          results.push({ key, changed: false, reason: "The audit log is unavailable. Nothing was done." }); continue;
+        }
+        attempt = { tenantId, eventId };
         const result = input.action === "escalate"
           ? await escalateEventToOwner(tenantId, eventId)
-          : await resolveEventAction(tenantId, eventId, input.action === "approve" ? "approved" : "dismissed");
+          : await resolveEventAction(tenantId, eventId, input.action === "approve" ? "approved" : "dismissed", signedIn.actorId);
         results.push({ key, ...result });
-      } catch { results.push({ key, changed: false, reason: "This draft could not be handled. Its current state must be checked." }); }
+        await auditOperatorDecision({ operator: signedIn, tenantId, eventId, action: auditAction, phase: "result", detail: { ...detail, changed: result.changed, reason: result.reason ?? null } })
+          .catch(() => console.error(`[admin/queue] audit result row failed for ${eventId}; its attempt row stands.`));
+      } catch {
+        results.push({ key, changed: false, reason: "This draft could not be handled. Its current state must be checked." });
+        if (attempt) {
+          await auditOperatorDecision({ operator: signedIn, tenantId: attempt.tenantId, eventId: attempt.eventId, action: auditAction, phase: "result", detail: { queueKey: key, changed: false, reason: "error" } })
+            .catch(() => console.error(`[admin/queue] audit result row failed for ${attempt?.eventId}; its attempt row stands.`));
+        }
+      }
     }
     revalidatePath("/admin/queue"); revalidatePath("/admin");
     const changed = results.filter((result) => result.changed).length;
