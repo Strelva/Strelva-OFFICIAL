@@ -150,6 +150,19 @@ export async function fixtureTenant(admin: Admin, input: { siteName: string; own
 }
 
 /**
+ * Read or write the disposable database directly, for tables the app reaches
+ * only through RPCs (no table grant to service_role): tenant_leads,
+ * inquiry_events, systems. Loopback only. `:'v1'`, `:'v2'`… are the values.
+ */
+export function localSql<T>(sql: string, ...values: string[]): T {
+  const url = process.env.STRELVA_LOCAL_DB_URL || "";
+  if (!url || new URL(url).hostname !== "127.0.0.1") throw new Error("Set STRELVA_LOCAL_DB_URL to the disposable database (loopback only).");
+  const vars = values.flatMap((value, index) => ["-v", `v${index + 1}=${value}`]);
+  const out = execFileSync("psql", [url, "-X", "-A", "-t", "-q", "-v", "ON_ERROR_STOP=1", ...vars], { input: sql, encoding: "utf8" }).trim();
+  return (out ? JSON.parse(out) : null) as T;
+}
+
+/**
  * The tenant list is cached in Redis (`reb:tenants:all`); the app's own tenant
  * writes drop that key (src/lib/tenants.ts invalidateCache). A fixture written
  * straight to Postgres does the same, so the app sees it at once. Only the

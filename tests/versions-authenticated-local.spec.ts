@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { createSystemVersions, type JsonObject } from "@/platform/system-versions";
 import { createSupabaseConnectionOwnership, createSupabaseVersionStore, readVersionActor, type VersionsDb } from "@/platform/system-versions/supabase-store";
-import { adminClient, cleanup, convertedBusinessWithOwner, decisions, designateAgency, journeyEnvironment, noHorizontalOverflow, type Admin } from "./support/journeys";
+import { adminClient, cleanup, convertedBusinessWithOwner, decisions, designateAgency, journeyEnvironment, localSql, noHorizontalOverflow } from "./support/journeys";
 
 // Versions at 1.0, on real local Auth and Postgres: Strelva's agency shares a
 // System as a source; the client's own Version of it goes live only when the
@@ -16,19 +16,16 @@ test.setTimeout(300_000);
 
 const intake: JsonObject = { followUp: { message: "We'll call you back today." }, routing: { minutes: 30 } };
 
-async function system(admin: Admin, businessId: string, name: string, createdBy: string): Promise<string> {
+/** A System on the spine. Its rows are written through RPCs in the app, never by table grant, so directly here. */
+function system(businessId: string, name: string, createdBy: string): string {
   const id = randomUUID();
-  const inserted = await admin.from("systems").insert({
-    id, business_workspace_id: businessId, name, kind: "inquiry", command_id: randomUUID(), command_digest: "a".repeat(64), created_by: createdBy, updated_by: createdBy,
-  });
-  expect(inserted.error).toBeNull();
+  localSql("insert into public.systems(id, business_workspace_id, name, kind, command_id, command_digest, created_by, updated_by) values (:'v1'::uuid, :'v2'::uuid, :'v3', 'inquiry', gen_random_uuid(), repeat('a', 64), :'v4'::uuid, :'v4'::uuid) returning to_json(id);",
+    id, businessId, name, createdBy);
   return id;
 }
 
-async function releases(admin: Admin, versionId: string): Promise<number[]> {
-  const read = await admin.from("system_version_releases").select("number").eq("version_id", versionId).order("number");
-  expect(read.error).toBeNull();
-  return (read.data as Array<{ number: number }>).map((row) => row.number);
+async function releases(versionId: string): Promise<number[]> {
+  return localSql<number[]>("select coalesce(json_agg(number order by number), '[]') from public.system_version_releases where version_id = :'v1'::uuid;", versionId);
 }
 
 test("an agency's improvement reaches a client's Version only when the owner approves it", async ({ browser }, testInfo) => {
@@ -45,12 +42,12 @@ test("an agency's improvement reaches a client's Version only when the owner app
     const agencyActor = await readVersionActor({ userId: operator.userId, verifiedEmail: operator.email }, db);
     const ownerActor = await readVersionActor({ userId: owner.userId, verifiedEmail: owner.email }, db);
     const sourceName = `Inquiry intake ${randomUUID().slice(0, 6)}`;
-    const source = { businessId: agencyId, systemId: await system(admin, agencyId, sourceName, operator.userId) };
+    const source = { businessId: agencyId, systemId: system(agencyId, sourceName, operator.userId) };
     const first = await versions.publishSourceRevision(agencyActor, { source, definition: intake, summary: "Intake" });
     await versions.shareSource(agencyActor, source, businessId);
-    const own = await system(admin, businessId, "Inquiries", owner.userId);
+    const own = system(businessId, "Inquiries", owner.userId);
     const version = await versions.createVersion(ownerActor, { source: first.source, version: { businessId, systemId: own }, context: { kind: "agency_client", label: workspaceName } });
-    expect(await releases(admin, version.id)).toEqual([]);
+    expect(await releases(version.id)).toEqual([]);
 
     // 1. Release 1 is the owner's decision.
     const home = await owner.context.newPage();
@@ -62,7 +59,7 @@ test("an agency's improvement reaches a client's Version only when the owner app
     let decided = home.waitForResponse((r) => new URL(r.url()).pathname === "/api/workspace/needs-you" && r.request().method() === "POST");
     await needsYou.getByRole("button", { name: `Approve: ${ask}` }).click();
     expect((await (await decided).json()).status).toBe("done");
-    await expect.poll(() => releases(admin, version.id)).toEqual([1]);
+    await expect.poll(() => releases(version.id)).toEqual([1]);
 
     // 2. The agency publishes an improvement. Nothing changes for the client yet.
     await versions.publishSourceRevision(agencyActor, { source, definition: { ...intake, routing: { minutes: 15 } }, summary: "Faster routing" });
@@ -82,7 +79,7 @@ test("an agency's improvement reaches a client's Version only when the owner app
     await expect(results).toContainText("Prepared. Waiting on the owner’s approval.");
     await noHorizontalOverflow(library);
     await library.screenshot({ path: testInfo.outputPath("agency-library-reviewed-1440.png"), fullPage: true });
-    expect(await releases(admin, version.id)).toEqual([1]);
+    expect(await releases(version.id)).toEqual([1]);
 
     // 4. The owner sees what changed and approves release 2.
     await home.setViewportSize({ width: 390, height: 844 });
@@ -95,7 +92,7 @@ test("an agency's improvement reaches a client's Version only when the owner app
     decided = home.waitForResponse((r) => new URL(r.url()).pathname === "/api/workspace/needs-you" && r.request().method() === "POST");
     await again.getByRole("button", { name: `Approve: ${ask}` }).click();
     expect((await (await decided).json()).status).toBe("done");
-    await expect.poll(() => releases(admin, version.id)).toEqual([1, 2]);
+    await expect.poll(() => releases(version.id)).toEqual([1, 2]);
     const rows = (await decisions(admin, businessId, owner, true)).filter((item) => item.sourceLifecycle === "version_release" && item.sourceId === version.id);
     expect(rows.map((item) => item.state)).toEqual(["approved", "approved"]);
 

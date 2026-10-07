@@ -54,7 +54,7 @@ for (const width of [1440, 390]) {
       await expect(take).toBeFocused();
       await take.click();
       await expect(page.getByRole("status").filter({ hasText: "Taken." })).toBeVisible();
-      await expect(row).toContainText("Taken by you", { timeout: 45_000 });
+      await expect(row).toContainText("Taken by you");
 
       const marks = async () => {
         const context = await admin.rpc("read_operator_queue_context", { p_user_id: operator.userId, p_verified_email: operator.email });

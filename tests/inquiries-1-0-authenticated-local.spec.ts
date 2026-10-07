@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { adminClient, cleanup, convertedBusinessWithOwner, journeyEnvironment, noHorizontalOverflow, person, tenantHost, type Person } from "./support/journeys";
+import { adminClient, cleanup, convertedBusinessWithOwner, journeyEnvironment, localSql, noHorizontalOverflow, person, tenantHost, type Person } from "./support/journeys";
 
 // Inquiries at 1.0, on real local Auth, Postgres and a loopback Redis: a
 // visitor's message through the public lead beacon is kept in Postgres first
@@ -42,12 +42,10 @@ test("a visitor's message reaches the owner's Inquiries; a held one is released 
     await visitor.close();
 
     // Kept in Postgres against the business, the caught one held with its reason.
-    const rows = async () => {
-      const read = await admin.from("tenant_leads").select("id,name,workspace_id,intake_state,held_reason").eq("tenant_slug_at_capture", tenantId);
-      expect(read.error).toBeNull();
-      return read.data as Array<{ id: string; name: string; workspace_id: string | null; intake_state: string; held_reason: string | null }>;
-    };
-    await expect.poll(async () => (await rows()).map((row) => `${row.name}:${row.intake_state}`).sort()).toEqual([`${caught.name}:held`, `${real.name}:kept`].sort());
+    const rows = async () => localSql<Array<{ id: string; name: string; workspace_id: string | null; intake_state: string; held_reason: string | null }>>(
+      "select coalesce(json_agg(json_build_object('id', id, 'name', name, 'workspace_id', workspace_id, 'intake_state', intake_state, 'held_reason', held_reason)), '[]') from public.tenant_leads where tenant_slug_at_capture = :'v1';",
+      tenantId);
+    await expect.poll(async () => (await rows()).map((row) => `${row.name}:${row.intake_state}`).sort()).toEqual([`${caught.name}:held_as_spam`, `${real.name}:kept`].sort());
     expect((await rows()).every((row) => row.workspace_id === businessId)).toBe(true);
     expect((await rows()).find((row) => row.name === caught.name)?.held_reason).toBe("honeypot");
 
@@ -55,7 +53,7 @@ test("a visitor's message reaches the owner's Inquiries; a held one is released 
     const heldRow = (await rows()).find((row) => row.name === caught.name)!;
     const refused = await stranger.context.request.post("/api/workspace/inquiries/held", { headers: { origin: env.app }, data: { workspaceId: businessId, rowId: heldRow.id, decision: "release" } });
     expect([403, 404]).toContain(refused.status());
-    expect((await rows()).find((row) => row.name === caught.name)?.intake_state).toBe("held");
+    expect((await rows()).find((row) => row.name === caught.name)?.intake_state).toBe("held_as_spam");
 
     // The owner's Inquiries page: the kept message, and the held one to decide.
     const page = await owner.context.newPage();
@@ -78,18 +76,20 @@ test("a visitor's message reaches the owner's Inquiries; a held one is released 
     await release.press("Enter");
     await expect(page.getByRole("status").filter({ hasText: "Released. It's with your other inquiries now; nobody was emailed." })).toBeVisible();
     await expect.poll(async () => (await rows()).find((row) => row.name === caught.name)?.intake_state).toBe("released");
-    const events = await admin.from("inquiry_events").select("kind,actor").eq("workspace_id", businessId);
-    expect(events.error).toBeNull();
-    expect((events.data as Array<{ kind: string; actor: string }>).map((event) => event.kind)).toEqual(expect.arrayContaining(["captured", "held_as_spam", "released"]));
+    const events = localSql<string[]>("select coalesce(json_agg(kind), '[]') from public.inquiry_events where workspace_id = :'v1'::uuid;", businessId);
+    expect(events).toEqual(expect.arrayContaining(["captured", "held_as_spam", "released"]));
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();
+    await expect(page.getByText(/2 in the last 30 days · 2 in all/)).toBeVisible({ timeout: 60_000 });
     const releasedCard = page.getByRole("article").filter({ has: page.getByRole("heading", { name: caught.name }) });
-    await expect(releasedCard.getByText("Released from held messages.")).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByText(/2 in the last 30 days · 2 in all/)).toBeVisible();
+    await expect(releasedCard).toHaveCount(1);
     await expect(page.getByRole("region", { name: "Held as spam" })).toHaveCount(0);
     await noHorizontalOverflow(page);
     await page.screenshot({ path: testInfo.outputPath("inquiries-released-390.png"), fullPage: true });
+    // A released message stays marked, with the way back to held.
+    await expect(releasedCard.getByText("Released from held messages.")).toBeVisible();
+    await expect(releasedCard.getByRole("button", { name: `Move the message from ${caught.name} back to held` })).toBeVisible();
   } finally {
     if (setup) await cleanup(admin, { tenantIds: [setup.tenantId], workspaceIds: [setup.businessId], operatorEmail: setup.operator.email, people: [setup.operator, setup.owner, ...(stranger ? [stranger] : [])] });
   }
