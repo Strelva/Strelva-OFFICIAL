@@ -1,3 +1,4 @@
+import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 /**
  * One-click approve-from-email (with a confirm step).
  *
@@ -27,11 +28,11 @@
  */
 import { NextResponse } from "next/server";
 import { verifyAnyApproveToken, type ApproveLinkClaims, type WorkspaceApproveLinkClaims } from "@/lib/approve-link";
-import { needsYouAppOrigin, needsYouReleaseEnabled, needsYouService, needsYouStore } from "@/platform/needs-you/server";
 import { resolveEventAction } from "@/lib/event-actions";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
+import { ownerWebsitePreviewHref, ownerWebsitePreviewMayBeOn } from "@/app/api/owner-website-preview/links";
 
 export const dynamic = "force-dynamic";
 
@@ -100,6 +101,7 @@ function confirmPage(params: {
   body: string;
   confirmLabel: string;
   dashboardUrl?: string;
+  previewUrl?: string;
 }): NextResponse {
   const secondary = params.dashboardUrl
     ? `<div style="margin-top:14px;"><a href="${escapeHtml(params.dashboardUrl)}" style="font-size:13px;color:${MUTED};text-decoration:underline;">Open your dashboard instead</a></div>`
@@ -108,7 +110,10 @@ function confirmPage(params: {
           <input type="hidden" name="token" value="${escapeHtml(params.token)}">
           <button type="submit" style="display:inline-block;padding:12px 26px;border:0;border-radius:999px;background:${ACCENT};color:#fff;font-weight:600;font-size:15px;cursor:pointer;">${escapeHtml(params.confirmLabel)}</button>
         </form>${secondary}`;
-  return shell(200, headingBody(params.heading, params.body) + form);
+  const preview = params.previewUrl
+    ? `<p style="margin-top:22px;"><a href="${escapeHtml(params.previewUrl)}" style="color:${INK};text-decoration:underline;">Review the complete website preview before deciding</a></p>`
+    : "";
+  return shell(200, headingBody(params.heading, params.body) + preview + form);
 }
 
 const INVALID = {
@@ -128,8 +133,8 @@ const INVALID = {
 // the recipient is still the owner, then resolves through the source's own
 // resolver. Access, money and exit never resolve from a link.
 
-function workspaceOpenUrl(workspaceId: string, href?: string | null): string {
-  return `${needsYouAppOrigin().replace(/\/+$/, "")}${href ?? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}`;
+function workspaceOpenUrl(origin: string, workspaceId: string, href?: string | null): string {
+  return `${origin.replace(/\/+$/, "")}${href ?? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}`;
 }
 
 const CHANGED = { heading: "This changed since we emailed you", body: "Nothing was done. Open Strelva to see the latest version and decide there." };
@@ -137,10 +142,11 @@ const HANDLED = { heading: "Already handled", body: "This was already taken care
 const EXPIRED = { heading: "This link expired", body: "Nothing was done. Open Strelva to see what's waiting." };
 
 async function workspaceConfirm(token: string, claims: WorkspaceApproveLinkClaims): Promise<NextResponse> {
+  const { needsYouAppOrigin, needsYouReleaseEnabled, needsYouStore } = await import("@/platform/needs-you/server");
   if (!needsYouReleaseEnabled()) return noticePage({ status: 400, ...INVALID.bad });
   const item = await needsYouStore.read(claims.workspaceId, claims.itemId).catch(() => null);
   if (!item) return noticePage({ status: 400, ...INVALID.bad });
-  const open = workspaceOpenUrl(claims.workspaceId, item.openHref);
+  const open = workspaceOpenUrl(needsYouAppOrigin(), claims.workspaceId, item.openHref);
   if (item.state === "superseded" || item.revisionHash !== claims.revision) return noticePage({ status: 200, ...CHANGED, dashboardUrl: open, buttonLabel: "Open" });
   if (item.state !== "open") return noticePage({ status: 200, ...HANDLED, dashboardUrl: open, buttonLabel: "Open" });
   if (Date.parse(item.expiresAt) <= Date.now()) return noticePage({ status: 200, ...EXPIRED, dashboardUrl: open, buttonLabel: "Open" });
@@ -152,12 +158,15 @@ async function workspaceConfirm(token: string, claims: WorkspaceApproveLinkClaim
     body: `${process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && (item.kind === "customer.message" || item.kind === "customer.commitment") && item.detail ? `${item.detail}\n\n` : ""}${isApprove ? item.approveEffect : item.notYetEffect} Nothing happens until you confirm.`,
     confirmLabel: isApprove ? "Confirm — approve" : "Confirm — not yet",
     dashboardUrl: open,
+    ...(item.sourceLifecycle === "website_document" && ownerWebsitePreviewMayBeOn() ? { previewUrl: ownerWebsitePreviewHref(token) } : {}),
   });
 }
 
 async function workspaceResolve(claims: WorkspaceApproveLinkClaims): Promise<NextResponse> {
+  const { needsYouAppOrigin, needsYouReleaseEnabled, needsYouService } = await import("@/platform/needs-you/server");
   if (!needsYouReleaseEnabled()) return noticePage({ status: 400, ...INVALID.bad });
-  const open = workspaceOpenUrl(claims.workspaceId);
+  const origin = needsYouAppOrigin();
+  const open = workspaceOpenUrl(origin, claims.workspaceId);
   let result;
   try {
     result = await needsYouService().decide({
@@ -169,9 +178,9 @@ async function workspaceResolve(claims: WorkspaceApproveLinkClaims): Promise<Nex
     });
   } catch (err) {
     console.error(`[api/approve] Needs you decision failed for ${claims.workspaceId}/${claims.itemId}:`, err);
-    return noticePage({ status: 200, heading: "We hit a snag", body: "We couldn't complete that just now. Nothing was done. Open Strelva to finish it there.", dashboardUrl: open, buttonLabel: "Open" });
+    return noticePage({ status: 200, heading: "Strelva is checking the outcome", body: "The change may have gone through, but we couldn't record its final result. Strelva needs to check it before anyone tries again.", dashboardUrl: open, buttonLabel: "Open" });
   }
-  const openItem = workspaceOpenUrl(claims.workspaceId, result.item?.openHref);
+  const openItem = workspaceOpenUrl(origin, claims.workspaceId, result.item?.openHref);
   switch (result.status) {
     case "done":
     case "done_unverified":
@@ -212,7 +221,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   const tenant = await getTenantConfig(claims.tenantId).catch(() => null);
   const businessName = tenant?.siteName || "your site";
-  const dashboardUrl = tenant ? getTenantDashboardUrl(tenant, "/dashboard") : undefined;
+  const dashboardUrl = tenant ? await ownerNoticeUrl(tenant, "/dashboard", getTenantDashboardUrl(tenant, "/dashboard")) : undefined;
   const isApprove = claims.action === "approve";
 
   return confirmPage({
@@ -245,7 +254,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const tenant = await getTenantConfig(claims.tenantId).catch(() => null);
   const businessName = tenant?.siteName || "your site";
-  const dashboardUrl = tenant ? getTenantDashboardUrl(tenant, "/dashboard") : undefined;
+  const dashboardUrl = tenant ? await ownerNoticeUrl(tenant, "/dashboard", getTenantDashboardUrl(tenant, "/dashboard")) : undefined;
   const workflowAction = claims.action === "approve" ? "approved" : "dismissed";
 
   let result: { changed: boolean; reason?: string };

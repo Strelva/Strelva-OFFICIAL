@@ -124,6 +124,7 @@ export interface TenantOwnerRecipientRow {
 }
 
 export interface BusinessRecordPort {
+  ownerNoticeWorkspaceUrl?(tenant: { id: string; stableId?: string }, path: string, legacyUrl: string): Promise<string>;
   /** The owner-recipient rule for one tenant. Server-only; sends nothing. */
   resolveTenantOwnerRecipient(tenantId: string): Promise<TenantOwnerRecipientRow | null>;
 }

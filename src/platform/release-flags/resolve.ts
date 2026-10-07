@@ -39,7 +39,7 @@ export type MakeRealLiveFlag = (typeof MAKE_REAL_LIVE_FLAGS)[number];
  * business, under STRELVA_MAKE_REAL_OWNER_LINK_RELEASE, off by default. Off:
  * the link answers "Sign in to decide this", as before 20261009131000.
  */
-export const RELEASE_FLAGS = ["owner_entry", "inquiries", "website_rebuild", "systems", ...MAKE_REAL_LIVE_FLAGS, "connected_sites", "make_real_owner_link", "publishing", "publishing_record_google_policy", "internal_tool_notices", "catalog_reports", "newsletter_contacts"] as const;
+export const RELEASE_FLAGS = ["owner_entry", "inquiries", "website_rebuild", "systems", ...MAKE_REAL_LIVE_FLAGS, "connected_sites", "make_real_owner_link", "publishing", "publishing_record_google_policy", "internal_tool_notices", "catalog_reports", "newsletter_contacts", "owner_decision_links"] as const;
 export type ReleaseFlag = (typeof RELEASE_FLAGS)[number];
 export type ReleaseFlagEnvMode = "off" | "workspace" | "on";
 export type ReleaseFlagRowState = "off" | "operators" | "on";
@@ -65,6 +65,7 @@ export const RELEASE_FLAG_ENV: Record<ReleaseFlag, string> = {
   internal_tool_notices: "STRELVA_INTERNAL_TOOL_NOTICES_RELEASE",
   catalog_reports: "STRELVA_CATALOG_REPORTS_RELEASE",
   newsletter_contacts: "STRELVA_NEWSLETTER_CONTACTS_RELEASE",
+  owner_decision_links: "STRELVA_OWNER_DECISION_LINKS_RELEASE",
 };
 
 export const RELEASE_FLAG_LABELS: Record<ReleaseFlag, string> = {
@@ -84,6 +85,7 @@ export const RELEASE_FLAG_LABELS: Record<ReleaseFlag, string> = {
   internal_tool_notices: "Internal tool submit notices",
   catalog_reports: "Catalog reports",
   newsletter_contacts: "Newsletter contacts",
+  owner_decision_links: "Owner decisions by email link",
 };
 
 export type ReleaseEnvironment = Partial<Record<string, string | undefined>>;

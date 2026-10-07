@@ -350,6 +350,8 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007192000_mak
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-authority-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-systems-schema.sql"
 
+# Hold long enough for a separate psql probe under parallel-stream CPU load.
+# The probe still has its strict 150ms lock timeout; permission assertions do not change.
 authority_leaver='c9000000-0000-4000-8000-000000000005'
 # The holder waits for an explicit parent command instead of a short PgSleep.
 # Its ready application name is set only after the guarded statement finishes.
@@ -814,8 +816,6 @@ psql "${psql_args[@]}" --file="$repo_root/tests/booking-native-workspace-schema.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-w6-booking-native-workspace.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135956_booking_native_workspace.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-native-workspace-schema.sql"
-# Every stream's release flag key survives the last literal redefinition (#253).
-psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 
 # The one booking store through both real route families (legacy /api/booking
 # and the public booking service) against the real booking functions. Last,
@@ -823,6 +823,18 @@ psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.
 STRELVA_BOOKINGS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/booking-one-store.test.ts
 bash "$repo_root/scripts/check-inquiry-rollbacks.sh" "$cluster_socket" "$cluster_port"
+# Wave 6 owner entry and Ask (isolated local proof; explicit rollbacks are never applied here).
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010100000_owner_invitation_claim.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-invitation-claim-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010103000_ask_business_fact_drafts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/ask-business-fact-drafts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010102000_owner_decision_links.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010102100_website_owner_link_launch.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-links-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010104000_owner_decision_website_preview.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-website-preview-schema.sql"
+# Every stream's release flag key survives every redefinition, in any apply order (#253).
+psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 

@@ -318,6 +318,8 @@ export interface WorkspaceSystemPossibility {
   evidence: string | null;
   /** Same-origin rendering of the candidate. */
   previewHref: string | null;
+  /** Signed isolated Try for a prepared native candidate. */
+  tryHref?: string;
   /** The saved work the candidate came from. */
   workId: string;
   /** Stored in Postgres: it survives deploys and restarts. Additive. */

@@ -47,6 +47,8 @@ import { stageInquiryScanFacts, correctInquiryBusinessFact, inquiryRecordOnboard
 import { readInquiryBusinessContext } from "./business-context";
 
 export { recordedInquiryAssignee, recordedInquiryStatus } from "./record-projection";
+export { prepareInquiryMessageReviewWithDependencies } from "./delivery-approval-service";
+export { readAskInquirySummary } from "./ask-read";
 export { decideHeldInquiry, parseWorkspaceLead, readInquiryEvents, readWorkspaceInquiryLeads } from "./workspace-records";
 export type { HeldDecision, InquiryEventView, IntakeState, WorkspaceInquiryLead } from "./workspace-records";
 
@@ -964,3 +966,7 @@ export { replyFromWorkspace, workspaceInquiryRepliesEnabled, workspaceReplyInput
 
 /** Shared tenant read switch at the existing legacy adapter boundary. */
 export async function inquiryLeadReadSource() { return leadReadSource(); }
+export { composeAskInquiryFollowUp, approveAskInquiryFollowUp, followUpTryView, askInquiryFollowUpSelectionSchema } from "./ask-follow-up";
+export type { InquiryRepository } from "./repository";
+
+export { askInquiryFollowUpStillCurrent, approveAskInquiryFollowUpPublication } from "./ask-follow-up-server";

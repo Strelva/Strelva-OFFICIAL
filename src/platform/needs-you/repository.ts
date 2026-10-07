@@ -19,7 +19,7 @@ import {
   type ProposedItem,
 } from "./contracts";
 import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
-import { parseServiceSession, startMakeRealLinkSession, type ServiceSession } from "./service-actor";
+import { parseServiceSession, startMakeRealLinkSession, startOwnerDecisionLinkSession, authorizeOwnerDecisionLinkRun, type ServiceSession } from "./service-actor";
 
 type DbError = { message?: string; code?: string } | null;
 export type NeedsYouDb = { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: DbError }> };
@@ -126,6 +126,8 @@ export interface NeedsYouStore {
    * the business's `make_real_owner_link` release flag is off (20261009140000).
    */
   linkSession?(workspaceId: string, itemId: string, recipient: string): Promise<ServiceSession | null>;
+  ownerLinkSession?(workspaceId: string, itemId: string, revision: string, recipient: string): Promise<ServiceSession | null>;
+  authorizeOwnerLinkRun?(session: ServiceSession): Promise<void>;
   policies(actor: WorkspaceActor, workspaceId: string): Promise<PolicySetting[]>;
   setPolicy(actor: WorkspaceActor, input: { workspaceId: string; layer: PolicyLayer; systemId: string | null; kind: string; route: LadderRoute | null; reason: string | null; expectedVersion: number }): Promise<PolicyState>;
   handled(actor: WorkspaceActor, workspaceId: string, since: string | null): Promise<Record<string, unknown>[]>;
@@ -160,6 +162,14 @@ export const PostgresNeedsYouStore: NeedsYouStore = {
     (await workspaceReleaseFlagEnabled("make_real_owner_link", workspaceId))
       ? startMakeRealLinkSession(workspaceId, itemId, recipient)
       : null,
+  ownerLinkSession: async (workspaceId, itemId, revision, recipient) =>
+    (await workspaceReleaseFlagEnabled("owner_decision_links", workspaceId))
+      ? startOwnerDecisionLinkSession(workspaceId, itemId, revision, recipient)
+      : null,
+  authorizeOwnerLinkRun: async (session) => {
+    if (!(await workspaceReleaseFlagEnabled("owner_decision_links", session.workspaceId))) throw new WorkspaceAccessError();
+    await authorizeOwnerDecisionLinkRun(session);
+  },
   policies: async (actor, workspaceId) => (await call("read_decision_policies", { p_workspace_id: workspaceId, ...actorArgs(actor) }, z.object({ settings: z.array(policyRowSchema.passthrough()) }).passthrough(), "The policy could not be read."))
     .settings.flatMap(row => row.kind === "suggestion" || row.kind === "health.owner_action" ? [] : [{ layer: row.layer, systemId: row.systemId, kind: row.kind, route: row.route } as PolicySetting]),
   setPolicy: (actor, input) => call("set_decision_policy", {

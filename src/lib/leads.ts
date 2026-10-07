@@ -1,3 +1,4 @@
+import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 /**
  * Lead capture — the honest version of "who reached out".
  *
@@ -323,7 +324,7 @@ async function notifyOwnerOfLead(tenant: string, lead: LeadRecord): Promise<void
       email,
       siteName: config.siteName,
       lead: { name: lead.name, email: lead.email, message: lead.message },
-      dashboardUrl: getTenantDashboardUrl(config, "/dashboard"),
+      dashboardUrl: await ownerNoticeUrl(config, "/dashboard", getTenantDashboardUrl(config, "/dashboard")),
       logPrefix: "[leads]",
     });
   } catch (err) {

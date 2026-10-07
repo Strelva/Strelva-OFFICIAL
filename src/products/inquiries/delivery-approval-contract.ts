@@ -14,6 +14,8 @@ export interface InquiryMessageReviewPrepareInput {
   inquiryId: string;
   action: InquiryMessageReviewAction;
   actorId: string;
+  /** Exact Ask draft copy. Absent: existing template behavior. */
+  authoredReply?: string;
 }
 
 export interface InquiryMessageReviewApproveInput extends InquiryMessageReviewPrepareInput {
@@ -22,6 +24,8 @@ export interface InquiryMessageReviewApproveInput extends InquiryMessageReviewPr
 }
 
 export interface InquiryMessageReviewPreview {
+  /** Durable event receipt for an authored Ask reply. */
+  eventId?: string;
   reviewToken: string;
   inquiryId: string;
   action: InquiryMessageReviewAction;

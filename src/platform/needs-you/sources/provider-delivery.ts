@@ -56,6 +56,7 @@ export function providerDeliveryAdapter(ports: ProviderDeliveryPorts): SourceAda
   return {
     lifecycle: "provider_delivery",
     needsMemberActor: true,
+    ownerLinkWithoutAccount: true,
     propose: (ctx) => proposeAsMember(ctx, async actor => {
       const items: ProposedItem[] = [];
       for (const delivery of await ports.list(actor, ctx.workspaceId)) {
@@ -79,6 +80,7 @@ export function providerDeliveryAdapter(ports: ProviderDeliveryPorts): SourceAda
       try {
         const delivery = await find(actor, ctx.workspaceId, item.sourceId);
         if (!delivery) return { outcome: "done", reason: "already_resolved" };
+        if (deliveryRevision(delivery) !== item.revisionHash) return { outcome: "failed", reason: "source_changed" };
         const decided = await ports.confirm(actor, { deliveryId: delivery.id, expectedRevision: delivery.revision, note: "Confirmed from Needs you." });
         if (decided.customerDecision !== "confirmed") return { outcome: "failed", reason: "not_confirmed" };
         return { outcome: "done", receiptRef: `provider_delivery:${decided.id}:${decided.revision}` };

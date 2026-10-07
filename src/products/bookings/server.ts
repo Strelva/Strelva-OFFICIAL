@@ -26,6 +26,7 @@ import { manualBookingsEnabled } from "@/platform/bookings/manual";
  */
 
 export type BookingView = "day" | "week";
+export const bookingLocalDate = zonedTodayIso;
 
 export interface BookingRow {
   id: string;
@@ -176,7 +177,7 @@ async function linkedTenants(actor: WorkspaceActor, workspaceId: string): Promis
 export async function readWorkspaceBookings(
   actor: WorkspaceActor,
   workspaceId: string,
-  options: { view: BookingView; date?: string | null; now?: Date },
+  options: { view: BookingView; date?: string | null; now?: Date; upcomingDays?: number },
   dependencies: BookingDependencies = defaults,
 ): Promise<WorkspaceBookings> {
   const tenants = await linkedTenants(actor, workspaceId);
@@ -200,7 +201,7 @@ export async function readWorkspaceBookings(
   }
   // One date for the page: the asked-for date, else the first site's local today.
   const anchor = options.date && isoDate.test(options.date) ? options.date : (sites[0]?.today ?? zonedTodayIso("America/New_York", options.now));
-  const range = bookingRange(options.view, anchor);
+  const range = options.upcomingDays === undefined ? bookingRange(options.view, anchor) : { from: anchor, to: addDays(anchor, z.number().int().min(1).max(30).parse(options.upcomingDays)) };
   await Promise.all(sites.map(async (site) => {
     if (site.unavailable) return;
     try {
@@ -223,9 +224,10 @@ export async function readWorkspaceBookings(
         });
         return;
       }
-      const bookings = await dependencies.bookings(site.tenantId, range);
+      const siteRange = options.upcomingDays === undefined ? range : { from: site.today, to: addDays(site.today, options.upcomingDays) };
+      const bookings = await dependencies.bookings(site.tenantId, siteRange);
       site.bookings = bookings
-        .filter((b) => b.date >= range.from && b.date <= range.to)
+        .filter((b) => b.date >= siteRange.from && b.date <= siteRange.to)
         .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))
         .map(row);
     } catch (error) {
@@ -407,3 +409,4 @@ export async function changeWorkspaceBooking(
 export { BookingSettingsError, bookingSettingsChange, bookingSettingsEnabled, changeBookingSettings, readBookingSettings, bookingSettingsAdapter } from "./settings";
 
 export { ownerCanProposeBookingTimes, readInquiryProposalOptions } from "./inquiry-proposals";
+export { readAskBookingSummary } from "./ask-read";
