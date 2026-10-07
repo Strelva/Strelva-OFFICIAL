@@ -52,9 +52,10 @@ function fakeDb(tables: Record<string, Row[]>) {
 }
 
 /** Redis fake that only implements the read interface; values are never exposed. */
-function fakeRedis(keys: Record<string, { type: string; card?: number }>) {
+function fakeRedis(keys: Record<string, { type: string; card?: number; override?: "on" | "off" | "absent" | "unknown" }>) {
   const calls: string[] = [];
   const redis: ReadOnlyRedis = {
+    async clientEmailOverride(id) { calls.push(`policy ${id}`); return keys[`reb:client-email:${id}`]?.override ?? "absent"; },
     async scan(cursor, { match }) {
       calls.push(`scan ${match}`);
       const re = new RegExp(`^${match.split("*").map((p) => p.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*")}$`);
@@ -99,7 +100,7 @@ const tables: Record<string, Row[]> = {
 };
 
 const redisKeys = {
-  "reb:client-email:gldf": { type: "string" },
+  "reb:client-email:gldf": { type: "string", override: "on" },
   "orders:gldf": { type: "zset", card: 12 },
   "order:gldf:o1": { type: "string" },
   "reb:rewards:gldf:members": { type: "set" },
@@ -248,13 +249,13 @@ describe("production readiness snapshot", () => {
     expect(() => assertNoSensitiveOutput("c2VjcmV0LWtleS1tYXRlcmlhbC10aGF0LW11c3QtbmV2ZXItcHJpbnQ=")).toThrow(/token/);
   });
 
-  it("only ever reads: no column with secrets or PII is selected and Redis values are never fetched", async () => {
+  it("only ever reads: no column with secrets or PII is selected and only the fixed-key email policy enum is fetched", async () => {
     const d = deps();
     await runReadinessSnapshot({ jacobsYes: true }, d.value);
     for (const call of d.pgCalls.filter((c) => c.startsWith("rows "))) {
       expect(call).not.toMatch(/owner_email|owner_name|owner_phone|google_search_console_key|email/);
     }
-    expect(d.redisCalls.every((c) => /^(scan|type|card) /.test(c))).toBe(true);
+    expect(d.redisCalls.every((c) => /^(scan|type|card|policy) /.test(c))).toBe(true);
     expect(d.redisCalls.some((c) => c.startsWith("scan "))).toBe(true);
   });
 
@@ -262,8 +263,45 @@ describe("production readiness snapshot", () => {
     for (const file of ["scripts/readiness-snapshot.ts", "scripts/production-readiness-snapshot.ts"]) {
       const source = readFileSync(join(process.cwd(), file), "utf8");
       expect(source, file).not.toMatch(/\.(insert|update|upsert|delete|rpc)\(/);
-      expect(source, file).not.toMatch(/redis\.(set|del|get|hset|zadd|expire|rename|unlink|incr|lpush|rpush|sadd|eval)\(/i);
+      expect(source, file).not.toMatch(/redis\.(set|del|hset|zadd|expire|rename|unlink|incr|lpush|rpush|sadd|eval)\(/i);
     }
+  });
+
+  it("stops silent rollout for active tenant overrides and either email gate", async () => {
+    const d = deps();
+    const report = await runReadinessSnapshot({ jacobsYes: true }, d.value);
+    expect(report.silentRollout.safe).toBe(false);
+    expect(report.silentRollout.stopConditions.join(" ")).toContain("EMAIL_SENDING_ENABLED");
+    expect(report.silentRollout.stopConditions.join(" ")).toContain("Active tenant gldf");
+    expect(formatReport(report).join("\n")).toContain("Silent rollout: STOP");
+    expect(d.redisCalls.filter((c) => c.startsWith("policy "))).toEqual(["policy gldf", "policy rohlax"]);
+    const customer = await runReadinessSnapshot({ jacobsYes: true }, deps({ env: { CUSTOMER_EMAIL_ENABLED: "true" } }).value);
+    expect(customer.silentRollout.stopConditions.join(" ")).toContain("CUSTOMER_EMAIL_ENABLED");
+  });
+
+  it("allows off overrides, ignores inactive tenants, and fails closed on unknown policy reads", async () => {
+    const r = fakeRedis({
+      "reb:client-email:gldf": { type: "string", override: "off" },
+      "reb:client-email:old-client": { type: "string", override: "on" },
+    });
+    const options = deps({ env: {}, redis: r.redis }).value;
+    const safe = await runReadinessSnapshot({ jacobsYes: true }, options);
+    expect(safe.silentRollout).toEqual({ safe: true, stopConditions: [] });
+    expect(safe.redis?.clientEmailOverrides).toEqual({ gldf: "off", rohlax: "absent" });
+    r.redis.clientEmailOverride = async () => { throw new Error("secret response must not print"); };
+    const failed = await runReadinessSnapshot({ jacobsYes: true }, options);
+    expect(failed.silentRollout.safe).toBe(false);
+    expect(JSON.stringify(failed)).not.toContain("secret response");
+    expect(failed.silentRollout.stopConditions.join(" ")).toContain("unknown");
+    const missing = await runReadinessSnapshot({ jacobsYes: true }, deps({ env: {}, db: null, redis: null }).value);
+    expect(missing.silentRollout.safe).toBe(false);
+  });
+
+  it("does not infer safety from an empty or incomplete active tenant listing", async () => {
+    const db = fakeDb(tables).db;
+    db.rows = async () => ({ ok: true, rows: [] });
+    const report = await runReadinessSnapshot({ jacobsYes: true }, deps({ env: {}, db }).value);
+    expect(report.silentRollout.stopConditions.join(" ")).toContain("inventory is incomplete");
   });
 
   it("has a sentinel table for every unapplied migration that creates a table", () => {

@@ -41,7 +41,8 @@
     "check:prod": "tsx scripts/production-checklist.ts",
     "typecheck": "next typegen && tsc --noEmit",
     "reborn:progress": "node scripts/reborn-progress.mjs",
-    "version:check": "node scripts/check-version-sync.mjs"
+    "version:check": "node scripts/check-version-sync.mjs",
+    "check:release-safety": "python3 -m unittest discover -s scripts/release-safety -p \"test_*.py\" && python3 scripts/check-release-safety.py"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.78",
