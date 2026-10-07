@@ -9,13 +9,16 @@
  * and flags only.
  *
  * Read-only by construction: the dependencies below expose reads only
- * (Postgres head counts and column selects, Redis SCAN, TYPE and cardinality).
- * Nothing here can insert, update, delete, call an RPC, GET a Redis value or
+ * (Postgres head counts and column selects, Redis SCAN, TYPE, cardinality and
+ * one fixed-key client-email enum read per active tenant).
+ * Nothing here can insert, update, delete, call an RPC, read an arbitrary Redis value or
  * set a key. The report holds no secret values and no customer data: env
  * secrets are reported as present/absent, tenant slugs and sending domains are
  * business identifiers, and assertNoSensitiveOutput() refuses to print anything
  * that looks like an email address or a token.
  */
+
+import { silentRolloutEnvStops } from "./silent-rollout";
 
 export const JACOBS_YES = "--i-have-jacobs-yes";
 
@@ -58,8 +61,9 @@ export interface ReadOnlyDb {
   ): Promise<DbRows<T>>;
 }
 
-/** Redis, read side only: SCAN, TYPE and a cardinality read per type. Never GET. */
+/** Redis reads only. The fixed-key email policy read returns an enum, never a raw value. */
 export interface ReadOnlyRedis {
+  clientEmailOverride(tenantId: string): Promise<"on" | "off" | "absent" | "unknown">;
   scan(cursor: string, options: { match: string; count: number }): Promise<[string, string[]]>;
   type(key: string): Promise<string>;
   /** ZCARD / LLEN / SCARD / HLEN by type; a number, never a value. */
@@ -262,7 +266,9 @@ export interface SnapshotReport {
     activeTenantsWithAnalyticsConfig: string[];
     activeTenantsWithGoogleConnection: string[];
     activeTenantsWithClientEmailOverride: string[];
+    clientEmailOverrides: Record<string, "on" | "off" | "absent" | "unknown">;
   } | null;
+  silentRollout: { safe: boolean; stopConditions: string[] };
   notes: string[];
 }
 
@@ -384,6 +390,7 @@ export async function runReadinessSnapshot(options: { jacobsYes: boolean }, deps
     }
   }
 
+  let activeTenantReadComplete = false;
   /* postgres */
   const pg: SnapshotReport["postgres"] = {
     tenants: { total: null, active: null },
@@ -413,6 +420,7 @@ export async function runReadinessSnapshot(options: { jacobsYes: boolean }, deps
     });
     const gscIds = new Set(gsc.ok ? gsc.rows.map((r) => r.id) : []);
     if (active.ok) {
+      activeTenantReadComplete = pg.tenants.active !== null && active.rows.length === pg.tenants.active;
       pg.activeTenants = active.rows.map((row) => ({
         id: row.id,
         features: Array.isArray(row.features) ? [...row.features].sort() : [],
@@ -463,8 +471,14 @@ export async function runReadinessSnapshot(options: { jacobsYes: boolean }, deps
       const present = new Set(Object.keys(family?.byTenant ?? {}));
       return activeIds.length ? activeIds.filter((id) => present.has(id)) : [...present].sort();
     };
+    const clientEmailOverrides: NonNullable<SnapshotReport["redis"]>["clientEmailOverrides"] = {};
+    for (const id of activeIds) {
+      try { clientEmailOverrides[id] = await redis.clientEmailOverride(id); }
+      catch { clientEmailOverrides[id] = "unknown"; }
+    }
     redisReport = {
       families,
+      clientEmailOverrides,
       activeTenantsWithAnalyticsConfig: tenantsIn("analytics config"),
       activeTenantsWithGoogleConnection: tenantsIn("google connections"),
       activeTenantsWithClientEmailOverride: tenantsIn("client email overrides"),
@@ -474,7 +488,16 @@ export async function runReadinessSnapshot(options: { jacobsYes: boolean }, deps
 
   notes.push("Out of scope: gldf's own Supabase project (paused on Sept 30), Stripe, Vercel logs, Google.");
 
+  const stopConditions = silentRolloutEnvStops(deps.env);
+  if (!activeTenantReadComplete) stopConditions.push("Active tenant inventory is incomplete; silent rollout cannot be verified.");
+  if (!redisReport) stopConditions.push("Redis email overrides are unavailable; silent rollout cannot be verified.");
+  for (const [id, state] of Object.entries(redisReport?.clientEmailOverrides ?? {})) {
+    if (state === "on") stopConditions.push(`Active tenant ${id} has reb:client-email override on.`);
+    if (state === "unknown") stopConditions.push(`Active tenant ${id} email override is unknown; silent rollout cannot be verified.`);
+  }
+
   const report: SnapshotReport = {
+    silentRollout: { safe: stopConditions.length === 0, stopConditions },
     version: 1,
     observedAt: iso(now),
     sources: { postgres: Boolean(db), redis: Boolean(redis), auth: Boolean(auth), schemaMigrations: Boolean(applied) },
@@ -502,6 +525,9 @@ export function formatReport(report: SnapshotReport): string[] {
   lines.push(`Strelva production readiness snapshot, ${report.observedAt} (read-only)`);
   lines.push(`Sources: postgres=${report.sources.postgres} redis=${report.sources.redis} auth=${report.sources.auth} schema_migrations=${report.sources.schemaMigrations}`);
   lines.push("");
+  lines.push(`Silent rollout: ${report.silentRollout.safe ? "safe" : "STOP"}`);
+  for (const stop of report.silentRollout.stopConditions) lines.push(`  STOP: ${stop}`);
+  lines.push("");
   lines.push("Env (names only; secrets as present/absent):");
   for (const [name, state] of Object.entries(report.env.secrets)) lines.push(`  ${name}: ${state}`);
   for (const [name, state] of Object.entries(report.env.flags)) lines.push(`  ${name}: ${state}`);
@@ -527,7 +553,7 @@ export function formatReport(report: SnapshotReport): string[] {
   if (report.auth) lines.push(`Auth users: ${report.auth.total}, ${report.auth.emailConfirmed} email-confirmed, ${report.auth.signedInLast30Days} signed in within 30 days`);
   lines.push("");
   if (report.redis) {
-    lines.push("Redis (SCAN/TYPE/cardinality only):");
+    lines.push("Redis (SCAN/TYPE/cardinality and fixed-key email policy enums only):");
     for (const f of report.redis.families) {
       const tenants = Object.entries(f.byTenant).sort(([a], [b]) => a.localeCompare(b)).map(([t, c]) => `${t} ${c}${f.entriesByTenant?.[t] !== undefined ? `/${f.entriesByTenant[t]} entries` : ""}`);
       lines.push(`  ${f.match}: ${f.keys} keys${f.truncated ? " (truncated)" : ""}${tenants.length ? `; ${tenants.join(", ")}` : ""}`);

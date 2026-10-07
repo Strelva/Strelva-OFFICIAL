@@ -10,7 +10,7 @@
  *   - optional SNAPSHOT_DATABASE_URL: one READ ONLY transaction that lists
  *     supabase_migrations.schema_migrations versions via psql;
  *   - Auth: user counts (identities are never kept or printed);
- *   - Redis: SCAN, TYPE and ZCARD/LLEN/SCARD/HLEN. Never GET, never SET/DEL.
+ *   - Redis: SCAN, TYPE and ZCARD/LLEN/SCARD/HLEN. A fixed-key GET reads only the client-email policy enum. Never SET/DEL.
  * Prints counts and flags only: env secrets as present/absent, no customer data.
  * The logic and its tests live in scripts/readiness-snapshot.ts and
  * src/__tests__/production-readiness-snapshot.test.ts.
@@ -86,6 +86,10 @@ function readOnlyDb(url: string, key: string): ReadOnlyDb {
 function readOnlyRedis(url: string, token: string): ReadOnlyRedis {
   const redis = new Redis({ url, token });
   return {
+    async clientEmailOverride(tenantId) {
+      const value = await redis.get(`reb:client-email:${tenantId}`);
+      return value === "on" || value === "off" ? value : value === null ? "absent" : "unknown";
+    },
     async scan(cursor, options) {
       const [next, keys] = await redis.scan(cursor, options);
       return [String(next), keys];
@@ -147,6 +151,7 @@ async function main() {
   const text = options.json ? JSON.stringify(report, null, 2) : formatReport(report).join("\n");
   assertNoSensitiveOutput(text);
   console.log(text);
+  if (!report.silentRollout.safe) process.exitCode = 1;
 }
 
 main().catch((error: unknown) => {
