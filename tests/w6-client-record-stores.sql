@@ -28,6 +28,11 @@ begin
   if v_result->>'status'<>'kept' then raise exception 'stale save revived deletion'; end if;
   perform public.record_tenant_client_record('w6-store-client','orders','r1','{"value":3}','dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd','2026-10-06 14:00:00+00','dual_write','replace');
   if jsonb_array_length(public.read_tenant_client_records_page('w6-store-client','orders',1000,null,null))<>2 then raise exception 'new save did not revive record'; end if;
+  -- Saving the same value later must still block an older, different retry.
+  v_result := public.record_tenant_client_record('w6-store-client','orders','r1','{"value":3}','dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd','2026-10-06 16:00:00+00','dual_write','replace');
+  if v_result->>'status'<>'unchanged' then raise exception 'identical save duplicated record'; end if;
+  v_result := public.record_tenant_client_record('w6-store-client','orders','r1','{"value":4}','eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','2026-10-06 15:00:00+00','repair','replace');
+  if v_result->>'status'<>'kept' then raise exception 'identical newer save lost ordering watermark'; end if;
 end $$;
 update public.tenants set id='w6-store-renamed' where id='w6-store-client';
 do $$begin

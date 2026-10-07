@@ -142,6 +142,10 @@ begin
     return jsonb_build_object('status','kept','id',v_row.id,'workspaceId',v_row.workspace_id);
   end if;
   if v_row.payload_hash = p_payload_hash and v_row.removed_at is null then
+    -- Identical newer saves still advance the ordering watermark. Otherwise
+    -- an older failed save with different content could replay over them.
+    update public.tenant_client_records set captured_at = greatest(captured_at, p_captured_at),
+        updated_at = clock_timestamp() where id = v_row.id and captured_at < p_captured_at;
     return jsonb_build_object('status', 'unchanged', 'id', v_row.id, 'workspaceId', v_row.workspace_id);
   end if;
   update public.tenant_client_records set payload = p_payload, payload_hash = p_payload_hash,
