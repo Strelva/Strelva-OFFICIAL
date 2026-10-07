@@ -43,7 +43,9 @@ for (const width of [1280, 390]) {
   });
 }
 
-test("Ask handles unavailable, unsaved, released-off and read-only states", async ({ page }) => {
+for (const width of [1280, 390]) {
+test(`Ask handles unavailable, unsaved, released-off and read-only states at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 });
   await page.goto(ask("error"));
   const composer = page.getByRole("textbox", { name: "Ask Strelva about The Mooney Firm" });
   await composer.fill("What are our hours?");
@@ -56,9 +58,11 @@ test("Ask handles unavailable, unsaved, released-off and read-only states", asyn
   await expect(page.getByRole("textbox", { name: /Ask Strelva about/ })).toHaveCount(0);
   await page.goto(ask("on", "mooney-shared"));
   await expect(page.getByRole("textbox", { name: /Ask Strelva about/ })).toBeDisabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
-test("Invitation suppression, failure and permission states remain honest", async ({ page }) => {
+test(`Invitation suppression, failure and permission states remain honest at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 });
   await page.goto("/preview/strelva/owner-invitations?delivery=suppressed");
   await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Email invitation" }).click();
@@ -72,4 +76,6 @@ test("Invitation suppression, failure and permission states remain honest", asyn
   await expect(page.getByRole("textbox")).toHaveCount(0);
   await page.goto("/preview/strelva/owner-invitations?state=unavailable");
   await expect(page.getByRole("alert").filter({ hasText: "could not be read" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
+}

@@ -119,17 +119,13 @@ export default async function WorkspaceSitePage({ searchParams }: { searchParams
     panel = <ContentWorkspace siteName={data.siteName} ownerName={data.ownerName} sectionData={data.sectionData} timestamps={data.timestamps}
       assistant={askReleased ? <AskStrelva compact workspaceId={workspaceId} businessName={state.workspaceName} systemId={systemId} systemName={siteLabel} readOnly={readOnly} readOnlyReason={readOnly ? "Only an owner or admin can ask for changes here." : undefined} /> : undefined} />;
   } else if (tab === "store" || tab === "members") {
-    try {
-      if (tab === "store") {
-        const data = await loadWebsiteStoreData(site.tenantId);
-        panel = data.configured ? <StorePanel summary={data.summary} orders={data.orders} products={data.products} />
-          : <WorkspaceSiteMessageInline title="This site has no store." body="A store appears here when this website has products or its store connection is enabled." href={home} action="Back to Home" />;
-      } else {
-        panel = <MembersPanel {...await loadWebsiteMembersData(site.tenantId)} />;
-      }
-    } catch {
-      panel = <WorkspaceSiteMessageInline title="These records couldn't load." body="Nothing changed. Try again in a moment." href={here} action="Try again" />;
-    }
+    const data = tab === "store"
+      ? await loadWebsiteStoreData(site.tenantId).then(store => ({ kind: "store" as const, store })).catch(() => null)
+      : await loadWebsiteMembersData(site.tenantId).then(members => ({ kind: "members" as const, members })).catch(() => null);
+    panel = !data ? <WorkspaceSiteMessageInline title="These records couldn't load." body="Nothing changed. Try again in a moment." href={here} action="Try again" />
+      : data.kind === "members" ? <MembersPanel {...data.members} />
+      : data.store.configured ? <StorePanel summary={data.store.summary} orders={data.store.orders} products={data.store.products} />
+      : <WorkspaceSiteMessageInline title="This site has no store." body="A store appears here when this website has products or its store connection is enabled." href={home} action="Back to Home" />;
   } else if (tab === "photos") {
     panel = <PhotoLibrary />;
   } else if (tab === "look") {
