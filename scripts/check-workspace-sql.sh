@@ -651,6 +651,21 @@ psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-flag-schema
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
+# Wave 6 catalog: additive submit/contact RPCs, report receipts, newsletter
+# projection and delegated Make authority. Run after all required flag names,
+# business ownership, Systems and work-plan functions exist.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010150000_internal_tool_submit_notices.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-submit-notices-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010150100_internal_tool_use_links.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-use-links-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010152000_catalog_report_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/catalog-reports-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010153000_newsletter_contacts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-contacts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010154000_system_work_plan_authority.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/system-work-plan-authority-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
+
 # The real Make real runner, checkpointing through these RPCs (psql-backed port).
 STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run src/__tests__/make-real-activation-repository.test.ts

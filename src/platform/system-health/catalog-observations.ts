@@ -1,9 +1,8 @@
-import { detectTrafficAnomaly } from "@/lib/anomaly";
-import type { DailyMetric } from "@/lib/storage";
+import { detectTrafficAnomaly, type DailyTraffic } from "@/platform/infra/analytics/traffic";
 import type { SearchConnectionEvidence } from "@/platform/catalog-reports/search-connection";
 import type { Observation } from "./contracts";
 
-export function trafficObservation(subjectId: string, daily: DailyMetric[] | null): Observation {
+export function trafficObservation(subjectId: string, daily: DailyTraffic[] | null): Observation {
   const base = { subjectId, signal: "website.traffic", maxAgeSeconds: 48 * 3600, source: "traffic" as const };
   if (!daily?.length) return { ...base, outcome: "unknown", observedAt: null, message: "Traffic trend is unavailable; this is not zero visits." };
   const ordered = [...daily].sort((a, b) => a.date.localeCompare(b.date));

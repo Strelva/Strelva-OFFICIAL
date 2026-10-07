@@ -14,7 +14,7 @@
 import { checkHeartbeats } from "@/platform/infra/heartbeat";
 import { getDomainHealth } from "@/lib/domain-monitor-store";
 import { getScanSummaries } from "@/lib/scan-store";
-import { getDailyMetrics } from "@/lib/storage";
+import { readDailyTraffic } from "@/platform/infra/analytics/traffic";
 import { readSearchConnection } from "@/platform/catalog-reports/search-connection";
 import { searchConsoleObservation, trafficObservation } from "@/platform/system-health/catalog-observations";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
@@ -260,7 +260,7 @@ export async function readSystemsEvidence(listing: BusinessSystems, now: number 
     observations.push(scanObservation(site.system.id, scans[tenantId] ?? null));
     observations.push(...heartbeatObservations(site.system.id, heartbeats, ["domain-monitor", "portfolio-scan"]));
     const [daily, search] = await Promise.all([
-      getDailyMetrics(tenantId, 30).catch(() => null),
+      readDailyTraffic(tenantId, 30).catch(() => null),
       readSearchConnection(tenantId, listing.businessId).catch(() => null),
     ]);
     observations.push(trafficObservation(site.system.id, daily), searchConsoleObservation(site.system.id, search));

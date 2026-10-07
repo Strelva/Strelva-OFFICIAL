@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ released: vi.fn(), maker: vi.fn(), member: vi.fn(), capacity: vi.fn(), save: vi.fn(), readPlan: vi.fn(), workspaces: vi.fn(), delegations: vi.fn() }));
 vi.mock("@/platform/systems-release", () => ({ systemsReleasedFor: mocks.released, systemsReleaseEnabled: () => false }));
-vi.mock("@/platform/workspaces/repository", () => ({ assertCanMakeSystems: mocks.maker }));
+vi.mock("@/platform/workspaces/repository", async (importOriginal) => ({ ...await importOriginal<Record<string, unknown>>(), assertCanMakeSystems: mocks.maker }));
 vi.mock("@/platform/workspaces", async () => ({ ...await vi.importActual<Record<string, unknown>>("@/platform/workspaces"), assertWorkspaceMember: mocks.member, assertCanSaveWork: mocks.capacity, listWorkspaces: mocks.workspaces, listAgencyDelegations: mocks.delegations }));
 vi.mock("@/products/work-plans/repository", () => ({ saveMakerWorkPlan: mocks.save, readWorkPlan: mocks.readPlan }));
 

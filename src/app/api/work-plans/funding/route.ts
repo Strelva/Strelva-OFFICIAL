@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionUser } from "@/platform/infra/db/server-client";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
-import { workPlanFundingWorkspace } from "@/products/work-plans/funding";
+import { workPlanFundingWorkspace } from "@/products/work-plans/server";
 import { WorkspaceAccessError, WorkspaceMakeSystemsError } from "@/platform/workspaces/types";
 
 export const dynamic = "force-dynamic";
