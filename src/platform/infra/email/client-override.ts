@@ -34,20 +34,20 @@ function key(tenant: string): string {
 }
 
 /** Read a tenant's client-email override. Defaults to "inherit". Null-safe. */
-export async function getClientEmailOverride(tenant: string): Promise<ClientEmailOverride> {
-  return readThroughFlag("tenant_settings", tenant, () => getRedisOverride(tenant), (rows) => {
+export async function getClientEmailOverride(tenant: string, options: { failClosed?: boolean } = {}): Promise<ClientEmailOverride> {
+  return readThroughFlag("tenant_settings", tenant, () => getRedisOverride(tenant, options), (rows) => {
     const value = rows.find((r) => r.recordId === "client_email")?.payload.value;
     return value === "on" || value === "off" ? value : DEFAULT_CLIENT_EMAIL_OVERRIDE;
   });
 }
-async function getRedisOverride(tenant: string): Promise<ClientEmailOverride> {
+async function getRedisOverride(tenant: string, options: { failClosed?: boolean }): Promise<ClientEmailOverride> {
   const redis = getRedis();
-  if (!redis) return DEFAULT_CLIENT_EMAIL_OVERRIDE;
+  if (!redis) return options.failClosed ? "off" : DEFAULT_CLIENT_EMAIL_OVERRIDE;
   try {
     const stored = await redis.get<string>(key(tenant));
     return stored === "on" || stored === "off" ? stored : DEFAULT_CLIENT_EMAIL_OVERRIDE;
   } catch {
-    return DEFAULT_CLIENT_EMAIL_OVERRIDE;
+    return options.failClosed ? "off" : DEFAULT_CLIENT_EMAIL_OVERRIDE;
   }
 }
 

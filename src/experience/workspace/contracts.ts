@@ -114,7 +114,8 @@ export interface WorkspaceDelegation {
 }
 
 /** A business this agency operates (provider of record). A label, not access:
- * the server lists only businesses the actor already belongs to. */
+ * the server lists only businesses the actor can already open, as a member or
+ * through the agency's provider seat with the actor staffed on it. */
 export interface WorkspaceProvidedClient {
   customerWorkspaceId: string;
   name: string;
@@ -146,8 +147,9 @@ export interface WorkspaceSnapshot {
   managedWorkUnavailable?: boolean;
   handoffs: WorkspaceHandoff[];
   delegations: WorkspaceDelegation[];
-  /** Businesses the selected agency operates that the actor can open as a
-   * member (workspace_providers intersected with membership). Absent when
+  /** Businesses the selected agency operates that the actor can open
+   * (workspace_providers intersected with membership or a staffed provider
+   * seat). Absent when
    * not an agency, or when the provider list could not be read. Additive. */
   providedClients?: WorkspaceProvidedClient[];
   products: WorkspaceProduct[];
@@ -162,6 +164,8 @@ export interface WorkspaceSnapshot {
 }
 
 export interface WorkspaceReleases {
+  /** Agency-owned public check leads, off unless explicitly released. */
+  agencyProspecting?: boolean;
   systems: boolean;
   /** STRELVA_NEEDS_YOU_RELEASE: Home reads Needs you and Strelva handled from the policy model. */
   needsYou?: boolean;
@@ -175,6 +179,8 @@ export interface WorkspaceReleases {
   websiteRebuild?: boolean;
   /** Connected sites on for this business (its `connected_sites` row, and Systems): Home links to /workspace/site. */
   connectedSites?: boolean;
+  /** STRELVA_AGENCY_SIGNUP_RELEASE: agency Home links to the setup checklist at /workspace/agency/start. */
+  agencySetup?: boolean;
 }
 
 /**

@@ -1,3 +1,4 @@
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 /**
  * Make real from the System page: which path a request takes. Server only.
  *
@@ -65,7 +66,7 @@ export async function liveMakeRealPorts(): Promise<LiveMakeRealPorts> {
     async approve(actor, workspaceId, possibilityId) {
       const decided = await makeRealThroughNeedsYou(actor, workspaceId, possibilityId, {
         store: PostgresNeedsYouStore, sendEmail: sendEmailWithReceipt,
-        appOrigin: process.env.NEXT_PUBLIC_APP_URL || "https://app.strelva.com",
+        appOrigin: process.env.NEXT_PUBLIC_APP_URL || CONTROL_PLANE_URL,
       });
       if (!decided) return null;
       if (decided.status === "forbidden" || decided.status === "not_owner") throw new WorkspaceAccessError("Only an owner of this business can make a possibility real.");

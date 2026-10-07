@@ -1,3 +1,4 @@
+import { publishingWorkspaceId } from "@/platform/infra/publishing-scope";
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import { encryptSecret } from "@/platform/infra/crypto/secrets";
@@ -126,7 +127,8 @@ export async function upsertGoogleBinding(input: GoogleGrantInput, mode: UpsertM
 }
 
 export async function readGoogleBindingForTenant(tenantId: string, db?: AccountBindingsDb | null): Promise<AccountBindingWithSecrets | null> {
-  return call("read_google_binding_for_tenant", { p_tenant_id: tenantId },
+  const workspaceId = publishingWorkspaceId(tenantId);
+  return call(workspaceId ? "read_native_workspace_google_binding" : "read_google_binding_for_tenant", workspaceId ? { p_workspace_id: workspaceId } : { p_tenant_id: tenantId },
     (data) => (data === null || data === undefined ? null : accountBindingWithSecretsSchema.parse(data)), db ?? accountBindingsDb());
 }
 

@@ -1,5 +1,5 @@
 import { intakeQuestionSchema, validateBookingIntake } from "@/platform/bookings/service-policy";
-import { publicRecordReservationId, publicRecordManagementToken } from "@/platform/bookings/public-request";
+import { type PublicBookingAdmission, publicRecordReservationId, publicRecordManagementToken } from "@/platform/bookings/public-request";
 import { PublicBookingError } from "@/platform/bookings/errors";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -29,7 +29,8 @@ export const publicBookingRequestIdSchema = z.string().trim().min(32).max(96).re
 const isoDate = z.string().datetime({ offset: true });
 
 export const publicBookingRangeSchema = z.object({ from: isoDate, to: isoDate }).strict()
-  .refine(value => Date.parse(value.to) > Date.parse(value.from), "The booking range must end after it starts.");
+  .refine(value => Date.parse(value.to) > Date.parse(value.from), "The booking range must end after it starts.")
+  .refine(value => Date.parse(value.to) - Date.parse(value.from) <= 60 * 86400000, "Choose a range of up to 60 days.");
 export type PublicBookingRange = z.infer<typeof publicBookingRangeSchema>;
 
 export type PublicBookingSlot = z.infer<typeof publicBookingSlotSchema>;
@@ -251,11 +252,13 @@ export interface PublicBookingDependencies {
   calendar: PublicBookingCalendar;
   tokens: PublicBookingTokenStore;
   store?: PublicBookingStoreHook;
+  admission?: PublicBookingAdmission;
   createReservationId?: () => string;
   createRequestId?: () => string;
   createManagementToken?: () => string;
 }
 
+export type { PublicBookingAdmission } from "@/platform/bookings/public-request";
 export { PublicBookingError } from "@/platform/bookings/errors";
 
 function boundedToken(value: string, label: string): string {
@@ -433,6 +436,7 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
       if (input.slotId !== existing.slotId || existing.requestFingerprint !== requestFingerprint) {
         throw new PublicBookingError("conflict", "This booking request is already used for different booking details.");
       }
+      if (existing.status !== "cancelled") await dependencies.admission?.send({ tenantId: input.tenantId, requestId: idempotencyRequestId });
       return receipt(existing);
     }
 
@@ -455,6 +459,8 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
       slot,
       visitor,
     });
+    // Admission is durable and precedes inquiry capture, email, store and calendar writes.
+    await dependencies.admission?.claim({ binding: safe, requestId: idempotencyRequestId, fingerprint: requestFingerprint, visitor, start: slot.start, end: slot.end });
     let captured: { inquiryId: string };
     try {
       captured = await dependencies.inquiries.capture({
@@ -477,7 +483,7 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
     const pendingManagementToken = safe.recordBooking
       ? publicRecordManagementToken(safe.tenantStableId ?? safe.tenantId, idempotencyRequestId)
       : boundedToken(managementToken(), "The management token");
-    if (dependencies.store) {
+    if (dependencies.store && !dependencies.admission) {
       const claim = await dependencies.store.claim({
         binding: safe, reservationId: pendingReservationId, requestFingerprint, title,
         start: slot.start, end: slot.end, visitor, inquiryId: captured.inquiryId,
@@ -528,6 +534,10 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
       else await settleStore({ binding: safe, reservationId: pendingReservationId, status: "cancelled", title, start: slot.start, end: slot.end });
       return receipt(pending);
     }
+    if (dependencies.admission) {
+      await dependencies.admission.send({ tenantId: input.tenantId, requestId: idempotencyRequestId });
+      return receipt(pending);
+    }
     let result: Awaited<ReturnType<PublicBookingCalendar["reserve"]>>;
     try {
       result = await dependencies.calendar.reserve({ binding: safe, requestId: idempotencyRequestId, reservationId: pendingReservationId, title, start: slot.start, end: slot.end });
@@ -545,6 +555,32 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
     if (ref.requestFingerprint !== requestFingerprint) throw new PublicBookingError("conflict", "This booking request is already used for different booking details.");
     await settleStore({ binding: safe, reservationId: ref.reservationId, status: ref.status, title, start: ref.start, end: ref.end, visitor });
     return receipt(ref);
+  }
+
+  async function confirm(token: string): Promise<PublicBookingReceipt> {
+    if (!dependencies.admission) throw new PublicBookingError("not_found", "This confirmation link is unavailable.");
+    // A single durable consume wins before any outside write. A failed/unknown
+    // provider outcome is left for recovery; it must never replay a create.
+    const confirmed = await dependencies.admission.consume(token);
+    const ref = await findByRequest(dependencies, confirmed);
+    if (!ref || ref.status === "cancelled") throw new PublicBookingError("not_found", "This request is unavailable.");
+    const binding = await resolveBinding(dependencies, { tenantId: ref.tenantId, capabilityId: ref.capabilityId, requestId: ref.requestId });
+    if (!binding) throw new PublicBookingError("not_found", "This booking capability is unavailable.");
+    const safe = assertBinding(binding, ref.tenantId, ref.capabilityId);
+    if (safe.paused || safe.version !== ref.version) throw new PublicBookingError("conflict", "This booking changed. Request a new time.");
+    slotFor(safe, ref.slotId);
+    const claim = await dependencies.store?.claim({ binding: safe, reservationId: ref.reservationId,
+      requestFingerprint: ref.requestFingerprint, title: ref.title, start: ref.start, end: ref.end,
+      visitor: confirmed.visitor, inquiryId: ref.inquiryId });
+    if (claim === "conflict" || (safe.recordBooking && claim !== "claimed")) throw new PublicBookingError("conflict", "This time cannot be booked now.");
+    const result = await dependencies.calendar.reserve({ binding: safe, requestId: ref.requestId,
+      reservationId: ref.reservationId, title: ref.title, start: ref.start, end: ref.end });
+    const saved = await saveToken(dependencies, { ...ref, expectedRevision: result.expectedRevision, start: result.start, end: result.end,
+      status: result.status ?? (result.verification === "verified" ? "confirmed" : "pending") });
+    await dependencies.admission.placed(ref);
+    await settleStore({ binding: safe, reservationId: saved.reservationId, status: saved.status, title: saved.title,
+      start: saved.start, end: saved.end, visitor: confirmed.visitor });
+    return receipt(saved);
   }
 
   async function settleStore(input: Parameters<PublicBookingStoreHook["settle"]>[0]): Promise<void> {
@@ -565,6 +601,7 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
     if (!ref || ref.reservationId !== input.reservationId || ref.capabilityId !== input.capabilityId || ref.status === "cancelled") {
       throw new PublicBookingError("not_found", "This reservation is unavailable.");
     }
+    if (dependencies.admission && !await dependencies.admission.verified(ref)) throw new PublicBookingError("conflict", "Confirm the email request before changing its time.");
     const binding = await resolveBinding(dependencies, { tenantId: input.tenantId, capabilityId: ref.capabilityId, includeRevoked: true });
     if (!binding) throw new PublicBookingError("not_found", "This booking capability is unavailable.");
     const safe = assertBinding(binding, input.tenantId, ref.capabilityId);
@@ -589,6 +626,9 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
     const ref = await findByToken(dependencies, { tenantId: input.tenantId, managementToken: token });
     if (!ref || ref.reservationId !== input.reservationId) throw new PublicBookingError("not_found", "This reservation is unavailable.");
     if (ref.status === "cancelled") return receipt(ref);
+    if (dependencies.admission && await dependencies.admission.cancel(ref)) {
+      return receipt(await saveToken(dependencies, { ...ref, status: "cancelled" }));
+    }
     const binding = await resolveBinding(dependencies, { tenantId: input.tenantId, capabilityId: ref.capabilityId, includeRevoked: true });
     if (!binding) throw new PublicBookingError("not_found", "This booking capability is unavailable.");
     const safe = assertBinding(binding, input.tenantId, ref.capabilityId);
@@ -605,5 +645,5 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
     return receipt(cancelled);
   }
 
-  return { read, reserve, change, cancel };
+  return { read, reserve, confirm, change, cancel };
 }

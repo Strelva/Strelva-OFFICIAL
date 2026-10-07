@@ -109,6 +109,18 @@ describe("GET with a workspace link (scanner-safe)", () => {
     expect(mockRead).toHaveBeenCalledWith(WS, ITEM);
   });
 
+  it("shows agent attribution in a booking decision and resolves without a login", async () => {
+    const { signWorkspaceApproveToken } = await import("@/lib/approve-link");
+    const bookingItem = item({ title: "Booking request: Booked through Claude · Dana, Fri Nov 6 2:00 PM", approveEffect: "The booking is confirmed for this time. Booked through Claude.", sourceLifecycle: "booking_request" });
+    mockRead.mockResolvedValue(bookingItem);
+    mockDecide.mockResolvedValue({ status: "done", item: { ...bookingItem, state: "approved" } });
+    const token = signWorkspaceApproveToken(claims);
+    expect(await (await get(token)).text()).toContain("Booked through Claude");
+    expect(mockDecide).not.toHaveBeenCalled();
+    expect((await post(token)).status).toBe(200);
+    expect(mockDecide).toHaveBeenCalledWith(expect.objectContaining({ by: { kind: "owner_link", recipient: "owner@example.test" } }));
+  });
+
   it("says the item changed when the revision moved or it was superseded", async () => {
     const { signWorkspaceApproveToken } = await import("@/lib/approve-link");
     mockRead.mockResolvedValueOnce(item({ revisionHash: "b".repeat(64) }));

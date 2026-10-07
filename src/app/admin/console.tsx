@@ -1,3 +1,4 @@
+import { isPlatformDomain } from "@/platform/infra/brand";
 /**
  * Operator-console design primitives — the shared vocabulary for the redesigned
  * /admin surfaces. Verdict-first, one sage family + three status hues, real logo
@@ -170,7 +171,7 @@ export function clientHost(t: { productionDomain?: string | null; siteUrl?: stri
   const raw = (t.productionDomain || t.siteUrl || "").trim().toLowerCase();
   if (!raw) return null;
   const host = raw.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-  if (!host || host.endsWith(".strelva.com") || host.endsWith(".vercel.app")) return null;
+  if (!host || isPlatformDomain(host) || host.endsWith(".vercel.app")) return null;
   return host;
 }
 

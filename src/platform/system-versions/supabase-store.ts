@@ -14,6 +14,7 @@ import {
   type SourceSystemRecord,
   type VersionActor,
   type VersionLineage,
+  type VersionMembershipVia,
   type VersionRole,
 } from "./types";
 
@@ -118,7 +119,11 @@ const lineageSchema = z.object({
 
 const actorSchema = z.object({
   userId: uuid,
-  memberships: z.array(z.object({ businessId: uuid, role: z.enum(["owner", "admin", "member"]) }).strict()),
+  memberships: z.array(z.object({
+    businessId: uuid,
+    role: z.enum(["owner", "admin", "member"]),
+    via: z.enum(["membership", "provider_seat"]).optional(),
+  }).strict()),
 }).strict();
 
 function actorArgs(actor: VersionActor) {
@@ -221,12 +226,12 @@ export function createSupabaseConnectionOwnership(client?: VersionsDb): Connecti
   };
 }
 
-/** The signed-in actor's direct memberships, as the Versions service needs them. */
+/** The signed-in actor's direct memberships and provider seats, as the Versions service needs them. */
 export async function readVersionActor(actor: WorkspaceActor, client?: VersionsDb): Promise<VersionActor> {
   const value = await call(client ?? versionsDb(), "read_version_actor", {
     p_user_id: uuid.parse(actor.userId), p_verified_email: z.string().email().parse(actor.verifiedEmail.trim().toLowerCase()),
   }, actorSchema, "Your access could not be checked.");
-  return { userId: value.userId, verifiedEmail: actor.verifiedEmail.trim().toLowerCase(), memberships: value.memberships as Array<{ businessId: string; role: VersionRole }> };
+  return { userId: value.userId, verifiedEmail: actor.verifiedEmail.trim().toLowerCase(), memberships: value.memberships as Array<{ businessId: string; role: VersionRole; via?: VersionMembershipVia }> };
 }
 
 /**

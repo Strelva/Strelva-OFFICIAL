@@ -51,6 +51,7 @@ export const agencyClientRowSchema = z.object({
   openRequests: z.number().int().min(0),
   improvementsWaiting: z.number().int().min(0),
   lastReceiptAt: iso.nullable(),
+  agentBookings: z.boolean().optional(),
 }).strict();
 
 export const agencyQueueItemSchema = z.object({

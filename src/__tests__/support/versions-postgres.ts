@@ -59,6 +59,7 @@ export function psqlDb(connection: string): VersionsDb & { query(sql: string): s
   const types: Record<string, string> = {
     p_workspace_id: "uuid", p_user_id: "uuid", p_verified_email: "text", p_system_id: "uuid", p_number: "integer",
     p_shared_with: "uuid[]", p_revision: "jsonb", p_version_id: "uuid", p_connection_ref: "text", p_lineage: "jsonb",
+    p_expected_change: "bigint", p_activate: "boolean", p_to: "text", p_limit: "integer",
     p_expected_row_revision: "bigint", p_input: "jsonb", p_command_id: "uuid", p_command_digest: "text",
   };
   const literal = (value: unknown) => Array.isArray(value) && value.every((item) => typeof item === "string")

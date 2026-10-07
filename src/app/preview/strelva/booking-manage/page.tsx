@@ -31,6 +31,7 @@ export default async function ManageBookingPreviewPage({ searchParams }: { searc
     : name === "unavailable" ? { ...ready, days: [], slotsUnavailable: true }
     : name === "empty" ? { ...ready, days: [] }
     : name === "held" ? { ...ready, booking: { ...BOOKING, status: "held", confirmationRequired: true }, days: [], changesClosed: true }
+    : name === "agent-receipt" ? { ...ready, booking: { ...BOOKING, agentSource: "Booked through Claude" } }
     : name === "pending" ? { ...ready, booking: { ...BOOKING, status: "pending" } }
     : ready;
   return <ManageBooking state={state} actionUrl="/preview/strelva/booking-manage" />;

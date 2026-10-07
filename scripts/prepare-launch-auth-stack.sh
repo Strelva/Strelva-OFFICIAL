@@ -19,7 +19,9 @@ for item in sockets: item.close()
 PY
 )
 mkdir -p "$stack/supabase/migrations"
-cp "$root"/supabase/migrations/*.sql "$stack/supabase/migrations/"
+# Validate the full inventory, then stage only forward migrations. Supabase skips
+# helpers with a filename notice; keep them out of the disposable stack entirely.
+node "$root/scripts/copy-forward-migrations.mjs" "$root/supabase/migrations" "$stack/supabase/migrations"
 cat > "$stack/supabase/config.toml" <<CONFIG
 project_id = "strelva-proof-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}"
 [api]

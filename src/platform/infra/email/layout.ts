@@ -93,6 +93,8 @@ export interface EmailDecision {
 }
 
 export interface EmailOptions {
+  /** Agency identity; richer logo/color treatment is owned by #264. */
+  preparedBy?: string;
   /** Hidden preview text shown in the inbox list before the body. */
   preheader?: string;
   /** The one h1. */
@@ -131,7 +133,8 @@ export function escapeEmailHtml(value: string): string {
 
 /** The real Strelva logo (cairn + Fraunces wordmark) as a hosted image.
  *  `footer` = the smaller footer variant. */
-function logo(footer = false): string {
+function logo(footer = false, preparedBy?: string): string {
+  if (preparedBy) return `<span style="font-size:16px;font-weight:600;">${escapeEmailHtml(preparedBy)} <span style="font-size:12px;font-weight:400;">on Strelva</span></span>`;
   const w = footer ? 92 : 132;
   const h = Math.round(w * LOGO_RATIO);
   return `<img src="${escapeEmailHtml(EMAIL_LOGO_URL)}" alt="Strelva" width="${w}" height="${h}" style="display:block;width:${w}px;height:${h}px;border:0;outline:none;text-decoration:none;">`;
@@ -231,7 +234,7 @@ function footerHtml(opts: EmailOptions): string {
   const metaRow = meta.length
     ? `<div style="margin-top:10px;font-size:12px;line-height:1.5;color:${TOKENS.faint};">${meta.join(" &nbsp;·&nbsp; ")}</div>`
     : "";
-  return `<div style="padding:24px 0 8px;">${logo(true)}${metaRow}</div>`;
+  return `<div style="padding:24px 0 8px;">${logo(true, opts.preparedBy)}${metaRow}</div>`;
 }
 
 /** Full branded HTML email document. */
@@ -259,7 +262,7 @@ ${preheader}
 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:${TOKENS.page};padding:32px 12px;">
   <tr><td align="center">
     <table role="presentation" cellpadding="0" cellspacing="0" width="${TOKENS.width}" style="max-width:${TOKENS.width}px;width:100%;background:${TOKENS.card};border:1px solid ${TOKENS.hairline};border-radius:14px;font-family:${TOKENS.font};">
-      <tr><td style="padding:28px 32px 0;">${logo()}</td></tr>
+      <tr><td style="padding:28px 32px 0;">${logo(false, opts.preparedBy)}</td></tr>
       <tr><td style="padding:20px 32px 0;">
         <h1 style="margin:0 0 16px;font-size:24px;line-height:1.25;font-weight:700;color:${TOKENS.ink};">${escapeEmailHtml(opts.heading)}</h1>
         ${paragraphs}${highlight}${bullets}${decisions}${rows}${button}${secondaryButton}
@@ -295,7 +298,7 @@ export function renderEmailText(opts: EmailOptions): string {
   if (opts.button) parts.push(`${opts.button.label}: ${opts.button.url}`, "");
   if (opts.secondaryButton) parts.push(`${opts.secondaryButton.label}: ${opts.secondaryButton.url}`, "");
   if (opts.footerNote) parts.push(opts.footerNote);
-  parts.push("Strelva");
+  parts.push(opts.preparedBy ? `${opts.preparedBy} on Strelva` : "Strelva");
   if (opts.manageUrl) parts.push(`Manage: ${opts.manageUrl}`);
   if (opts.unsubscribeUrl) parts.push(`Unsubscribe: ${opts.unsubscribeUrl}`);
   return parts.join("\n").replace(/\n{3,}/g, "\n\n").trim();

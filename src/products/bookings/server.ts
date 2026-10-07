@@ -8,11 +8,13 @@ import { getTenantSiteName } from "@/lib/tenant-display";
 import type { Booking, BookingConfig } from "@/lib/types";
 import { callReleaseFlagsRpc } from "@/platform/release-flags/store";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
-import { bookingReadSource, bookingStoreWriteEnabled } from "@/platform/bookings/flags";
+import { bookingReadSource, bookingStoreWriteEnabled, bookingAgentVisibilityEnabled } from "@/platform/bookings/flags";
 import { BookingStoreError, bookingStoreDb, parseStoreBooking, readTenantBookings, readBookingContext, setTenantBookingHours, type StoreBooking, type StoreBookingStatus, type BookingContext } from "@/platform/bookings/store";
 import { readOwnerBookingEvidence, markOwnerBookingNoShow, type OwnerBookingEvidence, type BookingHistoryEntry } from "@/platform/bookings/owner-evidence";
 import { openRanges, settingsOrDefault, timeZoneOf } from "@/platform/bookings/availability";
 import { assertWorkspaceCalendarManager } from "@/products/scheduling/server";
+import { bookingAgentName } from "@/platform/bookings/agent-source";
+import { readProviderBookings } from "./provider";
 import { manualBookingsEnabled } from "@/platform/bookings/manual";
 
 /**
@@ -37,6 +39,7 @@ export interface BookingRow {
   clientEmail: string;
   clientPhone: string;
   serviceName: string;
+  agentName?: string;
   notes?: string;
   intake?: Array<{ label: string; answer: string }>;
   status: StoreBookingStatus;
@@ -75,6 +78,9 @@ export interface WorkspaceBookings {
   to: string;
   sites: SiteBookings[];
   native?: boolean;
+  agentVisibility?: boolean;
+  source?: "all" | "agent";
+  readOnly?: boolean;
 }
 
 const links = z.array(z.object({ tenantId: z.string().min(1), tenantStableId: z.string().uuid(), linkedAt: z.string() }));
@@ -91,6 +97,8 @@ export interface BookingDependencies {
   readSource?: typeof bookingReadSource;
   evidence?: typeof readOwnerBookingEvidence;
   context?: typeof readBookingContext;
+  agentVisibility?: () => boolean;
+  provider?: typeof readProviderBookings;
 }
 
 async function storeHours(tenantId: string): Promise<BookingHoursView | null> {
@@ -177,10 +185,15 @@ async function linkedTenants(actor: WorkspaceActor, workspaceId: string): Promis
 export async function readWorkspaceBookings(
   actor: WorkspaceActor,
   workspaceId: string,
-  options: { view: BookingView; date?: string | null; now?: Date; upcomingDays?: number },
+  options: { view: BookingView; date?: string | null; now?: Date; upcomingDays?: number; source?: "all" | "agent" },
   dependencies: BookingDependencies = defaults,
 ): Promise<WorkspaceBookings> {
-  const tenants = await linkedTenants(actor, workspaceId);
+  const visible = (dependencies.agentVisibility ?? bookingAgentVisibilityEnabled)();
+  let tenants: string[];
+  try { tenants = await linkedTenants(actor, workspaceId); } catch (error) {
+    if (!(error instanceof WorkspaceAccessError) || !visible || await (dependencies.readSource ?? bookingReadSource)() !== "postgres") throw error;
+    return (dependencies.provider ?? readProviderBookings)(actor, workspaceId, options);
+  }
   const storeServes = dependencies.evidence && (await (dependencies.readSource ?? bookingReadSource)()) === "postgres";
   const sites = await Promise.all(tenants.map(async (tenantId): Promise<SiteBookings> => {
     const siteName = await dependencies.siteName(tenantId).catch(() => tenantId);
@@ -218,7 +231,8 @@ export async function readWorkspaceBookings(
           const intake = Object.entries(booking.intakeAnswers).filter(([key]) => key !== "notes").map(([key, answer]) => ({
             label: questions.find(q => q.id === key)?.label ?? (key === "message" ? "Customer message" : key), answer,
           }));
-          return { ...storeRow(booking), ...(intake.length ? { intake } : {}), evidence: { history, historyTruncated, calendar,
+          const agentName = visible ? bookingAgentName(booking) : null;
+          return { ...storeRow(booking), ...(agentName ? { agentName } : {}), ...(intake.length ? { intake } : {}), evidence: { history, historyTruncated, calendar,
             outsideRecordHours: bookingOutsideRecordHours(booking, context),
             canMarkNoShow: booking.status === "confirmed" && Date.parse(booking.end) <= (options.now ?? new Date()).getTime() } };
         });
@@ -243,7 +257,7 @@ export async function readWorkspaceBookings(
       if (hours) site.hours = hours;
     }));
   }
-  return { view: options.view, from: range.from, to: range.to, sites, ...(storeServes && !tenants.length ? {native:true} : {}) };
+  return { view: options.view, from: range.from, to: range.to, sites, ...(visible && storeServes ? { agentVisibility: true, source: options.source === "agent" ? "agent" : "all" } : {}), ...(storeServes && !tenants.length ? {native:true} : {}) };
 }
 
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);

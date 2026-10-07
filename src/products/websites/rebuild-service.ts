@@ -20,7 +20,7 @@ import { connectWebsiteCapabilitiesInputSchema } from "./contracts";
 import { listPublishedWebsiteCapabilityOptions, resolvePublishedWebsiteCapabilities } from "./published-capabilities";
 import { auditRebuildHtml } from "./rebuild-audit";
 import { renderSiteDocumentHtml } from "./site-export";
-import { ROOT_DOMAIN } from "@/platform/infra/brand";
+import { tenantSiteOrigin, tenantSiteHost } from "@/platform/infra/brand";
 import { normalizeCustomDomain } from "@/lib/domains";
 import { bindWebsiteBusinessRecord, projectWebsiteBusinessFacts } from "./business-facts";
 import { readCandidateBusinessFacts } from "./business-facts-server";
@@ -109,7 +109,7 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     const revision = loaded.rebuild.revision+1;
     const temporary = present({ ...loaded,rebuild:{ ...loaded.rebuild,candidate:{ revision:row.revision,contentHash,document,previewHref:previewHref(loaded.work.id,row) } } });
     const slug = hostedTenantSlug(temporary);
-    const audit = loaded.rebuild.sourceAudit ? { scope: "html" as const, before: loaded.rebuild.sourceAudit, after: auditRebuildHtml(renderSiteDocumentHtml(document,"/",{ canonicalUrl:`https://${slug}.strelva.com`,tenant:slug }),`https://${slug}.strelva.com`), checkedAt: now(), unavailable: ["PageSpeed and Lighthouse performance", "Response security headers", "AI assistant visibility", "Well-known robots, sitemap and llms files on the original site", "Live hosted response"] } : null;
+    const audit = loaded.rebuild.sourceAudit ? { scope: "html" as const, before: loaded.rebuild.sourceAudit, after: auditRebuildHtml(renderSiteDocumentHtml(document,"/",{ canonicalUrl:tenantSiteOrigin(slug),tenant:slug }),tenantSiteOrigin(slug)), checkedAt: now(), unavailable: ["PageSpeed and Lighthouse performance", "Response security headers", "AI assistant visibility", "Well-known robots, sitemap and llms files on the original site", "Live hosted response"] } : null;
     const payload = websiteRebuildSchema.parse({ ...loaded.rebuild, title: document.siteName, status: "review_ready", candidate: { revision: row.revision, contentHash, document, previewHref: previewHref(loaded.work.id,row) }, approvedCandidateRevision: null, lastError: null, revision, audit, history: [...loaded.rebuild.history,{ revision,kind,actorId:actor.userId,at:now() }] });
     if (Buffer.byteLength(JSON.stringify(payload))>1_950_000) throw new WorkspaceStoreError("This rebuild exceeds its saved-work size limit.");
     return loadWork(await documents.commitCandidate(actor,{ workspaceId: loaded.work.workspaceId, workId: loaded.work.id, expectedRevision: latest?.revision ?? 0, expectedWorkRevision: loaded.rebuild.revision, document, payload }));
@@ -306,7 +306,7 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     // atomically; a scoped provider may launch only an owner's approval.
     const tenantId = dependencies.createHostedTenant ? await dependencies.createHostedTenant(actor,present(loaded)) : await documents.reserveHostedTenant(actor,{ workspaceId: loaded.work.workspaceId, workId, revision: candidate.revision, contentHash: candidate.contentHash, tenantId: routedTenant ?? hostedTenantSlug(present(loaded)) });
     loaded = await update(actor,loaded,"hosted_tenant_bound",{ tenantId });
-    const providerUrl = `https://${tenantId}.${ROOT_DOMAIN}/`;
+    const providerUrl = `${tenantSiteOrigin(tenantId)}/`;
     const receipt: WebsiteLaunchReceipt = websiteLaunchReceiptSchema.parse({ status: "published", provider: "strelva-hosted", providerUrl, receiptId: `hosted-${createHash("sha256").update(`${workId}:${candidate.revision}:${candidate.contentHash}`).digest("hex").slice(0,32)}`, artifactHash: candidate.contentHash, candidateRevision: candidate.revision, publishedAt: now(), evidence: "The approved immutable site document is the hosted tenant's published revision." });
     const row = await documents.publish(actor,{ workspaceId: loaded.work.workspaceId, workId, revision: candidate.revision, contentHash: candidate.contentHash, tenantId, receipt });
     // Once this pointer/receipt exists, read-back failures cannot create a new
@@ -336,7 +336,7 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     if (!documents.publishToLinkedTenant) throw new WorkspaceStoreError("Publishing onto an existing site is unavailable.");
     if (loaded.rebuild.status !== "approved" && loaded.rebuild.status !== "published") throw new WorkspaceConflictError("Approve the exact current preview before publishing it onto your site.");
     if (loaded.rebuild.approvedCandidateRevision !== candidate.revision) throw new WorkspaceConflictError("Approve the exact current preview before publishing it onto your site.");
-    const providerUrl = `https://${input.tenantId}.${ROOT_DOMAIN}/`;
+    const providerUrl = `${tenantSiteOrigin(input.tenantId)}/`;
     const receipt: WebsiteLaunchReceipt = websiteLaunchReceiptSchema.parse({ status: "published", provider: "strelva-hosted", providerUrl, receiptId: `hosted-${createHash("sha256").update(`${workId}:${input.tenantId}:${candidate.revision}:${candidate.contentHash}`).digest("hex").slice(0,32)}`, artifactHash: candidate.contentHash, candidateRevision: candidate.revision, publishedAt: now(), evidence: "The approved immutable site document is the linked tenant's published revision." });
     const prior = await documents.published(input.tenantId);
     const replay = prior?.workId === workId && prior.revision === candidate.revision && prior.contentHash === candidate.contentHash && prior.receipt;
@@ -358,7 +358,7 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     if (!replay) loaded = await update(actor,loaded,"hosted_read_back",{ launch: { receipt: committedReceipt, readBack } });
     const redirects = candidate.document.redirects.length;
     const cutover: WebsiteCutoverItem[] = [
-      { id: "document_published", status: "done", label: `Published revision ${row.revision} at ${tenantId}.${ROOT_DOMAIN}.` },
+      { id: "document_published", status: "done", label: `Published revision ${row.revision} at ${tenantSiteHost(tenantId)}.` },
       { id: "read_back", status: readBack?.status === "verified" ? "done" : readBack?.status === "failed" ? "failed" : "waiting", label: readBack?.message ?? "Not checked yet." },
       { id: "domain_moved", status: "waiting", label: "Your domain still points at the old site. Moving it is a DNS step you approve; Strelva prepares the exact records." },
       { id: "old_project_kept", status: "waiting", label: `Your old site's project is kept as a fallback until ${row.fallbackUntil.slice(0,10)}. Strelva never removes it automatically.` },

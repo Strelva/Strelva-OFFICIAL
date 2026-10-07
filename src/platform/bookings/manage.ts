@@ -21,6 +21,7 @@ export interface ManagedBookingView {
   time: string;
   timeZoneLabel: string;
   status: "pending" | "confirmed" | "cancelled" | "held";
+  agentSource?: string;
   confirmationRequired?: boolean;
 }
 
@@ -109,6 +110,7 @@ export function managedView(reservation: ManagedReservation): ManagedBookingView
     time: when.time,
     timeZoneLabel: zoneLabel(reservation.start, reservation.timeZone),
     status: reservation.status,
+    ...(reservation.agentSource ? { agentSource: reservation.agentSource } : {}),
     confirmationRequired: reservation.confirmationRequired,
   };
 }

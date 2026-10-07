@@ -1,7 +1,9 @@
 -- No security-definer function in public may be callable with the public
 -- (anon) or signed-in (authenticated) key. Trigger functions are excluded:
--- PostgreSQL refuses to call them outside a trigger. The three row-security
+-- PostgreSQL refuses to call them outside a trigger. The row-security
 -- helpers are intentionally callable by signed-in users: policies use them.
+-- Newsletter backfill is a session-bound operator RPC: it derives auth.uid()
+-- and checks current verified, unrevoked operator authority in its transaction.
 do $$
 declare
   exposed text;
@@ -14,6 +16,8 @@ begin
     and p.prosecdef
     and p.prorettype <> 'trigger'::regtype
     and p.proname not in ('app_is_super_admin', 'app_tenant_ids', 'app_tenant_stable_ids')
+    and p.oid is distinct from to_regprocedure('public.agency_prospect_member(uuid)')
+    and p.oid is distinct from to_regprocedure('public.backfill_newsletter_contacts(text,uuid,boolean,text,integer)')
     and (has_function_privilege('anon', p.oid, 'execute')
       or has_function_privilege('authenticated', p.oid, 'execute'));
   if exposed is not null then
@@ -27,4 +31,26 @@ begin
   if not has_function_privilege('service_role', 'public.create_owned_workspace(uuid,text,text,text)'::regprocedure, 'execute') then
     raise exception 'service_role lost execute on create_owned_workspace';
   end if;
+end $$;
+
+-- This one request-session RPC is intentional, but it must never become an
+-- anonymous or service-role backfill path. Its authority tests run separately.
+do $$
+declare backfill regprocedure := to_regprocedure('public.backfill_newsletter_contacts(text,uuid,boolean,text,integer)');
+begin
+  if backfill is not null and (
+    not has_function_privilege('authenticated', backfill, 'execute')
+    or has_function_privilege('anon', backfill, 'execute')
+    or has_function_privilege('service_role', backfill, 'execute')
+  ) then raise exception 'newsletter backfill lost its request-session execute boundary'; end if;
+end $$;
+
+-- JWT-bound RLS helper exposes only whether the caller belongs to this agency.
+do $$
+declare helper regprocedure := to_regprocedure('public.agency_prospect_member(uuid)');
+begin
+  if helper is not null and (
+    not has_function_privilege('authenticated', helper, 'execute')
+    or has_function_privilege('anon', helper, 'execute')
+  ) then raise exception 'agency prospect RLS helper lost its request-session boundary'; end if;
 end $$;

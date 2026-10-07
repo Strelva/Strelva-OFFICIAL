@@ -25,6 +25,14 @@ describe("workspace return destination", () => {
     const target = `/workspace?workspaceId=${workspaceId}&view=inquiries&tenantId=buffalo-realty&inquiryView=shape&inquiryRequest=request-1`;
     expect(workspaceReturnTarget(target)).toBe(target);
   });
+  it("preserves the agency setup checklist through sign-in and nothing broader", () => {
+    expect(workspaceReturnTarget("/workspace/agency/start")).toBe("/workspace/agency/start");
+    expect(workspaceReturnTarget(`/workspace/agency/start?workspaceId=${workspaceId}`)).toBe(`/workspace/agency/start?workspaceId=${workspaceId}`);
+    expect(workspaceReturnTarget("/workspace/agency/start?workspaceId=not-a-uuid")).toBeNull();
+    expect(workspaceReturnTarget(`/workspace/agency/start?workspaceId=${workspaceId}&next=https%3A%2F%2Fevil.example`)).toBeNull();
+    expect(workspaceReturnTarget(`/workspace/agency/start?workspaceId=${workspaceId}#x`)).toBeNull();
+    expect(workspaceReturnTarget("/workspace/agency/other")).toBeNull();
+  });
   it("preserves the document start route through sign-in", () => {
     expect(workspaceReturnTarget(`/workspace?workspaceId=${workspaceId}&view=document`)).toBe(`/workspace?workspaceId=${workspaceId}&view=document`);
   });

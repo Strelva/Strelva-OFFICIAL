@@ -105,3 +105,8 @@ export function bookingAgentsEnabled(env: Env = process.env): boolean {
 export function bookingMessagesEnabled(env: Env = process.env): boolean {
   return env.STRELVA_BOOKING_MESSAGES?.trim() === "1" && bookingStoreWriteEnabled(env);
 }
+
+/** Owner/provider attribution only; enables no booking writes or notifications. */
+export function bookingAgentVisibilityEnabled(env: Env = process.env): boolean {
+  return env.STRELVA_BOOKING_AGENT_VISIBILITY?.trim() === "1";
+}

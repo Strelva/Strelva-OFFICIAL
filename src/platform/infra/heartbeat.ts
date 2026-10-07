@@ -52,6 +52,7 @@ const _CRON_SCHEDULE = {
   "portfolio-snapshot": 5 * 3600, // every 4h
   "review-auto-post": 5 * 3600, // every 3h
   "inquiry-follow-ups": 3 * 3600, // hourly
+  "newsletter-sender": 30 * 60, // every 5 min, independently release-gated
   "needs-you": 3 * 3600, // hourly, independently release-gated
   "workspace-work": 30 * 60, // every 5 min, independently release-gated
   "governed-work-reconcile": 7 * 3600, // every 6h — durability sweep for the PG mirror

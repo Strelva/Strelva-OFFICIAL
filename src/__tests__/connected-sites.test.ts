@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { businessJsonLd, defaultAllowedOrigins, publicFactsFromRecord, verificationProofs } from "@/products/connected-sites/contracts";
 import { connectSite, connectedSiteSystemId, normalizeSiteUrl, readPublicContext, recordBeacon, submitPublicInquiry, verifySite } from "@/products/connected-sites/server";
-import { ConnectedSiteInputError, type ConnectedSitesStore } from "@/products/connected-sites/store";
+import { createConnectedSitesStore, ConnectedSiteInputError, type ConnectedSitesStore } from "@/products/connected-sites/store";
 import { connectedInquiryEmail, notifyConnectedSiteInquiry } from "@/products/connected-sites/server";
 import { systemsFromExisting } from "@/platform/systems/from-existing";
 import { systemOriginId } from "@/platform/systems/invariants";
@@ -99,6 +99,15 @@ describe("connected sites on the server", () => {
     if (spammy.status === "held_as_spam") expect(s.recordSpam).toHaveBeenCalledOnce(); else expect(spammy.status).toBe("recorded");
     await expect(submitPublicInquiry(KEY, site, null, { id: "inq12345681", capture: "strelva-form", fields: { name: "Only a name" } }, { store: s })).rejects.toBeInstanceOf(ConnectedSiteInputError);
     await expect(submitPublicInquiry(KEY, { ...site, captureForms: false }, null, { id: "inq12345682", capture: "site-form", fields: { email: "pat@example.test" } }, { store: s })).rejects.toBeInstanceOf(ConnectedSiteInputError);
+  });
+  it("carries confirmed policies through the SQL adapter to connect.js without private provenance", async () => {
+    const policy = { value: { required: false }, source: "operator", verified: true, updatedAt: "2026-10-07T00:00:00Z", updatedBy: BUSINESS };
+    const rpc = vi.fn(async () => ({ data: { revision: 5, facts: { display_name: "Fictional Bakery" }, services: [], policyFacts: { deposit: policy }, site: { captureForms: true, injectSchema: true } }, error: null }));
+    const context = (await readPublicContext(KEY, site, createConnectedSitesStore({ rpc })))!;
+    expect(context.facts.policies?.deposit?.value).toEqual({ required: false });
+    expect(JSON.stringify(context.jsonLd)).toContain("No deposit required.");
+    expect(JSON.stringify(context)).not.toContain("updatedBy");
+    expect(JSON.stringify(context)).not.toContain(BUSINESS);
   });
   it("reads the public context from the business record", async () => {
     const context = (await readPublicContext(KEY, site, store()))!;

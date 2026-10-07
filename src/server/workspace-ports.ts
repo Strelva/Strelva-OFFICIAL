@@ -10,6 +10,7 @@
 const inquiryPublicationServer = () => import("@/products/inquiries/server");
 
 export const workspacePortLoaders = {
+  bookingProof: () => import("@/platform/bookings/agent-proof"),
   clientRecords: async () => {
     const [mirror, move] = await Promise.all([
       import("@/platform/client-records/mirror"),

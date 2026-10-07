@@ -27,6 +27,8 @@ export interface NeedsYouDeps {
   canDeliver?(row: DeliveryRow): Promise<boolean>;
   /** Booking calendar health is an owner action, separate from decisions. */
   bookingWorkspaces?(): Promise<string[]>;
+  /** Overflow stays undelivered and joins the existing morning digest. */
+  bookingUrgentAllowed?(workspaceId: string): Promise<boolean>;
   bookingCalendarHealth?(workspaceId: string, input: { now: number; appOrigin: string; sendEmail: NeedsYouDeps["sendEmail"] }): Promise<{ digests: number; ownerNotTold: number; failed: number; complete: boolean }>;
   /** New immediate inquiry delivery stays off unless the host supplies the
    * release switches and strict global/customer/per-tenant email gates. */
@@ -445,7 +447,8 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
         }
         if (row.sourceLifecycle === "booking_request" && !bookingOwnerNoticeEnabled()) continue;
         if (deps.canDeliver && !(await deps.canDeliver(row))) { summary.ownerNotTold += 1; continue; }
-        if (row.urgent && row.deliveryState === "not_sent") {
+        if (row.urgent && row.deliveryState === "not_sent"
+          && (row.sourceLifecycle !== "booking_request" || !deps.bookingUrgentAllowed || await deps.bookingUrgentAllowed(workspaceId))) {
           await deliver("urgent", [row], summary);
           summary.urgent += 1;
           continue;
@@ -468,6 +471,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     if (!bookingOwnerNoticeEnabled()) return summary;
     const row = (await deps.store.dueForDelivery(500)).find(item => item.workspaceId === workspaceId && item.id === itemId && item.sourceLifecycle === "booking_request" && item.state === "open" && item.urgent && item.deliveryState === "not_sent");
     if (!row || await reconcile({ workspaceId }, row) !== "current") return summary;
+    if (deps.bookingUrgentAllowed && !await deps.bookingUrgentAllowed(workspaceId)) return summary;
     await deliver("urgent", [row], summary); summary.urgent = 1;
     return summary;
   }

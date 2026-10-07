@@ -159,16 +159,54 @@ under conflicting locks, concurrent index creation does not queue out client
 writes, a valid index can be retried, and an incompatible index is rejected.
 It never connects to a hosted or production database.
 
-Both commands require PostgreSQL server binaries. On this workstation:
+Both commands require PostgreSQL server binaries. The SQL check scripts and
+release-safety rehearsal set `LC_ALL=C` internally, including for `initdb` and
+`pg_ctl`; callers do not need to export a locale on macOS/PostgreSQL 18.
+The workspace, upgrade, inquiry and customer-mapping checks remove only the
+cluster/socket directories they create on success, failure, SIGINT or SIGTERM.
+They record the postmaster PID and stop that cluster before deleting its files,
+including when startup fails after launching Postgres. If both shutdown attempts
+fail and the recorded PID is still alive, the check fails and prints the retained
+path rather than deleting a running server's data. SIGKILL cannot run cleanup.
+
+The release-safety rehearsal uses the same ownership rules, removes its database
+and dump files, and saves its private receipt under `output/release-safety/`.
+Private PostgreSQL error diagnostics remain separate from disposable clusters.
+Run `node --test scripts/tests/temp-postgres.node-test.mjs` with PostgreSQL 18
+installed (or `POSTGRES_BIN` pointing to its binaries) to exercise initialization,
+partial-startup and SQL failures plus signal cleanup. These tests skip when the
+server binaries are unavailable.
+
+On this workstation:
 
 ```bash
 PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-sql
 PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-upgrade
+PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm test:migration-helpers
 ```
 
-The upgrade rehearsal is a deliberate release check rather than a per-push CI
-step because it replays the full retained history. Run it when the workspace
-migration tail or its baseline changes and before authorizing a real migration.
+The Launch verification `persisted-delivery` job runs the ordered upgrade and
+helper filename proof on pull requests. Run them locally when the migration tail
+or its baseline changes and before authorizing a real migration.
+
+Forward filenames must match `<14-digit version>_<name>.sql`. The metadata
+inventory explicitly excludes `rollback-<14-digit version>_<name>.sql` and the
+retained manual helper names in `scripts/check-workspace-target.mjs`; other
+non-versioned SQL files fail closed. New rollback helpers use the timestamped
+convention. Keep existing helper paths: release manifests, rollback rehearsals
+and operational instructions reference them.
+
+Supabase CLI 2.117.0, pinned in both Launch verification jobs, skips helpers with
+a filename notice ([filename rule](https://github.com/supabase/cli/blob/v2.117.0/apps/cli-go/pkg/migration/file.go),
+[skip behavior](https://github.com/supabase/cli/blob/v2.117.0/apps/cli-go/pkg/migration/list.go)).
+`pnpm test:migration-helpers` starts a disposable loopback PostgreSQL cluster,
+replaces every repository helper's SQL with an exception, runs the installed
+CLI's `migration up`, and verifies only the forward appears in migration history.
+It also checks the ordered-upgrade file selection and the Auth stack's shared
+staging function. `prepare-launch-auth-stack.sh` stages only validated forward
+files, so Auth startup has no helper skip notices. The ontology check likewise
+reads only forward SQL. These checks require the Supabase CLI and PostgreSQL
+server binaries; they use no Docker, hosted configuration or real migrations.
 
 The content-version index migration uses `-- pg-delta: transaction=false` and
 `CREATE INDEX CONCURRENTLY`. Use Supabase CLI 2.117.0 (which supports this directive) or `psql` without a

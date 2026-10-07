@@ -13,7 +13,7 @@ import { sendEmailWithReceipt } from "@/platform/infra/email/send";
 import { customerEmailPaused, emailSendingPaused } from "@/platform/infra/email/enabled";
 import { getClientEmailOverride } from "@/platform/infra/email/client-override";
 import { getTenantConfig } from "@/lib/tenants";
-import { OPERATOR_URL, ROOT_DOMAIN } from "@/platform/infra/brand";
+import { OPERATOR_URL, SITES_ROOT_DOMAIN } from "@/platform/infra/brand";
 import { bindToCurrentTenant } from "./hosted-routing";
 import { businessOutcomeReportsEnabled, deliverBusinessOutcomeReport, readBusinessOutcomeReports, type BusinessOutcomeReport } from "@/platform/business-outcomes/reports";
 export const websiteReportInputSchema=z.object({month:z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/)}).strict();
@@ -41,7 +41,7 @@ export async function readWebsiteMonthlyReport(actor:WorkspaceActor,workId:strin
  let inquiries:WebsiteMonthlyReport["inquiries"]={status:"unavailable",count:null,limitedToRecentRecords:true};
  if(tenantId){try{const data=await readInquiryWorkspace({tenantId,businessId:record.workspaceId,leadLimit:500});if(data.recordsAvailable&&data.records)inquiries={status:"available",count:data.records.filter(row=>during(row.createdAt)).length,limitedToRecentRecords:true};}catch{/* Missing storage is not zero inquiries. */}}
  // After a slug rename the issued binding names the old slug; the receipt proves it is this tenant (P2 #8).
- const servedCapabilities=published&&tenantId?bindToCurrentTenant(published.document,tenantId,published.receipt,ROOT_DOMAIN).capabilities:undefined;
+ const servedCapabilities=published&&tenantId?bindToCurrentTenant(published.document,tenantId,published.receipt,SITES_ROOT_DOMAIN).capabilities:undefined;
  const bookingBinding=servedCapabilities?.tenant===tenantId?servedCapabilities.booking:undefined;
  let scheduleId:unknown;
  if(bookingBinding){try{const tenant=tenantId?await getTenantConfig(tenantId):null;const rawGrants=await listPublicWebsiteBookingGrants(actor,record.workspaceId);const grants=Array.isArray(rawGrants)?rawGrants:[rawGrants];scheduleId=grants.find(grant=>grant.status==="published"&&!!tenant?.stableId&&grant.tenant_stable_id===tenant.stableId&&grant.capability_id===bookingBinding.capabilityId&&Number(grant.capability_version)===bookingBinding.version)?.work_id;}catch{/* The booking measurement remains explicitly unavailable. */}}

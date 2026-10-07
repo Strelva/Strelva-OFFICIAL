@@ -1,3 +1,4 @@
+import { workspacePublishingScope } from "@/platform/infra/publishing-scope";
 import { tenantPublishingPorts } from "@/platform/infra/tenant-publishing";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -30,8 +31,7 @@ const defaults: RecordChangeDeps = {
   async locations(actor, workspaceId) {
     const { readPublishingSnapshot } = await import("./server");
     const snapshot = await readPublishingSnapshot(actor, workspaceId);
-    return snapshot.bindings.flatMap(binding => binding.originTenantId
-      ? binding.locations.map(location => ({ tenantId: binding.originTenantId!, locationId: location.locationId })) : []);
+    return snapshot.bindings.flatMap(binding => binding.locations.map(location => ({ tenantId: binding.originTenantId ?? workspacePublishingScope(workspaceId), locationId: location.locationId })));
   },
   async prepare(actor, input) { return (await import("@/products/google-listing/server")).prepareGoogleListingDraft(actor, input); },
   async approve(tenantId, eventId, actorId) { return (await tenantPublishingPorts()).resolveEventAction(tenantId, eventId, "approved", actorId); },
