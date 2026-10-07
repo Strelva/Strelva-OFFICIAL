@@ -551,7 +551,14 @@ starting implementation.
 
 Publishing uses [ContentWorkspace](../../src/experience/publishing/ContentWorkspace.tsx)
 for exact-content review, collection publication/restore, and immutable newsletter
-issues with sending paused. [RecordPublishingFields](../../src/experience/publishing/RecordPublishingFields.tsx)
+issues. Approved issue data may include a separate optional `delivery` projection:
+current state, accepted/suppressed counts, unconfirmed batches and append-only batch
+receipts. The view preserves approved words and distinguishes provider acceptance,
+not-sent gates and unconfirmed sends; it never claims delivery. October 7, 2026,
+`a1/newsletter-sender`: accepted desktop and gated/unconfirmed 390px fixtures were
+observed locally. Sending still defaults off; see the
+[implementation handoff](../product/streams/a1-newsletter-sender.md).
+[RecordPublishingFields](../../src/experience/publishing/RecordPublishingFields.tsx)
 saves hours, special hours and website facts through the owner boundary, shows
 the optional Google approval disclosure, and reports each location separately
 as confirmed, awaiting approval, unapplied or unknown. Unknown writes never say
