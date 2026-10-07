@@ -36,6 +36,7 @@ describe("saved copy restore Requests", () => {
   it("files an exact, idempotent Request without touching live content, drafts or the snapshot", async () => {
     const result = await restore(actor, savedCopy);
     expect(result).toMatchObject({ status: "requested", requestId: "restore-request" });
+    if (result.status !== "requested") throw new Error("Expected a restore Request");
     expect(result.message).toContain("preview still needs to be prepared and approved");
     expect(ports.request).toHaveBeenCalledWith(actor, expect.objectContaining({
       status: "requested", request: expect.stringContaining("snap_one, saved 2026-10-01T12:00:00Z"),

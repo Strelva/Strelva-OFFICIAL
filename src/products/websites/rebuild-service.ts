@@ -261,6 +261,11 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     await documents.approve(actor,{ workspaceId: loaded.work.workspaceId, workId, revision: candidate.revision, contentHash: candidate.contentHash });
     return present(await update(actor,loaded,"rebuild_approved",{ status: "approved", approvedCandidateRevision: candidate.revision, lastError: null }));
   }
+  async function assertCurrentCapabilities(actor: WorkspaceActor, loaded: Loaded) {
+    if (!loaded.rebuild.publishedCapabilitySelection) return;
+    const projection = await (dependencies.resolveCapabilities ?? resolvePublishedWebsiteCapabilities)(actor,loaded.work.workspaceId,loaded.work.id,loaded.rebuild.publishedCapabilitySelection);
+    if (!projection || JSON.stringify(projection) !== JSON.stringify(loaded.rebuild.candidate!.document.capabilities)) throw new WorkspaceConflictError("The visitor form or booking connection changed. Reconnect it and approve the new preview before publishing.");
+  }
   async function launch(actor: WorkspaceActor, workId: string, raw: unknown) {
     let loaded = await load(actor,workId); const { candidate } = exact(loaded,raw);
     if (loaded.rebuild.launch.receipt?.status === "published" && loaded.rebuild.launch.receipt.artifactHash === candidate.contentHash && loaded.rebuild.launch.receipt.candidateRevision === candidate.revision) return present(loaded.rebuild.status === "published" ? loaded : await update(actor,loaded,"publish_reconciled",{ status:"published" }));
@@ -270,10 +275,7 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
       if (published?.workId === workId && published.revision === candidate.revision && published.contentHash === candidate.contentHash && published.receipt) return present(await update(actor,loaded,"publish_reconciled",{ status: "published", launch: { receipt: published.receipt, readBack: { status: "pending", checkedAt: now(), message: "Publication is committed; the public read-back has not been confirmed yet." } } }));
     }
     if (loaded.rebuild.status !== "approved" || loaded.rebuild.approvedCandidateRevision !== candidate.revision) throw new WorkspaceConflictError("Approve the exact current preview before launching.");
-    if (loaded.rebuild.publishedCapabilitySelection) {
-      const projection = await (dependencies.resolveCapabilities ?? resolvePublishedWebsiteCapabilities)(actor,loaded.work.workspaceId,workId,loaded.rebuild.publishedCapabilitySelection);
-      if (!projection || JSON.stringify(projection) !== JSON.stringify(candidate.document.capabilities)) throw new WorkspaceConflictError("The visitor form or booking connection changed. Reconnect it and approve the new preview before publishing.");
-    }
+    await assertCurrentCapabilities(actor,loaded);
     // Never re-approve as the launcher: that would replace the customer's
     // approval with the operator's (audit 2026-10-05, finding 6). Reserve and
     // publish each check launch authority and the exact approved revision
@@ -314,6 +316,9 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     const receipt: WebsiteLaunchReceipt = websiteLaunchReceiptSchema.parse({ status: "published", provider: "strelva-hosted", providerUrl, receiptId: `hosted-${createHash("sha256").update(`${workId}:${input.tenantId}:${candidate.revision}:${candidate.contentHash}`).digest("hex").slice(0,32)}`, artifactHash: candidate.contentHash, candidateRevision: candidate.revision, publishedAt: now(), evidence: "The approved immutable site document is the linked tenant's published revision." });
     const prior = await documents.published(input.tenantId);
     const replay = prior?.workId === workId && prior.revision === candidate.revision && prior.contentHash === candidate.contentHash && prior.receipt;
+    // Recheck new publication authority, but never turn an accepted replay
+    // into another publish because a visitor connection was later revoked.
+    if (!replay) await assertCurrentCapabilities(actor,loaded);
     const linked = replay && documents.linkedPublications ? (await documents.linkedPublications(actor,{ workspaceId: loaded.work.workspaceId, workId })).find(item => item.revision === candidate.revision && item.contentHash === candidate.contentHash) : undefined;
     const row = replay && linked ? { ...prior, priorDeliveryModel: linked.priorDeliveryModel, fallbackUntil: linked.fallbackUntil } : await documents.publishToLinkedTenant(actor,{ workspaceId: loaded.work.workspaceId, workId, revision: candidate.revision, contentHash: candidate.contentHash, tenantId: input.tenantId, receipt });
     const committedReceipt = row.receipt ?? receipt;
