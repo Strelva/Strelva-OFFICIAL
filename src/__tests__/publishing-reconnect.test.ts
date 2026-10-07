@@ -54,11 +54,11 @@ describe("signed owner reconnect", () => {
     const token = signReconnectToken(target, "link");
     const response = await reconnectGet(new Request(`https://app.example.test/api/publishing/google/reconnect?token=${token}`));
     expect(response.status).toBe(200); expect(await response.text()).toContain("Continue to Google");
-    expect(mocks.rpc.mock.calls[0][1].p_action).toBe("read");
+    expect(mocks.rpc.mock.calls[0]![1].p_action).toBe("read");
     const begun = await reconnectPost(new Request("https://app.example.test/api/publishing/google/reconnect", { method: "POST", headers: { origin: "https://app.example.test" }, body: new URLSearchParams({ token }) }));
     expect(begun.status).toBe(303); expect(begun.headers.get("location")).toContain("accounts.google.com");
     expect(begun.headers.get("set-cookie")).toContain("HttpOnly");
-    expect(mocks.rpc.mock.calls.at(-1)?.[1].p_action).toBe("begin");
+    expect(mocks.rpc.mock.calls.at(-1)?.[1]?.p_action).toBe("begin");
   });
   it("flags off, changed owner, missing encryption and cross-origin POST cannot begin", async () => {
     const token = signReconnectToken(target, "link");
@@ -112,7 +112,7 @@ describe("publishing delivery gates and existing digest", () => {
   });
   it("gated rows stay unsent, then existing morning digest contains each revision-bound approve link and records delivery", async () => {
     const memory = needsYouMemoryStore({ clock: { now: clock } });
-    const rows = [];
+    const rows: Awaited<ReturnType<typeof memory.store.open>>[] = [];
     for (const sourceId of ["fixture-firm:blog", "fixture-firm:newsletter"]) rows.push(await memory.store.open(WS, { kind: "customer.broadcast", route: "owner_decides", title: sourceId, approveEffect: "Publish after approval", notYetEffect: "Keep draft", sourceLifecycle: "tenant_event", sourceId, revisionHash: "a".repeat(64), urgent: false, adminMayDecide: true }));
     memory.store.dueForDelivery = async () => rows.map(row => ({ ...row, businessName: "Fixture firm", timezone: "America/New_York", recipient: { email: target.recipient, from: "record", tenantId: target.tenantId! } }));
     memory.store.recordDelivery = vi.fn(async (_ws, id) => rows.find(row => row.id === id)!);
@@ -120,7 +120,7 @@ describe("publishing delivery gates and existing digest", () => {
     const service = createNeedsYouService({ store: memory.store, adapters: [], appOrigin: "https://app.example.test", now: () => clock, sendEmail: send, canDeliver: async () => deliver });
     expect((await service.chase()).ownerNotTold).toBe(2); expect(send).not.toHaveBeenCalled(); expect(memory.store.recordDelivery).not.toHaveBeenCalled();
     deliver = true; expect((await service.chase()).digests).toBe(1); expect(send).toHaveBeenCalledTimes(1);
-    const decisions = send.mock.calls[0][0].options.decisions;
+    const decisions = send.mock.calls[0]![0].options.decisions;
     expect(decisions).toHaveLength(2);
     for (const item of decisions) expect(verifyWorkspaceApproveToken(new URL(item.approve.url).searchParams.get("token")!)).toMatchObject({ workspaceId: WS, recipient: target.recipient, revision: "a".repeat(64) });
     expect(memory.store.recordDelivery).toHaveBeenCalledTimes(2);
@@ -129,7 +129,7 @@ describe("publishing delivery gates and existing digest", () => {
     const send = vi.fn().mockResolvedValue(accepted);
     const store = { list: vi.fn(async () => [target.bindingId]), target: vi.fn(async () => target), notice: vi.fn(), noticeFailed: vi.fn(), restored: vi.fn() };
     expect(await chaseGoogleReconnectNotices({ store, send, enabled: async () => false })).toMatchObject({ suppressed: 1 }); expect(send).not.toHaveBeenCalled();
-    await chaseGoogleReconnectNotices({ store, send, enabled: async () => true }); expect(send.mock.calls[0][0].idempotencyKey).toBe(`publishing-google-outage:${ID}`);
+    await chaseGoogleReconnectNotices({ store, send, enabled: async () => true }); expect(send.mock.calls[0]![0].idempotencyKey).toBe(`publishing-google-outage:${ID}`);
     store.target.mockResolvedValue({ ...target, noticeStatus: "accepted" }); await chaseGoogleReconnectNotices({ store, send, enabled: async () => true }); expect(send).toHaveBeenCalledTimes(1);
     vi.stubEnv("STRELVA_PUBLISHING_RELEASE", "0"); store.list.mockClear(); await chaseGoogleReconnectNotices({ store, send }); expect(store.list).not.toHaveBeenCalled();
   });

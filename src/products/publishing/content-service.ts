@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { addEvent, getEventsRaw } from "@/lib/events";
-import type { UnifiedEvent } from "@/lib/types";
-import { COLLECTION_TYPES, validateEntryData, type CollectionType } from "@/lib/cms/collection-types";
-import { getEntry, listEntriesForType, slugify } from "@/lib/cms/collections-service";
+import { tenantPublishingPorts } from "@/platform/infra/tenant-publishing";
+import type { UnifiedEvent } from "@/platform/infra/event-contract";
+import { COLLECTION_TYPES, validateEntryData, type CollectionType } from "@/platform/infra/collection-types";
+
 import { canonicalJson, sha256 } from "@/platform/business-record/tenant-import";
 import { authorizePublishingEvent } from "./authority";
 import { publishingEnabledForWorkspace } from "./release";
@@ -42,8 +42,8 @@ async function rpc(name: string, input: Record<string, unknown>) {
 const defaultPorts: ContentPorts = {
   enabled: (workspaceId, actor) => actor ? publishingEnabledForWorkspace(workspaceId, actor) : workspaceReleaseFlagEnabled("publishing", workspaceId),
   authorize: authorizePublishingEvent,
-  entry: getEntry,
-  add: event => addEvent(event, { requirePersistence: true }),
+  entry: async (...args) => (await tenantPublishingPorts()).getEntry(...args),
+  add: async event => (await tenantPublishingPorts()).addEvent(event, { requirePersistence: true }),
   publish: input => rpc("publish_workspace_collection", input),
   approveIssue: input => rpc("approve_workspace_newsletter_issue", input),
 };
@@ -60,7 +60,7 @@ export async function prepareContentDraft(target: ContentTarget, raw: unknown, p
     if (!parsed.success) throw parsed.error;
     const data = parsed.data as Record<string, unknown>;
     if (Buffer.byteLength(JSON.stringify(data)) > 12000) throw new Error("This entry is too large to review safely.");
-    const slug = draft.slug ?? slugify(String(data[COLLECTION_TYPES[draft.type].titleField]));
+    const slug = draft.slug ?? String(data[COLLECTION_TYPES[draft.type].titleField]).toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
     z.string().regex(/^[a-z0-9-]{1,80}$/).parse(slug);
     const before = contentBaseline(await ports.entry(target.tenantId, draft.type, slug));
     payload = { type: draft.type, slug, data, before, baselineHash: contentFingerprint(before) };
@@ -110,8 +110,8 @@ export async function executePublishingEvent(input: { tenantId: string; event: U
 
 export async function readContentWorkspace(target: ContentTarget) {
   const [entries, events, outputs, receipts] = await Promise.all([
-    target.kind === "website" ? Promise.all((["blog", "video", "product"] as const).map(async type => ({ type, entries: await listEntriesForType(target.tenantId, type, { limit: 100 }) }))) : Promise.resolve([]),
-    getEventsRaw(target.tenantId, { limit: 100 }),
+    target.kind === "website" ? Promise.all((["blog", "video", "product"] as const).map(async type => ({ type, entries: await (await tenantPublishingPorts()).listEntriesForType(target.tenantId, type, { limit: 100 }) }))) : Promise.resolve([]),
+    tenantPublishingPorts().then(ports => ports.getEventsRaw(target.tenantId, { limit: 100 })),
     target.kind === "newsletter" ? readNewsletterIssues(target.workspaceId, target.tenantId) : Promise.resolve([]),
     target.kind === "website" ? readCollectionReceipts(target) : Promise.resolve([]),
   ]);

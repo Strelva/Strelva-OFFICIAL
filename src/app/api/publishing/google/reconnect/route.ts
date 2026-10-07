@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { reconnectPage } from "@/products/publishing/reconnect-page";
-import { GOOGLE_RECONNECT_COOKIE, newReconnectNonce, reconnectAppOrigin, reconnectHash, reconnectReleaseEnabled, reconnectStore, signReconnectToken, verifyReconnectToken } from "@/products/publishing/reconnect";
+import { reconnectPage } from "@/products/publishing/server";
+import { GOOGLE_RECONNECT_COOKIE, newReconnectNonce, reconnectAppOrigin, reconnectHash, reconnectReleaseEnabled, reconnectStore, signReconnectToken, verifyReconnectToken } from "@/products/publishing/server";
 
 
 async function readTarget(token: string) {

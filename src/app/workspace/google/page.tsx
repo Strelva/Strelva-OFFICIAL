@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { openWorkspacePlace } from "@/platform/owner-entry/place";
 import { readPlace } from "@/platform/owner-entry/place-state";
-import { publishingEnabledForWorkspace } from "@/products/publishing/release";
-import { readWorkspaceGoogle } from "@/products/google-listing/workspace";
+import { publishingEnabledForWorkspace } from "@/products/publishing/server";
+import { readWorkspaceGoogle } from "@/products/google-listing/server";
 import { WorkspaceGoogle } from "@/experience/places/WorkspaceGoogle";
 
 export const dynamic = "force-dynamic";

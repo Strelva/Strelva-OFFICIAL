@@ -3,7 +3,7 @@ import { requireCronRequest } from "@/lib/cron-auth";
 import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { needsYouReleaseEnabled, needsYouService } from "@/platform/needs-you/server";
 import { releaseFlagMayBeOn } from "@/platform/release-flags/resolve";
-import { chaseGoogleReconnectNotices } from "@/products/publishing/reconnect";
+import { chaseGoogleReconnectNotices } from "@/products/publishing/server";
 
 export const maxDuration = 300;
 

@@ -76,3 +76,25 @@ export async function readPublishingExtras(listing: BusinessSystems, readers: Pu
   collections.sort((a, b) => a.tenantId.localeCompare(b.tenantId));
   return { newsletters, collections };
 }
+
+export const publishingEnabledForWorkspace = async (...args: Parameters<typeof import("./release").publishingEnabledForWorkspace>) => (await import("./release")).publishingEnabledForWorkspace(...args);
+
+export const recordGoogleApprovalPolicyEnabled = async (...args: Parameters<typeof import("./release").recordGoogleApprovalPolicyEnabled>) => (await import("./release")).recordGoogleApprovalPolicyEnabled(...args);
+
+export const authorizePublishingEvent = async (...args: Parameters<typeof import("./authority").authorizePublishingEvent>) => (await import("./authority")).authorizePublishingEvent(...args);
+
+export const contentTarget = async (...args: Parameters<typeof import("./content-server").contentTarget>) => (await import("./content-server")).contentTarget(...args);
+
+export const prepareContentDraft = async (...args: Parameters<typeof import("./content-service").prepareContentDraft>) => (await import("./content-service")).prepareContentDraft(...args);
+
+export const readContentWorkspace = async (...args: Parameters<typeof import("./content-service").readContentWorkspace>) => (await import("./content-service")).readContentWorkspace(...args);
+
+export const changeRecordWithGoogle = async (...args: Parameters<typeof import("./record-changes").changeRecordWithGoogle>) => (await import("./record-changes")).changeRecordWithGoogle(...args);
+
+export const patchRecordWithGoogle = async (...args: Parameters<typeof import("./record-changes").patchRecordWithGoogle>) => (await import("./record-changes")).patchRecordWithGoogle(...args);
+
+export const executePublishingEvent = async (...args: Parameters<typeof import("./execution").executePublishingEvent>) => (await import("./execution")).executePublishingEvent(...args);
+
+export { recordGoogleApprovalCopy } from "./record-changes";
+export * from "./reconnect";
+export { reconnectPage } from "./reconnect-page";

@@ -1,4 +1,4 @@
-import { publishingEnabledForWorkspace } from "@/products/publishing/release";
+import { publishingEnabledForWorkspace } from "@/products/publishing/server";
 /**
  * Server projection for the Systems experience. Server only: it reads the
  * spine, existing monitors and saved rebuilds, and runs Make real on an

@@ -1,3 +1,4 @@
+import { tenantPublishingPorts } from "@/platform/infra/tenant-publishing";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
@@ -33,7 +34,7 @@ const defaults: RecordChangeDeps = {
       ? binding.locations.map(location => ({ tenantId: binding.originTenantId!, locationId: location.locationId })) : []);
   },
   async prepare(actor, input) { return (await import("@/products/google-listing/server")).prepareGoogleListingDraft(actor, input); },
-  async approve(tenantId, eventId, actorId) { return (await import("@/lib/event-actions")).resolveEventAction(tenantId, eventId, "approved", actorId); },
+  async approve(tenantId, eventId, actorId) { return (await tenantPublishingPorts()).resolveEventAction(tenantId, eventId, "approved", actorId); },
 };
 
 /** The record commits first. Each Google effect has its own approval/receipt;

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { UnifiedEvent } from "@/lib/types";
+import type { UnifiedEvent } from "@/platform/infra/event-contract";
 import { getSessionUser } from "@/platform/infra/db/server-client";
 import { hasTenantPermission } from "@/platform/infra/auth";
 import { readLinkedSite } from "@/platform/owner-entry/linked-sites";

@@ -1,5 +1,5 @@
-import { recordGoogleApprovalPolicyEnabled } from "@/products/publishing/release";
-import { recordGoogleApprovalCopy } from "@/products/publishing/record-changes";
+import { recordGoogleApprovalPolicyEnabled } from "@/products/publishing/server";
+import { recordGoogleApprovalCopy } from "@/products/publishing/server";
 import type { Metadata } from "next";
 import { isSuperAdmin } from "@/platform/infra/auth";
 import { readBusinessRecord } from "@/platform/business-record/service";

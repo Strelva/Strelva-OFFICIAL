@@ -57,5 +57,5 @@ export const workspacePortLoaders = {
 
   websites: () => import("@/products/websites/index"),
 
-  publishingContent: () => import("@/products/publishing/execution"),
+  publishingContent: () => import("@/products/publishing/server"),
 };

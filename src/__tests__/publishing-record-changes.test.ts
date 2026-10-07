@@ -41,7 +41,7 @@ describe("record changes and Google policy", () => {
     expect(result.record).toEqual(saved); expect(result.propagationError).toContain("record was saved"); expect(d.approve).not.toHaveBeenCalled();
   });
   it("rejects a member before a policy write and names the owner consent effect only when enabled", async () => {
-    const d = deps(); d.read = vi.fn(async () => ({ ...record, access: "member" }));
+    const d = deps(); d.read = vi.fn(async () => ({ ...record, access: "member" as const }));
     await expect(changeRecordWithGoogle(actor, workspaceId, 1, patch, { source: "owner", commandId }, d)).rejects.toThrow("Only an owner");
     expect(d.patch).not.toHaveBeenCalled(); expect(recordGoogleApprovalCopy(record, false)).toBeNull(); expect(recordGoogleApprovalCopy(record, true)).toContain("also approves");
   });

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { isSuperAdmin } from "@/platform/infra/auth";
 import { getSessionUser } from "@/platform/infra/db/server-client";
 import { readBusinessRecord } from "@/platform/business-record/service";
-import { patchRecordWithGoogle } from "@/products/publishing/record-changes";
+import { patchRecordWithGoogle } from "@/products/publishing/server";
 import { saveBusinessDetails } from "@/platform/business-record/details-save";
 import { ownerEntryHomesOpen } from "@/platform/owner-entry/linked-sites";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";

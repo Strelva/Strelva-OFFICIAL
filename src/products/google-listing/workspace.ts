@@ -1,24 +1,24 @@
 import { z } from "zod";
-import { addEvent, getEvents, getEventRaw } from "@/lib/events";
-import type { UnifiedEvent } from "@/lib/types";
+import { tenantPublishingPorts } from "@/platform/infra/tenant-publishing";
+import type { UnifiedEvent } from "@/platform/infra/event-contract";
 import { canonicalJson, sha256 } from "@/platform/business-record/tenant-import";
 import { getRedis } from "@/platform/infra/redis";
-import { authorizePublishingEvent } from "@/products/publishing/authority";
+import { authorizePublishingEvent } from "@/products/publishing/server";
 import { hasTenantPermission } from "@/platform/infra/auth";
 import { readLinkedSite } from "@/platform/owner-entry/linked-sites";
 import { readBusinessRecord } from "@/platform/business-record/service";
 import { factValueSchemas } from "@/platform/business-record/contracts";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
-import { publishingEnabledForWorkspace } from "@/products/publishing/release";
+import { publishingEnabledForWorkspace } from "@/products/publishing/server";
 import { readPublishingSnapshot } from "@/products/publishing/server";
 import { defaultTenantReplyDeps } from "./tenant-replies";
 import { readListingControl, noteListingAccess, setListingPaused } from "./controls";
-import { postInputSchema, type ListingReceipt } from "./contracts";
+import { googleDraftInputSchema, postInputSchema, type ListingReceipt } from "./contracts";
 import { createListingPost, syncHoursFromRecord, syncInfoFromRecord, undoListingChange, receiptHeadline, type ListingContext, type ListingWriteOutcome, postReviewReply, withdrawReviewReply } from "./service";
 import { infoToGoogle, hoursToGoogle, type RecordInfo } from "./record";
 
 const infoSchema = z.object({ phone: factValueSchemas.phone.optional(), description: factValueSchemas.description.optional(), links: factValueSchemas.links.optional() }).strict();
-export const googleDraftInputSchema = z.object({ workspaceId: z.string().uuid(), tenantId: z.string().min(1).max(120), locationId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/), kind: z.enum(["hours", "info", "post"]), post: postInputSchema.optional(), commandId: z.string().uuid().optional() }).strict();
+
 const draftSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("hours"), hours: factValueSchemas.hours }),
   z.object({ action: z.literal("info"), record: infoSchema }),
@@ -52,20 +52,20 @@ export async function prepareGoogleListingDraft(actor: WorkspaceActor, raw: z.in
   const display = draft.action === "hours" ? hoursToGoogle(draft.hours) : draft.action === "info" ? infoToGoogle(draft.record).body : draft.post;
   const digest = sha256(canonicalJson({ tenantId: input.tenantId, locationId: input.locationId, draft, revision: record.revision }));
   const redis = input.commandId ? getRedis() : null;
-  const commandKey = input.commandId ? `google-listing-draft:${input.workspaceId}:${input.commandId}` : null;
+  const commandKey = input.commandId ? `google-listing-draft:${input.workspaceId}:${input.commandId}:${input.locationId}:${input.kind}` : null;
   if (commandKey) {
     if (!redis) throw new Error("Draft persistence is unavailable.");
     const prior = await redis.get<{ digest: string; eventId?: string }>(commandKey);
     if (prior) {
       if (prior.digest !== digest) throw new Error("This command already prepared a different draft.");
-      const event = prior.eventId ? await getEventRaw(prior.eventId) : null;
+      const event = prior.eventId ? await (await tenantPublishingPorts()).getEventRaw(prior.eventId) : null;
       if (event) return event;
       throw new Error("This draft needs reconciliation. Nothing was prepared again.");
     }
     const reserved = await redis.set(commandKey, { digest }, { nx: true, ex: 90 * 24 * 60 * 60 });
     if (!reserved) throw new Error("This draft is already being prepared.");
   }
-  const event = await addEvent({ tenantId: input.tenantId, source: "google", type: "content_update", title: draft.action === "post" ? "Review your Google post" : `Review your Google ${draft.action}`, body: JSON.stringify(display, null, 2), status: "pending", metadata: { kind: "workspace_google_listing_draft", workspaceId: input.workspaceId, locationId: input.locationId, draft, reviewAudience: "owner", recordRevision: record.revision } }, { requirePersistence: true });
+  const event = await (await tenantPublishingPorts()).addEvent({ tenantId: input.tenantId, source: "google", type: "content_update", title: draft.action === "post" ? "Review your Google post" : `Review your Google ${draft.action}`, body: JSON.stringify(display, null, 2), status: "pending", metadata: { kind: "workspace_google_listing_draft", workspaceId: input.workspaceId, locationId: input.locationId, draft, reviewAudience: "owner", recordRevision: record.revision } }, { requirePersistence: true });
   if (commandKey && redis) await redis.set(commandKey, { digest, eventId: event.id }, { ex: 90 * 24 * 60 * 60 });
   return event;
 }
@@ -102,7 +102,7 @@ export async function executeGoogleListingEvent(input: { tenantId: string; event
     const { getSupabase } = await import("@/platform/infra/db/client");
     const db = getSupabase();
     if (!db) return { accepted: false, reason: "record_unavailable" };
-    const { data, error } = await db.rpc("check_google_listing_record_revision", { p_workspace_id: metadata.workspaceId, p_revision: input.event.metadata?.recordRevision });
+    const { data, error } = await (db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> }).rpc("check_google_listing_record_revision", { p_workspace_id: metadata.workspaceId, p_revision: input.event.metadata?.recordRevision });
     if (error || data !== true) return { accepted: false, reason: "Your business details changed. Prepare a fresh Google draft." };
   }
   const ctx = await tenantListingContext(input.tenantId, metadata.workspaceId, metadata.locationId);
@@ -136,7 +136,7 @@ export async function readWorkspaceGoogle(actor: WorkspaceActor, workspaceId: st
   const allowed = new Set(sites.map(site => site.tenantId));
   return Promise.all(snapshot.bindings.filter(binding => binding.originTenantId && allowed.has(binding.originTenantId)).flatMap(binding => binding.locations.map(async location => {
     const tenantId = binding.originTenantId!;
-    const [control, events, canManage] = await Promise.all([readListingControl(workspaceId, location.locationId), getEvents(tenantId, { limit: 1000, status: "pending" }), hasTenantPermission(tenantId, "publishing:manage")]);
+    const [control, events, canManage] = await Promise.all([readListingControl(workspaceId, location.locationId), tenantPublishingPorts().then(ports => ports.getEvents(tenantId, { limit: 1000, status: "pending" })), hasTenantPermission(tenantId, "publishing:manage")]);
     const receipts = snapshot.receipts.filter(receipt => receipt.locationId === location.locationId && receipt.bindingId === binding.id) as unknown as ListingReceipt[];
     return { tenantId, locationId: location.locationId, name: location.title ?? "Google listing", control, canManage, connected: binding.status === "connected", drafts: events.filter(event => isGoogleListingEvent(event) && event.metadata?.workspaceId === workspaceId && event.metadata?.locationId === location.locationId).map(event => ({ id: event.id, title: event.title, body: event.body })), receipts: receipts.map(receipt => ({ id: receipt.id, headline: receiptHeadline(receipt), before: receipt.before, after: receipt.after, authority: receipt.authority, readback: receipt.readback, status: receipt.status, undo: Boolean(receipt.undo) && ["posted", "posted_unverified", "held_by_google"].includes(receipt.status) })) };
   })));

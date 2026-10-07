@@ -1,6 +1,6 @@
-import type { UnifiedEvent } from "@/lib/types";
+import type { UnifiedEvent } from "@/platform/infra/event-contract";
 import { executePublishingEvent as executeContentEvent } from "./content-service";
-import { executeGoogleListingEvent } from "@/products/google-listing/workspace";
+import { executeGoogleListingEvent } from "@/products/google-listing/server";
 
 /** One port into the existing claimed event executor; each output keeps its
  * source resolver and its own receipt home. */

@@ -1,11 +1,9 @@
-import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 
-export const listingControlSchema = z.object({
-  workspaceId: z.string().uuid(), locationId: z.string(), paused: z.boolean(), accessPending: z.boolean(), updatedAt: z.string().nullable(),
-});
-export type ListingControl = z.infer<typeof listingControlSchema>;
+import { listingControlSchema } from "./contracts";
+export { listingControlSchema } from "./contracts";
+export type { ListingControl } from "./contracts";
 type Db = { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: unknown }> };
 
 async function call(name: string, args: Record<string, unknown>, db: Db | null) {

@@ -2,7 +2,7 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypt
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import { bindingEncryptionReady, googleBindingsEnabled, upsertGoogleBinding } from "@/platform/account-bindings/store";
-import { recordGoogleConnection } from "@/lib/google-access";
+import { tenantPublishingPorts } from "@/platform/infra/tenant-publishing";
 import { releaseFlagMayBeOn } from "@/platform/release-flags/resolve";
 import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 import { publishingNoticesEnabled } from "@/platform/needs-you/publishing-delivery";
@@ -127,7 +127,7 @@ export async function finishGoogleReconnect(target: ReconnectTarget, code: strin
   if (!scopes.includes(MANAGE_SCOPE)) throw new Error("Google publishing permission was not granted.");
   const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
   if (target.tenantId) {
-    const outcome = await recordGoogleConnection({ tenantId: target.tenantId, accessToken: tokens.access_token, refreshToken: tokens.refresh_token, expiresAt, scopes });
+    const outcome = await (await tenantPublishingPorts()).recordGoogleConnection({ tenantId: target.tenantId, accessToken: tokens.access_token, refreshToken: tokens.refresh_token, expiresAt, scopes });
     if (outcome.binding !== "written") throw new Error("Google access could not be saved in this workspace.");
   } else {
     const saved = await upsertGoogleBinding({ workspaceId: target.workspaceId, originTenantStableId: target.tenantStableId,

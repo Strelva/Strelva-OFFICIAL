@@ -1,7 +1,7 @@
 import { customerEmailEnabled, emailSendingEnabled } from "@/platform/infra/email/enabled";
 import { getClientEmailOverride } from "@/platform/infra/email/client-override";
 import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
-import { getEventRaw } from "@/lib/events";
+import { tenantPublishingPorts } from "@/platform/infra/tenant-publishing";
 import type { DeliveryRow } from "@/platform/needs-you/repository";
 
 export const PUBLISHING_EVENT_KINDS = new Set([
@@ -23,7 +23,7 @@ export async function publishingDecisionDeliveryAllowed(row: DeliveryRow): Promi
   const separator = row.sourceId.indexOf(":");
   if (separator <= 0) return true;
   const tenantId = row.sourceId.slice(0, separator);
-  const event = await getEventRaw(row.sourceId.slice(separator + 1));
+  const event = await (await tenantPublishingPorts()).getEventRaw(row.sourceId.slice(separator + 1));
   if (!event || !PUBLISHING_EVENT_KINDS.has(String(event.metadata?.kind ?? ""))) return true;
   return publishingNoticesEnabled(row.workspaceId, tenantId);
 }

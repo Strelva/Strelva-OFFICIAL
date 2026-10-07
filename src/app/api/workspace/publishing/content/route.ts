@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";
-import { publishingEnabledForWorkspace } from "@/products/publishing/release";
-import { contentTarget } from "@/products/publishing/content-server";
-import { prepareContentDraft, readContentWorkspace } from "@/products/publishing/content-service";
+import { publishingEnabledForWorkspace } from "@/products/publishing/server";
+import { contentTarget } from "@/products/publishing/server";
+import { prepareContentDraft, readContentWorkspace } from "@/products/publishing/server";
 import { getEventRaw } from "@/lib/events";
 import { resolveEventAction } from "@/lib/event-actions";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";

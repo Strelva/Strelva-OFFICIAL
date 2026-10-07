@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { WorkspacePlace, type PlaceState } from "./WorkspacePlace";
-import type { readWorkspaceGoogle } from "@/products/google-listing/workspace";
+import type { readWorkspaceGoogle } from "@/products/google-listing/server";
 
 type Listings = Awaited<ReturnType<typeof readWorkspaceGoogle>>;
 function Context({ workspaceId, listing }: { workspaceId: string; listing: Listings[number] }) {

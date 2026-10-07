@@ -3,7 +3,7 @@ import type { UnifiedEvent } from "@/lib/types";
 import { authorizePublishingEvent, type PublishingAuthorityDeps } from "@/products/publishing/authority";
 const workspaceId = "7f000000-0000-4000-8000-000000000010";
 const actorId = "7f000000-0000-4000-8000-000000000001";
-const event = { tenantId: "mooney", metadata: { workspaceId, kind: "workspace_newsletter_issue" } } as UnifiedEvent;
+const event: UnifiedEvent = { id: "event", createdAt: "2026-10-07T12:00:00Z", source: "ai", type: "newsletter_draft", status: "pending", title: "Issue", body: "Reviewed copy", tenantId: "mooney", metadata: { workspaceId, kind: "workspace_newsletter_issue" } };
 const deps = (): PublishingAuthorityDeps => ({ target: vi.fn(async () => ({ workspaceId } as never)), owner: vi.fn(async () => ({ email: "owner@example.test" } as never)), session: vi.fn(async () => null), permission: vi.fn(async () => true), linked: vi.fn(async () => ({ tenantId: "mooney" } as never)), record: vi.fn(async () => ({ access: "owner" } as never)), released: vi.fn(async () => true), viewer: vi.fn(async () => ({ operator: false, tester: false })) });
 describe("publishing decision authority", () => {
   it("accepts a recipient-bound decision only for the live owner of the linked business", async () => {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GOOGLE_RECONNECT_COOKIE, finishGoogleReconnect, reconnectHash, reconnectReleaseEnabled, reconnectStore, verifyReconnectToken } from "@/products/publishing/reconnect";
-import { reconnectPage } from "@/products/publishing/reconnect-page";
+import { GOOGLE_RECONNECT_COOKIE, finishGoogleReconnect, reconnectHash, reconnectReleaseEnabled, reconnectStore, verifyReconnectToken } from "@/products/publishing/server";
+import { reconnectPage } from "@/products/publishing/server";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const finish = (message: string, status: number) => {

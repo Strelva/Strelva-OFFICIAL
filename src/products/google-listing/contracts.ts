@@ -119,3 +119,10 @@ export interface GoogleInfo {
   websiteUri?: string;
   profile?: { description?: string };
 }
+
+export const listingControlSchema = z.object({
+  workspaceId: z.string().uuid(), locationId: z.string(), paused: z.boolean(), accessPending: z.boolean(), updatedAt: z.string().nullable(),
+});
+export type ListingControl = z.infer<typeof listingControlSchema>;
+
+export const googleDraftInputSchema = z.object({ workspaceId: z.string().uuid(), tenantId: z.string().min(1).max(120), locationId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/), kind: z.enum(["hours", "info", "post"]), post: postInputSchema.optional(), commandId: z.string().uuid().optional() }).strict();
