@@ -1,3 +1,6 @@
+import { businessBookingEmailEnabled } from "./email-enablement";
+import { bookingAgentLabel } from "./agent-source";
+import { bookingAgentVisibilityEnabled } from "./flags";
 /** One send path, existing audience gates, no retry after a provider attempt. */
 import { z } from "zod";
 import { decryptSecret } from "@/platform/infra/crypto/secrets";
@@ -20,7 +23,7 @@ export async function bookingCustomerEmailAllowed(tenantId: string | null, works
   if (!z.string().uuid().safeParse(workspaceId).success) return false;
   // Native businesses have no tenant override to inherit. Explicit operator
   // arming is required in addition to both global email gates.
-  return !!workspaceId && await getClientEmailOverride(`workspace:${workspaceId}`) === "on";
+  return !!workspaceId && await businessBookingEmailEnabled(workspaceId);
 }
 
 function calendarFile(booking: StoreBooking, businessName: string, address: string) {
@@ -68,6 +71,7 @@ export async function deliverBookingUpdates(bookingId: string | null = null, dep
       const to = row.audience === "client" ? business?.ownerEmail : booking.customer.email;
       if (!business || !to) { await finish("skipped", null, "no_recipient"); continue; }
       if (!await (booking.tenantId ? deps.customerAllowed(booking.tenantId) : deps.customerAllowed(null, booking.workspaceId))) { summary.suppressed++; await finish("suppressed", null, "email_gates"); continue; }
+      const agentSource = bookingAgentVisibilityEnabled() ? bookingAgentLabel(booking) : null;
       const when = bookingWhen(booking);
       const state = booking.status;
       const rescheduled = row.reason === "Customer rescheduled";
@@ -87,7 +91,7 @@ export async function deliverBookingUpdates(bookingId: string | null = null, dep
           : state === "declined" ? "This time was not confirmed. Reply to ask about another time."
           : "Your time is confirmed.",
           ...(business.address ? [`Where: ${business.address}`] : [])],
-          rows: [{ label: "Service", value: booking.serviceName }, { label: "When", value: `${when.day}, ${when.time} (${booking.timeZone})` }],
+          rows: [{ label: "Service", value: booking.serviceName }, { label: "When", value: `${when.day}, ${when.time} (${booking.timeZone})` }, ...(agentSource ? [{ label: "Source", value: agentSource }] : [])],
           ...(url ? { button: { label: row.audience === "client" ? "Open bookings" : state === "held" ? "Review and confirm" : "Change or cancel", url } } : {}) },
         ...(state === "confirmed" && row.audience === "customer" ? { attachments: [{ filename: "booking.ics", content: Buffer.from(calendarFile(booking, business.name, business.address ?? "")).toString("base64") }] } : {}),
       });

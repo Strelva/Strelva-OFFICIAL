@@ -90,7 +90,7 @@ Rendered documents on local port 3016: 1280px populated editable file; 360px rea
 
 Auth screenshots under ignored `test-results/`: `catalog-staff-1280.png`, `catalog-staff-360.png`, `catalog-owner-request-360.png`, `catalog-failed-plan-request-360.png`. The rendered staff list revealed raw link UUIDs; readable use-grant labels now join only contacts/staff referenced by the current recipient’s visible records/fields, rechecking grant/release/identity. SQL tests cover own/all/none scope, hidden fields, foreign links, revocation and expiry; rollback/reapply passed. Croki rendered the real recipient component through the gated, network-free `/preview/strelva/tool` rehearsal: 360px labeled records and a saved correction; 1280px read-only without edit/submit controls; 320px empty. Labels fit without overflow, IDs stay in the correction draft, email validation accepts an unchanged person link, and keyboard focus moves into the correction then tabs through fields. Screenshots under the same browser-artifacts directory: `browser-screenshot-localhost-muyangsm-2092f1af.png`, `browser-screenshot-localhost-muyao7al-d65a5628.png`, `browser-screenshot-localhost-muyaokwc-064a2d5c.png`, `browser-screenshot-localhost-muyaol0a-4936fa8b.png`.
 
-The real Auth journey passed before the additive display-label lookup. Docker then became unresponsive and the owned loopback Auth database stopped accepting connections, so that Auth journey was not repeated after labels. Current labels are proven separately in the real SQL boundary, service projection tests and browser renderer. No Docker daemon restart or unrelated-stack action was attempted. This limitation is preserved rather than called a provider or production failure. The owned dev servers are stopped. Auth stack cleanup was attempted with a bounded stop of only `/tmp/strelva-auth.Qt8VdE`; Docker did not respond, so cleanup is not confirmed. When Docker recovers, run the cached Supabase CLI `stop --workdir /tmp/strelva-auth.Qt8VdE --no-backup`; do not stop unrelated stacks. Its private local env is `/tmp/w6-catalog-auth.env`, and cleanup output is `/tmp/w6-catalog-auth-cleanup.log`.
+Historical limitation, superseded for Auth verification by the #472 rerun below: the real Auth journey passed before the additive display-label lookup. Docker then became unresponsive and the owned loopback Auth database stopped accepting connections, so that Auth journey was not repeated after labels. Labels were proven separately in the real SQL boundary, service projection tests and browser renderer. No Docker daemon restart or unrelated-stack action was attempted. The owned dev servers were stopped. Auth stack cleanup was attempted with a bounded stop of only `/tmp/strelva-auth.Qt8VdE`; Docker did not respond, so that older stack's cleanup was not confirmed. Its original cleanup instruction remains `supabase stop --workdir /tmp/strelva-auth.Qt8VdE --no-backup`, with private local env `/tmp/w6-catalog-auth.env` and cleanup log `/tmp/w6-catalog-auth-cleanup.log`. This rerun does not certify cleanup of an older agent's stack.
 
 Failures retained and resolved:
 
@@ -117,4 +117,114 @@ Not proven: live converted-client parity; actual provider access/reliability/del
 
 Canonical project-model/capability/vault reconciliation belongs to the integration agent in the main checkout. This stream leaves shared company state untouched and supplies code/spec/handoff evidence.
 
-Exact next action: the integration agent reviews the committed `w6/catalog` tree and runs combined verification before promotion. Repeat the optional isolated Auth journey after Docker is available, then prepare the silent production steps above for Jacob. Production remains a separate decision.
+Exact next action: the integration agent reviews the #472 verification PR and resolves the inherited business-policies readiness sentinel before claiming combined release checks pass. The isolated Auth rerun is recorded below; the silent production steps above remain a separate decision.
+
+## October 7 integrated Auth rerun — #472
+
+Worktree `REB-a1-catalog-auth-journey`, branch `a1/catalog-auth-journey`, based on
+integrated revision `2af92d58bd8c94b5cdf0200eac5a8c54570861cc`. This closes the
+post-label Auth evidence gap, without changing catalog runtime code, migrations,
+release gates or dependencies.
+
+The unchanged journey first passed with real disposable Supabase Auth and all
+integrated migrations: **2 passed (15.5s)**. The expanded regression also checks
+atomic member submission, pre-grant denial, readable contact/staff labels in the
+recipient API and rendered records at 1280/360px, preservation of link IDs during
+a mobile correction, keyboard focus, own-record isolation, three accepted notice
+receipts, their sign-in destinations, and revocation denial. The owner Request
+and failed-maker Request recovery test remains intact. Three submissions produce
+three captured notices; the correction produces no extra notice.
+
+The local provider preloader answers model/mail calls with the existing synthetic
+fixtures and blocks other external fetches. Auth, application requests, permission
+checks and database writes are real loopback services. Model quality, mailbox
+delivery, live Google reads and production activation remain unproven. Monthly
+recap recipient resolution, suppression/failure behavior and receipt projection
+are covered by the targeted tests below; this Auth journey does not send a real
+monthly recap.
+
+Additional checks on this integrated tree:
+
+```text
+pnpm install --frozen-lockfile: exit 0
+pnpm exec playwright test tests/catalog-authenticated-local.spec.ts --workers=1 --retries=0 --reporter=line
+  Expanded dev-server journey: 2 passed (24.0s)
+NODE_ENV=production pnpm build: exit 0
+NODE_ENV=production pnpm exec next start --hostname localhost --port 3147
+pnpm exec playwright test tests/catalog-authenticated-local.spec.ts --workers=1 --retries=0 --reporter=line
+  Local optimized production-build journey: 2 passed (11.6s), no retries
+pnpm typecheck: exit 0
+pnpm lint: exit 0 (generated database.types.ts Babel size note)
+pnpm exec eslint tests/catalog-authenticated-local.spec.ts: exit 0
+pnpm check:boundaries: exit 0; 204 workspace -> src/lib imports in 93 files, 44 older imports
+pnpm check:custom-repos: exit 0; 196/196 checks passed
+LC_ALL=en_US.UTF-8 PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-sql
+  Workspace, customer mapping and inquiry SQL checks passed; exit 0
+```
+
+The targeted command was:
+
+```bash
+pnpm test src/__tests__/internal-tool-links.test.ts src/__tests__/internal-tool-use-labels.test.ts src/__tests__/internal-tool-use-edits.test.ts src/__tests__/internal-tool-use-edit-renderer.test.tsx src/__tests__/internal-tool-notice-delivery.test.ts src/__tests__/catalog-crons.test.ts src/__tests__/catalog-reports.test.ts src/__tests__/catalog-health.test.ts src/__tests__/workspace-recaps.test.tsx src/__tests__/systems-catalog-projection.test.ts --maxWorkers=2
+```
+
+Result: **10 files, 100 tests passed (2.82s)**. Full commands also accompany the
+#472 PR. Local evidence logs use `/tmp/a1-472-*`; screenshots remain under ignored
+`test-results/` as `catalog-staff-1280.png`, `catalog-staff-360.png`,
+`catalog-owner-request-360.png` and `catalog-failed-plan-request-360.png`.
+Desktop and mobile screenshots were inspected; readable labels wrap within the
+record cards, and both widths pass the horizontal-overflow assertion.
+
+Both app runs use `STRELVA_LOCAL_AUTH_PROOF=1`,
+`STRELVA_LOCAL_CATALOG_PROOF=1`, the catalog provider preload, local Auth keys
+from `scripts/prepare-launch-auth-stack.sh`, and workspace/Systems/planning/
+internal-tool-notice release flags on. The model and Resend keys are dummy
+fixture values; both dev access bypasses are off. The optimized server additionally
+uses disposable Unix-socket Redis through the existing `startLocalRedis` and
+`startUpstashBridge` exports in `scripts/scrubbed-copy/redis.ts`, with
+`TENANTS_SOURCE=postgres`, `CONTENT_SOURCE=postgres` and `DATA_SOURCE=postgres`.
+This exercises the production rate-limit guard through the real Redis client.
+
+The owned app servers, Redis process/REST bridge and Supabase stack
+`/tmp/strelva-auth.sBaiDd` are stopped. `supabase stop --no-backup` succeeded;
+no containers remain for its project ID `strelva-proof-a1-catalog-472-1`.
+The three stopped SQL clusters, Auth directory/private env, Redis directory/
+private env, temporary Redis launcher and generated `.next` directories were
+removed. Unrelated stacks were left alone. Cleanup evidence is in
+`/tmp/a1-472-auth-cleanup.log` and `/tmp/a1-472-redis.log`.
+
+Failures preserved:
+
+- The first expanded run reached revocation with passing submit/label/correction
+  assertions, then failed because the new test read `grant.id` instead of
+  `grant.grant.id` and sent no JSON body/header. Corrected the fixture request;
+  the app's JSON guard was working as intended.
+- The first optimized-server attempt omitted Redis and failed both planning
+  checks with generic 503s, before the catalog journey could proceed. Production
+  rate limiting requires Redis and deliberately fails closed. Added disposable
+  local Redis through the existing bridge; the journey then passed. That run's
+  log also exposed a missing `TENANTS_SOURCE=postgres` setting in the test server.
+  Set the local data-source flags to Postgres and repeated the journey: **2
+  passed (11.6s)**, with no production-guard errors in the final app log. No app
+  guard was bypassed or weakened. Initial logs are
+  `/tmp/a1-472-production-journey-no-redis.log` and
+  `/tmp/a1-472-production-app-no-tenant-source.log`.
+- `pnpm test -- <paths>` forwarded a literal `--` to Vitest and started a broad
+  run. Interrupted it and used `pnpm test <paths> --maxWorkers=2` for the actual
+  targeted result: **10 files, 100 tests passed**. The targeted files cover
+  internal-tool links, use labels, edits, edit renderer, notice delivery, catalog
+  crons/reports/health, workspace recaps and Systems catalog projection.
+- The broad attempt found an inherited readiness failure and a booking timeout.
+  A bounded rerun of `production-readiness-snapshot.test.ts` and
+  `booking-one-store.test.ts` with one worker/30-second timeouts produced
+  **46 passed, 1 skipped, 1 failed**. The sole failure is
+  `20261011120000_business_policies.sql needs a sentinel` at
+  `src/__tests__/production-readiness-snapshot.test.ts:341`. The booking file
+  passes. This branch leaves the unrelated readiness mapping to its owning
+  stream; it does not claim the complete suite passes.
+
+Canonical project-model/capability/vault reconciliation remains with the
+integration coordinator. Proposed evidence delta: the catalog's post-label
+isolated Auth limitation is resolved locally; production/provider/commercial
+claims are unchanged. Review the verification PR, register the business-policies
+sentinel through its owner, then resume the separately authorized release work.

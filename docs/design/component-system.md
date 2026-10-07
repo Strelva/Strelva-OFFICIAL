@@ -551,13 +551,15 @@ starting implementation.
 
 Publishing uses [ContentWorkspace](../../src/experience/publishing/ContentWorkspace.tsx)
 for exact-content review, collection publication/restore, and immutable newsletter
-issues. Approved issue data may include a separate optional `delivery` projection:
-current state, accepted/suppressed counts, unconfirmed batches and append-only batch
-receipts. The view preserves approved words and distinguishes provider acceptance,
-not-sent gates and unconfirmed sends; it never claims delivery. October 7, 2026,
-`a1/newsletter-sender`: accepted desktop and gated/unconfirmed 390px fixtures were
-observed locally. Sending still defaults off; see the
-[implementation handoff](../product/streams/a1-newsletter-sender.md).
+issues. Native website Systems use the same panel and approval controls;
+publication confirms the content store, while website rendering remains unverified.
+Native newsletter approval stays paused. Approved issue data may include a separate
+optional `delivery` projection for linked tenants: current state, accepted/suppressed
+counts, unconfirmed batches and append-only batch receipts. The view preserves
+approved words and distinguishes provider acceptance, not-sent gates and unconfirmed
+sends; it never claims delivery. October 7, 2026, `a1/newsletter-sender`: accepted
+desktop and gated/unconfirmed 390px fixtures were observed locally. Sending still
+defaults off; see the [implementation handoff](../product/streams/a1-newsletter-sender.md).
 [RecordPublishingFields](../../src/experience/publishing/RecordPublishingFields.tsx)
 saves hours, special hours and website facts through the owner boundary, shows
 the optional Google approval disclosure, and reports each location separately
@@ -736,3 +738,15 @@ marks business confirmation explicitly: calendar sync is a copy, and a pending
 request awaits the business. Native visitor forms accept optional phone and show
 slots and receipts in the browser time zone, with the zone named. Without native
 authority metadata, the flags-off flow keeps its fields and provider wording.
+
+### Agent booking source, October 7, 2026
+
+`WorkspaceBookings` reuses Card, semantic status text, native details disclosures
+and existing navigation. Agent source is a wrapping text pill using the owned
+gray surface tokens; it grants no authority. The source filter preserves the
+chosen date and view, has 44px targets, and names the selected source with
+`aria-current`. Delegated reads hide all booking actions. `ManageBooking` reuses
+its receipt definition list for Source. These additions are default off under
+`STRELVA_BOOKING_AGENT_VISIBILITY`; agent names are supplied at booking.
+Local proof and remaining limits live in
+[the #304 handoff](../product/streams/a1-agent-bookings-visible.md).

@@ -1,3 +1,4 @@
+import { workspacePublishingScope } from "@/platform/infra/publishing-scope";
 import { hasTenantPermission } from "@/platform/infra/auth";
 import { listWorkspaces } from "@/platform/workspaces";
 import { WorkspaceAccessError, WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
@@ -16,13 +17,13 @@ export async function contentTarget(actor: WorkspaceActor, workspaceId: string, 
   const base = await listBusinessSystems(actor, workspaceId, { store: createSupabaseSystemStore() });
   const [snapshot, extras] = await Promise.all([readPublishingSnapshot(actor, workspaceId), readPublishingExtras(base)]);
   const item = addPublishingSystems(base, snapshot, extras).listing.systems.find(item => item.system.id === systemId && ["website", "newsletter"].includes(item.system.kind));
-  if (!item?.references.tenantId) throw new WorkspaceAccessError();
+  if (!item) throw new WorkspaceAccessError();
   const stopped = await readWorkspaceExitCompleted(workspaceId);
   const paused = item.system.lifecycle === "paused";
-  const canCompose = (workspace.role === "owner" || workspace.role === "admin") && await hasTenantPermission(item.references.tenantId, "content:write");
+  const canCompose = (workspace.role === "owner" || workspace.role === "admin") && (!item.references.tenantId || await hasTenantPermission(item.references.tenantId, "content:write"));
   const canApprove = workspace.role === "owner";
   if (write && (!canCompose || stopped || paused)) throw new WorkspaceConflictError("Publishing is paused or unavailable to your account.");
-  return { actor, workspaceId, systemId, tenantId: item.references.tenantId, kind: item.system.kind as ContentTarget["kind"], canCompose: canCompose && !stopped && !paused, canApprove: canApprove && !stopped && !paused, paused };
+  return { actor, workspaceId, systemId, tenantId: item.references.tenantId ?? workspacePublishingScope(workspaceId), kind: item.system.kind as ContentTarget["kind"], canCompose: canCompose && !stopped && !paused, canApprove: canApprove && !stopped && !paused, paused };
 }
 
 /** A tenant authoring tool keeps its legacy draft path unless this business

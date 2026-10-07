@@ -49,6 +49,9 @@ __pycache__/
 
 # Local release-safety investigation logs and generated catalog captures
 /.scratch/release-safety/
+/output/release-safety/
+/.scratch/temp-cluster-cleanup/*.log
+/.scratch/temp-cluster-cleanup/*.json
 # Stream command logs written at the worktree root
 /.scratch-*.log
 

@@ -1,3 +1,4 @@
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 /** Inquiry → three open times → a requested booking in the one store.
  * Off by default. A choice is a short-lived bearer link; GET never reserves. */
 import { createHash, randomBytes } from "node:crypto";
@@ -31,7 +32,7 @@ function project(raw: unknown): InquiryBookingOffer | null {
   if (!row.success) return null;
   const r = row.data, token = decryptSecret(r.token_ciphertext);
   if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) throw new PublicBookingError("unavailable", "Booking suggestions are unavailable.");
-  const origin = (process.env.NEXT_PUBLIC_APP_URL || "https://app.strelva.com").replace(/\/$/, "");
+  const origin = (process.env.NEXT_PUBLIC_APP_URL || CONTROL_PLANE_URL).replace(/\/$/, "");
   return { id: r.id, serviceId: r.service_ref, serviceName: r.service_name, timeZone: r.timezone,
     slots: r.slots, expiresAt: r.expires_at, url: `${origin}/book-inquiry/${token}`, token, booked: !!r.booking_id };
 }

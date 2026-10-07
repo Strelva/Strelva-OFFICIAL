@@ -1,3 +1,4 @@
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 /**
  * Connected sites, server side. Server only.
  *
@@ -71,7 +72,7 @@ export const generateSiteKey = () => `sk_pub_${randomSlug(24)}`;
 export const generateVerificationToken = () => randomSlug(32);
 
 function appOrigin(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL || "https://app.strelva.com").replace(/\/+$/, "");
+  return (process.env.NEXT_PUBLIC_APP_URL || CONTROL_PLANE_URL).replace(/\/+$/, "");
 }
 
 /** The two things a site owner pastes into the page. */
