@@ -109,6 +109,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261011102000": "workspace_collection_entries",
   "20261011101000": "business_booking_email_settings",
   "20261011120000": "business_policies",
+  "20261011150000": "public_booking_requests",
   "20261010140000": "google_listing_controls",
   "20261010142000": "workspace_newsletter_issues",
   "20261010143000": "publishing_google_outages",

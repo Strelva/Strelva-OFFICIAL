@@ -458,6 +458,7 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
       if (input.slotId !== existing.slotId || existing.requestFingerprint !== requestFingerprint) {
         throw new PublicBookingError("conflict", "This booking request is already used for different booking details.");
       }
+      if (existing.status !== "cancelled") await dependencies.admission?.send({ tenantId: input.tenantId, requestId: idempotencyRequestId });
       return receipt(existing);
     }
 

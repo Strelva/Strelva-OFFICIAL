@@ -876,6 +876,12 @@ psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-visibility-schema.
 # Every stream's release flag key survives the last literal redefinition (#253).
 psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 
+# #529: anonymous booking caps, email-only placement, and reversible schema.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011150000_public_booking_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011150000_public_booking_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011150000_public_booking_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/public-booking-admission-schema.sql"
+
 # Google location lineage through the real Versions/System stores, after the
 # account-binding migrations. Preparation stays fake; no Google dispatch.
 if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
