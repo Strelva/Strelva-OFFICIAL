@@ -197,3 +197,19 @@ export function mergeWebsiteHistory(native: WebsiteHistoryItem[], system: Array<
   })).map(row => ({ id: row.id, source: "system" as const, at: row.at, by: "Strelva", title: row.sentence, undo: null }));
   return newestFirst([...native, ...extra]);
 }
+
+/** Domain ownership and routing observations keep their own freshness and
+ * authority. Listing a Connection never authorizes a DNS or provider write. */
+export function websiteDomainConnections(detail: WebsiteSystemDetail): import("./model").SystemConnection[] {
+  return detail.domains.map(domain => ({
+    id: `${detail.systemId}:domain:${domain.hostname}`, kind: "appear", target: domain.hostname,
+    sentence: `The website appears at ${domain.hostname}. ${domain.label}.`,
+    status: domain.state === "verified" ? "connected" : domain.state === "pending" || domain.state === "not_claimed" ? "unknown" : "not_connected",
+    contract: {
+      sourceOfTruth: domain.label.includes("business's") || domain.label.includes("proof") ? "Connected site ownership proof; this does not verify hosted routing." : "Domain claims and the hosting provider's routing checks.",
+      authority: `Strelva may check this address. Changes are owner-decided. ${domain.whoCanChange}`,
+      freshness: domain.lastCheckedAt ? `Last checked ${domain.lastCheckedAt}.` : "No completed domain check is recorded.",
+      failureBehavior: "A routing problem changes domain health, not the website's lifecycle. DNS changes require the owner's decision and exact records.",
+    },
+  }));
+}

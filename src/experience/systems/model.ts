@@ -46,6 +46,8 @@ export interface SystemConnection {
   status: "connected" | "not_connected" | "unknown";
   /** `in`: another System points at this one (the form that appears on this site). */
   direction?: "out" | "in";
+  /** The actual read/write boundary, distinct from the connection's status. */
+  contract?: { sourceOfTruth: string; authority: string; freshness: string; failureBehavior: string };
 }
 
 export type PossibilityStatus = "exploring" | "ready";

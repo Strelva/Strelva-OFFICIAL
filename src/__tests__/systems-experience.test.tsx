@@ -51,6 +51,26 @@ describe("Systems read adapter with STRELVA_SYSTEMS_RELEASE off", () => {
 });
 
 describe("Systems read adapter over the spine projection", () => {
+  it("shows the business facts boundary for repo-only, native content, and hosted websites", () => {
+    for (const scenario of [
+      { editing: "request" as const, savedWorkId: null, status: "not_connected", sentence: "Strelva updates this site by hand" },
+      { editing: "native" as const, savedWorkId: null, status: "not_connected", sentence: "native website content" },
+      { editing: "native" as const, savedWorkId: "document", status: "connected", sentence: "when it renders" },
+    ]) {
+      const mapped = readBusinessSystems({ snapshot: snapshot([], projection({ systems: [entry(SITE, "website", "The Mooney Firm", { tenantId: "mooney-firm", editing: scenario.editing, savedWorkId: scenario.savedWorkId })] })), sites: [mooneySite] });
+      const facts = mapped.systems[0]!.connections.find(connection => connection.target === "Business record")!;
+      expect(facts).toMatchObject({ kind: "read", status: scenario.status, contract: { sourceOfTruth: "The business record's confirmed facts" } });
+      expect(facts.sentence).toContain(scenario.sentence);
+      expect(facts.contract?.authority).toContain("no contacts");
+    }
+  });
+  it("enriches a connected site's existing business facts read once after it becomes hosted", () => {
+    const mapped = readBusinessSystems({ snapshot: snapshot([], projection({
+      systems: [entry(SITE, "website", "Connected website", { tenantId: "mooney-firm", savedWorkId: "document", connectedSite: { siteUrl: "https://attymooney.com", siteHost: "attymooney.com", verified: true, lastEventAt: null } })],
+      connections: [{ id: "facts", sourceId: SITE, kind: "read", targetSystemId: null, targetLabel: "Business record", state: "connected", purpose: "Confirmed facts from the business record are filled into the site" }],
+    })), sites: [mooneySite] });
+    expect(mapped.systems[0]!.connections).toEqual([expect.objectContaining({ id: "facts", target: "Business record", status: "connected", sentence: "This website reads confirmed business facts when it renders." })]);
+  });
   it("draws the server's Systems by spine id, with lifecycle and health as separate marks", () => {
     const { systems, files, unavailable } = readBusinessSystems({
       snapshot: snapshot([work("intake", "applications", { title: "Mediation intake", operation: { status: "installed" } }), work("rebuild", "websites"), work("check", "ai_visibility")], mooney),
@@ -220,6 +240,19 @@ describe("Make real and the System page", () => {
     expect(html).toContain("Works with 2 things");
     expect(html).toMatch(/Posts to Google\.[^]*Not connected/);
     expect(html.indexOf("Posts to Google.")).toBeLessThan(html.indexOf("Works with 2 things"));
+  });
+
+  it("renders a misconfigured domain's contract without changing the website lifecycle", () => {
+    const html = render({ system: { ...site, lifecycle: "live" }, websiteDetail: { status: "ready", detail: {
+      systemId: SITE, domains: [{ hostname: "attymooney.com", state: "misconfigured", label: "DNS misconfigured", lastCheckedAt: "2026-10-07T00:00:00Z", whoCanChange: "The owner, with their registrar" }], waiting: [], requests: [], history: [], unavailable: [],
+    } } });
+    expect(html).toContain("The website appears at attymooney.com");
+    expect(html).toContain("Not connected");
+    expect(html).toContain("Source: Domain claims");
+    expect(html).toContain("Changes are owner-decided");
+    expect(html).toContain("Last checked 2026-10-07T00:00:00Z");
+    expect(html).toContain("not the website&#x27;s lifecycle");
+    expect(html).toContain('data-lifecycle="live"');
   });
 
   it("shows Make real in progress step by step, then History, in the spec's order", () => {

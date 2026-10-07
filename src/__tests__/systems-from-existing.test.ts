@@ -172,6 +172,10 @@ describe("systems from existing things", () => {
       expect(listing.systems).toHaveLength(1);
       expect(listing.systems[0]?.system).toMatchObject({ id: systemOriginId(BUSINESS, { kind: "connected_site", ref: connectedId }), lifecycle: "live" });
       expect(listing.systems[0]?.references).toMatchObject({ connectedSiteId: connectedId, savedWorkId: "5e000000-0000-4000-8000-0000000000a9" });
+      expect(listing.connections).toEqual([expect.objectContaining({ connection: expect.objectContaining({
+        source: { businessId: BUSINESS, systemId: listing.systems[0]!.system.id }, kind: "read", state: "connected",
+        target: { type: "business_resource", resource: "business_record:facts" },
+      }) })]);
     }
   });
 

@@ -152,6 +152,17 @@ tested the old website. Its copy states that Strelva switches its routing
 after those confirmations; it does not claim an automatic fallback check.
 The shared Button remains disabled until both confirmations are checked.
 
+October 7, Wave 6 website Connections: the System page retains a business-record
+read across a connected site's rebuild. Hosted documents describe reads at
+render; native content describes reviewed publication; repo-only sites say
+**Not connected** and "Strelva updates this site by hand." Per-domain
+**appear** Connections use the same domain observations as the Domains panel,
+with source of truth, owner authority, last check and DNS failure behavior.
+Disconnected or unconfirmed Connections remain visible; working ones use the
+existing **Works with** disclosure. These are read-only contracts behind the
+Systems release, not new grants or provider writes. Focused projection and
+render tests cover the contracts; browser proof belongs in the stream handoff.
+
 Keep completion scoped to named consumers. A repaired Button does not migrate all
 native buttons, and passing component tests does not prove an entire page journey.
 Record local checks with their revision and limitations in the existing

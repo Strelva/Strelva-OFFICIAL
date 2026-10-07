@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildWebsiteSystemDetail, type WebsiteDetailInputs } from "@/experience/systems/website-detail";
+import { buildWebsiteSystemDetail, websiteDomainConnections, type WebsiteDetailInputs } from "@/experience/systems/website-detail";
 import type { WebsiteDetailSources } from "@/experience/systems/website-detail-server";
 import type { ConnectedSitesOverview } from "@/products/connected-sites/server";
 
@@ -19,6 +19,12 @@ function inputs(overrides: Partial<WebsiteDetailInputs> = {}): WebsiteDetailInpu
 }
 
 describe("website System page lists", () => {
+  it("projects domain appearance with its source, owner authority, freshness and failure behavior", () => {
+    const detail = buildWebsiteSystemDetail(inputs({ domains: [{ hostname: "gldf.example.test", state: "misconfigured", label: "DNS misconfigured", lastCheckedAt: "2026-10-07T00:00:00Z", whoCanChange: "The owner, with their registrar" }] }));
+    expect(websiteDomainConnections(detail)).toEqual([expect.objectContaining({ kind: "appear", target: "gldf.example.test", status: "not_connected",
+      contract: { sourceOfTruth: "Domain claims and the hosting provider's routing checks.", authority: expect.stringContaining("owner-decided"), freshness: "Last checked 2026-10-07T00:00:00Z.", failureBehavior: expect.stringContaining("not the website's lifecycle") } })]);
+    expect(detail.domains[0]!.state).toBe("misconfigured");
+  });
   it("merges the four release stores into one History, newest first, with who and undo", () => {
     const detail = buildWebsiteSystemDetail(inputs({
       contentVersions: [{ id: "v_1", section: "hero", author: "ai", timestamp: "2026-10-01T10:00:00Z", status: "live" }, { id: "v_2", section: "hero", author: "user", timestamp: "2026-10-04T10:00:00Z", status: "live", changes: [{ field: "_restore" }] }],

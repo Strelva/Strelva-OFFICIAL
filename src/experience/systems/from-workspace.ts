@@ -207,6 +207,32 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
     }
   }
 
+  // Website contracts never imply that a repo-only site reads business facts.
+  // These are read-only presentation of the existing authorized delivery paths.
+  for (const entry of entries.filter(entry => entry.kind === "website")) {
+    const system = byId.get(entry.ref.systemId);
+    if (!system) continue;
+    const connectedOnly = Boolean(entry.connectedSite && !entry.tenantId);
+    const document = Boolean(entry.savedWorkId && entry.tenantId);
+    const automatic = document || (connectedOnly && entry.connectedSite?.verified);
+    const native = entry.editing === "native";
+    const facts: SystemConnection = {
+      id: `${system.id}:business-facts`, kind: "read", target: "Business record", status: automatic ? "connected" : "not_connected",
+      sentence: document ? "This website reads confirmed business facts when it renders."
+        : connectedOnly ? "Confirmed business facts are filled into the connected site after ownership is proven."
+          : native ? "Strelva prepares business fact changes as native website content for review and publishing."
+            : "Strelva updates this site by hand; it does not read the business record.",
+      contract: { sourceOfTruth: "The business record's confirmed facts", authority: "Only confirmed public business facts; no contacts, requests or owner-only details.",
+        freshness: automatic ? "Read when the website renders or the connected page loads." : "Changes reach the live site only after Strelva publishes them.",
+        failureBehavior: automatic ? "If facts cannot be read, the last approved website content stays available." : "A business record change does not automatically change this website." },
+    };
+    // The spine already projects the connected-site read. Enrich it once,
+    // including when that same System later becomes a hosted document.
+    const existing = system.connections.findIndex(connection => connection.kind === "read" && !connection.systemId && /business record/i.test(connection.sentence));
+    if (existing >= 0) system.connections[existing] = { ...facts, id: system.connections[existing]!.id };
+    else system.connections.push(facts);
+  }
+
   // A Possibility is business-level: show it from every System it would change.
   for (const possibility of ready?.possibilities ?? []) {
     const view: SystemPossibility = {

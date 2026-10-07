@@ -321,6 +321,9 @@ export function systemsFromExisting(raw: ExistingSystemsSnapshot): BusinessSyste
         rebuilt.system.lifecycle = "live";
         rebuilt.basis = `Connected; ${site.siteHost} is proven to be this business's. A rebuild is prepared beside it.`;
       }
+      connections.push({ provenance: "existing", connection: existingConnection(rebuilt.system, "read",
+        { type: "business_resource", resource: "business_record:facts" }, site.verifiedAt && site.status === "active" ? "connected" : "disconnected",
+        "Confirmed facts from the business record are available to this website") });
       continue;
     }
     const verified = site.verifiedAt !== null;
