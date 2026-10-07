@@ -127,7 +127,9 @@ export function tenantEventItem(event: UnifiedEvent): ProposedItem | null {
     kind,
     route,
     title: event.title.slice(0, 200).trim() || "A change is waiting",
-    detail: event.body ? event.body.slice(0, 600) : null,
+    detail: process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && event.metadata?.kind === "inquiry_delivery_approval"
+      ? [event.metadata.recipient, event.metadata.subject, event.metadata.messageBody].filter((value): value is string => typeof value === "string").join("\n").slice(0, 8000)
+      : event.body ? event.body.slice(0, 600) : null,
     approveEffect,
     notYetEffect,
     sourceLifecycle: "tenant_event",

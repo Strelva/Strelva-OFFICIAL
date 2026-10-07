@@ -169,6 +169,8 @@ export interface WorkspaceReleases {
   ask?: boolean;
   /** STRELVA_INQUIRIES_RELEASE for this workspace (per-workspace row under `workspace`). */
   inquiries?: boolean;
+  /** Durable customer inbox instead of the internal inquiry builder. */
+  inquiryInbox?: boolean;
   /** STRELVA_WEBSITE_REBUILD_RELEASE for this workspace. Absent: the page's env value decides. */
   websiteRebuild?: boolean;
   /** Connected sites on for this business (its `connected_sites` row, and Systems): Home links to /workspace/site. */

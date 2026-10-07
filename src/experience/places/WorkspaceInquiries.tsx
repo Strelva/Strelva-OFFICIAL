@@ -89,10 +89,10 @@ function HeldSection({ held, workspaceId }: { held: HeldInquiries; workspaceId: 
   );
 }
 
-export function WorkspaceInquiries({ workspaceId, state }: { workspaceId: string; state: PlaceState<WorkspaceLeads> }) {
+export function WorkspaceInquiries({ workspaceId, state, embedded = false }: { workspaceId: string; state: PlaceState<WorkspaceLeads>; embedded?: boolean }) {
   const data = state.kind === "ready" ? state.data : null;
   return (
-    <WorkspacePlace workspaceId={workspaceId} eyebrow="Inquiries" title="Who reached out"
+    <WorkspacePlace embedded={embedded} workspaceId={workspaceId} eyebrow="Inquiries" title="Who reached out"
       intro={data?.durable ? "Everyone who contacted you through your site, newest first. Your inquiries stay on record." : "Everyone who contacted you through your site, newest first. Strelva keeps the last 90 days here."}
       state={state} denied={data?.denied.map((site) => site.siteName)}
       errorTitle="Inquiries couldn't load" errorBody="Nothing is lost. Reload to check the current records. Reload the page to try again.">
@@ -111,12 +111,13 @@ export function WorkspaceInquiries({ workspaceId, state }: { workspaceId: string
             </Card>
           ) : (
             <>
-              <p className="mb-3 text-sm text-gray-muted">{site.lastThirtyDays} in the last 30 days · {site.leads.length} shown</p>
+              <p className="mb-3 text-sm text-gray-muted">{data.paged ? "" : `${site.lastThirtyDays} in the last 30 days · `}{site.leads.length} shown</p>
               <div className="grid gap-3">{site.leads.map((lead) => <LeadCard key={lead.id} lead={lead} workspaceId={workspaceId} replies={data.workspaceReplies} />)}</div>
             </>
           )}
         </section>
       ))}
+      {data?.nextPage ? <a className="mt-6 inline-flex min-h-12 items-center text-sm underline" href={`/workspace/inquiries?workspaceId=${encodeURIComponent(workspaceId)}&before=${encodeURIComponent(data.nextPage.before)}&beforeId=${encodeURIComponent(data.nextPage.beforeId)}`}>Earlier inquiries</a> : null}
       {data?.held ? <HeldSection held={data.held} workspaceId={workspaceId} /> : null}
     </WorkspacePlace>
   );

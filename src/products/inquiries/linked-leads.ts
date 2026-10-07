@@ -70,6 +70,8 @@ export interface WorkspaceLeads {
   sites: SiteLeads[];
   workspaceReplies?: boolean;
   durable?: boolean;
+  paged?: boolean;
+  nextPage?: { before: string; beforeId: string };
   denied: LinkedSite[];
   held?: HeldInquiries;
 }
