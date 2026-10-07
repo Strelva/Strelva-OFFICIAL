@@ -79,3 +79,54 @@ test(`Invitation suppression, failure and permission states remain honest at ${w
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 }
+
+for (const width of [1280, 390]) {
+  test(`Booking Try uses only a local test receipt at ${width}px`, async ({ page }) => {
+    const requests: string[] = [];
+    page.on("request", request => { if (["POST", "PUT", "PATCH", "DELETE"].includes(request.method())) requests.push(request.url()); });
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/preview/strelva/try?state=booking");
+    const candidate = page.getByRole("region", { name: "Working website candidate" });
+    await expect(candidate.getByRole("heading", { name: "Book a consulting session", level: 1 })).toBeVisible();
+    await expect(candidate.getByRole("status")).toContainText("/book");
+    await candidate.getByLabel("Name", { exact: true }).fill("Fictional Visitor");
+    await candidate.getByLabel("Email", { exact: true }).fill("fictional@example.invalid");
+    await candidate.getByRole("button", { name: "Try booking this time" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(candidate.getByRole("status").filter({ hasText: "Test booking completed" })).toContainText("no calendar changed, and no real record was kept");
+    await expect(candidate.locator("input")).toHaveCount(0);
+    await candidate.getByRole("button", { name: "Try another test" }).click();
+    await expect(candidate.getByLabel("Name", { exact: true })).toHaveValue("");
+    await candidate.getByRole("link", { name: "River Practice", exact: true }).first().click();
+    await expect(candidate.getByRole("status")).toContainText("Preview page: /");
+    await expect(page).toHaveURL(/\/preview\/strelva\/try\?state=booking$/);
+    expect(requests).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+
+  test(`Working page-set Try keeps navigation isolated at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/preview/strelva/try?state=pages");
+    const candidate = page.getByRole("region", { name: "Working website candidate" });
+    await expect(candidate.getByRole("heading", { name: "Our services" })).toBeVisible();
+    await candidate.getByRole("link", { name: "Consulting", exact: true }).focus();
+    await page.keyboard.press("Enter");
+    await expect(candidate.getByRole("heading", { name: "Consulting", exact: true })).toBeVisible();
+    await expect(candidate.getByRole("status")).toContainText("/consulting");
+    await expect(page).toHaveURL(/\/preview\/strelva\/try\?state=pages$/);
+    await expect(candidate.locator("form,input,button")).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+
+  test(`Complete signed-review renderer keeps visitor actions disabled at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/preview/strelva/owner-website-preview");
+    const review = page.getByRole("complementary", { name: "Website review" });
+    await expect(review.getByText("Complete copy awaiting your decision")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Send request" })).toBeDisabled();
+    await page.getByRole("link", { name: "About", exact: true }).click();
+    await expect(page).toHaveURL(/page=%2Fabout/);
+    await expect(page.getByRole("button", { name: "Send request" })).toBeDisabled();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+}
