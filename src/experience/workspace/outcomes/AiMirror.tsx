@@ -4,7 +4,7 @@ import { useId, useMemo, useRef } from "react";
 import { motion } from "motion/react";
 import { Sparkle } from "lucide-react";
 import { EntranceProvider, Reveal, entranceTransition, useEntranceTrigger } from "@/components/ui/motion/Entrance";
-import { staggerDelay, strelvaMotion } from "@/lib/motion";
+import { staggerDelay, strelvaMotion } from "@/platform/infra/motion";
 import { aiMirrorHeadline, aiMirrorMatrix, splitAnswer, type AiMirrorData } from "./ai-mirror";
 import { outcomeFont } from "./outcome-font";
 import styles from "./outcomes.module.css";

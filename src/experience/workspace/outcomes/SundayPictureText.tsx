@@ -4,7 +4,7 @@ import { useId, useRef, type CSSProperties, type ReactNode } from "react";
 import { motion, type Transition } from "motion/react";
 import { CountUp } from "@/components/ui/motion/CountUp";
 import { EntranceProvider, useEntranceTrigger, type EntranceState } from "@/components/ui/motion/Entrance";
-import { strelvaMotion } from "@/lib/motion";
+import { strelvaMotion } from "@/platform/infra/motion";
 import { weeklyPictureLine, weeklyReportBubbles, weeklyReportText, type WeeklyReport } from "./weekly-report";
 import { outcomeFont } from "./outcome-font";
 import styles from "./outcomes.module.css";

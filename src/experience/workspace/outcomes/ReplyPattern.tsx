@@ -3,7 +3,7 @@
 import { useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { motion, type TargetAndTransition, type Transition } from "motion/react";
 import { EntranceProvider, Reveal, entranceTransition, useEntranceTrigger } from "@/components/ui/motion/Entrance";
-import { strelvaMotion } from "@/lib/motion";
+import { strelvaMotion } from "@/platform/infra/motion";
 import { WEEK_DAYS, formatReplyTime, pinLayout, replyVerdict, type ReplyLead } from "./reply-pattern";
 import { outcomeFont } from "./outcome-font";
 import styles from "./outcomes.module.css";

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildAiVisibilityScorecard } from "@/lib/ai-visibility-scorecard";
 import type { VisibilitySnapshot } from "@/lib/visibility/snapshots";
-import { staggerDelay } from "@/lib/motion";
+import { staggerDelay, strelvaEntrance, strelvaMotion } from "@/platform/infra/motion";
+import * as legacyMotion from "@/lib/motion";
 import { loopChips, loopHeadline, loopRibbonGeometry, type LoopStage } from "@/experience/workspace/outcomes/loop";
 import { aiMirrorFromScorecard, aiMirrorHeadline, aiMirrorMatrix, splitAnswer } from "@/experience/workspace/outcomes/ai-mirror";
 import { arrivalOrder, formatReplyTime, median, pinLayout, replyVerdict, type ReplyLead } from "@/experience/workspace/outcomes/reply-pattern";
@@ -12,6 +13,12 @@ import { HEAT_EMPTY, HEAT_SCALE, formatTileMinutes, heatStep, heatmapVerdict, ty
 import { BAKERY_LEADS, BAKERY_LOOP, BAKERY_RATINGS, BAKERY_REPORT, COMFORT_AIR_LOCATIONS } from "@/experience/workspace/preview/outcomes-fixture";
 
 describe("staggerDelay (reveal role)", () => {
+  it("keeps legacy and workspace consumers on the same motion roles", () => {
+    expect(legacyMotion.strelvaMotion).toBe(strelvaMotion);
+    expect(legacyMotion.strelvaEntrance).toBe(strelvaEntrance);
+    expect(legacyMotion.staggerDelay).toBe(staggerDelay);
+  });
+
   it("steps 40 ms and caps at the sixth item", () => {
     expect([0, 1, 5].map(index => staggerDelay(index))).toEqual([0, 0.04, 0.2]);
     expect(staggerDelay(6)).toBe(0.2);
