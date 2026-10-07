@@ -43,6 +43,8 @@ import { explainWhyWithDelivery, projectInquiryDeliveryTimeline, withoutInquiryD
 import { placeholderInquiryRecords, projectedInquiryRecords } from "./record-projection";
 import { assertInquiryWorkspaceOpen } from "./workspace-exit";
 import { currentResponsibility } from "./currentness";
+import { stageInquiryScanFacts, correctInquiryBusinessFact, inquiryRecordOnboarding } from "./business-facts";
+import { readInquiryBusinessContext } from "./business-context";
 
 export { recordedInquiryAssignee, recordedInquiryStatus } from "./record-projection";
 export { decideHeldInquiry, parseWorkspaceLead, readInquiryEvents, readWorkspaceInquiryLeads } from "./workspace-records";
@@ -636,6 +638,7 @@ async function surfaceSnapshot(input: SurfaceContext, workspace: InquiryWorkspac
   const readOnly = permissions?.canEdit !== true;
   const businessRole: "owner" | "agency_member" | "read_only" = readOnly ? "read_only" : input.audience === "agency" ? "agency_member" : "owner";
   const website = config.siteUrl ?? config.productionDomain ?? null;
+  const businessFacts = await readInquiryBusinessContext(input.tenantId);
   const projectedConnections = projectInquiryConnections(input.tenantId, connections, "/account?connections=1");
   const patternInstallations = listPatternInstallations(new InquiryEngine({ businessId: input.businessId, state: baseState })).map(({ id, capabilityId, sourceBusinessId, sourceCapabilityId, sourceVersion, targetVersion, status, lastProposalId, updatedAt }) => ({ id, capabilityId, sourceBusinessId, sourceCapabilityId, sourceVersion, targetVersion, status, lastProposalId, updatedAt }));
   try {
@@ -655,7 +658,7 @@ async function surfaceSnapshot(input: SurfaceContext, workspace: InquiryWorkspac
     state: visibleState,
     capabilities: visibleState.capabilities,
     connections: projectedConnections,
-    onboarding: projectOnboardingCorrections(recordedOnboarding(baseState.actionReceipts) ?? {
+    onboarding: businessFacts ? inquiryRecordOnboarding(businessFacts) : projectOnboardingCorrections(recordedOnboarding(baseState.actionReceipts) ?? {
       website,
       statements: [
         { id: "website", label: "Website", value: website, provenance: website ? "Tenant settings" : null, editable: true, confirmed: Boolean(website) },
@@ -827,6 +830,10 @@ export async function executeInquirySurface(input: {
     }
     case "scan-onboarding": {
       const facts = await readOnboardingWebsite(action.website);
+      if (!facts.checks.some(check => check.status === "failed")) {
+        const business = await readInquiryBusinessContext(context.tenantId);
+        if (business) await stageInquiryScanFacts(business.workspaceId, actorId, facts);
+      }
       engine._addActionReceipt({ businessId: context.businessId, requestId: null, capabilityId: null, inquiryId: null, responsibilityId: null,
         actor: { kind: "person", id: actorId }, action: "onboarding_scan", what: "Read public website metadata to propose business facts.",
         why: "The user requested website-based setup.", lookedAt: [facts.website ?? action.website],
@@ -836,6 +843,11 @@ export async function executeInquirySurface(input: {
     }
     case "correct-onboarding": {
       const value = action.value.trim();
+      const business = await readInquiryBusinessContext(context.tenantId);
+      if (business && await correctInquiryBusinessFact(business.workspaceId, actorId, action.statementId, value)) {
+        message = "Your confirmed detail was saved in Business details. Inquiries reads it from there.";
+        break;
+      }
       if (action.statementId === "website") {
         let website: URL;
         try { website = new URL(value); } catch { throw new InquiryValidationError("Enter a complete website address."); }

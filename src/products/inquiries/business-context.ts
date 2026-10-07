@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { inquiryRecordsRpc } from "@/platform/infra/inquiry-records";
 import { factValueSchemas } from "@/platform/business-record/contracts";
+import type { InquiryCapabilityDefinition } from "./contracts";
 
 const contextSchema = z.object({
   workspaceId: z.string().uuid(),
@@ -9,6 +10,19 @@ const contextSchema = z.object({
   services: z.array(z.object({ id: z.string().uuid(), name: z.string(), description: z.string().nullable(), priceText: z.string().nullable(), active: z.boolean(), verified: z.boolean() })),
 });
 export type InquiryBusinessContext = z.infer<typeof contextSchema>;
+
+/** Service choices come from the current confirmed record. The stored release
+ * identifies a service selector; it never keeps a second list of services. */
+export function applyInquiryBusinessServices<T extends Pick<InquiryCapabilityDefinition["form"], "fields">>(form: T, context: InquiryBusinessContext): T {
+  const options = context.services.filter(service => service.active && service.verified).map(service => service.name);
+  return { ...form, fields: form.fields.map(field => field.kind === "select" && ["service", "service_id", "serviceId"].includes(field.id)
+    ? { ...field, options } : field) };
+}
+
+export async function inquiryDefinitionAtUse(tenantId: string, definition: InquiryCapabilityDefinition): Promise<InquiryCapabilityDefinition> {
+  const context = await readInquiryBusinessContext(tenantId);
+  return context ? { ...definition, form: applyInquiryBusinessServices(definition.form, context) } : definition;
+}
 
 export function inquiryBusinessFactsEnabled(): boolean {
   return process.env.STRELVA_INQUIRY_BUSINESS_FACTS === "1";

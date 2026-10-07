@@ -585,3 +585,15 @@ private previews are noindexed. The static export includes the immutable
 document, each page, redirect mappings, image bytes and file checksums. No new
 renderer dependencies were added. Local automated and rendered verification is
 recorded with the website rebuild delivery evidence.
+
+### Inquiry System detail (wave 6)
+
+`src/experience/places/InquirySystemDetails.tsx` composes the owned `TextInput`,
+`TextArea`, `SelectInput` and `Button` for a viewing copy of the accepted inquiry
+form. The published form comes first, the existing records follow, and typed
+Connections and recorded History sit below. Lifecycle and health stay separate.
+The viewing copy cannot submit an inquiry. The component preserves records during
+loading and errors, offers retry, aborts old business reads, and never projects
+private routing destinations into form data. Fixture projection, authorization,
+publication health and failure states have focused local tests; desktop/mobile
+browser inspection remains separate evidence in the stream handoff.

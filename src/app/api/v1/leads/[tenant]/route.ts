@@ -18,6 +18,7 @@ import { scoreLeadSpam } from "@/lib/lead-spam";
 import { recordSpam } from "@/lib/spam-pit";
 import { readLeadAttribution } from "@/lib/lead-attribution";
 import { notifyInquiryOwner } from "@/products/inquiries";
+import { inquiryDefinitionAtUse } from "@/products/inquiries";
 import {
   getInquiryRepository,
   inquiryReleaseEnabledForTenant,
@@ -185,7 +186,7 @@ export async function POST(
       // Use the same validator as the engine so the public route enforces the
       // exact published definition, including required fields, email syntax,
       // unknown fields, and select options.
-      const validationErrors = capability?.live ? validateInquiryFields(capability.live, fields) : ["Inquiry form unavailable."];
+      const validationErrors = capability?.live ? validateInquiryFields(await inquiryDefinitionAtUse(tenant, capability.live), fields) : ["Inquiry form unavailable."];
       if (validationErrors.length > 0) return corsJson({ error: validationErrors[0] }, 400);
 
       const name = str(body.name, 200) || str(fields.name, 200) || str(fields.full_name, 200);

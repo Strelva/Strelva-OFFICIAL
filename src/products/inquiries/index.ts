@@ -74,3 +74,8 @@ export async function readWorkspaceInquiryInbox(...args: Parameters<typeof impor
   return (await import("./workspace-inbox")).readWorkspaceInquiryInbox(...args);
 }
 export type { WorkspaceLeads } from "./linked-leads";
+export { readInquirySystemDetails, projectInquirySystemDetail } from "./system-detail";
+export type { InquirySystemDetail } from "./system-detail";
+export { readInquiryFactProposals, stageInquiryScanFacts, inquiryScanFactSuggestions } from "./business-facts";
+export type { InquiryFactProposal } from "./business-facts";
+export { inquiryBusinessFactsEnabled, inquiryDefinitionAtUse } from "./business-context";

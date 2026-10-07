@@ -18,6 +18,7 @@ import { bookingRequestAdapter } from "@/platform/bookings/needs-you-adapter";
 import { decideBookingRequest, readWorkspaceBooking, readWorkspaceBookingRequests } from "@/platform/bookings/store";
 import { bookingStoreWriteEnabled } from "@/platform/bookings/flags";
 import { updateBooking as updateLegacyBookingStatus } from "@/platform/bookings/legacy-store";
+import { inquiryFactAdapter } from "./sources/inquiry-fact";
 
 export { needsYouReleaseEnabled } from "./release";
 
@@ -51,6 +52,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
       ...systemsSourceAdapters(store),
       ...deliverySourceAdapters(),
       ...productSourceAdapters(),
+      inquiryFactAdapter(),
       // Booking requests in the one booking store (empty until request mode is used).
       bookingRequestAdapter({
         // Nothing to read until the store receives writes (and its migration exists).
