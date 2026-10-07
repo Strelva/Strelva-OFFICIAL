@@ -114,3 +114,4 @@ export const prepareContentRestore = async (...args: Parameters<typeof import(".
 export const prepareTenantCollectionDraft = async (...args: Parameters<typeof import("./content-server").prepareTenantCollectionDraft>) => (await import("./content-server")).prepareTenantCollectionDraft(...args);
 
 export { sendApprovedNewsletterIssues, newsletterSenderEnabled } from "./newsletter-sender";
+export type { PublishingSnapshot } from "./projection";

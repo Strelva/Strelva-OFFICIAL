@@ -1,3 +1,5 @@
+import { googleVersionPinSchema, googleVersionDraftCurrent, type GoogleVersionPin } from "./versions";
+import { systemsReleasedFor, systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";
 import { paceGoogleWrites } from "./pacing";
 import { z } from "zod";
 import { tenantPublishingPorts } from "@/platform/infra/tenant-publishing";
@@ -25,22 +27,24 @@ const draftSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("info"), record: infoSchema }),
   z.object({ action: z.literal("post"), post: postInputSchema }),
 ]);
-const metadataSchema = z.object({ kind: z.literal("workspace_google_listing_draft"), workspaceId: z.string().uuid(), locationId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/), draft: draftSchema });
+const metadataSchema = z.object({ kind: z.literal("workspace_google_listing_draft"), workspaceId: z.string().uuid(), locationId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/), draft: draftSchema, version: googleVersionPinSchema.optional() });
 
 /** Existing approval events own the exact frozen copy, never a separate approval store. */
-export async function prepareGoogleListingDraft(actor: WorkspaceActor, raw: z.infer<typeof googleDraftInputSchema>): Promise<UnifiedEvent> {
+export async function prepareGoogleListingDraft(actor: WorkspaceActor, raw: z.infer<typeof googleDraftInputSchema>, version?: { pin: GoogleVersionPin; hours?: z.infer<typeof factValueSchemas.hours> | null }): Promise<UnifiedEvent> {
   const input = googleDraftInputSchema.parse(raw);
   if (!(await publishingEnabledForWorkspace(input.workspaceId, actor))) throw new Error("Publishing is not enabled for this business.");
   const site = await readLinkedSite(actor, input.workspaceId, input.tenantId);
   if (!site || !(await hasTenantPermission(input.tenantId, "publishing:manage"))) throw new Error("Only an authorized owner can prepare Google changes.");
   const snapshot = await readPublishingSnapshot(actor, input.workspaceId);
   const binding = snapshot.bindings.find(row => row.originTenantId === input.tenantId && row.locations.some(location => location.locationId === input.locationId));
+  if (version && (binding?.id !== version.pin.bindingId || !(await systemsReleasedFor(actor, input.workspaceId)))) throw new Error("This Google Version is unavailable.");
   if (!binding) throw new Error("This Google listing does not belong to this website.");
   if ((await readListingControl(input.workspaceId, input.locationId)).paused) throw new Error("The Google listing is paused.");
   const record = await readBusinessRecord(actor, input.workspaceId);
   if (input.expectedRecordRevision !== undefined && record.revision !== input.expectedRecordRevision) throw new Error("Your record changed before this Google draft could be prepared. Nothing was approved on Google.");
   let draft: z.infer<typeof draftSchema>;
   if (input.kind === "post") draft = { action: "post", post: postInputSchema.parse(input.post) };
+  else if (input.kind === "hours" && version) draft = { action: "hours", hours: factValueSchemas.hours.nullable().parse(version.hours) };
   else if (input.kind === "hours") draft = { action: "hours", hours: record.facts.hours?.value === undefined && input.expectedRecordRevision !== undefined ? null : factValueSchemas.hours.parse(record.facts.hours?.value) };
   else {
     const info: RecordInfo = {};
@@ -52,8 +56,9 @@ export async function prepareGoogleListingDraft(actor: WorkspaceActor, raw: z.in
     if (!infoToGoogle(info).updateMask.length) throw new Error("Add your phone, website or description to Business details first.");
     draft = { action: "info", record: info };
   }
+  if (version && !(await googleVersionDraftCurrent({ workspaceId: input.workspaceId, locationId: input.locationId, bindingId: binding.id, pin: version.pin, draft }))) throw new Error("This Google Version changed. Prepare a fresh draft.");
   const display = draft.action === "hours" ? draft.hours ? hoursToGoogle(draft.hours) : { regularHours: null, specialHours: null } : draft.action === "info" ? infoToGoogle(draft.record).body : draft.post;
-  const digest = sha256(canonicalJson({ tenantId: input.tenantId, locationId: input.locationId, draft, revision: record.revision }));
+  const digest = sha256(canonicalJson({ tenantId: input.tenantId, locationId: input.locationId, draft, revision: version ? null : record.revision, ...(version ? { version: version.pin } : {}) }));
   const redis = input.commandId ? getRedis() : null;
   const commandKey = input.commandId ? `google-listing-draft:${input.workspaceId}:${input.commandId}:${input.locationId}:${input.kind}` : null;
   if (commandKey) {
@@ -68,7 +73,7 @@ export async function prepareGoogleListingDraft(actor: WorkspaceActor, raw: z.in
     const reserved = await redis.set(commandKey, { digest }, { nx: true, ex: 90 * 24 * 60 * 60 });
     if (!reserved) throw new Error("This draft is already being prepared.");
   }
-  const event = await (await tenantPublishingPorts()).addEvent({ tenantId: input.tenantId, source: "google", type: "content_update", title: draft.action === "post" ? "Review your Google post" : `Review your Google ${draft.action}`, body: JSON.stringify(display, null, 2), status: "pending", metadata: { kind: "workspace_google_listing_draft", workspaceId: input.workspaceId, locationId: input.locationId, draft, reviewAudience: "owner", recordRevision: record.revision } }, { requirePersistence: true });
+  const event = await (await tenantPublishingPorts()).addEvent({ tenantId: input.tenantId, source: "google", type: "content_update", title: draft.action === "post" ? "Review your Google post" : `Review your Google ${draft.action}`, body: JSON.stringify(display, null, 2), status: "pending", metadata: { kind: "workspace_google_listing_draft", workspaceId: input.workspaceId, locationId: input.locationId, draft, reviewAudience: "owner", recordRevision: record.revision, ...(version ? { version: version.pin } : {}) } }, { requirePersistence: true });
   if (commandKey && redis) await redis.set(commandKey, { digest, eventId: event.id }, { ex: 90 * 24 * 60 * 60 });
   return event;
 }
@@ -101,7 +106,7 @@ export async function executeGoogleListingEvent(input: { tenantId: string; event
   if (input.event.tenantId !== input.tenantId || input.actorId === "auto-reply-policy") return { accepted: false, reason: "permission_denied" };
   const authorization = await authorizePublishingEvent({ ...input, event: { ...input.event, metadata: { ...input.event.metadata, businessId: metadata.workspaceId } } });
   if (!authorization.allowed) return { accepted: false, reason: authorization.reason };
-  if (metadata.draft.action !== "post") {
+  if (metadata.draft.action !== "post" && !metadata.version) {
     const { getSupabase } = await import("@/platform/infra/db/client");
     const db = getSupabase();
     if (!db) return { accepted: false, reason: "record_unavailable" };
@@ -109,6 +114,7 @@ export async function executeGoogleListingEvent(input: { tenantId: string; event
     if (error || data !== true) return { accepted: false, reason: "Your business details changed. Prepare a fresh Google draft." };
   }
   const ctx = await tenantListingContext(input.tenantId, metadata.workspaceId, metadata.locationId);
+  if (metadata.version && (!(await systemsReleaseEnabledForWorkspace(metadata.workspaceId, authorization.viewer)) || !(await googleVersionDraftCurrent({ workspaceId: metadata.workspaceId, locationId: metadata.locationId, bindingId: ctx.bindingId, pin: metadata.version, draft: metadata.draft })))) return { accepted: false, reason: "This Google Version changed. Prepare a fresh draft." };
   ctx.onWriteAccepted = async () => (await tenantPublishingPorts()).markExecutionExternalAccepted(input.event.id);
   ctx.onWriteUnconfirmed = async () => (await tenantPublishingPorts()).markExecutionExternalUnconfirmed(input.event.id);
   let accepted = false;
