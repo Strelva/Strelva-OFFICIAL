@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { replyFromWorkspace, workspaceInquiryRepliesEnabled, workspaceReplyInput, type WorkspaceReplyDependencies } from "@/products/inquiries/workspace-replies";
+import { reconcileWorkspaceInquiryProviderEvent, replyFromWorkspace, workspaceInquiryRepliesEnabled, workspaceReplyInput, type WorkspaceReplyDependencies } from "@/products/inquiries/workspace-replies";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import { readBusinessInquiryOutcomes, readBusinessOutcomeMonth } from "@/platform/business-outcomes";
 const actor = { userId: "d0000000-0000-4000-8000-0000000000e2", verifiedEmail: "owner@example.test" };
@@ -25,6 +25,7 @@ describe("owner workspace replies", () => {
     expect(await replyFromWorkspace(actor,input,d)).toMatchObject({ status: "accepted", retryable: false, providerMessageId: "mail-1" });
     expect(d.rpc).toHaveBeenNthCalledWith(1,"claim_workspace_inquiry_reply",expect.objectContaining({ p_user_id: actor.userId,p_verified_email: actor.verifiedEmail,p_lead_row_id:input.rowId,p_body:input.body }),expect.any(Function));
     expect(d.send).toHaveBeenCalledWith(expect.objectContaining({ audience: "customer",fromAddress:"hello@mail.strelva.com",replyTo:"owner@example.test",idempotencyKey:expect.stringContaining(claim.id) }));
+    expect(d.send).toHaveBeenCalledWith(expect.objectContaining({ tags: { strelva_workspace_message_id: claim.id, strelva_workspace_id: input.workspaceId } }));
     expect(d.rpc).toHaveBeenNthCalledWith(2,"finish_workspace_inquiry_reply",expect.objectContaining({ p_status:"accepted",p_provider_message_id:"mail-1" }));
   });
   it("never sends a duplicate, in-progress, bounced or unknown purpose", async () => {
@@ -54,6 +55,49 @@ describe("owner workspace replies", () => {
     expect(workspaceReplyInput.safeParse({...input,subject:"Hello\nBCC: victim@example.test"}).success).toBe(false);
     expect(workspaceReplyInput.safeParse({...input,to:"victim@example.test"}).success).toBe(false);
     expect(workspaceReplyInput.safeParse({...input,requestId:"same"}).success).toBe(false);
+  });
+});
+describe("workspace reply provider reconciliation", () => {
+  const event = { type: "email.delivered", created_at: "2026-10-06T12:01:00Z", data: {
+    email_id: "mail-1", created_at: "2026-10-06T12:00:00Z", to: ["dana@example.test"], subject: input.subject,
+    tags: { strelva_workspace_message_id: claim.id, strelva_workspace_id: input.workspaceId },
+  } };
+  it("flags off and unrelated events do no storage, readback or send", async () => {
+    const d = deps({ enabled: () => false });
+    expect(await reconcileWorkspaceInquiryProviderEvent({ event, eventId: "evt1" }, d)).toMatchObject({ status: "ignored" });
+    expect(d.rpc).not.toHaveBeenCalled();
+    const active = deps();
+    expect(await reconcileWorkspaceInquiryProviderEvent({ event: { ...event, data: { ...event.data, tags: {} } }, eventId: "evt1" }, active)).toMatchObject({ status: "ignored" });
+    expect(active.rpc).not.toHaveBeenCalled();
+  });
+  it("correlates authenticated evidence with scope, destination, subject and event time; never sends", async () => {
+    const d = deps({ rpc: vi.fn(async () => ({ status: "recorded" })) });
+    expect(await reconcileWorkspaceInquiryProviderEvent({ event, eventId: "evt1" }, d)).toEqual({ status: "recorded" });
+    expect(d.rpc).toHaveBeenCalledWith("record_workspace_inquiry_provider_event", {
+      p_message_id: claim.id, p_workspace_id: input.workspaceId, p_provider_message_id: "mail-1", p_event_id: "evt1",
+      p_status: "delivered", p_event_at: event.created_at, p_accepted_at: event.data.created_at,
+      p_recipients: ["dana@example.test"], p_subject: input.subject,
+    });
+    expect(d.send).not.toHaveBeenCalled(); expect(d.readback).not.toHaveBeenCalled();
+  });
+  it("passes duplicate and mismatch, and keeps persistence failure retryable as webhook evidence", async () => {
+    for (const status of ["duplicate", "unmatched"] as const) {
+      const d = deps({ rpc: vi.fn(async () => ({ status })) });
+      expect(await reconcileWorkspaceInquiryProviderEvent({ event, eventId: "evt1" }, d)).toEqual({ status });
+    }
+    const d = deps({ rpc: vi.fn(async () => { throw new Error("DB offline"); }) });
+    expect(await reconcileWorkspaceInquiryProviderEvent({ event, eventId: "evt1" }, d)).toMatchObject({ status: "unavailable" });
+    expect(d.send).not.toHaveBeenCalled();
+  });
+  it("supports provider tag arrays and email.sent acceptance time; rejects incomplete evidence", async () => {
+    const d = deps({ rpc: vi.fn(async () => ({ status: "recorded" })) });
+    const sent = { ...event, type: "email.sent", data: { ...event.data, created_at: undefined,
+      tags: Object.entries(event.data.tags).map(([name, value]) => ({ name, value })) } };
+    expect(await reconcileWorkspaceInquiryProviderEvent({ event: sent, eventId: "sent1" }, d)).toMatchObject({ status: "recorded" });
+    expect(d.rpc).toHaveBeenCalledWith("record_workspace_inquiry_provider_event", expect.objectContaining({ p_status: "accepted", p_accepted_at: sent.created_at }));
+    d.rpc = vi.fn();
+    expect(await reconcileWorkspaceInquiryProviderEvent({ event: { ...event, data: { ...event.data, to: [] } }, eventId: "bad" }, d)).toMatchObject({ status: "unmatched" });
+    expect(d.rpc).not.toHaveBeenCalled();
   });
 });
 describe("inquiry outcome proof",()=>{

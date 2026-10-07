@@ -19,6 +19,9 @@ export interface NeedsYouDeps {
   /** Origin that serves /api/approve and /workspace. */
   appOrigin: string;
   now(): number;
+  /** New immediate inquiry delivery stays off unless the host supplies the
+   * release switches and strict global/customer/per-tenant email gates. */
+  urgentInquiryAllowed?(tenantId: string | null): Promise<boolean>;
 }
 
 export type DecideStatus =
@@ -270,6 +273,32 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     }
     if (status === "suppressed") summary.ownerNotTold += rows.length;
     if (status === "failed") summary.failed += rows.length;
+    return status;
+  }
+
+  /** One just-created inquiry decision, without waiting for the hourly chase
+   * or contacting any other business. Source revision is re-read before send. */
+  async function deliverUrgentSource(workspaceId: string, sourceLifecycle: string, sourceId: string): Promise<"sent" | "suppressed" | "failed" | "none"> {
+    if (!deps.urgentInquiryAllowed) return "none";
+    const adapter = adapterFor(sourceLifecycle);
+    if (!adapter || adapter.needsMemberActor) return "none";
+    const ctx = { workspaceId };
+    const proposal = await adapter.propose(ctx);
+    if (!proposal.complete) return "none";
+    const proposed = proposal.items.find(item => item.sourceId === sourceId && item.sourceLifecycle === sourceLifecycle);
+    if (!proposed || !proposed.urgent || proposed.route !== "owner_decides") return "none";
+    await deps.store.open(workspaceId, proposed);
+    const row = deps.store.deliveryForSource
+      ? await deps.store.deliveryForSource(workspaceId, sourceLifecycle, sourceId)
+      : (await deps.store.dueForDelivery(500)).find(item => item.workspaceId === workspaceId && item.sourceLifecycle === sourceLifecycle && item.sourceId === sourceId) ?? null;
+    if (!row || row.state !== "open" || row.deliveryState !== "not_sent" || !row.urgent || row.route !== "owner_decides") return "none";
+    if (await reconcile(ctx, row) !== "current") return "none";
+    if (!(await deps.urgentInquiryAllowed(row.recipient?.tenantId ?? null))) {
+      await deps.store.recordDelivery(workspaceId, row.id, "urgent", "suppressed", row.recipient?.email ?? null, null, "inquiry_email_gates_off");
+      return "suppressed";
+    }
+    const summary: ChaseSummary = { lapsed: 0, reminded: 0, digests: 0, urgent: 0, ownerNotTold: 0, failed: 0 };
+    return (await deliver("urgent", [row], summary)) ?? "suppressed";
   }
 
   /** The hourly chase: lapse at day 14, urgent at once, morning email and reminders at 07:00 local. */
@@ -332,7 +361,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     return summary;
   }
 
-  return { sync, list, decide, chase };
+  return { sync, list, decide, chase, deliverUrgentSource };
 }
 
 export type NeedsYouService = ReturnType<typeof createNeedsYouService>;

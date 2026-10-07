@@ -43,7 +43,11 @@ export const workspacePortLoaders = {
   inquiries: async () => {
     const index = await import("@/products/inquiries");
     return {
-      notifyInquiryOwner: index.notifyInquiryOwner,
+      notifyInquiryOwner: async (input: Parameters<typeof index.notifyInquiryOwner>[0]) =>
+        (await import("@/products/inquiries")).notifyInquiryOwner(input),
+      inquiryOutcomeProofEnabled: () => process.env.STRELVA_INQUIRY_OUTCOMES === "1",
+      readTenantInquiryOutcomeProof: async (tenantId: string, from: string, to: string) =>
+        (await import("@/products/inquiries")).readTenantInquiryOutcomeProof(tenantId, from, to),
       isInquiryMessageReviewEvent: index.isInquiryMessageReviewEvent,
       authorizeInquiryMessageReviewActor: index.authorizeInquiryMessageReviewActor,
       executeInquiryMessageReview: index.executeInquiryMessageReview,

@@ -17,6 +17,7 @@ import { captureLead } from "@/lib/leads";
 import { scoreLeadSpam } from "@/lib/lead-spam";
 import { recordSpam } from "@/lib/spam-pit";
 import { readLeadAttribution } from "@/lib/lead-attribution";
+import { notifyInquiryOwner } from "@/products/inquiries/owner-notice";
 import {
   getInquiryRepository,
   inquiryReleaseEnabledForTenant,
@@ -214,6 +215,12 @@ export async function POST(
         return corsJson({ error: "Inquiry capture is temporarily unavailable." }, 503);
       }
       if (captured.status === "unavailable") return corsJson({ error: "Inquiry capture is temporarily unavailable." }, 503);
+      // A factual notice is independent of customer-handling authority. It
+      // still runs when handling is paused; its own release flag, email gates
+      // and one-purpose claim prevent default sends or a duplicate worker send.
+      if (process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && captured.lead) {
+        await notifyInquiryOwner({ tenantId: tenant, lead: captured.lead }).catch(() => undefined);
+      }
       // Re-read the mapped workspace after Redis capture. A concurrent exit
       // may leave the lead as retained evidence, but it must not proceed into
       // a new durable inquiry receipt or delivery path.

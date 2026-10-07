@@ -1,6 +1,9 @@
 import { getEventRaw, getEvents } from "@/lib/events";
 import { resolveEventAction } from "@/lib/event-actions";
 import { sendEmailWithReceipt } from "@/platform/infra/email/send";
+import { customerEmailEnabled, emailSendingEnabled } from "@/platform/infra/email/enabled";
+import { getClientEmailOverride } from "@/platform/infra/email/client-override";
+import { needsYouReleaseEnabled } from "./release";
 import { DeliveryCommitmentService, PostgresServiceRequestStore, mutateServiceRequestCommitment } from "@/platform/service-requests";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { serviceRequestAdapter, tenantEventAdapter } from "./adapters";
@@ -32,6 +35,8 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
     appOrigin: needsYouAppOrigin(),
     now: () => Date.now(),
     sendEmail: sendEmailWithReceipt,
+    urgentInquiryAllowed: async (tenantId) => process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && needsYouReleaseEnabled()
+      && emailSendingEnabled() && customerEmailEnabled() && (!tenantId || await getClientEmailOverride(tenantId) !== "off"),
     adapters: [
       tenantEventAdapter({
         linkedTenants: async (workspaceId) => (await store.linkedTenants(workspaceId)).map(link => link.tenantId),

@@ -3,16 +3,24 @@ import { copyInquiryEvent, inquiryRecordsRpc } from "@/platform/infra/inquiry-re
 import { deliverInquiryAction, getInquiryDeliveryMessageDigest, inquirySubmissionFromLead, normalizeInquiryRoutingPolicy, resolveInquiryRoute, type LeadRecord } from "./delivery";
 import type { InquiryDeliveryDependencies, InquiryDeliveryResult, InquiryRoute, ResponsibilityDeliveryGate } from "./delivery-types";
 import { inquiryReleaseEnabledForTenant } from "./release";
+import { customerEmailEnabled, emailSendingEnabled } from "@/platform/infra/email/enabled";
+import { getClientEmailOverride } from "@/platform/infra/email/client-override";
 
 export function inquiryOwnerNoticesEnabled(): boolean {
   return process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1";
 }
 
 export interface OwnerNoticeDependencies {
+  gates?: (tenantId: string) => Promise<boolean>;
   released?: (tenantId: string) => Promise<boolean>;
   route?: (tenantId: string) => Promise<InquiryRoute>;
   delivery?: InquiryDeliveryDependencies;
   record?: typeof copyInquiryEvent;
+}
+
+export async function inquiryNoticeEmailGates(tenantId: string): Promise<boolean> {
+  return emailSendingEnabled() && customerEmailEnabled()
+    && await getClientEmailOverride(tenantId) !== "off";
 }
 
 export function originalNoticeInquiryId(inquiryId: string): string {
@@ -46,6 +54,9 @@ async function deliverOwnerNotice(input: { tenantId: string; lead: LeadRecord },
   };
   let result: InquiryDeliveryResult;
   try {
+    if (!(await (deps.gates ?? inquiryNoticeEmailGates)(input.tenantId))) {
+      result = { ...base, status: "suppressed", reason: "email_gates_closed" };
+    } else {
     result = await deliverInquiryAction(inquiry, "owner_notification", {
       policy,
       deps: {
@@ -63,6 +74,7 @@ async function deliverOwnerNotice(input: { tenantId: string; lead: LeadRecord },
         },
       },
     });
+    }
   } catch {
     result = { ...base, status: "unavailable", reason: "owner_notice_unavailable" };
   }

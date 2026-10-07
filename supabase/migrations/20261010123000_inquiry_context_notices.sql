@@ -40,8 +40,8 @@ language plpgsql security definer set search_path = public, pg_temp as $$
 declare stable uuid; ws uuid; prior jsonb; dedupe text; old_digest text;
 begin
   if not exists(select 1 from public.super_admins a join public.users u on u.id = a.user_id
-    where a.user_id = p_actor_id and u.verified_at is not null)
-    or p_recipient_digest !~ '^[a-f0-9]{64}$' then raise exception 'inquiry_access_denied'; end if;
+    where a.user_id = p_actor_id and a.revoked_at is null and u.verified_at is not null)
+    or p_recipient_digest is null or p_recipient_digest !~ '^[a-f0-9]{64}$' then raise exception 'inquiry_access_denied'; end if;
   select t.stable_id, l.workspace_id into stable, ws from public.tenants t
     left join public.tenant_workspace_links l on l.tenant_stable_id = t.stable_id where t.id = p_tenant_id;
   if stable is null then return false; end if;

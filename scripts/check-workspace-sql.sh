@@ -628,6 +628,8 @@ psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
 # Wave 6 inquiry closure: additive replies, exact outcome proof, notice context and connected spam review.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010120000_inquiry_workspace_replies.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010121000_inquiry_outcome_proof.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010122000_inquiry_weekly_outcomes.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-weekly-outcomes-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-workspace-replies-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010123000_inquiry_context_notices.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-context-notices-schema.sql"

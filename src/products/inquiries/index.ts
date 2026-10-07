@@ -1,5 +1,7 @@
 /** Public product entry point for inquiry operations used by routes and jobs. */
 
+export { inquiryOutcomeProofEnabled, readTenantInquiryOutcomeProof } from "./outcome-proof";
+
 export { runDueInquiryFollowUps } from "./follow-up-cron";
 
 export { inquiryReleaseEnabled, inquiryReleaseMayBeOn, inquiryReleaseEnabledForWorkspace, inquiryReleaseEnabledForTenant, inquiryReleasedForCurrentUser } from "./release";

@@ -188,6 +188,8 @@ export interface InquiryReviewOutcome {
 }
 
 export interface InquiriesPort {
+  inquiryOutcomeProofEnabled(): boolean;
+  readTenantInquiryOutcomeProof(tenantId: string, from: string, to: string): Promise<import("./types").WeeklyInquiryOutcomeProof>;
   notifyInquiryOwner(input: { tenantId: string; lead: import("./leads").LeadRecord }): Promise<unknown>;
   isInquiryMessageReviewEvent(event: UnifiedEvent): boolean;
   authorizeInquiryMessageReviewActor(input: { tenantId: string; event: UnifiedEvent; actorId: string }): Promise<{ allowed: boolean; reason?: string }>;

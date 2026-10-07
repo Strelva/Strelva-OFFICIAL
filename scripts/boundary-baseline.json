@@ -250,7 +250,6 @@
       "src/lib/types"
     ],
     "src/products/inquiries/linked-leads.ts": [
-      "src/lib/inquiry-records",
       "src/lib/leads"
     ],
     "src/products/inquiries/message-receipt.ts": [
@@ -280,9 +279,6 @@
       "src/lib/events",
       "src/lib/leads",
       "src/lib/types"
-    ],
-    "src/products/inquiries/workspace-records.ts": [
-      "src/lib/inquiry-records"
     ],
     "src/products/investigations/public-website-source.ts": [
       "src/lib/audit/checks",

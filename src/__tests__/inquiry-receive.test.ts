@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { InquiryEngine } from "@/products/inquiries/inquiry-engine";
 import { evaluateInquiryResponsibility, recordInquiryEvidence, stateForReceive } from "@/products/inquiries/receive";
 import { createInMemoryInquiryRepository } from "@/products/inquiries/repository";
 import { createMemoryInquiryCaptureRepairStore } from "@/products/inquiries/reconciliation";
+import { inquiryCurrentness } from "@/products/inquiries/currentness";
 
 const TENANT = "acme";
 const BUSINESS = "acme-business";
@@ -70,6 +71,22 @@ function snapshot() {
 const fields = { name: "Ada Rivera", email: "ada@example.test", timeline: "Soon" };
 
 describe("canonical inquiry receive seam", () => {
+  afterEach(() => vi.unstubAllEnvs());
+  it("records paused intake without resuming its capability or authorizing customer work", async () => {
+    vi.stubEnv("STRELVA_INQUIRY_RECORDS", "1");
+    vi.stubEnv("DUAL_WRITE_PG", "1");
+    const repository = createInMemoryInquiryRepository();
+    const state = snapshot().state;
+    state.capabilities[0]!.status = "paused";
+    await repository.compareAndSwap({ tenantId: TENANT, businessId: BUSINESS, expectedRevision: null, state });
+    const result = await recordInquiryEvidence({ tenantId: TENANT, businessId: BUSINESS, inquiryId: "lead_paused", capabilityId: CAPABILITY,
+      expectedCapabilityVersion: 2, fields, receivedAt: RECEIVED_AT, repository });
+    expect(result.status).toBe("recorded");
+    const saved = await repository.getSnapshot(TENANT, BUSINESS);
+    expect(saved?.state.capabilities[0]!.status).toBe("paused");
+    expect(saved?.state.timeline.filter((event) => event.inquiryId === "lead_paused").map((event) => event.type)).toEqual(["received", "record_created"]);
+    expect(inquiryCurrentness(saved!.state, BUSINESS, { capabilityId: CAPABILITY, capabilityVersion: 2 })).toMatchObject({ current: false, reason: "not_live" });
+  });
   it("records engine receipt and received/record-created timeline, then reads it idempotently", async () => {
     const repository = createInMemoryInquiryRepository();
     const seeded = await repository.compareAndSwap({

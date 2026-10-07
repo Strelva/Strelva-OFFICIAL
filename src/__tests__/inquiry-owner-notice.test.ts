@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { notifyInquiryOwner } from "@/products/inquiries/owner-notice";
+import { inquiryNoticeEmailGates, notifyInquiryOwner } from "@/products/inquiries/owner-notice";
 import { readInquiryOwnerNoticeIssues } from "@/platform/operator-queue/inquiry-owner-notices";
 import { createMemoryInquiryDeliveryStore } from "@/products/inquiries/delivery-store";
 import type { InquiryOutboundTransport } from "@/products/inquiries/delivery-types";
@@ -7,14 +7,37 @@ import type { InquiryOutboundTransport } from "@/products/inquiries/delivery-typ
 const lead = { id: "lead_notice", name: "Dana", email: "dana@example.test", message: "A party?", createdAt: "2026-10-10T12:00:00Z" };
 const route = async () => ({ tenantId: "notice-site", businessName: "Cottage", ownerEmail: "owner@example.test", customerEmail: null, customerReplyTo: null, ownerNotification: "send" as const });
 const now = () => new Date(lead.createdAt);
+const override = vi.hoisted(() => vi.fn().mockResolvedValue("inherit"));
+vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: override }));
 afterEach(() => vi.unstubAllEnvs());
 
 describe("inquiry owner notices", () => {
+  it("every new notice obeys both global gates and the tenant block", async () => {
+    vi.stubEnv("EMAIL_SENDING_ENABLED", "");
+    vi.stubEnv("CUSTOMER_EMAIL_ENABLED", "true");
+    override.mockResolvedValue("on");
+    expect(await inquiryNoticeEmailGates("notice-site")).toBe(false);
+    vi.stubEnv("EMAIL_SENDING_ENABLED", "true");
+    vi.stubEnv("CUSTOMER_EMAIL_ENABLED", "");
+    expect(await inquiryNoticeEmailGates("notice-site")).toBe(false);
+    vi.stubEnv("CUSTOMER_EMAIL_ENABLED", "true");
+    override.mockResolvedValue("off");
+    expect(await inquiryNoticeEmailGates("notice-site")).toBe(false);
+    override.mockResolvedValue("inherit");
+    expect(await inquiryNoticeEmailGates("notice-site")).toBe(true);
+  });
+  it("closed gates record owner not told without reaching transport", async () => {
+    vi.stubEnv("STRELVA_INQUIRY_OWNER_NOTICES", "1");
+    const d = deps(); d.gates = async () => false;
+    expect(await notifyInquiryOwner({ tenantId: "notice-site", lead }, d)).toMatchObject({ status: "suppressed", reason: "email_gates_closed" });
+    expect(d.delivery.transport.send).not.toHaveBeenCalled();
+    expect(d.record).toHaveBeenCalledWith(expect.objectContaining({ detail: expect.objectContaining({ status: "suppressed" }) }));
+  });
   function deps(verification: Awaited<ReturnType<InquiryOutboundTransport["verify"]>> = { status: "verified" }) {
     const send = vi.fn().mockResolvedValue({ status: "accepted", providerMessageId: "notice_1", acceptedAt: lead.createdAt });
     const verify = vi.fn().mockResolvedValue(verification);
     const record = vi.fn().mockResolvedValue("recorded");
-    return { released: vi.fn().mockResolvedValue(true), route, record, delivery: { store: createMemoryInquiryDeliveryStore(), transport: { send, verify }, now, isWorkspaceExited: async () => false } };
+    return { gates: async () => true, released: vi.fn().mockResolvedValue(true), route, record, delivery: { store: createMemoryInquiryDeliveryStore(), transport: { send, verify }, now, isWorkspaceExited: async () => false } };
   }
   it("flags off reaches neither release storage nor transport", async () => {
     vi.stubEnv("STRELVA_INQUIRY_OWNER_NOTICES", "");

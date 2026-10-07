@@ -254,5 +254,6 @@ printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at
 
 # Wave 6 inquiry contracts against the complete upgrade.
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-workspace-replies-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-weekly-outcomes-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-context-notices-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-inquiry-records-schema.sql"

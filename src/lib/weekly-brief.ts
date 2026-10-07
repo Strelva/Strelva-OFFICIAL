@@ -1,5 +1,6 @@
 import { generateModelText } from "@/platform/infra/model-calls";
-import type { WeeklyBrief, WeeklyBriefStats } from "./types";
+import type { WeeklyBrief, WeeklyBriefStats, WeeklyInquiryOutcomeProof } from "./types";
+import { workspacePorts } from "./workspace-ports";
 import { getRedis } from "@/platform/infra/redis";
 import { getClickCounts, getActivity, getClickCountsByPrefix, getContent, getSearchData, getSectionTimestamps } from "./storage";
 import { getEvents } from "./events";
@@ -13,6 +14,31 @@ import { collectPeriodHighlights } from "./analytics/metric-sources";
 
 function briefsKey(tenantId: string): string {
   return `briefs:${tenantId}`;
+}
+
+async function inquiryProof(tenantId: string, from: Date, to: Date): Promise<WeeklyInquiryOutcomeProof | undefined> {
+  // Do not even resolve the workspace port with flags off. Old reports retain
+  // their exact shape and dependency reads.
+  if (process.env.STRELVA_INQUIRY_OUTCOMES !== "1") return undefined;
+  try {
+    return await (await workspacePorts().inquiries()).readTenantInquiryOutcomeProof(tenantId, from.toISOString(), to.toISOString());
+  } catch {
+    return { status: "unavailable", reason: "inquiry_outcomes_unavailable" };
+  }
+}
+
+/** Deterministic, owner-visible proof survives an unavailable summary model. */
+export function inquiryProofHighlights(proof: WeeklyInquiryOutcomeProof | undefined, periodLabel = "this week"): string[] {
+  if (!proof) return [];
+  if (proof.status === "unavailable") return ["Inquiry counts and reply times are unavailable. This report does not estimate them."];
+  const lines = [`${proof.inquiries} ${proof.inquiries === 1 ? "inquiry" : "inquiries"} received ${periodLabel}; ${proof.answered} answered, ${proof.withinDay} within a day. Replies count when the email provider accepts them.`];
+  if (proof.averageReplySeconds !== null && proof.medianReplySeconds !== null) {
+    const duration = (seconds: number) => seconds < 60 ? `${Math.round(seconds)} seconds` : seconds < 3600 ? `${Math.round(seconds / 60)} minutes` : `${(seconds / 3600).toFixed(1)} hours`;
+    lines.push(`First reply time: ${duration(proof.averageReplySeconds)} average; ${duration(proof.medianReplySeconds)} median.`);
+  } else {
+    lines.push("No accepted replies yet; average and median reply times are unavailable.");
+  }
+  return lines;
 }
 
 function getWeekBounds(date: Date = new Date()): { weekStart: string; weekEnd: string } {
@@ -174,6 +200,10 @@ export async function generateWeeklyBrief(tenantId: string): Promise<WeeklyBrief
     phoneClicks: phoneCounts.thisWeek,
     phoneClicksDelta: phoneCounts.thisWeek - phoneCounts.lastWeek,
   };
+  const inquiryTo = new Date(`${weekEnd}T00:00:00.000Z`);
+  inquiryTo.setUTCDate(inquiryTo.getUTCDate() + 1);
+  const proof = await inquiryProof(tenantId, new Date(`${weekStart}T00:00:00.000Z`), inquiryTo);
+  if (proof) stats.inquiryOutcomeProof = proof;
 
   // Owner-facing only — the brief never hands the client our operator craft.
   const [suggestion] = ownerSuggestions(await getSuggestions(tenantId));
@@ -212,6 +242,7 @@ export async function generateWeeklyBrief(tenantId: string): Promise<WeeklyBrief
   // Metric-source registry (GBP, etc.) contributes owner-facing proof for the week.
   const sourceHighlights = await collectPeriodHighlights(tenantId, weekStartDate, weekEndDate);
   const highlights = [
+    ...inquiryProofHighlights(proof),
     ...visibilityWins,
     ...sourceHighlights,
     ...buildHighlights(stats, weeklyEvents, activity, reviewSummary, phoneCounts.thisWeek),
@@ -300,6 +331,11 @@ export async function generateMonthlyRecap(tenantId: string): Promise<WeeklyBrie
     phoneClicks: period.phoneClicks,
     phoneClicksDelta: period.phoneClicks - period.phoneClicksPrior,
   };
+  const inquiryFrom = new Date(`${isoDate(monthStart)}T00:00:00.000Z`);
+  const inquiryTo = new Date(inquiryFrom);
+  inquiryTo.setUTCMonth(inquiryTo.getUTCMonth() + 1);
+  const proof = await inquiryProof(tenantId, inquiryFrom, inquiryTo);
+  if (proof) stats.inquiryOutcomeProof = proof;
 
   const topSearchQueries = (searchData?.queries || []).slice(0, 3);
   const staleSections = detectStaleSections(
@@ -312,6 +348,7 @@ export async function generateMonthlyRecap(tenantId: string): Promise<WeeklyBrie
   // Metric-source registry (GBP, etc.) contributes owner-facing proof for the month.
   const sourceHighlights = await collectPeriodHighlights(tenantId, monthStart, monthEndInclusive);
   const highlights = [
+    ...inquiryProofHighlights(proof, "this month"),
     ...visibilityWins,
     ...sourceHighlights,
     ...buildHighlights(stats, monthEvents, activity, reviewSummary, period.phoneClicks, "this month"),
@@ -465,7 +502,7 @@ Stats:
 - ${data.stats.bookingClicks} clicked your booking link (${formatDelta(data.stats.bookingClicksDelta)} ${vsPrior})
 - ${data.phoneClicks} called you from your site
 - ${data.stats.reviewsReceived} reviews received
-- ${data.stats.contentUpdates} AI site updates
+- ${data.stats.contentUpdates} AI site updates${data.stats.inquiryOutcomeProof ? `\n- Inquiry outcome evidence: ${inquiryProofHighlights(data.stats.inquiryOutcomeProof, `this ${periodNoun}`).join(" ")}\n- These are submission counts and first business reply acceptances, never visits, bookings, delivery or customer replies. If unavailable, say unavailable; never invent counts or times.` : ""}
 
 ${data.topServices.length ? `Top services:\n${data.topServices.map((s) => `- ${s.name}: ${s.clicks} clicks`).join("\n")}` : `No service click data this ${periodNoun}.`}
 ${data.topSearchQueries.length ? `Top searches:\n${data.topSearchQueries.map((q) => `- ${q.query}: ${q.clicks} clicks, ${q.impressions} impressions`).join("\n")}` : `No search query data this ${periodNoun}.`}

@@ -103,6 +103,8 @@ export interface NeedsYouStore {
   finish(workspaceId: string, itemId: string, outcome: "done" | "done_unverified" | "failed", reason: string | null, receiptRef: string | null): Promise<OwnerDecision>;
   recordDelivery(workspaceId: string, itemId: string, kind: "urgent" | "digest" | "reminder_1" | "reminder_2", status: "sent" | "suppressed" | "bounced" | "failed", recipient: string | null, providerMessageId: string | null, reason: string | null): Promise<OwnerDecision>;
   dueForDelivery(limit: number): Promise<DeliveryRow[]>;
+  /** Exact urgent source; avoids unrelated businesses or the cron's page cap. */
+  deliveryForSource?(workspaceId: string, lifecycle: string, sourceId: string): Promise<DeliveryRow | null>;
   linkedTenants(workspaceId: string | null): Promise<{ workspaceId: string; tenantId: string }[]>;
   ownerActor(workspaceId: string, recipient: string): Promise<WorkspaceActor | null>;
   /**
@@ -139,6 +141,7 @@ export const PostgresNeedsYouStore: NeedsYouStore = {
     p_workspace_id: workspaceId, p_decision_id: itemId, p_kind: kind, p_status: status, p_recipient: recipient, p_provider_message_id: providerMessageId, p_reason: reason,
   }, ownerDecisionSchema, "The delivery could not be recorded."),
   dueForDelivery: (limit) => call("list_open_owner_decisions_for_delivery", { p_limit: limit }, z.array(deliveryRowSchema), "Open decisions could not be listed."),
+  deliveryForSource: (workspaceId, lifecycle, sourceId) => call("read_owner_decision_source_for_delivery", { p_workspace_id: workspaceId, p_lifecycle: lifecycle, p_source_id: sourceId }, deliveryRowSchema.nullable(), "The urgent decision could not be read."),
   linkedTenants: (workspaceId) => call("needs_you_linked_tenants", { p_workspace_id: workspaceId }, z.array(z.object({ workspaceId: z.string().uuid(), tenantId: z.string() })), "Linked sites could not be read."),
   ownerActor: (workspaceId, recipient) => call("needs_you_owner_actor", { p_workspace_id: workspaceId, p_recipient: recipient }, z.object({ userId: z.string().uuid(), verifiedEmail: z.string() }).nullable(), "The owner could not be confirmed."),
   serviceSession: async (workspaceId) => parseServiceSession(await call("strelva_service_reader", { p_workspace_id: workspaceId, p_purpose: "needs_you_sync" }, z.unknown(), "Strelva's service session could not start.")),

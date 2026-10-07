@@ -24,7 +24,7 @@ import type {
 } from "./repository";
 import { getInquiryRepository } from "./repository";
 import { enqueueInquiryCaptureRepair, type InquiryCaptureRepairStore } from "./reconciliation";
-import { currentResponsibility, inquiryCurrentness } from "./currentness";
+import { currentResponsibility, inquiryIntakeCurrentness } from "./currentness";
 
 export interface RecordInquiryEvidenceInput {
   tenantId: string;
@@ -254,7 +254,7 @@ async function recordInquiryEvidenceInternal(
     const already = existingEvidence(snapshot, input.inquiryId);
     if (already) return already;
 
-    const currentness = inquiryCurrentness(snapshot.state, snapshot.businessId, {
+    const currentness = inquiryIntakeCurrentness(snapshot.state, snapshot.businessId, {
       capabilityId: input.capabilityId,
       capabilityVersion: input.expectedCapabilityVersion,
     });

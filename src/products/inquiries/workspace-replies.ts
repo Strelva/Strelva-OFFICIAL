@@ -75,6 +75,7 @@ export async function replyFromWorkspace(actor: WorkspaceActor, raw: WorkspaceRe
       ...(claim.replyTo ? { replyTo: claim.replyTo } : {}),
       options: { heading: claim.subject, paragraphs: [claim.body], footerNote: `Sent by Strelva for ${claim.businessName}, approved by the business owner.` },
       idempotencyKey: `inquiry-workspace-${claim.id}`,
+      tags: { strelva_workspace_message_id: claim.id, strelva_workspace_id: input.workspaceId },
     });
   } catch {
     // A rejected request can still have reached the provider. No send retry.
@@ -97,4 +98,60 @@ export async function replyFromWorkspace(actor: WorkspaceActor, raw: WorkspaceRe
       : ["failed", "canceled", "complained"].includes(readback.lastEvent) ? "failed" : "accepted";
   if (status !== "accepted") await finish(status, sent.providerMessageId, sent.acceptedAt).catch(() => undefined);
   return outcome(status, sent.providerMessageId, sent.acceptedAt);
+}
+
+export interface WorkspaceInquiryProviderEventResult {
+  status: "recorded" | "duplicate" | "ignored" | "unmatched" | "unavailable";
+  reason?: string;
+}
+
+/** The webhook host verifies the provider signature before invoking this.
+ * Metadata identifies the immutable local purpose; SQL also checks the actual
+ * destination, subject and provider id. No event can acquire a send claim. */
+export async function reconcileWorkspaceInquiryProviderEvent(
+  input: { event: unknown; eventId: string },
+  dependencies: Pick<WorkspaceReplyDependencies, "rpc" | "enabled"> = defaults,
+): Promise<WorkspaceInquiryProviderEventResult> {
+  if (!dependencies.enabled()) return { status: "ignored", reason: "workspace_replies_off" };
+  const payload = input.event && typeof input.event === "object" ? input.event as Record<string, unknown> : null;
+  const data = payload?.data && typeof payload.data === "object" ? payload.data as Record<string, unknown> : null;
+  if (!data) return { status: "ignored", reason: "provider_event_invalid" };
+  const tags: Record<string, unknown> = {};
+  if (Array.isArray(data.tags)) {
+    for (const item of data.tags) {
+      if (item && typeof item === "object" && typeof item.name === "string") tags[item.name] = item.value;
+    }
+  } else if (data.tags && typeof data.tags === "object") Object.assign(tags, data.tags);
+  if (!tags.strelva_workspace_message_id) return { status: "ignored", reason: "provider_event_not_for_workspace_reply" };
+  const eventStatuses: Record<string, WorkspaceReplyStatus> = {
+    "email.sent": "accepted", "email.delivered": "delivered", "email.delivery_delayed": "deferred",
+    "email.bounced": "bounced", "email.failed": "failed", "email.complained": "failed", "email.canceled": "failed",
+  };
+  const status = typeof payload?.type === "string" ? eventStatuses[payload.type] : undefined;
+  if (!status) return { status: "ignored", reason: "provider_event_not_a_delivery_outcome" };
+  const timestamp = z.string().refine((value) => Number.isFinite(Date.parse(value)));
+  const parsed = z.object({
+    messageId: z.string().uuid(), workspaceId: z.string().uuid(),
+    providerMessageId: z.string().trim().min(1).max(240), eventId: z.string().trim().min(1).max(240),
+    eventAt: timestamp, acceptedAt: timestamp.nullable(),
+    recipients: z.array(z.string().email()).min(1), subject: z.string(),
+  }).safeParse({
+    messageId: tags.strelva_workspace_message_id, workspaceId: tags.strelva_workspace_id,
+    providerMessageId: data.email_id, eventId: input.eventId, eventAt: payload?.created_at,
+    acceptedAt: data.created_at ?? (payload?.type === "email.sent" ? payload.created_at : null),
+    recipients: Array.isArray(data.to) ? data.to : [data.to], subject: data.subject,
+  });
+  if (!parsed.success) return { status: "unmatched", reason: "workspace_reply_provider_evidence_invalid" };
+  const event = parsed.data;
+  try {
+    const result = await dependencies.rpc("record_workspace_inquiry_provider_event", {
+      p_message_id: event.messageId, p_workspace_id: event.workspaceId, p_provider_message_id: event.providerMessageId,
+      p_event_id: event.eventId, p_status: status, p_event_at: event.eventAt, p_accepted_at: event.acceptedAt,
+      p_recipients: event.recipients, p_subject: event.subject,
+    }) as { status?: unknown } | null;
+    if (result?.status === "recorded" || result?.status === "duplicate" || result?.status === "unmatched") return { status: result.status };
+    return { status: "unavailable", reason: "workspace_reply_provider_receipt_malformed" };
+  } catch {
+    return { status: "unavailable", reason: "workspace_reply_provider_receipt_unavailable" };
+  }
 }
