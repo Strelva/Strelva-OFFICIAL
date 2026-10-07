@@ -12,6 +12,8 @@ import { previewWebsiteDetail, previewWebsiteDetailMode, type PreviewWebsiteDeta
 import type { PreviewSystems } from "./systems-projection";
 import { agencyPreviewState, withAgencyPreview } from "./agency-fixture";
 import { withAskPreview, type AskPreviewMode } from "./ask-fixture";
+import { HomeOutcomesProvider, type HomeOutcomes } from "../outcomes/HomeOutcomes";
+import { BAKERY_LOOP } from "./outcomes-fixture";
 import styles from "./preview.module.css";
 
 const previewJson = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -65,7 +67,10 @@ function previewHref(scenario: string, systems: string | null): string {
   return `/preview/strelva?${params}`;
 }
 
-export function WorkspacePreview({ scenario, systems, needsYou = false, ask = null }: { scenario: PreviewScenario; systems?: PreviewSystems; needsYou?: boolean; ask?: AskPreviewMode | null }) {
+/** Fixture-only outcome data for Home (`outcomes=on`). */
+const PREVIEW_OUTCOMES: HomeOutcomes = { loop: BAKERY_LOOP };
+
+export function WorkspacePreview({ scenario, systems, needsYou = false, ask = null, outcomes = false }: { scenario: PreviewScenario; systems?: PreviewSystems; needsYou?: boolean; ask?: AskPreviewMode | null; outcomes?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [installedStaffRequest] = useState(() => searchParams.get("previewSetup") === "staff-request");
@@ -103,6 +108,8 @@ export function WorkspacePreview({ scenario, systems, needsYou = false, ask = nu
       {systems ? <Link href={previewHref(scenario, systems.released ? "off" : "on")} aria-label={`Systems are ${systems.released ? "on" : "off"}. Turn them ${systems.released ? "off" : "on"}.`}>Systems: {systems.released ? "on" : "off"}</Link> : null}
       {(scenario === "paid" || scenario === "enterprise") && <p>Relationship example only. Pricing and permissions are not simulated.</p>}
     </aside>
-    <WorkspaceApp key={`${scenario}:${systems?.released ? "systems" : "reborn"}:${needsYou ? "needs-you" : ""}:${ask ?? ""}`} request={request} appBase="/preview/strelva" signOut={null} inquiry={inquiry} />
+    <HomeOutcomesProvider value={outcomes ? PREVIEW_OUTCOMES : null}>
+      <WorkspaceApp key={`${scenario}:${systems?.released ? "systems" : "reborn"}:${needsYou ? "needs-you" : ""}:${ask ?? ""}:${outcomes ? "outcomes" : ""}`} request={request} appBase="/preview/strelva" signOut={null} inquiry={inquiry} />
+    </HomeOutcomesProvider>
   </div>;
 }

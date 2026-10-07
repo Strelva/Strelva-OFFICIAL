@@ -21,6 +21,8 @@ import { SiteSummarySection, useSiteSummary } from "./SiteSummarySection";
 import { workspaceHome } from "./workspace-home";
 import { businessRequestRows, deliveryProviderName, type BusinessRequestRow } from "./WorkspaceRequests";
 import { workspaceWorkLabel } from "./work-label";
+import { LoopRibbon } from "./outcomes/LoopRibbon";
+import { useHomeOutcomes } from "./outcomes/HomeOutcomes";
 import styles from "./business-home.module.css";
 
 interface Props {
@@ -82,6 +84,8 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   const needsYouReleased = snapshot.releases?.needsYou === true && current?.kind === "customer" && !readOnly;
   const needsYou = useNeedsYou(needsYouReleased ? snapshot.workspaceId : undefined);
   // Owner entry: the linked site's numbers, inquiries and Strelva's work (the old Today page).
+  // Outcome loop: preview-only until the loop is joined on the server (null by default).
+  const outcomes = useHomeOutcomes();
   const siteSummary = useSiteSummary(current?.kind === "customer" && !readOnly ? snapshot.workspaceId : undefined);
   const attentionCount = home.attention.length + deliveryAttention.length;
   const fileIds = systemsReleased && files ? new Set(files.map(item => item.id)) : null;
@@ -166,6 +170,8 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
           </div>
         </> : null}
       </section>}
+
+      {outcomes ? <LoopRibbon {...outcomes.loop} className={styles.outcome} /> : null}
 
       {managedWorkUnavailable ? <p role="status" className={styles.notice}>Some websites could not be loaded. <a href={accountHref}>Check website access</a></p> : null}
 

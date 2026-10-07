@@ -35,7 +35,7 @@ acceptance. Keep these distinctions when making changes:
 | Type sizes | Global starting roles: metadata 12/16, compact 14/20, body 16/24, introduction 20/28, component 24/32, section 32/40, page 40/48, display 64/72. At most three sizes and weights per authored component. | These are font-size/line-height standards, not a complete implemented token API. Older dashboard CSS comments describe a denser hierarchy. Do not silently treat those comments or a generated image as a new global decision. Expressive type may exceed the scale through a deliberate role. |
 | Icons | One family and consistent stroke; 16px small, 20px default, 24px prominent. | Shared examples use Lucide. `IconButton` requires an accessible label. Icon-only affordances still need usable hit areas. |
 | Focus and targets | Visible 2px outline, 2px offset; 44px touch target preferred. | Shared controls implement focus geometry and coarse-pointer target expansion. This does not certify older fields, tabs or every consumer. |
-| Motion | Gooey disclosure, restrained overshoot, sharp text, interruptible state changes, reduced-motion alternative. | [Motion contract](./motion.md), [CSS roles](../../src/app/styles/motion.css), [React presets](../../src/lib/motion.ts), and `GooeyDisclosure` own this. Do not substitute page-specific timing recipes. |
+| Motion | Gooey disclosure, restrained overshoot, sharp text, interruptible state changes, reduced-motion alternative. Data surfaces add reveal, draw and count. | [Motion contract](./motion.md), [CSS roles](../../src/app/styles/motion.css), [React presets](../../src/lib/motion.ts), `GooeyDisclosure`, and the entrance primitives (`Entrance`, `Reveal`, `CountUp`) own this. Do not substitute page-specific timing recipes. |
 | Materials | Real bounded material beneath a continuous frosted surface; sharp content and fine highlights. | [Atmospheric contract](./atmospheric-component-contract.md) owns construction. `AtmosphericCard` provides six compositions. The newest ink/mineral study and smoked/clear/matte comparisons are not all product APIs or final selected materials. |
 | Identity | Original cairn; preserve the established identity. | [StrelvaLockup](../../src/components/brand/StrelvaLockup.tsx) and the letter-morph implementation exist. Custom seven-letter artwork is not a font for headings. App-wide adoption remains incomplete. |
 
@@ -136,6 +136,47 @@ native buttons, and passing component tests does not prove an entire page journe
 Record local checks with their revision and limitations in the existing
 [verification record](./atmospheric-components-verification.md) or owning
 feature handoff. Human acceptance and production release remain separate.
+
+### Outcome components (October 6, local preview only)
+
+Contract: [outcome-components.md](./outcome-components.md). Seven components
+in [src/experience/workspace/outcomes](../../src/experience/workspace/outcomes/),
+one shared CSS module (`outcomes.module.css`, contract colors scoped as
+`--oc-*` on `.card`/`.scope`, not added to global palettes) and DM Sans loaded
+for these components only (`outcome-font.ts`, `--font-outcome`; the app font
+stays Geist). Every verdict, ratio and geometry comes from a pure function
+with tests (`outcome-models.test.ts`); rendering, accessibility and the
+honesty rails are covered by `outcome-components.test.tsx`.
+
+| Component | Props in | Pure functions | Honest empty state |
+| --- | --- | --- | --- |
+| `LoopRibbon` | `eyebrow`, five `LoopStage`s (`value: null` = no source), optional `trend`, `footer` | `loopRibbonGeometry`, `loopHeadline`, `loopChips` | "Not measured yet" per stage; no ribbon when nothing is measured; Found marked Estimated |
+| `AiMirror` | `AiMirrorData`; `aiMirrorFromScorecard()` adapts `AiVisibilityScorecard` (one Gemini column today) | `aiMirrorMatrix`, `aiMirrorHeadline`, `splitAnswer` | Only probed assistants get columns, only mentioned / wrong-info-fixed cells draw, rows with no mention are omitted; never "not mentioned" |
+| `ReplyPattern` | `ReplyLead[]` (day, time, name, minutes or null) | `replyVerdict` ("Steady." when all ≤ 5 min), `pinLayout`, `arrivalOrder` | "No leads this week."; unanswered leads pin in clay and count as waiting |
+| `RatingTrend` | `RatingPoint[]`, `cutoff` (4.5), notes | `ratingChartGeometry`, `ratingCrossing`, `ratingTrendWord` | Needs two readings; says so otherwise |
+| `SundayPictureText` | `WeeklyReport` | `weeklyPictureLine`, `weeklyReportBubbles`, `weeklyReportText` (plain SMS) | Unmeasured parts omitted, never written as zero |
+| `PriceSheet` | title, price, terms, `onConfirm` | `slideCommits` (> 85%), `slideProgress`, `confirmLabel` | Real button always present and equivalent; slider on coarse pointers (or `slider="always"`); one confirm per commit; failure keeps the button usable |
+| `LocationHeatmap` | `HeatmapRow[]`, optional `suggestion`, `onAction` | `heatStep` (contract scale), `formatTileMinutes`, `heatmapVerdict` | One action only when a location is slipping |
+
+Interactive marks are keyboard reachable: Loop stage numerals link to receipts
+when a `receiptHref` exists; reply pins are buttons (links with a receipt)
+labeled with who, when and minutes; heatmap tiles are links to the day's
+receipts or focusable images with the reply time. Tooltips mirror the label
+and are aria-hidden.
+
+Wiring: only the Loop ribbon reaches a product surface, on business Home via
+`HomeOutcomesProvider` (default null; only `WorkspacePreview` provides it, for
+`outcomes=on`). No live route reads or sets outcome data; the loop is not
+joined on the server yet.
+
+Preview (with `STRELVA_UI_PREVIEW=1`): `/preview/strelva/outcomes` (all seven,
+plus partial and empty Loop ribbon and an empty AI mirror) and
+`/preview/strelva?outcomes=on` (any scenario). Fixtures:
+[outcomes-fixture.ts](../../src/experience/workspace/preview/outcomes-fixture.ts)
+(fictional Hertel Ave Bakery and Comfort Air). Checked in Chromium at 1440 and
+390 px with and without reduced motion: 200s, no console errors, no
+horizontal overflow. Jacob's visual acceptance, screen readers and physical
+devices remain open.
 
 ## Extending the foundation
 

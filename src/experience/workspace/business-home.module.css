@@ -10,6 +10,7 @@
 
 .start,
 .businessHeader,
+.outcome,
 .ask,
 .section,
 .notice,
@@ -580,4 +581,9 @@
   color: var(--gray-muted);
   font-size: 12px;
   line-height: 20px;
+}
+
+/* Outcome loop ribbon (preview-only today). */
+.outcome {
+  margin-bottom: 32px;
 }
