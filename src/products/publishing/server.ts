@@ -112,3 +112,6 @@ export { reconnectPage } from "./reconnect-page";
 export const prepareContentRestore = async (...args: Parameters<typeof import("./content-service").prepareContentRestore>) => (await import("./content-service")).prepareContentRestore(...args);
 
 export const prepareTenantCollectionDraft = async (...args: Parameters<typeof import("./content-server").prepareTenantCollectionDraft>) => (await import("./content-server")).prepareTenantCollectionDraft(...args);
+
+export { sendApprovedNewsletterIssues, newsletterSenderEnabled } from "./newsletter-sender";
+export type { PublishingSnapshot } from "./projection";

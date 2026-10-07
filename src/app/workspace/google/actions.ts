@@ -2,11 +2,9 @@
 
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/platform/infra/db/server-client";
-import { readLinkedSite } from "@/platform/owner-entry/linked-sites";
-import { hasTenantPermission } from "@/platform/infra/auth";
 import { publishingEnabledForWorkspace } from "@/products/publishing/server";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
-import { prepareGoogleListingDraft, undoWorkspaceGoogleChange, setListingPaused, changeWorkspaceGoogleReply } from "@/products/google-listing/server";
+import { googleTargetAllowed, prepareGoogleListingDraft, undoWorkspaceGoogleChange, setListingPaused, changeWorkspaceGoogleReply } from "@/products/google-listing/server";
 import { resolveEventAction } from "@/lib/event-actions";
 import { getEventRaw } from "@/lib/events";
 import { z } from "zod";
@@ -19,7 +17,7 @@ export async function googleListingAction(form: FormData): Promise<void> {
   const user = await getSessionUser().catch(() => null);
   if (!user?.id || !user.email || !user.email_confirmed_at) redirect("/sign-in");
   const actor = { userId: user.id, verifiedEmail: user.email.trim().toLowerCase() };
-  if (!(await publishingEnabledForWorkspace(workspaceId, actor)) || !(await readLinkedSite(actor, workspaceId, tenantId)) || !(await hasTenantPermission(tenantId, "publishing:manage"))) redirect(`/workspace?workspaceId=${workspaceId}`);
+  if (!(await publishingEnabledForWorkspace(workspaceId, actor)) || !(await googleTargetAllowed(actor, workspaceId, tenantId))) redirect(`/workspace?workspaceId=${workspaceId}`);
   let result = "";
   try {
     const action = String(form.get("action"));

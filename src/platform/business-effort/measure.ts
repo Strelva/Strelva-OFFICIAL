@@ -6,20 +6,27 @@ import type { BusinessEffortEntry, EffortBusiness } from "./types";
  *
  * - The latest month is the most recent COMPLETE month; the current month is
  *   reported separately as month-to-date so a partial month never reads as a fall.
- * - Measurement for a business starts in the month of its first non-voided entry.
- *   From then on a month without entries counts as zero minutes. Before it, the
- *   month is unmeasured, and a comparison involving it is insufficient data.
+ * - Every supplied business is in scope in every month of the window.
+ * - A month is logged only when it has a non-voided entry, including an explicit
+ *   zero-minute entry. Absence is unknown, even after the first effort date.
+ * - Portfolio statistics use every in-scope business, including logged zeros,
+ *   and remain unknown until coverage is complete. Partial sums are labeled.
  * - Voided entries never count.
  */
 
 export type EffortDirection = "falling" | "rising" | "flat" | "insufficient_data";
-export interface MonthMinutes { month: string; minutes: number }
+export interface MonthMinutes {
+  month: string;
+  minutes: number | null;
+  coverage: "logged" | "not_logged";
+  entryCount: number;
+}
 
 export interface BusinessEffortMeasure {
   businessId: string;
   name: string | null;
   tenantIds: string[];
-  /** Measured months within the window, oldest first, including zero months. */
+  /** Every month in the window, oldest first, with explicit log coverage. */
   months: MonthMinutes[];
   monthToDate: MonthMinutes | null;
   latest: MonthMinutes | null;
@@ -29,10 +36,17 @@ export interface BusinessEffortMeasure {
 
 export interface PortfolioMonth {
   month: string;
-  totalMinutes: number;
+  /** All customer businesses supplied by the caller; the statistical denominator. */
+  businessCount: number;
+  loggedBusinessCount: number;
+  unloggedBusinessCount: number;
   businessesWithEffort: number;
-  /** Median over businesses with any minutes that month; null when none. */
-  medianMinutesPerActiveBusiness: number | null;
+  /** Sum of available logs, never a claim about unlogged businesses. */
+  loggedMinutes: number;
+  /** Full portfolio statistics are unknown while any business is not logged. */
+  totalMinutes: number | null;
+  medianMinutesPerBusiness: number | null;
+  averageMinutesPerBusiness: number | null;
 }
 
 export interface EffortMeasure {
@@ -76,13 +90,24 @@ function median(values: number[]): number | null {
   return sorted.length % 2 === 1 ? upper : ((sorted[middle - 1] ?? 0) + upper) / 2;
 }
 
-function portfolioMonth(month: string, minutesByBusiness: Map<string, Map<string, number>>): PortfolioMonth {
-  const active = [...minutesByBusiness.values()].map((months) => months.get(month) ?? 0).filter((minutes) => minutes > 0);
+function portfolioMonth(month: string, minutesByBusiness: Map<string, Map<string, { minutes: number; entryCount: number }>>): PortfolioMonth {
+  const logs = [...minutesByBusiness.values()].flatMap((months) => {
+    const log = months.get(month);
+    return log ? [log.minutes] : [];
+  });
+  const businessCount = minutesByBusiness.size;
+  const loggedMinutes = logs.reduce((sum, minutes) => sum + minutes, 0);
+  const complete = businessCount > 0 && logs.length === businessCount;
   return {
     month,
-    totalMinutes: active.reduce((sum, minutes) => sum + minutes, 0),
-    businessesWithEffort: active.length,
-    medianMinutesPerActiveBusiness: median(active),
+    businessCount,
+    loggedBusinessCount: logs.length,
+    unloggedBusinessCount: businessCount - logs.length,
+    businessesWithEffort: logs.filter((minutes) => minutes > 0).length,
+    loggedMinutes,
+    totalMinutes: complete ? loggedMinutes : null,
+    medianMinutesPerBusiness: complete ? median(logs) : null,
+    averageMinutesPerBusiness: complete ? loggedMinutes / businessCount : null,
   };
 }
 
@@ -97,47 +122,42 @@ export function measureBusinessEffort(input: {
   const windowStart = effortWindowStart(input.now);
   const firstWindowMonth = windowStart.slice(0, 7);
 
-  const known = new Map(input.businesses.map((business) => [business.id, business]));
-  const firstMonth = new Map<string, string>();
-  const minutesByBusiness = new Map<string, Map<string, number>>();
-  for (const business of input.businesses) {
-    minutesByBusiness.set(business.id, new Map());
-    if (business.firstEffortOn) firstMonth.set(business.id, business.firstEffortOn.slice(0, 7));
-  }
+  const minutesByBusiness = new Map(input.businesses.map((business) => [
+    business.id, new Map<string, { minutes: number; entryCount: number }>(),
+  ]));
 
   for (const entry of input.entries) {
-    if (entry.void) continue;
+    const months = minutesByBusiness.get(entry.businessId);
+    // The business list owns scope. Stale/out-of-scope entries cannot add a
+    // business to the denominator or leak another workspace into the measure.
+    if (entry.void || !months) continue;
     const month = entry.occurredOn.slice(0, 7);
-    const earliest = firstMonth.get(entry.businessId);
-    if (!earliest || month < earliest) firstMonth.set(entry.businessId, month);
     if (month < firstWindowMonth || month > currentMonth) continue;
-    const months = minutesByBusiness.get(entry.businessId) ?? new Map<string, number>();
-    months.set(month, (months.get(month) ?? 0) + entry.minutes);
-    minutesByBusiness.set(entry.businessId, months);
+    const log = months.get(month) ?? { minutes: 0, entryCount: 0 };
+    months.set(month, { minutes: log.minutes + entry.minutes, entryCount: log.entryCount + 1 });
   }
 
-  const businesses: BusinessEffortMeasure[] = [...minutesByBusiness.entries()].map(([businessId, months]) => {
-    const business = known.get(businessId);
-    const start = firstMonth.get(businessId) ?? null;
-    const measured = (month: string): MonthMinutes | null =>
-      start !== null && month >= start ? { month, minutes: months.get(month) ?? 0 } : null;
+  const businesses: BusinessEffortMeasure[] = input.businesses.map((business) => {
+    const months = minutesByBusiness.get(business.id)!;
+    const measured = (month: string): MonthMinutes => {
+      const log = months.get(month);
+      return { month, minutes: log?.minutes ?? null, coverage: log ? "logged" : "not_logged", entryCount: log?.entryCount ?? 0 };
+    };
     const series: MonthMinutes[] = [];
-    if (start !== null) {
-      for (let month = start > firstWindowMonth ? start : firstWindowMonth; month <= currentMonth; month = addMonths(month, 1)) {
-        series.push({ month, minutes: months.get(month) ?? 0 });
-      }
+    for (let month = firstWindowMonth; month <= currentMonth; month = addMonths(month, 1)) {
+      series.push(measured(month));
     }
     const latest = measured(latestMonth);
     const previous = measured(previousMonth);
     return {
-      businessId,
-      name: business?.name ?? null,
-      tenantIds: business?.tenantIds ?? [],
+      businessId: business.id,
+      name: business.name,
+      tenantIds: business.tenantIds,
       months: series,
       monthToDate: measured(currentMonth),
       latest,
       previous,
-      direction: direction(latest?.minutes ?? null, previous?.minutes ?? null),
+      direction: direction(latest.minutes, previous.minutes),
     };
   });
 
@@ -153,7 +173,7 @@ export function measureBusinessEffort(input: {
       monthToDate: portfolioMonth(currentMonth, minutesByBusiness),
       latest,
       previous,
-      direction: direction(latest.medianMinutesPerActiveBusiness, previous.medianMinutesPerActiveBusiness),
+      direction: direction(latest.medianMinutesPerBusiness, previous.medianMinutesPerBusiness),
     },
   };
 }

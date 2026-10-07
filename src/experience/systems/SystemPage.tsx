@@ -1,4 +1,5 @@
 "use client";
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 
 import Link from "next/link";
 import { ContentWorkspace } from "@/experience/publishing/ContentWorkspace";
@@ -186,7 +187,7 @@ function HistoryPanel({ system }: { system: SystemView }) {
 export function websiteSandbox(src: string): string {
   try {
     const url = new URL(src);
-    const own = url.hostname === "app.strelva.com" || url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    const own = url.hostname === new URL(CONTROL_PLANE_URL).hostname || url.hostname === "localhost" || url.hostname === "127.0.0.1";
     return (url.protocol === "https:" || url.protocol === "http:") && !own ? "allow-scripts allow-same-origin allow-popups" : "";
   } catch {
     return "";

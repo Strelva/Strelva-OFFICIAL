@@ -149,6 +149,8 @@ export function resolveService(
 
 /** Store rows that hold time on a calendar: held, requested, confirmed, plus imported bookings. */
 export function blocksTime(booking: StoreBooking): boolean {
+  if (booking.status === "held" && (booking.origin === "site" || booking.origin === "inquiry")
+    && Date.parse(booking.createdAt) <= Date.now() - 15 * 60000) return false;
   return SLOT_HOLDING_STATUSES.has(booking.status) || (booking.origin === "import" && booking.status === "confirmed");
 }
 

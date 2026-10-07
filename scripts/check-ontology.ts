@@ -79,7 +79,7 @@ const REQUIRED_CHECKS = [
 ];
 const migrationsDir = path.join(repoRoot, "supabase/migrations");
 const allMigrations = readdirSync(migrationsDir)
-  .filter((f) => f.endsWith(".sql"))
+  .filter((f) => /^\d{14}_.+\.sql$/.test(f))
   .map((f) => readFileSync(path.join(migrationsDir, f), "utf8"))
   .join("\n");
 for (const constraint of REQUIRED_CHECKS) {

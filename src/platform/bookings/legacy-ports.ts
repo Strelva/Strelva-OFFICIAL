@@ -24,6 +24,8 @@ type ReceiptRow = {
   time_zone: string;
   status: "pending" | "confirmed" | "cancelled";
   created_at: string;
+  email_confirmation_required?: boolean;
+  email_confirmation_expires_at?: string;
 };
 
 type Query = PromiseLike<{ data: unknown; error: { message?: string } | null }> & {
@@ -45,7 +47,9 @@ async function receiptInput(tenant: string, row: ReceiptRow): Promise<StoreBooki
   const lead = await getLeadById(tenant, row.inquiry_id).catch(() => null);
   return {
     publicReservationId: row.id,
-    status: STATUS[row.status],
+    status: row.email_confirmation_required && row.status === "pending"
+      ? Date.parse(row.email_confirmation_expires_at ?? "") <= Date.now() ? "cancelled" : "held"
+      : STATUS[row.status],
     origin: "site",
     serviceName: row.title.slice(0, 160),
     start: new Date(row.start_at).toISOString(),
@@ -60,7 +64,7 @@ async function receiptInput(tenant: string, row: ReceiptRow): Promise<StoreBooki
   };
 }
 
-const COLUMNS = "id,inquiry_id,request_fingerprint,title,start_at,end_at,time_zone,status,created_at";
+const COLUMNS = "email_confirmation_required,email_confirmation_expires_at,id,inquiry_id,request_fingerprint,title,start_at,end_at,time_zone,status,created_at";
 
 type Rows = { data: unknown; error: { message?: string } | null };
 

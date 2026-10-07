@@ -28,7 +28,7 @@ export function EffortLogForm({ businesses, today }: { businesses: EffortBusines
   const [pending, startTransition] = useTransition();
 
   const minutesNumber = Number(minutes);
-  const minutesValid = /^\d+$/.test(minutes) && minutesNumber >= 1 && minutesNumber <= MAX_EFFORT_MINUTES;
+  const minutesValid = /^\d+$/.test(minutes) && minutesNumber >= 0 && minutesNumber <= MAX_EFFORT_MINUTES;
   const canSubmit = Boolean(businessId) && minutesValid && Boolean(occurredOn) && !pending;
 
   function submit(event: FormEvent) {
@@ -70,8 +70,8 @@ export function EffortLogForm({ businesses, today }: { businesses: EffortBusines
           inputMode="numeric"
           value={minutes}
           onChange={(event) => setMinutes(event.target.value.trim())}
-          error={minutes && !minutesValid ? `Enter whole minutes from 1 to ${MAX_EFFORT_MINUTES}.` : undefined}
-          helperText="Human time only. Split longer work across days."
+          error={minutes && !minutesValid ? `Enter whole minutes from 0 to ${MAX_EFFORT_MINUTES}.` : undefined}
+          helperText="Human time only. Record 0 to confirm no human work for this UTC month; it does not replace other entries."
           required
         />
         <SelectInput

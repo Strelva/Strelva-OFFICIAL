@@ -10,7 +10,7 @@ export interface BookingAlternatives {
 /** Conflict suggestions are fresh offers, never commitments. Gate the additive
  * response with the same authority flip; unavailable reads leave the refusal intact. */
 export async function bookingConflictAlternatives(error: unknown, read: () => Promise<{ timeZone: string; slots: BookingAlternatives["nextSlots"] }>): Promise<Partial<BookingAlternatives>> {
-  if (!(error instanceof PublicBookingError) || error.code !== "conflict" || await bookingReadSource() !== "postgres") return {};
+  if (!(error instanceof PublicBookingError) || error.code !== "conflict" || error.status === 429 || await bookingReadSource() !== "postgres") return {};
   try {
     const offered = await read();
     return { timeZone: offered.timeZone, nextSlots: offered.slots.slice(0, 3).map(({ id, start, end }) => ({ id, start, end })) };

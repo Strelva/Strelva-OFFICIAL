@@ -1,3 +1,4 @@
+import { bookingAgentVisibilityEnabled } from "@/platform/bookings/flags";
 /**
  * Server reads behind the agency surface. Each one runs under the signed-in
  * actor; Postgres rechecks access on every row.
@@ -57,7 +58,8 @@ export async function readAgencyClientsPage(
   }, "Clients could not be loaded.");
   const parsed = agencyClientsPageSchema.safeParse(data);
   if (!parsed.success || parsed.data.agencyWorkspaceId !== agencyWorkspaceId) throw new WorkspaceStoreError("Clients could not be loaded. The response was malformed.");
-  return parsed.data;
+  return { ...parsed.data, clients: parsed.data.clients.map(client => ({ ...client,
+    ...(bookingAgentVisibilityEnabled() && client.systems.some(system => ["booking", "bookings"].includes(system.kind)) ? { agentBookings: true } : {}) })) };
 }
 
 const sourcesSchema = z.object({

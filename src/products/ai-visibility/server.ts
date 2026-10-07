@@ -48,3 +48,5 @@ export type {
   AiVisibilityWorkResourceKind,
   PrivateAiVisibilityWorkPayload,
 } from "./work";
+
+export { attributedAiVisibility } from "./attribution";
