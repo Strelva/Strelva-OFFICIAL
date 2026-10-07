@@ -100,12 +100,18 @@ export async function issueNativeAccess(tenant: string, ref: string) {
   return await nativeRpc("issue_booking_access", { p_tenant_id: tenant, p_ref: ref, p_access: newBookingAccess() }) as Record<string, unknown>;
 }
 
+/** Whether a held request could reach this business's customer for
+ * confirmation: messages, manage page, reminders and this business's email gate. */
+export async function agentConfirmationAvailable(tenant: string): Promise<boolean> {
+  const { bookingCustomerEmailAllowed } = await import("./updates");
+  const { bookingMessagesEnabled, bookingManagePageEnabled, bookingRemindersEnabled } = await import("./flags");
+  return bookingMessagesEnabled() && bookingManagePageEnabled() && bookingRemindersEnabled() && await bookingCustomerEmailAllowed(tenant);
+}
+
 export async function requestAgentBooking(tenant: string, raw: unknown) {
   await requireAgentBookings();
   const input = agentBookingSchema.parse(raw);
-  const { bookingCustomerEmailAllowed } = await import("./updates");
-  const { bookingMessagesEnabled, bookingManagePageEnabled, bookingRemindersEnabled } = await import("./flags");
-  if (!bookingMessagesEnabled() || !bookingManagePageEnabled() || !bookingRemindersEnabled() || !await bookingCustomerEmailAllowed(tenant)) {
+  if (!await agentConfirmationAvailable(tenant)) {
     throw new PublicBookingError("unavailable", "Customer confirmation is not available for this business.");
   }
   const ctx = await context(tenant);
