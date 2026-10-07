@@ -7,6 +7,23 @@
 begin;
 set local lock_timeout = '3s';
 set local statement_timeout = '120s';
+-- The deployed July tables may have hosted default grants absent from a
+-- migration-only fixture. Require the reviewed pre-batch-4 metadata capture.
+do $grant_capture_guard$
+begin
+  if to_regclass('release_rollback_baseline.m20261007180000_billing_grants') is null then
+    raise exception 'rollback_billing_grant_capture_required';
+  end if;
+  if (select count(*) from release_rollback_baseline.m20261007180000_billing_grants) <> 4
+    or exists(select 1 from release_rollback_baseline.m20261007180000_billing_grants b
+      left join pg_class c on c.oid = to_regclass(format('public.%I', b.relation_name))
+      where c.oid is distinct from b.relation_oid or c.relowner is distinct from b.owner_oid
+        or b.relation_name not in ('accounts','account_memberships','subscriptions','subscription_items'))
+    or exists(select 1 from release_rollback_baseline.m20261007180000_billing_grants b,
+      lateral aclexplode(b.grants) a where a.grantor <> b.owner_oid) then
+    raise exception 'rollback_billing_grant_capture_drift';
+  end if;
+end; $grant_capture_guard$;
 do $conversion_guard$ begin
   if exists(select 1 from public.tenant_workspace_links) then
     raise exception 'rollback_conversions_first: use the reviewed per-tenant unlink plan before reversing business billing';
@@ -53,10 +70,30 @@ alter table public."accounts" drop column "billing_sources";
 alter table public."accounts" drop column "payment_updated_at";
 alter table public."accounts" drop column "grandfathered_terms";
 alter table public."subscription_items" add constraint "subscription_items_tenant_id_fkey" FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE;
-revoke all on table public."accounts" from public, anon, authenticated, service_role;
-revoke all on table public."subscriptions" from public, anon, authenticated, service_role;
-revoke all on table public."subscription_items" from public, anon, authenticated, service_role;
-revoke all on table public."account_memberships" from public, anon, authenticated, service_role;
+do $restore_grants$
+declare b record; a record; grantee_name text;
+begin
+  for b in select * from release_rollback_baseline.m20261007180000_billing_grants
+    order by relation_name loop
+    for a in select distinct x.grantee from pg_class c,
+      lateral aclexplode(coalesce(c.relacl, acldefault('r', c.relowner))) x
+      where c.oid = b.relation_oid loop
+      grantee_name := case when a.grantee = 0 then 'PUBLIC' else quote_ident(pg_get_userbyid(a.grantee)) end;
+      execute format('revoke all on table public.%I from %s', b.relation_name, grantee_name);
+    end loop;
+    -- Preserve ACL item order as well as privileges and grant options.
+    for a in select x.grantee, x.is_grantable,
+        string_agg(x.privilege_type, ', ' order by x.privilege_type) as privileges
+      from unnest(b.grants) with ordinality item(acl, position),
+        lateral aclexplode(array[item.acl]) x
+      group by item.position, x.grantee, x.is_grantable
+      order by item.position, x.is_grantable loop
+      grantee_name := case when a.grantee = 0 then 'PUBLIC' else quote_ident(pg_get_userbyid(a.grantee)) end;
+      execute format('grant %s on table public.%I to %s%s', a.privileges,
+        b.relation_name, grantee_name, case when a.is_grantable then ' with grant option' else '' end);
+    end loop;
+  end loop;
+end; $restore_grants$;
 drop function public.business_billing_on_link();
 drop function public.business_billing_json(uuid);
 drop function public.business_billing_on_unlink();

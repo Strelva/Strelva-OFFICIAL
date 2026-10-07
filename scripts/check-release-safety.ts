@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import manifest from "./release-safety/batches.json";
-import { catalog, command, sql, type Catalog } from "./release-safety/postgres";
+import { catalog, command, databaseUrl, sql, type Catalog } from "./release-safety/postgres";
 import { compareCounts, rehearse, tableCounts } from "./rehearse-database-restore";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -75,6 +75,30 @@ update public.tenants set account_id='cccccccc-cccc-4ccc-8ccc-cccccccccccc' wher
     const baseline = catalog(admin, root);
     legacy(admin);
     for (const [number, items] of manifest.batches.entries()) {
+      if (number === 4) {
+        // A clone keeps hosted-default/grant-option coverage independent of
+        // the July migration-only proof, whose forward file has no GRANTs.
+        const aclFixture = databaseUrl(admin, "billing_grants_fixture");
+        sql(admin, { text: "create database billing_grants_fixture template postgres;" });
+        sql(aclFixture, { text: `grant all on public.accounts, public.account_memberships,
+ public.subscriptions, public.subscription_items to anon, authenticated, service_role;
+grant select on public.accounts to authenticated with grant option;
+grant select on public.account_memberships to public;` });
+        sql(aclFixture, { file: join(root, "scripts/release-safety/capture-billing-grants.sql") });
+        const aclBefore = catalog(aclFixture, root);
+        for (const item of items) apply(aclFixture, item);
+        for (const item of [...items].reverse()) reverse(aclFixture, item);
+        assertCatalog(catalog(aclFixture, root), aclBefore, "Hosted defaults and grant options after billing rollback");
+        legacy(aclFixture);
+        console.log("Billing rollback restored hosted-default grants, PUBLIC grants and grant options.");
+        expectRefusal(admin, () => reverse(admin, items[1]!), "Billing rollback without a grant capture");
+        sql(admin, { file: join(root, "scripts/release-safety/capture-billing-grants.sql") });
+        expectRefusal(admin, () => sql(admin, { file: join(root, "scripts/release-safety/capture-billing-grants.sql") }), "Overwrite of the billing grant capture");
+        if (sql(admin, { text: "select has_schema_privilege('anon','release_rollback_baseline','usage') or has_schema_privilege('authenticated','release_rollback_baseline','usage') or has_schema_privilege('service_role','release_rollback_baseline','usage');" }) !== "f") throw new Error("Billing grant capture exposed to app/browser roles.");
+        sql(admin, { text: "update release_rollback_baseline.m20261007180000_billing_grants set relation_oid=0 where relation_name='accounts';" });
+        expectRefusal(admin, () => reverse(admin, items[1]!), "Billing rollback with a drifted grant capture");
+        sql(admin, { text: "update release_rollback_baseline.m20261007180000_billing_grants set relation_oid='public.accounts'::regclass where relation_name='accounts';" });
+      }
       const before = catalog(admin, root);
       for (const item of items) apply(admin, item);
       const forward = catalog(admin, root);

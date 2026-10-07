@@ -39,6 +39,17 @@ Every pending forward file has `supabase/migrations/rollback-<forward-file>`.
 The July companion is `rollback-org-layer-phase0.sql`. Do not put rollback,
 verify, or future-stream files in a CLI push directory.
 
+Immediately before batch 4, run the separately approved
+`scripts/release-safety/capture-billing-grants.sql` on the reviewed target.
+It records the four July billing tables' original ACLs and identities in
+`release_rollback_baseline`, inaccessible to browser and service roles.
+Existing captures and non-owner grantors stop. Keep this metadata and the
+verified dump; do not overwrite it. Billing rollback refuses missing or
+drifted captures and restores the original grants, including grant options.
+The restored October 7 production copy proved why this is required: hosted
+default grants differ from the migration-only fixture. Capturing grants after
+the forward revoke cannot recover the prior permissions.
+
 Undo later batches first, then each batch in reverse manifest order. Each
 rollback is a transaction with a 3-second lock timeout and 120-second statement
 timeout. A failure rolls back that file; earlier successfully reversed files
@@ -53,8 +64,9 @@ archive to make a live retry pass. Reapplying schema does **not** replay data
 from those archives.
 
 Function-body hashes fail closed on drift; unknown dependent objects stop
-ordinary non-cascading drops. The hashes were checked on local PostgreSQL 18;
-hosted-version compatibility must still be rehearsed. Reverse conversions with
+ordinary non-cascading drops. The hashes were checked on local PostgreSQL 18
+and the restored production dump on isolated PostgreSQL 17.11; the hosted
+target and old deployed app must still be rehearsed. Reverse conversions with
 the reviewed per-tenant unlink flow before reversing business billing, which
 refuses any retained `tenant_workspace_links` rows. The July rollback refuses
 1.0 account/workspace dependencies. Neither path rewrites Supabase migration

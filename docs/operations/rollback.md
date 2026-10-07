@@ -59,6 +59,10 @@ corrective-migration preference above. Reverse conversions before business
 billing. Preserve private archives and a verified dump. Hosted PostgreSQL,
 current application behavior, lock limits and data compatibility require
 separate rehearsal before choosing any live reversal.
+Before batch 4, separately approve and run the private
+[billing grant capture](../../scripts/release-safety/capture-billing-grants.sql).
+Its rollback requires that pre-revoke snapshot; migration-only default grants
+do not reproduce the permissions in the restored production dump.
 
 ## Redis recovery
 
