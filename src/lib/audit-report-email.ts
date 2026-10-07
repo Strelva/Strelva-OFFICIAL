@@ -58,6 +58,7 @@ export function buildAuditReportEmailOptions(
   const bullets = findings.slice(0, 3).map((f) => ({ title: f.name, text: bulletText(f.impact, f.issue) }));
 
   return {
+    ...(result.agency ? { preparedBy: result.agency.name, secondaryButton: { label: `Contact ${result.agency.name}`, url: result.agency.contactUrl } } : {}),
     preheader: `${result.grade} · ${result.overallScore}/100 for ${host}`,
     heading: "Your site health report is ready",
     paragraphs: [
@@ -72,7 +73,7 @@ export function buildAuditReportEmailOptions(
     },
     bullets: bullets.length ? bullets : undefined,
     button: { label: "See the full report", url: reportUrl },
-    footerNote: "You requested this audit at strelva.com/audit.",
+    footerNote: result.agency ? `You requested this audit through ${result.agency.name} on Strelva.` : "You requested this audit at strelva.com/audit.",
   };
 }
 
@@ -85,12 +86,14 @@ export async function sendAuditReportEmail(params: {
   lead: { name: string; email: string; url: string };
   result: AuditResult;
   reportUrl: string;
+  replyTo?: string;
 }): Promise<boolean> {
   const opts = buildAuditReportEmailOptions(params.lead, params.result, params.reportUrl);
   try {
     const host = displayHost(params.lead.url);
     return await sendEmail({
       audience: "prospect",
+      ...(params.result.agency ? { fromName: `${params.result.agency.name} on Strelva`, replyTo: params.replyTo } : {}),
       to: params.lead.email,
       subject: `Your site health report — ${host}`,
       options: opts,

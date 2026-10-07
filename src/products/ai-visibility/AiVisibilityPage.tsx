@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { AiVisibilityResultView } from "./AiVisibilityResultView";
+import type { AgencyAttribution } from "@/platform/infra/agency-attribution";
 import type { AiVisibilityResult } from "./contracts";
 
 type ScanState = "idle" | "scanning" | "done" | "error";
@@ -14,6 +15,8 @@ interface AuditResponse extends AiVisibilityResult {
 
 interface AiVisibilityPageProps {
   initialResult?: AiVisibilityResult;
+  agency?: AgencyAttribution;
+  embedded?: boolean;
   scanId?: string;
   /** The server decides whether private workspace continuation is open. */
   workspaceEnabled?: boolean;
@@ -31,7 +34,7 @@ function acquisitionSource(): string | undefined {
   }
 }
 
-export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspaceEnabled = false }: AiVisibilityPageProps) {
+export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspaceEnabled = false, agency, embedded = false }: AiVisibilityPageProps) {
   const [business, setBusiness] = useState("");
   const [url, setUrl] = useState("");
   const [category, setCategory] = useState("");
@@ -75,6 +78,7 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
           category: category.trim() || undefined,
           city: city.trim() || undefined,
           source: acquisitionSource(),
+          ...(agency ? { agency: agency.slug } : {}),
         }),
       });
       if (!response.ok) {
@@ -86,7 +90,10 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
       setResult(data);
       setScanId(data.scanId);
       if (data.scanId && /^scan_[a-z0-9]+$/i.test(data.scanId)) {
-        window.history.replaceState(window.history.state, "", `/ai-visibility/${encodeURIComponent(data.scanId)}`);
+        const location = new URL(window.location.href);
+        if (embedded) location.searchParams.set("scan", data.scanId);
+        else location.pathname = `/ai-visibility/${encodeURIComponent(data.scanId)}`;
+        window.history.replaceState(window.history.state, "", `${location.pathname}${location.search}`);
       }
       setShareUrl(data.shareUrl);
       setState("done");
@@ -97,7 +104,11 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
   }
 
   function handleReset() {
-    window.history.replaceState(window.history.state, "", "/ai-visibility");
+    const location = new URL(window.location.href);
+    if (embedded) location.searchParams.delete("scan");
+    else location.pathname = "/ai-visibility";
+    if (agency) location.searchParams.set("agency", agency.slug);
+    window.history.replaceState(window.history.state, "", `${location.pathname}${location.search}`);
     setState("idle");
     setResult(null);
     setScanId(null);
@@ -108,6 +119,7 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
   return (
     <div className="product-surface px-6 py-8 md:px-12">
       <div className="relative z-10 mx-auto max-w-[760px] pb-16">
+        {agency && <p data-agency-brand={agency.slug} className="mb-6 text-sm font-medium text-m-text-2">{agency.name} on Strelva</p>}
         {(state === "idle" || state === "error") && (
           <div className="motion-rise">
             <p className="text-[14px] font-medium text-m-text-3">Free AI visibility audit</p>

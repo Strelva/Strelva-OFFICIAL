@@ -1,3 +1,4 @@
+import { attributedAiVisibility } from "./attribution";
 /**
  * HTML artifact renderer for the AI Visibility Score.
  *
@@ -81,7 +82,9 @@ function probeStatusLabel(citation: CitationProbe): string {
  * Render an `AiVisibilityResult` into a self-contained one-page HTML document.
  * Pure function: same input -> same output, no IO, no env reads.
  */
-export function renderAiVisibilityHtml(result: AiVisibilityResult): string {
+export function renderAiVisibilityHtml(raw: AiVisibilityResult): string {
+  const result = attributedAiVisibility(raw, raw.agency);
+  const agencyName = result.agency ? escapeHtml(result.agency.name) : null;
   const measured = result.readinessMeasured ?? result.measurementStatus !== "unavailable";
   const accent = measured ? GRADE_HEX[result.grade] : "#6b7280";
   const business = escapeHtml(result.business);
@@ -229,7 +232,7 @@ export function renderAiVisibilityHtml(result: AiVisibilityResult): string {
 </head>
 <body>
   <main class="page">
-    <p class="eyebrow">Strelva · AI Visibility Score</p>
+    <p class="eyebrow">${agencyName ? `${agencyName} on Strelva` : "Strelva"} · AI Visibility Score</p>
     <h1>${business}</h1>
     ${url ? `<div class="url">${url}</div>` : ""}
 
@@ -262,7 +265,7 @@ ${signalsBlock}
     </div>
 
     <footer>
-      Prepared by Strelva. <a href="https://strelva.com">strelva.com</a>
+      ${result.agency ? `Prepared by ${agencyName} on Strelva. <a href="${escapeHtml(result.agency.contactUrl)}">Get this fixed</a>` : 'Prepared by Strelva. <a href="https://strelva.com">strelva.com</a>'}
     </footer>
   </main>
 </body>
