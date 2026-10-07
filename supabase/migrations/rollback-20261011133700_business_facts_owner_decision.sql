@@ -1,4 +1,5 @@
--- Reverses 20261011133700_business_facts_owner_decision.sql.
+-- Reverses 20261011133700_business_facts_owner_decision.sql. Roll back
+-- 20261013110000_public_facts_read_confirmed first: it reads the confirmed copy.
 -- WARNING: restoring these readers lets operator-written facts render on
 -- client sites again with no owner decision (#509). Run only to unblock a
 -- failed release, and reapply the forward migration before rollout.
@@ -8,6 +9,14 @@
 -- written recipient receives owner links).
 begin;
 set local lock_timeout = '3s';
+-- Refuse out of order: the public-facts reader must stop reading the
+-- confirmed copy before the copy is dropped.
+do $$ begin
+  if exists (select 1 from pg_proc where oid = to_regprocedure('public.business_confirmed_public_facts(uuid)')
+      and prosrc like '%business_record_confirmed%') then
+    raise exception 'business_facts_rollback_order: roll back 20261013110000_public_facts_read_confirmed first';
+  end if;
+end $$;
 
 create or replace function public.read_hosted_website_business_facts(p_tenant_id text) returns jsonb
 language plpgsql stable security definer set search_path=public,pg_temp as $$
@@ -42,6 +51,25 @@ begin
       from public.business_services s where s.workspace_id = v_site.business_workspace_id and s.active and (s.verified or s.source in ('owner','operator'))), '[]'::jsonb),
     'site', jsonb_build_object('captureForms', v_site.capture_forms, 'injectSchema', v_site.inject_schema));
 end $$;
+
+-- With 20261012110000_business_pages applied after it, the connected-site
+-- reader belongs to that migration: restore its body (the shared public read)
+-- rather than the 20261008151000 one above.
+do $do$ begin
+  if to_regprocedure('public.business_confirmed_public_facts(uuid)') is not null then
+    execute $f$
+create or replace function public.read_connected_site_context(p_public_key text) returns jsonb
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+declare v_site public.connected_sites;
+begin
+  select * into v_site from public.connected_sites where public_key = p_public_key and status = 'active';
+  if v_site.id is null then return null; end if;
+  return public.business_confirmed_public_facts(v_site.business_workspace_id)
+    || jsonb_build_object('site', jsonb_build_object('captureForms', v_site.capture_forms, 'injectSchema', v_site.inject_schema));
+end $$
+$f$;
+  end if;
+end $do$;
 
 -- Same body as 20261002120000_business_record.sql.
 create or replace function public.resolve_business_owner_recipient(p_workspace_id uuid) returns jsonb
