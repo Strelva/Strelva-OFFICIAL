@@ -254,5 +254,13 @@ psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-flag-schema
 psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 # Batch 7A readers must work in the transaction mode PostgREST chooses for POST.
 psql "${psql_args[@]}" --file="$repo_root/tests/reader-rpc-volatility-schema.sql"
+# Batch 7A (20261009151000-20261009154000) replaces the actor, service-actor
+# and payer functions; its contracts hold after the full ordered upgrade, and
+# the replaced contracts above ran against the replacements.
+psql "${psql_args[@]}" --file="$repo_root/tests/provider-seats-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-verifications-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/platform-service-actor-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/payer-party-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/batch-7a-reader-modes.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
