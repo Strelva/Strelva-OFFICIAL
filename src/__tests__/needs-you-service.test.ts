@@ -101,7 +101,7 @@ let sendEmail: ReturnType<typeof vi.fn<(input: SendEmailInput) => Promise<SendEm
 let requests: ServiceRequest[];
 let change: ReturnType<typeof vi.fn>;
 
-function service(adapters?: SourceAdapter[], urgentInquiryAllowed?: () => Promise<boolean>) {
+function service(adapters?: SourceAdapter[], urgentInquiryAllowed?: (tenantId: string | null) => Promise<boolean>) {
   return createNeedsYouService({
     store: mem.store,
     appOrigin: "https://app.example.test",
@@ -376,7 +376,8 @@ describe("strict inquiry fact and publication email gates", () => {
     requests=[]; events.clear();
     const item:ProposedItem={kind:"fact.inferred",route:"owner_decides",title:"Confirm website fact",approveEffect:"Confirm",notYetEffect:"Nothing",sourceLifecycle:"inquiry_fact",sourceId:"fact",revisionHash:"a".repeat(64),urgent:false,adminMayDecide:false};
     const adapter:SourceAdapter={lifecycle:"inquiry_fact",needsMemberActor:false,propose:async()=>({items:[item],complete:true}),currentRevision:async()=>item.revisionHash,resolve:async()=>({outcome:"done"})};
-    const svc=service([adapter],async()=>false); await svc.list(OWNER,WS); await svc.chase(); expect(sendEmail).not.toHaveBeenCalled();
+    const original=mem.store.dueForDelivery; mem.store.dueForDelivery=async limit=>(await original(limit)).map(row=>({...row,recipient:row.recipient?{...row.recipient,tenantId:null}:null}));
+    const gates=vi.fn(async()=>false); const svc=service([adapter],gates); await svc.list(OWNER,WS); await svc.chase(); expect(sendEmail).not.toHaveBeenCalled(); expect(gates).toHaveBeenCalledWith(null);
     const opened=[...mem.items.values()][0]!; mem.items.set(opened.id,{...opened,deliveryState:"sent"}); clock.now+=4*DAY;
     await svc.chase(); expect(sendEmail).not.toHaveBeenCalled();
     expect([...mem.items.values()][0]?.deliveries.at(-1)).toMatchObject({status:"suppressed",reason:"inquiry_email_gates_off"});
@@ -388,6 +389,27 @@ describe("durable urgent inquiry owner notices", () => {
   it.each(["inquiry_capability_publish", "inquiry_capability_undo"])("keeps %s owner-only even when its old event was operator-routed", kind => {
     const item = tenantEventItem(ev({ type: "change_request", metadata: { kind, reviewAudience: "operator" } }));
     expect(item).toMatchObject({ route: "owner_decides", adminMayDecide: false });
+  });
+  it("a configured business owner cannot erase the source tenant's disabled mail override", async () => {
+    inquiryService(); const original=mem.store.dueForDelivery;
+    mem.store.dueForDelivery=async limit=>(await original(limit)).map(row=>({...row,recipient:row.recipient?{...row.recipient,tenantId:null}:null}));
+    const allowed=vi.fn(async (tenantId:string|null)=>tenantId!=="fixture-firm");
+    const closed=service(undefined,allowed);
+    expect(await deliver(closed)).toBe("suppressed"); expect(allowed).toHaveBeenCalledWith("fixture-firm"); expect(sendEmail).not.toHaveBeenCalled();
+  });
+  it("sends an allowed urgent notice with its source tenant even when the configured owner has no tenant context",async()=>{
+    const svc=inquiryService(); const original=mem.store.dueForDelivery;
+    mem.store.dueForDelivery=async limit=>(await original(limit)).map(row=>({...row,recipient:row.recipient?{...row.recipient,tenantId:null}:null}));
+    expect(await deliver(svc)).toBe("suppressed"); // The fake transport suppresses; it still exposes the send context.
+    expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({tenantId:"fixture-firm"}));
+  });
+  it("checks every inquiry origin before sending a multi-site digest", async()=>{
+    events.clear(); requests=[];
+    const proposals:ProposedItem[]=["fixture-firm","other-site"].map(tenant=>({kind:"system.go_live",route:"owner_decides",title:"Publish",approveEffect:"Publishes",notYetEffect:"Nothing",sourceLifecycle:"tenant_event",sourceId:`${tenant}:publish`,revisionHash:"a".repeat(64),urgent:false,adminMayDecide:false}));
+    const adapter:SourceAdapter={lifecycle:"tenant_event",needsMemberActor:false,propose:async()=>({items:proposals,complete:true}),currentRevision:async()=>"a".repeat(64),inquiryEmailSource:async()=>true,resolve:async()=>({outcome:"done"})};
+    const allowed=vi.fn(async(tenantId:string|null)=>tenantId!=="other-site"); const svc=service([adapter],allowed);
+    await svc.list(OWNER,WS); await svc.chase();
+    expect(allowed).toHaveBeenCalledWith("fixture-firm"); expect(allowed).toHaveBeenCalledWith("other-site"); expect(sendEmail).not.toHaveBeenCalled();
   });
   function inquiryService() {
     requests = [];

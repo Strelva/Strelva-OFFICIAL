@@ -249,11 +249,24 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
       return;
     }
     const inquiryUrgent = rows.some(row => row.sourceLifecycle === "tenant_event" && (row.kind === "customer.message" || row.kind === "customer.commitment"));
-    const inquiryEmail = inquiryUrgent || rows.some(row => row.sourceLifecycle === "inquiry_fact")
-      || (await Promise.all(rows.filter(row => row.sourceLifecycle === "tenant_event" && (row.kind === "system.go_live" || row.kind === "system.change_live"))
-        .map(row => adapterFor(row.sourceLifecycle)?.inquiryEmailSource?.({ workspaceId: row.workspaceId }, row.sourceId).catch(() => true) ?? true))).some(Boolean);
-    if (inquiryEmail
-      && (!deps.urgentInquiryAllowed || !(await deps.urgentInquiryAllowed(first.recipient?.tenantId ?? null)))) {
+    const inquiryRows = (await Promise.all(rows.map(async row => ({ row, inquiry: row.sourceLifecycle === "inquiry_fact"
+      || (row.sourceLifecycle === "tenant_event" && (row.kind === "customer.message" || row.kind === "customer.commitment"))
+      || (row.sourceLifecycle === "tenant_event" && (row.kind === "system.go_live" || row.kind === "system.change_live")
+        && await (adapterFor(row.sourceLifecycle)?.inquiryEmailSource?.({ workspaceId: row.workspaceId }, row.sourceId).catch(() => true) ?? true)),
+    })))).filter(item => item.inquiry).map(item => item.row);
+    const sourceTenant = (row: DeliveryRow) => row.sourceLifecycle === "tenant_event"
+      ? row.sourceId.indexOf(":") > 0 ? row.sourceId.slice(0, row.sourceId.indexOf(":")) : null
+      : row.recipient?.tenantId ?? null;
+    const inquiryTenants = [...new Set(inquiryRows.map(sourceTenant))];
+    const mailTenant = inquiryRows.length && first.sourceLifecycle === "tenant_event" ? sourceTenant(first)
+      : first.recipient?.tenantId ?? inquiryTenants.find(tenantId => tenantId !== null) ?? null;
+    // A configured business owner has tenantId:null. It must not erase the
+    // originating tenant's mail override, including in a multi-site digest.
+    if (first.recipient?.tenantId && !inquiryTenants.includes(first.recipient.tenantId)) inquiryTenants.push(first.recipient.tenantId);
+    if (mailTenant && !inquiryTenants.includes(mailTenant)) inquiryTenants.push(mailTenant);
+    if (inquiryRows.length && (!deps.urgentInquiryAllowed
+      || inquiryRows.some(row => row.sourceLifecycle === "tenant_event" && !sourceTenant(row))
+      || !(await Promise.all(inquiryTenants.map(tenantId => deps.urgentInquiryAllowed!(tenantId)))).every(Boolean))) {
       for (const row of rows) await deps.store.recordDelivery(row.workspaceId, row.id, kind, "suppressed", recipient, null, "inquiry_email_gates_off");
       summary.ownerNotTold += rows.length;
       return "suppressed";
@@ -290,7 +303,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
       result = await deps.sendEmail({
         audience: "client",
         // Client email is tenant-aware; without a linked tenant the global switch decides.
-        ...(first.recipient?.tenantId ? { tenantId: first.recipient.tenantId } : {}),
+        ...(mailTenant ? { tenantId: mailTenant } : {}),
         to: recipient,
         subject,
         options,
