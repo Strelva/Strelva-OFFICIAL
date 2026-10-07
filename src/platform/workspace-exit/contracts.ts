@@ -48,7 +48,7 @@ export const workspaceExitHandoffSchema = z.object({
   dataDeleted: z.literal(false),
   sites: z.array(z.object({
     tenantId: z.string(), tenantStableId: uuid, siteName: z.string(),
-    steps: z.array(z.object({ kind: z.enum(["export", "files", "billing", "domain"]), status: z.literal("pending"), detail: z.string() }).strict()),
+    steps: z.array(z.object({ kind: z.enum(["export", "files", "billing", "domain"]), status: z.enum(["pending", "completed"]), detail: z.string(), evidence: z.string().optional(), completedAt: instant.optional(), completedBy: uuid.optional() }).strict()),
   }).strict()),
   systems: z.array(z.object({ id: uuid, name: z.string(), lifecycle: z.enum(["draft", "live", "paused"]) }).strict()),
 }).strict();
@@ -90,3 +90,15 @@ export const workspaceExitResponseSchema = z.object({
   replayed: z.boolean(),
 }).strict();
 export type WorkspaceExitResponse = z.infer<typeof workspaceExitResponseSchema>;
+
+/** Records a handoff already performed; never calls billing, DNS or repo providers. */
+export const workspaceExitHandoffCompletionSchema = z.object({
+  workspaceId: uuid,
+  tenantStableId: uuid,
+  kind: z.enum(["export", "files", "billing", "domain"]),
+  evidence: z.string().trim().min(1).max(1000),
+  exportBuildId: uuid.optional(),
+}).strict().superRefine((value, ctx) => {
+  if (value.kind === "export" && !value.exportBuildId) ctx.addIssue({ code: "custom", message: "Name the completed business export.", path: ["exportBuildId"] });
+  if (value.kind !== "export" && value.exportBuildId) ctx.addIssue({ code: "custom", message: "Export reference belongs only to the export step.", path: ["exportBuildId"] });
+});

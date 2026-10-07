@@ -12,6 +12,7 @@ import {
   workspaceExitOptionsSchema,
   workspaceExitResponseSchema,
   workspaceExitHandoffSchema,
+  workspaceExitHandoffCompletionSchema,
   type WorkspaceExitCommand,
   type WorkspaceExitOptions,
   type WorkspaceExitResponse,
@@ -65,7 +66,8 @@ export async function readWorkspaceExit(actor: WorkspaceActor, workspaceId: stri
   if (process.env.STRELVA_EXIT_HANDOFF === "1") {
     const plan = await db().rpc("read_workspace_exit_handoff_plan", { ...identity(actor), p_workspace_id: id });
     if (plan.error) fail(plan.error, "The site handoff could not be loaded.");
-    return { ...parsed.data, handoff: workspaceExitHandoffSchema.parse(plan.data) };
+    const handoff = workspaceExitHandoffSchema.parse(plan.data);
+    return { ...parsed.data, handoff, state: parsed.data.state ? { ...parsed.data.state, handoff } : null };
   }
   return parsed.data;
 }
@@ -94,4 +96,17 @@ export async function completeWorkspaceExit(actor: WorkspaceActor, raw: unknown)
   });
   if (error) fail(error, "The workspace exit could not be confirmed.");
   return response(data);
+}
+
+/** A verified workspace operator records evidence after the owner confirmed exit. */
+export async function recordWorkspaceExitHandoff(actor: WorkspaceActor, raw: unknown) {
+  if (process.env.STRELVA_EXIT_HANDOFF !== "1") throw new WorkspaceStoreError("Site handoff is unavailable.");
+  const command = workspaceExitHandoffCompletionSchema.parse(raw);
+  const result = await db().rpc("record_workspace_exit_handoff", {
+    ...identity(actor), p_workspace_id: command.workspaceId,
+    p_tenant_stable_id: command.tenantStableId, p_kind: command.kind,
+    p_evidence: command.evidence, p_export_build_id: command.exportBuildId ?? null,
+  });
+  if (result.error) fail(result.error, "The handoff evidence could not be recorded.");
+  return workspaceExitHandoffSchema.parse(result.data);
 }

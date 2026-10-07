@@ -110,10 +110,10 @@ function obligationEffectLabel(effect: "none" | "accepted" | "unknown") {
 function HandoffPlan({ plan }: { plan: NonNullable<WorkspaceExitOptions["handoff"]> }) {
   return <section className="mt-8" aria-label="Business handoff">
     <h2 className="font-medium">Your business goes with you</h2>
-    <p className="mt-3 text-sm leading-6 text-gray-muted">The business record and {plan.systems.length} Systems stay available. No data is deleted. These handoff steps still need to be completed; no payment, domain or repository has been changed.</p>
+    <p className="mt-3 text-sm leading-6 text-gray-muted">The business record and {plan.systems.length} Systems stay available. No data is deleted. Completed steps show the operator’s recorded evidence; pending steps still need attention.</p>
     <ul className="mt-4 space-y-4">{plan.sites.map(site => <li key={site.tenantStableId} className="border-t border-gray-border pt-4">
       <h3 className="font-medium">{site.siteName}</h3>
-      <ul className="mt-2 space-y-2 text-sm text-gray-muted">{site.steps.map(step => <li key={step.kind}>{step.detail} · Pending</li>)}</ul>
+      <ul className="mt-2 space-y-2 text-sm text-gray-muted">{site.steps.map(step => <li key={step.kind}>{step.detail} · {step.status === "completed" ? "Completed" : "Pending"}{step.evidence ? <span className="block">{step.evidence}</span> : null}</li>)}</ul>
     </li>)}</ul>
   </section>;
 }
