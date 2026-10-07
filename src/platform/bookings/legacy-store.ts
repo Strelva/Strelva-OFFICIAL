@@ -518,7 +518,7 @@ async function siteServices(tenant: string): Promise<SiteService[]> {
 
 export type CreateBookingResult =
   | { success: true; booking: Booking; /** Request mode: held until the owner approves through Needs you. */ requested?: boolean; context?: BookingContext }
-  | { success: false; error: string; code?: "paused" | "taken" | "invalid_service" | "unavailable" };
+  | { success: false; error: string; code?: "paused" | "taken" | "invalid_service" | "invalid_intake" | "unavailable" };
 
 /**
  * Atomically claim a slot, verify availability, and create booking.

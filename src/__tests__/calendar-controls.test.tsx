@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScheduleCalendarControls } from "@/experience/scheduling/ScheduleCalendarControls";
 import { WorkspaceRequestContext } from "@/experience/workspace/WorkspaceRequest";
 import type { CalendarConnection } from "@/products/scheduling/contracts";
+import { outlookCalendarConsentAction } from "@/products/scheduling/contracts";
 
 const connection: CalendarConnection = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -81,6 +82,39 @@ async function mount(
 }
 
 describe("calendar sync controls", () => {
+  it("announces local Outlook disconnection and the remaining Microsoft consent step", async () => {
+    const onChanged = await mount([]);
+    await act(async () => Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(button => button.textContent === "Disconnect")!.click());
+    await act(async () => pending.shift()!.resolve(response({ disconnected: true, providerConsentAction: outlookCalendarConsentAction })));
+    await act(async () => pending.shift()!.resolve(response({ connections: [{ ...connection, status: "revoked" }] })));
+    const status = container.querySelector('[role="status"]');
+    expect(status?.textContent).toContain("Strelva is disconnected.");
+    expect(status?.textContent).toContain("Microsoft calendar consent has not been removed.");
+    const link = status?.querySelector("a");
+    expect(link?.getAttribute("href")).toBe("https://myapps.microsoft.com");
+    expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(link?.textContent).toContain("opens in a new tab");
+    expect(onChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([undefined, { ...outlookCalendarConsentAction, href: "javascript:alert(1)" }])("preserves the original disconnect UI when no valid consent action is returned", async providerConsentAction => {
+    await mount([]);
+    await act(async () => Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(button => button.textContent === "Disconnect")!.click());
+    await act(async () => pending.shift()!.resolve(response({ disconnected: true, ...(providerConsentAction ? { providerConsentAction } : {}) })));
+    await act(async () => pending.shift()!.resolve(response({ connections: [{ ...connection, status: "revoked" }] })));
+    expect(container.textContent).not.toContain("Microsoft calendar consent");
+    expect(container.querySelector('a[href="https://myapps.microsoft.com"]')).toBeNull();
+  });
+
+  it("keeps a failed disconnect connected and exposes no success follow-up", async () => {
+    const onChanged = await mount([]);
+    await act(async () => Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(button => button.textContent === "Disconnect")!.click());
+    await act(async () => pending.shift()!.resolve(response({ error: "Provider consent could not be revoked." }, 503)));
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("Provider consent could not be revoked.");
+    expect(container.textContent).toContain("Operations");
+    expect(container.querySelector('a[href="https://myapps.microsoft.com"]')).toBeNull();
+    expect(pending).toHaveLength(0); expect(onChanged).not.toHaveBeenCalled();
+  });
   it("shows a provider conflict without offering a blind duplicate retry", async () => {
     await mount([{ ...baseReservation, status: "reserved" }]);
     const sync = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(button => button.textContent === "Sync reservation");

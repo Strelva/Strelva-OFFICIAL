@@ -42,7 +42,7 @@ import type {
   WorkspaceSnapshot,
   WorkspaceWork,
 } from "./contracts";
-import type { WorkspaceInquiryTarget } from "./WorkspaceLayout";
+import type { WorkspaceInquiryTarget, WorkspacePlanRenderer } from "./WorkspaceLayout";
 import type { WorkspaceStartContinuation } from "./workspace-start";
 import { selectWorkspaceLocation, isHorizontalView, viewForWork, type HorizontalView, type WorkspaceView as View } from "./workspace-selection";
 import { workspaceExitBlocksChanges, workspaceExitIsStopped } from "./workspace-exit-ui";
@@ -478,8 +478,8 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
       ? <LocalDocumentPreview key={`${snapshot.workspaceId}:${documentRequestText || "new"}`} workspaceId={snapshot.workspaceId} readOnly={workspaceReadOnly} initialRequestText={documentRequestText} />
       : <><DocumentExperience key={`${snapshot.workspaceId}:${selectedWork?.productId === "documents" ? selectedWork.id : "new"}:${documentRequestText || "new"}`} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === "documents" ? selectedWork.id : undefined} readOnly={workspaceReadOnly} onSaved={handleDocumentSaved} initialRequestText={documentRequestText} sources={snapshot.work} />{selectedWork?.productId === "documents" ? <WorkAuthorityPanel key={selectedWork.id} workId={selectedWork.id} canManage={!workspaceReadOnly && (currentWorkspace?.role === "owner" || currentWorkspace?.role === "admin")} sources={snapshot.work} /> : null}</>
     : undefined;
-  const planContent: React.ReactNode | undefined = snapshot && view === "plan"
-    ? <WorkPlanExperience workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === "work_plans" ? selectedWork.id : undefined} initialRequest={planStartRequest || undefined} sources={snapshot.work} readOnly={workspaceReadOnly} localPreview={snapshot.actor.localPreview} onSaved={handlePlanSaved} onOpenWork={openWorkFromPlan} />
+  const planContent: WorkspacePlanRenderer | undefined = snapshot && view === "plan"
+    ? onRequest => <WorkPlanExperience systemsRelease={snapshot.releases?.systems === true} onRequest={onRequest} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === "work_plans" ? selectedWork.id : undefined} initialRequest={planStartRequest || undefined} sources={snapshot.work} readOnly={workspaceReadOnly} localPreview={snapshot.actor.localPreview} onSaved={handlePlanSaved} onOpenWork={openWorkFromPlan} />
     : undefined;
 
   function clearPublicSaveQuery() {
@@ -637,6 +637,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
           ) : isHorizontalView(view) ? <>
             {view === "operations" ? <WorkspaceOngoing
               workspaceId={snapshot.workspaceId}
+              monthlyRecap={snapshot.releases?.systems === true && snapshot.systems?.systems.some(system => system.kind === "website" && !!system.tenantId)}
               sources={snapshot.work}
               selectedWork={selectedWork}
               selectedStandingId={selectedStandingId}

@@ -18,6 +18,21 @@ async function mount(element: ReturnType<typeof createElement>) {
 }
 function button(name: string) { return Array.from(container.querySelectorAll("button")).find(item => item.textContent?.trim() === name)!; }
 describe("website rebuild review", () => {
+  it("keeps skipped source paths and their reasons visible after checkpoints are pruned", async () => {
+    const record = fixtureRebuild();
+    const skippedPaths = [{ url: "https://attymooney.com/blocked", reason: "robots" as const }, { url: "https://attymooney.com/app", reason: "javascript_only" as const }, { url: "https://attymooney.com/missing", reason: "unreachable" as const }];
+    const at = "2026-10-01T20:00:00.000Z";
+    const view = parseRebuildView({ workId: record.workId, workspaceId: record.workspaceId, rebuild: { version: 2, revision: 1, title: record.title, input: { requestId: "skipped-request", url: "https://attymooney.com" }, status: "review_ready", stages: [], checkpoint: null, skippedPaths, candidate: { revision: 1, contentHash: "a".repeat(64), document: fixtureSiteDocument, previewHref: `/api/websites/${record.workId}/preview` }, approvedCandidateRevision: null, tenantId: null, launch: { receipt: null, readBack: null }, lastError: null, createdBy: "owner", createdAt: at, history: [] } });
+    expect(view.skippedPaths).toEqual(skippedPaths);
+    await mount(createElement(RebuildExperience, { workspaceId: view.workspaceId, initialRecord: view }));
+    const panel = container.querySelector('[aria-labelledby="rebuild-skipped-heading"]')!;
+    expect(panel.textContent).toContain("robots.txt blocks");
+    expect(panel.textContent).toContain("needs a browser");
+    expect(panel.textContent).toContain("could not be opened");
+    expect(panel.textContent).toContain("business description instead");
+    for (const page of skippedPaths) expect(panel.textContent).toContain(page.url);
+    expect(rebuildViewSchema.parse({ ...record, skippedPaths: undefined }).skippedPaths).toEqual([]);
+  });
   it("blocks approval while a supported sensitive claim awaits confirmation", async () => {
     const record = fixtureRebuild();
     delete record.candidate!.facts.uncertain;

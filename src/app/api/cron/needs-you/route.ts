@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { requireCronRequest } from "@/lib/cron-auth";
 import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { needsYouReleaseEnabled, needsYouService } from "@/platform/needs-you/server";
+import { releaseFlagMayBeOn } from "@/platform/release-flags/resolve";
+import { chaseGoogleReconnectNotices } from "@/products/publishing/server";
 
 export const maxDuration = 300;
 
@@ -25,12 +27,13 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   try {
     const summary = await needsYouService().chase();
+    const reconnect = releaseFlagMayBeOn("publishing") ? await chaseGoogleReconnectNotices() : null;
     await recordHeartbeat("needs-you", {
-      ok: summary.failed === 0,
+      ok: summary.failed === 0 && (reconnect?.failed ?? 0) === 0,
       processed: summary.lapsed + summary.reminded + summary.digests + summary.urgent,
-      failed: summary.failed,
+      failed: summary.failed + (reconnect?.failed ?? 0),
     });
-    return NextResponse.json({ ranAt: new Date().toISOString(), ...summary });
+    return NextResponse.json({ ranAt: new Date().toISOString(), ...summary, ...(reconnect ? { reconnect } : {}) });
   } catch (error) {
     console.error("[cron needs-you] failed", error instanceof Error ? error.message : String(error));
     await recordHeartbeat("needs-you", { ok: false, failed: 1 });

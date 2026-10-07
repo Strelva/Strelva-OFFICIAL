@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const boundary = vi.hoisted(() => ({
   db: null as unknown as object | null,
@@ -38,6 +38,9 @@ vi.mock("@/products/inquiries/server", () => ({
   validateInquiryFields: vi.fn(),
 }));
 
+import { fakeBookingStore } from "./support/booking-store-fake";
+import { setBookingStoreDb } from "@/platform/bookings/store";
+import { resetBookingFlagCache } from "@/platform/bookings/flags";
 import { resolvePublishedPublicBooking } from "@/products/scheduling/public-booking-server";
 import { createPublicBookingService, publicBookingScheduleSchema } from "@/products/scheduling/public-booking";
 
@@ -66,7 +69,31 @@ function fakeClient(options: { bindingStatus?: "active" | "revoked"; grantStatus
   } };
 }
 
+afterEach(() => { vi.unstubAllEnvs(); vi.useRealTimers(); setBookingStoreDb(undefined); resetBookingFlagCache(); });
+
 describe("published public booking resolver", () => {
+  it("after the flip resolves the granted service from live record hours without copying intervals or requiring a provider", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-11-02T12:00:00Z"));
+    vi.stubEnv("STRELVA_BOOKING_STORE_WRITE", "1"); vi.stubEnv("STRELVA_BOOKING_STORE_READ", "postgres");
+    vi.stubEnv("STRELVA_BOOKING_CALENDAR_BUSY", "0");
+    const store = fakeBookingStore(); store.state.streakDays = 7;
+    store.tenants.set("northstar", { stableId: "stable-tenant", workspaceId: "workspace-1", systemId: "system", paused: false, phone: null,
+      hours: { timezone: "America/New_York", weekly: [{ day: 5, opens: "09:00", closes: "15:00" }] },
+      services: [{ id: "service-1", externalRef: "consultations", name: "Consultation", durationMinutes: 30, active: true }] });
+    store.settings.set("stable-tenant", { mode: "request", bufferMinutes: 15, minNoticeMinutes: 0, maxAdvanceDays: 60, defaultLengthMinutes: 60, maxPerDay: null, timezone: "UTC", bookableHours: null, bookableOverrides: null, revision: 1 });
+    setBookingStoreDb(store.db); resetBookingFlagCache(); boundary.db = fakeClient(); boundary.readWorkspaceProviderAvailability.mockClear();
+    const input = { tenantId: "northstar", capabilityId: "consultations", range: { from: "2026-11-06T00:00:00Z", to: "2026-11-07T00:00:00Z" } };
+    const first = await resolvePublishedPublicBooking(input);
+    expect(first?.slots[0]).toMatchObject({ start: "2026-11-06T14:00:00.000Z", end: "2026-11-06T14:30:00.000Z" });
+    expect(first?.recordBooking).toMatchObject({ serviceRef: "consultations", mode: "request", bufferMinutes: 15 });
+    store.tenants.get("northstar")!.hours!.weekly[0]!.closes = "12:00";
+    const changed = await resolvePublishedPublicBooking(input);
+    expect(changed?.slots.length).toBeLessThan(first!.slots.length);
+    expect(changed?.slots.every(s => Date.parse(s.end) <= Date.parse("2026-11-06T17:00:00Z"))).toBe(true);
+    expect(boundary.readWorkspaceProviderAvailability).not.toHaveBeenCalled();
+    store.tenants.get("northstar")!.paused = true;
+    expect((await resolvePublishedPublicBooking(input))?.slots).toEqual([]);
+  });
   it("requires the explicit grant, filters provider-busy slots, and keeps provider ids server-side", async () => {
     boundary.db = fakeClient();
     const result = await resolvePublishedPublicBooking({ tenantId: "northstar", capabilityId: "consultations" });

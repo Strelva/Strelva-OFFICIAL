@@ -56,12 +56,18 @@ export function liveChannelAdapters(actor: WorkspaceActor, workspaceId: string) 
       read: async (a, workId) => (await import("@/products/websites/rebuild-service")).readWebsiteRebuild(a, workId),
       approve: async (a, workId, selection) => (await import("@/products/websites/rebuild-service")).approveWebsiteRebuild(a, workId, selection),
       launch: async (a, workId, selection) => (await import("@/products/websites/rebuild-service")).launchWebsiteRebuild(a, workId, selection),
+      publishLinked: async (a, workId, selection) => (await import("@/products/websites/rebuild-service")).publishWebsiteRebuildOntoLinkedSite(a, workId, selection),
     }, ctx),
     createTenantContentAdapter({
       tenantConfig: async (tenantId) => (await getTenantConfig(tenantId)) ?? null,
       apply: (input) => applySectionUpdate({ ...input, section: input.section as ContentSection, tenantConfig: input.tenantConfig as Parameters<typeof applySectionUpdate>[0]["tenantConfig"] }),
       versions: async (section, tenantId) => (await getVersions(section as ContentSection, tenantId)).map((v) => ({ id: v.id, data: v.data, ...(v.requestId ? { requestId: v.requestId } : {}) })),
       content: (section, tenantId) => getContent(section as ContentSection, tenantId),
+      publicReadBack: async (tenantId, section, expected) => {
+        const tenant = await getTenantConfig(tenantId);
+        if (!tenant) return { ok: false, detail: "The published site's address is unavailable." };
+        return (await import("@/products/websites/rebuild-service")).readPublishedWebsiteContent({ tenant, section, expected });
+      },
       restore: (section, versionId, tenantId) => restoreVersion(section as ContentSection, versionId, tenantId, "ai"),
     }, ctx),
     createInquiryFormAdapter({

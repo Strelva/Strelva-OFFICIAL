@@ -3,6 +3,7 @@ import { addSubscriber } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { readJsonObject } from "@/lib/request-body";
+import { subscribeWithNewsletterContact } from "@/platform/business-record/newsletter-contacts";
 
 function cleanText(value: unknown, maxLength: number): string | undefined {
   if (typeof value !== "string") return undefined;
@@ -36,9 +37,10 @@ export async function POST(req: Request) {
     }
 
     const tenant = await getTenantFromHeaders();
-    const result = await addSubscriber(
+    const subscriberName = cleanText(name, 160);
+    const result = await subscribeWithNewsletterContact(tenant, emailTrimmed, subscriberName) ?? await addSubscriber(
       emailTrimmed,
-      cleanText(name, 160),
+      subscriberName,
       tenant
     );
 

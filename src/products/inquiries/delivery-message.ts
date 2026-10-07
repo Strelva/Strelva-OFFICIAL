@@ -135,3 +135,19 @@ export function createInquiryDeliveryMessage(
     idempotencyKey: `inquiry:${inquiry.id}:${action}`,
   };
 }
+
+/** The review and delivery hash the same final receipt, including offered times. */
+export async function prepareInquiryDeliveryMessage(inquiry: InquiryDeliverySubmission, route: InquiryRoute, action: InquiryDeliveryAction) {
+  const message = createInquiryDeliveryMessage(inquiry, route, action);
+  if (message && action === "reply" && message.audience === "customer") {
+    const { readInquiryBookingOfferForReceipt, bookingOfferEmailOptions } = await import("@/platform/bookings/inquiry-offers");
+    const offer = await readInquiryBookingOfferForReceipt(inquiry.tenantId, inquiry.id);
+    if (offer) {
+      const booking = bookingOfferEmailOptions(offer);
+      message.options = { ...message.options, rows: [...(message.options.rows ?? []), ...(booking.rows ?? [])], button: booking.button };
+      message.tags = { ...message.tags, strelva_booking_offer: "1" };
+      message.fromName = inquiryBusinessName(inquiry, route.businessName);
+    }
+  }
+  return message;
+}

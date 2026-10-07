@@ -43,6 +43,15 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Python local tooling caches
+__pycache__/
+*.py[cod]
+
+# Local release-safety investigation logs and generated catalog captures
+/.scratch/release-safety/
+# Stream command logs written at the worktree root
+/.scratch-*.log
+
 # content
 /public/uploads/
 .claude/sessions/

@@ -14,7 +14,7 @@ import type {
 import { InquiryEngine } from "./inquiry-engine";
 import {
   createEmailInquiryTransport,
-  createInquiryDeliveryMessage,
+  prepareInquiryDeliveryMessage,
   createRedisInquiryDeliveryStore,
   deliverInquiryAction,
   evaluateInquiryDelivery,
@@ -265,7 +265,7 @@ async function buildContext(input: {
   } catch (error) {
     throw new InquiryMessageReviewEngineError(errorMessage(error, "The inquiry recipient could not be resolved."), "recipient_route_changed");
   }
-  const message = createInquiryDeliveryMessage(inquiry, route, input.action);
+  const message = await prepareInquiryDeliveryMessage(inquiry, route, input.action);
   if (!message) throwCode("recipient_unavailable", "A permitted inquiry recipient is not configured.");
   const messageBody = renderInquiryMessage(message).text;
   const messageDigest = getInquiryDeliveryMessageDigest(message);

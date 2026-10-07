@@ -81,7 +81,7 @@ describe("stored rebuild possibilities", () => {
     const { target, revisions } = fixture();
     const input = rebuildPossibilityInput(target, revisions)!;
     expect(input.changes![0]!.baseline).toMatchObject({ systemId: target.site.system.id, number: 1 });
-    expect(input.effects).toEqual([expect.objectContaining({ kind: "publish", channel: "hosted_website", request: { workId: target.candidate.workId, candidateRevision: 3, candidateContentHash: HASH } })]);
+    expect(input.effects).toEqual([expect.objectContaining({ kind: "publish", channel: "hosted_website", request: { workId: target.candidate.workId, candidateRevision: 3, candidateContentHash: HASH, tenantId: "mooney" } })]);
     expect(rebuildPossibilityInput({ ...target, candidate: candidate({ candidateRevision: null }) }, revisions)).toBeNull();
     expect(rebuildPossibilityInput(target, new Map())).toBeNull();
   });

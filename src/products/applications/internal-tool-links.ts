@@ -1,10 +1,13 @@
+import { deliverToolNotice } from "./notice-delivery";
 import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import { sendEmailWithReceipt, type SendEmailInput, type SendEmailResult } from "@/platform/infra/email/send";
-import { systemsReleaseEnabled, systemsReleasedFor } from "@/platform/systems-release";
-import { workspaceReleaseOn } from "@/platform/release-flags/resolve";
+import { systemsReleaseEnabled, systemsReleaseMayBeOn, systemsReleasedFor } from "@/platform/systems-release";
+import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
+import { releaseViewerFor } from "@/platform/release-flags/viewer";
+import { releaseFlagMayBeOn, workspaceReleaseOn } from "@/platform/release-flags/resolve";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
-import type { ApplicationRecord, ApplicationSpec, applicationLinkInputSchema } from "./contracts";
-import type { z } from "zod";
+import { recordSchema, type ApplicationRecord, type ApplicationSpec, type applicationLinkInputSchema } from "./contracts";
+import { z } from "zod";
 
 /**
  * Internal tools that point at the business record
@@ -12,7 +15,7 @@ import type { z } from "zod";
  *
  * A `contact` field becomes a business_contacts id and an `assigned_person`
  * field a business_people id before the record is saved. After the save, the
- * assigned person gets one email naming the tool, the record title and the
+ * owner and assigned person get one gated submission notice naming the tool, the record title and the
  * one missing item, with a sign-in link and nothing else from the record.
  * Every send, suppression or failure leaves a receipt in
  * internal_tool_notices. All of it sits behind STRELVA_SYSTEMS_RELEASE.
@@ -53,7 +56,10 @@ export async function linkFieldsReleasedFor(spec: ApplicationSpec, actor: { user
 
 function failure(error: { message?: string; code?: string }, field?: LinkField): never {
   const detail = `${error.code ?? ""} ${error.message ?? ""}`;
-  if (detail.includes("workspace_membership_required") || detail.includes("application_access_denied")) throw new WorkspaceAccessError();
+  if (detail.includes("workspace_membership_required") || detail.includes("application_access_denied") || detail.includes("verified_identity_required")) throw new WorkspaceAccessError();
+  if (/application_(release_conflict|records_revision_conflict|record_duplicate|record_limit_reached)/.test(detail)) {
+    throw new WorkspaceConflictError("This application's records or release changed. Reload before submitting.");
+  }
   if (detail.includes("application_record_person_unknown")) {
     throw new WorkspaceConflictError(`${field?.label ?? "Assigned person"}: that email isn't on this business's staff.`);
   }
@@ -71,14 +77,11 @@ function failure(error: { message?: string; code?: string }, field?: LinkField):
  * to save and the labels of contact fields where the email and the phone
  * matched different contacts (the email match was kept).
  */
-export async function resolveRecordLinks(
-  db: LinkDb,
-  actor: WorkspaceActor,
-  target: { workspaceId: string; workId: string },
+function recordLinkRequests(
   spec: ApplicationSpec,
   record: ApplicationRecord,
   links: Record<string, LinkInput> = {},
-): Promise<{ record: ApplicationRecord; conflicts: string[] }> {
+) {
   const requests: Array<Record<string, unknown>> = [];
   const fields = new Map<string, LinkField>();
   for (const field of linkFields(spec)) {
@@ -94,6 +97,18 @@ export async function resolveRecordLinks(
       requests.push({ fieldId: field.id, kind: field.type, ...fallback, ...typed });
     }
   }
+  return { requests, fields };
+}
+
+export async function resolveRecordLinks(
+  db: LinkDb,
+  actor: WorkspaceActor,
+  target: { workspaceId: string; workId: string },
+  spec: ApplicationSpec,
+  record: ApplicationRecord,
+  links: Record<string, LinkInput> = {},
+): Promise<{ record: ApplicationRecord; conflicts: string[] }> {
+  const { requests, fields } = recordLinkRequests(spec, record, links);
   if (!requests.length) return { record, conflicts: [] };
   const { data, error } = await db.rpc("resolve_internal_tool_links", {
     p_workspace_id: target.workspaceId,
@@ -113,6 +128,28 @@ export async function resolveRecordLinks(
     if (resolved[fieldId]?.conflict === true) conflicts.push(field.label);
   }
   return { record: { ...record, values }, conflicts };
+}
+
+/** Contact resolution and member submit share the revision-checked SQL transaction. */
+export async function submitRecordWithLinks(
+  db: LinkDb,
+  actor: WorkspaceActor,
+  target: { workspaceId: string; workId: string },
+  spec: ApplicationSpec,
+  input: { record: ApplicationRecord; links?: Record<string, LinkInput>; expectedReleaseVersion: number; expectedRecordsRevision: number },
+): Promise<{ record: ApplicationRecord; conflicts: string[] }> {
+  const { requests, fields } = recordLinkRequests(spec, input.record, input.links);
+  const { data, error } = await db.rpc("submit_internal_tool_member_record", {
+    p_workspace_id: target.workspaceId, p_work_id: target.workId,
+    p_user_id: actor.userId, p_verified_email: actor.verifiedEmail,
+    p_expected_release_version: input.expectedReleaseVersion,
+    p_expected_records_revision: input.expectedRecordsRevision,
+    p_record_id: input.record.id, p_values: input.record.values, p_links: requests,
+  });
+  if (error) failure(error, requests.length === 1 ? fields.get(String(requests[0]!.fieldId)) : undefined);
+  const saved = z.object({ record: recordSchema, conflicts: z.array(z.string()).max(30) }).safeParse(data);
+  if (!saved.success || saved.data.record.id !== input.record.id) throw new WorkspaceStoreError("The application record could not be confirmed.");
+  return saved.data;
 }
 
 function oneLine(value: string, max = 120): string {
@@ -171,6 +208,14 @@ export function assignedPersonEmail(input: {
   };
 }
 
+/** Separate from Systems exposure: a rollout can enable tools silently. */
+export async function internalToolNoticesReleasedFor(actor: WorkspaceActor, workspaceId: string): Promise<boolean> {
+  if (!systemsReleaseMayBeOn() || !releaseFlagMayBeOn("internal_tool_notices")) return false;
+  const viewer = await releaseViewerFor(actor);
+  return await workspaceReleaseFlagEnabled("systems", workspaceId, viewer)
+    && await workspaceReleaseFlagEnabled("internal_tool_notices", workspaceId, viewer);
+}
+
 export type AssignedPersonNoticeStatus = "none" | "duplicate" | "skipped" | "sent" | "suppressed" | "failed";
 
 /**
@@ -185,56 +230,43 @@ export async function notifyAssignedPerson(
   deps: { send: (input: SendEmailInput) => Promise<SendEmailResult> } = { send: sendEmailWithReceipt },
 ): Promise<{ status: AssignedPersonNoticeStatus; noticeId?: string }> {
   const field = linkFields(input.spec).find((item) => item.type === "assigned_person");
-  const value = field ? input.record.values[field.id] : undefined;
-  if (!field || typeof value !== "string" || !LINK_ID.test(value)) return { status: "none" };
   try {
-    const claim = await db.rpc("claim_internal_tool_notice", {
+    if (!(await internalToolNoticesReleasedFor(actor, input.workspaceId))) return { status: "none" };
+    const claim = await db.rpc("claim_internal_tool_submit_notice", {
       p_workspace_id: input.workspaceId,
       p_work_id: input.workId,
       p_record_id: input.record.id,
-      p_field_id: field.id,
+      p_field_id: field?.id ?? null,
       p_user_id: actor.userId,
       p_verified_email: actor.verifiedEmail,
     });
     if (claim.error) throw new Error(claim.error.message || "notice claim failed");
-    const claimed = (claim.data ?? {}) as { claimed?: boolean; noticeId?: string; status?: string; recipientEmail?: string; personName?: string };
+    const claimed = (claim.data ?? {}) as { claimed?: boolean; noticeId?: string; status?: string; recipientEmail?: string; personName?: string; assignedEmail?: string; tenantId?: string | null };
     if (!claimed.claimed || !claimed.noticeId || !claimed.recipientEmail) {
       return { status: claimed.status === "skipped" ? "skipped" : "duplicate", noticeId: claimed.noticeId };
     }
     const title = recordTitle(input.spec, input.record);
-    const email = assignedPersonEmail({
-      toolTitle: input.toolTitle,
-      title,
-      missing: missingItem(input.spec, input.record),
-      personName: claimed.personName ?? null,
-      signInUrl: toolSignInUrl(input.workspaceId, input.workId),
-    });
-    let status: "sent" | "suppressed" | "failed";
-    let detail: string | null = null;
-    let providerMessageId: string | null = null;
-    try {
-      const result = await deps.send({
-        audience: "client",
-        to: claimed.recipientEmail,
-        subject: email.subject,
-        options: email.options,
-        idempotencyKey: `internal-tool-notice:${claimed.noticeId}`,
-        tags: { kind: "internal_tool_notice" },
-      });
-      if (result.status === "accepted") { status = "sent"; providerMessageId = result.providerMessageId; }
-      else { status = "suppressed"; detail = result.reason; }
-    } catch (error) {
-      status = "failed";
-      detail = oneLine(error instanceof Error ? error.message : "send failed", 300);
-    }
-    const finish = await db.rpc("finish_internal_tool_notice", {
-      p_notice_id: claimed.noticeId,
-      p_workspace_id: input.workspaceId,
-      p_status: status,
-      p_detail: detail,
-      p_provider_message_id: providerMessageId,
-    });
-    if (finish.error) console.error("[internal-tool-notice] receipt not recorded", { noticeId: claimed.noticeId, status });
+    const missing = missingItem(input.spec, input.record);
+    const email = {
+      subject: oneLine(`${input.toolTitle}: ${title}`, 150),
+      options: {
+        heading: `New submission: ${title}`,
+        paragraphs: [
+          `A new record was submitted to ${oneLine(input.toolTitle, 80)}.`,
+          ...(claimed.personName ? [`Assigned to ${oneLine(claimed.personName, 80)}.`] : []),
+          missing ? `Still missing: ${missing}.` : "Next step: open it and confirm nothing is missing.",
+          "Sign in to see the full record. This email doesn't include its details.",
+        ],
+        button: { label: "Sign in to open it", url: toolSignInUrl(input.workspaceId, input.workId) },
+      },
+    };
+    const recipients = [...new Set([claimed.recipientEmail, claimed.assignedEmail].filter((value): value is string => Boolean(value)))];
+    const status = await deliverToolNotice(db, claimed.noticeId, input.workspaceId, {
+      audience: "client", ...(claimed.tenantId ? { tenantId: claimed.tenantId } : {}),
+      to: recipients.length === 1 ? recipients[0]! : recipients,
+      subject: email.subject, options: email.options,
+      idempotencyKey: `internal-tool-notice:${claimed.noticeId}`, tags: { kind: "internal_tool_notice" },
+    }, deps.send);
     return { status, noticeId: claimed.noticeId };
   } catch (error) {
     console.error("[internal-tool-notice] notice not claimed", { workId: input.workId, error: error instanceof Error ? error.message : "unknown" });

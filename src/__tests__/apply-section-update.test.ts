@@ -26,6 +26,8 @@ const storage = vi.hoisted(() => ({
 }));
 const queueAiContentReview = vi.hoisted(() => vi.fn());
 const revalidateClientSite = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const observeAcceptedNativePublish = vi.hoisted(() => vi.fn());
+vi.mock("@/app/api/publish/native-readback", () => ({ observeAcceptedNativePublish }));
 
 vi.mock("../lib/storage", () => storage);
 vi.mock("../lib/schemas", () => ({
@@ -95,6 +97,15 @@ beforeEach(() => {
 afterEach(() => vi.clearAllMocks());
 
 describe("applySectionUpdate", () => {
+  it("keeps auto-publication accepted when the public observer fails", async () => {
+    observeAcceptedNativePublish.mockRejectedValueOnce(new Error("Observation unavailable"));
+    const res = await applySectionUpdate({ ...baseInput(), requestId: "accepted-auto-1" });
+    expect(res.status).toBe("published");
+    expect(storage.setContent).toHaveBeenCalledTimes(1);
+    expect(revalidateClientSite).toHaveBeenCalledTimes(1);
+    expect(queueAiContentReview).not.toHaveBeenCalled();
+    expect(observeAcceptedNativePublish).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "gldf", section: "hero", expected: { title: "New" }, publicationRef: "accepted-auto-1" }));
+  });
   it("publishes a low-risk approved change (writes content, no review queued)", async () => {
     const res = await applySectionUpdate(baseInput());
     expect(res.status).toBe("published");

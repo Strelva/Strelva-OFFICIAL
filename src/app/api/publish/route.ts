@@ -24,6 +24,7 @@ import { diffFields } from "@/lib/utils";
 import { revalidateClientSite } from "@/lib/revalidate-client";
 import { parseAndValidatePageConfig } from "@/lib/page-config-validation";
 import { clientRevalidationTargetForSections } from "@/lib/content-revalidation";
+import { releaseFlagMayBeOn } from "@/platform/release-flags/resolve";
 
 export async function GET() {
   const authed = await verifyAuth();
@@ -171,11 +172,50 @@ export async function POST() {
       liveSite = { status: "failed", error };
     }
 
+    // Revalidation acceptance is distinct from observing the public homepage.
+    // Keep the existing response and calls exactly when the new channel is off.
+    let readBack: Record<string, unknown> | undefined;
+    let readBackEnabled = false;
+    if (releaseFlagMayBeOn("systems") && releaseFlagMayBeOn("make_real_live:tenant_content")) {
+      try {
+        const [{ tenantReleaseFlagEnabled }, { currentReleaseViewer }] = await Promise.all([
+          import("@/platform/release-flags/store"), import("@/platform/release-flags/viewer"),
+        ]);
+        const viewer = await currentReleaseViewer();
+        if (await tenantReleaseFlagEnabled("systems", tenant, viewer) && await tenantReleaseFlagEnabled("make_real_live:tenant_content", tenant, viewer)) {
+          readBackEnabled = true;
+          const [{ getTenantConfig }, { readPublishedWebsiteContent }] = await Promise.all([
+            import("@/lib/tenants"), import("@/products/websites/index"),
+          ]);
+          const config = await getTenantConfig(tenant);
+          readBack = { ...await readPublishedWebsiteContent({
+            tenant: config ?? {}, section: "website", expected: Object.fromEntries(parsedDrafts.map(draft => [draft.section, draft.data])),
+          }) };
+          // A failed read-back never makes accepted writes retryable.
+          try {
+            await logAuditEvent({ tenant, actor, action: "content.public_read_back", targetType: "website", targetId: tenant, metadata: readBack });
+          } catch { /* The response still exposes the observation if audit storage fails. */ }
+        }
+      } catch {
+        readBack = { ok: false, status: "unverified", detail: "The publish was accepted. Public read-back could not be confirmed; do not republish automatically." };
+      }
+    }
+    if (readBackEnabled && readBack && readBack.ok !== true && (publishedSections.length || publishedPageConfig)) {
+      try {
+        const { addEvent } = await import("@/lib/events");
+        await addEvent({ tenantId: tenant, source: "website", type: "change_verify_failed", status: "pending",
+          title: "Website publication needs a public check", body: String(readBack.detail),
+          metadata: { ...readBack, sections: publishedSections, pageConfigChanged: publishedPageConfig,
+            publicationAccepted: true, reviewAudience: "operator", kind: "native_public_read_back" } });
+      } catch { /* Operator bookkeeping cannot make an accepted publish retryable. */ }
+    }
+
     return NextResponse.json({
       success: true,
       publishedSections,
       publishedPageConfig,
       liveSite,
+      ...(readBack ? { readBack } : {}),
     });
   } catch (err) {
     console.error("[publish POST]", err);

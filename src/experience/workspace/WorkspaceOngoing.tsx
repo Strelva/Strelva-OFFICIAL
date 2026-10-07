@@ -12,6 +12,7 @@ export function WorkspaceOngoing({
   creatingStanding,
   readOnly,
   newWorkBlocked = false,
+  monthlyRecap = false,
   initialRequest,
   onCreatingStandingChange,
   onOpenStanding,
@@ -26,6 +27,8 @@ export function WorkspaceOngoing({
   readOnly: boolean;
   /** Stop/paused work blocks new commands while leaving owner recovery available. */
   newWorkBlocked?: boolean;
+  /** Systems projection confirms this business has a managed website. */
+  monthlyRecap?: boolean;
   initialRequest?: string;
   onCreatingStandingChange: (creating: boolean) => void;
   onOpenStanding: (id: string) => void;
@@ -43,6 +46,8 @@ export function WorkspaceOngoing({
       <h1 className="mt-3 font-display text-4xl font-normal text-warm-black">What Strelva keeps running</h1>
       <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-muted">Each one is named by what it keeps true. Strelva acts within the access you have given, asks when it can’t, and records every run.</p>
     </header>}
+
+    {!finiteJobOpen && monthlyRecap ? <p className="rounded-2xl border border-gray-border bg-white p-4 text-sm text-warm-black">Strelva sends you a monthly recap. Each send, hold or failure is recorded in Strelva handled.</p> : null}
 
     {finiteJobOpen ? null : <StandingResponsibilityPicker
       workspaceId={workspaceId}

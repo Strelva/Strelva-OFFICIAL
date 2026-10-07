@@ -152,6 +152,7 @@ export const SOURCE_LIFECYCLES = [
   "service_request",
   "provider_delivery",
   "website_document",
+  "website_domain",
   "standing_responsibility",
   "work_responsibility",
   "assignment_offer",
@@ -163,6 +164,7 @@ export const SOURCE_LIFECYCLES = [
   "make_real",
   "version_release",
   "booking_request",
+  "booking_settings",
 ] as const;
 export type SourceLifecycle = (typeof SOURCE_LIFECYCLES)[number];
 

@@ -1,5 +1,6 @@
+import { bookingAlternativeRange } from "@/platform/bookings/conflicts";
 import { isTenantId } from "@/lib/scaffold-contracts";
-import { bookingError, bookingJson, bookingOptions, bookingService, bodyObject, stringValue } from "../../../_shared";
+import { bookingConflictError, bookingError, bookingJson, bookingOptions, bookingService, bodyObject, stringValue } from "../../../_shared";
 
 function integerValue(value: unknown): number | undefined {
   return Number.isSafeInteger(value) && Number(value) > 0 ? Number(value) : undefined;
@@ -22,7 +23,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ te
   try {
     return bookingJson(await bookingService().change({ tenantId: tenant, reservationId, managementToken, capabilityId, capabilityVersion, slotId }));
   } catch (error) {
-    return bookingError(error);
+    return bookingConflictError(error, () => bookingService().read({ tenantId: tenant, capabilityId, range: bookingAlternativeRange() }));
   }
 }
 

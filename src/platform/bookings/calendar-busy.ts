@@ -50,7 +50,7 @@ function nextDate(date: string): string {
 }
 
 function cacheKey(context: BookingContext, date: string): string {
-  return `reb:booking:busy:${context.tenantStableId}:${date}`;
+  return `reb:booking:busy:${context.calendarKey ?? context.tenantStableId ?? context.workspaceId}:${date}`;
 }
 
 function isBusyList(value: unknown): value is BusyInterval[] {
@@ -127,7 +127,7 @@ export function defaultBusyPorts(): CalendarBusyPorts | null {
       const db = getSupabase() as unknown as { from(table: string): Query } | null;
       if (!db) return null;
       const { data, error } = await db.from("workspace_calendar_connections").select("provider,status").eq("workspace_id", workspaceId)
-        .in("status", ["connected", "authorized", "error"]).order("provider").limit(1);
+        .in("status", ["connected", "authorized", "error", "revoked"]).order("provider").limit(1);
       if (error) throw new Error("calendar_connection_unreadable");
       const row = (Array.isArray(data) ? data[0] : null) as ConnectionRow | null;
       if (!row || (row.provider !== "google" && row.provider !== "outlook")) return null;

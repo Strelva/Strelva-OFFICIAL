@@ -32,6 +32,7 @@ import { manifestAllowsAction } from "./site-capabilities";
 import { clientRevalidationTargetForSections } from "./content-revalidation";
 import { revalidateClientSite } from "./revalidate-client";
 import { diffFields } from "./utils";
+import { workspacePorts } from "./workspace-ports";
 
 type Governance = Awaited<ReturnType<typeof maybeAutoApprove>>;
 type FieldChange = ReturnType<typeof diffFields>[number];
@@ -193,9 +194,14 @@ export async function applySectionUpdate(
     }
     const { revalidatePath } = await import("next/cache");
     revalidatePath("/");
-    revalidateClientSite(tenantId, clientRevalidationTargetForSections([section])).catch((err) => {
+    const revalidation = revalidateClientSite(tenantId, clientRevalidationTargetForSections([section])).catch((err) => {
       console.error("[agent] Failed to revalidate client site:", err);
     });
+    try {
+      await (await workspacePorts().websitePublicationReadback()).observeAcceptedNativePublish({
+        tenantId, section, expected: parsed.data, actorId: "ai", publicationRef: input.requestId, revalidation,
+      });
+    } catch { /* Public observation cannot turn the accepted write into failure. */ }
   } else {
     const event = await queueAiContentReview({
       tenantId,

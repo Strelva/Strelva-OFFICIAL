@@ -2,18 +2,19 @@
 
 import { intentRequestFor, useWorkspaceIntent } from "./WorkspaceIntent";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { TextInput, TextArea } from "@/components/ui/TextInput";
 import { WorkPlanExperience } from "./WorkPlanExperience";
 import type { WorkspaceWork } from "./contracts";
-import type { WorkspaceDocument } from "@/products/documents/contracts";
+import { documentHistoryPageSchema, type DocumentHistoryPage, type DocumentReceipt, type WorkspaceDocument } from "@/products/documents/contracts";
 
-export type DocumentSaved = { workId: string; workspaceId: string; document: WorkspaceDocument };
+export type DocumentSaved = { workId: string; workspaceId: string; document: WorkspaceDocument; historyEnabled?: boolean };
 export type DocumentTransport = {
   mode: "server" | "local-preview";
   read(workId: string, signal: AbortSignal): Promise<DocumentSaved>;
   write(body: Record<string, unknown>): Promise<DocumentSaved>;
+  history?(workId: string, beforeRevision: number, signal: AbortSignal): Promise<DocumentHistoryPage>;
 };
 const serverTransport: DocumentTransport = {
   mode: "server",
@@ -28,6 +29,13 @@ const serverTransport: DocumentTransport = {
     const body = await response.json();
     if (!response.ok) throw new Error(body.error ?? "The change could not be saved.");
     return body;
+  },
+  async history(workId, beforeRevision, signal) {
+    const params = new URLSearchParams({ workId, beforeRevision: String(beforeRevision) });
+    const response = await fetch(`/api/documents/history?${params}`, { signal, cache: "no-store" });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error ?? "Document history could not be loaded.");
+    return documentHistoryPageSchema.parse(body);
   },
 };
 type Props = { workspaceId: string; workId?: string; readOnly?: boolean; onSaved?: (workId: string) => void; transport?: DocumentTransport; initialRequestText?: string; sources?: readonly WorkspaceWork[] };
@@ -92,10 +100,49 @@ function DocumentSession({ workspaceId, workId, readOnly, onSaved, transport = s
       <Button type="submit" disabled={disabled || !dirty || !title.trim()}>{busy ? "Saving…" : "Save document"}</Button>
     </form>}
     {saved ? <section className="space-y-3 border-t border-gray-border pt-4"><h2 className="font-display text-xl">Change history</h2>
-      {!saved.document.history.length ? <p className="text-sm text-gray-muted">Created {new Date(saved.document.createdAt).toLocaleString()}. No edits yet.</p> : <ol className="space-y-3">{saved.document.history.slice(-20).reverse().map(receipt => <li key={receipt.revision} className="border-b border-gray-border pb-3 text-sm"><p>Revision {receipt.revision}: {receipt.kind === "undo" ? "Undid the previous edit" : "Saved document changes"}</p><time className="text-gray-muted" dateTime={receipt.at}>{new Date(receipt.at).toLocaleString()}</time><details className="mt-2"><summary>Before and after</summary><p className="mt-2 whitespace-pre-wrap">{receipt.before.title}{"\n"}{receipt.before.text}</p><hr className="my-3 border-gray-border" /><p className="whitespace-pre-wrap">{receipt.after.title}{"\n"}{receipt.after.text}</p></details></li>)}</ol>}
+      <DocumentHistory key={`${saved.workId}:${saved.document.revision}`} saved={saved} transport={transport} />
       {saved.document.history.at(-1)?.kind === "edit" && !readOnly ? <Button type="button" variant="secondary" disabled={disabled || dirty} onClick={() => void save(true)}>Undo last edit</Button> : null}
       {dirty && saved.document.history.length ? <p className="text-sm text-gray-muted">Save or discard your unsaved text before using Undo.</p> : null}
     </section> : null}
     </>}
   </section>;
+}
+
+function DocumentHistory({ saved, transport }: { saved: DocumentSaved; transport: DocumentTransport }) {
+  const [receipts, setReceipts] = useState<DocumentReceipt[]>(() => saved.document.history.slice(-20).reverse());
+  const [before, setBefore] = useState<number | null>(() => {
+    const oldest = saved.document.history.slice(-20)[0]?.revision ?? saved.document.revision + 1;
+    return oldest > 1 ? oldest : null;
+  });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const pending = useRef<AbortController | null>(null);
+  useEffect(() => () => pending.current?.abort(), []);
+
+  async function loadOlder() {
+    if (busy || before === null || !transport.history) return;
+    const controller = new AbortController();
+    pending.current = controller;
+    setBusy(true); setError("");
+    try {
+      const page = documentHistoryPageSchema.parse(await transport.history(saved.workId, before, controller.signal));
+      if (controller.signal.aborted) return;
+      if (page.workId !== saved.workId || page.workspaceId !== saved.workspaceId
+        || page.receipts.some(receipt => receipt.revision >= before)
+        || (page.nextBeforeRevision !== null && (page.nextBeforeRevision >= before || page.nextBeforeRevision !== page.receipts.at(-1)?.revision))) {
+        throw new Error("Document history could not be confirmed. Try again.");
+      }
+      setReceipts(current => [...current, ...page.receipts]);
+      setBefore(page.nextBeforeRevision);
+    } catch (cause) {
+      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Document history could not be loaded.");
+    } finally { if (!controller.signal.aborted) setBusy(false); }
+  }
+
+  return <>
+    {!receipts.length ? <p className="text-sm text-gray-muted">Created {new Date(saved.document.createdAt).toLocaleString()}. {saved.document.revision === 0 || !saved.historyEnabled ? "No edits yet." : "Load earlier changes to read saved history."}</p> : <ol className="space-y-3">{receipts.map(receipt => <li key={receipt.revision} className="border-b border-gray-border pb-3 text-sm"><p>Revision {receipt.revision}: {receipt.kind === "undo" ? "Undid the previous edit" : "Saved document changes"}</p><time className="text-gray-muted" dateTime={receipt.at}>{new Date(receipt.at).toLocaleString()}</time><details className="mt-2"><summary>Before and after</summary><p className="mt-2 whitespace-pre-wrap">{receipt.before.title}{"\n"}{receipt.before.text}</p><hr className="my-3 border-gray-border" /><p className="whitespace-pre-wrap">{receipt.after.title}{"\n"}{receipt.after.text}</p></details></li>)}</ol>}
+    {saved.historyEnabled && transport.history && before !== null ? <Button type="button" variant="secondary" disabled={busy} onClick={() => void loadOlder()}>{busy ? "Loading earlier changes…" : error ? "Retry earlier changes" : "Load earlier changes"}</Button> : null}
+    {busy ? <p role="status" className="text-sm text-gray-muted">Loading document history…</p> : null}
+    {error ? <p role="alert" className="text-critical">{error}</p> : null}
+  </>;
 }

@@ -76,6 +76,8 @@ export const hostedWebsiteRequestSchema = z.object({
   workId: z.string().uuid(),
   candidateRevision: z.number().int().positive(),
   candidateContentHash: z.string().regex(/^[0-9a-f]{64}$/),
+  /** Existing managed site: publish onto its linked tenant, keeping identity. */
+  tenantId: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/).optional(),
 }).strict();
 
 type RebuildSelection = { expectedRevision: number; candidateRevision: number; candidateContentHash: string };
@@ -89,6 +91,7 @@ export interface HostedWebsitePorts {
   /** The owner's approval of this exact preview, recorded on the rebuild (the plan approval is that decision). */
   approve(actor: WorkspaceActor, workId: string, selection: RebuildSelection): Promise<unknown>;
   launch(actor: WorkspaceActor, workId: string, selection: RebuildSelection): Promise<{ rebuild: { launch: LaunchView } }>;
+  publishLinked?(actor: WorkspaceActor, workId: string, selection: RebuildSelection & { tenantId: string }): Promise<{ rebuild: { launch: LaunchView }; cutover?: unknown }>;
 }
 
 export function createHostedWebsiteAdapter(ports: HostedWebsitePorts, ctx: LiveChannelContext): EffectAdapter {
@@ -115,10 +118,14 @@ export function createHostedWebsiteAdapter(ports: HostedWebsitePorts, ctx: LiveC
       } else if (!replay && current.rebuild.status !== "approved") {
         return rejected("The rebuilt site is not ready to publish. Nothing was published.");
       }
-      const launched = await ports.launch(ctx.actor, req.workId, { expectedRevision: current.rebuild.revision, candidateRevision: req.candidateRevision, candidateContentHash: req.candidateContentHash });
+      if (req.tenantId && !ports.publishLinked) return rejected("Publishing onto this existing site is not connected yet.");
+      const selection = { expectedRevision: current.rebuild.revision, candidateRevision: req.candidateRevision, candidateContentHash: req.candidateContentHash };
+      const launched = req.tenantId
+        ? await ports.publishLinked!(ctx.actor, req.workId, { ...selection, tenantId: req.tenantId })
+        : await ports.launch(ctx.actor, req.workId, selection);
       const receipt = launched.rebuild.launch.receipt;
       if (!receipt || receipt.candidateRevision !== req.candidateRevision) return rejected("The launch returned no receipt for this version.");
-      return { status: "accepted", providerRef: ref(req.workId, receipt.receiptId), result: { receiptId: receipt.receiptId, providerUrl: receipt.providerUrl, candidateRevision: receipt.candidateRevision, tenantId: current.rebuild.tenantId } };
+      return { status: "accepted", providerRef: ref(req.workId, receipt.receiptId), result: { receiptId: receipt.receiptId, providerUrl: receipt.providerUrl, candidateRevision: receipt.candidateRevision, tenantId: req.tenantId ?? current.rebuild.tenantId, ...("cutover" in launched ? { cutover: launched.cutover } : {}) } };
     },
     async find({ effect }) {
       const req = parseRequest(hostedWebsiteRequestSchema, effect);
@@ -156,6 +163,8 @@ export interface TenantContentPorts {
   /** Newest first. */
   versions(section: string, tenantId: string): Promise<Array<{ id: string; requestId?: string; data?: unknown }>>;
   content(section: string, tenantId: string): Promise<unknown>;
+  /** Verify the visitor's page, separately from the accepted content write. */
+  publicReadBack?(tenantId: string, section: string, expected: Record<string, unknown>): Promise<{ ok: boolean; detail: string }>;
   restore(section: string, versionId: string, tenantId: string): Promise<{ id: string } | null>;
 }
 
@@ -194,7 +203,9 @@ export function createTenantContentAdapter(ports: TenantContentPorts, ctx: LiveC
       const live = await ports.content(section, tenantId);
       const expected = ours.data;
       if (expected && typeof expected === "object" && !contains(live, expected as Record<string, unknown>)) return { ok: false, detail: "The live section differs from what was published." };
-      return { ok: true, detail: `The ${section} section reads back as published.` };
+      if (!expected || typeof expected !== "object" || !ports.publicReadBack) return { ok: false, detail: "The content was saved; the visitor's page has not been verified." };
+      try { return await ports.publicReadBack(tenantId, section, expected as Record<string, unknown>); }
+      catch { return { ok: false, detail: "The content was saved; the visitor's page could not be checked." }; }
     },
     async compensate({ providerRef }) {
       const { tenantId, section, versionId } = split(providerRef);

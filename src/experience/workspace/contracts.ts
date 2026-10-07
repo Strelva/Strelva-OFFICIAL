@@ -227,6 +227,8 @@ export interface WorkspaceSystemHistoryRow {
   /** "Strelva published the rebuilt site". Never called a Version. */
   sentence: string;
   at: string;
+  releaseRef?: string;
+  implementationKind?: string;
 }
 
 export interface WorkspaceSystemReceipt {
@@ -281,11 +283,13 @@ export interface WorkspaceSystemEntry {
   savedWorkId: string | null;
   tenantId: string | null;
   /** What the evidence shows. Never derived from lifecycle. */
-  health: { status: HealthStatus; summary: string; lastVerifiedAt: string | null };
+  health: { status: HealthStatus; summary: string; lastVerifiedAt: string | null; signals?: string[] };
   /** A Bookings System's day and week views on the managed site (wellness schedule, roster). */
   views?: Array<"schedule" | "roster">;
   /** A managed website: Strelva edits its content (`native`) or every change is a repo Request (`request`). */
   editing?: "native" | "request";
+  /** Confirmed from this tenant's issued document and enabled business-facts runtime. */
+  businessFactsConnected?: boolean;
   /** A website the business runs elsewhere, connected by script. Additive. */
   connectedSite?: { siteUrl: string; siteHost: string; verified: boolean; lastEventAt: string | null };
 }

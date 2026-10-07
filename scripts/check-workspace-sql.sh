@@ -351,16 +351,36 @@ psql "${psql_args[@]}" --file="$repo_root/tests/workspace-authority-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-systems-schema.sql"
 
 authority_leaver='c9000000-0000-4000-8000-000000000005'
+# The holder waits for an explicit parent command instead of a short PgSleep.
+# Its ready application name is set only after the guarded statement finishes.
+# A loaded machine can miss a timed hold entirely; this barrier cannot expire
+# before the competing transaction has actually reached its lock wait.
 authority_session_ready() {
-  local app_name="$1" attempt
+  local app_name="$1" state="$2" attempt
   for attempt in $(seq 1 200); do
-    if [[ "$(psql "${psql_args[@]}" -Atc "select exists(select 1 from pg_stat_activity where application_name='$app_name' and wait_event='PgSleep');")" == t ]]; then
+    if [[ "$(psql "${psql_args[@]}" -Atc "select exists(select 1 from pg_stat_activity where application_name='$app_name' and $state);")" == t ]]; then
       return 0
     fi
     sleep 0.02
   done
-  printf 'Authority race session %s never reached its hold point.\n' "$app_name" >&2
+  printf 'Authority race session %s never reached its required state.\n' "$app_name" >&2
   return 1
+}
+authority_hold() {
+  local app_name="$1" statement="$2"
+  authority_pipe="$cluster_root/authority-session.in"
+  mkfifo "$authority_pipe"
+  exec 9<>"$authority_pipe"
+  PGAPPNAME="$app_name" psql "${psql_args[@]}" <"$authority_pipe" >"$cluster_root/$app_name-$authority_call.log" 2>&1 &
+  authority_holder=$!
+  printf "begin;\n%s;\nset local application_name='%s-ready';\n" "$statement" "$app_name" >&9
+  authority_session_ready "$app_name-ready" "state='idle in transaction'"
+}
+authority_release() {
+  printf '%s;\n\\q\n' "$1" >&9
+  wait "$authority_holder"
+  exec 9>&-
+  rm "$authority_pipe"
 }
 for authority_call in $(psql "${psql_args[@]}" -Atc "select name from public.authority_parity_calls order by name"); do
   authority_stmt="$(psql "${psql_args[@]}" -Atc "select replace(stmt, ':actor', quote_literal('$authority_leaver') || '::uuid') from public.authority_parity_calls where name='$authority_call'")"
@@ -371,46 +391,43 @@ for authority_call in $(psql "${psql_args[@]}" -Atc "select name from public.aut
   esac
   authority_membership="workspace_id='$authority_workspace' and user_id='$authority_leaver'"
 
-  # 1. Removed mid-transaction: a write that queues behind an uncommitted
-  # removal must re-read the committed row and be denied, not land once more.
-  PGAPPNAME=authority-remover psql "${psql_args[@]}" \
-    -c "begin; delete from public.workspace_memberships where $authority_membership; select pg_sleep(0.6); commit;" >/dev/null &
-  authority_remover=$!
-  authority_session_ready authority-remover
-  if psql "${psql_args[@]}" -c "$authority_stmt" >"$cluster_root/authority-removed-$authority_call.log" 2>&1; then
+  # 1. Removed mid-transaction: observe the write queued behind an uncommitted
+  # removal, then commit removal. The write must re-read the row and be denied.
+  authority_hold authority-remover "delete from public.workspace_memberships where $authority_membership"
+  PGAPPNAME=authority-removed-write psql "${psql_args[@]}" -c "set statement_timeout='30s'; $authority_stmt" >"$cluster_root/authority-removed-$authority_call.log" 2>&1 &
+  authority_writer=$!
+  authority_session_ready authority-removed-write "wait_event_type='Lock'"
+  authority_release commit
+  if wait "$authority_writer"; then
     printf 'Authority race: %s landed after the actor was removed.\n' "$authority_call" >&2
     exit 1
   fi
   grep -q workspace_membership_required "$cluster_root/authority-removed-$authority_call.log"
-  wait "$authority_remover"
   psql "${psql_args[@]}" -c "insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values ('$authority_workspace','$authority_leaver','admin','c9000000-0000-4000-8000-000000000001');" >/dev/null
 
-  # 2. Removal waits for an in-flight write: the write holds the membership
-  # row FOR SHARE, so a concurrent delete cannot get its row lock.
-  PGAPPNAME=authority-writer psql "${psql_args[@]}" \
-    -c "begin; $authority_stmt; select pg_sleep(0.6); rollback;" >"$cluster_root/authority-writer-$authority_call.log" 2>&1 &
-  authority_writer=$!
-  authority_session_ready authority-writer
+  # 2. An in-flight write holds membership FOR SHARE until we release it.
+  # A concurrent delete must time out even if process scheduling is delayed.
+  authority_hold authority-writer "$authority_stmt"
   if psql "${psql_args[@]}" -c "set lock_timeout='150ms'; delete from public.workspace_memberships where $authority_membership;" >"$cluster_root/authority-blocked-$authority_call.log" 2>&1; then
     printf 'Authority race: removal did not wait for in-flight %s.\n' "$authority_call" >&2
     exit 1
   fi
   grep -q 'lock timeout' "$cluster_root/authority-blocked-$authority_call.log"
-  wait "$authority_writer"
+  authority_release rollback
 
-  # 3. Downgraded mid-transaction: an owner/admin write queued behind an
-  # uncommitted admin -> member change is denied.
+  # 3. Observe a manager write queued behind an uncommitted downgrade, then
+  # commit the downgrade. The write must re-read the role and be denied.
   if [[ "$authority_tier" == manager ]]; then
-    PGAPPNAME=authority-demoter psql "${psql_args[@]}" \
-      -c "begin; update public.workspace_memberships set role='member' where $authority_membership; select pg_sleep(0.6); commit;" >/dev/null &
-    authority_demoter=$!
-    authority_session_ready authority-demoter
-    if psql "${psql_args[@]}" -c "$authority_stmt" >"$cluster_root/authority-demoted-$authority_call.log" 2>&1; then
+    authority_hold authority-demoter "update public.workspace_memberships set role='member' where $authority_membership"
+    PGAPPNAME=authority-demoted-write psql "${psql_args[@]}" -c "set statement_timeout='30s'; $authority_stmt" >"$cluster_root/authority-demoted-$authority_call.log" 2>&1 &
+    authority_writer=$!
+    authority_session_ready authority-demoted-write "wait_event_type='Lock'"
+    authority_release commit
+    if wait "$authority_writer"; then
       printf 'Authority race: %s landed after the actor was downgraded.\n' "$authority_call" >&2
       exit 1
     fi
     grep -q workspace_permission_denied "$cluster_root/authority-demoted-$authority_call.log"
-    wait "$authority_demoter"
     psql "${psql_args[@]}" -c "update public.workspace_memberships set role='admin' where $authority_membership;" >/dev/null
   fi
   printf 'Workspace authority race passed: %s\n' "$authority_call"
@@ -521,8 +538,10 @@ psql "${psql_args[@]}" --file="$repo_root/tests/agency-client-overview-schema.sq
 if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
   # The same Version store contract the in-memory store passes, run through
   # createSupabaseVersionStore against this cluster (psql-backed RPC port).
+  # SQL contracts spawn real Postgres clients; allow bounded host scheduling
+  # time without changing lock limits or any behavior assertion.
   STRELVA_VERSIONS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
-    pnpm --dir "$repo_root" exec vitest run src/__tests__/system-versions-store-contract.test.ts src/__tests__/agency-versions-server.test.ts
+    pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/system-versions-store-contract.test.ts src/__tests__/agency-versions-server.test.ts
 fi
 # Needs you and Strelva handled: decision policy, owner decisions and the
 # handled read model, on the same fictional cluster (needs the business record,
@@ -570,6 +589,8 @@ psql "${psql_args[@]}" --file="$repo_root/tests/booking-lifecycle-schema.sql"
 # for every Google write. After Systems, because it extends the origin kinds.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007170000_workspace_account_bindings.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-account-bindings-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010143000_publishing_reconnect.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/publishing-reconnect-schema.sql"
 # Human minutes per business, then the operator queue (marks and the
 # outside-write receipt ledger) and minutes resolved through the conversion
 # link. Fictional rows only; each test rolls back.
@@ -602,7 +623,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
 # The release flag rules still hold after the flag names gain channel keys.
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 STRELVA_POSSIBILITIES_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
-  pnpm --dir "$repo_root" exec vitest run src/__tests__/possibility-repository.test.ts
+  pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/possibility-repository.test.ts
 # Website System (2026-10-08): publish onto a linked tenant, routing after a
 # rename, the business template, and operator domain work on owner approval.
 # Replaces reserve_website_hosted_tenant and manage_published_website_tenant;
@@ -653,14 +674,97 @@ psql "${psql_args[@]}" --file="$repo_root/tests/reader-rpc-volatility-schema.sql
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
+# Wave 6 website: fallback undo, immutable release reconciliation, and
+# owner-decided domain proposals. Fictional fixtures and isolated Postgres only.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010110000_website_cutover_undo.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010113000_website_system_releases.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-system-releases-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010114000_website_domain_requests.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-domain-requests-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010115000_website_model_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-model-admission-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010115500_website_business_facts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-business-facts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010115700_website_native_fact_reviews.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-native-fact-reviews-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-cutover-undo-schema.sql"
+# Wave 6 catalog: additive submit/contact RPCs, report receipts, newsletter
+# projection and delegated Make authority. Run after all required flag names,
+# business ownership, Systems and work-plan functions exist.
+# Match the retained tenant newsletter table from 20260618224329. This
+# isolated workspace fixture does not apply the complete legacy schema.
+psql "${psql_args[@]}" <<'SQL'
+create table public.newsletter_subscribers (
+  tenant_id text not null references public.tenants(id) on delete cascade,
+  email text not null, name text,
+  subscribed_at timestamptz not null default now(),
+  status text not null default 'active',
+  primary key (tenant_id, email)
+);
+SQL
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010150000_internal_tool_submit_notices.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-submit-notices-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010150100_internal_tool_use_links.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-use-links-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010150200_internal_tool_notice_delivery.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-notice-delivery-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010150300_catalog_tool_evidence.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/catalog-tool-evidence-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010150400_internal_tool_use_edits.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-use-edits-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010155100_internal_tool_member_submit.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-member-submit-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010155200_internal_tool_use_link_labels.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-use-link-labels-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010152000_catalog_report_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/catalog-reports-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010153000_newsletter_contacts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-contacts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010154000_system_work_plan_authority.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/system-work-plan-authority-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010155000_failed_system_plan_request.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/failed-system-plan-request-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
+
 # The real Make real runner, checkpointing through these RPCs (psql-backed port).
 STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
-  pnpm --dir "$repo_root" exec vitest run src/__tests__/make-real-activation-repository.test.ts
+  pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/make-real-activation-repository.test.ts
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010130000_booking_parity.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-parity-schema.sql"
+
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010131000_booking_access.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010132000_booking_updates.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010133000_booking_calendar_mirror.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010134000_booking_inquiry_offers.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135000_booking_setup.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135500_booking_receipt_history.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135900_booking_receipt_lifecycle.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135910_booking_owner_evidence.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135920_booking_service_policies.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135940_booking_manual.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135945_booking_cancellation_cutoff.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135950_booking_calendar_health.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135955_booking_exit_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135956_booking_native_workspace.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-agent-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-owner-evidence-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-manual-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-service-policy-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-calendar-health-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-native-workspace-schema.sql"
+# Prove the final interrupted checkpoint's rollback restores the tenant-only
+# functions and can be reapplied before any native commitments are admitted.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-w6-booking-native-workspace.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135956_booking_native_workspace.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-native-workspace-schema.sql"
+# Every stream's release flag key survives the last literal redefinition (#253).
+psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
+
 # The one booking store through both real route families (legacy /api/booking
 # and the public booking service) against the real booking functions. Last,
 # because it commits its fictional rows.
 STRELVA_BOOKINGS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
-  pnpm --dir "$repo_root" exec vitest run src/__tests__/booking-one-store.test.ts
+  pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/booking-one-store.test.ts
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 

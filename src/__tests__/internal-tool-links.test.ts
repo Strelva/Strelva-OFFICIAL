@@ -4,7 +4,13 @@ const boundary = vi.hoisted(() => ({
   calls: [] as Array<{ name: string; args: Record<string, unknown> }>,
   responses: {} as Record<string, (args: Record<string, unknown>) => { data: unknown; error: { message: string } | null }>,
   state: null as unknown,
+  noticesReleased: true,
+  emailOverride: "inherit" as "inherit" | "on" | "off",
 }));
+
+vi.mock("@/platform/release-flags/store", () => ({ workspaceReleaseFlagEnabled: async () => boundary.noticesReleased }));
+vi.mock("@/platform/release-flags/viewer", () => ({ releaseViewerFor: async () => ({ operator: false, tester: false }) }));
+vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: async () => boundary.emailOverride }));
 
 // The SQL side (ids, cross-business guard, receipts) is proven by
 // tests/internal-tool-links-schema.sql. Here the database is a recorder so
@@ -15,7 +21,10 @@ vi.mock("@/products/applications/repository", async (importOriginal) => {
     async rpc(name: string, args: Record<string, unknown>) {
       boundary.calls.push({ name, args });
       const respond = boundary.responses[name];
-      return respond ? respond(args) : { data: null, error: null };
+      if (respond) return respond(args);
+      if (name === "lease_internal_tool_notice") return { data: { noticeId, workspaceId, lease: noticeId, delivery: args.p_delivery }, error: null };
+      if (name === "finish_internal_tool_notice_delivery") return { data: true, error: null };
+      return { data: null, error: null };
     },
     from() { throw new Error("not used"); },
   };
@@ -67,7 +76,10 @@ const db = {
   async rpc(name: string, args: Record<string, unknown>) {
     boundary.calls.push({ name, args });
     const respond = boundary.responses[name];
-    return respond ? respond(args) : { data: null, error: null };
+    if (respond) return respond(args);
+      if (name === "lease_internal_tool_notice") return { data: { noticeId, workspaceId, lease: noticeId, delivery: args.p_delivery }, error: null };
+      if (name === "finish_internal_tool_notice_delivery") return { data: true, error: null };
+      return { data: null, error: null };
   },
 };
 const resolved = () => ({ data: { client: { id: contactId, created: true, conflict: false }, handler: { id: personId, created: false, conflict: false } }, error: null });
@@ -76,6 +88,12 @@ const claimed = () => ({ data: { claimed: true, noticeId, status: "pending", rec
 beforeEach(() => {
   boundary.calls = [];
   boundary.responses = {};
+  boundary.noticesReleased = true;
+  boundary.emailOverride = "inherit";
+  vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+  vi.stubEnv("STRELVA_INTERNAL_TOOL_NOTICES_RELEASE", "1");
+  vi.stubEnv("EMAIL_SENDING_ENABLED", "true");
+  vi.stubEnv("CUSTOMER_EMAIL_ENABLED", "true");
   vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "1");
   vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://app.strelva.example.test");
 });
@@ -158,7 +176,7 @@ describe("the assigned-person email", () => {
   });
 
   it("sends once through the shared email path and records the receipt", async () => {
-    boundary.responses.claim_internal_tool_notice = claimed;
+    boundary.responses.claim_internal_tool_submit_notice = claimed;
     const send = vi.fn(async () => ({ status: "accepted" as const, providerMessageId: "provider-1", acceptedAt: "2026-10-07T12:00:00Z" }));
     const result = await notifyAssignedPerson(db, staff, { workspaceId, workId, toolTitle: spec.title, spec, record }, { send });
     expect(result).toEqual({ status: "sent", noticeId });
@@ -167,42 +185,92 @@ describe("the assigned-person email", () => {
       audience: "client", to: "sam@leslie.example.test", subject: "New client intake: Brightline Co",
       idempotencyKey: `internal-tool-notice:${noticeId}`,
     }));
-    expect(boundary.calls.map((call) => call.name)).toEqual(["claim_internal_tool_notice", "finish_internal_tool_notice"]);
-    expect(boundary.calls[1]!.args).toEqual({ p_notice_id: noticeId, p_workspace_id: workspaceId, p_status: "sent", p_detail: null, p_provider_message_id: "provider-1" });
+    expect(boundary.calls.map((call) => call.name)).toEqual(["claim_internal_tool_submit_notice", "lease_internal_tool_notice", "finish_internal_tool_notice_delivery"]);
+    expect(boundary.calls[2]!.args).toEqual({ p_notice_id: noticeId, p_workspace_id: workspaceId, p_status: "sent", p_lease: noticeId, p_provider_message_id: "provider-1" });
   });
 
   it("records a suppression receipt while client email is paused", async () => {
     vi.stubEnv("EMAIL_SENDING_ENABLED", "false");
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    boundary.responses.claim_internal_tool_notice = claimed;
+    boundary.responses.claim_internal_tool_submit_notice = claimed;
     const result = await notifyAssignedPerson(db, staff, { workspaceId, workId, toolTitle: spec.title, spec, record }, { send: sendEmailWithReceipt });
     expect(result.status).toBe("suppressed");
-    expect(boundary.calls[1]!.args).toMatchObject({ p_status: "suppressed", p_detail: "email_suppressed_or_unconfigured" });
+    expect(boundary.calls[2]!.args).toMatchObject({ p_status: "suppressed" });
   });
 
   it("records a failure receipt when the provider throws, without failing the submit", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    boundary.responses.claim_internal_tool_notice = claimed;
+    boundary.responses.claim_internal_tool_submit_notice = claimed;
     const send = vi.fn(async () => { throw new Error("provider down"); });
     const result = await notifyAssignedPerson(db, staff, { workspaceId, workId, toolTitle: spec.title, spec, record }, { send });
     expect(result).toEqual({ status: "failed", noticeId });
-    expect(boundary.calls[1]!.args).toMatchObject({ p_status: "failed", p_detail: "provider down" });
+    expect(boundary.calls[2]!.args).toMatchObject({ p_status: "failed" });
   });
 
   it("never sends twice for the same record and skips a person with no email", async () => {
     const send = vi.fn();
-    boundary.responses.claim_internal_tool_notice = () => ({ data: { claimed: false, noticeId, status: "sent" }, error: null });
+    boundary.responses.claim_internal_tool_submit_notice = () => ({ data: { claimed: false, noticeId, status: "sent" }, error: null });
     expect(await notifyAssignedPerson(db, staff, { workspaceId, workId, toolTitle: spec.title, spec, record }, { send })).toEqual({ status: "duplicate", noticeId });
-    boundary.responses.claim_internal_tool_notice = () => ({ data: { claimed: false, noticeId, status: "skipped" }, error: null });
+    boundary.responses.claim_internal_tool_submit_notice = () => ({ data: { claimed: false, noticeId, status: "skipped" }, error: null });
     expect(await notifyAssignedPerson(db, staff, { workspaceId, workId, toolTitle: spec.title, spec, record }, { send })).toEqual({ status: "skipped", noticeId });
-    expect(await notifyAssignedPerson(db, staff, { workspaceId, workId, toolTitle: spec.title, spec, record: { id: "r2", values: { business: "No one" } } }, { send })).toEqual({ status: "none" });
+    expect(await notifyAssignedPerson(db, staff, { workspaceId, workId, toolTitle: spec.title, spec, record: { id: "r2", values: { business: "No one" } } }, { send })).toEqual({ status: "skipped", noticeId });
     expect(send).not.toHaveBeenCalled();
   });
 
   it("reports a failed claim as a failed notice instead of throwing", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    boundary.responses.claim_internal_tool_notice = () => ({ data: null, error: { message: "internal_tool_notice_denied" } });
+    boundary.responses.claim_internal_tool_submit_notice = () => ({ data: null, error: { message: "internal_tool_notice_denied" } });
     expect(await notifyAssignedPerson(db, staff, { workspaceId, workId, toolTitle: spec.title, spec, record }, { send: vi.fn() })).toEqual({ status: "failed" });
+  });
+});
+
+describe("owner notices and release gates", () => {
+  const record = { id: "r-owner", values: { business: "Brightline", notes: "Private tax details" } };
+  const plainSpec = { ...spec, fields: [spec.fields[0]!], components: [{ kind: "form" as const, fields: ["business"] }] };
+  it("notifies the owner even without an assigned-person field, using the tenant mail gate", async () => {
+    boundary.responses.claim_internal_tool_submit_notice = () => ({ data: { claimed: true, noticeId, recipientEmail: "owner@example.test", tenantId: "gldf" }, error: null });
+    const send = vi.fn(async () => ({ status: "accepted" as const, providerMessageId: "owner-send", acceptedAt: "2026-10-10T12:00:00Z" }));
+    expect((await notifyAssignedPerson(db, staff, { workspaceId, workId, toolTitle: spec.title, spec: plainSpec, record }, { send })).status).toBe("sent");
+    expect(boundary.calls[0]!.args.p_field_id).toBeNull();
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ to: "owner@example.test", tenantId: "gldf", audience: "client" }));
+    expect(JSON.stringify(send.mock.calls)).not.toContain("Private tax details");
+  });
+  it("addresses the owner and assigned person once, deduplicating the same address", async () => {
+    const send = vi.fn(async () => ({ status: "accepted" as const, providerMessageId: "one-send", acceptedAt: "2026-10-10T12:00:00Z" }));
+    boundary.responses.claim_internal_tool_submit_notice = () => ({ data: { claimed: true, noticeId, recipientEmail: "owner@example.test", assignedEmail: "sam@example.test" }, error: null });
+    await notifyAssignedPerson(db, staff, { workspaceId, workId, toolTitle: spec.title, spec, record }, { send });
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ to: ["owner@example.test", "sam@example.test"] }));
+    boundary.responses.claim_internal_tool_submit_notice = () => ({ data: { claimed: true, noticeId, recipientEmail: "owner@example.test", assignedEmail: "owner@example.test" }, error: null });
+    await notifyAssignedPerson(db, staff, { workspaceId, workId, toolTitle: spec.title, spec, record }, { send });
+    expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ to: "owner@example.test" }));
+  });
+  it.each(["STRELVA_INTERNAL_TOOL_NOTICES_RELEASE", "STRELVA_WORKSPACE_RELEASE"])("does no database or send work with %s off", async flag => {
+    vi.stubEnv(flag, "0");
+    const send = vi.fn();
+    expect(await notifyAssignedPerson(db, staff, { workspaceId, workId, toolTitle: spec.title, spec, record }, { send })).toEqual({ status: "none" });
+    expect(boundary.calls).toEqual([]);
+    expect(send).not.toHaveBeenCalled();
+  });
+  it("honors a per-business off row", async () => {
+    boundary.noticesReleased = false;
+    expect(await notifyAssignedPerson(db, staff, { workspaceId, workId, toolTitle: spec.title, spec, record }, { send: vi.fn() })).toEqual({ status: "none" });
+    expect(boundary.calls).toEqual([]);
+  });
+  it.each(["EMAIL_SENDING_ENABLED", "CUSTOMER_EMAIL_ENABLED"])("requires %s even with a tenant override on", async flag => {
+    vi.stubEnv(flag, "false");
+    boundary.emailOverride = "on";
+    boundary.responses.claim_internal_tool_submit_notice = () => ({ data: { claimed: true, noticeId, recipientEmail: "owner@example.test", tenantId: "gldf" }, error: null });
+    const send = vi.fn();
+    expect((await notifyAssignedPerson(db, staff, { workspaceId, workId, toolTitle: spec.title, spec, record }, { send })).status).toBe("suppressed");
+    expect(send).not.toHaveBeenCalled();
+    expect(boundary.calls.at(-1)!.args.p_status).toBe("suppressed");
+  });
+  it("honors reb:client-email off even when global sending is enabled", async () => {
+    boundary.emailOverride = "off";
+    boundary.responses.claim_internal_tool_submit_notice = () => ({ data: { claimed: true, noticeId, recipientEmail: "owner@example.test", tenantId: "gldf" }, error: null });
+    const send = vi.fn();
+    expect((await notifyAssignedPerson(db, staff, { workspaceId, workId, toolTitle: spec.title, spec, record }, { send })).status).toBe("suppressed");
+    expect(send).not.toHaveBeenCalled();
   });
 });
 
@@ -210,28 +278,53 @@ describe("member submit of a live tool", () => {
   const release = { version: 1, spec, publishedAt: "2026-10-07T12:00:00Z", publishedBy: "operator", provenance: "published" as const };
   beforeEach(() => {
     boundary.state = { currentReleaseVersion: 1, releases: [release], recordsRevision: 0, status: "installed" };
+    boundary.responses.submit_internal_tool_member_record = args => ({ data: {
+      record: { id: args.p_record_id, values: { ...(args.p_values as Record<string, unknown>), client: contactId, handler: personId } }, conflicts: [],
+    }, error: null });
     vi.stubEnv("EMAIL_SENDING_ENABLED", "false");
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
   });
 
-  it("resolves links, saves ids, then claims one notice", async () => {
-    boundary.responses.resolve_internal_tool_links = resolved;
-    boundary.responses.claim_internal_tool_notice = claimed;
+  it("resolves links and saves ids in one RPC, then claims one notice", async () => {
+    boundary.responses.claim_internal_tool_submit_notice = claimed;
     const result = await createApplicationService().submit(staff, workId, {
       expectedReleaseVersion: 1, expectedRecordsRevision: 0,
       record: { id: "r1", values: { business: "Brightline", client: "owner@brightline.example.test", handler: "sam@leslie.example.test" } },
     });
-    expect(boundary.calls.map((call) => call.name)).toEqual(["resolve_internal_tool_links", "submit_application_record", "claim_internal_tool_notice", "finish_internal_tool_notice"]);
-    expect(boundary.calls[1]!.args.p_values).toEqual({ business: "Brightline", client: contactId, handler: personId });
+    expect(boundary.calls.map((call) => call.name)).toEqual(["submit_internal_tool_member_record", "claim_internal_tool_submit_notice", "lease_internal_tool_notice", "finish_internal_tool_notice_delivery"]);
+    expect(boundary.calls[0]!.args).toMatchObject({ p_expected_records_revision: 0, p_expected_release_version: 1,
+      p_values: { business: "Brightline", client: "owner@brightline.example.test", handler: "sam@leslie.example.test" },
+      p_links: [{ fieldId: "client", kind: "contact", email: "owner@brightline.example.test" }, { fieldId: "handler", kind: "assigned_person", email: "sam@leslie.example.test" }],
+    });
     expect(result).toMatchObject({ linkResult: { notice: "suppressed", contactConflicts: [] } });
   });
 
   it("saves nothing when a contact cannot be resolved", async () => {
-    boundary.responses.resolve_internal_tool_links = () => ({ data: null, error: { message: "application_record_invalid" } });
+    boundary.responses.submit_internal_tool_member_record = () => ({ data: null, error: { message: "application_record_invalid" } });
     await expect(createApplicationService().submit(staff, workId, {
       expectedReleaseVersion: 1, expectedRecordsRevision: 0, record: { id: "r1", values: { business: "A", client: "not an email" } },
     })).rejects.toThrow("Check the email or phone in this record.");
-    expect(boundary.calls.map((call) => call.name)).toEqual(["resolve_internal_tool_links"]);
+    expect(boundary.calls.map((call) => call.name)).toEqual(["submit_internal_tool_member_record"]);
+  });
+
+  it.each(["application_records_revision_conflict", "application_release_conflict", "application_record_duplicate"])("does not claim a notice after %s", async error => {
+    boundary.responses.submit_internal_tool_member_record = () => ({ data: null, error: { message: error } });
+    await expect(createApplicationService().submit(staff, workId, {
+      expectedReleaseVersion: 1, expectedRecordsRevision: 0, record: { id: "r1", values: { business: "A", client: "a@client.example.test" } },
+    })).rejects.toBeInstanceOf(WorkspaceConflictError);
+    expect(boundary.calls.map(call => call.name)).toEqual(["submit_internal_tool_member_record"]);
+  });
+
+  it("passes typed contact details into the transaction and returns its conflict labels", async () => {
+    boundary.responses.submit_internal_tool_member_record = () => ({ data: { record: { id: "r1", values: { business: "A", client: contactId } }, conflicts: ["Client contact"] }, error: null });
+    boundary.responses.claim_internal_tool_submit_notice = claimed;
+    const result = await createApplicationService().submit(staff, workId, {
+      expectedReleaseVersion: 1, expectedRecordsRevision: 0,
+      record: { id: "r1", values: { business: "A", client: "a@client.example.test" } },
+      links: { client: { name: "Acme", phone: "7165550100" } },
+    });
+    expect(boundary.calls[0]!.args.p_links).toEqual([{ fieldId: "client", kind: "contact", email: "a@client.example.test", name: "Acme", phone: "7165550100" }]);
+    expect(result).toMatchObject({ linkResult: { contactConflicts: ["Client contact"] } });
   });
 
   it("refuses to use a tool with link fields while the flag is off", async () => {

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { businessJsonLd, defaultAllowedOrigins, publicFactsFromRecord, verificationProofs } from "@/products/connected-sites/contracts";
 import { connectSite, connectedSiteSystemId, normalizeSiteUrl, readPublicContext, recordBeacon, submitPublicInquiry, verifySite } from "@/products/connected-sites/server";
 import { ConnectedSiteInputError, type ConnectedSitesStore } from "@/products/connected-sites/store";
@@ -110,10 +110,15 @@ describe("connected sites on the server", () => {
 
 describe("owner notice for a connected-site inquiry", () => {
   const inquiry = { id: "77000000-0000-4000-8000-0000000000aa", name: "Pat Visitor", email: "pat@example.test", message: "A cake?" };
+  beforeEach(() => {
+    vi.stubEnv("STRELVA_CONNECTED_SITE_EMAIL_ENABLED", "1");
+    vi.stubEnv("CUSTOMER_EMAIL_ENABLED", "true");
+  });
+  afterEach(() => vi.unstubAllEnvs());
   it("goes to the one owner recipient through the one email path", async () => {
     const send = vi.fn(async () => true);
-    expect(await notifyConnectedSiteInquiry({ site, inquiry }, { paused: () => false, recipient: async () => ({ email: "owner@bakery.example", name: null, from: "record" as const, source: "owner" as const, verified: true, tenantId: null }), send })).toBe("sent");
-    expect(send).toHaveBeenCalledWith(expect.objectContaining({ audience: "client", to: "owner@bakery.example", idempotencyKey: `connected-inquiry:${inquiry.id}` }));
+    expect(await notifyConnectedSiteInquiry({ site, inquiry }, { paused: () => false, clientOverride: async () => "inherit", recipient: async () => ({ email: "owner@bakery.example", name: null, from: "record" as const, source: "owner" as const, verified: true, tenantId: "bakery" }), send })).toBe("sent");
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({ audience: "client", tenantId: "bakery", to: "owner@bakery.example", idempotencyKey: `connected-inquiry:${inquiry.id}` }));
     expect(connectedInquiryEmail(site, inquiry).subject).toBe("New inquiry from fictional-bakery.example");
   });
   it("sends nothing while client email is paused or no owner is known", async () => {

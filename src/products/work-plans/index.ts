@@ -64,3 +64,4 @@ export type {
   WorkPlanGenerator,
 } from "./server";
 export { listWorkPlanOutputs } from "@/platform/workspaces";
+export { fileFailedSystemPlanRequest } from "./failure-request";

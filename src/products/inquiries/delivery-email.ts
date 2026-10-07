@@ -18,10 +18,15 @@ export function createEmailInquiryTransport(options: { allowExternalSends?: bool
         return { status: "rejected", reason: "external_sends_disabled_in_test", retryable: false };
       }
       try {
+        if (message.tags?.strelva_booking_offer === "1") {
+          const { bookingCustomerEmailAllowed } = await import("@/platform/bookings/updates");
+          if (!await bookingCustomerEmailAllowed(message.tenantId)) return { status: "rejected", reason: "email_gates", retryable: false, outcome: "suppressed" };
+        }
         const sent = await sendEmailWithReceipt({
           audience: message.audience,
           tenantId: message.audience === "client" ? message.tenantId : undefined,
           to: message.to,
+          ...(message.tags?.strelva_booking_offer === "1" ? { fromAddress: "bookings@mail.strelva.com", fromName: message.fromName || "Strelva" } : {}),
           ...(message.replyTo ? { replyTo: message.replyTo } : {}),
           subject: message.subject,
           options: message.options,

@@ -11529,6 +11529,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      read_hosted_website_business_facts: { Args: { p_tenant_id: string }; Returns: Json };
       accept_operational_assignment: {
         Args: {
           p_assignment_id: string
@@ -16054,6 +16055,31 @@ export type Database = {
         Returns: {
           tenant_id: string
         }[]
+      }
+      reserve_website_model_call: {
+        Args: {
+          p_workspace_id: string
+          p_work_id: string
+          p_user_id: string
+          p_verified_email: string
+          p_maximum: number
+        }
+        Returns: number
+      }
+      claim_native_website_fact_review: {
+        Args: {
+          p_workspace_id: string
+          p_user_id: string
+          p_verified_email: string
+          p_tenant_id: string
+          p_record_revision: number
+          p_claim_token: string
+        }
+        Returns: boolean
+      }
+      record_native_website_fact_review: {
+        Args: { p_claim_token: string; p_status: string; p_event_id: string | null }
+        Returns: Json
       }
       resolve_billing_workspace: {
         Args: {

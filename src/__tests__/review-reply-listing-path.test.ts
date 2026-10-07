@@ -38,6 +38,7 @@ vi.mock("@/products/inquiries", () => ({
   reconcileInquiryMessageReview: vi.fn(),
 }));
 vi.mock("@/products/inquiries/server", () => ({ executeInquiryPublication: vi.fn() }));
+vi.mock("@/products/publishing/server", () => ({ executePublishingEvent: async () => null }));
 vi.mock("../lib/suggestions", () => ({ updateSuggestion: vi.fn() }));
 vi.mock("../lib/agent-executor", () => ({ executeAgentPrompt: vi.fn() }));
 vi.mock("../lib/storage", () => ({
@@ -124,7 +125,7 @@ describe("review reply approve on the listing System", () => {
     expect(receipts.all()[0]).toMatchObject({
       workspaceId: WORKSPACE, bindingId: "binding-1", action: "reply_post", status: "posted", readback: "matched",
       authority: { kind: "owner_approval", actor: "owner-user-1", approvalRef: "event:evt_rr" },
-      idempotencyKey: "review-reply:evt_rr:attempt_1",
+      idempotencyKey: "review-reply:evt_rr",
     });
     expect(mockPublishReviewReply).not.toHaveBeenCalled();
     expect(mockRecordOutsideWrite).not.toHaveBeenCalled();

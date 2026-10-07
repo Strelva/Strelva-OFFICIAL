@@ -22,6 +22,8 @@ import { auditRebuildHtml } from "./rebuild-audit";
 import { renderSiteDocumentHtml } from "./site-export";
 import { ROOT_DOMAIN } from "@/platform/infra/brand";
 import { normalizeCustomDomain } from "@/lib/domains";
+import { bindWebsiteBusinessRecord, projectWebsiteBusinessFacts } from "./business-facts";
+import { readCandidateBusinessFacts } from "./business-facts-server";
 
 interface Loaded { work: SavedWork; rebuild: WebsiteRebuild }
 /** One part of a cutover onto an existing site, reported on its own. */
@@ -29,7 +31,7 @@ export interface WebsiteCutoverItem { id: "document_published" | "read_back" | "
 interface ServiceDependencies {
   documents?: WebsiteDocumentStore;
   pipeline?: typeof runWebsiteRebuild;
-  pipelineOptions?: RebuildOptions;
+  pipelineOptions?: RebuildOptions | ((actor: WorkspaceActor, workspaceId: string) => Promise<RebuildOptions>);
   list?: typeof listWork;
   rateLimited?: (workspaceId: string) => Promise<boolean>;
   createHostedTenant?: (actor: WorkspaceActor, record: WebsiteRebuildRecord) => Promise<string>;
@@ -97,6 +99,8 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     return loadWork(await store.update(actor, loaded.work, loaded.rebuild.revision, payload));
   }
   async function saveCandidate(actor: WorkspaceActor, loaded: Loaded, document: SiteDocument, kind: string, forceNewRevision = false) {
+    const businessFacts = await readCandidateBusinessFacts(actor,loaded.work.workspaceId);
+    document = projectWebsiteBusinessFacts(bindWebsiteBusinessRecord(document,businessFacts),businessFacts);
     await store.member(actor,loaded.work.workspaceId);
     const latest = await documents.read(actor,{ workspaceId: loaded.work.workspaceId, workId: loaded.work.id });
     const contentHash = siteDocumentHash(document);
@@ -113,16 +117,21 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     let current = await update(actor,loaded,"rebuild_started",{ status: "building", lastError: null, approvedCandidateRevision: null });
     const { requestId: _requestId, ...input } = current.rebuild.input;
     try {
+      const pipelineOptions = typeof dependencies.pipelineOptions === "function"
+        ? await dependencies.pipelineOptions(actor, current.work.workspaceId)
+        : dependencies.pipelineOptions ?? await (await import("./rebuild-runtime")).configuredWebsiteRebuildOptions({
+          actor, workspaceId: current.work.workspaceId, workId: current.work.id, recheck: () => store.member(actor, current.work.workspaceId).then(() => undefined),
+        });
       const checkpoint = current.rebuild.checkpoint as RebuildCheckpoint | null;
       const result = await pipeline(input as WebsiteRebuildInput, {
-        ...dependencies.pipelineOptions,
+        ...pipelineOptions,
         ...(checkpoint ? { checkpoint } : {}),
         onSourcePage: async page => {
           await documents.retainCrawlPage(actor,{ workspaceId: current.work.workspaceId, workId: current.work.id, page });
           if (!current.rebuild.sourceAudit) current = await update(actor,current,"source_audit_saved",{ sourceAudit: auditRebuildHtml(page.html,page.url) });
-          await dependencies.pipelineOptions?.onSourcePage?.(page);
+          await pipelineOptions.onSourcePage?.(page);
         },
-        rehostAssets: dependencies.pipelineOptions?.rehostAssets ?? (process.env.BLOB_READ_WRITE_TOKEN ? async assets => {
+        rehostAssets: pipelineOptions.rehostAssets ?? (process.env.BLOB_READ_WRITE_TOKEN ? async assets => {
           const facts = (current.rebuild.checkpoint as RebuildCheckpoint | null)?.facts;
           const stem = (facts?.name ?? current.rebuild.title).toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,40) || "business";
           return rehostWebsiteAssets(`${stem}-${current.work.id.replace(/-/g,"").slice(0,12)}`,assets);
@@ -142,7 +151,7 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
       current = await saveCandidate(actor,current,result.document,"rebuild_ready");
       // Documents own durable facts. Drop large model/crawl duplicates after
       // success while retaining the stage log and source provenance.
-      current = await update(actor,current,"rebuild_finished",{ checkpoint: null, pageMapping: result.pageMapping });
+      current = await update(actor,current,"rebuild_finished",{ checkpoint: null, pageMapping: result.pageMapping, skippedPaths: result.crawl?.skipped.slice(0, 200) ?? [] });
       return present(current);
     } catch (error) {
       // A lost CAS or revoked access must never overwrite a newer actor's work.
@@ -256,6 +265,11 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     await documents.approve(actor,{ workspaceId: loaded.work.workspaceId, workId, revision: candidate.revision, contentHash: candidate.contentHash });
     return present(await update(actor,loaded,"rebuild_approved",{ status: "approved", approvedCandidateRevision: candidate.revision, lastError: null }));
   }
+  async function assertCurrentCapabilities(actor: WorkspaceActor, loaded: Loaded) {
+    if (!loaded.rebuild.publishedCapabilitySelection) return;
+    const projection = await (dependencies.resolveCapabilities ?? resolvePublishedWebsiteCapabilities)(actor,loaded.work.workspaceId,loaded.work.id,loaded.rebuild.publishedCapabilitySelection);
+    if (!projection || JSON.stringify(projection) !== JSON.stringify(loaded.rebuild.candidate!.document.capabilities)) throw new WorkspaceConflictError("The visitor form or booking connection changed. Reconnect it and approve the new preview before publishing.");
+  }
   async function launch(actor: WorkspaceActor, workId: string, raw: unknown) {
     let loaded = await load(actor,workId); const { candidate } = exact(loaded,raw);
     if (loaded.rebuild.launch.receipt?.status === "published" && loaded.rebuild.launch.receipt.artifactHash === candidate.contentHash && loaded.rebuild.launch.receipt.candidateRevision === candidate.revision) return present(loaded.rebuild.status === "published" ? loaded : await update(actor,loaded,"publish_reconciled",{ status:"published" }));
@@ -265,10 +279,7 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
       if (published?.workId === workId && published.revision === candidate.revision && published.contentHash === candidate.contentHash && published.receipt) return present(await update(actor,loaded,"publish_reconciled",{ status: "published", launch: { receipt: published.receipt, readBack: { status: "pending", checkedAt: now(), message: "Publication is committed; the public read-back has not been confirmed yet." } } }));
     }
     if (loaded.rebuild.status !== "approved" || loaded.rebuild.approvedCandidateRevision !== candidate.revision) throw new WorkspaceConflictError("Approve the exact current preview before launching.");
-    if (loaded.rebuild.publishedCapabilitySelection) {
-      const projection = await (dependencies.resolveCapabilities ?? resolvePublishedWebsiteCapabilities)(actor,loaded.work.workspaceId,workId,loaded.rebuild.publishedCapabilitySelection);
-      if (!projection || JSON.stringify(projection) !== JSON.stringify(candidate.document.capabilities)) throw new WorkspaceConflictError("The visitor form or booking connection changed. Reconnect it and approve the new preview before publishing.");
-    }
+    await assertCurrentCapabilities(actor,loaded);
     // Never re-approve as the launcher: that would replace the customer's
     // approval with the operator's (audit 2026-10-05, finding 6). Reserve and
     // publish each check launch authority and the exact approved revision
@@ -307,18 +318,24 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     if (loaded.rebuild.approvedCandidateRevision !== candidate.revision) throw new WorkspaceConflictError("Approve the exact current preview before publishing it onto your site.");
     const providerUrl = `https://${input.tenantId}.${ROOT_DOMAIN}/`;
     const receipt: WebsiteLaunchReceipt = websiteLaunchReceiptSchema.parse({ status: "published", provider: "strelva-hosted", providerUrl, receiptId: `hosted-${createHash("sha256").update(`${workId}:${input.tenantId}:${candidate.revision}:${candidate.contentHash}`).digest("hex").slice(0,32)}`, artifactHash: candidate.contentHash, candidateRevision: candidate.revision, publishedAt: now(), evidence: "The approved immutable site document is the linked tenant's published revision." });
-    const row = await documents.publishToLinkedTenant(actor,{ workspaceId: loaded.work.workspaceId, workId, revision: candidate.revision, contentHash: candidate.contentHash, tenantId: input.tenantId, receipt });
+    const prior = await documents.published(input.tenantId);
+    const replay = prior?.workId === workId && prior.revision === candidate.revision && prior.contentHash === candidate.contentHash && prior.receipt;
+    // Recheck new publication authority, but never turn an accepted replay
+    // into another publish because a visitor connection was later revoked.
+    if (!replay) await assertCurrentCapabilities(actor,loaded);
+    const linked = replay && documents.linkedPublications ? (await documents.linkedPublications(actor,{ workspaceId: loaded.work.workspaceId, workId })).find(item => item.revision === candidate.revision && item.contentHash === candidate.contentHash) : undefined;
+    const row = replay && linked ? { ...prior, priorDeliveryModel: linked.priorDeliveryModel, fallbackUntil: linked.fallbackUntil } : await documents.publishToLinkedTenant(actor,{ workspaceId: loaded.work.workspaceId, workId, revision: candidate.revision, contentHash: candidate.contentHash, tenantId: input.tenantId, receipt });
     const committedReceipt = row.receipt ?? receipt;
     const tenantId = row.tenantId ?? input.tenantId;
     // The publication is committed. Nothing after this point can make it retryable.
-    loaded = await update(actor,loaded,"published_onto_linked_site",{ status: "published", tenantId, launch: { receipt: committedReceipt, readBack: { status: "pending", checkedAt: now(), message: "Published; checking the public site." } } });
+    if (!replay || loaded.rebuild.status !== "published" || loaded.rebuild.launch.receipt?.receiptId !== committedReceipt.receiptId) loaded = await update(actor,loaded,"published_onto_linked_site",{ status: "published", tenantId, launch: { receipt: committedReceipt, readBack: { status: "pending", checkedAt: now(), message: "Published; checking the public site." } } });
     try { await invalidatePublishedSiteDocument(tenantId); await (dependencies.revalidate ?? (async () => { revalidatePath("/","layout"); }))(); } catch { /* Cache and read-back are separate from the publication. */ }
     const readUrl = committedReceipt.providerUrl;
-    let readBack: WebsiteRebuild["launch"]["readBack"];
-    try {
+    let readBack: WebsiteRebuild["launch"]["readBack"] = loaded.rebuild.launch.readBack;
+    if (!replay) try {
       readBack = dependencies.checkLive ? await dependencies.checkLive(row,readUrl) : await (async () => { const result = await checkWebsiteHealth({ workspaceId: row.workspaceId, workId, tenantId, revision: row.revision, contentHash: row.contentHash, url: readUrl }); return { status: result.status === "healthy" ? "verified" as const : "failed" as const, checkedAt: result.checkedAt, message: result.status === "healthy" ? "The public site matches the published document." : "Published, but we couldn't confirm the public document yet." }; })();
     } catch { readBack = { status: "failed", checkedAt: now(), message: "Published, but we couldn't confirm the public document yet." }; }
-    loaded = await update(actor,loaded,"hosted_read_back",{ launch: { receipt: committedReceipt, readBack } });
+    if (!replay) loaded = await update(actor,loaded,"hosted_read_back",{ launch: { receipt: committedReceipt, readBack } });
     const redirects = candidate.document.redirects.length;
     const cutover: WebsiteCutoverItem[] = [
       { id: "document_published", status: "done", label: `Published revision ${row.revision} at ${tenantId}.${ROOT_DOMAIN}.` },
@@ -333,7 +350,11 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     const input = rebuildSelectionSchema.extend({ ops: z.unknown(), forceReview: z.boolean().optional() }).strict().parse(raw);
     const loaded = await load(actor,workId); const { candidate } = exact(loaded,{ expectedRevision: input.expectedRevision, candidateRevision: input.candidateRevision, candidateContentHash: input.candidateContentHash });
     await store.member(actor,loaded.work.workspaceId);
-    const prepared = await prepareSitePatch({ document: candidate.document, ops: input.ops, forceReview: input.forceReview });
+    const modelOptions = await (await import("./rebuild-runtime")).configuredWebsitePatchOptions({
+      actor, workspaceId: loaded.work.workspaceId, workId, document: candidate.document, ops: input.ops,
+      recheck: () => store.member(actor,loaded.work.workspaceId).then(() => undefined),
+    });
+    const prepared = await prepareSitePatch({ document: candidate.document, ops: input.ops, forceReview: input.forceReview, ...modelOptions });
     if (prepared.governance.action === "block") throw new WorkspaceConflictError(prepared.governance.reason);
     return present(await saveCandidate(actor,loaded,prepared.document,"site_patched"));
   }
@@ -418,3 +439,6 @@ export const websiteRebuildDomain = websiteRebuildService.domain;
 export const initializeRebuildHandoff = websiteRebuildService.initializeHandoff;
 export const connectWebsiteRebuildCapabilities = websiteRebuildService.connectCapabilities;
 export const listWebsiteRebuildCapabilityOptions = websiteRebuildService.capabilityOptions;
+
+export { readPublishedWebsiteContent } from "./site-health";
+export const approveWebsiteDomainRequest: typeof import("./domain-requests").websiteDomainRequestService.approve = (...args) => import("./domain-requests").then(module => module.websiteDomainRequestService.approve(...args));

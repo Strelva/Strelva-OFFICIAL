@@ -42,7 +42,10 @@ export function siteDocumentJsonLd(document: SiteDocument, origin: string, indus
   const phone = location?.phone ?? contacts.find(fact => /\+?[\d()\s-]{7,}/.test(fact.text))?.text.match(/\+?[\d()\s-]{7,}/)?.[0]?.trim();
   const email = contacts.find(fact => /[^\s@]+@[^\s@]+\.[^\s@]+/.test(fact.text))?.text.match(/[^\s@]+@[^\s@]+\.[^\s@]+/)?.[0];
   const logo = document.theme.logo ? document.assets[document.theme.logo] : undefined;
+  const bookingPage = process.env.STRELVA_BOOKING_AGENTS === "1" && document.capabilities?.booking
+    ? document.pages.find(page => { const seen = new Set<string>(); const hasBooking = (id: string): boolean => { if (seen.has(id)) return false; seen.add(id); const node = document.nodes[id]; return !!node && (node.type === "Booking" || node.children.some(hasBooking)); }; return hasBooking(page.root); }) : undefined;
   return { "@context": "https://schema.org", "@type": schemaType, name: document.siteName, url: origin, subjectOf: { "@type": "WebSite", "@id": `${origin}/#website`, name: document.siteName, url: origin }, description: document.pages.find(page => page.path === "/")?.description,
+    ...(bookingPage ? { potentialAction: { "@type": "ReserveAction", target: new URL(bookingPage.path, origin).toString() } } : {}),
     ...(phone ? { telephone: phone } : {}), ...(email ? { email } : {}), ...(location?.address ? { address: { "@type": "PostalAddress", streetAddress: location.address } } : {}),
     ...(logo ? { logo: new URL(logo.url, origin).toString() } : {}),
     ...(review?.type === "ReviewSummary" && review.props.rating !== undefined && review.props.count !== undefined && review.props.count > 0 && reviewFacts.length > 0 && reviewFacts.every(fact => fact && (fact.origin === "owner_confirmed" || fact.verification?.supported)) ? { aggregateRating: { "@type": "AggregateRating", ratingValue: review.props.rating, reviewCount: review.props.count } } : {}),

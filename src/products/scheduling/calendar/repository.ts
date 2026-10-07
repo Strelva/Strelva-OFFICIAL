@@ -13,7 +13,7 @@ import {
   type CalendarProvider,
   type CalendarReminderPolicy,
 } from "./contracts";
-import { refreshCalendarOAuthToken } from "./oauth";
+import { revokeCalendarOAuthToken, refreshCalendarOAuthToken } from "./oauth";
 
 type DbRow = Record<string, unknown>;
 type CalendarConnectionWithSecrets = CalendarConnection & { accessToken?: string; refreshToken?: string };
@@ -336,6 +336,10 @@ export async function configureWorkspaceCalendarConnection(actor: WorkspaceActor
 
 export async function revokeWorkspaceCalendarConnection(actor: WorkspaceActor, workspaceId: string, provider: CalendarProvider): Promise<boolean> {
   await assertWorkspaceCalendarManager(actor, workspaceId);
+  if (process.env.STRELVA_BOOKING_CALENDAR_REVOKE === "1") {
+    const connection = await getWorkspaceCalendarConnection(actor, workspaceId, provider);
+    if (connection) await revokeCalendarOAuthToken(provider, connection.refreshToken || connection.accessToken || "");
+  }
   const { data, error } = await db().rpc("revoke_workspace_calendar_connection", {
     p_workspace_id: workspaceId,
     p_user_id: actor.userId,
@@ -345,8 +349,15 @@ export async function revokeWorkspaceCalendarConnection(actor: WorkspaceActor, w
   return data === true;
 }
 
-export async function markWorkspaceCalendarConnectionError(actor: WorkspaceActor, workspaceId: string, provider: CalendarProvider, message: string): Promise<void> {
+export async function markWorkspaceCalendarConnectionError(actor: WorkspaceActor, workspaceId: string, provider: CalendarProvider, message: string, expectedUpdatedAt?: string): Promise<void> {
   await assertWorkspaceCalendarManager(actor, workspaceId);
+  if (expectedUpdatedAt) {
+    const { error } = await db().from("workspace_calendar_connections").update({
+      status: "error", last_error: message.slice(0, 1000), updated_at: new Date().toISOString(),
+    }).eq("workspace_id", workspaceId).eq("provider", provider).eq("updated_at", expectedUpdatedAt);
+    if (error) failure(error, "Calendar connection status could not be saved.");
+    return;
+  }
   const { error } = await db().rpc("mark_workspace_calendar_connection_error", {
     p_workspace_id: workspaceId,
     p_user_id: actor.userId,

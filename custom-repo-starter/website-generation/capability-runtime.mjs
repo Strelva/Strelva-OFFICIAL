@@ -26,7 +26,11 @@ async function jsonResponse(response, fallback) {
   try { body = await response.json(); } catch { /* use the stable fallback */ }
   if (!response.ok) {
     const error = record(body);
-    throw new Error(typeof error?.error === "string" ? error.error : fallback);
+    const failure = new Error(typeof error?.error === "string" ? error.error : fallback);
+    if (response.status === 409 && Array.isArray(error?.nextSlots) && error.nextSlots.length <= 3 && error.nextSlots.every(slot => record(slot) && TOKEN.test(text(slot.id)) && ISO.test(text(slot.start)) && ISO.test(text(slot.end)) && Date.parse(slot.end) > Date.parse(slot.start)) && text(error.timeZone)) {
+      try { new Intl.DateTimeFormat(undefined, { timeZone: error.timeZone }); failure.nextSlots = error.nextSlots.map(({ id, start, end }) => ({ id, start, end })); failure.timeZone = error.timeZone; } catch { /* malformed guidance never widens the offer */ }
+    }
+    throw failure;
   }
   if (!record(body)) throw new Error(fallback);
   return body;
@@ -53,6 +57,8 @@ function bookingSchedule(value, expected) {
   if (!item || item.schemaVersion !== 1 || item.capabilityId !== expected.capabilityId || item.version !== expected.version || !text(item.name) ||
     !["outlook", "google"].includes(item.provider) || !text(item.timeZone) || !Array.isArray(item.slots) || item.slots.length > 500) return null;
   if (!item.slots.every(slot => record(slot) && TOKEN.test(text(slot.id)) && ISO.test(text(slot.start)) && ISO.test(text(slot.end)) && Date.parse(slot.end) > Date.parse(slot.start))) return null;
+  if (item.bookingAuthority !== undefined && item.bookingAuthority !== "business") return null;
+  if (item.intake !== undefined && (!Array.isArray(item.intake) || item.intake.length>8 || !item.intake.every(q=>record(q) && /^[A-Za-z0-9_-]{1,80}$/.test(text(q.id)) && text(q.label).length>0 && text(q.label).length<=200 && ["text","textarea"].includes(q.type) && typeof q.required==="boolean") || new Set(item.intake.map(q=>q.id)).size!==item.intake.length)) return null;
   return item;
 }
 
@@ -71,7 +77,7 @@ function visitor(value) {
   const email = text(item?.email).trim().toLowerCase().slice(0, 320);
   if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter your name and a valid email address.");
   const message = text(item?.message).trim().slice(0, 2_000);
-  return { name, email, ...(message ? { message } : {}) };
+  return { name, email, ...(text(item?.phone).trim() ? { phone: text(item.phone).trim().slice(0,80) } : {}), ...(message ? { message } : {}), ...(record(item?.intakeAnswers) ? {intakeAnswers:Object.fromEntries(Object.entries(item.intakeAnswers).sort(([a],[b])=>a.localeCompare(b)).map(([id,value])=>[id,text(value).slice(0,2000)]))} : {}) };
 }
 
 function requestId() {
@@ -145,6 +151,7 @@ export function createCapabilityApi(fetcher = globalThis.fetch) {
       });
       const value = await jsonResponse(response, response.status === 409 ? "This form changed. Reload it before sending your request." : "Your request was not confirmed. Please try again.");
       if (value.ok !== true) throw new Error("Your request was not confirmed. Please try again.");
+      return value.bookingOffer;
     },
     async loadBooking(config, signal) {
       const expected = config.booking;
@@ -224,7 +231,21 @@ function mountInquiry(root, config, api) {
     form.addEventListener("submit", event => {
       event.preventDefault(); submit.disabled = true; result.textContent = "";
       const values = Object.fromEntries(fields.map(field => [field.name, String(field.value).trim()]));
-      void api.submitInquiry(config, definition, values).then(() => { form.reset(); result.textContent = "Your request has been received."; }, error => { result.textContent = error instanceof Error ? error.message : "Your request was not confirmed. Please try again."; }).finally(() => { submit.disabled = false; });
+      void api.submitInquiry(config, definition, values).then(offer => {
+        form.reset(); result.textContent = "Your request has been received.";
+        if (record(offer) && text(offer.url) && Array.isArray(offer.slots) && offer.slots.length <= 3) {
+          let url; try { url = new URL(offer.url); } catch { return; }
+          if (url.protocol !== "https:" && !(url.protocol === "http:" && url.hostname === "localhost")) return;
+          const choices = element("div");
+          choices.append(element("p", "You can also request a time. The business will confirm it."));
+          for (const slot of offer.slots) {
+            if (!record(slot) || !Number.isFinite(Date.parse(slot.start))) continue;
+            let label; try { label = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: offer.timeZone }).format(new Date(slot.start)); } catch { label = slot.start; }
+            choices.append(element("p", `${text(offer.serviceName)} · ${label}`));
+          }
+          choices.append(element("a", "Choose a time to request", { href: url.toString() })); result.after(choices);
+        }
+      }, error => { result.textContent = error instanceof Error ? error.message : "Your request was not confirmed. Please try again."; }).finally(() => { submit.disabled = false; });
     });
     root.replaceChildren(form);
   }, error => status(root, error instanceof Error ? error.message : "This inquiry form is unavailable."));
@@ -244,20 +265,39 @@ function mountBooking(root, config, api) {
       return;
     }
     let currentSchedule = schedule;
+    const native = schedule.bookingAuthority === "business";
+    const visitorTimeZone = native ? new Intl.DateTimeFormat().resolvedOptions().timeZone : schedule.timeZone;
     const wrapper = element("section", undefined, { "aria-label": schedule.name });
-    wrapper.append(element("h2", schedule.name), element("p", `Choose a time. ${schedule.provider === "outlook" ? "Outlook" : "Google Calendar"} will confirm the reservation.`));
+    wrapper.append(element("h2", schedule.name), element("p", native ? "Choose a time. The business confirms your booking; a connected calendar receives a copy." : `Choose a time. ${schedule.provider === "outlook" ? "Outlook" : "Google Calendar"} will confirm the reservation.`));
+    if (native) wrapper.append(element("p", `Times shown in ${visitorTimeZone}.`));
     const form = element("form", undefined, { "aria-label": "Reserve a time" });
     const slotSelect = element("select", undefined, { id: "strelva-booking-slot", name: "slot" });
     const renderSlots = () => {
       const selected = slotSelect.value;
-      slotSelect.replaceChildren(...currentSchedule.slots.map(slot => element("option", slotLabel(slot, currentSchedule.timeZone), { value: slot.id })));
+      slotSelect.replaceChildren(...currentSchedule.slots.map(slot => element("option", slotLabel(slot, native ? visitorTimeZone : currentSchedule.timeZone), { value: slot.id })));
       if (currentSchedule.slots.some(slot => slot.id === selected)) slotSelect.value = selected;
     };
     renderSlots();
+    const showConflict = error => {
+      if (!Array.isArray(error?.nextSlots)) return;
+      currentSchedule = { ...currentSchedule, timeZone: error.timeZone, slots: error.nextSlots };
+      renderSlots();
+      reserve.disabled = !currentSchedule.slots.length;
+      result.textContent += currentSchedule.slots.length ? " The next available times are shown above. Choose a time and try again." : " No alternative times are available right now. Contact the business directly.";
+    };
     const name = element("input", undefined, { id: "strelva-booking-name", name: "name", required: "true", maxlength: "160" });
     const email = element("input", undefined, { id: "strelva-booking-email", name: "email", type: "email", required: "true", maxlength: "320" });
     const message = element("textarea", undefined, { id: "strelva-booking-message", name: "message", maxlength: "2000" });
     form.append(element("label", "Available time", { for: "strelva-booking-slot" }), slotSelect, element("label", "Name", { for: "strelva-booking-name" }), name, element("label", "Email", { for: "strelva-booking-email" }), email, element("label", "Note (optional)", { for: "strelva-booking-message" }), message);
+    const phone = native ? element("input", undefined, { id: "strelva-booking-phone", name: "phone", type: "tel", maxlength: "80" }) : null;
+    if (phone) form.append(element("label", "Phone (optional)", { for: "strelva-booking-phone" }), phone);
+    const intakeInputs = new Map();
+    for (const question of schedule.intake ?? []) {
+      const id=`strelva-booking-intake-${question.id}`;
+      const input=element(question.type === "textarea" ? "textarea" : "input",undefined,{id,maxlength:"2000",...(question.required ? {required:"true"} : {})});
+      form.append(element("label",question.label+(question.required ? "" : " (optional)"),{for:id}),input);
+      intakeInputs.set(question.id,input);
+    }
     const reserve = element("button", "Reserve time", { type: "submit" }); form.append(reserve);
     const result = element("p", undefined, { role: "status" }); form.append(result); wrapper.append(form);
     const receiptRoot = element("section", undefined, { "aria-label": "Booking receipt" }); wrapper.append(receiptRoot);
@@ -265,16 +305,16 @@ function mountBooking(root, config, api) {
     const updateReceipt = () => {
       receiptRoot.replaceChildren();
       if (!receipt) return;
-      receiptRoot.append(element("h3", receipt.title), element("p", slotLabel(receipt, receipt.timeZone)), element("p", receipt.status === "confirmed" ? `${currentSchedule.provider === "outlook" ? "Outlook" : "Google Calendar"} confirmed this reservation.` : receipt.status === "cancelled" ? "This reservation is cancelled." : "We could not confirm this reservation yet. Check the calendar before trying again.", { role: "status" }));
+      receiptRoot.append(element("h3", receipt.title), element("p", slotLabel(receipt, native ? visitorTimeZone : receipt.timeZone)), element("p", receipt.status === "confirmed" ? native ? "The business confirmed this booking." : `${currentSchedule.provider === "outlook" ? "Outlook" : "Google Calendar"} confirmed this reservation.` : receipt.status === "cancelled" ? "This reservation is cancelled." : native ? "Your request is waiting for the business to confirm. This time is not confirmed yet." : "We could not confirm this reservation yet. Check the calendar before trying again.", { role: "status" }));
       if (receipt.status === "cancelled") return;
       if (receipt.status === "pending") {
-        const check = element("button", "Check booking status", { type: "button" });
+        const check = element("button", native ? "Check request status" : "Check booking status", { type: "button" });
         check.addEventListener("click", () => {
           check.disabled = true;
           void api.readbackBooking(config, receipt).then(next => {
             receipt = next;
             updateReceipt();
-            result.textContent = next.status === "confirmed" ? "The reservation is confirmed." : next.status === "cancelled" ? "The reservation is cancelled." : "The reservation is still awaiting confirmation. Check the calendar before trying again.";
+            result.textContent = next.status === "confirmed" ? "The reservation is confirmed." : next.status === "cancelled" ? "The reservation is cancelled." : native ? "The business has not confirmed your request yet." : "The reservation is still awaiting confirmation. Check the calendar before trying again.";
           }, error => {
             result.textContent = error instanceof Error ? error.message : "The booking status could not be checked. Please try again.";
             check.disabled = false;
@@ -284,12 +324,12 @@ function mountBooking(root, config, api) {
         return;
       }
       const change = element("button", "Change time", { type: "button" });
-      change.addEventListener("click", () => { change.disabled = true; void api.changeBooking(config, receipt, currentSchedule.slots.find(slot => slot.id === slotSelect.value)).then(next => { receipt = next; updateReceipt(); }, error => { result.textContent = error instanceof Error ? error.message : "Your booking was not changed. Please try again."; }).finally(() => { change.disabled = false; }); });
+      change.addEventListener("click", () => { change.disabled = true; void api.changeBooking(config, receipt, currentSchedule.slots.find(slot => slot.id === slotSelect.value)).then(next => { receipt = next; updateReceipt(); }, error => { result.textContent = error instanceof Error ? error.message : "Your booking was not changed. Please try again."; showConflict(error); }).finally(() => { change.disabled = !currentSchedule.slots.length; }); });
       const cancel = element("button", "Cancel reservation", { type: "button" });
       cancel.addEventListener("click", () => { cancel.disabled = true; void api.cancelBooking(config, receipt).then(next => { receipt = next; updateReceipt(); }, error => { result.textContent = error instanceof Error ? error.message : "Your booking was not cancelled. Please try again."; }).finally(() => { cancel.disabled = false; }); });
       receiptRoot.append(change, cancel);
     };
-    form.addEventListener("submit", event => { event.preventDefault(); reserve.disabled = true; result.textContent = ""; void api.reserveBooking(config, currentSchedule, currentSchedule.slots.find(slot => slot.id === slotSelect.value), { name: name.value, email: email.value, message: message.value }).then(next => { receipt = next; updateReceipt(); result.textContent = next.status === "confirmed" ? "Your time is reserved." : "Your request was received for confirmation."; form.reset(); }, error => { result.textContent = error instanceof Error ? error.message : "Your booking was not confirmed. Please try again."; }).finally(() => { reserve.disabled = false; }); });
+    form.addEventListener("submit", event => { event.preventDefault(); reserve.disabled = true; for(const input of intakeInputs.values()) input.disabled=true; result.textContent = ""; void api.reserveBooking(config, currentSchedule, currentSchedule.slots.find(slot => slot.id === slotSelect.value), { name: name.value, email: email.value, message: message.value, ...(phone?.value.trim() ? { phone: phone.value.trim() } : {}), ...(schedule.intake ? {intakeAnswers:Object.fromEntries([...intakeInputs].map(([id,input])=>[id,input.value]))} : {}) }).then(next => { receipt = next; updateReceipt(); result.textContent = next.status === "confirmed" ? "Your time is reserved." : "Your request was received for confirmation."; form.reset(); }, error => { result.textContent = error instanceof Error ? error.message : "Your booking was not confirmed. Please try again."; showConflict(error); }).finally(() => { reserve.disabled = !currentSchedule.slots.length; for(const input of intakeInputs.values()) input.disabled=false; }); });
     root.replaceChildren(wrapper);
   }, error => status(root, error instanceof Error ? error.message : "Booking availability is unavailable."));
 }

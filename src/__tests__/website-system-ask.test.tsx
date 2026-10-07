@@ -62,11 +62,12 @@ describe("Ask for a change on a managed website files a Request", () => {
     expect(request.mock.calls.filter(([url]) => String(url).startsWith("/api/workspace/systems/website")).length).toBe(2);
   });
 
-  it("the Requests panel's own link opens the same form", async () => {
+  it("an empty Requests panel is hidden and the header opens the same form", async () => {
     const { node, onAsk } = await mount(server(() => new Response("{}", { status: 500 })) as unknown as typeof fetch, managed);
     const links = buttons(node, "Ask for a change");
-    expect(links.length).toBe(2);
-    await act(async () => links[1]!.click());
+    expect(links.length).toBe(1);
+    expect(node.querySelector("ul[aria-label='Requests']")).toBeNull();
+    await act(async () => links[0]!.click());
     expect(node.querySelector("textarea")).not.toBeNull();
     expect(onAsk).not.toHaveBeenCalled();
   });

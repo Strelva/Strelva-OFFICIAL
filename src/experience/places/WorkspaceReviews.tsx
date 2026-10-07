@@ -28,7 +28,7 @@ function draftLine(review: ReviewView, mode: SiteReviews["replyMode"]): string {
   return "Strelva drafted this reply. It waits for your okay here or in Needs you.";
 }
 
-function ReviewCard({ workspaceId, site, review }: { workspaceId: string; site: SiteReviews; review: ReviewView }) {
+function ReviewCard({ workspaceId, site, review, publishing }: { workspaceId: string; site: SiteReviews; review: ReviewView; publishing: boolean }) {
   const postsToGoogle = review.source === "google" && site.googleConnected;
   return (
     <Card padding="md">
@@ -44,6 +44,7 @@ function ReviewCard({ workspaceId, site, review }: { workspaceId: string; site: 
           <div className="mt-4 rounded-lg border border-gray-border p-3">
             <p className="text-xs font-medium text-gray-muted">Your reply{review.repliedAt ? ` · ${whenLabel(review.repliedAt)}` : ""}</p>
             <p className="mt-1 whitespace-pre-line text-sm leading-6">{review.reply}</p>
+            {publishing && review.source === "google" && review.externalId ? <a className="mt-2 inline-block text-sm underline" href={`/workspace/google?${new URLSearchParams({ workspaceId, reviewId: review.externalId, replyText: review.reply })}`}>Edit or withdraw on Google</a> : null}
           </div>
         ) : (
           <>
@@ -69,7 +70,7 @@ function ReviewLink({ placeId }: { placeId: string | null }) {
   );
 }
 
-export function WorkspaceReviewsView({ workspaceId, state }: { workspaceId: string; state: PlaceState<WorkspaceReviews> }) {
+export function WorkspaceReviewsView({ workspaceId, state, publishing = false }: { workspaceId: string; state: PlaceState<WorkspaceReviews>; publishing?: boolean }) {
   const data = state.kind === "ready" ? state.data : null;
   return (
     <WorkspacePlace workspaceId={workspaceId} eyebrow="Google listing" title="Reviews"
@@ -97,7 +98,7 @@ export function WorkspaceReviewsView({ workspaceId, state }: { workspaceId: stri
                     <p className="mt-2 text-sm leading-6 text-gray-muted">{site.googleConnected ? "New Google reviews show up here within a day, each with a drafted reply." : "Once your Google listing is connected, reviews show up here with a drafted reply. Ask Strelva to connect it."}</p>
                   </Card>
                 ) : (
-                  <div className="grid gap-3">{site.reviews.map((review) => <ReviewCard key={review.id} workspaceId={workspaceId} site={site} review={review} />)}</div>
+                  <div className="grid gap-3">{site.reviews.map((review) => <ReviewCard publishing={publishing} key={review.id} workspaceId={workspaceId} site={site} review={review} />)}</div>
                 )}
               </>
             )}

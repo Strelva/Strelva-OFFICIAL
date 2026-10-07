@@ -126,11 +126,44 @@ the owning implementation and the affected rendered behavior has been checked.
 | URL rebuild, factual review and hosted website operation | [RebuildExperience](../../src/experience/websites/RebuildExperience.tsx) composes existing [Button](../../src/components/ui/Button.tsx) and [fields](../../src/components/ui/TextInput.tsx), with product schema validation in [rebuild transport](../../src/experience/websites/rebuild-transport.ts). It provides URL/description intake, persisted progress, source-backed fact decisions, a sandboxed hash-checked private iframe, exact candidate approval, launch verification, domain records, measured HTML before/after comparisons, document-revision restore and exact-revision export. The existing visitor-form selector is shared with v1. [Operator entry](../../src/experience/websites/OperatorRebuildEntry.tsx) preserves workspace/work selection in the URL. [Monthly report](../../src/experience/websites/WebsiteRebuildReport.tsx) shows recorded counts or explicit unavailable measurements, and separates saved assistant citation results from website readiness checks; [agency sharing](../../src/experience/websites/WebsiteRebuildSharing.tsx) prepares recipient-bound links without sending messages. Managed customers review results; operators handle creation and domain work. | October 1, 2026: `website-rebuild-experience.test.tsx` and the existing v1 experience/connection tests pass 20/20; `pnpm typecheck` passes locally. Native collaborative browser inspected desktop 1280px and mobile 390px, including confirm/edit/approve, read-only and failed mutation preservation. After the native browser host disconnected, local headless Chromium checked 320px reflow (document scroll width 320px), remove/approve/publish, read-back-failure copy and loading. Publication and pending/verified/error domain fixtures also cover exact long synthetic DNS records and unavailable monthly measurements at 1280, 390 and 320px; provider error messages remain visible. These are synthetic interface fixtures, not authenticated provider or production proof. The rebuild release flag preserves v1 creation when disabled. No dependency installed; the 21st CLI is unavailable in this environment. |
 | Scoped agency website document drafts | [AgencyWebsiteDocumentDraftExperience](../../src/experience/agency-website/AgencyWebsiteDocumentDraftExperience.tsx) is reached from the existing agency client-work website link. It discovers a version 2 candidate through the managed binding, edits only accepted native sections with shared fields and buttons, sends controlled props/order patches with exact candidate identity, and saves for customer review. Private multi-page previews use the current scoped grant on every request. Navigation/footer preparation stays with the customer or Strelva. The original [legacy editor](../../src/experience/agency-website/AgencyManagedWebsiteDraftExperience.tsx) remains the default when rollout is off or the binding has no version 2 document. | October 1, 2026: agency document and legacy UI tests pass 24/24; typecheck and product boundaries pass locally. Headless Chromium inspected 24 active/loading/expired/revoked/no-permission/error/stale/private-preview-denial states at 1280, 390 and 320px, plus saved section ordering and a detail-page edit. Unsaved changes survive preview page navigation and stale saves; permission failures remove save controls. Followed sign-in redirects, non-JSON responses and incomplete successful envelopes require a fresh permission read while retaining unsaved proposals; the disabled discovery envelope still preserves the legacy editor. The actual no-session private-preview request returns an auth redirect with SAMEORIGIN/private CSP and exposes recovery, not document data. Local interface/HTTP proof is in `output/website-rebuild-spike-2026-10-01/ui-proof/agency-evidence.json`; it does not claim an authenticated client save or production publication. |
 | Generated client visitor forms | The starter [renderer](../../custom-repo-starter/website-generation/renderer.ts) and exported [runtime](../../custom-repo-starter/website-generation/renderer.mjs) own capability form layout and styling using the generated site's existing theme variables. This is a client-site renderer, not a replacement for REB field components. | September 20, 2026: the native booking Auth journey exports and builds the selected project, submits inquiries and confirms bookings on desktop, then changes and cancels at 390px. Rendered controls use full-width fields, visible focus and 44px minimum targets. Exact local captures and provider-fixture limits are in the horizontal acceptance ledger. |
+| Booking customer and owner controls | [ManageBooking](../../src/experience/bookings/ManageBooking.tsx) owns the signed manage page and held confirmation, request, paused, unavailable and recovery states. [InquiryBookingOffer](../../src/experience/bookings/InquiryBookingOffer.tsx) never preselects a time or labels a request confirmed. Owner [BookingActions](../../src/experience/bookings/BookingActions.tsx) and [BookingHoursEditor](../../src/experience/bookings/BookingHoursEditor.tsx) retain the shared Button API and desktop compact sizing; buttons gain a 44px minimum height below 640px, in addition to the primitive's coarse-pointer sizing. [WorkspaceBookings](../../src/experience/bookings/WorkspaceBookings.tsx) adds gated authority/status/history, calendar health and record-hours evidence. [ProposeBookingTimes](../../src/experience/bookings/ProposeBookingTimes.tsx) lets an owner inspect the named inquiry recipient, choose up to three current times and explicitly send one request-mode reply; accepted, suppressed and unknown delivery remain distinct. [ManualBookingForm](../../src/experience/bookings/ManualBookingForm.tsx) takes an owner booking request using shared labelled service/time/customer/intake fields, preserves the customer draft on reopen, and separates the saved request from owner confirmation. The gated workspace-only path lists a real Bookings System without a website tenant; its setup prompt uses a Request, and taking a booking still requires the owner’s confirmation. [CalendarConnectionPanel](../../src/experience/scheduling/CalendarConnectionPanel.tsx) validates the gated Outlook disconnect follow-up before rendering a status and fixed Microsoft My Apps consent-removal link; the link has a 44px target and a visible 2px keyboard outline. A failed Google revocation retains the connection. Manage times, proposal checkboxes and booking-hour inputs have 44px targets; the final manual input/select recheck measures 44px at 390px, and required textarea intake measures 64px. | October 7, 2026, local preview fixtures only: desktop 1280px, mobile layout 390px, and representative 320px reflow. Native radio/checkbox Tab and arrow selection have visible 2px outlines. The generated visitor fixture uses the exported starter renderer/runtime with entirely synthetic transport and visible 3px field focus. State captures and exact limits live in [booking UI evidence](../../output/w6-bookings-ui/README.md). No provider write, authenticated save, physical-device or screen-reader proof. |
 | Tabs | REB Tabs.tsx. Shared variants implement a roving tab stop, orientation-aware keyboard navigation, disabled handling and optional panel relationships; the component reference uses actual tabs and `TabsPanel`. | Verify automatic/manual activation, selected tab stop, arrow/Home/End handling, panel relationships and visible focus in affected consumers; current local browser coverage is the component specimen, while route-like consumer semantics remain open. |
 | Marketing primitives and composition | Marketing owns its components and CSS. Earlier audit findings must be rechecked against current code. | Adopt the agreed measurements and semantic roles at primitive owners; migrate page controls without breaking brief persistence, dialogs, keyboard or recovery. |
 | Materials | REB owns AtmosphericCard; marketing has a separate implementation. Latest study variant 6 is not in the product API. | Choose any new material explicitly; record its implementation and consumers, and verify readability, pause, reduced motion and fallback. Similar-looking blur is not parity. |
 | Font and identity adoption | REB now loads Geist Sans for interface and display roles through one Next font binding; the original vector lettering remains separate. The component reference renders the actual family in both theme modes. | Verify computed family after fonts load and review 400/500/600 weights on the actual materials. Marketing and client repositories retain their own adoption rows. |
 | Rendered foundation reference | Existing colors/components previews cover only part of the system. | Show spacing/type roles and actual atoms with relevant states, not inline lookalikes. Verify desktop/mobile, keyboard, reflow and enlarged content. |
+
+October 7, Wave 6 local History contract: [WebsiteHistoryPanel](../../src/experience/systems/WebsiteSystemPanels.tsx)
+uses the shared Button for native content and earlier document restores. The
+document action pins the saved revision and prepares a new candidate through
+the existing undo service; approval is cleared and the live site is unchanged.
+Saved-copy actions say **Ask Strelva to restore** and file a Request containing
+the exact snapshot ID and date, because full-copy preparation still belongs to
+Strelva. Read-only access has no restore action. Busy actions cannot repeat;
+an unconfirmed response shows an alert and requires a reload before another
+attempt. Successful preparation shows a status message and refreshes the lists.
+`website-history-restore.test.ts`, `website-system-detail.test.ts` and
+`website-system-panels.test.tsx` cover authority, exact targets, failure states
+and the owner action. Desktop/mobile fixture proof is recorded in the
+[Wave 6 website handoff](../product/streams/w6-website.md); no production proof
+is implied.
+
+October 7, Wave 6 cutover undo: [WebsiteCutoverUndo](../../src/experience/websites/WebsiteRecoveryControls.tsx)
+requires separate confirmations that the owner restored DNS and opened and
+tested the old website. Its copy states that Strelva switches its routing
+after those confirmations; it does not claim an automatic fallback check.
+The shared Button remains disabled until both confirmations are checked.
+
+October 7, Wave 6 website Connections: the System page retains a business-record
+read across a connected site's rebuild. Hosted documents describe reads at
+render; native content describes reviewed publication; repo-only sites say
+**Not connected** and "Strelva updates this site by hand." Per-domain
+**appear** Connections use the same domain observations as the Domains panel,
+with source of truth, owner authority, last check and DNS failure behavior.
+Disconnected or unconfirmed Connections remain visible; working ones use the
+existing **Works with** disclosure. These are read-only contracts behind the
+Systems release, not new grants or provider writes. Focused projection and
+render tests cover the contracts; browser proof belongs in the stream handoff.
 
 Keep completion scoped to named consumers. A repaired Button does not migrate all
 native buttons, and passing component tests does not prove an entire page journey.
@@ -515,6 +548,18 @@ starting implementation.
 
 [DESIGN.md](../../DESIGN.md) owns product direction. [Color system](./color-system.md) owns palette roles; [motion](./motion.md) owns animation behavior; the [atmospheric contract](./atmospheric-component-contract.md) records material decisions and rejections. Source code owns the implemented API.
 
+Publishing uses [ContentWorkspace](../../src/experience/publishing/ContentWorkspace.tsx)
+for exact-content review, collection publication/restore, and immutable newsletter
+issues with sending paused. [RecordPublishingFields](../../src/experience/publishing/RecordPublishingFields.tsx)
+saves hours, special hours and website facts through the owner boundary, shows
+the optional Google approval disclosure, and reports each location separately
+as confirmed, awaiting approval, unapplied or unknown. Unknown writes never say
+that nothing was sent. [WorkspaceGoogle](../../src/experience/places/WorkspaceGoogle.tsx)
+composes the same field and Button family for drafts, pause, reply edits,
+withdrawal and undo; reply forms retain their command identity through a submission retry,
+and undo stays keyed to its original receipt. All have permission and failure states. Local fictional
+fixtures live at `/preview/strelva/publishing`; these do not prove provider writes.
+
 | Component | Source | Contract |
 | --- | --- | --- |
 | Button / IconButton | [Button.tsx](../../src/components/ui/Button.tsx) | Button variants primary, secondary, ghost, danger, contrast; sizes sm/md/lg; loading disables and sets aria-busy; `static` disables press scale. IconButton requires `label`. |
@@ -603,6 +648,21 @@ StrelvaShell, StrelvaSidebar and AppFrame now provide the customer Home/navigati
 
 This adoption does not certify every legacy page control. The library supports four curated form/list templates, not arbitrary generated application code. Search is complete over supplied authorized items, not every provider's records. Session storage is continuity only and is cleared on sign-out. Request approval, budgets, external actions and publication remain server-enforced. The implementation and rendered evidence are recorded in [current component context](./current-component-context.md).
 
+Catalog extension (October 7, local): `ApplicationUseRenderer` accepts contact
+email/phone and assigned-person email fields. An existing linked ID stays in
+the correction draft while the field displays the authorized contact/staff name
+and email (or phone). Record lists use those same labels, projected only from
+the recipient's visible linked records and fields;
+typing a replacement changes the link. Opening a labeled correction focuses its
+first field; Tab follows the existing form order. The gated `/preview/strelva/tool`
+fixture rehearses labeled records, corrections, read-only and empty states with
+no network or persistence. UUIDs never become invalid email input
+values. `DocumentExperience` reuses shared fields and Button for private files
+and read-only shares, with bounded recent receipts and opt-in keyset pagination,
+loading, persistent history error/retry, and cancellation on document change.
+The server applies the same saved-work read grant to full history. Local
+verification and limitations belong in [the catalog handoff](../product/streams/w6-catalog.md).
+
 ## Hosted website catalog (v2)
 
 [SiteRenderer](../../src/products/websites/SiteRenderer.tsx) renders the closed,
@@ -627,3 +687,44 @@ private previews are noindexed. The static export includes the immutable
 document, each page, redirect mappings, image bytes and file checksums. No new
 renderer dependencies were added. Local automated and rendered verification is
 recorded with the website rebuild delivery evidence.
+
+An explicitly bound hosted document can read confirmed public business facts
+under `STRELVA_WEBSITE_BUSINESS_FACTS_ENABLED`. `SiteRenderer` projects typed
+name, contact, address, hours and service slots onto a copy, preserves the issued
+document checksum, and reports the business record revision separately. Private
+previews remain pinned; unavailable reads use the approved content. The System
+Connection claims this behavior only after the issued bindings and runtime read
+are confirmed.
+
+### Catalog planning recovery, October 7, 2026
+
+`WorkPlanExperience` preserves the typed goal when planning fails. With Systems
+released, a confirmed fallback Request shows its pending review state and hides
+the duplicate filing action; a failed fallback retains Ask Strelva to build this.
+Scope and deadline remain unagreed. The server rechecks operator/delegation
+authority and uses an actor-bound retry identity. Flags off preserve the earlier
+unavailable response and planning prompt. Local route and SQL tests cover
+confirmed filing, storage failure, revocation and retry; this entry does not
+claim provider generation or production delivery.
+
+The standalone workspace planner receives the Systems release and Request
+navigation from `WorkspaceLayout`. A denied maker check shows an editable
+request with no planning budget or preparation controls; its action opens the
+existing Request form with those words. Real isolated local Auth covers owner
+filing and failed-provider recovery at 360px, and staff use at 1280 and 360px.
+The model and email providers are bounded local fixtures.
+
+### Booking conflict choices and intake
+
+The native visitor form in [StrelvaBookingForm](../../custom-repo-starter/StrelvaBookingForm.tsx) and its
+[exported runtime](../../custom-repo-starter/website-generation/capability-runtime.mjs) preserve visitor input when
+a time is taken. Store-served conflict responses offer at most three fresh slots;
+the forms replace stale choices and keep reserve/change disabled when there are
+none. The existing legacy BookingWidget shows the suggested local times in its
+error text. These controls appear only when the gated server supplies them.
+Optional service intake questions use the existing input/textarea controls,
+required semantics and eight-question limit. A store-served native schedule also
+marks business confirmation explicitly: calendar sync is a copy, and a pending
+request awaits the business. Native visitor forms accept optional phone and show
+slots and receipts in the browser time zone, with the zone named. Without native
+authority metadata, the flags-off flow keeps its fields and provider wording.

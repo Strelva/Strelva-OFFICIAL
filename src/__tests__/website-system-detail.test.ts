@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildWebsiteSystemDetail, type WebsiteDetailInputs } from "@/experience/systems/website-detail";
+import { buildWebsiteSystemDetail, websiteDomainConnections, type WebsiteDetailInputs } from "@/experience/systems/website-detail";
 import type { WebsiteDetailSources } from "@/experience/systems/website-detail-server";
+import type { ConnectedSitesOverview } from "@/products/connected-sites/server";
 
 vi.mock("@/platform/systems/supabase-store", () => ({ createSupabaseSystemStore: () => ({}) }));
 const { readWebsiteSystemDetail } = await import("@/experience/systems/website-detail-server");
@@ -18,6 +19,12 @@ function inputs(overrides: Partial<WebsiteDetailInputs> = {}): WebsiteDetailInpu
 }
 
 describe("website System page lists", () => {
+  it("projects domain appearance with its source, owner authority, freshness and failure behavior", () => {
+    const detail = buildWebsiteSystemDetail(inputs({ domains: [{ hostname: "gldf.example.test", state: "misconfigured", label: "DNS misconfigured", lastCheckedAt: "2026-10-07T00:00:00Z", whoCanChange: "The owner, with their registrar" }] }));
+    expect(websiteDomainConnections(detail)).toEqual([expect.objectContaining({ kind: "appear", target: "gldf.example.test", status: "not_connected",
+      contract: { sourceOfTruth: "Domain claims and the hosting provider's routing checks.", authority: expect.stringContaining("owner-decided"), freshness: "Last checked 2026-10-07T00:00:00Z.", failureBehavior: expect.stringContaining("not the website's lifecycle") } })]);
+    expect(detail.domains[0]!.state).toBe("misconfigured");
+  });
   it("merges the four release stores into one History, newest first, with who and undo", () => {
     const detail = buildWebsiteSystemDetail(inputs({
       contentVersions: [{ id: "v_1", section: "hero", author: "ai", timestamp: "2026-10-01T10:00:00Z", status: "live" }, { id: "v_2", section: "hero", author: "user", timestamp: "2026-10-04T10:00:00Z", status: "live", changes: [{ field: "_restore" }] }],
@@ -29,9 +36,31 @@ describe("website System page lists", () => {
     expect(detail.history[0]).toMatchObject({ title: "Private events page added", by: "Strelva" });
     expect(detail.history[1]).toMatchObject({ title: "Restored an earlier homepage banner", by: "You" });
     expect(detail.history[2]).toMatchObject({ title: "Published site revision 2", by: "You" });
-    expect(detail.history.every(item => item.undo)).toBe(true);
+    expect(detail.history.filter(item => item.source !== "document").every(item => item.undo)).toBe(true);
+    expect(detail.history[2]?.undo).toBeNull();
     // Issued rows never change here: History only reads them.
     expect(detail.requests).toEqual([]);
+  });
+  it("pins a saved copy Request and an earlier document restore directly on the owner's History row", () => {
+    const detail = buildWebsiteSystemDetail(inputs({
+      workspaceId: businessId, workId,
+      snapshots: [{ id: "saved-copy", label: "Before rebuilding", reason: "manual", author: "user", createdAt: "2026-10-01T00:00:00Z", status: "available" }],
+      documentRevisions: [1, 2].map(revision => ({ revision, contentHash: String(revision).repeat(64), createdAt: `2026-10-0${revision}T00:00:00Z`, createdBy: actor.userId, published: true })),
+    }));
+    expect(detail.history.find(row => row.source === "snapshot")).toMatchObject({ restore: { kind: "snapshot", snapshotId: "saved-copy" } });
+    expect(detail.history.find(row => row.id.startsWith("document:1:"))).toMatchObject({ restore: { kind: "document", workId, targetRevision: 1, targetContentHash: "1".repeat(64) } });
+    expect(detail.history.find(row => row.id.startsWith("document:2:"))?.restore).toBeUndefined();
+    expect(detail.history.every(row => !row.restoreHref)).toBe(true);
+  });
+  it("includes actual deploy receipts with honest failed read-back and immutable evidence", () => {
+    const detail = buildWebsiteSystemDetail(inputs({ repoDeployments: [{
+      id: "deploy-receipt", requestId: "request", title: "Private events page", commitSha: "abcdef0",
+      deploymentUrl: "https://fictional.vercel.app", readBack: "not_confirmed", recordedAt: "2026-10-05T10:00:00Z",
+    }] }));
+    expect(detail.history).toEqual([expect.objectContaining({
+      source: "deploy", title: "Private events page · deployed, not yet confirmed",
+      deployment: { commitSha: "abcdef0", url: "https://fictional.vercel.app", readBack: "not_confirmed" },
+    })]);
   });
   it("lists only open Requests, with their stage", () => {
     const detail = buildWebsiteSystemDetail(inputs({
@@ -81,6 +110,45 @@ function sources(overrides: Partial<WebsiteDetailSources> = {}): WebsiteDetailSo
 }
 
 describe("website System page loader", () => {
+  const connectedId = "75000000-0000-4000-8000-000000000020";
+  function connectedOverview(siteHost = "gldf.example.test"): ConnectedSitesOverview {
+    return { sites: [{ id: connectedId, workspaceId: businessId, publicKey: `sk_pub_${"a".repeat(24)}`, label: siteHost,
+      siteUrl: `https://${siteHost}/`, siteHost, allowedOrigins: [`https://${siteHost}`], platform: "wix",
+      captureForms: true, injectSchema: true, status: "active", verificationToken: null,
+      verifiedAt: "2026-10-01T00:00:00Z", createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z",
+      revokedAt: null, firstEventAt: null, lastEventAt: null, systemId: siteId, snippet: { meta: null, script: "" }, activity: {} }], inquiries: [] };
+  }
+  function connectedSources(siteHost = "gldf.example.test", tenantId: string | null = "gldf") {
+    return sources({
+      listSystems: vi.fn(async () => ({ businessId, connections: [], systems: [{ system: { id: siteId, kind: "website", name: siteHost },
+        references: { tenantId, savedWorkId: tenantId ? workId : null, tenantStableId: null, connectedSiteId: connectedId }, provenance: "existing", basis: null }] })) as unknown as WebsiteDetailSources["listSystems"],
+      connectedSites: async () => connectedOverview(siteHost),
+    });
+  }
+  it("shows current hosted routing status after a connected site rebuild, keeping one row per hostname", async () => {
+    const detail = (await readWebsiteSystemDetail(actor, businessId, siteId, connectedSources()))!;
+    expect(detail.domains).toEqual([{ hostname: "gldf.example.test", state: "misconfigured", label: "DNS misconfigured",
+      lastCheckedAt: "2026-10-07T00:00:00Z", whoCanChange: "The owner, with their registrar" }]);
+    expect(detail.connectedSite?.verified).toBe(true);
+  });
+  it("keeps the original connected address and adds domains of its hosted replacement", async () => {
+    const detail = (await readWebsiteSystemDetail(actor, businessId, siteId, connectedSources("original.example.test")))!;
+    expect(detail.domains.map(domain => [domain.hostname, domain.state])).toEqual([["original.example.test", "verified"], ["gldf.example.test", "misconfigured"]]);
+    expect(detail.domains[0]?.label).toBe("Proven to be this business's");
+  });
+  it("retains ownership proof while exposing an unavailable hosted-domain check", async () => {
+    const s = connectedSources();
+    s.domains = vi.fn(async () => { throw new Error("domain storage down"); });
+    const detail = (await readWebsiteSystemDetail(actor, businessId, siteId, s))!;
+    expect(detail.domains).toEqual([expect.objectContaining({ hostname: "gldf.example.test", label: "Proven to be this business's", lastCheckedAt: "2026-10-01T00:00:00Z" })]);
+    expect(detail.unavailable).toContain("Domains");
+  });
+  it("keeps a connected-only site's domain unchanged without reading a tenant", async () => {
+    const s = connectedSources("original.example.test", null);
+    const detail = (await readWebsiteSystemDetail(actor, businessId, siteId, s))!;
+    expect(detail.domains).toEqual([{ hostname: "original.example.test", state: "verified", label: "Proven to be this business's", lastCheckedAt: "2026-10-01T00:00:00Z", whoCanChange: "Your site's builder; Strelva never changes it." }]);
+    expect(s.domains).not.toHaveBeenCalled();
+  });
   it("reads every source for the site this business holds, filtering decisions and requests to it", async () => {
     const s = sources();
     const detail = (await readWebsiteSystemDetail(actor, businessId, siteId, s))!;
@@ -89,6 +157,13 @@ describe("website System page loader", () => {
     expect(detail.requests.map(item => item.title)).toEqual(["Menu page"]);
     expect(detail.unavailable).toEqual([]);
     expect(s.events).toHaveBeenCalledWith("gldf", { limit: 100 });
+  });
+  it("keeps deploy and reconciliation outages visible without inventing an empty history", async () => {
+    const detail = (await readWebsiteSystemDetail(actor, businessId, siteId, sources({
+      repoChanges: async () => { throw new Error("receipt storage down"); },
+    })))!;
+    expect(detail.unavailable).toContain("Repo deploy history");
+    expect(detail.history).toEqual([]);
   });
   it("names a source it could not read instead of showing it as empty", async () => {
     const detail = (await readWebsiteSystemDetail(actor, businessId, siteId, sources({ versions: vi.fn(async () => { throw new Error("down"); }) as unknown as WebsiteDetailSources["versions"], domains: vi.fn(async () => { throw new Error("down"); }) as unknown as WebsiteDetailSources["domains"] })))!;
