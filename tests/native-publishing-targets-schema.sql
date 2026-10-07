@@ -8,11 +8,16 @@ insert into public.workspaces(id,kind,name,created_by) values
  ('af100000-0000-4000-8000-000000000010','customer','Native Publishing','af100000-0000-4000-8000-000000000001'),
  ('af100000-0000-4000-8000-000000000011','customer','Other Business','af100000-0000-4000-8000-000000000001');
 insert into public.systems(id,business_workspace_id,name,kind,lifecycle,current_revision_id,current_revision_number,command_id,command_digest,created_by,updated_by)
- values('af100000-0000-4000-8000-000000000020','af100000-0000-4000-8000-000000000010','Native Website','website','draft','af100000-0000-4000-8000-000000000030',1,'af100000-0000-4000-8000-000000000031',repeat('a',64),'af100000-0000-4000-8000-000000000001','af100000-0000-4000-8000-000000000001'),
+ values('af100000-0000-4000-8000-000000000020','af100000-0000-4000-8000-000000000010','Native Website','website','live','af100000-0000-4000-8000-000000000030',1,'af100000-0000-4000-8000-000000000031',repeat('a',64),'af100000-0000-4000-8000-000000000001','af100000-0000-4000-8000-000000000001'),
  ('af100000-0000-4000-8000-000000000021','af100000-0000-4000-8000-000000000010','Native Newsletter','newsletter','draft','af100000-0000-4000-8000-000000000032',1,'af100000-0000-4000-8000-000000000033',repeat('b',64),'af100000-0000-4000-8000-000000000001','af100000-0000-4000-8000-000000000001');
 insert into public.system_revisions(id,system_id,business_workspace_id,number,implementation,command_id,command_digest,created_by) values
  ('af100000-0000-4000-8000-000000000030','af100000-0000-4000-8000-000000000020','af100000-0000-4000-8000-000000000010',1,'{"kind":"content","ref":"native-fixture"}','af100000-0000-4000-8000-000000000034',repeat('c',64),'af100000-0000-4000-8000-000000000001'),
  ('af100000-0000-4000-8000-000000000032','af100000-0000-4000-8000-000000000021','af100000-0000-4000-8000-000000000010',1,'{"kind":"content","ref":"native-newsletter"}','af100000-0000-4000-8000-000000000035',repeat('d',64),'af100000-0000-4000-8000-000000000001');
+-- The common cold-start case is a native website projected from saved work,
+-- before any persistent System or legacy tenant is reserved.
+insert into public.saved_product_work(id,workspace_id,product_id,resource_kind,title,payload,created_by)
+ values('af100000-0000-4000-8000-000000000040','af100000-0000-4000-8000-000000000010','websites','website','Unhosted website','{}','af100000-0000-4000-8000-000000000001');
+select public.native_publishing_require_system('af100000-0000-4000-8000-000000000010',public.system_origin_id('af100000-0000-4000-8000-000000000010','saved_work','af100000-0000-4000-8000-000000000040'),'website');
 create temp table np_input(doc jsonb);
 insert into np_input values(jsonb_build_object('workspaceId','af100000-0000-4000-8000-000000000010','systemId','af100000-0000-4000-8000-000000000020','tenantId','workspace-af100000-0000-4000-8000-000000000010',
  'eventId','evt-native-fixture','actor','owner-link:native-publishing@example.test','draftHash',repeat('b',64),'type','blog','slug','hello','data','{"title":"Native words"}'::jsonb,'before','null'::jsonb));
@@ -36,7 +41,8 @@ select pg_temp.np_expect($$select public.publish_native_workspace_collection(doc
 select public.approve_native_workspace_newsletter_issue(doc || '{"systemId":"af100000-0000-4000-8000-000000000021","eventId":"evt-native-newsletter","subject":"Native issue","body":"Frozen words"}') from np_input;
 select pg_temp.np_assert((select tenant_id is null and state='approved_sending_paused' and accepted_count=0 from public.workspace_newsletter_issues where event_id='evt-native-newsletter'),'native issue is immutable and paused');
 select pg_temp.np_expect($$update public.workspace_newsletter_issues set body='changed' where event_id='evt-native-newsletter'$$,'newsletter_issue_is_immutable');
-select pg_temp.np_assert(jsonb_array_length(public.read_native_workspace_newsletter_issues('af100000-0000-4000-8000-000000000011'))=0,'other business cannot read native issues');
+select pg_temp.np_assert(jsonb_array_length(public.read_native_workspace_newsletter_issues('af100000-0000-4000-8000-000000000010','af100000-0000-4000-8000-000000000021'))=1,'native issue read-back');
+select pg_temp.np_expect($$select public.read_native_workspace_newsletter_issues('af100000-0000-4000-8000-000000000011','af100000-0000-4000-8000-000000000021')$$,'publishing_system_not_owned');
 -- Native grant is workspace-owned, with no linked tenant and no Redis fallback.
 select public.upsert_workspace_account_binding(jsonb_build_object('workspaceId','af100000-0000-4000-8000-000000000010','provider','google','originTenantStableId',null,'scopes','[]'::jsonb,'refreshTokenCiphertext','enc:v1:YQ==:Yg==:Yw==','accessTokenCiphertext','enc:v1:YQ==:Yg==:Yw==','status','connected'),'oauth');
 select pg_temp.np_assert(public.read_native_workspace_google_binding('af100000-0000-4000-8000-000000000010')->>'originTenantId' is null and public.read_native_workspace_google_binding('af100000-0000-4000-8000-000000000010')->>'workspaceId'='af100000-0000-4000-8000-000000000010','native binding resolved');

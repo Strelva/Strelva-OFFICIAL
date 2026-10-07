@@ -122,16 +122,16 @@ export async function readContentWorkspace(target: ContentTarget) {
   const [entries, events, outputs, receipts] = await Promise.all([
     target.kind === "website" ? Promise.all((["blog", "video", "product"] as const).map(async type => ({ type, entries: nativeEntries ? nativeEntries.filter(row => row.type === type) : await (await tenantPublishingPorts()).listEntriesForType(target.tenantId, type, { limit: 100 }) }))) : Promise.resolve([]),
     tenantPublishingPorts().then(ports => ports.getEventsRaw(target.tenantId, { limit: 100 })),
-    target.kind === "newsletter" ? readNewsletterIssues(target.workspaceId, target.tenantId) : Promise.resolve([]),
+    target.kind === "newsletter" ? readNewsletterIssues(target.workspaceId, target.tenantId, target.systemId) : Promise.resolve([]),
     target.kind === "website" ? readCollectionReceipts(target) : Promise.resolve([]),
   ]);
   return { target, entries, drafts: events.filter(event => event.metadata?.systemId === target.systemId && [COLLECTION_PUBLISH, NEWSLETTER_ISSUE].includes(String(event.metadata?.kind))), outputs, receipts, sendingEnabled: false as const };
 }
 
-async function readNewsletterIssues(workspaceId: string, tenantId: string): Promise<unknown[]> {
+async function readNewsletterIssues(workspaceId: string, tenantId: string, systemId: string): Promise<unknown[]> {
   const db = getSupabase();
   if (!db) throw new Error("Publishing storage is unavailable.");
-  const { data, error } = await (db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> }).rpc(publishingWorkspaceId(tenantId) ? "read_native_workspace_newsletter_issues" : "read_workspace_newsletter_issues", publishingWorkspaceId(tenantId) ? { p_workspace_id: workspaceId } : { p_workspace_id: workspaceId, p_tenant_id: tenantId });
+  const { data, error } = await (db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> }).rpc(publishingWorkspaceId(tenantId) ? "read_native_workspace_newsletter_issues" : "read_workspace_newsletter_issues", publishingWorkspaceId(tenantId) ? { p_workspace_id: workspaceId, p_system_id: systemId } : { p_workspace_id: workspaceId, p_tenant_id: tenantId });
   if (error || !Array.isArray(data)) throw new Error("Newsletter receipts could not be loaded.");
   return data;
 }

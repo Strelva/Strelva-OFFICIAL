@@ -20,7 +20,9 @@ begin
   if not exists(select 1 from public.workspaces where id=p_workspace_id and kind='customer') then raise exception 'publishing_business_required'; end if;
   if not exists(select 1 from public.systems where business_workspace_id=p_workspace_id and id=p_system_id and kind=p_kind)
     and not (p_kind='website' and exists(select 1 from public.saved_product_work w where w.workspace_id=p_workspace_id and w.product_id='websites' and w.resource_kind='website'
-      and public.system_origin_id(p_workspace_id,'saved_work',w.id::text)=p_system_id)) then raise exception 'publishing_system_not_owned'; end if;
+      and public.system_origin_id(p_workspace_id,'saved_work',w.id::text)=p_system_id))
+    and not (p_kind='website' and exists(select 1 from public.connected_sites c where c.business_workspace_id=p_workspace_id
+      and public.system_origin_id(p_workspace_id,'connected_site',c.id::text)=p_system_id)) then raise exception 'publishing_system_not_owned'; end if;
 end; $$;
 
 create function public.read_native_workspace_collection(p_workspace_id uuid,p_system_id uuid)
@@ -50,7 +52,9 @@ begin
       or v_receipt->'request'->>'draftHash' is distinct from p_input->>'draftHash' or v_receipt->>'tenantId' is not null then raise exception 'publishing_receipt_conflict'; end if;
     return jsonb_build_object('receiptId',v_receipt->>'id','verified',true);
   end if;
-  if public.workspace_exit_completed(v_workspace) or exists(select 1 from public.systems where id=v_system and lifecycle='paused') then raise exception 'publishing_paused'; end if;
+  if public.workspace_exit_completed(v_workspace) or exists(select 1 from public.systems where id=v_system and lifecycle='paused')
+    or exists(select 1 from public.connected_sites c where c.business_workspace_id=v_workspace and c.status='revoked'
+      and public.system_origin_id(v_workspace,'connected_site',c.id::text)=v_system) then raise exception 'publishing_paused'; end if;
   select * into v_current from public.workspace_collection_entries where workspace_id=v_workspace and system_id=v_system and type=v_type and slug=v_slug for update;
   v_baseline := case when found then jsonb_build_object('status',v_current.status,'data',v_current.data) else 'null'::jsonb end;
   if v_baseline is distinct from p_input->'before' then raise exception 'publishing_baseline_changed'; end if;
@@ -93,17 +97,19 @@ begin
   end if;
   return jsonb_build_object('receiptId',v_row.id,'verified',true);
 end; $$;
-create function public.read_native_workspace_newsletter_issues(p_workspace_id uuid)
-returns jsonb language sql security definer set search_path=public,pg_temp as $$
-  select coalesce(jsonb_agg(to_jsonb(r) order by r.approved_at desc),'[]') from
-    (select * from public.workspace_newsletter_issues where workspace_id=p_workspace_id and tenant_id is null order by approved_at desc limit 100) r;
-$$;
+create function public.read_native_workspace_newsletter_issues(p_workspace_id uuid,p_system_id uuid)
+returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
+begin
+  perform public.native_publishing_require_system(p_workspace_id,p_system_id,'newsletter');
+  return coalesce((select jsonb_agg(to_jsonb(r) order by r.approved_at desc) from
+    (select * from public.workspace_newsletter_issues where workspace_id=p_workspace_id and system_id=p_system_id and tenant_id is null order by approved_at desc limit 100) r),'[]');
+end; $$;
 create function public.read_native_workspace_google_binding(p_workspace_id uuid)
 returns jsonb language sql security definer set search_path=public,pg_temp as $$
   select public.account_binding_json(b,true) from public.workspace_account_bindings b join public.workspaces w on w.id=b.workspace_id
     where b.workspace_id=p_workspace_id and w.kind='customer' and b.provider='google' and b.origin_tenant_stable_id is null;
 $$;
 revoke all on function public.native_publishing_require_system(uuid,uuid,text) from public,anon,authenticated,service_role;
-revoke all on function public.read_native_workspace_collection(uuid,uuid),public.publish_native_workspace_collection(jsonb),public.read_native_workspace_collection_receipts(uuid,uuid),public.approve_native_workspace_newsletter_issue(jsonb),public.read_native_workspace_newsletter_issues(uuid),public.read_native_workspace_google_binding(uuid) from public,anon,authenticated;
-grant execute on function public.read_native_workspace_collection(uuid,uuid),public.publish_native_workspace_collection(jsonb),public.read_native_workspace_collection_receipts(uuid,uuid),public.approve_native_workspace_newsletter_issue(jsonb),public.read_native_workspace_newsletter_issues(uuid),public.read_native_workspace_google_binding(uuid) to service_role;
+revoke all on function public.read_native_workspace_collection(uuid,uuid),public.publish_native_workspace_collection(jsonb),public.read_native_workspace_collection_receipts(uuid,uuid),public.approve_native_workspace_newsletter_issue(jsonb),public.read_native_workspace_newsletter_issues(uuid,uuid),public.read_native_workspace_google_binding(uuid) from public,anon,authenticated;
+grant execute on function public.read_native_workspace_collection(uuid,uuid),public.publish_native_workspace_collection(jsonb),public.read_native_workspace_collection_receipts(uuid,uuid),public.approve_native_workspace_newsletter_issue(jsonb),public.read_native_workspace_newsletter_issues(uuid,uuid),public.read_native_workspace_google_binding(uuid) to service_role;
 commit;

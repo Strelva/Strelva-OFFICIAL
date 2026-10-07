@@ -799,6 +799,17 @@ psql "${psql_args[@]}" --file="$repo_root/tests/booking-native-workspace-schema.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-w6-booking-native-workspace.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135956_booking_native_workspace.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-native-workspace-schema.sql"
+# Legacy collection fixture (20260620120000), then the Wave 6 content output
+# migration: both are prerequisites of the additive native target migration.
+psql "${psql_args[@]}" <<'SQL'
+create table public.collection_entries (
+ id uuid primary key default gen_random_uuid(), tenant_id text not null references public.tenants(id) on delete cascade,
+ type text not null, slug text not null, status text not null default 'draft', data jsonb not null,
+ created_at timestamptz not null default now(), updated_at timestamptz not null default now(), unique(tenant_id,type,slug)
+);
+SQL
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010142000_workspace_publishing_content.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-publishing-content-schema.sql"
 # Agency 1.0 native publishing targets and logged booking email enablement.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011100000_native_publishing_targets.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011101000_business_booking_email.sql"
