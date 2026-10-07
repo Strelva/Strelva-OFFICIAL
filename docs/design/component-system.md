@@ -750,3 +750,12 @@ its receipt definition list for Source. These additions are default off under
 `STRELVA_BOOKING_AGENT_VISIBILITY`; agent names are supplied at booking.
 Local proof and remaining limits live in
 [the #304 handoff](../product/streams/a1-agent-bookings-visible.md).
+
+
+### October 7 public booking email confirmation
+
+`/booking-confirm/[token]` uses the owned `Card` and `Button` primitives and
+semantic canvas/text roles. Opening the page is read-only; the native form
+POSTs to its action route. Expired/unavailable and rate-limit states keep the
+customer from claiming a booking was made. This is local implementation for
+#529; no production adoption or new visual-system decision is implied.

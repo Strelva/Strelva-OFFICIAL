@@ -10,6 +10,7 @@ begin
 end $$;
 insert into public.users(id,email,verified_at) values('d5290000-0000-4000-8000-000000000001','ab-owner@example.test',now());
 insert into public.workspaces(id,kind,name,created_by) values('d5290000-0000-4000-8000-000000000010','customer','Abuse fixture','d5290000-0000-4000-8000-000000000001');
+insert into public.business_records(workspace_id,created_by,updated_by) values('d5290000-0000-4000-8000-000000000010','d5290000-0000-4000-8000-000000000001','d5290000-0000-4000-8000-000000000001');
 insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values('d5290000-0000-4000-8000-000000000010','d5290000-0000-4000-8000-000000000001','owner','d5290000-0000-4000-8000-000000000001');
 insert into public.tenants(id,stable_id,site_name,active) values('ab-site','d5290000-0000-4000-8000-000000000020','Abuse fixture',true);
 insert into public.offering_website_bindings(business_workspace_id,tenant_stable_id,tenant_id_at_binding,site_name_at_binding,idempotency_key,command_digest,created_by,updated_by)
@@ -52,7 +53,7 @@ select pg_temp.ab_expect($q$select public.claim_public_booking_request('ab-site'
 update public.public_booking_requests set expires_at=now()-interval '1 second' where state='held';
 select public.claim_public_booking_request('ab-site',pg_temp.ab_request(30));
 -- Store-side inquiry requests participate in the very same caps.
-insert into public.tenant_workspace_links(tenant_stable_id,workspace_id,linked_by) values('d5290000-0000-4000-8000-000000000020','d5290000-0000-4000-8000-000000000010','d5290000-0000-4000-8000-000000000001');
+insert into public.tenant_workspace_links(tenant_stable_id,tenant_slug_at_link,workspace_id,linked_by,command_id,command_digest,receipt) values('d5290000-0000-4000-8000-000000000020','ab-site','d5290000-0000-4000-8000-000000000010','d5290000-0000-4000-8000-000000000001',gen_random_uuid(),repeat('b',64),'{}');
 create function pg_temp.ab_booking(n integer,email text,status text default 'held') returns jsonb language sql as $$
  select jsonb_build_object('legacyId','ab-booking-'||n,'origin','inquiry','status',status,'serviceName','Consultation',
  'start',now()+make_interval(days=>n),'end',now()+make_interval(days=>n,mins=>30),'timeZone','UTC','bufferMinutes',0,
@@ -64,5 +65,21 @@ select pg_temp.ab_expect($q$select public.claim_public_booking_request('ab-site'
 update public.business_bookings set created_at=now()-interval '16 minutes' where legacy_id='ab-booking-32';
 select public.claim_public_booking_request('ab-site',pg_temp.ab_request(33,'OTHER@example.test',32));
 select pg_temp.ab_assert((select status='cancelled' from public.business_bookings where legacy_id='ab-booking-32'),'expired store hold releases exclusion without cron');
+-- Native inquiry choice issues email-only access, stays held, and becomes a
+-- request only when that access is consumed. The anonymous offer is not enough.
+insert into public.business_services(workspace_id,name,external_ref,duration_minutes,active,source,created_by,updated_by) values('d5290000-0000-4000-8000-000000000010','Consultation','consult',30,true,'owner','d5290000-0000-4000-8000-000000000001','d5290000-0000-4000-8000-000000000001');
+select public.issue_inquiry_booking_offer('ab-site',jsonb_build_object('inquiryId','ab-inquiry','key','receipt','customer',jsonb_build_object('name','Dana','email','verified@example.test'),
+ 'serviceId','consult','serviceName','Consultation','timeZone','UTC','bufferMinutes',0,
+ 'slots',jsonb_build_array(jsonb_build_object('start',now()+interval '40 days','end',now()+interval '40 days 30 minutes')),
+ 'tokenHash',repeat('c',64),'tokenCiphertext','enc:v1:fixture','expiresAt',now()+interval '1 day'));
+select public.choose_inquiry_booking_offer(repeat('c',64),now()+interval '40 days',jsonb_build_object(
+ 'manageHash',repeat('d',64),'manageCiphertext','enc:v1:manage','confirmHash',repeat('e',64),'confirmCiphertext','enc:v1:confirm','statusHash',repeat('f',64),'statusCiphertext','enc:v1:status','agentName','Website request'));
+select pg_temp.ab_assert((select status='held' from public.business_bookings where inquiry_id='ab-inquiry'),'inquiry choice is not placed');
+select pg_temp.ab_expect($q$select public.set_tenant_booking_status('ab-site',(select id::text from public.business_bookings where inquiry_id='ab-inquiry'),'confirmed','visitor','bypass')$q$,'booking_email_confirmation_required');
+select pg_temp.ab_assert((select jsonb_array_length(public.claim_booking_updates((select id from public.business_bookings where inquiry_id='ab-inquiry'),true,false,200)))=1,'public inquiry hold gets only customer confirmation mail with agent flag off');
+select public.confirm_agent_booking(repeat('e',64),true);
+select pg_temp.ab_assert((select status='requested' from public.business_bookings where inquiry_id='ab-inquiry'),'email confirmation permits owner request');
+select public.confirm_agent_booking(repeat('e',64),true);
+select pg_temp.ab_assert((select count(*)=1 from public.business_bookings where inquiry_id='ab-inquiry'),'confirmed replay remains idempotent');
 select 'public booking admission caps and confirmation checks passed' as result;
 rollback;

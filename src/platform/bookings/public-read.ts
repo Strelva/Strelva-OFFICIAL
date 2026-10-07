@@ -13,7 +13,7 @@ export async function limitPublicBookingRead(request: Request, business: string)
   }
 }
 
-type Cache = { get<T>(key: string): Promise<T | null>; set(key: string, value: unknown, options: { ex: number; nx?: boolean }): Promise<unknown> };
+type Cache = { get(key: string): Promise<unknown>; set(key: string, value: unknown, options: { ex: number; nx?: boolean }): Promise<unknown> };
 export async function cachedPublicCalendarRead<T>(scope: string[], read: () => Promise<T>, deps: {
   cache?: Cache | null; limited?: typeof isRateLimitedAsync;
 } = {}): Promise<T> {
@@ -21,8 +21,8 @@ export async function cachedPublicCalendarRead<T>(scope: string[], read: () => P
   const limited = deps.limited ?? isRateLimitedAsync;
   const key = `reb:booking:public-busy:${createHash("sha256").update(JSON.stringify(scope)).digest("hex")}`;
   // A cache error must not silently become an expensive provider call.
-  const hit = await cache?.get<T>(key);
-  if (hit != null) return hit;
+  const hit = await cache?.get(key);
+  if (hit != null) return hit as T;
   if (await limited(`public-booking-provider:${scope[0]}`, 10)) throw new PublicBookingError("unavailable", "Calendar availability is busy. Try again in a minute.", 429);
   // One distributed fill per range per minute, including provider failures.
   // Leave the lock to expire; a failed call cannot trigger an immediate stampede.

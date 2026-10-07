@@ -173,7 +173,7 @@ export async function resolvePublishedPublicBooking(input: {
     : { busy: [] as Array<{ start: string; end: string }>, timeZone: text(grant, "time_zone") || "UTC" };
   const providerBusy = Array.isArray(availability.busy) ? availability.busy : [];
   const slots = (paused ? [] : schedule.availability)
-    .filter(slot => !input.range || (Date.parse(slot.start) >= Date.parse(input.range.from) && Date.parse(slot.end) <= Date.parse(input.range.to)))
+    .filter(slot => !configuredRange || (Date.parse(slot.start) >= Date.parse(configuredRange.start) && Date.parse(slot.end) <= Date.parse(configuredRange.end)))
     .filter(slot => !schedule.reservations.some(reservation => reservation.status !== "cancelled" && overlaps(slot, reservation)))
     .filter(slot => !providerBusy.some(busy => overlaps(slot, busy)))
     .slice(0, 500)

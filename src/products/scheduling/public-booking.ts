@@ -1,5 +1,5 @@
 import { intakeQuestionSchema, validateBookingIntake } from "@/platform/bookings/service-policy";
-import { publicRecordReservationId, publicRecordManagementToken } from "@/platform/bookings/public-request";
+import { type PublicBookingAdmission, publicRecordReservationId, publicRecordManagementToken } from "@/platform/bookings/public-request";
 import { PublicBookingError } from "@/platform/bookings/errors";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -260,15 +260,6 @@ export interface PublicBookingStoreHook {
   }): Promise<void>;
 }
 
-export interface PublicBookingAdmission {
-  claim(input: { binding: PublicBookingBinding; requestId: string; fingerprint: string; visitor: PublicBookingVisitor; start: string; end: string }): Promise<void>;
-  send(input: { tenantId: string; requestId: string }): Promise<void>;
-  consume(token: string): Promise<{ tenantId: string; requestId: string; visitor: PublicBookingVisitor }>;
-  placed(input: { tenantId: string; requestId: string }): Promise<void>;
-  verified(input: { tenantId: string; requestId: string }): Promise<boolean>;
-  cancel(input: { tenantId: string; requestId: string }): Promise<boolean>;
-}
-
 export interface PublicBookingDependencies {
   resolve(input: { tenantId: string; capabilityId: string; range?: PublicBookingRange; includeRevoked?: boolean; requestId?: string }): Promise<PublicBookingBinding | null>;
   inquiries: PublicBookingInquiryCapture;
@@ -281,6 +272,7 @@ export interface PublicBookingDependencies {
   createManagementToken?: () => string;
 }
 
+export type { PublicBookingAdmission } from "@/platform/bookings/public-request";
 export { PublicBookingError } from "@/platform/bookings/errors";
 
 function boundedToken(value: string, label: string): string {

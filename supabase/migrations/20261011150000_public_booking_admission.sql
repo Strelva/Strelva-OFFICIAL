@@ -115,6 +115,15 @@ create function public.guard_public_booking_budget() returns trigger
 language plpgsql security definer set search_path=public,pg_temp as $$
 declare v_admission public.public_booking_requests;
 begin
+ -- Every native inquiry handoff starts as an expiring hold, including the
+ -- separate w6 choose_inquiry_booking_slot path. The old offer token is not
+ -- customer email verification. Unsupported callers cannot place a request.
+ if new.origin='inquiry' and new.recorded_via='native' then
+   if tg_op='INSERT' and new.status in ('requested','confirmed') then new.status:='held'; end if;
+   if tg_op='UPDATE' and old.status='held' and new.status in ('requested','confirmed')
+     and not exists(select 1 from public.business_booking_access where booking_id=new.id and confirmed_at is not null)
+   then raise exception 'booking_email_confirmation_required'; end if;
+ end if;
  if new.public_reservation_id is not null then
    select r.* into v_admission from public.public_booking_requests r join public.public_website_bookings b
      on b.tenant_stable_id=r.tenant_stable_id and b.calendar_request_id=r.request_id where b.id=new.public_reservation_id;
@@ -149,6 +158,53 @@ end $$;
 create trigger guard_public_booking_receipt before insert or update on public.public_website_bookings for each row execute function public.guard_public_booking_receipt();
 revoke all on function public.guard_public_booking_receipt() from public,anon,authenticated,service_role;
 
+alter function public.issue_booking_access(text,text,jsonb) rename to issue_booking_access_before_public_admission;
+create function public.issue_booking_access(p_tenant_id text, p_ref text, p_access jsonb) returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare v record; v_b public.business_bookings; v_a public.business_booking_access;
+begin
+  select * into v from public.booking_tenant(p_tenant_id);
+  select * into v_b from public.business_bookings where calendar_key = coalesce(v.tenant_stable_id,v.workspace_id) and (id::text = p_ref or legacy_id = p_ref) for update;
+  if not found then raise exception 'booking_not_found'; end if;
+  insert into public.business_booking_access(booking_id, manage_hash, manage_ciphertext, confirm_hash, confirm_ciphertext,
+    status_hash, status_ciphertext, confirm_until, agent_name)
+  values (v_b.id, p_access->>'manageHash', p_access->>'manageCiphertext', p_access->>'confirmHash', p_access->>'confirmCiphertext',
+    p_access->>'statusHash', p_access->>'statusCiphertext', case when v_b.status='held' and p_access->>'confirmHash' is not null then v_b.created_at + interval '15 minutes' end, p_access->>'agentName')
+  on conflict (booking_id) do nothing;
+  select * into v_a from public.business_booking_access where booking_id = v_b.id;
+  return to_jsonb(v_a);
+end;
+$$;
+
+revoke all on function public.issue_booking_access_before_public_admission(text,text,jsonb) from public,anon,authenticated,service_role;
+revoke all on function public.issue_booking_access(text,text,jsonb) from public,anon,authenticated;
+grant execute on function public.issue_booking_access(text,text,jsonb) to service_role;
+
+alter function public.confirm_agent_booking(text,boolean) rename to confirm_agent_booking_before_public_admission;
+create function public.confirm_agent_booking(p_hash text, p_force_request boolean) returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare v_b public.business_bookings; v_a public.business_booking_access; v_to text;
+begin
+  select b.* into v_b from public.business_bookings b join public.business_booking_access a on a.booking_id = b.id
+    where a.confirm_hash = p_hash for update of b;
+  if not found then raise exception 'booking_not_found'; end if;
+  select * into v_a from public.business_booking_access where booking_id = v_b.id;
+  if v_a.confirmed_at is not null then return jsonb_build_object('status','unchanged','booking',public.booking_json(v_b)); end if;
+  if v_b.status <> 'held' or v_a.confirm_until <= clock_timestamp() or v_b.start_at <= clock_timestamp() then raise exception 'booking_hold_expired'; end if;
+  v_to := case when p_force_request or coalesce((select p.mode from public.booking_service_policies p where coalesce(p.calendar_key,p.tenant_stable_id,p.workspace_id)=v_b.calendar_key and p.business_service_id=v_b.business_service_id),(select mode from public.booking_settings where calendar_key=v_b.calendar_key),'request') = 'request'
+    then 'requested' else 'confirmed' end;
+  update public.business_booking_access set confirmed_at = clock_timestamp() where booking_id = v_b.id;
+  update public.business_bookings set status = v_to, updated_at = clock_timestamp() where id = v_b.id returning * into v_b;
+  insert into public.business_booking_history(booking_id, actor, from_status, to_status, reason)
+    values(v_b.id, 'visitor', 'held', v_to, 'Customer confirmed email booking request');
+  return jsonb_build_object('status','updated','booking',public.booking_json(v_b));
+end;
+$$;
+
+revoke all on function public.confirm_agent_booking_before_public_admission(text,boolean) from public,anon,authenticated,service_role;
+revoke all on function public.confirm_agent_booking(text,boolean) from public,anon,authenticated;
+grant execute on function public.confirm_agent_booking(text,boolean) to service_role;
+
 -- Inquiry handoffs reuse the existing customer-email confirmation path, even
 -- when the anonymous caller has the original offer bearer token.
 alter function public.choose_inquiry_booking_offer(text,timestamptz,jsonb) rename to choose_inquiry_booking_offer_before_public_admission;
@@ -163,8 +219,6 @@ begin
  -- before any provider mirror, owner notice or customer update can observe it.
  if v_result->>'status'='recorded' then
    update public.business_bookings set status='held' where id=v_id;
-   update public.business_booking_access set confirm_until=clock_timestamp()+interval '15 minutes' where booking_id=v_id;
-   insert into public.business_booking_history(booking_id,actor,from_status,to_status,reason) values(v_id,'system','requested','held','Customer email confirmation required');
    select public.booking_json(b) into v_result from public.business_bookings b where id=v_id;
    return jsonb_build_object('status','recorded','booking',v_result);
  end if;

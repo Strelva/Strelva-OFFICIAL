@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { decryptSecret, encryptSecret } from "@/platform/infra/crypto/secrets";
 import { sendEmailWithReceipt } from "@/platform/infra/email/send";
-import type { PublicBookingAdmission } from "@/products/scheduling/public-booking";
+import type { PublicBookingAdmission } from "./public-request";
 import { PublicBookingError } from "./errors";
 import { nativeRpc, tokenHash } from "./native";
 import { bookingCustomerEmailAllowed } from "./updates";

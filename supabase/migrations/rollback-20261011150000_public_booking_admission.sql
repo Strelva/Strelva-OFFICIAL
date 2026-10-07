@@ -1,8 +1,14 @@
 begin;
 -- Rollback must never erase pending email authorizations or their outcomes.
 do $$ begin
- if exists(select 1 from public.public_booking_requests) then raise exception 'public_booking_admission_rollback_requires_data_preservation'; end if;
+ if exists(select 1 from public.public_booking_requests) or exists(select 1 from public.business_bookings where origin='inquiry' and status='held') then raise exception 'public_booking_admission_rollback_requires_data_preservation'; end if;
 end $$;
+drop function public.issue_booking_access(text,text,jsonb);
+alter function public.issue_booking_access_before_public_admission(text,text,jsonb) rename to issue_booking_access;
+grant execute on function public.issue_booking_access(text,text,jsonb) to service_role;
+drop function public.confirm_agent_booking(text,boolean);
+alter function public.confirm_agent_booking_before_public_admission(text,boolean) rename to confirm_agent_booking;
+grant execute on function public.confirm_agent_booking(text,boolean) to service_role;
 drop function public.claim_booking_updates(uuid,boolean,boolean,integer);
 alter function public.claim_booking_updates_before_public_admission(uuid,boolean,boolean,integer) rename to claim_booking_updates;
 grant execute on function public.claim_booking_updates(uuid,boolean,boolean,integer) to service_role;
