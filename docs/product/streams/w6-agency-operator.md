@@ -74,3 +74,35 @@ Only this worktree is edited. Coordination with owner-ask remains integration
 work. Root owns staging to prevent parallel agents sharing Git's index; one
 content receipt commit also captured the separately tested queue action files.
 No work was lost and no production action followed.
+
+## Round 5 — standalone closure
+
+Resumed clean at `c3685728`. Three independent audits inspect agency/Versions,
+operator, and money/data; root owns owner-recipient work and the Git index.
+No production or provider access. The supplied brief's production observation
+remains attributed to Jacob, not independently verified here.
+
+Initial resumed checks found and retained: targeted Version-management test
+expected 500 for an unavailable store, which correctly returned 503; typecheck
+found four fixture typing mistakes; lint found three unescaped apostrophes.
+These are being corrected. Boundaries passed. Owner-routing and related
+regressions passed: 5 files, 86 tests; focused owner/content piece: 2 files,
+25 tests. New coverage proves added notice paths never call the resolver with
+either rollout gate off, use the same rule with both gates on, and preserve
+bounded tenant fallback on resolver failure.
+
+Audit findings being closed: owner-only Version lineage/data grants at both
+service and SQL boundaries; queue source failures and missing kinds cannot
+be silently green; stale/missing site health is unknown; expanded cron coverage
+retains exact rebuild-only behavior with the operator release off; an identical
+newer client-record write advances the watermark; pending repair snapshots
+follow tenant renames. Local rendered queue at 1280×800 and 390×844 has no
+page overflow and names unavailable sources. Its initial 32px mobile controls
+are being raised to the shared 48px Button size. Loading and operator-denied
+states render explicitly. Full SQL and final checks remain running/pending.
+
+Next action: finish and commit each passing audit piece, inspect agency and
+portability fixtures, run the full required checks, then replace this in-progress
+section with the final evidence and inventory. Larger capability/vault reviews
+remain deferred to wave integration because this isolated stream owns code
+closure only; no offer, price, provider authority or promotion is selected here.

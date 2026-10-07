@@ -56,7 +56,12 @@ describe("content publication receipts", () => {
     await setContent("hero", defaults.hero, "alpha");
     expect(mocks.atomic).toHaveBeenCalledTimes(1);
     expect(mocks.settle).toHaveBeenCalledWith("receipt-1", "matched", expect.stringContaining("External storefront rendering is unverified"));
-    expect(mocks.atomic.mock.invocationCallOrder[0]).toBeLessThan(mocks.cacheWrite.mock.invocationCallOrder[0]);
+    const acceptedAt = mocks.atomic.mock.invocationCallOrder[0];
+    const cachedAt = mocks.cacheWrite.mock.invocationCallOrder[0];
+    expect(acceptedAt).toBeDefined();
+    expect(cachedAt).toBeDefined();
+    if (acceptedAt === undefined || cachedAt === undefined) throw new Error("Publication or cache write did not run");
+    expect(acceptedAt).toBeLessThan(cachedAt);
   });
   it("does not confuse public cache data with a successful strict source read", async () => {
     mocks.stored.mockRejectedValue(new Error("Postgres down"));
