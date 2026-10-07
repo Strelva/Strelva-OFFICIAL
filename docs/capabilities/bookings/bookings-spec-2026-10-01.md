@@ -715,18 +715,34 @@ pattern, `public-booking.ts:489-531`) and expires after the booking ends.
   - `POST .../reservations` with `origin: "agent"` and `agent.name`.
     Agent-made bookings always go through the customer confirmation email.
   - An OpenAPI document at `/api/v1/bookings/openapi.json`.
-- **MCP server** at `/api/mcp/bookings/[tenant]` with tools `list_services`,
-  `find_slots`, `request_booking` and `get_booking_status`. It covers the
-  same operations and limits as the public API. **Needs Jacob's yes for the
-  dependency (`@modelcontextprotocol/sdk`) or we hand-roll the protocol.**
+- **One platform MCP server** at `/api/mcp/public` for every business
+  (#301), hand-rolled with no dependency (`src/platform/agent-channel`). Tools:
+  `search_business`, `get_business`, then `list_services`, `find_slots`,
+  `request_booking` and `get_booking_status`, each taking a `business`
+  handle. It is dual-era: MCP 2026-07-28 (no `initialize`, per-request
+  `_meta`, `server/discover`, mirrored `MCP-Protocol-Version`/`Mcp-Method`/
+  `Mcp-Name` headers, `-32022` for unsupported versions) and the 2025-03-26,
+  2025-06-18 and 2025-11-25 `initialize` handshake. Search lists only
+  businesses whose assistant requests can be confirmed today.
+  `/api/mcp/bookings/[tenant]` stays as an alias with the business fixed by
+  the URL and the four booking tools. Owner and agency tools come later (#302).
 - **Site markup.** Hosted sites add JSON-LD `potentialAction: ReserveAction`
   pointing at the booking page. It's cheap; evidence that it helps is
   unproven.
 - **Google Business Profile booking link.** Set the profile's booking URL to
   the site's booking page. The GBP API write is blocked until Google approves
   API access, so until then an operator sets it by hand.
-- Rate limits: the existing 20-per-window limit per IP, plus [n] agent holds
-  per tenant per hour.
+- Rate limits: the durable 10 agent holds per business per hour in
+  `hold_agent_booking`, plus 20 a minute per business and IP. Hosted
+  assistants call from shared provider egress, so
+  `STRELVA_AGENT_IDENTITY_LIMITS=1` (off by default, #310) replaces the IP
+  quota with buckets per business, customer email, request id or status
+  token, declared agent name, address or published provider egress
+  (checked-in OpenAI and Anthropic ranges, refreshed by
+  `scripts/refresh-provider-egress.ts`), and a platform-wide cap. It also
+  refuses throwaway confirmation addresses. Agent names and provider
+  addresses only add caps; they never lift one. Limits in
+  `src/platform/agent-channel/limits.ts` are starting values.
 
 ### Reserve with Google (separate track)
 

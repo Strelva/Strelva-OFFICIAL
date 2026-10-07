@@ -11,7 +11,7 @@ import { agentConfirmationAvailable, agentReceipt, nativeBookingByToken, nativeS
 import { servicePolicy } from "@/platform/bookings/service-policy";
 import { bookingStoreDb, readBookingContext } from "@/platform/bookings/store";
 import { deliverBookingUpdates } from "@/platform/bookings/updates";
-import { agentCallLimited, agentIdentityLimitsEnabled, isDisposableEmail, type AgentCall } from "./limits";
+import { agentCallLimited, agentHoldCall, agentIdentityLimitsEnabled, isDisposableEmail, type AgentCall } from "./limits";
 import type { McpServer, McpTool, ToolOutcome } from "./protocol";
 
 /** A business as the tenant directory lists it (the app edge supplies these). */
@@ -64,9 +64,7 @@ const text = (value: unknown) => typeof value === "string" ? value : undefined;
 const sub = (value: unknown) => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 
 function agentCall(tool: string | undefined, args: Record<string, unknown>, business: string | undefined): AgentCall {
-  if (tool === "request_booking" && business) {
-    return { kind: "hold", business, email: text(sub(args.customer).email), agentName: text(sub(args.agent).name), requestId: text(args.requestId) };
-  }
+  if (tool === "request_booking" && business) return agentHoldCall(business, args);
   if (tool === "get_booking_status") return { kind: "status", business, statusToken: text(args.statusToken) };
   return { kind: "read", business };
 }

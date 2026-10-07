@@ -29,6 +29,15 @@ export type AgentCall =
   | { kind: "status"; business?: string; statusToken?: string }
   | { kind: "hold"; business: string; email?: string; agentName?: string; requestId?: string };
 
+const field = (value: unknown, key: string): string | undefined => {
+  const inner = value && typeof value === "object" ? (value as Record<string, unknown>)[key] : undefined;
+  return typeof inner === "string" ? inner : undefined;
+};
+/** The hold identity of an agent booking body, before it is validated. */
+export function agentHoldCall(business: string, body: Record<string, unknown> | null): AgentCall {
+  return { kind: "hold", business, email: field(body?.customer, "email"), agentName: field(body?.agent, "name"), requestId: field(body, "requestId") };
+}
+
 export interface LimitBucket { key: string; max: number; windowMs: number }
 
 const MINUTE = 60_000, HOUR = 3_600_000;
