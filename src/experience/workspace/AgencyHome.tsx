@@ -271,6 +271,7 @@ export function AgencyHome({
     <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-accent-text">{agencyName}</p>
     <h1 className="mt-3 font-display text-[28px] font-medium leading-tight text-warm-black sm:text-[32px]">Client work</h1>
     <p className="mt-3 text-[14px] leading-relaxed text-gray-muted">Each client is shown with the access you have in that business. Customers keep ownership and control access.</p>
+    {canUseTools && snapshot.releases?.agencySetup ? <a href={`/workspace/agency/start?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="mt-4 inline-flex min-h-11 items-center gap-2 text-[13px] font-medium text-warm-black underline-offset-4 hover:underline">Agency setup and verification<ArrowRight size={15} aria-hidden="true" /></a> : null}
     {canUseTools && snapshot.releases?.agencyProspecting && <a href={`/workspace/prospects?workspace=${encodeURIComponent(snapshot.workspaceId)}`} className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm text-warm-black underline">View prospects<ArrowRight size={16} aria-hidden="true" /></a>}
     {combined ? <p className="mt-4 font-mono text-[12px] tabular-nums text-warm-black" aria-live="polite">
       {combined.total} {combined.total === 1 ? "client" : "clients"} · {combined.queue.length} {released ? "in the queue" : "need attention"}{oldestQueueWait ? ` · oldest waiting ${oldestQueueWait} ${oldestQueueWait === 1 ? "day" : "days"}` : ""}
