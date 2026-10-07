@@ -18,7 +18,7 @@ import type {SiteHealthSnapshot} from "@/platform/operator-queue/site-coverage";
 // The nine live custom-repo clients from release-manifest.json, as fictional tenant rows.
 const CUSTOM_REPOS=["gldf","mclears","rohlax","twintrees","twintrees-market","mooney","leslie","rhm","wellness"];
 function domainHealth(tenantId:string,state:"up"|"down"="up"){const checkedAt=new Date().toISOString();return{tenantId,siteName:tenantId,ownerName:"Owner",primaryHost:`${tenantId}.example.test`,checks:[{host:`${tenantId}.example.test`,kind:"custom" as const,url:`https://${tenantId}.example.test`,httpStatus:state==="up"?200:503,bytes:5000,state,expiresAt:null,daysToExpiry:200,checkedAt,latencyMs:80}],worst:state,nearestExpiryDays:200};}
-beforeEach(()=>{vi.resetAllMocks();deps.release.mockReturnValue(true);deps.prune.mockResolvedValue(0);deps.list.mockResolvedValue([{workspaceId:"workspace",workId:"website",tenantId:"mooney",revision:1,contentHash:"a".repeat(64)}]);deps.save.mockResolvedValue(undefined);deps.send.mockResolvedValue({status:"suppressed",reason:"disabled"});
+beforeEach(()=>{vi.resetAllMocks();vi.stubEnv("STRELVA_OPERATOR_QUEUE_RELEASE","1");deps.release.mockReturnValue(true);deps.prune.mockResolvedValue(0);deps.list.mockResolvedValue([{workspaceId:"workspace",workId:"website",tenantId:"mooney",revision:1,contentHash:"a".repeat(64)}]);deps.save.mockResolvedValue(undefined);deps.send.mockResolvedValue({status:"suppressed",reason:"disabled"});
  deps.tenants.mockResolvedValue(CUSTOM_REPOS.map(id=>({id,stableId:`00000000-0000-4000-8000-${String(CUSTOM_REPOS.indexOf(id)).padStart(12,"0")}`,siteName:id,deliveryModel:"custom_repo",customRepo:{revalidationHealth:id==="gldf"?"failing":"healthy"}})));
  deps.domainSnapshot.mockResolvedValue({scannedAt:new Date().toISOString(),results:CUSTOM_REPOS.filter(id=>id!=="leslie").map(id=>domainHealth(id,id==="rohlax"?"down":"up"))});
  deps.probe.mockImplementation(async(tenant:{id:string})=>domainHealth(tenant.id));
@@ -28,6 +28,16 @@ beforeEach(()=>{vi.resetAllMocks();deps.release.mockReturnValue(true);deps.prune
 afterEach(()=>vi.unstubAllEnvs());
 function savedCoverage():SiteHealthSnapshot{return deps.saveCoverage.mock.calls.at(-1)![0];}
 describe("website health cron",()=>{
+ it("preserves the skipped response and performs no expanded checks while both flags are off",async()=>{
+  vi.stubEnv("STRELVA_OPERATOR_QUEUE_RELEASE","0");deps.release.mockReturnValue(false);
+  expect(await(await GET(authenticatedCronRequest())).json()).toEqual({skipped:true,reason:"website_rebuild_release_disabled"});
+  expect(deps.tenants).not.toHaveBeenCalled();expect(deps.probe).not.toHaveBeenCalled();expect(deps.saveCoverage).not.toHaveBeenCalled();expect(deps.send).not.toHaveBeenCalled();
+ });
+ it("preserves hosted-only checks and response fields with the rebuild on and queue off",async()=>{
+  vi.stubEnv("STRELVA_OPERATOR_QUEUE_RELEASE","0");deps.fetch.mockResolvedValue(`<meta name="strelva-site-hash" content="${"a".repeat(64)}">`);
+  expect(await(await GET(authenticatedCronRequest())).json()).toEqual({processed:1,failed:0,crawlRetention:{status:"pruned",removed:0}});
+  expect(deps.list).toHaveBeenCalledOnce();expect(deps.tenants).not.toHaveBeenCalled();expect(deps.saveCoverage).not.toHaveBeenCalled();
+ });
  it("authenticates before scanning, and with the rebuild release off still covers every custom-repo site",async()=>{vi.stubEnv("CRON_SECRET","test-cron-secret");expect((await GET(new Request("https://app.strelva.com/api/cron/website-health"))).status).toBe(401);expect(deps.list).not.toHaveBeenCalled();expect(deps.tenants).not.toHaveBeenCalled();
   deps.release.mockReturnValue(false);const response=await GET(authenticatedCronRequest());const body=await response.json();
   expect(body).toMatchObject({hosted:{skipped:true},coverage:{sites:9,customRepos:9,probed:1}});expect(body.skipped).toBeUndefined();

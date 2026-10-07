@@ -73,6 +73,10 @@ export function projectQueue(input: ProjectInput): OperatorQueue {
   const marks = new Map((input.context?.marks ?? []).map((mark) => [markKey(mark.source, mark.sourceRef), mark]));
 
   const gaps: QueueSourceGap[] = [];
+  const readKinds = new Set(input.reads.map((read) => read.kind));
+  for (const kind of QUEUE_KINDS) {
+    if (!readKinds.has(kind)) gaps.push({ kind, source: kind.replaceAll("_", " "), reason: "Source was not read" });
+  }
   if (!input.context) {
     gaps.push({ kind: "readback_failed", source: "Queue marks and receipts", reason: input.contextFailure ?? "Postgres unavailable" });
   }

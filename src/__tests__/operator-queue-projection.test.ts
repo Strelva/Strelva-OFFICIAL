@@ -95,6 +95,12 @@ describe("operator queue projection", () => {
     expect(queue.items.some((item) => item.kind === "change_request")).toBe(false);
   });
 
+  it("a missing source is an explicit gap even if every attempted read succeeded", () => {
+    const queue = projectQueue({ reads: reads().filter((read) => read.kind !== "assignment_offer"), context: context(), tenants, emailPaused: false, now: NOW });
+    expect(queue.complete).toBe(false);
+    expect(queue.gaps).toEqual([{ kind: "assignment_offer", source: "assignment offer", reason: "Source was not read" }]);
+  });
+
   it("without Postgres the marks are unknown, so the list is incomplete", () => {
     const queue = projectQueue({ reads: reads(), context: null, contextFailure: "Queue storage is unavailable.", tenants, emailPaused: false, now: NOW });
     expect(queue.complete).toBe(false);

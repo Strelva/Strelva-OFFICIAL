@@ -3,7 +3,9 @@ import { getRedis } from "@/platform/infra/redis";
 import { getSupabase } from "@/platform/infra/db/client";
 import { getEventsRaw } from "@/lib/events";
 import { listDrafts } from "@/lib/storage";
-import { listPendingDigests } from "@/lib/maintenance-digest";
+import { listPendingDigests, type MaintenanceDigest } from "@/lib/maintenance-digest";
+import { dataSourceIsPostgres } from "@/platform/infra/db/source-flags";
+import { CRON_MAX_AGE_SECONDS } from "@/platform/infra/heartbeat";
 import { buildAttentionBriefing, buildAttentionFromSnapshot } from "@/lib/attention";
 import { getPortfolioSummaryState } from "@/lib/portfolio";
 import { getDomainHealth } from "@/lib/domain-monitor-store";
@@ -122,6 +124,24 @@ export async function readSiteDrafts(tenants: QueueTenant[], now: number): Promi
   try {
     const rows: QueueItemRaw[] = [];
     for (const tenant of tenants) {
+      if (operatorQueueReleaseEnabled() && dataSourceIsPostgres()) {
+        const db = getSupabase();
+        if (!db) throw new Error("Postgres unavailable");
+        // The legacy helper degrades to an empty dev store on Postgres errors.
+        // The queue must report failure and keep the source's actual age.
+        for (let offset = 0; ; offset += 500) {
+          const page = await db.from("draft_content").select("section,created_at").eq("tenant_id", tenant.id)
+            .order("section", { ascending: true }).range(offset, offset + 499);
+          if (page.error || !page.data) throw new Error("Postgres draft read failed");
+          for (const draft of page.data) rows.push({
+            kind: "site_draft", sourceRef: `${tenant.id}:${draft.section}`, tenantId: tenant.id, workspaceId: null,
+            title: `Draft of the ${draft.section} section`, openedAt: draft.created_at,
+            href: `/admin/drafts?tenant=${encodeURIComponent(tenant.id)}`,
+          });
+          if (page.data.length < 500) break;
+        }
+        continue;
+      }
       const drafts = await listDrafts(tenant.id);
       for (const section of Object.keys(drafts).filter((key) => drafts[key])) {
         rows.push({
@@ -138,9 +158,26 @@ export async function readSiteDrafts(tenants: QueueTenant[], now: number): Promi
 }
 
 export async function readMaintenanceDigests(): Promise<SourceRead> {
-  if (!getRedis()) return noRedis(["maintenance_digest"], "Maintenance digests")[0]!;
+  const redis = getRedis();
+  if (!redis) return noRedis(["maintenance_digest"], "Maintenance digests")[0]!;
   try {
-    const digests = await listPendingDigests();
+    let digests: MaintenanceDigest[];
+    if (!operatorQueueReleaseEnabled()) digests = await listPendingDigests();
+    else {
+      // Legacy listPendingDigests intentionally hides read failures on old
+      // screens. Read the same keys strictly here, without mutating either.
+      const tenants = await redis.smembers<string[]>("maint-digest:pending");
+      const values = await Promise.all(tenants.map(async (tenant) => {
+        const raw = await redis.get<MaintenanceDigest | string>(`maint-digest:${tenant}`);
+        if (!raw) return null; // A source can close between the index and blob reads.
+        const value = typeof raw === "string" ? JSON.parse(raw) as MaintenanceDigest : raw;
+        if (value.tenant !== tenant || !Array.isArray(value.items) || !["pending", "approved", "dismissed"].includes(value.status) || !Number.isFinite(Date.parse(value.createdAt))) {
+          throw new Error("Maintenance digest could not be read");
+        }
+        return value;
+      }));
+      digests = values.filter((value): value is MaintenanceDigest => value !== null && value.status === "pending");
+    }
     return {
       kind: "maintenance_digest", source: "Maintenance digests", ok: true,
       rows: digests.map((digest) => ({
@@ -217,7 +254,7 @@ export async function readUnverifiedDomains(tenants: QueueTenant[], now: number)
   }
 }
 
-export async function readSiteHealthItems(context: QueueContext | null, tenants: Map<string, QueueTenant>): Promise<SourceRead> {
+export async function readSiteHealthItems(context: QueueContext | null, tenants: Map<string, QueueTenant>, now = Date.now()): Promise<SourceRead> {
   const source = "Site health";
   let snapshot;
   try {
@@ -226,19 +263,30 @@ export async function readSiteHealthItems(context: QueueContext | null, tenants:
     return failure("site_health", source, error);
   }
   if (!snapshot) return { kind: "site_health", source, ok: false, reason: "No site health run on record" };
-  const rows: QueueItemRaw[] = snapshot.results.filter((result) => result.status !== "healthy").map((result) => ({
+  const checkedAt = Date.parse(snapshot.checkedAt);
+  const stale = operatorQueueReleaseEnabled() && (!Number.isFinite(checkedAt) || now - checkedAt > CRON_MAX_AGE_SECONDS["website-health"] * 1000);
+  const rows: QueueItemRaw[] = snapshot.results.filter((result) => stale || result.status !== "healthy").map((result) => ({
     kind: "site_health" as const, sourceRef: `site:${result.tenantId}`, tenantId: result.tenantId, workspaceId: null,
-    title: result.status === "unknown"
+    title: stale || result.status === "unknown"
       ? `${result.siteName || siteLabel(tenants, result.tenantId)}: no recent evidence`
       : `${result.siteName || siteLabel(tenants, result.tenantId)}: ${result.reasons[0]?.message ?? result.status}`,
-    openedAt: result.lastVerifiedAt ?? snapshot.checkedAt, facts: { healthStatus: result.status }, href: clientHref(result.tenantId, "health"),
+    openedAt: result.lastVerifiedAt ?? snapshot.checkedAt, facts: { healthStatus: stale ? "unknown" : result.status }, href: clientHref(result.tenantId, "health"),
   }));
+  if (operatorQueueReleaseEnabled()) {
+    const covered = new Set(snapshot.results.map((result) => result.tenantId));
+    for (const tenant of tenants.values()) if (!covered.has(tenant.id)) rows.push({
+      kind: "site_health", sourceRef: `site:${tenant.id}`, tenantId: tenant.id, workspaceId: null,
+      title: `${tenant.siteName || tenant.id}: no recent evidence`, openedAt: snapshot.checkedAt,
+      facts: { healthStatus: "unknown" }, href: clientHref(tenant.id, "health"),
+    });
+  }
   for (const health of context?.documentHealth ?? []) {
-    if (health.status === "healthy") continue;
+    const documentStale = operatorQueueReleaseEnabled() && (!Number.isFinite(Date.parse(health.checkedAt)) || now - Date.parse(health.checkedAt) > CRON_MAX_AGE_SECONDS["website-health"] * 1000);
+    if (health.status === "healthy" && !documentStale) continue;
     rows.push({
       kind: "site_health", sourceRef: `document:${health.workId}:${health.revision}`, tenantId: health.tenantId, workspaceId: health.workspaceId,
-      title: `Published revision ${health.revision} is not verified (${health.status.replace("_", " ")})`,
-      openedAt: health.checkedAt, facts: { healthStatus: "blocked" }, href: `/admin/websites`,
+      title: documentStale ? `Published revision ${health.revision}: no recent evidence` : `Published revision ${health.revision} is not verified (${health.status.replace("_", " ")})`,
+      openedAt: health.checkedAt, facts: { healthStatus: documentStale ? "unknown" : "blocked" }, href: `/admin/websites`,
     });
   }
   return { kind: "site_health", source, ok: true, rows };
@@ -262,7 +310,7 @@ export async function readServiceRequests(actor: QueueActor): Promise<SourceRead
 
 export async function readOperationalExceptions(): Promise<SourceRead> {
   try {
-    const exceptions = await listOperationalExceptions();
+    const exceptions = await listOperationalExceptions(operatorQueueReleaseEnabled() ? { all: true } : undefined);
     return {
       kind: "operational_exception", source: "Operational exceptions", ok: true,
       rows: exceptions.map((exception) => ({
@@ -429,7 +477,7 @@ export async function readAllSources(input: { tenants: QueueTenant[]; context: Q
     guard("ops_alert", "Operations alerts", readOpsAlerts),
     guard("domain_alert", "Domain monitor", readDomainAlerts),
     guard("domain_unverified", "Domain claims", () => readUnverifiedDomains(tenants, now)),
-    guard("site_health", "Site health", () => readSiteHealthItems(context, byId)),
+    guard("site_health", "Site health", () => readSiteHealthItems(context, byId, now)),
     guard("service_request", "Service requests", () => readServiceRequests(actor)),
     guard("operational_exception", "Operational exceptions", readOperationalExceptions),
     guard("assignment_offer", "Assignment offers", () => readAssignmentOffers(now)),
