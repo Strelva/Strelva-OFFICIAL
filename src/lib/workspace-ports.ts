@@ -238,6 +238,10 @@ export interface WebsitesPort {
   patchWebsiteRebuild(actor: VerifiedActor, workId: string, patch: Record<string, unknown> & { forceReview: true }): Promise<unknown>;
 }
 
+export interface PublishingContentPort {
+  executePublishingEvent(input: { tenantId: string; event: UnifiedEvent; actorId: string; attemptId: string }): Promise<null | { accepted: boolean; reason?: string; receiptId?: string; verified?: boolean }>;
+}
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 export interface WorkspacePorts {
@@ -250,6 +254,7 @@ export interface WorkspacePorts {
   inquiries(): Promise<InquiriesPort>;
   tenantReviewReplies(): Promise<TenantReviewRepliesPort>;
   websites(): Promise<WebsitesPort>;
+  publishingContent(): Promise<PublishingContentPort>;
 }
 
 const SLOT = Symbol.for("strelva.workspace-ports");

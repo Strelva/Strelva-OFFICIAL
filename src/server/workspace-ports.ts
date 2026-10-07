@@ -56,4 +56,6 @@ export const workspacePortLoaders = {
   tenantReviewReplies: () => import("@/products/google-listing/server"),
 
   websites: () => import("@/products/websites/index"),
+
+  publishingContent: () => import("@/products/publishing/execution"),
 };

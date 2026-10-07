@@ -5,6 +5,7 @@ import { defaultPropagation, systemOriginId } from "@/platform/systems/invariant
 import type { ConnectionKind, ConnectionState, ConnectionTarget, System, SystemConnection, SystemOrigin } from "@/platform/systems/contracts";
 import type { BusinessSystems, SystemListing } from "@/platform/systems/from-existing";
 import type { Observation } from "@/platform/system-health/contracts";
+import { listingControlSchema } from "@/products/google-listing/controls";
 import { listingHealth, listingObservation } from "@/products/google-listing/health";
 import type { ListingHealth, ListingReceipt } from "@/products/google-listing/contracts";
 
@@ -34,6 +35,7 @@ export const publishingSnapshotSchema = z.object({
   scope: z.enum(["business", "assigned"]),
   bindings: z.array(accountBindingSchema),
   receipts: z.array(receiptSummarySchema),
+  controls: z.array(listingControlSchema).optional(),
 });
 export type PublishingSnapshot = z.infer<typeof publishingSnapshotSchema>;
 
@@ -146,12 +148,12 @@ export function addPublishingSystems(base: BusinessSystems, rawSnapshot: Publish
     if (!location) continue;
     const listingSystem = system(businessId, { kind: "google_location", ref: `${binding.id}:${location.locationId}` }, {
       name: location.title ?? (website ? `${website.system.name} on Google` : "Google listing"),
-      kind: "listing", lifecycle: "live", createdAt: binding.createdAt, updatedAt: binding.updatedAt,
+      kind: "listing", lifecycle: snapshot.controls?.find((control) => control.locationId === location.locationId)?.paused ? "paused" : "live", createdAt: binding.createdAt, updatedAt: binding.updatedAt,
     });
     if (seen.has(listingSystem.id)) continue;
     seen.add(listingSystem.id);
     const receipts = snapshot.receipts.filter((receipt) => receipt.bindingId === binding.id && receipt.locationId === location.locationId);
-    const healthInput = { binding, receipts: receipts as unknown as ListingReceipt[], now };
+    const healthInput = { binding, receipts: receipts as unknown as ListingReceipt[], now, accessPending: snapshot.controls?.find((control) => control.locationId === location.locationId)?.accessPending };
     const verdict = listingHealth(healthInput);
     systems.push({
       system: listingSystem, provenance: "existing",

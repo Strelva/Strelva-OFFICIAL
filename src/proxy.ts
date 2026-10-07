@@ -79,6 +79,10 @@ const PUBLIC_EXACT = new Set([
   "/api/newsletter/subscribe",
   // Signed one-click unsubscribe (RFC 8058); the token is the authorization.
   "/api/newsletter/unsubscribe",
+  // Signed owner capability plus single-use, browser-bound OAuth state. These
+  // routes restore an existing grant for owners with no workspace session.
+  "/api/publishing/google/reconnect",
+  "/api/publishing/google/reconnect/callback",
   "/api/track",
   "/api/billing/webhook",
 ]);

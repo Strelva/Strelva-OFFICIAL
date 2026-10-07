@@ -19,6 +19,9 @@ export interface NeedsYouDeps {
   /** Origin that serves /api/approve and /workspace. */
   appOrigin: string;
   now(): number;
+  /** Optional channel-specific release/send policy; false leaves the item
+   * waiting without consuming its delivery state. */
+  canDeliver?(row: DeliveryRow): Promise<boolean>;
 }
 
 export type DecideStatus =
@@ -315,6 +318,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
           const fresh = await reconcile(readCtx, row);
           if (fresh === "gone" || fresh === "changed") continue;
         }
+        if (deps.canDeliver && !(await deps.canDeliver(row))) { summary.ownerNotTold += 1; continue; }
         if (row.urgent && row.deliveryState === "not_sent") {
           await deliver("urgent", [row], summary);
           summary.urgent += 1;

@@ -250,6 +250,13 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   let result: { changed: boolean; reason?: string };
   try {
+    // Tenant links predate recipient-bound workspace decisions. Keep those
+    // live emails working; new workspace publishing requires the ws2 link.
+    const { getEventRaw } = await import("@/lib/events");
+    const event = await getEventRaw(claims.eventId);
+    if (event && ["workspace_collection_publish", "workspace_newsletter_issue", "workspace_google_listing_draft"].includes(String(event.metadata?.kind))) {
+      return noticePage({ status: 403, heading: "Use the current approval link", body: "Open this item in Needs you, or use the recipient-bound approval link Strelva prepared for it." });
+    }
     result = await resolveEventAction(claims.tenantId, claims.eventId, workflowAction);
   } catch (err) {
     console.error(`[api/approve] resolveEventAction threw for ${claims.tenantId}/${claims.eventId}:`, err);

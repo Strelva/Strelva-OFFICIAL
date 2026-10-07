@@ -14,7 +14,7 @@ import { publishingSnapshotSchema, type PublishingExtras, type PublishingSnapsho
 /** STRELVA_PUBLISHING_RELEASE=1 shows the listing and newsletter Systems and
  * website parts on top of STRELVA_SYSTEMS_RELEASE. Off by default. */
 export function publishingReleaseEnabled(env: { STRELVA_PUBLISHING_RELEASE?: string } = { STRELVA_PUBLISHING_RELEASE: process.env.STRELVA_PUBLISHING_RELEASE }): boolean {
-  return env.STRELVA_PUBLISHING_RELEASE === "1";
+  return env.STRELVA_PUBLISHING_RELEASE === "1" || env.STRELVA_PUBLISHING_RELEASE === "workspace";
 }
 
 type Db = { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message?: string } | null }> };

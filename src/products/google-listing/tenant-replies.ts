@@ -43,6 +43,8 @@ export interface TenantReplyDeps {
   client(accessToken: string): GoogleListingClient;
   receipts(): ListingReceiptStore;
   notify(text: string): void;
+  control?(workspaceId: string, locationId: string): Promise<{ paused: boolean }>;
+  noteAccess?(workspaceId: string, locationId: string, pending: boolean): Promise<unknown>;
 }
 
 /** Which ledger this tenant's reply belongs to. Decided before any write. */
@@ -87,6 +89,9 @@ export async function postTenantReviewReply(input: {
   const locationId = located ? locationIdOf(located.locationId) : null;
   if (!located || !locationId) return fail("missing_account_location_meta");
 
+  const control = await deps.control?.(input.workspaceId, locationId);
+  if (control?.paused) return { status: "refused", reason: "refused_paused" };
+
   // Track whether Google took the reply, so a failure after acceptance is
   // never reported as "nothing sent".
   const base = deps.client(token);
@@ -104,8 +109,7 @@ export async function postTenantReviewReply(input: {
       workspaceId: input.workspaceId,
       bindingId: grant.bindingId && grant.workspaceId === input.workspaceId ? grant.bindingId : null,
       location: { accountId: located.accountId, locationId },
-      // The listing System has no stored pause yet; the projection reads it as live.
-      lifecycle: "live",
+      lifecycle: control?.paused ? "paused" : "live",
       client,
       receipts: deps.receipts(),
     }, {
@@ -115,16 +119,22 @@ export async function postTenantReviewReply(input: {
       idempotencyKey: `review-reply:${input.eventId}:${input.attemptId}`.slice(0, 256),
     });
     if (outcome.status === "refused") {
+      if (outcome.reason === "api_access_pending") {
+        await deps.noteAccess?.(input.workspaceId, locationId, true);
+        return { status: "failed", reason: "google_access_pending" };
+      }
       if (outcome.reason === "nothing_to_change") return { status: "already_on_google" };
       return fail(`refused_${outcome.reason}`);
     }
     if (outcome.status === "failed") {
+      if (outcome.accessPending) await deps.noteAccess?.(input.workspaceId, locationId, true);
       deps.notify(`Review reply FAILED for *${input.tenantId}* (reviewId=${input.reviewId}): ${outcome.receipt.error ?? "Google refused it"}`);
       return { status: "failed", reason: outcome.accessPending ? "google_access_pending" : "google_refused", receipt: outcome.receipt };
     }
     if (outcome.status !== "posted") {
       deps.notify(`Review reply posted for *${input.tenantId}* (reviewId=${input.reviewId}) but not confirmed: ${outcome.status}`);
     }
+    await deps.noteAccess?.(input.workspaceId, locationId, false);
     return { status: outcome.status, receipt: outcome.receipt };
   } catch (error) {
     const reason = error instanceof Error ? error.message.slice(0, 200) : "listing_write_failed";
@@ -154,6 +164,8 @@ export async function defaultTenantReplyDeps(): Promise<TenantReplyDeps> {
     accessToken: (grant) => access.getValidGoogleAccessToken(grant),
     client: (token) => createHttpGoogleListingClient(token),
     receipts: () => createSupabaseReceiptStore(),
+    control: async (workspaceId, locationId) => (await import("./controls")).readListingControl(workspaceId, locationId),
+    noteAccess: async (workspaceId, locationId, pending) => (await import("./controls")).noteListingAccess(workspaceId, locationId, pending),
     notify: (text) => { sendSlackNotification({ text }).catch(() => {}); },
   };
 }

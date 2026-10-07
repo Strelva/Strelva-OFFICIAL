@@ -50,13 +50,14 @@ export type ListingWriteOutcome =
   | { status: "failed"; receipt: ListingReceipt; message: string; accessPending: boolean }
   | { status: "refused"; reason: ListingRefusal; message: string };
 
-export type ListingRefusal = "paused" | "authority" | "invalid" | "snapshot_unavailable" | "not_undoable" | "unsafe_url" | "nothing_to_change";
+export type ListingRefusal = "paused" | "authority" | "invalid" | "snapshot_unavailable" | "api_access_pending" | "not_undoable" | "unsafe_url" | "nothing_to_change";
 
 const MESSAGES = {
   paused: "The Google listing is paused, so Strelva isn't changing it.",
   authority: "This change needs the owner's approval.",
   invalid: "That change can't be sent to Google as written.",
   snapshot_unavailable: "Strelva couldn't read Google's current listing, so nothing was changed.",
+  api_access_pending: "Waiting for Google to approve API access. Your draft is kept. Nothing was sent.",
   not_undoable: "This change can't be undone.",
   unsafe_url: "That link can't be used on Google.",
   nothing_to_change: "Google already matches.",
@@ -130,7 +131,7 @@ async function governedWrite<T>(ctx: ListingContext, plan: WritePlan<T>): Promis
   if (replayed && receipt.status !== "posting") {
     // Already decided. Never a second write.
     return receipt.status === "failed"
-      ? { status: "failed", receipt, message: receiptHeadline(receipt), accessPending: false }
+      ? { status: "failed", receipt, message: receiptHeadline(receipt), accessPending: receipt.error?.startsWith("Google API access is still pending") ?? false }
       : { status: receipt.status === "undone" ? "posted" : receipt.status as "posted" | "posted_unverified" | "held_by_google", receipt, message: receiptHeadline(receipt) };
   }
   if (replayed) {
@@ -152,7 +153,7 @@ async function governedWrite<T>(ctx: ListingContext, plan: WritePlan<T>): Promis
     });
     return {
       status: "failed", receipt: settled, accessPending,
-      message: accessPending ? "Google access is still being set up. This will go out once Google approves." : receiptHeadline(settled),
+      message: accessPending ? "Waiting for Google to approve API access. Your draft is kept. Nothing was sent." : receiptHeadline(settled),
     };
   }
 
@@ -189,8 +190,9 @@ export async function postReviewReply(ctx: ListingContext, input: {
   if (paused) return paused;
   const text = input.text.trim();
   if (!text || Buffer.byteLength(text, "utf8") > REVIEW_REPLY_MAX_BYTES || !/^[A-Za-z0-9_-]{1,300}$/.test(input.reviewId)) return refused("invalid");
-  const review = await readReview(ctx, input.reviewId);
-  if (!review) return refused("snapshot_unavailable");
+  const read = await ctx.client.getReview(ctx.location, input.reviewId);
+  if (!read.ok) return refused(read.kind === "setup_pending" ? "api_access_pending" : "snapshot_unavailable");
+  const review = read.data;
   const previous = review.reviewReply?.comment ?? null;
   if (previous !== null && normalize(previous) === normalize(text)) return refused("nothing_to_change");
   const action: ListingAction = previous === null ? "reply_post" : "reply_update";
@@ -221,8 +223,9 @@ export async function withdrawReviewReply(ctx: ListingContext, input: {
   const paused = checkRefusal(ctx);
   if (paused) return paused;
   if (input.authority.kind === "auto_reply_policy") return refused("authority");
-  const review = await readReview(ctx, input.reviewId);
-  if (!review) return refused("snapshot_unavailable");
+  const read = await ctx.client.getReview(ctx.location, input.reviewId);
+  if (!read.ok) return refused(read.kind === "setup_pending" ? "api_access_pending" : "snapshot_unavailable");
+  const review = read.data;
   const previous = review.reviewReply?.comment ?? null;
   if (previous === null) return refused("nothing_to_change");
   return governedWrite(ctx, {
@@ -258,7 +261,7 @@ async function patchFromRecord(ctx: ListingContext, input: {
   if (input.authority.kind === "auto_reply_policy") return refused("authority");
   if (!input.mask.length) return refused("nothing_to_change");
   const current = await ctx.client.getLocation(ctx.location, [...input.mask, "metadata"]);
-  if (!current.ok) return refused("snapshot_unavailable");
+  if (!current.ok) return refused(current.kind === "setup_pending" ? "api_access_pending" : "snapshot_unavailable");
   if (input.matches(current.data)) return refused("nothing_to_change");
   const snapshot = pick(current.data, input.mask);
   return governedWrite(ctx, {

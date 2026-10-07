@@ -334,6 +334,25 @@ async function executeResolvedEventAction(
   // event to resolved. A failed or stale action must leave the item pending —
   // never resolve it and have the UI falsely say "Made live".
 
+  // Workspace publishing uses the existing event claim and owner decision.
+  // New kinds cannot fall through to a tenant publisher when rollout is off.
+  if (["workspace_collection_publish", "workspace_newsletter_issue", "workspace_google_listing_draft"].includes(String(event.metadata?.kind))) {
+    if (action === "dismissed") {
+      const resolved = await resolveEvent(eventId, "dismissed", { actor: actorId });
+      return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
+    }
+    const publishing = await workspacePorts().publishingContent();
+    const execution = await publishing.executePublishingEvent({ tenantId, event, actorId, attemptId });
+    if (!execution?.accepted) return { changed: false, reason: execution?.reason ?? "publishing_unavailable" };
+    // Google acceptance, atomic site publication or an immutable newsletter
+    // approval all close this exact draft. A failed read-back never republishes.
+    await markExecutionExternalAccepted(eventId);
+    const resolved = await resolveEvent(eventId, "approved", { actor: actorId });
+    return resolved.changed
+      ? { changed: true, ...(execution.reason ? { reason: execution.reason } : {}) }
+      : { changed: false, reason: "already_resolved" };
+  }
+
   if (event.type === "content_update") {
     const kind = event.metadata?.kind;
 

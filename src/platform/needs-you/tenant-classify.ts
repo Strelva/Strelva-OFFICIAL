@@ -35,6 +35,7 @@ export function classifyTenantEvent(event: UnifiedEvent): TenantEventClassificat
     const rating = typeof m.rating === "number" ? m.rating : undefined;
     return { kind: "review.reply", origin: "strelva", signals: rating === undefined ? {} : { reviewRating: rating } };
   }
+  if (kind === "workspace_collection_publish") return { kind: "copy.marketing", origin: "owner_interpreted", signals: {} };
   if (event.type === "newsletter_draft" || kind === "newsletter_approval") return { kind: "customer.broadcast", origin, signals: {} };
   if (kind === "manual_structural_change") return { kind: "structure", origin, signals: {} };
   if (kind === "gbp_post_draft") return { kind: "google.post", origin, signals: {} };
