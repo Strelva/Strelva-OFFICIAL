@@ -22,6 +22,8 @@ export interface OrderLineItem {
 export interface OrderRecord {
   id: string;
   externalId?: string;
+  /** Only site-signature orders enter Store outcome totals and receipts. */
+  verification: "site-signature";
   amountCents: number;
   currency: string;
   itemCount: number;
@@ -83,14 +85,19 @@ function newOrderId(): string {
   return `ord_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** Record a completed storefront order. Idempotent on externalId (required —
- *  the idempotency key); returns null on dedup/no-redis. */
+/** Record a site-verified storefront order. Idempotent on externalId (required). */
 export async function recordOrder(
   tenant: string,
-  input: { amountCents: number; currency: string; items: OrderLineItem[]; externalId: string },
+  input: {
+    amountCents: number;
+    currency: string;
+    items: OrderLineItem[];
+    externalId: string;
+    verification: "site-signature";
+  },
 ): Promise<OrderRecord | null> {
   const redis = getRedis();
-  if (!redis) return null;
+  if (!redis) throw new Error("Order storage is unavailable");
 
   const dedupKey = `order-ext:${tenant}:${input.externalId}`;
   const fresh = await redis.set(dedupKey, "1", { nx: true, ex: ORDER_TTL_SECONDS });
@@ -99,6 +106,7 @@ export async function recordOrder(
   const order: OrderRecord = {
     id: newOrderId(),
     externalId: input.externalId,
+    verification: input.verification,
     amountCents: input.amountCents,
     currency: input.currency,
     itemCount: input.items.reduce((sum, it) => sum + it.quantity, 0) || input.items.length,
@@ -128,7 +136,9 @@ export async function getOrders(tenant: string, limit = 50): Promise<OrderRecord
   const ids = await redis.zrange<string[]>(ordersKey(tenant), 0, limit - 1, { rev: true });
   if (!ids.length) return [];
   const rows = await redis.mget<OrderRecord[]>(...ids.map((id) => orderKey(tenant, id)));
-  return rows.filter((o): o is OrderRecord => Boolean(o));
+  // Old records predate the site-signature boundary. Keep them out of order
+  // visibility and every derived outcome total; their source cannot be proven.
+  return rows.filter((o): o is OrderRecord => Boolean(o) && o.verification === "site-signature");
 }
 
 /** Order count + revenue + top products over the trailing window. */

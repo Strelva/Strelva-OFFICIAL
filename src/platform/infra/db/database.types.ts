@@ -9195,6 +9195,32 @@ export type Database = {
           },
         ]
       }
+      tenant_track_signing_keys: {
+        Row: {
+          created_at: string
+          public_key: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          public_key: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          public_key?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_track_signing_keys_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       unified_events: {
         Row: {
           body: string | null

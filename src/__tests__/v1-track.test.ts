@@ -1,10 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { generateKeyPairSync } from "node:crypto";
+import { createTrackSignatureHeaders } from "../../custom-repo-starter/track-signature";
 
 const mockTrackClick = vi.fn((..._args: unknown[]) => Promise.resolve());
 const mockGetTenantConfig = vi.fn((_tenant?: string): Promise<unknown> =>
   Promise.resolve({ id: "gldf", active: true })
 );
 const mockIsRateLimited = vi.fn((..._args: unknown[]) => Promise.resolve(false));
+const mockRecordOrder = vi.fn((..._args: unknown[]) => Promise.resolve({ id: "order-1" }));
+const mockGetTrackPublicKey = vi.fn((_tenant: string) => Promise.resolve<string | null>(null));
+const mockRedis = { set: vi.fn() };
+const mockGetRedis = vi.fn(() => null as typeof mockRedis | null);
 
 vi.mock("@/lib/storage", () => ({
   trackClick: (...args: unknown[]) => mockTrackClick(...args),
@@ -14,15 +20,27 @@ vi.mock("@/lib/tenants", () => ({
   getTenantConfig: (tenant: string) => mockGetTenantConfig(tenant),
 }));
 
+vi.mock("@/lib/orders", () => ({
+  recordOrder: (...args: unknown[]) => mockRecordOrder(...args),
+}));
+
+vi.mock("@/lib/tracking-signing-keys", () => ({
+  getTenantTrackPublicKey: (tenant: string) => mockGetTrackPublicKey(tenant),
+}));
+
+vi.mock("@/platform/infra/redis", () => ({
+  getRedis: () => mockGetRedis(),
+}));
+
 vi.mock("@/platform/infra/rate-limit", () => ({
   isRateLimitedAsync: (...args: unknown[]) => mockIsRateLimited(...args),
   rateLimitKey: vi.fn((_request: Request, scope: string) => `${scope}:test`),
 }));
 
-function post(tenant: string, body: string | object) {
+function post(tenant: string, body: string | object, headers: Record<string, string> = {}) {
   return new Request(`http://localhost/api/v1/track/${tenant}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
 }
@@ -32,6 +50,10 @@ describe("v1 track beacon — POST /api/v1/track/:tenant", () => {
     vi.clearAllMocks();
     mockGetTenantConfig.mockResolvedValue({ id: "gldf", active: true });
     mockIsRateLimited.mockResolvedValue(false);
+    mockRecordOrder.mockResolvedValue({ id: "order-1" });
+    mockGetTrackPublicKey.mockResolvedValue(null);
+    mockGetRedis.mockReturnValue(null);
+    mockRedis.set.mockReset();
   });
 
   it("stores a page-view as page-view for the tenant", async () => {
@@ -223,6 +245,101 @@ describe("v1 track beacon — POST /api/v1/track/:tenant", () => {
     });
 
     expect(response.status).toBe(429);
+    expect(mockTrackClick).not.toHaveBeenCalled();
+  });
+
+  it("checks independent site-wide and IP-wide limits", async () => {
+    mockIsRateLimited.mockImplementation(async (key: unknown) => key === "v1-track:ip:test");
+    const { POST } = await import("@/app/api/v1/track/[tenant]/route");
+
+    const response = await POST(post("gldf", { event: "page-view" }), {
+      params: Promise.resolve({ tenant: "gldf" }),
+    });
+
+    expect(response.status).toBe(429);
+    expect(mockIsRateLimited).toHaveBeenNthCalledWith(1, "v1-track:site:gldf", 6_000);
+    expect(mockIsRateLimited).toHaveBeenNthCalledWith(2, "v1-track:ip:test", 120);
+    expect(mockTrackClick).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when the rate limiter is unavailable", async () => {
+    mockIsRateLimited.mockRejectedValue(new Error("redis unavailable"));
+    const { POST } = await import("@/app/api/v1/track/[tenant]/route");
+
+    const response = await POST(post("gldf", { event: "page-view" }), {
+      params: Promise.resolve({ tenant: "gldf" }),
+    });
+
+    expect(response.status).toBe(503);
+    expect(mockTrackClick).not.toHaveBeenCalled();
+  });
+
+  it("keeps the legacy order payload usable but does not record an unsigned order", async () => {
+    const { POST } = await import("@/app/api/v1/track/[tenant]/route");
+
+    const response = await POST(post("gldf", {
+      event: "order", orderId: "legacy-order", amountCents: 2_499, currency: "USD",
+    }), { params: Promise.resolve({ tenant: "gldf" }) });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true, verified: false, recorded: false });
+    expect(mockRecordOrder).not.toHaveBeenCalled();
+  });
+
+  it("records a signed order only when the signature is bound to the configured origin", async () => {
+    const pair = generateKeyPairSync("ed25519");
+    const publicKey = pair.publicKey.export({ type: "spki", format: "pem" }).toString();
+    const privateKeyBase64 = pair.privateKey.export({ type: "pkcs8", format: "der" }).toString("base64");
+    const origin = "https://gldf.strelva.com";
+    const timestamp = Date.now().toString();
+    const rawBody = JSON.stringify({ event: "order", orderId: "stripe-session-1", amountCents: 2499 });
+    const signatureHeaders = createTrackSignatureHeaders({
+      tenant: "gldf", origin, rawBody, privateKeyBase64, timestamp,
+    });
+    expect(signatureHeaders).not.toBeNull();
+    mockGetTrackPublicKey.mockResolvedValue(publicKey);
+    const { POST } = await import("@/app/api/v1/track/[tenant]/route");
+
+    const response = await POST(post("gldf", rawBody, { origin, ...signatureHeaders! }), {
+      params: Promise.resolve({ tenant: "gldf" }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true, verified: true, recorded: true });
+    expect(mockRecordOrder).toHaveBeenCalledWith("gldf", {
+      amountCents: 2499, currency: "USD", items: [], externalId: "stripe-session-1", verification: "site-signature",
+    });
+  });
+
+  it("does not write a valid signature presented from an unconfigured origin", async () => {
+    const pair = generateKeyPairSync("ed25519");
+    const publicKey = pair.publicKey.export({ type: "spki", format: "pem" }).toString();
+    const privateKeyBase64 = pair.privateKey.export({ type: "pkcs8", format: "der" }).toString("base64");
+    const origin = "https://attacker.example";
+    const timestamp = Date.now().toString();
+    const rawBody = JSON.stringify({ event: "order", orderId: "forged", amountCents: 50_000 });
+    const signatureHeaders = createTrackSignatureHeaders({ tenant: "gldf", origin, rawBody, privateKeyBase64, timestamp });
+    mockGetTrackPublicKey.mockResolvedValue(publicKey);
+    const { POST } = await import("@/app/api/v1/track/[tenant]/route");
+
+    const response = await POST(post("gldf", rawBody, { origin, ...signatureHeaders! }), {
+      params: Promise.resolve({ tenant: "gldf" }),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true, verified: false, recorded: false });
+    expect(mockRecordOrder).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when Redis deduplication is unavailable", async () => {
+    mockGetRedis.mockReturnValue({ set: vi.fn().mockRejectedValue(new Error("redis unavailable")) });
+    const { POST } = await import("@/app/api/v1/track/[tenant]/route");
+
+    const response = await POST(post("gldf", { event: "page-view" }), {
+      params: Promise.resolve({ tenant: "gldf" }),
+    });
+
+    expect(response.status).toBe(503);
     expect(mockTrackClick).not.toHaveBeenCalled();
   });
 

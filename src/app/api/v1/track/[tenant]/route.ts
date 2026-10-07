@@ -29,9 +29,11 @@ import { NextResponse } from "next/server";
 import { trackClick } from "@/lib/storage";
 import { getTenantConfig } from "@/lib/tenants";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
-import { readOptionalJsonObject } from "@/lib/request-body";
 import { isTenantId } from "@/lib/scaffold-contracts";
 import { getRedis } from "@/platform/infra/redis";
+import { getTenantPublicUrl } from "@/lib/tenant-urls";
+import { getTenantTrackPublicKey } from "@/lib/tracking-signing-keys";
+import { TRACK_SIGNATURE_HEADERS, verifyTrackSignature } from "@/lib/track-signature";
 
 // The minimal public event vocabulary. Kept intentionally small: this is a
 // non-sensitive beacon, not the full internal event set. Maps 1:1 onto the
@@ -42,6 +44,9 @@ const ALLOWED_EVENTS = new Set(["page-view", "booking-click", "phone-click", "or
 
 const MAX_ORDER_CENTS = 100_000_000; // $1M — reject absurd/garbage amounts
 const MAX_ITEMS = 100;
+const MAX_TRACK_BODY_BYTES = 64 * 1024;
+const TRACK_SITE_PER_MINUTE = 6_000;
+const TRACK_IP_PER_MINUTE = 120;
 
 /** Parse + strictly validate the order payload from a public beacon. */
 function parseOrder(body: Record<string, unknown>):
@@ -81,7 +86,7 @@ const SERVICE_ID_RE = /^[a-z0-9][a-z0-9_-]{0,79}$/i;
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": `Content-Type, ${TRACK_SIGNATURE_HEADERS.timestamp}, ${TRACK_SIGNATURE_HEADERS.signature}`,
   "Access-Control-Max-Age": "86400",
 };
 
@@ -104,28 +109,34 @@ export async function POST(
   }
 
   try {
-    // Per-IP + per-tenant rate limit, same helper the internal beacon uses.
-    // Generous ceiling: a single visitor legitimately fires a handful of events
-    // per page, but this still caps scripted floods. Fail OPEN on a rate-limiter
-    // error (e.g. a Redis blip) — a dropped/duplicated analytics event is far
-    // cheaper than 500-storming the beacon, and the limiter throws in prod when
-    // Redis is unavailable.
-    let limited = false;
+    // Independently cap a site's aggregate writes and a caller IP's writes.
+    // Neither counter is optional: a Redis failure denies this write.
+    let siteLimited: boolean;
+    let ipLimited: boolean;
     try {
-      limited = await isRateLimitedAsync(rateLimitKey(req, `v1-track:${tenant}`), 120);
+      siteLimited = await isRateLimitedAsync(`v1-track:site:${tenant}`, TRACK_SITE_PER_MINUTE);
+      ipLimited = await isRateLimitedAsync(rateLimitKey(req, "v1-track:ip"), TRACK_IP_PER_MINUTE);
     } catch {
-      limited = false;
+      return corsJson({ error: "Tracking temporarily unavailable" }, 503);
     }
-    if (limited) {
+    if (siteLimited || ipLimited) {
       return corsJson({ error: "Too many requests" }, 429);
     }
 
-    // readOptionalJsonObject reads raw text() (so a text/plain sendBeacon body
-    // parses the same as a JSON fetch) and returns undefined for an empty body
-    // or null for malformed JSON. A tracking event always needs an `event`
-    // field, so treat both "no body" cases as a 400.
-    const body = await readOptionalJsonObject(req);
-    if (!body) {
+    // Read once so the signed server-to-server order event is checked against
+    // the exact bytes that were parsed. text/plain sendBeacon stays supported.
+    const rawBody = await req.text();
+    if (new TextEncoder().encode(rawBody).byteLength > MAX_TRACK_BODY_BYTES) {
+      return corsJson({ error: "Request body too large" }, 413);
+    }
+    let body: Record<string, unknown>;
+    try {
+      const parsed: unknown = JSON.parse(rawBody);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return corsJson({ error: "Invalid request body" }, 400);
+      }
+      body = parsed as Record<string, unknown>;
+    } catch {
       return corsJson({ error: "Invalid request body" }, 400);
     }
 
@@ -152,23 +163,60 @@ export async function POST(
       return corsJson({ error: "Tenant not found" }, 404);
     }
 
-    // Order beacon: a completed storefront purchase. Recorded idempotently by
-    // orderId (its own dedup) and counted in the click metrics, then we return
-    // — it doesn't go through the click dedup/trackClick path below.
+    // Only a site-signed order from the configured public origin is an outcome.
+    // Keep the old payload/200 response for compatibility, but acknowledge an
+    // unsigned or untrusted order as unverified without writing it to Store.
     if (event === "order") {
       const parsed = parseOrder(body);
       if ("error" in parsed) {
         return corsJson({ error: parsed.error }, 400);
       }
+
+      const publicKey = await getTenantTrackPublicKey(tenant);
+      const originHeader = req.headers.get("origin");
+      let origin: string | null = null;
+      try {
+        const parsedOrigin = originHeader ? new URL(originHeader) : null;
+        if (parsedOrigin && parsedOrigin.origin === originHeader && !parsedOrigin.username && !parsedOrigin.password) {
+          origin = parsedOrigin.origin;
+        }
+      } catch {
+        // No or malformed Origin is unverified.
+      }
+      let configuredOrigin: string | null = null;
+      try {
+        configuredOrigin = new URL(getTenantPublicUrl(config, "production")).origin;
+      } catch {
+        // A missing or invalid configured public URL cannot verify a site.
+      }
+
+      const verified = Boolean(
+        publicKey &&
+        origin &&
+        origin === configuredOrigin &&
+        verifyTrackSignature({
+          publicKey,
+          tenant,
+          origin,
+          timestamp: req.headers.get(TRACK_SIGNATURE_HEADERS.timestamp),
+          signature: req.headers.get(TRACK_SIGNATURE_HEADERS.signature),
+          rawBody,
+        }),
+      );
+      if (!verified) {
+        return corsJson({ ok: true, verified: false, recorded: false }, 200);
+      }
+
       const { recordOrder } = await import("@/lib/orders");
-      await recordOrder(tenant, parsed);
-      return corsJson({ ok: true }, 200);
+      const order = await recordOrder(tenant, { ...parsed, verification: "site-signature" });
+      return corsJson(order
+        ? { ok: true, verified: true, recorded: true }
+        : { ok: true, verified: true, deduped: true }, 200);
     }
 
     // Best-effort dedup: collapse identical rapid-fire events (double-fires,
-    // sendBeacon retries) from the same client within a short window so weekly
-    // numbers aren't inflated. Lossy by design (a genuine repeat inside the
-    // window is dropped) and fail-open on a Redis hiccup.
+    // sendBeacon retries) from the same client within a short window. Redis is
+    // also required by the write rate limits, so a dedup outage denies writes.
     const redis = getRedis();
     if (redis) {
       // Extract the IP directly from x-forwarded-for to avoid splitting on ':'
@@ -183,7 +231,7 @@ export async function POST(
           return corsJson({ ok: true, deduped: true }, 200);
         }
       } catch {
-        // fail open — better to count than to drop on infra error
+        return corsJson({ error: "Tracking temporarily unavailable" }, 503);
       }
     }
 
