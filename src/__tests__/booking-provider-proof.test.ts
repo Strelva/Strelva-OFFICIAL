@@ -15,7 +15,7 @@ describe("booking calendar provider failure contract", () => {
     } });
     await expect(adapter.create({ accessToken: "fictional" }, {
       calendarId: "disposable-fixture", title: "Booking proof", start: "2026-11-05T15:00:00Z", end: "2026-11-05T15:30:00Z",
-      timeZone: "America/New_York", idempotencyKey: "booking-proof-rate-limit",
+      timeZone: "America/New_York", idempotencyKey: "booking-proof-rate-limit", reminderPolicy: { mode: "off" },
     })).rejects.toMatchObject({ status: 429, retryable: true });
     expect(calls).toBe(1);
   });
@@ -39,7 +39,7 @@ describe.runIf(process.env.STRELVA_BOOKING_PROVIDER_PROOF === "1")("booking disp
     const input = {
       calendarId: process.env[`${prefix}_CALENDAR_ID`]!, title: "Strelva disposable booking proof",
       start: new Date(Date.now() + 7 * 86400000).toISOString(), end: new Date(Date.now() + 7 * 86400000 + 1800000).toISOString(),
-      timeZone: "America/New_York", idempotencyKey: `booking-proof:${randomUUID()}`,
+      timeZone: "America/New_York", idempotencyKey: `booking-proof:${randomUUID()}`, reminderPolicy: { mode: "off" as const },
     };
     let eventId: string | null = null;
     try {
