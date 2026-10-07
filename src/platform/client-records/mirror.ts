@@ -167,7 +167,39 @@ export function parsePendingMember(member: string): { store: ClientRecordStore; 
   return { store, tenant: member.slice(first + 1, second), recordId: member.slice(second + 1) };
 }
 
-async function rememberPending(store: ClientRecordStore, tenant: string, record: PendingRecord, reason: string): Promise<void> {
+/** Failure callbacks can finish out of order. Retain the latest value (or
+ * earliest first reply) atomically instead of overwriting a newer retry. */
+export const QUEUE_CLIENT_RECORD_REPAIR_LUA = `
+local current = redis.call('GET', KEYS[2])
+local replace = ARGV[2] ~= ''
+if current and replace then
+  local ok, value = pcall(cjson.decode, current)
+  local incoming = cjson.decode(ARGV[2])
+  if ok and value.capturedAt and incoming.capturedAt then
+    if ARGV[4] == 'keep_first' then replace = incoming.capturedAt < value.capturedAt
+    else replace = incoming.capturedAt >= value.capturedAt end
+  end
+end
+if replace then redis.call('SET', KEYS[2], ARGV[2]) end
+redis.call('ZADD', KEYS[1], ARGV[3], ARGV[1])
+return 1
+`;
+export const CLEAR_CLIENT_RECORD_REPAIR_LUA = `
+local current = redis.call('GET', KEYS[2])
+if (not current and ARGV[2] == '') or current == ARGV[2] then
+  redis.call('ZREM', KEYS[1], ARGV[1])
+  redis.call('DEL', KEYS[2])
+  return 1
+end
+return 0
+`;
+export async function clearPendingClientRecord(member: string, snapshot: PendingRecord | null, redis: {
+  eval(script: string, keys: string[], args: string[]): Promise<unknown>;
+}): Promise<boolean> {
+  return Number(await redis.eval(CLEAR_CLIENT_RECORD_REPAIR_LUA, [CLIENT_RECORD_PENDING_KEY, pendingPayloadKey(member)], [member, snapshot ? JSON.stringify(snapshot) : ""])) === 1;
+}
+
+async function rememberPending(store: ClientRecordStore, tenant: string, record: PendingRecord, reason: string, mode: ClientRecordMode = "replace"): Promise<void> {
   const recordId = record.recordId;
   console.error("[client-records] record not copied to Postgres", { store, tenant, recordId, reason });
   const redis = getRedis();
@@ -175,24 +207,26 @@ async function rememberPending(store: ClientRecordStore, tenant: string, record:
   try {
     const member = pendingMember(store, tenant, recordId);
     // Never place legacy plaintext OAuth secrets into the retry payload.
-    if (store !== "provider_connections" || "remove" in record || ["accessToken", "refreshToken", "apiKey"].every((field) => !record.payload[field] || String(record.payload[field]).startsWith("enc:v1:"))) {
-      await redis.set(pendingPayloadKey(member), record);
-    }
-    await redis.zadd(CLIENT_RECORD_PENDING_KEY, { score: Date.now(), member });
+    const safe = store !== "provider_connections" || "remove" in record || ["accessToken", "refreshToken", "apiKey"].every((field) => !record.payload[field] || String(record.payload[field]).startsWith("enc:v1:"));
+    const normalized = { ...record, ...(record.capturedAt ? { capturedAt: new Date(record.capturedAt).toISOString() } : {}) };
+    await redis.eval(QUEUE_CLIENT_RECORD_REPAIR_LUA, [CLIENT_RECORD_PENDING_KEY, pendingPayloadKey(member)],
+      [member, safe ? JSON.stringify(normalized) : "", String(Date.now()), mode]);
   } catch {
     // The Redis copy still exists; backfill and parity find it.
   }
 }
 
-async function forgetOlderPending(store: ClientRecordStore, tenant: string, record: PendingRecord): Promise<void> {
+async function forgetOlderPending(store: ClientRecordStore, tenant: string, record: PendingRecord, mode: ClientRecordMode = "replace"): Promise<void> {
   const redis = getRedis();
   if (!redis) return;
   try {
     const member = pendingMember(store, tenant, record.recordId);
     const pending = await redis.get<PendingRecord>(pendingPayloadKey(member));
-    if (pending && pending.capturedAt && record.capturedAt && pending.capturedAt > record.capturedAt) return;
-    await redis.zrem(CLIENT_RECORD_PENDING_KEY, member);
-    await redis.del(pendingPayloadKey(member));
+    if (pending && pending.capturedAt && record.capturedAt) {
+      const pendingAt = Date.parse(pending.capturedAt), writtenAt = Date.parse(record.capturedAt);
+      if (mode === "keep_first" ? pendingAt < writtenAt : pendingAt > writtenAt) return;
+    }
+    await clearPendingClientRecord(member, pending, redis);
   } catch { /* Backfill/parity still repair failures without affecting the request. */ }
 }
 
@@ -208,8 +242,8 @@ export async function mirrorClientRecord(
 ): Promise<ClientRecordWriteResult> {
   if (!clientRecordDualWriteEnabled()) return { status: "skipped", reason: "disabled" };
   const result = await writeClientRecord(store, tenant, record, "dual_write", mode);
-  if (result.status === "failed" || result.status === "skipped") await rememberPending(store, tenant, record, result.reason);
-  else await forgetOlderPending(store, tenant, record);
+  if (result.status === "failed" || result.status === "skipped") await rememberPending(store, tenant, record, result.reason, mode);
+  else await forgetOlderPending(store, tenant, record, mode);
   return result;
 }
 

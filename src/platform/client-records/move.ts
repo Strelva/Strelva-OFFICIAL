@@ -9,6 +9,7 @@ import {
   clientRecordDb,
   clientRecordDualWriteEnabled,
   clientRecordHash,
+  clearPendingClientRecord,
   parsePendingMember,
   pendingPayloadKey,
   type PendingRecord,
@@ -200,10 +201,10 @@ export interface RepairReport {
 
 /** Retries queued dual-write failures by re-reading the record from Redis. */
 export async function repairPendingClientRecords(
-  options: { limit?: number; redis?: (ClientRecordRedis & { zrem(key: string, ...members: string[]): Promise<unknown>; zcard(key: string): Promise<number>; del(...keys: string[]): Promise<unknown> }) | null; db?: ClientRecordDb | null } = {},
+  options: { limit?: number; redis?: (ClientRecordRedis & { zrem(key: string, ...members: string[]): Promise<unknown>; zcard(key: string): Promise<number>; del(...keys: string[]): Promise<unknown>; eval(script: string, keys: string[], args: string[]): Promise<unknown> }) | null; db?: ClientRecordDb | null } = {},
 ): Promise<RepairReport> {
   const redis = (options.redis === undefined ? getRedis() : options.redis) as
-    | (ClientRecordRedis & { zrem(key: string, ...members: string[]): Promise<unknown>; zcard(key: string): Promise<number>; del(...keys: string[]): Promise<unknown> })
+    | (ClientRecordRedis & { zrem(key: string, ...members: string[]): Promise<unknown>; zcard(key: string): Promise<number>; del(...keys: string[]): Promise<unknown>; eval(script: string, keys: string[], args: string[]): Promise<unknown> })
     | null;
   const db = options.db === undefined ? clientRecordDb() : options.db;
   const report: RepairReport = { checked: 0, repaired: 0, failed: 0, dropped: 0, remaining: 0 };
@@ -224,8 +225,7 @@ export async function repairPendingClientRecords(
     else if (definition.removalIsIntentional) result = await writeClientRecord(parsed.store, parsed.tenant, { recordId: parsed.recordId, remove: true }, "repair", "replace", db);
     else { await redis.zrem(CLIENT_RECORD_PENDING_KEY, member); report.dropped++; continue; }
     if (result.status === "failed" || result.status === "skipped") { report.failed++; continue; }
-    await redis.zrem(CLIENT_RECORD_PENDING_KEY, member);
-    await redis.del(pendingPayloadKey(member));
+    await clearPendingClientRecord(member, snapshot, redis);
     report.repaired++;
   }
   report.remaining = Number(await redis.zcard(CLIENT_RECORD_PENDING_KEY));

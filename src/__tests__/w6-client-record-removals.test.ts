@@ -1,18 +1,16 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-const holder = vi.hoisted(() => ({ values: new Map<string, unknown>(), pending: new Set<string>() }));
-vi.mock("@/platform/infra/redis", () => ({ getRedis: () => ({
-  set: async (key: string, value: unknown) => { holder.values.set(key, value); },
-  get: async (key: string) => holder.values.get(key) ?? null,
-  zadd: async (_key: string, entry: { member: string }) => { holder.pending.add(entry.member); },
-  zrange: async () => [...holder.pending], zcard: async () => holder.pending.size,
-  zrem: async (_key: string, member: string) => { holder.pending.delete(member); },
-  del: async (key: string) => { holder.values.delete(key); },
-}) }));
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { isolatedRedisAvailable, startIsolatedRedis, type IsolatedRedis } from "./support/isolated-redis";
+const holder = vi.hoisted(() => ({ client: null as unknown }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => holder.client }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => null }));
 import { mirrorClientRecordRemoval, pendingPayloadKey, setClientRecordDb } from "@/platform/client-records/mirror";
 import { repairPendingClientRecords } from "@/platform/client-records/move";
-afterEach(() => { vi.unstubAllEnvs(); setClientRecordDb(undefined); holder.values.clear(); holder.pending.clear(); vi.useRealTimers(); });
-describe("client record removal repair", () => {
+afterEach(() => { vi.unstubAllEnvs(); setClientRecordDb(undefined); vi.useRealTimers(); });
+describe.skipIf(!isolatedRedisAvailable)("client record removal repair", () => {
+  let redis: IsolatedRedis;
+  beforeAll(async () => { redis = await startIsolatedRedis("client-record-removal"); holder.client = redis.client; });
+  beforeEach(() => { redis.cli("FLUSHDB"); });
+  afterAll(async () => { await redis?.stop(); });
   it("retains the deletion time across a delayed retry so SQL can reject stale deletion", async () => {
     vi.stubEnv("STRELVA_CLIENT_RECORDS_DUAL_WRITE", "1"); vi.stubEnv("DUAL_WRITE_PG", "1");
     vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-07T12:00:00Z"));
@@ -20,7 +18,7 @@ describe("client record removal repair", () => {
     setClientRecordDb({ rpc });
     expect((await mirrorClientRecordRemoval("provider_connections", "one", "google")).status).toBe("failed");
     const member = "provider_connections|one|google";
-    expect(holder.values.get(pendingPayloadKey(member))).toEqual({ recordId: "google", remove: true, capturedAt: "2026-10-07T12:00:00.000Z" });
+    expect(await redis.client.get(pendingPayloadKey(member))).toEqual({ recordId: "google", remove: true, capturedAt: "2026-10-07T12:00:00.000Z" });
     vi.setSystemTime(new Date("2026-10-07T13:00:00Z"));
     rpc.mockResolvedValue({ data: { status: "kept" }, error: null });
     expect(await repairPendingClientRecords()).toMatchObject({ repaired: 1, remaining: 0 });
