@@ -56,6 +56,7 @@ rollbacks=(
   inquiry-decision-notice-claims inquiry-decision-notice-events
   tenant-lead-parity-completeness inquiry-member-replies inquiry-business-facts
   inquiry-operator-authority inquiry-booking-handoff inquiry-operator-review
+  inquiry-operator-revocation
 )
 for rollback in "${rollbacks[@]}"; do
   psql "${psql_args[@]}" --dbname=postgres -c 'create database inquiry_rollback_case template inquiry_rollback_template strategy file_copy' >/dev/null
@@ -72,4 +73,4 @@ psql "${psql_args[@]}" --dbname=inquiry_rollback_case --file="$repo_root/tests/i
 psql "${psql_args[@]}" --dbname=postgres -c 'drop database inquiry_rollback_case' >/dev/null
 psql "${psql_args[@]}" --dbname=postgres -c 'drop database inquiry_rollback_template' >/dev/null
 trap - EXIT
-printf 'All 19 inquiry rollbacks passed individually and in reverse order with retained evidence.\n'
+printf 'All 20 inquiry rollbacks passed individually and in reverse order with retained evidence.\n'

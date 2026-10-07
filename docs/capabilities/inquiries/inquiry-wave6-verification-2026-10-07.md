@@ -43,14 +43,14 @@ rollback files now revoke entry points while retaining claims, provider receipts
 proposals and offers. The decision-notice claim rollback no longer drops the
 parent of the retained provider-event foreign key.
 
-## Operator gates awaiting #251 — reported, unchanged
+## Operator gates reviewed under #251
 
 The audit's **five SQL `super_admins` checks** are all present:
 
 1. `20261010123000_inquiry_context_notices.sql:43`, `authorize_inquiry_owner_notice_repair`: verified, unrevoked super-admin authorizes bounded managed-site owner-notice repair; no tenant membership check at this seam.
 2. `20261010124000_connected_inquiry_records.sql:207`, `decide_held_workspace_lead`: current workspace owner or an unrevoked super-admin may decide held spam after verified-email identity and exact record/workspace binding. The operator branch does not require workspace membership.
 3. `20261010125930_inquiry_business_facts.sql:103`, `correct_inquiry_business_fact`: after canonical business-record actor validation, an unrevoked super-admin is labelled operator and may correct facts; otherwise owner authority is required.
-4. `20261010125935_inquiry_operator_authority.sql:8`, `authorize_inquiry_operator_actor`: verified user, matching super-admin email and **any tenant membership**. **It omits `revoked_at IS NULL`.** A local transactional probe set `revoked_at` on the fictional operator and the RPC still returned `true` (log: `recovery-operator-gate-audit.log`). Existing SQL tests delete the row rather than mark it revoked. This is a concrete unresolved authority finding for #251; it was not fixed under this task's report-only instruction.
+4. `20261010125935_inquiry_operator_authority.sql:8`, `authorize_inquiry_operator_actor`: verified user, matching super-admin email and **any tenant membership**. **It omits `revoked_at IS NULL`.** A local transactional probe set `revoked_at` on the fictional operator and the RPC still returned `true` (log: `recovery-operator-gate-audit.log`). Existing SQL tests delete the row rather than mark it revoked. Fixed for #251 by `20261010125955_inquiry_operator_revocation.sql`, which adds `a.revoked_at is null`; `tests/inquiry-operator-revocation-schema.sql` marks the row revoked (membership kept) and requires refusal, then reinstates and requires acceptance.
 5. `20261010125950_inquiry_operator_review.sql:8`, `inquiry_assert_operator`: verified email and unrevoked super-admin, with no business membership; protects global held/notice lists, spam decisions and corrected-recipient repair claims. Workers reverify that operator for repair.
 
 New application gates using `isSuperAdmin()` also protect:

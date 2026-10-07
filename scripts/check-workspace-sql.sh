@@ -707,6 +707,8 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125940_inq
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-booking-handoff-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125950_inquiry_operator_review.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-operator-review-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125955_inquiry_operator_revocation.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-operator-revocation-schema.sql"
 STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run src/__tests__/make-real-activation-repository.test.ts
 # The one booking store through both real route families (legacy /api/booking
