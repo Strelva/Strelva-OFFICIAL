@@ -551,13 +551,15 @@ starting implementation.
 
 Publishing uses [ContentWorkspace](../../src/experience/publishing/ContentWorkspace.tsx)
 for exact-content review, collection publication/restore, and immutable newsletter
-issues. Approved issue data may include a separate optional `delivery` projection:
-current state, accepted/suppressed counts, unconfirmed batches and append-only batch
-receipts. The view preserves approved words and distinguishes provider acceptance,
-not-sent gates and unconfirmed sends; it never claims delivery. October 7, 2026,
-`a1/newsletter-sender`: accepted desktop and gated/unconfirmed 390px fixtures were
-observed locally. Sending still defaults off; see the
-[implementation handoff](../product/streams/a1-newsletter-sender.md).
+issues. Native website Systems use the same panel and approval controls;
+publication confirms the content store, while website rendering remains unverified.
+Native newsletter approval stays paused. Approved issue data may include a separate
+optional `delivery` projection for linked tenants: current state, accepted/suppressed
+counts, unconfirmed batches and append-only batch receipts. The view preserves
+approved words and distinguishes provider acceptance, not-sent gates and unconfirmed
+sends; it never claims delivery. October 7, 2026, `a1/newsletter-sender`: accepted
+desktop and gated/unconfirmed 390px fixtures were observed locally. Sending still
+defaults off; see the [implementation handoff](../product/streams/a1-newsletter-sender.md).
 [RecordPublishingFields](../../src/experience/publishing/RecordPublishingFields.tsx)
 saves hours, special hours and website facts through the owner boundary, shows
 the optional Google approval disclosure, and reports each location separately
@@ -761,3 +763,11 @@ The agency prospects page uses a semantic table, scoped to direct agency members
 See [the stream contract](../product/streams/a1-agency-prospecting.md) for flag,
 state, permission and local-proof limitations; no visual acceptance or production
 adoption is implied.
+
+### October 7 public booking email confirmation
+
+`/booking-confirm/[token]` uses the owned `Card` and `Button` primitives and
+semantic canvas/text roles. Opening the page is read-only; the native form
+POSTs to its action route. Expired/unavailable and rate-limit states keep the
+customer from claiming a booking was made. This is local implementation for
+#529; no production adoption or new visual-system decision is implied.

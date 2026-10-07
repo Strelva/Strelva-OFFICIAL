@@ -42,7 +42,7 @@ export function ContentWorkspace({ workspaceId, systemId, kind, readOnly = false
       const response = await request("/api/workspace/publishing/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, systemId, action, ...(draft ? { draft } : {}), ...(eventId ? { eventId } : {}), ...(receiptId ? { receiptId } : {}) }) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error || data.result?.reason || "This change could not be confirmed. Reload before trying again.");
       if (action === "compose" || action === "restore") { setComposing(false); setFields({}); setSlug(""); setMessage("Saved for the owner's review. Nothing has been published or sent."); }
-      else setMessage(kind === "newsletter" && action === "approve" ? "Issue approved. Check its receipt below for sending status." : action === "not_yet" ? "Draft declined. Nothing changed." : "Published to your website's content store. Check your site to confirm how it appears.");
+      else setMessage(kind === "newsletter" && action === "approve" ? "Issue approved. Check its receipt below for sending status." : action === "not_yet" ? "Draft declined. Nothing changed." : "Published to this System's content store. Website rendering has not been checked.");
       await load();
     } catch (e) { setError(e instanceof Error ? e.message : "This change could not be confirmed."); }
     finally { setBusy(false); }
@@ -52,7 +52,7 @@ export function ContentWorkspace({ workspaceId, systemId, kind, readOnly = false
     return <Component key={key} label={label} value={fields[key] || ""} disabled={busy} onChange={event => setFields(old => ({ ...old, [key]: event.target.value }))} />;
   };
   return <section className="grid gap-4 p-6" aria-label={kind === "newsletter" ? "Newsletter issues" : "Website content"} aria-busy={loading || busy}>
-    <div><h2 className="text-sm font-semibold">{kind === "newsletter" ? "Newsletter" : "Blog and collections"}</h2><p className="mt-2 text-sm text-gray-muted">{kind === "newsletter" ? "Compose and approve each issue here. Its receipts show whether email was sent." : "Draft content here, then review the exact words before publishing them to your website."}</p></div>
+    <div><h2 className="text-sm font-semibold">{kind === "newsletter" ? "Newsletter" : "Blog and collections"}</h2><p className="mt-2 text-sm text-gray-muted">{kind === "newsletter" ? "Compose and approve each issue here. Its receipts show whether email was sent." : "Draft content here, then review the exact words before publishing."}</p></div>
     {loading ? <p role="status">Loading publishing…</p> : null}
     {error ? <div role="alert"><p>{error}</p><Button variant="ghost" onClick={() => void load()}>Reload publishing</Button></div> : null}
     {message ? <p role="status" className="text-sm text-gray-muted">{message}</p> : null}

@@ -1,3 +1,4 @@
+import { businessBookingEmailEnabled } from "./email-enablement";
 import { bookingAgentLabel } from "./agent-source";
 import { bookingAgentVisibilityEnabled } from "./flags";
 /** One send path, existing audience gates, no retry after a provider attempt. */
@@ -22,7 +23,7 @@ export async function bookingCustomerEmailAllowed(tenantId: string | null, works
   if (!z.string().uuid().safeParse(workspaceId).success) return false;
   // Native businesses have no tenant override to inherit. Explicit operator
   // arming is required in addition to both global email gates.
-  return !!workspaceId && await getClientEmailOverride(`workspace:${workspaceId}`) === "on";
+  return !!workspaceId && await businessBookingEmailEnabled(workspaceId);
 }
 
 function calendarFile(booking: StoreBooking, businessName: string, address: string) {
@@ -84,7 +85,7 @@ export async function deliverBookingUpdates(bookingId: string | null = null, dep
         subject: `${title}: ${booking.serviceName}, ${when.day} ${when.time}`,
         idempotencyKey: `booking-update:${row.messageId}`,
         options: { heading: title, paragraphs: [state === "held"
-          ? "An assistant requested this time for you. Confirm below within 15 minutes. Nothing is booked until you confirm."
+          ? "You requested this time. Confirm below within 15 minutes. Nothing is booked until you confirm."
           : state === "requested" ? "The business will confirm this request. This time is not confirmed yet."
           : state === "cancelled" ? "This booking is cancelled."
           : state === "declined" ? "This time was not confirmed. Reply to ask about another time."

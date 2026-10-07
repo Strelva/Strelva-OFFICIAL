@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ override: vi.fn(async () => "inherit") }));
+const mocks = vi.hoisted(() => ({ override: vi.fn(async () => "inherit"), business: vi.fn(async () => false) }));
+vi.mock("@/platform/bookings/email-enablement", () => ({ businessBookingEmailEnabled: mocks.business }));
 vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: mocks.override }));
 import { bookingCustomerEmailAllowed, deliverBookingUpdates, type BookingUpdatePorts } from "@/platform/bookings/updates";
 import { newBookingAccess } from "@/platform/bookings/native";
@@ -12,9 +13,23 @@ function fixture(audience: "customer" | "client" = "customer", status = "confirm
  finish: vi.fn(async () => undefined), business: vi.fn(async () => ({ name: "Fixture Firm", address: "1 Example St", ownerEmail: "owner@example.test", tenantId: "mooney", siteUrl: null })), customerAllowed: vi.fn(async () => true), send: vi.fn(async () => ({ status: "accepted" as const, providerMessageId: "email1", acceptedAt: "now" })) };
  return deps;
 }
-beforeEach(() => { vi.stubEnv("SECRETS_ENC_KEY", "11".repeat(32)); vi.stubEnv("STRELVA_BOOKING_STORE_WRITE", "1"); vi.stubEnv("STRELVA_BOOKING_MESSAGES", "1"); vi.stubEnv("STRELVA_BOOKING_MANAGE_PAGE", "1"); mocks.override.mockResolvedValue("inherit"); });
+beforeEach(() => { vi.stubEnv("SECRETS_ENC_KEY", "11".repeat(32)); vi.stubEnv("STRELVA_BOOKING_STORE_WRITE", "1"); vi.stubEnv("STRELVA_BOOKING_MESSAGES", "1"); vi.stubEnv("STRELVA_BOOKING_MANAGE_PAGE", "1"); mocks.override.mockResolvedValue("inherit"); mocks.business.mockResolvedValue(false); });
 afterEach(() => vi.unstubAllEnvs());
 describe("booking messages", () => {
+ it("native email requires the logged business switch, never a workspace Redis override", async () => {
+   const workspaceId = "ab000000-0000-4000-8000-000000000010";
+   vi.stubEnv("EMAIL_SENDING_ENABLED", "true"); vi.stubEnv("CUSTOMER_EMAIL_ENABLED", "true");
+   mocks.override.mockResolvedValue("on");
+   expect(await bookingCustomerEmailAllowed(null, workspaceId)).toBe(false);
+   mocks.business.mockResolvedValue(true);
+   expect(await bookingCustomerEmailAllowed(null, workspaceId)).toBe(true);
+   expect(await bookingCustomerEmailAllowed(`workspace:${workspaceId}`)).toBe(true);
+   expect(await bookingCustomerEmailAllowed(null, "invalid")).toBe(false);
+   vi.stubEnv("EMAIL_SENDING_ENABLED", "false");
+   expect(await bookingCustomerEmailAllowed(null, workspaceId)).toBe(false);
+   vi.stubEnv("EMAIL_SENDING_ENABLED", "true"); vi.stubEnv("CUSTOMER_EMAIL_ENABLED", "false");
+   expect(await bookingCustomerEmailAllowed(null, workspaceId)).toBe(false);
+ });
  it("does no I/O with messages off or the store killed", async () => { const deps = fixture(); vi.stubEnv("STRELVA_BOOKING_MESSAGES", "0"); expect((await deliverBookingUpdates(null,deps)).sent).toBe(0); expect(deps.claim).not.toHaveBeenCalled(); vi.stubEnv("STRELVA_BOOKING_MESSAGES","1"); vi.stubEnv("DUAL_WRITE_PG","0"); await deliverBookingUpdates(null,deps); expect(deps.claim).not.toHaveBeenCalled(); });
  it.each(["customer","client"] as const)("suppresses %s messages at the booking email gates", async audience => { const deps=fixture(audience); vi.mocked(deps.customerAllowed).mockResolvedValue(false); expect((await deliverBookingUpdates("b1",deps)).suppressed).toBe(1); expect(deps.send).not.toHaveBeenCalled(); expect(deps.finish).toHaveBeenCalledWith("m1","suppressed",null,"email_gates"); });
  it("sends confirmation with a valid calendar file, business address and manage link", async () => { const deps=fixture(); expect((await deliverBookingUpdates("b1",deps)).customerSent).toBe(1); const input=vi.mocked(deps.send).mock.calls[0]![0]; expect(input).toMatchObject({ audience:"customer", tenantId:"mooney", fromAddress:"bookings@mail.strelva.com", options:{ heading:"Booking confirmed", button:{ label:"Change or cancel" } } }); const ics=Buffer.from(input.attachments![0]!.content,"base64").toString(); expect(ics).toContain("DTSTART:20261103T150000Z\r\n"); expect(ics).toContain("LOCATION:1 Example St"); expect(deps.finish).toHaveBeenCalledWith("m1","sent","email1",null); });

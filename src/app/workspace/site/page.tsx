@@ -32,7 +32,8 @@ import { managedSiteNavigation, websiteEntryPath } from "@/experience/websites/s
 import { websiteRebuildReleasedFor } from "@/products/websites/index";
 import { listWebsiteRebuilds } from "@/products/websites/index";
 import { parseRebuildView } from "@/experience/websites/rebuild-transport";
-import { connectedSitesReleasedFor, readConnectedSites } from "@/products/connected-sites/server";
+import { connectedSitesReleasedFor, readBusinessVisibility, readConnectedSites, suggestBusinessHandle } from "@/products/connected-sites/server";
+import { ServerVisibility } from "@/experience/connected-sites/ServerVisibility";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Website", robots: { index: false, follow: false }, referrer: "no-referrer" };
@@ -172,12 +173,18 @@ async function WebsiteEntryPage({ workspaceId, entry, workId }: { workspaceId: s
   const canManage = workspace.role === "owner" || workspace.role === "admin";
   let body: React.ReactNode;
   try {
-    const [overview, records] = await Promise.all([
+    const [overview, records, visibility] = await Promise.all([
       path === "connect" ? readConnectedSites(actor, workspaceId) : null,
       path === "rebuild" ? listWebsiteRebuilds(actor, workspaceId) : [],
+      // The server-rendered details (#309, #502) are optional: if they fail, the connect flow still works.
+      path === "connect" ? Promise.resolve().then(() => readBusinessVisibility(actor, workspaceId)).catch(() => null) : null,
     ]);
-    body = <WebsiteEntry workspaceId={workspaceId} connectedEnabled={connectedEnabled} rebuildEnabled={rebuildEnabled} path={path} canManage={canManage} operator={operator}
-      initialWorkId={workId ?? undefined} rebuilds={records.map(parseRebuildView)} sites={overview?.sites.map(site => ({ id: site.id, siteHost: site.siteHost, siteUrl: site.siteUrl, status: site.status, verifiedAt: site.verifiedAt, systemId: site.systemId, snippet: site.snippet }))} />;
+    body = <>
+      <WebsiteEntry workspaceId={workspaceId} connectedEnabled={connectedEnabled} rebuildEnabled={rebuildEnabled} path={path} canManage={canManage} operator={operator}
+        initialWorkId={workId ?? undefined} rebuilds={records.map(parseRebuildView)} sites={overview?.sites.map(site => ({ id: site.id, siteHost: site.siteHost, siteUrl: site.siteUrl, status: site.status, verifiedAt: site.verifiedAt, systemId: site.systemId, snippet: site.snippet }))} />
+      {visibility ? <ServerVisibility workspaceId={workspaceId} canManage={canManage} suggestedHandle={suggestBusinessHandle(workspace.name)}
+        initial={{ pagesEnabled: visibility.pagesEnabled, page: visibility.page, blocks: visibility.blocks?.map(item => ({ id: item.id, label: item.label, url: item.url, checkable: item.checkable, block: { hash: item.block.hash, html: item.block.html } })) ?? null }} /> : null}
+    </>;
   } catch (error) {
     body = <Unavailable message={error instanceof WorkspaceAccessError ? "This business isn't available to your account." : "Your website couldn't be loaded just now. Nothing changed. Try again in a moment."} />;
   }

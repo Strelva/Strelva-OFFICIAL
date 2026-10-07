@@ -1,4 +1,5 @@
 "use client";
+import { tenantSiteOrigin } from "@/platform/infra/brand";
 import { useMemo } from "react";
 import { RebuildExperience } from "./RebuildExperience";
 import { fixtureRebuild } from "./rebuild-fixture";
@@ -17,7 +18,7 @@ export function RebuildFixture({ scenario }: { scenario: string }) {
       if (action === "remove" && extra?.factId && next.candidate) delete next.candidate.facts[extra.factId];
       if (["confirm", "edit", "remove", "undo"].includes(action) && next.candidate) { next.candidate.revision++; next.candidate.contentHash = String(next.revision).padStart(64, "0"); next.approved = false; next.status = "review"; }
       if (action === "approve") { next.approved = true; next.status = "approved"; }
-      if (action === "launch") { next.status = "published"; next.publishedUrl = "https://[fixture-domain].strelva.com"; next.readBack = "failed"; }
+      if (action === "launch") { next.status = "published"; next.publishedUrl = tenantSiteOrigin("fixture-domain"); next.readBack = "failed"; }
       if (action === "retry") { next.status = "review"; next.error = null; next.stages = next.stages.map(item => ({ ...item, status: "completed" })); }
       return next as RebuildView;
     },

@@ -5,24 +5,9 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 baseline_migration="20260802120000_report_snapshots.sql"
 upgrade_migration="20260905190000_release_one_workspaces.sql"
 schema_test="$repo_root/tests/workspace-upgrade-schema.sql"
-cluster_root="$(mktemp -d "${TMPDIR:-/tmp}/strelva-workspace-upgrade.XXXXXX")"
-cluster_data="$cluster_root/data"
-cluster_socket="$(mktemp -d /tmp/strelva-upgrade-socket.XXXXXX)"
-cluster_log="$cluster_root/postgres.log"
+source "$repo_root/scripts/temp-postgres.sh"
+create_temp_postgres strelva-workspace-upgrade strelva-upgrade-socket
 cluster_port="$((61000 + ($$ % 3000)))"
-cluster_started=0
-
-cleanup() {
-  local exit_code=$?
-  trap - EXIT INT TERM
-  if [[ "$cluster_started" -eq 1 ]]; then
-    pg_ctl -D "$cluster_data" -m fast -w stop >/dev/null 2>&1 || true
-  fi
-  rm -rf "$cluster_socket"
-  printf 'Workspace upgrade cluster preserved at: %s\n' "$cluster_root"
-  exit "$exit_code"
-}
-trap cleanup EXIT INT TERM
 
 for command_name in initdb pg_ctl psql grep; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -41,7 +26,7 @@ pg_ctl -D "$cluster_data" \
   -l "$cluster_log" \
   -o "-F -k '$cluster_socket' -c listen_addresses='' -p $cluster_port" \
   -w start >/dev/null
-cluster_started=1
+read -r cluster_postmaster_pid < "$cluster_data/postmaster.pid"
 
 psql_args=(
   --host="$cluster_socket"
@@ -241,6 +226,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/website-linked-publication-schem
 # 20261008151000 widens tenant_leads, tenant_client_records and
 # system_origin_kinds; their earlier contracts ran above against it.
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-pages-schema.sql"
 # 20261009100000 (Strelva service actor) replaces owner_decision_json and
 # workspace_release_flag_names(); its contract holds after the full ordered upgrade.
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
@@ -256,5 +242,22 @@ psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-flag-schema
 psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 # Batch 7A readers must work in the transaction mode PostgREST chooses for POST.
 psql "${psql_args[@]}" --file="$repo_root/tests/reader-rpc-volatility-schema.sql"
+# Batch 7A (20261009151000-20261009154000) replaces the actor, service-actor
+# and payer functions; its contracts hold after the full ordered upgrade, and
+# the replaced contracts above ran against the replacements.
+psql "${psql_args[@]}" --file="$repo_root/tests/provider-seats-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-verifications-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/platform-service-actor-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/payer-party-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/batch-7a-reader-modes.sql"
+# Native publishing and booking email on the full retained tenant schema.
+psql "${psql_args[@]}" --file="$repo_root/tests/native-publishing-targets-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-booking-email-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011101000_business_booking_email.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011102000_native_publishing_targets.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011102000_native_publishing_targets.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011101000_business_booking_email.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/native-publishing-targets-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-booking-email-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
