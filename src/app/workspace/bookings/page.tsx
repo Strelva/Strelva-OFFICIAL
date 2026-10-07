@@ -20,13 +20,14 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
   if (!workspaceId) redirect("/workspace");
   const view: BookingView = params.view === "day" ? "day" : "week";
   const date = typeof params.date === "string" && DATE.test(params.date) ? params.date : null;
+  const source = params.source === "agent" ? "agent" : "all";
   const user = await getSessionUser().catch(() => null);
   if (!user?.id || !user.email || !user.email_confirmed_at) {
-    redirect(`/sign-in?next=${encodeURIComponent(`/workspace/bookings?${new URLSearchParams({ workspaceId, view })}`)}`);
+    redirect(`/sign-in?next=${encodeURIComponent(`/workspace/bookings?${new URLSearchParams({ workspaceId, view, ...(date ? { date } : {}), ...(source === "agent" ? { source } : {}) })}`)}`);
   }
   let state: WorkspaceBookingsState;
   try {
-    state = { kind: "ready", bookings: await readWorkspaceBookings({ userId: user.id, verifiedEmail: user.email.trim().toLowerCase() }, workspaceId, { view, date }) };
+    state = { kind: "ready", bookings: await readWorkspaceBookings({ userId: user.id, verifiedEmail: user.email.trim().toLowerCase() }, workspaceId, { view, date, source }) };
   } catch (error) {
     if (error instanceof WorkspaceAccessError) state = { kind: "permission" };
     else {

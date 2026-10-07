@@ -47,9 +47,10 @@ export function workspaceReturnTarget(value: string | null): string | null {
     const workspaceId = target.searchParams.get("workspaceId");
     const view = target.searchParams.get("view");
     const date = target.searchParams.get("date");
-    const allowed = [...target.searchParams.keys()].every((key) => key === "workspaceId" || key === "view" || key === "date");
+    const allowed = [...target.searchParams.keys()].every((key) => key === "workspaceId" || key === "view" || key === "date" || key === "source");
     if (target.hash || target.pathname !== "/workspace/bookings" || !allowed || target.searchParams.getAll("workspaceId").length !== 1
       || !workspaceId || !UUID.test(workspaceId) || target.searchParams.getAll("view").length > 1 || (view !== null && view !== "day" && view !== "week")
+      || target.searchParams.getAll("source").length > 1 || (target.searchParams.has("source") && !["all", "agent"].includes(target.searchParams.get("source")!))
       || target.searchParams.getAll("date").length > 1 || (date !== null && !/^\d{4}-\d{2}-\d{2}$/.test(date))) return null;
     return `${target.pathname}?${target.searchParams}`;
   }
