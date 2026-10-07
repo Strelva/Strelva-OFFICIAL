@@ -132,6 +132,42 @@ describe("auth access pages", () => {
     expect(signUp).toContain("Need a managed website? Request your build");
   });
 
+  it("asks business or agency when the agency front door is on, and sends agencies to setup", async () => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    vi.stubEnv("STRELVA_AGENCY_SIGNUP_RELEASE", "1");
+    mockHeaderValues.clear();
+    mockGetInvite.mockResolvedValue(null);
+    const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
+
+    const business = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve({ next: "/workspace?save=scan_public123" }) }));
+    expect(business).toContain("Who is this account for?");
+    expect(business).toContain("I run a business");
+    expect(business).toContain('href="/sign-up?as=agency"');
+    expect(business).toContain('aria-current="page"');
+    expect(business).toContain("Start your work here.");
+    expect(business).toContain("&quot;next&quot;:&quot;/workspace?save=scan_public123&quot;");
+    // Strelva is not the default provider on the neutral front door (ADR 0012).
+    expect(business).not.toContain("Request your build");
+
+    const agency = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve({ as: "agency", next: "/workspace?save=scan_public123" }) }));
+    expect(agency).toContain("Run your client work in Strelva.");
+    expect(agency).toContain("turns on once Strelva verifies your agency for it");
+    expect(agency).toContain("&quot;next&quot;:&quot;/workspace/agency/start&quot;");
+    expect(agency).toContain('href="/sign-up?next=%2Fworkspace%3Fsave%3Dscan_public123"');
+  });
+
+  it("keeps the agency choice off by default", async () => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    mockHeaderValues.clear();
+    mockGetInvite.mockResolvedValue(null);
+    const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
+
+    const html = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve({ as: "agency" }) }));
+    expect(html).not.toContain("Who is this account for?");
+    expect(html).toContain("Start your work here.");
+    expect(html).toContain("&quot;next&quot;:&quot;/workspace&quot;");
+  });
+
   it("preserves a supported public-result destination through general signup", async () => {
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
     mockHeaderValues.clear();

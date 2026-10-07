@@ -175,6 +175,8 @@ export interface WorkspaceReleases {
   websiteRebuild?: boolean;
   /** Connected sites on for this business (its `connected_sites` row, and Systems): Home links to /workspace/site. */
   connectedSites?: boolean;
+  /** STRELVA_AGENCY_SIGNUP_RELEASE: agency Home links to the setup checklist at /workspace/agency/start. */
+  agencySetup?: boolean;
 }
 
 /**

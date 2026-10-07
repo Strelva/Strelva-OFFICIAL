@@ -64,6 +64,14 @@ export function workspaceReturnTarget(value: string | null): string | null {
     return null;
   }
 
+  // The agency setup checklist (#258), optionally for one agency.
+  if (value === "/workspace/agency/start") return value;
+  if (value?.startsWith("/workspace/agency/start?")) {
+    const target = new URL(value, "https://workspace.invalid");
+    const workspaceId = target.searchParams.get("workspaceId");
+    if (target.hash || target.pathname !== "/workspace/agency/start" || target.searchParams.size !== 1 || !workspaceId || !UUID.test(workspaceId)) return null;
+    return `${target.pathname}?${target.searchParams}`;
+  }
   if (!value || (value !== "/workspace" && !value.startsWith("/workspace?"))) return null;
   const url = new URL(value, "https://workspace.invalid");
   if (url.hash || url.pathname !== "/workspace") return null;

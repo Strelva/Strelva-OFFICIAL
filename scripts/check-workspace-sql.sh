@@ -761,6 +761,9 @@ grep -q 'rollback_wrong_order_or_function_drift' "$cluster_root/7a-wrong-order.l
 apply_batch_7a
 check_batch_7a_contracts
 printf 'Batch 7A forward, populated rollback and reapply passed.\n'
+# Agency signup (#258): the ordinary create path grants nothing outside the
+# agency, every effect starts unverified, and the cap and identity hold.
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-signup-schema.sql"
 # Wave 6 website: fallback undo, immutable release reconciliation, and
 # owner-decided domain proposals. Fictional fixtures and isolated Postgres only.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010110000_website_cutover_undo.sql"
