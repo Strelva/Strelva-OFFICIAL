@@ -147,3 +147,26 @@ export function createInquiryDeliveryMessage(
     idempotencyKey: `inquiry:${inquiry.id}:${action}`,
   };
 }
+
+/**
+ * Bind an approval to the exact message and capability revision. The provider
+ * idempotency key alone is not sufficient because an edited body could reuse
+ * the same inquiry/action key under the same policy version.
+ */
+export function getInquiryDeliveryMessageDigest(message: InquiryDeliveryMessage): string {
+  const canonical = JSON.stringify({
+    tenantId: message.tenantId,
+    inquiryId: message.inquiryId,
+    action: message.action,
+    capabilityId: message.capabilityId ?? null,
+    capabilityVersion: message.capabilityVersion ?? null,
+    audience: message.audience,
+    to: message.to,
+    replyTo: message.replyTo ?? null,
+    tags: message.tags ?? null,
+    subject: message.subject,
+    options: message.options,
+    idempotencyKey: message.idempotencyKey,
+  });
+  return createHash("sha256").update(canonical).digest("hex");
+}

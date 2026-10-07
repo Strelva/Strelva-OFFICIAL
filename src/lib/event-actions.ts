@@ -123,6 +123,12 @@ export async function resolveEventAction(
   // This also covers a process that died while the event was still marked
   // processing: the durable delivery marker is the only safe source of truth.
   const inquiries = await workspacePorts().inquiries();
+  if (event.type === "change_request" && typeof event.metadata?.kind === "string" && INQUIRY_PUBLICATION_KINDS.has(event.metadata.kind)) {
+    if (action !== "approved" && action !== "dismissed") return { changed: false, reason: "invalid_action" };
+    const claimId = typeof event.metadata?.publicationClaimId === "string" ? event.metadata.publicationClaimId : "";
+    const authorized = await inquiries.authorizeInquiryPublicationActor({ tenantId, eventId, claimId, event, actorId, action });
+    if (!authorized.allowed) return { changed: false, reason: authorized.reason ?? "permission_denied" };
+  }
   if (
     inquiries.isInquiryMessageReviewEvent(event) &&
     (event.metadata?.execution?.state === "external_accepted" || event.metadata?.execution?.state === "processing")
@@ -132,7 +138,7 @@ export async function resolveEventAction(
     // be the live responsibility sponsor before we allow that transition.
     // Never infer authorization from the event's requestedBy metadata or from
     // the actor that started the abandoned attempt.
-    const authorized = await inquiries.authorizeInquiryMessageReviewActor({ tenantId, event, actorId });
+    const authorized = await inquiries.authorizeInquiryMessageReviewActor({ tenantId, event, actorId, eventAction: "approved" });
     if (!authorized.allowed) {
       return { changed: false, reason: authorized.reason || "permission_denied" };
     }
@@ -264,7 +270,7 @@ async function executeResolvedEventAction(
 
   const inquiries = await workspacePorts().inquiries();
   if (inquiries.isInquiryMessageReviewEvent(event)) {
-    const authorized = await inquiries.authorizeInquiryMessageReviewActor({ tenantId, event, actorId });
+    const authorized = await inquiries.authorizeInquiryMessageReviewActor({ tenantId, event, actorId, eventAction: action === "dismissed" ? "dismissed" : "approved" });
     if (!authorized.allowed) return { changed: false, reason: authorized.reason || "permission_denied" };
     if (action === "dismissed") {
       const resolved = await resolveEvent(eventId, "dismissed", { actor: actorId });
@@ -311,7 +317,7 @@ async function executeResolvedEventAction(
         ? event.metadata.publicationClaimId.trim()
         : "";
       if (!claimId) return { changed: false, reason: "inquiry_publication_claim_missing" };
-      const publication = await inquiries.executeInquiryPublication({ tenantId, eventId, claimId });
+      const publication = await inquiries.executeInquiryPublication({ tenantId, eventId, claimId, event, actorId });
       if (!publication.accepted) {
         return { changed: false, reason: publication.reason || "inquiry_publication_failed" };
       }
@@ -319,13 +325,13 @@ async function executeResolvedEventAction(
       // read-back remains accepted and non-retryable; its verification evidence
       // is recorded by the inquiry executor.
       await markExecutionExternalAccepted(eventId);
-      const resolved = await resolveEvent(eventId, "approved", { actor: "user" });
+      const resolved = await resolveEvent(eventId, "approved", { actor: actorId });
       if (!resolved.changed) return { changed: false, reason: "already_resolved" };
       return publication.verified
         ? { changed: true }
         : { changed: true, reason: publication.reason || "accepted_unverified" };
     }
-    const resolved = await resolveEvent(eventId, "dismissed", { actor: "user" });
+    const resolved = await resolveEvent(eventId, "dismissed", { actor: actorId });
     return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
   }
 

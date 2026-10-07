@@ -14,7 +14,6 @@
  * "delivered" unless a transport supplies verification evidence.
  */
 
-import { createHash } from "node:crypto";
 import { ownerNoticeEmail } from "@/lib/owner-recipient";
 
 import type { InquiryTimelineEventType, ResponsibilityAction, ResponsibilityEvaluation, ResponsibilityPolicy } from "@/products/inquiries/contracts";
@@ -26,6 +25,8 @@ import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout"
 import { createEmailInquiryTransport } from "./delivery-email";
 import { createRedisInquiryDeliveryStore } from "./delivery-store";
 import { claimInquiryMessagePurpose, releaseRejectedInquiryMessagePurpose } from "./message-purpose";
+import { inquiryMessageRouteAtUse } from "./inquiry-policy-at-use";
+import { inquiryRecordsEnabled } from "@/platform/infra/inquiry-records";
 import { INQUIRY_WORKSPACE_EXIT_CODE, isInquiryWorkspaceExited } from "./workspace-exit";
 import type { EmailAudience } from "@/platform/infra/email/send";
 import { inquiryBusinessFactsEnabled, inquiryPersonEmail, inquiryWithinBusinessHours, readInquiryBusinessContext } from "./business-context";
@@ -34,6 +35,7 @@ import {
   createInquiryDeliveryMessage,
   deliveryActionLabel,
   getInquiryReplyTrackingAddress,
+  getInquiryDeliveryMessageDigest,
   inquiryBusinessName,
   validEmail,
 } from "./delivery-message";
@@ -189,31 +191,8 @@ function actionTimes(
   return { dueAt: dueAt.toISOString(), expiresAt: expiresAt.toISOString() };
 }
 
-/**
- * Bind an approval to the exact message and capability revision. The provider
- * idempotency key alone is not sufficient because an edited body could reuse
- * the same inquiry/action key under the same policy version.
- */
-export function getInquiryDeliveryMessageDigest(message: InquiryDeliveryMessage): string {
-  const canonical = JSON.stringify({
-    tenantId: message.tenantId,
-    inquiryId: message.inquiryId,
-    action: message.action,
-    capabilityId: message.capabilityId ?? null,
-    capabilityVersion: message.capabilityVersion ?? null,
-    audience: message.audience,
-    to: message.to,
-    replyTo: message.replyTo ?? null,
-    tags: message.tags ?? null,
-    subject: message.subject,
-    options: message.options,
-    idempotencyKey: message.idempotencyKey,
-  });
-  return createHash("sha256").update(canonical).digest("hex");
-}
-
 /** Build the exact message that an approval UI must display and hash. */
-export { createInquiryDeliveryMessage, getInquiryReplyTrackingAddress };
+export { createInquiryDeliveryMessage, getInquiryReplyTrackingAddress, getInquiryDeliveryMessageDigest };
 
 export function inquirySubmissionFromLead(tenantId: string, lead: LeadRecord): InquiryDeliverySubmission {
   return {
@@ -625,6 +604,19 @@ export async function deliverInquiryAction(
     const reason = responsibilityGate.reason || "responsibility_blocked";
     await appendTimelineSafe(store, timelineFor(inquiry, action, blockedTimelineType(action), reason, "blocked", now.toISOString()));
     return { inquiryId: inquiry.id, tenantId: inquiry.tenantId, action, status: blockedResultStatus(reason), reason, retryable: false };
+  }
+
+  if (action !== "owner_notification" && options.approval === undefined
+    && process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && inquiryRecordsEnabled()) {
+    const decisionRoute = responsibilityGate.evaluation
+      ? await (deps.messageRoute ?? inquiryMessageRouteAtUse)(inquiry.tenantId, responsibilityGate.evaluation,
+        `${message.subject}\n${renderInquiryMessage(message).text}`, inquiry.businessId)
+      : "never";
+    if (decisionRoute !== "handle") {
+      const reason = decisionRoute === "never" ? "responsibility_blocked" : "approval_required";
+      await appendTimelineSafe(store, timelineFor(inquiry, action, blockedTimelineType(action), reason, "blocked", now.toISOString()));
+      return { inquiryId: inquiry.id, tenantId: inquiry.tenantId, action, status: decisionRoute === "never" ? "paused" : "awaiting_approval", reason, retryable: false };
+    }
   }
 
   const messageDigest = getInquiryDeliveryMessageDigest(message);

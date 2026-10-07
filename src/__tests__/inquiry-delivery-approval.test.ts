@@ -6,6 +6,7 @@ import type { InquiryCapabilityDefinition, InquiryEngineState, ResponsibilityPol
 import { InquiryEngine } from "@/products/inquiries/inquiry-engine";
 import {
   approveInquiryMessageReviewWithDependencies,
+  authorizeInquiryMessageReviewActor,
   executeInquiryMessageReview,
   getInquiryMessageReviewMetadata,
   persistDeliveredInquiryMessageReceipt,
@@ -220,13 +221,14 @@ describe("signed owner decision through the tenant adapter and inquiry executor"
     const { base, events, repository } = await fixture();
     await prepare("reply", base);
     const event = events[0]!;
+    event.metadata!.reviewAudience = "owner"; // Existing owner-routed draft before the supervised release.
     const revision = tenantEventRevision(event);
     const owner = "owner@example.test";
     vi.stubEnv("STRELVA_INQUIRY_OWNER_NOTICES", authorization === "flags_off" ? "0" : "1");
     vi.stubEnv("STRELVA_INQUIRY_RECORDS", "1");
     vi.stubEnv("DUAL_WRITE_PG", "1");
     const authorize = vi.fn(async (name: string, args: Record<string, unknown>) => ({
-      data: name === "authorize_inquiry_owner_link_decision" && authorization !== "unclaimed"
+      data: name === "authorize_inquiry_owner_link_message_action" && authorization !== "unclaimed"
         && args.p_tenant_id === TENANT && args.p_event_id === event.id
         && args.p_revision === (authorization === "stale_revision" ? "b".repeat(64) : revision)
         && args.p_recipient === (authorization === "wrong_recipient" ? "other@example.test" : owner), error: null,
@@ -258,7 +260,7 @@ describe("signed owner decision through the tenant adapter and inquiry executor"
         why: "The business owner approved the exact rendered message through a signed decision.",
         outcomeEvidence: expect.arrayContaining(["signed owner decision owner-link:[redacted email]"]),
       });
-      expect(authorize).toHaveBeenCalledWith("authorize_inquiry_owner_link_decision", { p_tenant_id: TENANT, p_event_id: event.id, p_revision: revision, p_recipient: owner });
+      expect(authorize).toHaveBeenCalledWith("authorize_inquiry_owner_link_message_action", { p_tenant_id: TENANT, p_event_id: event.id, p_revision: revision, p_recipient: owner, p_action: "approved" });
     } else {
       expect(result).toMatchObject({ outcome: "failed", reason: "permission_denied" });
       expect(mail.send).not.toHaveBeenCalled();
@@ -266,8 +268,58 @@ describe("signed owner decision through the tenant adapter and inquiry executor"
   });
 });
 
+describe("signed Not yet message authorization",()=>{
+  it("closes exactly the declined owner event while refusing transport approval",async()=>{
+    const {base,events}=await fixture(); await prepare("reply",base); const event=events[0]!;
+    vi.stubEnv("STRELVA_INQUIRY_OWNER_NOTICES","1"); vi.stubEnv("STRELVA_INQUIRY_RECORDS","1"); vi.stubEnv("DUAL_WRITE_PG","1");
+    const rpc=vi.fn(async(name:string,args:Record<string,unknown>)=>({data:name==="authorize_inquiry_owner_link_message_action" && args.p_action==="dismissed",error:null}));
+    setInquiryRecordsDb({rpc});
+    const input={tenantId:TENANT,event,actorId:"owner-link:owner@example.test",deps:{...base,emailReady:async()=>false,messageRoute:async()=>"owner_decides" as const}};
+    expect(await authorizeInquiryMessageReviewActor({...input,eventAction:"dismissed"})).toEqual({allowed:true});
+    expect(await authorizeInquiryMessageReviewActor({...input,eventAction:"approved",deps:{...input.deps,emailReady:async()=>true}})).toMatchObject({allowed:false,reason:"permission_denied"});
+    const mail=transport(); expect(await executeInquiryMessageReview({...input,eventId:event.id,deps:{...input.deps,emailReady:async()=>true,transport:mail}})).toMatchObject({accepted:false,safeToResolve:false});
+    expect(mail.send).not.toHaveBeenCalled();
+  });
+});
+
+describe("supervised regular reply operator authority", () => {
+  const operator = "a9350000-0000-4000-8000-000000000001";
+  it.each(["authorized","revoked","owner_audience","commitment","policy_changed","flags_off"] as const)("executes only exact regular supervised drafts with current operator authority: %s", async state => {
+    const { base, events, repository } = await fixture();
+    vi.stubEnv("STRELVA_INQUIRY_OWNER_NOTICES", "1"); vi.stubEnv("STRELVA_INQUIRY_RECORDS", "1"); vi.stubEnv("DUAL_WRITE_PG", "1");
+    base.messageRoute = async () => "strelva_reviews";
+    await prepare("reply",base);
+    const event = events[0]!;
+    base.messageRoute = async () => "strelva_reviews";
+    if (state === "owner_audience") event.metadata!.reviewAudience = "owner";
+    if (state === "commitment") event.metadata!.messageBody = "The price is $40.";
+    if (state === "policy_changed") await updateState(repository, state => { state.responsibilities[0]!.updatedAt = "2026-09-12T12:00:00Z"; });
+    if (state === "flags_off") vi.stubEnv("STRELVA_INQUIRY_OWNER_NOTICES", "0");
+    const authorize = vi.fn(async (name:string,args:Record<string,unknown>) => ({ data: state !== "revoked" && name === "authorize_inquiry_operator_actor" && args.p_tenant_id === TENANT && args.p_actor_id === operator, error:null }));
+    setInquiryRecordsDb({ rpc:authorize }); const mail=transport();
+    const result=await executeInquiryMessageReview({ tenantId:TENANT,eventId:event.id,event,actorId:operator,deps:{ ...base,transport:mail } });
+    if (state === "authorized") {
+      expect(result).toMatchObject({ accepted:true,safeToResolve:true,receiptPersisted:true });
+      expect(mail.send).toHaveBeenCalledTimes(1);
+      expect((await repository.getSnapshot(TENANT,BUSINESS))?.state.responsibilityReceipts[0]).toMatchObject({ why: "Strelva reviewed the exact rendered message under the owner’s current supervised inquiry responsibility.", outcomeEvidence:expect.arrayContaining(["verified operator approval a[redacted phone]"]) });
+    } else { expect(result).toMatchObject({ accepted:false,safeToResolve:false }); expect(mail.send).not.toHaveBeenCalled(); }
+  });
+});
+
 describe("inquiry message review approval", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("routes a new supervised ordinary reply to Strelva review while the legacy switch stays unchanged", async () => {
+    vi.stubEnv("STRELVA_INQUIRY_OWNER_NOTICES", "1");
+    vi.stubEnv("STRELVA_NEEDS_YOU_RELEASE", "0");
+    const enabled = await fixture();
+    await prepare("reply", { ...enabled.base, messageRoute: async () => "strelva_reviews" });
+    expect(getInquiryMessageReviewMetadata(enabled.events[0]!)?.reviewAudience).toBe("operator");
+    vi.stubEnv("STRELVA_INQUIRY_OWNER_NOTICES", "0");
+    const legacy = await fixture();
+    await prepare("reply", legacy.base);
+    expect(getInquiryMessageReviewMetadata(legacy.events[0]!)?.reviewAudience).toBe("owner");
+  });
 
   it.each([
     ["reply", "ada@example.test", "customer"],

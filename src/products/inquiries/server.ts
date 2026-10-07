@@ -57,7 +57,7 @@ export {
   InquiryWorkspaceExitUnavailableError,
   resolveInquiryWorkspace,
 } from "./workspace-exit";
-export { executeInquiryPublication } from "./publication";
+export { executeInquiryPublication, authorizeInquiryPublicationActor } from "./publication";
 export { getInquiryRepository } from "./repository";
 export { publicationClaimToken } from "./repository";
 export { InquiryPersistenceError, InquiryValidationError } from "./repository";
@@ -166,14 +166,29 @@ export async function queueInquiryPublication(input: QueueInquiryPublicationInpu
   const kind = input.action === "undo" ? INQUIRY_UNDO_EVENT_KIND : INQUIRY_PUBLISH_EVENT_KIND;
   let createdEventId: string | null = null;
   try {
+    const snapshot = await repository.getSnapshot(input.tenantId, input.businessId);
+    const work = snapshot?.state.requests.find(item => item.id === input.requestId && item.capabilityId === input.capabilityId);
+    const current = snapshot?.state.capabilities.find(item => item.id === input.capabilityId);
+    const target = input.action === "undo" ? current?.previousLive : work?.draft;
+    if (!work || !current || (input.action === "make_live" && (target?.version !== input.version || work.activeChangeId !== input.changeId))
+      || (input.action === "undo" && ((current.live?.version ?? 0) + 1 !== input.version || work.lastLiveChangeId !== input.changeId))) {
+      throw new InquiryValidationError("This changed since we emailed you. Prepare a fresh live change.");
+    }
+    const confirmation = [
+      `${input.action === "undo" ? "Undo" : "Make live"} release ${input.version} for ${input.tenantId}.`,
+      `Appears in: ${input.tenantId}'s website inquiry form.`,
+      target ? `Form: ${target.form.title}.` : "The published inquiry form is removed; received inquiries stay kept.",
+      target?.routing ? `Routing: ${target.routing.sentence} Destination: ${target.routing.destination}. Within ${target.routing.withinMinutes} minutes.` : "Routing: no inquiry routing rule.",
+      target?.followUp ? `Follow-up: ${target.followUp.sentence} After ${target.followUp.afterMinutes} minutes; at most ${target.followUp.maxAttempts} attempts.` : "Follow-up: none.",
+      "Sender: Strelva via mail.strelva.com, subject to the current sending permissions.",
+      "Business recipients and hours are checked again before a message sends.",
+    ].join("\n");
     const event = await addEvent({
       tenantId: input.tenantId,
       source: "website",
       type: "change_request",
-      title: input.action === "undo" ? "Undo inquiry capability change" : "Make inquiry capability live",
-      body: input.summary?.trim().slice(0, 500) || (input.action === "undo"
-        ? "Review the requested inquiry capability undo before it changes the live form."
-        : "Review the requested inquiry capability before it changes the live form."),
+      title: input.action === "undo" ? "Undo the live inquiry form change" : "Make the inquiry form live",
+      body: confirmation,
       status: "pending",
       metadata: {
         kind,

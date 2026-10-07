@@ -86,3 +86,9 @@ export async function readStrelvaHandled(actor: WorkspaceActor, workspaceId: str
 export function pendingInquiryDecisionEvents(tenantId: string) {
   return getEventsRaw(tenantId, { status: "pending", limit: 1000 });
 }
+
+/** Trusted event lookup for inquiry decision executors; a global id never grants tenant access. */
+export async function readInquiryDecisionEvent(tenantId: string, eventId: string) {
+  const event = await getEventRaw(eventId);
+  return event?.tenantId === tenantId ? event : null;
+}
