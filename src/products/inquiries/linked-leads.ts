@@ -1,4 +1,4 @@
-import { ownerCanProposeBookingTimes } from "@/products/bookings/server";
+import type { ownerCanProposeBookingTimes } from "@/products/bookings/server";
 import { getLeads, leadReadStoreReady, type LeadRecord } from "@/lib/leads";
 
 import { workspaceInquiryRepliesEnabled, type WorkspaceReplyOutcome } from "./workspace-replies";
@@ -136,7 +136,8 @@ const defaults: LeadDependencies = {
     ]).then(([held, released, kept]) => ({ held, released, kept }))
     : null,
   connected: readConnectedSiteInquiries,
-  canProposeBookings: ownerCanProposeBookingTimes,
+  // Lazy: inquiry reads must not load the bookings server graph.
+  canProposeBookings: async (...args) => (await import("@/products/bookings/server")).ownerCanProposeBookingTimes(...args),
 };
 
 export function heldView(lead: WorkspaceInquiryLead): HeldView {

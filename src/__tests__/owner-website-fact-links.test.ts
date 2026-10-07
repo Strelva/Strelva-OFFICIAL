@@ -14,7 +14,7 @@ const AT = "2026-10-07T14:00:00.000Z";
 const OWNER = "owner-without-account@example.test";
 
 const live = vi.hoisted(() => ({ confirmFact: vi.fn(), list: vi.fn() }));
-vi.mock("@/products/websites/rebuild-release", () => ({ websiteRebuildReleaseEnabled: () => true }));
+vi.mock("@/products/websites/rebuild-release", () => ({ websiteRebuildReleaseEnabled: () => true, websiteRebuildReleaseMayBeOn: () => false }));
 vi.mock("@/products/websites/rebuild-service", () => ({ resolveWebsiteRebuildFact: live.confirmFact, listWebsiteRebuilds: live.list }));
 
 function record(): WebsiteRebuildRecord {

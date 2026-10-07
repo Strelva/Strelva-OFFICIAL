@@ -53,7 +53,8 @@ describe("workspace ports", () => {
       const port = (await ports[name]()) as unknown as Record<string, unknown>;
       for (const member of members) expect(port[member], `${name}.${member}`).toBeDefined();
     }
-  });
+  // Cold-imports every workspace module graph; transform time, not runtime.
+  }, 30_000);
 
   it("a port returns the same module instance a direct import does", async () => {
     const direct = await import("@/platform/account-bindings/store");

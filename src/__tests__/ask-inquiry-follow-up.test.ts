@@ -91,7 +91,7 @@ describe("Ask's native Inquiry follow-up alternative", () => {
     const claimed=await f.repository.claimPublication({...prepared.effects[0]!.request,tenantId:"fixture-site",businessId:workspaceId,requestId:selection.requestId,capabilityId:selection.capabilityId,changeId:selection.changeId,version:selection.version,action:"make_live",actorId:actor.userId,idempotencyKey:"approved-follow-up"});
     if(!claimed.acquired) throw Error("Fixture claim missing");
     await f.repository.linkPublicationEvent({tenantId:"fixture-site",claimId:claimed.claim.id,claimToken:claimed.claimToken,governanceEventId:"approved-event"});
-    expect(await executeInquiryPublication({tenantId:"fixture-site",eventId:"approved-event",claimId:claimed.claim.id,repository:f.repository})).toEqual({accepted:true,verified:true});
+    expect(await executeInquiryPublication({tenantId:"fixture-site",eventId:"approved-event",claimId:claimed.claim.id,repository:f.repository,actorId:actor.userId,authorizeActor:async()=>({allowed:true})})).toEqual({accepted:true,verified:true});
     const final=(await f.repository.getSnapshot("fixture-site",workspaceId))!;
     expect(final.state.capabilities[0]!.live).toEqual(prepared.content.draft);
     expect(final.state.responsibilities).toEqual(f.snapshot.state.responsibilities);
