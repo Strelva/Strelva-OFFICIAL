@@ -29,7 +29,7 @@ export interface WebsiteCutoverItem { id: "document_published" | "read_back" | "
 interface ServiceDependencies {
   documents?: WebsiteDocumentStore;
   pipeline?: typeof runWebsiteRebuild;
-  pipelineOptions?: RebuildOptions;
+  pipelineOptions?: RebuildOptions | ((actor: WorkspaceActor, workspaceId: string) => Promise<RebuildOptions>);
   list?: typeof listWork;
   rateLimited?: (workspaceId: string) => Promise<boolean>;
   createHostedTenant?: (actor: WorkspaceActor, record: WebsiteRebuildRecord) => Promise<string>;
@@ -113,16 +113,21 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     let current = await update(actor,loaded,"rebuild_started",{ status: "building", lastError: null, approvedCandidateRevision: null });
     const { requestId: _requestId, ...input } = current.rebuild.input;
     try {
+      const pipelineOptions = typeof dependencies.pipelineOptions === "function"
+        ? await dependencies.pipelineOptions(actor, current.work.workspaceId)
+        : dependencies.pipelineOptions ?? await (await import("./rebuild-runtime")).configuredWebsiteRebuildOptions({
+          actor, workspaceId: current.work.workspaceId, workId: current.work.id, recheck: () => store.member(actor, current.work.workspaceId).then(() => undefined),
+        });
       const checkpoint = current.rebuild.checkpoint as RebuildCheckpoint | null;
       const result = await pipeline(input as WebsiteRebuildInput, {
-        ...dependencies.pipelineOptions,
+        ...pipelineOptions,
         ...(checkpoint ? { checkpoint } : {}),
         onSourcePage: async page => {
           await documents.retainCrawlPage(actor,{ workspaceId: current.work.workspaceId, workId: current.work.id, page });
           if (!current.rebuild.sourceAudit) current = await update(actor,current,"source_audit_saved",{ sourceAudit: auditRebuildHtml(page.html,page.url) });
-          await dependencies.pipelineOptions?.onSourcePage?.(page);
+          await pipelineOptions.onSourcePage?.(page);
         },
-        rehostAssets: dependencies.pipelineOptions?.rehostAssets ?? (process.env.BLOB_READ_WRITE_TOKEN ? async assets => {
+        rehostAssets: pipelineOptions.rehostAssets ?? (process.env.BLOB_READ_WRITE_TOKEN ? async assets => {
           const facts = (current.rebuild.checkpoint as RebuildCheckpoint | null)?.facts;
           const stem = (facts?.name ?? current.rebuild.title).toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"").slice(0,40) || "business";
           return rehostWebsiteAssets(`${stem}-${current.work.id.replace(/-/g,"").slice(0,12)}`,assets);
@@ -142,7 +147,7 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
       current = await saveCandidate(actor,current,result.document,"rebuild_ready");
       // Documents own durable facts. Drop large model/crawl duplicates after
       // success while retaining the stage log and source provenance.
-      current = await update(actor,current,"rebuild_finished",{ checkpoint: null, pageMapping: result.pageMapping });
+      current = await update(actor,current,"rebuild_finished",{ checkpoint: null, pageMapping: result.pageMapping, skippedPaths: result.crawl?.skipped.slice(0, 200) ?? [] });
       return present(current);
     } catch (error) {
       // A lost CAS or revoked access must never overwrite a newer actor's work.

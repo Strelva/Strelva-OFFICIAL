@@ -119,6 +119,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261010110000": "website_cutover_undos",
   "20261010113000": "website_rebuild_origins",
   "20261010114000": "website_domain_requests",
+  "20261010115000": "website_model_allowances",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */

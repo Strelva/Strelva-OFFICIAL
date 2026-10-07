@@ -16055,6 +16055,16 @@ export type Database = {
           tenant_id: string
         }[]
       }
+      reserve_website_model_call: {
+        Args: {
+          p_workspace_id: string
+          p_work_id: string
+          p_user_id: string
+          p_verified_email: string
+          p_maximum: number
+        }
+        Returns: number
+      }
       resolve_billing_workspace: {
         Args: {
           p_tenant_id: string
