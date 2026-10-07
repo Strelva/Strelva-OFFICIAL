@@ -21,6 +21,7 @@ import type { BookingMessageKind, BookingMessageStatus, ClaimedBookingMessage, S
 
 export interface BookingBusiness {
   name: string;
+  address?: string;
   tenantId: string | null;
   /** The owner recipient, resolved once through the owner-recipient rule. */
   ownerEmail: string | null;
@@ -108,7 +109,7 @@ async function deliver(
   try {
     const result = await ports.send({
       audience,
-      ...(audience === "client" && business.tenantId ? { tenantId: business.tenantId } : {}),
+      ...(business.tenantId ? { tenantId: business.tenantId } : {}),
       ...(audience === "customer" ? { fromName: business.name || "Strelva", fromAddress: CUSTOMER_FROM } : {}),
       to,
       subject: email.subject,

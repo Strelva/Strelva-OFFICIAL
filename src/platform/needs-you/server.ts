@@ -1,3 +1,4 @@
+import { deliverBookingUpdates } from "@/platform/bookings/updates";
 import { getEventRaw, getEvents } from "@/lib/events";
 import { resolveEventAction } from "@/lib/event-actions";
 import { sendEmailWithReceipt } from "@/platform/infra/email/send";
@@ -54,6 +55,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
         // Why a request stopped waiting (its own 72-hour clock, a cancel) for the closed item.
         booking: (workspaceId, bookingId) => readWorkspaceBooking(workspaceId, bookingId),
         afterDecision: async (booking) => {
+          await deliverBookingUpdates(booking.id).catch(() => undefined);
           if (booking.legacyId && booking.tenantId) {
             await updateLegacyBookingStatus(booking.legacyId, { status: booking.status === "confirmed" ? "confirmed" : "cancelled" }, booking.tenantId);
           }

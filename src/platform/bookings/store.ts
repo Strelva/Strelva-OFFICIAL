@@ -439,7 +439,9 @@ export interface ManagedReservation {
   start: string;
   end: string;
   timeZone: string;
-  status: "pending" | "confirmed" | "cancelled";
+  status: "pending" | "confirmed" | "cancelled" | "held";
+  confirmationRequired?: boolean;
+  confirmUntil?: string | null;
 }
 
 /** The receipt a manage link's token belongs to, found by the token's hash alone. */

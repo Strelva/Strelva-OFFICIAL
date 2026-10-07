@@ -11,7 +11,7 @@ import { getTenantConfig } from "@/lib/tenants";
 import { getTenantPublicUrl } from "@/lib/tenant-urls";
 import { storeSlotsForDate } from "./availability";
 import { bookingWhen } from "./emails";
-import { bookingManagePageEnabled } from "./flags";
+import { bookingManagePageEnabled, bookingMessagesEnabled } from "./flags";
 import type { BookingLifecyclePorts } from "./lifecycle";
 import {
   claimBookingMessages,
@@ -55,8 +55,15 @@ export async function nextOpenTimes(booking: StoreBooking, now: Date, count = 3)
 }
 
 /** The customer's manage link for an API reservation (its token is stored encrypted for receipts). */
-async function manageUrl(booking: StoreBooking): Promise<string | null> {
-  if (!bookingManagePageEnabled() || !booking.publicReservationId) return null;
+export async function manageUrl(booking: StoreBooking): Promise<string | null> {
+  if (!bookingManagePageEnabled()) return null;
+  if (!booking.publicReservationId) {
+    if (!bookingMessagesEnabled()) return null;
+    const { issueNativeAccess } = await import("./native");
+    const access = booking.tenantId ? await issueNativeAccess(booking.tenantId, booking.id) : null;
+    const token = access && typeof access.manage_ciphertext === "string" ? decryptSecret(access.manage_ciphertext) : null;
+    return token ? `${bookingAppOrigin()}/b/${encodeURIComponent(token)}` : null;
+  }
   type Query = {
     select(columns: string): Query;
     eq(column: string, value: unknown): Query;
@@ -93,6 +100,12 @@ export const bookingLifecyclePorts: BookingLifecyclePorts = {
   },
   alternatives: (booking, now) => nextOpenTimes(booking, now),
   manageUrl,
-  send: sendEmailWithReceipt,
+  async send(input) {
+    if (input.audience === "customer") {
+      const { bookingCustomerEmailAllowed } = await import("./updates");
+      if (!await bookingCustomerEmailAllowed(input.tenantId ?? null)) return { status: "suppressed", reason: "email_gates" };
+    }
+    return sendEmailWithReceipt(input);
+  },
   appOrigin: bookingAppOrigin(),
 };

@@ -1,3 +1,5 @@
+import { agentBookingSchema, agentReceipt, requestAgentBooking } from "@/platform/bookings/native";
+import { deliverBookingUpdates } from "@/platform/bookings/updates";
 import { isTenantId } from "@/lib/scaffold-contracts";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { publicBookingVisitorSchema } from "@/products/scheduling/server";
@@ -22,6 +24,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
   }
   const body = await bodyObject(request);
   if (!body) return bookingJson({ error: "Invalid request body." }, 400);
+  if (body.origin === "agent") {
+    const parsed = agentBookingSchema.safeParse(body);
+    if (!parsed.success) return bookingJson({ error: "Enter the service, time, agent and customer details." }, 400);
+    try {
+      const result = await requestAgentBooking(tenant, parsed.data);
+      await deliverBookingUpdates(result.booking.id).catch(() => undefined);
+      return bookingJson(agentReceipt(result), result.created ? 201 : 200);
+    } catch (error) { return bookingError(error); }
+  }
   const capabilityId = stringValue(body.capabilityId, 200);
   const capabilityVersion = integerValue(body.capabilityVersion);
   const slotId = stringValue(body.slotId, 256);

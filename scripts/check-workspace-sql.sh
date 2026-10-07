@@ -670,3 +670,10 @@ bash "$repo_root/scripts/check-customer-mapping-sql.sh"
 # Inquiry capabilities use their own isolated fictional tenant fixture. This
 # validates the additive migration without connecting to production.
 bash "$repo_root/scripts/check-inquiry-workspace-sql.sh"
+
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010130000_booking_parity.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-parity-schema.sql"
+
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010131000_booking_access.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010132000_booking_updates.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-agent-schema.sql"

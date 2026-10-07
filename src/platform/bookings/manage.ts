@@ -20,7 +20,8 @@ export interface ManagedBookingView {
   day: string;
   time: string;
   timeZoneLabel: string;
-  status: "pending" | "confirmed" | "cancelled";
+  status: "pending" | "confirmed" | "cancelled" | "held";
+  confirmationRequired?: boolean;
 }
 
 export type ManageBookingState =
@@ -52,6 +53,7 @@ export interface ManageDeps {
   read(input: { tenantId: string; capabilityId: string; range: { from: string; to: string } }): Promise<Schedule>;
   change(input: { tenantId: string; reservationId: string; managementToken: string; capabilityId: string; capabilityVersion: number; slotId: string }): Promise<Receipt>;
   cancel(input: { tenantId: string; reservationId: string; managementToken: string }): Promise<Receipt>;
+  confirm?(token: string): Promise<Receipt>;
   now(): number;
 }
 
@@ -107,6 +109,7 @@ export function managedView(reservation: ManagedReservation): ManagedBookingView
     time: when.time,
     timeZoneLabel: zoneLabel(reservation.start, reservation.timeZone),
     status: reservation.status,
+    confirmationRequired: reservation.confirmationRequired,
   };
 }
 
@@ -121,10 +124,11 @@ export async function loadManageState(
   if (!reservation) return { kind: "not_found" };
   const booking = managedView(reservation);
   // The link expires once the booking has ended.
-  if (Date.parse(reservation.end) <= deps.now()) return { kind: "ended", booking };
+  if (Date.parse(reservation.end) <= deps.now() || (reservation.status === "held" && (!reservation.confirmUntil || Date.parse(reservation.confirmUntil) <= deps.now()))) return { kind: "ended", booking };
   const notice: "cancelled" | "rescheduled" | "pending" | undefined =
     query.done === "cancelled" || query.done === "rescheduled" || query.done === "pending" ? query.done : undefined;
   const base = { kind: "ready" as const, booking, ...(notice ? { notice } : {}), ...(query.error ? { error: manageErrorMessage(query.error) } : {}) };
+  if (reservation.status === "held") return { ...base, days: [], slotsUnavailable: false, changesClosed: true };
   if (reservation.status === "cancelled") return { ...base, days: [], slotsUnavailable: false, changesClosed: false };
   const now = deps.now();
   let schedule: Schedule;
@@ -162,6 +166,11 @@ export async function actOnManageLink(token: string, form: { action: string | nu
   if (!reservation || Date.parse(reservation.end) <= deps.now()) return { error: "not_found" };
   const ids = { tenantId: reservation.tenantId, reservationId: reservation.reservationId, managementToken: token };
   try {
+    if (form.action === "confirm" && reservation.confirmationRequired && deps.confirm) {
+      const receipt = await deps.confirm(token);
+      return { done: receipt.status === "confirmed" ? "rescheduled" : "pending" };
+    }
+    if (reservation.status === "held") return { error: "invalid" };
     if (form.action === "cancel") {
       const receipt = await deps.cancel(ids);
       return { done: receipt.status === "cancelled" ? "cancelled" : "pending" };

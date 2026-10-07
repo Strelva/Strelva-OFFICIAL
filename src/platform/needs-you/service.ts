@@ -293,7 +293,9 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
       const remind1: DeliveryRow[] = [];
       const remind2: DeliveryRow[] = [];
       for (const row of items) {
-        const step = nextChaseStep(row, now);
+        // Bookings own the 24 h / 72 h clock; the generic day 3/7/14
+        // clock must never send another chase or expire an existing booking.
+        const step = row.sourceLifecycle === "booking_request" ? "none" : nextChaseStep(row, now);
         if (step === "lapse") {
           try {
             const expired = await deps.store.expire(workspaceId, row.id);

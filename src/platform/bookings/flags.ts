@@ -95,3 +95,13 @@ export async function bookingReadSource(options: { env?: Env; db?: BookingStoreD
     return "compare";
   }
 }
+
+/** Additive discovery, customer-confirmed agent requests and MCP. Off by default.
+ * Requires store-served reads; the legacy visitor contract is untouched. */
+export function bookingAgentsEnabled(env: Env = process.env): boolean {
+  return env.STRELVA_BOOKING_AGENTS?.trim() === "1" && bookingStoreWriteEnabled(env);
+}
+/** Immediate booking messages and native manage tokens. Off by default. */
+export function bookingMessagesEnabled(env: Env = process.env): boolean {
+  return env.STRELVA_BOOKING_MESSAGES?.trim() === "1" && bookingStoreWriteEnabled(env);
+}

@@ -161,15 +161,25 @@ export async function checkTenantBookingParity(
 ): Promise<BookingParityReport> {
   const db = options.db === undefined ? bookingStoreDb() : options.db;
   if (!db) throw new Error("booking_parity_unconfigured");
-  const [bookings, legacy, services, context, store] = await Promise.all([
+  const [bookings, legacy, services, context, store, receipts] = await Promise.all([
     options.ports.bookings(tenant),
     options.ports.settings(tenant),
     options.ports.services(tenant),
     readBookingContext(tenant, db),
     readTenantBookings(tenant, undefined, db),
+    options.ports.reservations(tenant),
   ]);
   if (!context) throw new Error("booking_parity_unknown_tenant");
   const diff = compareBookingLists(bookings, store);
+  // A green day covers both route families, not just legacy-id rows.
+  for (const receipt of receipts) {
+    const stored = store.find((b) => b.publicReservationId === receipt.publicReservationId);
+    const ref = `receipt:${receipt.publicReservationId}`;
+    if (!stored) diff.missingFromStore.push(ref);
+    else if (stored.status !== receipt.status || Date.parse(stored.start) !== Date.parse(receipt.start)
+      || Date.parse(stored.end) !== Date.parse(receipt.end)) diff.mismatched.push(ref);
+  }
+  diff.mismatched.push(...diff.storeOnly.map((id) => `store_only:${id}`));
   const today = options.today ?? new Intl.DateTimeFormat("en-CA", { timeZone: legacy.config.timezone }).format(new Date());
   const slotDifferences: BookingParityReport["slotDifferences"] = [];
   const bookable = services.filter((s) => !s.comingSoon);
@@ -192,8 +202,8 @@ export async function checkTenantBookingParity(
   const report: BookingParityReport = {
     tenant,
     ok: diff.missingFromStore.length === 0 && diff.mismatched.length === 0 && unexplainedSlots === 0,
-    legacyCount: bookings.length,
-    storeCount: store.filter((b) => b.legacyId).length,
+    legacyCount: bookings.length + receipts.length,
+    storeCount: store.filter((b) => b.legacyId || b.publicReservationId).length,
     missing: diff.missingFromStore,
     mismatched: diff.mismatched,
     slotDifferences,
