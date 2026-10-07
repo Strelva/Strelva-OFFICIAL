@@ -53,7 +53,7 @@ vi.mock("@/products/google-listing/tenant-replies", async (original) => ({
   defaultTenantReplyDeps: async () => deps,
 }));
 
-import { AUTO_REPLY_ACTOR, resolveEventAction } from "../lib/event-actions";
+import { AUTO_REPLY_ACTOR, isOperatorActor, operatorActorId, resolveEventAction } from "../lib/event-actions";
 
 const WORKSPACE = "ab000000-0000-4000-8000-000000000010";
 const ok = <T,>(data: T): GoogleResult<T> => ({ ok: true, data });
@@ -186,6 +186,38 @@ describe("review reply approve on the listing System", () => {
     expect(result).toEqual({ changed: false, reason: "review_reply_needs_owner" });
     expect(google.writes).toEqual([]);
     expect(receipts.all()).toHaveLength(0);
+  });
+
+  it("an operator's reply is an operator instruction naming the operator, never the owner's approval", async () => {
+    const operator = operatorActorId("10000000-0000-4000-8000-0000000000aa");
+    const { google, receipts } = setup();
+    const result = await resolveEventAction("tenant-a", "evt_rr", "approved", operator);
+    expect(result).toEqual({ changed: true });
+    expect(google.writes).toEqual(["Thank you!"]);
+    expect(receipts.all()).toHaveLength(1);
+    expect(receipts.all()[0]).toMatchObject({
+      authority: { kind: "operator_instruction", actor: "operator:10000000-0000-4000-8000-0000000000aa", instructionRef: "event:evt_rr" },
+    });
+    expect(receipts.all()[0]).not.toMatchObject({ authority: { kind: "owner_approval" } });
+    expect(mockClaimEventAction).toHaveBeenCalledWith("evt_rr", "approved", operator);
+    expect(mockResolveEvent).toHaveBeenCalledWith("evt_rr", "approved", { actor: operator });
+  });
+
+  it("an operator's reply on the legacy publisher names the operator in its receipt", async () => {
+    const operator = operatorActorId("10000000-0000-4000-8000-0000000000aa");
+    setup({ bindingTarget: async () => null });
+    mockPublishReviewReply.mockResolvedValue({ published: true, verified: true });
+    expect(await resolveEventAction("tenant-a", "evt_rr", "approved", operator)).toEqual({ changed: true });
+    expect(mockPublishReviewReply).toHaveBeenCalledWith("tenant-a", "rev_9", "Thank you!", { actor: `${operator} approved event evt_rr` });
+    expect(mockResolveEvent).toHaveBeenCalledWith("evt_rr", "approved", { actor: operator });
+  });
+
+  it("only a verified operator id becomes an operator actor", () => {
+    expect(() => operatorActorId("user")).toThrow("operator_actor_invalid");
+    expect(() => operatorActorId("")).toThrow("operator_actor_invalid");
+    expect(isOperatorActor("owner-user-1")).toBe(false);
+    expect(isOperatorActor("operator:not-a-uuid")).toBe(false);
+    expect(isOperatorActor(operatorActorId("10000000-0000-4000-8000-0000000000aa"))).toBe(true);
   });
 
   it("an owner may still approve a 1-2 star reply", async () => {

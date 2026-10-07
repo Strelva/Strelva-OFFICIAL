@@ -87,7 +87,8 @@ vi.mock("../lib/gbp-replies", () => ({
   publishReviewReply: (...args: unknown[]) => mockPublishReviewReply(...args),
 }));
 
-import { resolveEventAction } from "../lib/event-actions";
+import { operatorActorId, resolveEventAction } from "../lib/event-actions";
+import { recordApproval, recordRejection } from "../lib/ai-auto-approve";
 
 describe("resolveEventAction", () => {
   beforeEach(() => {
@@ -273,6 +274,33 @@ describe("resolveEventAction", () => {
     expect(mockSetContent.mock.invocationCallOrder[0]!).toBeLessThan(
       mockResolveEvent.mock.invocationCallOrder[0]!,
     );
+  });
+
+  it("an operator's content approval is versioned as the operator's and never earns the owner's trust streak", async () => {
+    const operator = operatorActorId("10000000-0000-4000-8000-0000000000aa");
+    mockGetEvent.mockResolvedValue({
+      id: "evt_op", tenantId: "tenant-a", type: "content_update", source: "ai", status: "pending", createdAt: "2026-10-01T00:00:00.000Z",
+      metadata: { kind: "agent_preview", section: "contact", proposedData: { email: "new@example.com" } },
+    });
+    mockResolveEvent.mockResolvedValue({ changed: true });
+    mockGetDraftContent.mockResolvedValue(null);
+    mockGetContent.mockResolvedValue({ email: "old@example.com" });
+
+    expect(await resolveEventAction("tenant-a", "evt_op", "approved", operator)).toEqual({ changed: true });
+    expect(mockClaimEventAction).toHaveBeenCalledWith("evt_op", "approved", operator);
+    expect(mockResolveEvent).toHaveBeenCalledWith("evt_op", "approved", { actor: operator });
+    expect(mockAppendVersion.mock.calls[0]?.[2]).toBe("admin");
+    expect(recordApproval).not.toHaveBeenCalled();
+  });
+
+  it("an operator's dismissal still resets the trust streak, and names the operator", async () => {
+    const operator = operatorActorId("10000000-0000-4000-8000-0000000000aa");
+    mockGetEvent.mockResolvedValue({ id: "evt_op", tenantId: "tenant-a", type: "content_update", source: "ai", status: "pending", metadata: { section: "contact" } });
+    mockResolveEvent.mockResolvedValue({ changed: true });
+    expect(await resolveEventAction("tenant-a", "evt_op", "dismissed", operator)).toEqual({ changed: true });
+    expect(mockResolveEvent).toHaveBeenCalledWith("evt_op", "dismissed", { actor: operator });
+    expect(recordRejection).toHaveBeenCalledWith("tenant-a");
+    expect(recordApproval).not.toHaveBeenCalled();
   });
 
   it("does not run an effect when another approver owns the action claim", async () => {
