@@ -25,6 +25,7 @@ import { addTenantActivity } from "@/lib/tenant-crm";
 import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
 import { createEmailInquiryTransport } from "./delivery-email";
 import { createRedisInquiryDeliveryStore } from "./delivery-store";
+import { claimInquiryMessagePurpose, releaseRejectedInquiryMessagePurpose } from "./message-purpose";
 import { INQUIRY_WORKSPACE_EXIT_CODE, isInquiryWorkspaceExited } from "./workspace-exit";
 import type { EmailAudience } from "@/platform/infra/email/send";
 import { inquiryBusinessFactsEnabled, inquiryPersonEmail, inquiryWithinBusinessHours, readInquiryBusinessContext } from "./business-context";
@@ -848,8 +849,23 @@ export async function deliverInquiryAction(
     } catch {
       return { ...evaluated, status: "unavailable", reason: "inquiry_workspace_exit_unavailable", attemptId, retryable: false };
     }
+    // The workspace owner and governed engine cannot acquire two first replies,
+    // even while the other's provider write or acceptance checkpoint is pending.
+    let purposeClaimed: boolean;
+    try {
+      purposeClaimed = await claimInquiryMessagePurpose(inquiry.tenantId, inquiry.id, action, attemptId);
+    } catch {
+      return { ...evaluated, status: "reconciliation_required", reason: "shared_reply_claim_unavailable", attemptId, retryable: false };
+    }
+    if (!purposeClaimed) {
+      await store.markFailed({ tenantId: inquiry.tenantId, inquiryId: inquiry.id, action, attemptId, reason: "reply_purpose_already_claimed", retryable: false });
+      return { ...evaluated, status: "paused", reason: "reply_purpose_already_claimed", attemptId, retryable: false };
+    }
     const sent = await transport.send(message);
     if (sent.status === "rejected") {
+      // Explicit rejection proves nothing was accepted. Failure to record the
+      // release stays closed; an accepted/unknown write never reaches this seam.
+      await releaseRejectedInquiryMessagePurpose(inquiry.tenantId, inquiry.id, action, attemptId).catch(() => undefined);
       let failed: InquiryDeliveryCheckpoint;
       try {
         failed = await store.markFailed({ tenantId: inquiry.tenantId, inquiryId: inquiry.id, action, attemptId, reason: sent.reason, retryable: sent.retryable });

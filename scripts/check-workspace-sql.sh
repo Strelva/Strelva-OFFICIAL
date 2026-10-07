@@ -642,6 +642,27 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009100000_str
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125000_inquiry_urgent_decisions.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125500_inquiry_inbox.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-inbox-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125600_inquiry_reply_purpose.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-reply-purpose-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-reply-purpose-race-setup.sql"
+psql "${psql_args[@]}" --set=engine=true --file="$repo_root/tests/inquiry-reply-purpose-race.sql" >"$cluster_root/inquiry-engine-race.log" 2>&1 &
+inquiry_engine_race=$!
+psql "${psql_args[@]}" --set=engine=false --file="$repo_root/tests/inquiry-reply-purpose-race.sql" >"$cluster_root/inquiry-owner-race.log" 2>&1 &
+inquiry_owner_race=$!
+inquiry_engine_status=0
+inquiry_owner_status=0
+wait "$inquiry_engine_race" || inquiry_engine_status=$?
+wait "$inquiry_owner_race" || inquiry_owner_status=$?
+if [[ "$inquiry_engine_status" -eq 0 && "$inquiry_owner_status" -ne 0 ]]; then
+  grep -q inquiry_reply_already_sent "$cluster_root/inquiry-owner-race.log"
+elif [[ "$inquiry_owner_status" -eq 0 && "$inquiry_engine_status" -ne 0 ]]; then
+  grep -q reply_purpose_already_claimed "$cluster_root/inquiry-engine-race.log"
+else
+  printf 'Inquiry reply purpose race did not produce exactly one winner.\n' >&2
+  cat "$cluster_root/inquiry-engine-race.log" "$cluster_root/inquiry-owner-race.log" >&2
+  exit 1
+fi
+printf 'Inquiry engine/owner reply race passed: exactly one send purpose claimed.\n'
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
