@@ -120,15 +120,59 @@ export function compareWorkspaceTarget(catalog, deployment, migrations, options)
   };
 }
 
+// Retained helpers are explicit exceptions; new rollbacks use the timestamped
+// convention. Never broaden this to rollback-*.sql: typos must fail closed.
+export const MANUAL_MIGRATION_HELPERS = Object.freeze([
+  "rollback-business-effort-coverage.sql",
+  "rollback-catalog-report-receipts.sql",
+  "rollback-identity-spine-expand.sql",
+  "rollback-newsletter-backfill-identity.sql",
+  "rollback-newsletter-contacts.sql",
+  "rollback-org-layer-phase0.sql",
+  "rollback-publishing-reconnect.sql",
+  "rollback-publishing-release-flags.sql",
+  "rollback-reader-rpc-volatility.sql",
+  "rollback-w6-booking-access.sql",
+  "rollback-w6-booking-calendar-health.sql",
+  "rollback-w6-booking-calendar-mirror.sql",
+  "rollback-w6-booking-cancellation-cutoff.sql",
+  "rollback-w6-booking-exit-admission.sql",
+  "rollback-w6-booking-inquiry-offers.sql",
+  "rollback-w6-booking-manual.sql",
+  "rollback-w6-booking-native-workspace.sql",
+  "rollback-w6-booking-owner-evidence.sql",
+  "rollback-w6-booking-parity.sql",
+  "rollback-w6-booking-receipt-history.sql",
+  "rollback-w6-booking-receipt-lifecycle.sql",
+  "rollback-w6-booking-service-policies.sql",
+  "rollback-w6-booking-setup.sql",
+  "rollback-w6-booking-updates.sql",
+  "rollback-w6-catalog-tool-evidence.sql",
+  "rollback-w6-failed-system-plan-request.sql",
+  "rollback-w6-google-listing-controls.sql",
+  "rollback-w6-internal-tool-member-submit.sql",
+  "rollback-w6-internal-tool-notice-delivery.sql",
+  "rollback-w6-internal-tool-submit-notices.sql",
+  "rollback-w6-internal-tool-use-edits.sql",
+  "rollback-w6-internal-tool-use-link-labels.sql",
+  "rollback-w6-internal-tool-use-links.sql",
+  "rollback-w6-system-work-plan-authority.sql",
+  "rollback-website-business-facts.sql",
+  "rollback-website-cutover-undo.sql",
+  "rollback-website-domain-requests.sql",
+  "rollback-website-model-admission.sql",
+  "rollback-website-native-fact-reviews.sql",
+  "rollback-website-system-releases.sql",
+  "rollback-workspace-newsletter-sender.sql",
+  "rollback-workspace-publishing-content.sql",
+  "verify-identity-spine-expand.sql",
+]);
+const manualHelpers = new Set(MANUAL_MIGRATION_HELPERS);
+export const ROLLBACK_HELPER_PATTERN = /^rollback-\d{14}_.+\.sql$/;
+
 export function readCandidateMigrations(directory) {
-  // These retained manual helpers are not forward migrations. Keep the list
-  // explicit so an accidentally misnamed new migration still fails closed.
-  const helpers = new Set([
-    "rollback-identity-spine-expand.sql",
-    "rollback-org-layer-phase0.sql",
-    "verify-identity-spine-expand.sql",
-  ]);
-  return readdirSync(directory).filter(name => name.endsWith(".sql") && !helpers.has(name)).sort().map(name => {
+  return readdirSync(directory).filter(name => name.endsWith(".sql") &&
+    !manualHelpers.has(name) && !ROLLBACK_HELPER_PATTERN.test(name)).sort().map(name => {
     const match = /^(\d{14})_(.+)\.sql$/.exec(name);
     if (!match) throw new Error("Candidate contains a non-versioned SQL migration filename.");
     return { version: match[1], name: match[2] };
