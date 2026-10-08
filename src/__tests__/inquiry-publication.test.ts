@@ -3,6 +3,8 @@ import { InquiryEngine } from "@/products/inquiries/inquiry-engine";
 import { executeInquiryPublication } from "@/products/inquiries/publication";
 import { InMemoryInquiryRepository, publicationClaimToken } from "@/products/inquiries/repository";
 import { recordInquiryEvidence } from "@/products/inquiries/receive";
+const native=vi.hoisted(()=>({rpc:vi.fn(async()=>0)}));
+vi.mock("@/platform/infra/inquiry-records",async original=>({...await original<typeof import("@/platform/infra/inquiry-records")>(),inquiryRecordsRpc:native.rpc}));
 
 async function prepared() {
   const repository = new InMemoryInquiryRepository();
@@ -21,7 +23,7 @@ async function prepared() {
 }
 
 describe("governed inquiry publication transaction", () => {
-  beforeEach(() => vi.stubEnv("STRELVA_INQUIRIES_RELEASE", "1"));
+  beforeEach(() => {native.rpc.mockClear();vi.stubEnv("STRELVA_INQUIRIES_RELEASE", "1");});
   afterEach(() => vi.unstubAllEnvs());
 
   it("commits the public definition and its receipt, verifies it and never repeats the command", async () => {
@@ -34,6 +36,8 @@ describe("governed inquiry publication transaction", () => {
     const commit = vi.spyOn(repository, "compareAndSwap");
     expect(await executeInquiryPublication(input)).toEqual({ accepted: true, verified: true });
     expect(commit).not.toHaveBeenCalled();
+    expect(native.rpc).toHaveBeenCalledTimes(2);
+    expect(native.rpc).toHaveBeenLastCalledWith("reconcile_bundle_inquiry_releases",{p_workspace_id:claim.businessId,p_capability_id:claim.capabilityId});
   });
 
   it("rejects foreign event identity and stale draft approval before writing", async () => {
