@@ -110,3 +110,6 @@ cmp "$cluster_root/final-functions-before.catalog" "$cluster_root/final-function
 remaining="$(psql "${psql_args[@]}" -Atc "select count(*) from public.users where email like 'aw-%@%.example.test'")"
 [[ "$remaining" == 0 ]] || { printf 'Agency workflow left fictional users behind.\n' >&2; exit 1; }
 printf 'Agency workflow SQL passed on %s ordered migrations: add client, seat-only draft, owner claim/approval, guarded publish, readback receipt, isolation, revocation, stale revisions and replay.\n' "$migration_count"
+
+# #278 additive read-only payer UI capabilities and retained obligation proof.
+source "$repo_root/scripts/payer-transition-actions-checks.sh"

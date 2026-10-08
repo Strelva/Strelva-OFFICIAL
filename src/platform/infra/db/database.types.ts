@@ -18862,6 +18862,32 @@ export type Database = {
           workspace_name: string
         }[]
       }
+      workspace_payer_transition_inbox_v2: {
+        Args: {
+          p_actor_id: string
+          p_verified_email: string
+        }
+        Returns: {
+          can_respond: boolean
+          can_revoke: boolean
+          is_current: boolean
+          accepted_at: string
+          id: string
+          proposed_at: string
+          proposed_by: string
+          proposer_email: string
+          resolved_at: string
+          resolved_by: string
+          status: string
+          successor_email: string
+          successor_kind: string
+          successor_user_id: string
+          successor_workspace_id: string
+          successor_workspace_name: string
+          workspace_id: string
+          workspace_name: string
+        }[]
+      }
       workspace_payer_transition_snapshot: {
         Args: {
           p_actor_id: string
@@ -18869,6 +18895,32 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: {
+          accepted_at: string
+          id: string
+          proposed_at: string
+          proposed_by: string
+          proposer_email: string
+          resolved_at: string
+          resolved_by: string
+          status: string
+          successor_email: string
+          successor_kind: string
+          successor_user_id: string
+          successor_workspace_id: string
+          successor_workspace_name: string
+          workspace_id: string
+        }[]
+      }
+      workspace_payer_transition_snapshot_v2: {
+        Args: {
+          p_actor_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: {
+          can_respond: boolean
+          can_revoke: boolean
+          is_current: boolean
           accepted_at: string
           id: string
           proposed_at: string

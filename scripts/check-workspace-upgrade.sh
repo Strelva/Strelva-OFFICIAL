@@ -470,3 +470,6 @@ node --test "$repo_root/scripts/tests/readonly-rpcs.node-test.mjs"
 # Legacy calendar row-existence compatibility and receipt-preserving rollback.
 psql "${psql_args[@]}" --file="$repo_root/tests/legacy-calendar-revoke-result-schema.sql"
 bash "$repo_root/scripts/check-reader-writer-locks.sh" "postgresql:///postgres?host=$cluster_socket&port=$cluster_port"
+
+# #278 additive read-only payer UI capabilities and retained obligation proof.
+source "$repo_root/scripts/payer-transition-actions-checks.sh"

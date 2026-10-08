@@ -14,7 +14,7 @@ import { PayerTransitionAccessError, PayerTransitionConflictError } from "@/plat
 
 const actor = { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", email: "Owner@Example.com", email_confirmed_at: "2026-09-18" };
 const workspaceId = "11111111-1111-4111-8111-111111111111";
-const snapshot = { transitions: [], current: null, pending: null, currentActorId: actor.id };
+const snapshot = { workspaceId, transitions: [], current: null, pending: null, currentActorId: actor.id };
 
 function post(body: unknown, headers: Record<string, string> = {}) {
   return new Request("https://strelva.test/api/work-economics/payer-transition", {
@@ -31,8 +31,8 @@ describe("payer transition route authority", () => {
     mocks.session.mockResolvedValue(actor);
     mocks.read.mockResolvedValue(snapshot);
     mocks.inbox.mockResolvedValue(snapshot);
-    mocks.command.mockResolvedValue(snapshot);
-    mocks.acceptJob.mockResolvedValue({ ...snapshot, jobs: [{ id: workspaceId, workspaceId, workspaceName: "Business", productId: "operations", resourceKind: "responsibility", estimateCents: null, maxAuthorizedCents: 500, reservedCents: 0, usedCents: 0, actualCents: null, actualKnown: false, status: "accepted", createdAt: "2026-09-18" }] });
+    mocks.command.mockResolvedValue({ receipt: { kind: "payer_transition", action: "accept", id: workspaceId, workspaceId, status: "accepted", successorKind: "business" } });
+    mocks.acceptJob.mockResolvedValue({ receipt: { kind: "payer_job", action: "accept_job", id: workspaceId, workspaceId, status: "accepted" } });
   });
 
   it("requires the release gate and a verified account", async () => {
@@ -79,7 +79,8 @@ describe("payer transition route authority", () => {
     expect(response.status).toBe(200);
     expect(mocks.acceptJob).toHaveBeenCalledWith({ userId: actor.id, verifiedEmail: "owner@example.com" }, body);
     const result = await response.json();
-    expect(result.jobs).toEqual([expect.objectContaining({ id: workspaceId, maxAuthorizedCents: 500, status: "accepted" })]);
+    expect(result.receipt).toEqual({ kind: "payer_job", action: "accept_job", id: workspaceId, workspaceId, status: "accepted" });
+    expect(mocks.inbox).not.toHaveBeenCalled();
     expect(result).not.toHaveProperty("usage");
     expect(result).not.toHaveProperty("executions");
     expect(JSON.stringify(result)).not.toContain("recordedBy");
