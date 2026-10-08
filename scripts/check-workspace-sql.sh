@@ -1129,6 +1129,14 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012010000_ten
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012120000_track_signing_key_rotation.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-track-signing-keys-schema.sql"
 printf 'Tracking key migration passed forward, guarded rollback, empty rollback and reapply.\n'
+# Provider disconnect revocation receipts and local token cleanup: forward,
+# rollback while empty, and reapply. Fixtures use fictional credentials only.
+psql "${psql_args[@]}" --command="alter table public.tenants add column if not exists instagram_access_token text, add column if not exists updated_at timestamptz not null default now();"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011180000_provider_disconnect_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/provider-disconnect-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011180000_provider_disconnect_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011180000_provider_disconnect_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/provider-disconnect-schema.sql"
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
