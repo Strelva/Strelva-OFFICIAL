@@ -54,6 +54,19 @@ values ('f5380000-0000-4000-8000-000000000003','f5380000-0000-4000-8000-00000000
 insert into public.connected_inquiry_owner_notice_repairs(lead_row_id,workspace_id,actor_id,recipient,subject,status)
 values ('f5380000-0000-4000-8000-000000000003','f5380000-0000-4000-8000-000000000002',
   'f5380000-0000-4000-8000-000000000001','visitor@example.test','Inquiry received','failed');
+insert into public.inquiry_record_overlays(tenant_id,tenant_stable_id,business_id,inquiry_id,capability_id,status)
+select id,stable_id,'fixture-business','lead_expired','inquiries','new'
+from public.tenants where id='inquiry-retention-fixture';
+insert into public.booking_inquiry_offers(tenant_stable_id,inquiry_id,offer_key,token_hash,token_ciphertext,customer,
+  service_ref,service_name,timezone,buffer_minutes,slots,expires_at)
+select stable_id,'lead_expired','offer-1',repeat('c',64),'enc:v1:fictional',
+  '{"name":"Visitor","email":"visitor@example.test"}','consult','Consultation','America/New_York',0,
+  '[{"start":"2026-10-20T12:00:00Z"}]',clock_timestamp()+interval '1 hour'
+from public.tenants where id='inquiry-retention-fixture';
+insert into public.inquiry_booking_offers(lead_row_id,service_id,witness,slots,service_name,time_zone,requested_by)
+values ('f5380000-0000-4000-8000-000000000003','f5380000-0000-4000-8000-000000000009',
+  '{"lead":"lead_expired"}','[{"start":"2026-10-20T12:00:00Z"}]','Consultation','America/New_York',
+  'f5380000-0000-4000-8000-000000000001');
 insert into public.tenant_client_records(tenant_stable_id,store,record_id,payload,payload_hash,captured_at,recorded_via)
 select stable_id,'inquiry_reply','lead_expired','{"body":"Private reply copy"}',repeat('b',64),clock_timestamp(),'dual_write'
 from public.tenants where id='inquiry-retention-fixture';
@@ -71,6 +84,12 @@ select pg_temp.ilr_assert(not exists(select 1 from public.connected_inquiry_owne
   'owner notice removed');
 select pg_temp.ilr_assert(not exists(select 1 from public.connected_inquiry_owner_notice_repairs where lead_row_id='f5380000-0000-4000-8000-000000000003'),
   'owner notice repair removed');
+select pg_temp.ilr_assert(not exists(select 1 from public.inquiry_record_overlays where inquiry_id='lead_expired'),
+  'inquiry overlay removed');
+select pg_temp.ilr_assert(not exists(select 1 from public.booking_inquiry_offers where inquiry_id='lead_expired'),
+  'public booking offer removed');
+select pg_temp.ilr_assert(not exists(select 1 from public.inquiry_booking_offers where lead_row_id='f5380000-0000-4000-8000-000000000003'),
+  'workspace booking offer removed');
 select pg_temp.ilr_assert(not exists(select 1 from public.tenant_client_records where record_id='lead_expired'),
   'inquiry copy removed');
 select pg_temp.ilr_assert(exists(select 1 from public.tenant_leads where lead_id='lead_current'),
