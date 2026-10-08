@@ -19,9 +19,13 @@ beforeEach(() => {
 
 import { recordOrder, getOrders, getOrderSummary, buildStoreVerdict } from "@/lib/orders";
 
+function recordSiteOrder(tenant: string, input: Omit<Parameters<typeof recordOrder>[1], "verification">) {
+  return recordOrder(tenant, { ...input, verification: "site-signature" });
+}
+
 describe("orders store", () => {
   it("records an order and reads it back", async () => {
-    await recordOrder("t1", { amountCents: 2499, currency: "USD", items: [{ name: "Dried Mango", quantity: 2 }], externalId: "o1" });
+    await recordSiteOrder("t1", { amountCents: 2499, currency: "USD", items: [{ name: "Dried Mango", quantity: 2 }], externalId: "o1" });
     const orders = await getOrders("t1");
     expect(orders).toHaveLength(1);
     expect(orders[0]!.amountCents).toBe(2499);
@@ -29,24 +33,24 @@ describe("orders store", () => {
   });
 
   it("is idempotent on externalId — a retried beacon doesn't double-count", async () => {
-    await recordOrder("t1", { amountCents: 1000, currency: "USD", items: [], externalId: "dup" });
-    const second = await recordOrder("t1", { amountCents: 1000, currency: "USD", items: [], externalId: "dup" });
+    await recordSiteOrder("t1", { amountCents: 1000, currency: "USD", items: [], externalId: "dup" });
+    const second = await recordSiteOrder("t1", { amountCents: 1000, currency: "USD", items: [], externalId: "dup" });
     expect(second).toBeNull();
     expect(await getOrders("t1")).toHaveLength(1);
   });
 
   it("returns newest orders first", async () => {
-    await recordOrder("t1", { amountCents: 100, currency: "USD", items: [], externalId: "first" });
+    await recordSiteOrder("t1", { amountCents: 100, currency: "USD", items: [], externalId: "first" });
     clock += 60_000;
     vi.setSystemTime(clock);
-    await recordOrder("t1", { amountCents: 200, currency: "USD", items: [], externalId: "second" });
+    await recordSiteOrder("t1", { amountCents: 200, currency: "USD", items: [], externalId: "second" });
     const orders = await getOrders("t1");
     expect(orders[0]!.externalId).toBe("second");
   });
 
   it("summarizes revenue, count, and best sellers", async () => {
-    await recordOrder("t1", { amountCents: 2499, currency: "USD", items: [{ name: "Mango", quantity: 2 }], externalId: "a" });
-    await recordOrder("t1", { amountCents: 1500, currency: "USD", items: [{ name: "Mango", quantity: 1 }, { name: "Apricot", quantity: 3 }], externalId: "b" });
+    await recordSiteOrder("t1", { amountCents: 2499, currency: "USD", items: [{ name: "Mango", quantity: 2 }], externalId: "a" });
+    await recordSiteOrder("t1", { amountCents: 1500, currency: "USD", items: [{ name: "Mango", quantity: 1 }, { name: "Apricot", quantity: 3 }], externalId: "b" });
     const s = await getOrderSummary("t1", 30);
     expect(s.orderCount).toBe(2);
     expect(s.revenueCents).toBe(3999);
@@ -55,13 +59,26 @@ describe("orders store", () => {
   });
 
   it("excludes orders outside the window", async () => {
-    await recordOrder("t1", { amountCents: 5000, currency: "USD", items: [], externalId: "old" });
+    await recordSiteOrder("t1", { amountCents: 5000, currency: "USD", items: [], externalId: "old" });
     clock += 40 * 24 * 60 * 60 * 1000; // 40 days later
     vi.setSystemTime(clock);
-    await recordOrder("t1", { amountCents: 1000, currency: "USD", items: [], externalId: "new" });
+    await recordSiteOrder("t1", { amountCents: 1000, currency: "USD", items: [], externalId: "new" });
     const s = await getOrderSummary("t1", 30);
     expect(s.orderCount).toBe(1);
     expect(s.revenueCents).toBe(1000);
+  });
+
+  it("hides legacy unsigned records from order visibility and outcome totals", async () => {
+    mockRedis.store.set("order:t1:legacy", {
+      id: "legacy", externalId: "unverified", amountCents: 99_900, currency: "USD",
+      itemCount: 1, items: [{ name: "Fabricated", quantity: 1 }], createdAt: new Date(clock).toISOString(),
+    });
+    mockRedis.zsets.set("orders:t1", new Map([["legacy", clock]]));
+
+    expect(await getOrders("t1")).toEqual([]);
+    expect(await getOrderSummary("t1", 30)).toEqual({
+      orderCount: 0, revenueCents: 0, currency: "USD", topProducts: [],
+    });
   });
 
   it("builds an honest empty verdict when there are no orders", () => {
@@ -94,11 +111,11 @@ describe("orders store", () => {
       throw new Error("redis down mid-write");
     };
     await expect(
-      recordOrder("t1", { amountCents: 999, currency: "USD", items: [], externalId: "o1" }),
+      recordSiteOrder("t1", { amountCents: 999, currency: "USD", items: [], externalId: "o1" }),
     ).rejects.toThrow();
 
     mockRedis.zadd = orig;
-    const retry = await recordOrder("t1", { amountCents: 999, currency: "USD", items: [], externalId: "o1" });
+    const retry = await recordSiteOrder("t1", { amountCents: 999, currency: "USD", items: [], externalId: "o1" });
     expect(retry).not.toBeNull(); // dedup lock released → the retry captures it
     expect(await getOrders("t1")).toHaveLength(1);
   });
