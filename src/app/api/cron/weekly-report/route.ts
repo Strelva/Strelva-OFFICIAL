@@ -9,7 +9,6 @@ import { generateAllReports, buildReportSubject, buildReportHeading } from "@/li
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { generateWeeklyBrief } from "@/lib/weekly-brief";
 import { CONTROL_PLANE_URL, EMAIL_DOMAIN } from "@/platform/infra/brand";
-import { sanitizeEmailSubjectText } from "@/lib/invite-email";
 import { emailSendingPaused } from "@/platform/infra/email/enabled";
 import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
 import type { EmailRow } from "@/platform/infra/email/layout";
@@ -177,8 +176,8 @@ await mapPool(reports, 8, async (report) => {
             subject,
             html,
             text,
-            fromName: sanitizeEmailSubjectText(brand.agencyId ? brand.name : report.tenant.siteName).replace(/[<>"]/g, ""),
-            ...(brand.replyTo ? { replyTo: brand.replyTo } : {}),
+            brand,
+            fromName: report.tenant.siteName,
             fromAddress: `report@${domain}`,
           });
         } catch (err) {

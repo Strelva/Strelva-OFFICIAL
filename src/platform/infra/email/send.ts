@@ -1,4 +1,6 @@
-import { resolveOwnerBrand, resolveTenantBrand } from "@/platform/agency-brand/server";
+import { formatEmailFrom } from "@/platform/infra/email/from";
+import { STRELVA_BRAND, type OwnerBrand } from "@/platform/infra/agency-brand";
+import { resolveAgencyEmailIdentity, resolveOwnerBrand, resolveTenantBrand } from "@/platform/agency-brand/server";
 import {
   customerEmailPaused,
   emailSendingPaused,
@@ -27,6 +29,8 @@ export type SendEmailInput = RenderedEmail & {
   /** Business scope for owner presentation; never an authority grant. */
   workspaceId?: string;
   fromName?: string;
+  /** Presentation already rendered into raw reports; envelope is revalidated here. */
+  brand?: OwnerBrand;
   /** Full from address override, e.g. "report@updates.strelva.com". Defaults to
    * hello@{RESEND_DOMAIN}. For senders that need a distinct local-part or a
    * per-tenant sending domain (weekly/monthly reports). Must be a verified
@@ -105,20 +109,25 @@ export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendE
   const { Resend } = await import("resend");
   const resend = new Resend(apiKey);
   const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
-  const brand = input.options?.brand ?? (input.audience === "client" && input.options
-    ? input.workspaceId ? await resolveOwnerBrand(input.workspaceId) : input.tenantId ? await resolveTenantBrand(input.tenantId) : undefined
-    : undefined);
-  const options = input.options && brand?.agencyId ? { ...input.options, brand, heading: input.options.heading.replace(/Strelva/g, brand.name) } : input.options;
+  const suppliedBrand = input.options?.brand ?? input.brand;
+  const brand = input.audience === "client"
+    ? input.workspaceId ? await resolveOwnerBrand(input.workspaceId) : input.tenantId ? await resolveTenantBrand(input.tenantId) : suppliedBrand
+    : suppliedBrand;
+  // A cached brand remains a scope signal even when the fresh lookup fails.
+  const agencyId = brand?.agencyId ?? suppliedBrand?.agencyId;
+  const identity = agencyId ? await resolveAgencyEmailIdentity(agencyId) : null;
+  const options = input.options && brand ? { ...input.options, brand, heading: brand.agencyId ? input.options.heading.replace(/Strelva/g, () => brand.name) : input.options.heading } : input.options;
   const html = options ? renderEmailHtml(options) : input.html!;
   const text = options ? renderEmailText(options) : input.text!;
-  const fromName = (brand?.agencyId ? brand.name : input.fromName || "Strelva").replace(/[<>"\r\n]/g, "");
-  const fromAddress = brand?.agencyId
+  const fromName = identity ? `${identity.name} via Strelva` : agencyId ? STRELVA_BRAND.name : input.fromName || STRELVA_BRAND.name;
+  const fromAddress = agencyId
     ? input.fromAddress && /@(updates|mail)\.strelva\.com$/.test(input.fromAddress) ? input.fromAddress : "hello@updates.strelva.com"
     : input.fromAddress || `hello@${fromDomain}`;
-  const replyTo = brand?.replyTo || input.replyTo || process.env.REPLY_TO_EMAIL || "hello@strelva.com";
+  const defaultReplyTo = process.env.REPLY_TO_EMAIL || "hello@strelva.com";
+  const replyTo = agencyId ? identity?.replyTo || defaultReplyTo : input.replyTo || defaultReplyTo;
 
   const payload = {
-    from: `${fromName} <${fromAddress}>`,
+    from: formatEmailFrom(fromName, fromAddress),
     replyTo,
     to: input.to,
     subject: input.subject,
@@ -205,7 +214,7 @@ export async function sendBatchWithReceipt(input: SendBatchInput): Promise<SendB
   const resend = new Resend(apiKey);
   const replyTo = input.replyTo || process.env.REPLY_TO_EMAIL || "hello@strelva.com";
   const payload = input.messages.map((message) => ({
-    from: `${input.fromName} <${input.fromAddress}>`,
+    from: formatEmailFrom(input.fromName, input.fromAddress),
     replyTo,
     to: message.to,
     subject: message.subject,

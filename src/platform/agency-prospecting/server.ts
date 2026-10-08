@@ -1,4 +1,4 @@
-import { resolveOwnerBrand } from "@/platform/agency-brand/server";
+import { resolveAgencyEmailIdentity, resolveOwnerBrand } from "@/platform/agency-brand/server";
 import { getSupabase } from "@/platform/infra/db/client";
 import type { AgencyAttribution } from "@/platform/infra/agency-attribution";
 
@@ -40,7 +40,7 @@ export async function resolveAgencyAttribution(slug: unknown): Promise<AgencyAtt
     if (parsed.protocol !== "https:" || parsed.username || parsed.password) throw new Error("Invalid agency contact URL");
   } catch { throw new AgencyProspectingError("This agency check is unavailable.", 503); }
   const brand = await resolveOwnerBrand(String(row.workspace_id));
-  return { workspaceId: String(row.workspace_id), slug: String(row.slug), name: brand.agencyId ? brand.name : String(row.name),
+  return { workspaceId: String(row.workspace_id), slug: String(row.slug), name: brand.name,
     contactUrl, brand: { logoUrl: brand.logoUrl, accentColor: brand.agencyId ? brand.accentColor : null }, ...(brand.replyTo ? { replyTo: brand.replyTo } : {}) };
 }
 
@@ -64,7 +64,7 @@ export async function agencyReplyTo(agency: AgencyAttribution): Promise<string> 
   const rows = await rpc("agency_prospecting_profile", { p_slug: agency.slug });
   const row = (Array.isArray(rows) ? rows[0] : null) as Row | undefined;
   if (!row || row.workspace_id !== agency.workspaceId) throw new AgencyProspectingError("Agency email is unavailable.", 503);
-  return (await resolveOwnerBrand(agency.workspaceId)).replyTo ?? String(row.contact_email);
+  return (await resolveAgencyEmailIdentity(agency.workspaceId))?.replyTo ?? process.env.REPLY_TO_EMAIL ?? "hello@strelva.com";
 }
 
 export interface AgencyProspect {

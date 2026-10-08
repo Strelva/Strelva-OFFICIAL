@@ -1,8 +1,18 @@
 import { z } from "zod";
 
 export const BRAND_CREDIT = "Runs on Strelva.";
+/** Normalize before validation so invisible characters cannot split a reserved word. */
+export function normalizeAgencyName(name: string): string {
+  return name.normalize("NFKC").replace(/[\u202a-\u202e\u2066-\u2069\u200e\u200f\u200b-\u200d\ufeff\u2060\u180e]/g, "").trim();
+}
+const reservedName = /(^|[^\p{L}\p{N}_])(strelva|google|microsoft|apple|meta|facebook|instagram|yelp|stripe|paypal|square|amazon)(?=$|[^\p{L}\p{N}_])/iu;
+const addressOrUrl = /@|[a-z][a-z0-9+.-]*:\/\/|www\.|[\p{L}\p{N}-]+\.[a-z]{2,}(?:[\s/?:#]|$)/iu;
+export const agencyNameSchema = z.string().transform(normalizeAgencyName).pipe(
+  z.string().min(1).max(120).regex(/^[^\r\n\x00-\x1f\x7f]+$/)
+    .refine(name => !reservedName.test(name) && !addressOrUrl.test(name), "Use your agency name, without platform names, addresses or URLs."),
+);
 export const brandInputSchema = z.object({
-  displayName: z.string().trim().min(1).max(120).regex(/^[^\r\n\x00-\x1f\x7f]+$/),
+  displayName: agencyNameSchema,
   accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).transform(v => v.toLowerCase()),
   replyTo: z.string().trim().email().max(254).nullable(),
   logo: z.object({ type: z.enum(["image/png", "image/jpeg", "image/webp"]), data: z.string().max(349528) }).strict().nullable(),

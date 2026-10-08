@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { STRELVA_BRAND, type OwnerBrand } from "@/platform/infra/agency-brand";
 import type { SendEmailInput } from "@/platform/infra/email/send";
 
-const mock = vi.hoisted(() => ({ brand: vi.fn(), send: vi.fn(), tenants: vi.fn(), reports: vi.fn() }));
-vi.mock("@/platform/agency-brand/server", () => ({ resolveTenantBrand: mock.brand }));
-vi.mock("@/platform/infra/email/send", () => ({ sendEmail: mock.send }));
+const mock = vi.hoisted(() => ({ brand: vi.fn(), send: vi.fn(), tenants: vi.fn(), reports: vi.fn(), identity: vi.fn(), provider: vi.fn() }));
+vi.mock("@/platform/agency-brand/server", () => ({ resolveTenantBrand: mock.brand, resolveAgencyEmailIdentity: mock.identity }));
+vi.mock("@/platform/infra/email/send", async original => ({ ...await original<object>(), sendEmail: mock.send }));
+vi.mock("resend", () => ({ Resend: class { emails = { send: mock.provider }; } }));
+vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: async () => "on" }));
 vi.mock("@/platform/infra/email/enabled", () => ({ emailSendingPaused: () => false }));
 vi.mock("@/lib/cron-auth", () => ({ requireCronRequest: () => null }));
 vi.mock("@/lib/tenants", () => ({ getAllTenants: mock.tenants }));
@@ -19,6 +21,7 @@ vi.mock("@/lib/storage/mail-log", () => ({ recordMailSend: async () => null }));
 vi.mock("@/platform/catalog-reports/receipts", () => ({ recordCatalogReport: async () => null, catalogReportsMayBeOn: () => false }));
 vi.mock("@/products/websites/index", () => ({ runWebsiteMonthlyReports: async () => ({ tenants: [], sent: 0, suppressed: 0, errors: [] }) }));
 vi.mock("@/lib/tenant-urls", () => ({ getTenantDashboardUrl: () => "https://admin.fixture.example/dashboard/reports" }));
+import { sendEmailWithReceipt } from "@/platform/infra/email/send";
 import { GET as weekly } from "@/app/api/cron/weekly-report/route";
 import { GET as monthly } from "@/app/api/cron/monthly-report/route";
 
@@ -42,7 +45,7 @@ describe("agency brand in actual report cron output", () => {
       expect(await response.json()).toMatchObject({ sent: kind === "weekly" ? [tenant.id] : 1, errors: [] });
       expect(mock.brand).toHaveBeenCalledWith(tenant.id);
       const payload = mock.send.mock.calls[0]![0] as SendEmailInput;
-      expect(payload).toMatchObject({ fromName: "North & Web", replyTo: agency.replyTo, fromAddress: "report@updates.strelva.com" });
+      expect(payload).toMatchObject({ fromName: tenant.siteName, brand: agency, fromAddress: "report@updates.strelva.com" });
       expect(payload.html).toContain("North &amp; Web &lt;&quot;Owner&quot;&gt;");
       expect(payload.html).toContain(agency.logoUrl!); expect(payload.html).toContain("color:#000000");
       for (const artifact of [payload.html!, payload.text!]) {
@@ -51,6 +54,20 @@ describe("agency brand in actual report cron output", () => {
         expect(artifact).not.toContain("https://admin.fixture.example");
       }
       expect({ html: payload.html, text: payload.text }).toMatchSnapshot();
+    });
+    it(`${kind} leaves commas and quotes intact for the shared RFC 5322 formatter`, async () => {
+      const commaBrand = { ...agency, name: 'North, "Web"' };
+      mock.brand.mockResolvedValue(commaBrand);
+      mock.identity.mockResolvedValue({ name: commaBrand.name, replyTo: agency.replyTo });
+      mock.provider.mockResolvedValue({ data: { id: "report" }, error: null });
+      mock.send.mockImplementation(async (input: SendEmailInput) => (await sendEmailWithReceipt(input)).status === "accepted");
+      await route(new Request(`https://app.strelva.com/api/cron/${kind}-report`));
+      const payload = mock.send.mock.calls[0]![0] as SendEmailInput;
+      expect(payload.brand).toEqual(commaBrand);
+      expect(payload.replyTo).toBeUndefined();
+      expect(mock.provider.mock.calls.at(-1)![0]).toMatchObject({
+        from: '\"North, \\"Web\\" via Strelva\" <report@updates.strelva.com>', replyTo: agency.replyTo,
+      });
     });
     it(`${kind} retains self-serve Strelva identity and the existing report URL`, async () => {
       mock.brand.mockResolvedValue(STRELVA_BRAND);

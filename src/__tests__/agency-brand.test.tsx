@@ -12,7 +12,7 @@ import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout"
 import { OwnerBrandIdentity } from "@/components/brand/OwnerBrandIdentity";
 const id = "b2640000-0000-4000-8000-000000000010";
 const input = { displayName: 'North & Web <"Owner">', accentColor: "#ffff00", replyTo: "reply@north.example", logo: null, credit: "runs_on_strelva" as const };
-const row = { agencyId: id, name: "Workspace agency", brand: input };
+const row = { agencyId: id, name: "Workspace agency", brand: input, replyTo: input.replyTo, emailAllowed: true };
 const brand = presentBrand(row);
 const options = { brand, heading: "One decision", decisions: [{ title: "Publish the price?", approve: { label: "Approve", url: "https://app.strelva.com/api/approve?token=fixture" }, open: { label: "Needs you", url: "https://app.strelva.com/workspace" } }], secondaryButton: { label: "Not yet", url: "https://app.strelva.com/workspace" }, footerNote: "for The Mooney Firm" };
 afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks(); });
@@ -29,7 +29,7 @@ describe("agency owner brand", () => {
   });
   it("never hides read failures with another agency's brand", async () => {
     mock.rpc.mockResolvedValue({ data: null, error: { message: "database offline" } });
-    await expect(resolveOwnerBrand(id)).rejects.toThrow("Agency branding is unavailable");
+    expect(await resolveOwnerBrand(id)).toEqual(STRELVA_BRAND);
   });
   it("passes verified identity to owner-only configuration, and surfaces revocation", async () => {
     mock.rpc.mockResolvedValue({ data: null, error: { message: "agency_brand_access" } });
@@ -69,7 +69,7 @@ describe("agency owner brand", () => {
     vi.stubEnv("EMAIL_SENDING_ENABLED", "true"); vi.stubEnv("RESEND_API_KEY", "fixture"); vi.stubEnv("RESEND_DOMAIN", "unverified.example");
     mock.rpc.mockResolvedValue({ data: row, error: null }); mock.send.mockResolvedValue({ data: { id: "sent" }, error: null });
     await sendEmailWithReceipt({ audience: "client", workspaceId: id, to: "owner@example.test", subject: "Decision", fromAddress: "hello@agency.example", options: { heading: "Strelva needs one decision" } });
-    expect(mock.send.mock.calls[0]![0]).toMatchObject({ from: "North & Web Owner <hello@updates.strelva.com>", replyTo: input.replyTo });
+    expect(mock.send.mock.calls[0]![0]).toMatchObject({ from: '"North & Web <\\"Owner\\"> via Strelva" <hello@updates.strelva.com>', replyTo: input.replyTo });
     expect(mock.send.mock.calls[0]![0].html).toContain("North &amp; Web &lt;&quot;Owner&quot;&gt;");
     vi.stubEnv("EMAIL_SENDING_ENABLED", "false"); mock.rpc.mockClear();
     expect(await sendEmailWithReceipt({ audience: "client", workspaceId: id, to: "owner@example.test", subject: "Decision", options: { heading: "Decision" } })).toMatchObject({ status: "suppressed" }); expect(mock.rpc).not.toHaveBeenCalled();

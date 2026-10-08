@@ -9,7 +9,6 @@ import { getAllTenants } from "@/lib/tenants";
 import { generateMonthlyRecap } from "@/lib/weekly-brief";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { CONTROL_PLANE_URL, EMAIL_DOMAIN } from "@/platform/infra/brand";
-import { sanitizeEmailSubjectText } from "@/lib/invite-email";
 import { emailSendingPaused } from "@/platform/infra/email/enabled";
 import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
 import { getRedis } from "@/platform/infra/redis";
@@ -129,8 +128,8 @@ export async function GET(request: Request) {
             subject: `Your ${monthName} recap`,
             html,
             text,
-            fromName: sanitizeEmailSubjectText(brand.agencyId ? brand.name : tenant.siteName).replace(/[<>"]/g, ""),
-            ...(brand.replyTo ? { replyTo: brand.replyTo } : {}),
+            brand,
+            fromName: tenant.siteName,
             fromAddress: `report@${domain}`,
           });
         } catch (err) {

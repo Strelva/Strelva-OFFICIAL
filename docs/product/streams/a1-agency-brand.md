@@ -21,7 +21,12 @@ read failure cannot obscure a completed decision POST. Owner report/invitation
 links use the control-plane app, not the operator origin.
 
 Display names and reply-to can change; agency mail stays on `updates.strelva.com`
-or `mail.strelva.com`. #265 owns sender domains. Self-serve report delivery retains
+or `mail.strelva.com`. Custom From names (`{name} via Strelva`) and reply-to apply
+only while `agency_effect_allowed(agency, 'email')` is true. Save and every send
+check reply-to against a verified current agency member in `public.users` and
+`workspace_memberships`; removal or loss of verification removes reply routing.
+The current integrate schema has no #265 verified-domain record, so domain-based
+reply-to is unavailable. #265 owns sender domains. Self-serve report delivery retains
 its existing configuration. R23/#239 is pending: `runs_on_strelva` is the only
 accepted credit value. Agency identity keeps a small "Runs on Strelva." credit;
 platform controls and language remain explicit. No customer-site credit changes.
@@ -41,7 +46,12 @@ This introduces no storage provider or dependency. Replacing/removing a logo
 invalidates its previous URL after cache expiry; older emails may lose that image
 but retain the agency name. Durable asset history is outside this mechanism.
 Six-digit accent colors select black/white fill text at >=4.5:1; pale accents use
-dark text on white. Email names are HTML escaped; sender display is sanitized.
+dark text on white. Email names are HTML escaped. Names are NFKC-normalized, stripped of bidi and
+zero-width controls, and reject addresses, URLs and the reserved platform whole
+words at save and send. The shared `email/from.ts` formatter quotes display names
+and escapes quotes/backslashes for all transport calls, including raw weekly and
+monthly reports. Brand lookup errors log a non-sensitive warning and fall back to
+Strelva; workspace/report/prospect requests and email delivery keep working.
 
 ## Evidence and remaining uncertainty
 
@@ -77,7 +87,8 @@ dark text on white. Email names are HTML escaped; sender display is sanitized.
   remain. No second build was run.
 
 Unproven: production migration/delivery, real email-client image compatibility,
-agency adoption, #254 effect verification and R23's ultimate white-label depth.
+agency adoption, the operational verification criteria (#233), and R23's ultimate
+white-label depth. The #254 email predicate is implemented and tested locally.
 
 ## Integration handoff
 
@@ -90,3 +101,34 @@ was edited. Production rollout requires separate explicit authorization.
 Proposed durable claim: "Agency workspace branding is implemented locally and
 retains platform credit." Do not promote it to deployed/operated/adopted state.
 The coordinator owns canonical project/vault reconciliation and R23 review.
+
+## Requested-changes follow-up (October 8 UTC)
+
+Objective: resolve the Opus review on PR #557; no merge or production action.
+Merged moved `origin/integrate/reborn-1.0` with merge commit `0169fb10`.
+The original migration `20261012180000` is unmerged and outside checksum-pinned
+batches; its two RPCs now validate name/member reply identity and return current
+email-effect status. Its exact rollback and configured-data refusal are retained.
+No new dependencies or email send sites.
+
+Regression evidence against the pre-fix merge head: 35 failures across brand
+security, actual report transports and workspace API tests (56 unrelated tests
+passed). The new SQL suite fails on the original migration accepting
+`hello@strelva.com`. These baseline runs use private archived source and disposable
+PostgreSQL; no shared worktree or production data was changed.
+
+The full workspace SQL check reproduced the separately assigned clock-dependent
+`tests/booking-owner-evidence-schema.sql:35` failure: "range reads real bookings"
+at 00:16 UTC. It was left unchanged. Brand-only full-schema rehearsal passes
+independently, including current member/email revocation, effect status,
+normalization, provider selection, RPC exposure, rollback/reapply and refusal to
+discard configured data. Full workspace upgrade rehearsal passes.
+
+Final checks: typecheck, lint and boundaries passed; 63 targeted files passed
+(771 tests passed, 1 skipped). The single production build passed locally.
+Final command outputs and counts are recorded in PR #557. Local evidence logs
+are under `.scratch/agency-brand-review/`; they include the known SQL failure.
+Next action: orchestrator reviews this follow-up and the separate booking-clock
+fix, then decides integration. Production remains separately gated. The
+coordinator owns canonical project/vault state; this is a proposed local evidence
+delta, not a deployed/adopted claim.

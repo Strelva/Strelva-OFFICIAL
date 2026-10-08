@@ -7,7 +7,7 @@ vi.mock("@/platform/infra/auth", () => ({ requireTenantAccess: mock.access }));
 import { GET as getConfig, PUT } from "@/app/api/workspace/agency-brand/route";
 import { GET as getOwnerBrand } from "@/app/api/workspace/owner-brand/route";
 import { GET as getLogo } from "@/app/api/agency-brand/logo/[workspaceId]/[digest]/route";
-import { logoDigest, presentBrand } from "@/platform/agency-brand/server";
+import { AgencyBrandReplyToError, logoDigest, presentBrand } from "@/platform/agency-brand/server";
 const id = "b2640000-0000-4000-8000-000000000010";
 const input = { displayName: "Northside", accentColor: "#ffff00", replyTo: "reply@north.example", logo: null, credit: "runs_on_strelva" as const };
 function put(brand: unknown = input, origin = "https://app.strelva.com") { return new Request("https://app.strelva.com/api/workspace/agency-brand", { method: "PUT", headers: { origin, "content-type": "application/json" }, body: JSON.stringify({ workspaceId: id, brand }) }); }
@@ -25,6 +25,12 @@ describe("agency brand routes", () => {
     expect(mock.manage).not.toHaveBeenCalled();
     const huge = new Request("https://app.strelva.com/api/workspace/agency-brand", { method: "PUT", headers: { origin: "https://app.strelva.com", "content-type": "application/json" }, body: "x".repeat(360001) });
     expect((await PUT(huge)).status).toBe(413);
+  });
+  it("returns a useful validation error for a reply address without current verified membership", async () => {
+    mock.manage.mockRejectedValueOnce(new AgencyBrandReplyToError("Reply-to must be a verified email of a current agency member."));
+    const response = await PUT(put());
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Reply-to must be a verified email of a current agency member." });
   });
   it("checks resource access before resolving owner presentation", async () => {
     const request = new Request(`https://app.strelva.com/api/workspace/owner-brand?workspaceId=${id}`);
