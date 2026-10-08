@@ -17,7 +17,7 @@ const workspaceId = "workspace-a";
 
 /** make_systems as public.workspace_make_systems_authority resolves it. */
 const AUTHORITY: Record<string, MakeSystemsAuthority> = {
-  operator: "operator",
+  operator: "provider",
   agency: "agency",
   owner: "member",
   admin: "member",
@@ -80,7 +80,7 @@ describe("make_systems for internal tools", () => {
     const service = createApplicationService(store);
     const attempt = service.create(actor, workspaceId, spec(actor.userId));
     await expect(attempt).rejects.toBeInstanceOf(WorkspaceMakeSystemsError);
-    await expect(service.create(actor, workspaceId, spec(actor.userId))).rejects.toThrow("Ask Strelva to build this.");
+    await expect(service.create(actor, workspaceId, spec(actor.userId))).rejects.toThrow("Ask your agency, or find one.");
     expect(created).toEqual([]);
   });
 

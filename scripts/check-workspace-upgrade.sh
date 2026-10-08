@@ -340,6 +340,14 @@ fi
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012010000_tenant_track_signing_keys.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012120000_track_signing_key_rotation.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-track-signing-keys-schema.sql"
+# 20261014100000-20261014112000 (#255/#534) replace website and per-business
+# decision provider gates with the acting provider and make owner-link website
+# launches need publish; the effect matrix and the owner-link contracts hold
+# after the full ordered upgrade, and the replaced contracts above ran against it.
+psql "${psql_args[@]}" --file="$repo_root/tests/acting-provider-gates-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-links-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-website-preview-schema.sql"
+
 # The booking readers (20261013115000) and the public-facts reader roll back
 # in reverse order on the full ordered schema, then #509. Each rollback
 # restores exactly the readers it replaced, as they were before its forward
@@ -358,6 +366,9 @@ rollback_readers() {
 }
 psql "${psql_args[@]}" --file="$repo_root/tests/owner-recipient-trust-schema.sql"
 catalog_fingerprint >"$cluster_root/catalog-full.txt"
+# The newest gate patches the owner-trust claimant. Undo it first and reapply
+# after those reader/trust rehearsals, preserving #560's actual effect gate.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261014112000_acting_provider_gates.sql"
 # Newest first; the public-facts reader is last.
 public_facts_rollbacks=(20261013120000_owner_recipient_trust 20261013115000_booking_reads_confirmed_facts 20261013110000_public_facts_read_confirmed)
 for name in "${public_facts_rollbacks[@]}"; do
@@ -388,6 +399,7 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011133700_bus
 for (( index=${#public_facts_rollbacks[@]}-1; index>=0; index-- )); do
   psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/${public_facts_rollbacks[$index]}.sql"
 done
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261014112000_acting_provider_gates.sql"
 catalog_fingerprint >"$cluster_root/catalog-full-reapplied.txt"
 if ! diff -u "$cluster_root/catalog-full.txt" "$cluster_root/catalog-full-reapplied.txt"; then
   printf 'Reapplying #509, the public-facts and booking readers did not restore the full catalog.\n' >&2
