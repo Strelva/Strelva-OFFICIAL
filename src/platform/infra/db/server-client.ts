@@ -1,3 +1,4 @@
+import { verifiedAuthenticationTime } from "./verified-auth-time";
 import { hostOnlyAuthCookieOptions } from "@/platform/infra/db/auth-cookie-options";
 /**
  * Request-scoped Supabase client for Strelva — the RLS-enforced auth path.
@@ -77,7 +78,7 @@ export async function getSessionUser() {
 }
 
 /**
- * Verified auth user and the signed session's `auth_time` claim. Step-up
+ * Verified auth user and the signed session's authentication time. Step-up
  * actions use this instead of a caller-supplied timestamp or a decoded cookie.
  */
 export async function getSessionAuthContext(): Promise<{
@@ -89,9 +90,9 @@ export async function getSessionAuthContext(): Promise<{
   const { data: userData, error: userError } = await db.auth.getUser();
   if (userError || !userData.user) return null;
   const { data: claimsData, error: claimsError } = await db.auth.getClaims();
-  const claims = claimsData?.claims as { auth_time?: unknown } | undefined;
-  const authTime = !claimsError && typeof claims?.auth_time === "number" && Number.isFinite(claims.auth_time)
-    ? claims.auth_time
+  const claims = claimsData?.claims;
+  const authTime = !claimsError && claims?.sub === userData.user.id
+    ? verifiedAuthenticationTime(claims)
     : null;
   return { user: userData.user, authTime };
 }
