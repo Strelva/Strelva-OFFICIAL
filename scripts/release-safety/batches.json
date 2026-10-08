@@ -1419,6 +1419,18 @@
           "rollbackSha256": "d2af49d0cb7008e5b70512c44e3d68b5e06d6efe2667be4325ab5f787b1a4dc1"
         }
       ]
+    },
+    {
+      "batch": "13",
+      "status": "private owner recovery #293; not production-authorized",
+      "items": [
+        {
+          "file": "20261020090031_provider_change_cancel.sql",
+          "sha256": "aff8e993ddad15ff8e35cc0baf1d40a8dcb0bd150282b4004f65ef77904b628e",
+          "rollback": "rollback-20261020090031_provider_change_cancel.sql",
+          "rollbackSha256": "d3dc5319710eea6bcac335c408b00470876fddf26da0c5b744ac327bff2d1802"
+        }
+      ]
     }
   ]
 }

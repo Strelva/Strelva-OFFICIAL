@@ -8,9 +8,9 @@ import { verifyReleaseInventory } from "./release-safety/inventory";
 
 export const RELEASE_BATCHES = manifest.batches;
 export const RELEASE_BASELINE = manifest.baseline;
-export type ReleaseBatch = number | "H" | "7A" | "8" | "9" | "10" | "11" | "12";
+export type ReleaseBatch = number | "H" | "7A" | "8" | "9" | "10" | "11" | "12" | "13";
 type ReleaseStep = { batch: ReleaseBatch; items: typeof RELEASE_BASELINE; qualification: "prepared" | "proposed"; manifestStatus: string | null };
-function proposedStep(batch: "H" | "7A" | "8" | "9" | "10" | "11" | "12"): ReleaseStep {
+function proposedStep(batch: "H" | "7A" | "8" | "9" | "10" | "11" | "12" | "13"): ReleaseStep {
   const matches = manifest.proposed.filter(step => step.batch === batch);
   if (matches.length !== 1 || !matches[0]!.items.length) throw new Error(`Missing or duplicate packet step: ${batch}.`);
   const step = matches[0]!;
@@ -22,7 +22,7 @@ export const RELEASE_PACKET: ReleaseStep[] = [
   { batch: 0, items: RELEASE_BATCHES[0]!, qualification: "prepared", manifestStatus: null },
   proposedStep("H"),
   ...RELEASE_BATCHES.slice(1).map((items, index): ReleaseStep => ({ batch: index + 1, items, qualification: "prepared", manifestStatus: null })),
-  proposedStep("7A"), proposedStep("8"), proposedStep("9"), proposedStep("10"), proposedStep("11"), proposedStep("12"),
+  proposedStep("7A"), proposedStep("8"), proposedStep("9"), proposedStep("10"), proposedStep("11"), proposedStep("12"), proposedStep("13"),
 ];
 
 /** Offline only. The history input is a freshly reviewed list, not a provider lookup. */
@@ -61,7 +61,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   try {
     const args = process.argv.slice(2);
     if (args.length !== 6 || args[0] !== "--batch" || args[2] !== "--applied-versions" || args[4] !== "--out") {
-      throw new Error("Usage: pnpm exec tsx scripts/stage-release-batch.ts --batch <0–7|H|7A|8|9|10|11|12> --applied-versions <json-array-file> --out <fresh-directory>");
+      throw new Error("Usage: pnpm exec tsx scripts/stage-release-batch.ts --batch <0–7|H|7A|8|9|10|11|12|13> --applied-versions <json-array-file> --out <fresh-directory>");
     }
     const appliedVersions: unknown = JSON.parse(readFileSync(args[3]!, "utf8"));
     if (!Array.isArray(appliedVersions) || appliedVersions.some((v) => typeof v !== "string" || !/^\d{14}$/.test(v))) throw new Error("Applied versions must be a JSON array of 14-digit strings.");
