@@ -48,8 +48,8 @@ sanitized listing/calendar and current-publication evidence, missing/stale
 health, actual read-only transaction and rollback/reapply catalog parity.
 Final log: `/tmp/strelva-271-native-qualified.log`. Its owned cluster cleanup
 completed with no remaining listener. Two earlier fixture failures are retained:
-`/tmp/strelva-271-native.log` (fictional live System lacked a revision pointer)
-and `/tmp/strelva-271-native-final.log` (Postgres refused changing back to
+`/tmp/strelva-271-native-failed-fixture.log` (fictional live System lacked a revision pointer)
+and `/tmp/strelva-271-native-failed-readonly-flip.log` (Postgres refused changing back to
 read-write after read-only queries). Both fixture corrections were re-run;
 the actual read-only gate remains in the final proof.
 
@@ -58,12 +58,14 @@ The coordinator also rendered 11 fixture scenarios across five widths from
 `.scratch/provider-alerts-ui/` and `/tmp/strelva-271-ui.log`. The dev-only
 `/preview/strelva/provider-alerts` fixture reuses the production
 `AgencyQueueList`; ready/missing/empty/revoked states use fictional alerts.
-Actual signed-in Auth, a provider-specific browser journey, and the full agency
-workflow SQL check remain unqualified by this packet. No local result
+The full `pnpm check:agency-workflow` also passed all 277 ordered migrations,
+including payer concurrency and exact rollback/reapply/read-only projection checks
+(`/tmp/strelva-271-agency-workflow.log`). Actual signed-in Auth and a
+provider-specific browser journey remain unqualified by this packet. No local result
 establishes deployed routing or provider operation.
 
-Next: run the full agency workflow proof and a signed-in current-provider queue
-journey against the local ordered schema.
+Next: run a signed-in current-provider queue journey against the local ordered
+schema when the separately owned disposable Auth stack is available.
 Complete a separately specified synthetic form-submit contract that cannot
 send email or create customer records, then test each managed-site consumer;
 do not close #271 until its original form-submit acceptance is met.
