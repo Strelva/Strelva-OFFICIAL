@@ -1696,3 +1696,21 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021096000_age
 # Saved-main guarded teardown composes final export/retention owners.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022090000_guarded_tenant_teardown.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/guarded-tenant-teardown-schema.sql"
+# Qualify #272 against the final booking functions in a disposable clone so
+# native fixtures can commit across literal READ ONLY role checks without
+# leaking fictional bookings into the rest of this suite.
+outcomes_database=agent_booking_outcomes_readonly
+psql --host="$cluster_socket" --port="$cluster_port" --username="$(id -un)" --dbname=template1 \
+  --set=ON_ERROR_STOP=1 --no-psqlrc -c "create database $outcomes_database template postgres"
+outcomes_psql_args=(
+  --host="$cluster_socket"
+  --port="$cluster_port"
+  --username="$(id -un)"
+  --dbname="$outcomes_database"
+  --set=ON_ERROR_STOP=1
+  --no-psqlrc
+)
+psql "${outcomes_psql_args[@]}" --file="$repo_root/tests/agent-booking-outcomes-native-schema.sql"
+psql --host="$cluster_socket" --port="$cluster_port" --username="$(id -un)" --dbname=template1 \
+  --set=ON_ERROR_STOP=1 --no-psqlrc -c "drop database $outcomes_database"
+printf 'Agent booking outcome customer receipts and linked-calendar read-only checks passed.\n'

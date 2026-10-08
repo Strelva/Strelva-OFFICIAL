@@ -20,6 +20,8 @@ insert into public.business_bookings(id,calendar_key,tenant_stable_id,status,ori
 values
   ('ab272000-0000-4000-8000-000000000011','ab272000-0000-4000-8000-000000000001','ab272000-0000-4000-8000-000000000001','completed','agent','Consultation',now()+interval '3 days',now()+interval '3 days 30 minutes',now()+interval '3 days 30 minutes','UTC','Private Customer','private@example.test','{}','native',clock_timestamp()),
   ('ab272000-0000-4000-8000-000000000012','ab272000-0000-4000-8000-000000000001','ab272000-0000-4000-8000-000000000001','held','agent','Consultation',now()+interval '4 days',now()+interval '4 days 30 minutes',now()+interval '4 days 30 minutes','UTC','Another Private Customer','other-private@example.test','{}','native',clock_timestamp());
+insert into public.business_booking_access(booking_id,manage_hash,manage_ciphertext,confirmed_at)
+values ('ab272000-0000-4000-8000-000000000011',repeat('c',64),'enc:v1:fixture',clock_timestamp());
 insert into public.business_booking_history(booking_id,actor,from_status,to_status,reason,at) values
   ('ab272000-0000-4000-8000-000000000011','visitor','held','confirmed','customer email confirmed',clock_timestamp()),
   ('ab272000-0000-4000-8000-000000000011','visitor','held','confirmed','duplicate confirmation replay',clock_timestamp()),
@@ -29,7 +31,7 @@ select pg_temp.abo_assert(public.record_agent_business_discovery(array['outcome-
 select pg_temp.abo_assert(
   public.read_agent_booking_outcomes('outcome-site',date_trunc('day',now() at time zone 'UTC') at time zone 'UTC',(date_trunc('day',now() at time zone 'UTC')+interval '1 day') at time zone 'UTC')
     = jsonb_build_object('businessName','Outcome Fixture','discoveryCalls',2,'discoveryCoverage','partial','discoverySince',(now() at time zone 'UTC')::date,'holds',2,'confirmations',1,'completed',1),
-  'business-scoped outcomes dedupe booking transitions and expose recorded counts as a lower bound');
+  'business-scoped outcomes use the durable customer confirmation receipt and expose recorded discovery as a lower bound');
 select pg_temp.abo_assert(
   public.read_agent_booking_outcomes('other-outcome-site',date_trunc('day',now() at time zone 'UTC') at time zone 'UTC',(date_trunc('day',now() at time zone 'UTC')+interval '1 day') at time zone 'UTC')
     = jsonb_build_object('businessName','Other Outcome Fixture','discoveryCalls',0,'discoveryCoverage','unknown','discoverySince',null,'holds',0,'confirmations',0,'completed',0),

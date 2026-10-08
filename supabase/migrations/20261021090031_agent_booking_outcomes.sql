@@ -58,7 +58,7 @@ grant execute on function public.record_agent_business_discovery(text[]) to serv
 
 create function public.read_agent_booking_outcomes(p_tenant_id text, p_from timestamptz, p_to timestamptz) returns jsonb
 language plpgsql stable security definer set search_path = public, pg_temp as $$
-declare v_key uuid; v_workspace uuid; v_name text; v_discovery bigint; v_discovery_since date; v_first_observed_at timestamptz; v_discovery_coverage text; v_holds bigint; v_confirmations bigint; v_completed bigint;
+declare v_key uuid; v_keys uuid[]; v_workspace uuid; v_name text; v_discovery bigint; v_discovery_since date; v_first_observed_at timestamptz; v_discovery_coverage text; v_holds bigint; v_confirmations bigint; v_completed bigint;
 begin
   if p_from is null or p_to is null or p_to <= p_from or p_to - p_from > interval '8 days'
     or date_trunc('day', p_from at time zone 'UTC') <> p_from at time zone 'UTC'
@@ -67,12 +67,13 @@ begin
   if p_tenant_id ~ '^workspace:[0-9a-fA-F-]{36}$' then
     v_workspace := substring(p_tenant_id from 11)::uuid;
     v_key := v_workspace;
+    v_keys := array[v_workspace];
     perform 1 from public.workspaces where id = v_workspace;
     if not found then raise exception 'booking_unknown_tenant'; end if;
   else
     select t.tenant_stable_id, t.workspace_id into v_key, v_workspace from public.booking_tenant(p_tenant_id) t;
     if v_key is null then raise exception 'booking_unknown_tenant'; end if;
-    v_key := coalesce(v_key, v_workspace);
+    v_keys := array_remove(array[v_key, v_workspace], null::uuid);
   end if;
   select coalesce(
     (select f.value #>> '{}' from public.business_record_facts f where f.workspace_id = v_workspace and f.fact_key = 'display_name' and f.verified limit 1),
@@ -81,7 +82,7 @@ begin
     (select w.name from public.workspaces w where w.id = v_workspace),
     p_tenant_id
   ) into v_name;
-  select c.first_observed_at into v_first_observed_at from public.agent_business_discovery_coverage c where c.calendar_key = v_key;
+  select min(c.first_observed_at) into v_first_observed_at from public.agent_business_discovery_coverage c where c.calendar_key = any(v_keys);
   v_discovery_since := (v_first_observed_at at time zone 'UTC')::date;
   -- A first observation cannot establish uninterrupted coverage: it may happen
   -- late in the day, and the feature can be disabled or writes can fail later.
@@ -91,15 +92,21 @@ begin
     else 'partial'
   end;
   select coalesce(sum(d.calls), 0) into v_discovery from public.agent_business_discovery_days d
-    where d.calendar_key = v_key and d.day >= (p_from at time zone 'UTC')::date and d.day < (p_to at time zone 'UTC')::date;
+    where d.calendar_key = any(v_keys) and d.day >= (p_from at time zone 'UTC')::date and d.day < (p_to at time zone 'UTC')::date;
   select count(distinct b.id) into v_holds from public.business_bookings b
-    where b.calendar_key = v_key and b.origin = 'agent' and b.created_at >= p_from and b.created_at < p_to;
-  select count(distinct b.id) into v_confirmations from public.business_booking_history h
-    join public.business_bookings b on b.id = h.booking_id
-    where b.calendar_key = v_key and b.origin = 'agent' and h.to_status = 'confirmed' and h.at >= p_from and h.at < p_to;
+    where b.calendar_key = any(v_keys) and b.origin = 'agent' and b.created_at >= p_from and b.created_at < p_to;
+  -- `confirmed_at` is written once by the customer email-confirm RPC in both
+  -- request and instant modes. Status history also records owner decisions,
+  -- so counting `to_status='confirmed'` would mislabel owner approval as a
+  -- customer confirmation and miss request-mode customer confirmations. This
+  -- receipt is retained with its access row for the booking's lifetime; both
+  -- follow the booking's existing ON DELETE CASCADE lifecycle.
+  select count(distinct b.id) into v_confirmations from public.business_booking_access a
+    join public.business_bookings b on b.id = a.booking_id
+    where b.calendar_key = any(v_keys) and b.origin = 'agent' and a.confirmed_at >= p_from and a.confirmed_at < p_to;
   select count(distinct b.id) into v_completed from public.business_booking_history h
     join public.business_bookings b on b.id = h.booking_id
-    where b.calendar_key = v_key and b.origin = 'agent' and h.to_status = 'completed' and h.at >= p_from and h.at < p_to;
+    where b.calendar_key = any(v_keys) and b.origin = 'agent' and h.to_status = 'completed' and h.at >= p_from and h.at < p_to;
   return jsonb_build_object('businessName', v_name, 'discoveryCalls', v_discovery, 'discoveryCoverage', v_discovery_coverage,
     'discoverySince', v_discovery_since, 'holds', v_holds,
     'confirmations', v_confirmations, 'completed', v_completed);
