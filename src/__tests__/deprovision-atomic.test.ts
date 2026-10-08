@@ -28,7 +28,9 @@ vi.mock("@/platform/infra/db/client", () => ({
       db.rpcs.push({ name, args });
       if (name === "tenant_teardown_blockers") return { data: [db.blockers], error: null };
       if (name === "assert_tenant_inquiry_export") return db.teardownError ? { data: null, error: db.teardownError } : { data: null, error: null };
-      if (name === "deprovision_tenant_rows" || name === "deprovision_tenant_rows_after_inquiry_export" || name === "deprovision_tenant_rows_retained" || name === "deprovision_tenant_rows_retained_after_inquiry_export") return db.teardownError ? { data: null, error: db.teardownError } : { data: { memberships: 1, tenants: 1 }, error: null };
+      if (name === "deprovision_tenant_guarded") return db.teardownError || db.pauseError
+        ? { data: null, error: db.teardownError ?? db.pauseError }
+        : { data: { counts: { memberships: 1, tenants: 1 }, paused: 2 }, error: null };
       if (name === "pause_tenant_systems") return db.pauseError ? { data: null, error: db.pauseError } : { data: 2, error: null };
       return { data: null, error: { message: `unexpected rpc ${name}` } };
     },
@@ -67,17 +69,17 @@ describe("atomic hosted-tenant deprovision", () => {
   it("authority uses the atomic export-checked wrapper; flags off retain the original RPC", async () => {
     vi.stubEnv("DUAL_WRITE_PG", "1"); vi.stubEnv("STRELVA_LEADS_AUTHORITY", "postgres");
     await runDeprovision({ tenantId: "fictional-free", tenant: null, dryRun: false });
-    expect(db.rpcs.map(row => row.name)).toContain("deprovision_tenant_rows_after_inquiry_export");
+    expect(db.rpcs.map(row => row.name)).toContain("deprovision_tenant_guarded");
     expect(db.rpcs.map(row => row.name)).not.toContain("deprovision_tenant_rows");
   });
   it("authority plus retention uses the one combined export-checked, receipt-retaining wrapper", async () => {
     vi.stubEnv("DUAL_WRITE_PG", "1"); vi.stubEnv("STRELVA_LEADS_AUTHORITY", "postgres"); vi.stubEnv("STRELVA_TENANT_RECEIPT_RETENTION", "1");
     await runDeprovision({ tenantId: "fictional-free", tenant: null, dryRun: false });
-    expect(db.rpcs.filter(call => call.name.startsWith("deprovision_"))).toEqual([{ name: "deprovision_tenant_rows_retained_after_inquiry_export", args: { p_tenant_id: "fictional-free" } }]);
+    expect(db.rpcs.filter(call => call.name.startsWith("deprovision_"))).toEqual([{ name: "deprovision_tenant_guarded", args: { p_tenant_id: "fictional-free", p_force: false, p_require_inquiry_export: true, p_retain_receipts: true } }]);
   });
   it("retention off uses the exact legacy teardown and does not add receipt summaries", async () => {
     const result = await runDeprovision({ tenantId: "fictional-free", tenant: null, dryRun: false });
-    expect(db.rpcs.filter(call => call.name.startsWith("deprovision_"))).toEqual([{ name: "deprovision_tenant_rows", args: { p_tenant_id: "fictional-free" } }]);
+    expect(db.rpcs.filter(call => call.name.startsWith("deprovision_"))).toEqual([{ name: "deprovision_tenant_guarded", args: { p_tenant_id: "fictional-free", p_force: false, p_require_inquiry_export: false, p_retain_receipts: false } }]);
     expect(result.summary.postgres!.some(row => row.target === "report_snapshots")).toBe(false);
   });
 
@@ -85,7 +87,7 @@ describe("atomic hosted-tenant deprovision", () => {
     vi.stubEnv("STRELVA_TENANT_RECEIPT_RETENTION", "1");
     db.counts.report_snapshots = 4;
     const result = await runDeprovision({ tenantId: "fictional-free", tenant: null, dryRun: false });
-    expect(db.rpcs.filter(call => call.name.startsWith("deprovision_"))).toEqual([{ name: "deprovision_tenant_rows_retained", args: { p_tenant_id: "fictional-free" } }]);
+    expect(db.rpcs.filter(call => call.name.startsWith("deprovision_"))).toEqual([{ name: "deprovision_tenant_guarded", args: { p_tenant_id: "fictional-free", p_force: false, p_require_inquiry_export: false, p_retain_receipts: true } }]);
     expect(result.summary.postgres).toEqual(expect.arrayContaining([expect.objectContaining({ target: "report_snapshots", found: 4, deleted: false })]));
     db.rpcs.length = 0;
     await runDeprovision({ tenantId: "fictional-free", tenant: null, dryRun: true });
@@ -119,27 +121,23 @@ describe("atomic hosted-tenant deprovision", () => {
     const result = await runDeprovision({ tenantId: "fictional-free", tenant: null, dryRun: false });
     expect(result.ok).toBe(true);
     expect(db.deletes).toEqual([]);
-    expect(db.rpcs.filter((call) => call.name === "deprovision_tenant_rows")).toEqual([{ name: "deprovision_tenant_rows", args: { p_tenant_id: "fictional-free" } }]);
+    expect(db.rpcs.filter((call) => call.name === "deprovision_tenant_guarded")).toEqual([{ name: "deprovision_tenant_guarded", args: { p_tenant_id: "fictional-free", p_force: false, p_require_inquiry_export: false, p_retain_receipts: false } }]);
     expect(result.summary.postgres).toEqual(expect.arrayContaining([expect.objectContaining({ target: "memberships", deleted: true }), expect.objectContaining({ target: "tenants", deleted: true })]));
   });
 
-  it("pauses the converted business's stored Systems before the purge, and never deletes them", async () => {
+  it("pauses stored Systems inside the atomic purge and never deletes their history", async () => {
     const result = await runDeprovision({ tenantId: "fictional-converted", tenant: null, dryRun: false });
-    const names = db.rpcs.map((call) => call.name);
-    expect(names.indexOf("pause_tenant_systems")).toBeGreaterThan(-1);
-    expect(names.indexOf("pause_tenant_systems")).toBeLessThan(names.indexOf("deprovision_tenant_rows"));
-    expect(result.summary.postgres).toEqual(expect.arrayContaining([{ target: "systems", found: 2, deleted: false, detail: "stored Systems paused; records kept" }]));
+    expect(db.rpcs.map(call => call.name)).not.toContain("pause_tenant_systems");
+    expect(result.summary.postgres).toContainEqual({ target: "systems", found: 2, deleted: false, detail: "stored Systems paused; records kept" });
   });
-
-  it("reports a failed pause without blocking the deprovision, and only says it would on a dry run", async () => {
-    db.pauseError = { message: "function pause_tenant_systems does not exist" };
-    const result = await runDeprovision({ tenantId: "fictional-converted", tenant: null, dryRun: false });
-    expect(result.ok).toBe(true);
-    expect(result.summary.postgres).toEqual(expect.arrayContaining([expect.objectContaining({ target: "systems", found: "?", detail: expect.stringMatching(/not paused/) })]));
-    db.rpcs.length = 0;
-    const dry = await runDeprovision({ tenantId: "fictional-converted", tenant: null, dryRun: true });
-    expect(db.rpcs.map((call) => call.name)).not.toContain("pause_tenant_systems");
-    expect(dry.summary.postgres).toEqual(expect.arrayContaining([expect.objectContaining({ target: "systems", detail: expect.stringMatching(/dry run/) })]));
+  it("failed transactional pause blocks teardown and all outside deletes", async () => {
+    db.pauseError = { message: "pause failed" };
+    await expect(runDeprovision({ tenantId: "fictional-converted", tenant: null, dryRun: false })).rejects.toThrow("pause failed");
+    expect(redis.del).not.toHaveBeenCalled(); expect(vercel.deleteVercelProject).not.toHaveBeenCalled();
+  });
+  it.each(["*", "ab?", "www", "-bad", "a", "bad/slug"])("rejects unsafe id %s even with force", async tenantId => {
+    expect(await runDeprovision({ tenantId, tenant: null, dryRun: false, force: true })).toMatchObject({ ok: false, refusalReason: "invalid_tenant_id" });
+    expect(db.rpcs).toEqual([]); expect(redis.del).not.toHaveBeenCalled();
   });
 
   it("stops before Redis and Vercel when the atomic purge fails", async () => {

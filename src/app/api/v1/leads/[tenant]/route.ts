@@ -216,7 +216,7 @@ export async function POST(
       } catch {
         return corsJson({ error: "Inquiry capture is temporarily unavailable." }, 503);
       }
-      if (captured.status === "unavailable") return corsJson({ error: "Inquiry capture is temporarily unavailable." }, 503);
+      if (captured.status === "unavailable" || (captured.status === "duplicate" && !captured.lead)) return corsJson({ error: "Inquiry capture is temporarily unavailable." }, 503);
       // A factual notice is independent of customer-handling authority. It
       // still runs when handling is paused; its own release flag, email gates
       // and one-purpose claim prevent default sends or a duplicate worker send.
@@ -278,7 +278,7 @@ export async function POST(
     // copy when Redis is absent. Owner notification is unchanged (captureLead
     // notifies exactly as recordLead did).
     const outcome = await captureLead(tenant, { name, email, message, source, ...(attribution ? { fields: attribution } : {}) });
-    if (outcome.status === "unavailable" && !outcome.mirrored) {
+    if ((outcome.status === "unavailable" && !outcome.mirrored) || (outcome.status === "duplicate" && !outcome.lead && !outcome.acceptedByPostgres)) {
       return corsJson({ error: "Lead storage is temporarily unavailable.", code: "lead_storage_unavailable" }, 503);
     }
     return corsJson({ ok: true }, 200);

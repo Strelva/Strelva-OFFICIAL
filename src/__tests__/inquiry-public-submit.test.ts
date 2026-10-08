@@ -306,6 +306,13 @@ describe("public inquiry capability submission", () => {
     expect(mocks.capture).not.toHaveBeenCalled();
   });
 
+  it("does not accept a capability duplicate without a recoverable lead receipt", async () => {
+    mocks.capture.mockResolvedValueOnce({ status: "duplicate", acceptedByPostgres: true });
+    const response = await request(capabilityBody());
+    expect(response.status).toBe(503);
+    expect(mocks.evidence).not.toHaveBeenCalled();
+  });
+
   it("preserves the additive legacy lead contract", async () => {
     mocks.capture.mockResolvedValueOnce({ status: "captured", lead: { id: "lead_legacy" } });
     const response = await request({ name: "Legacy visitor", email: "legacy@example.test", source: "contact-form" });

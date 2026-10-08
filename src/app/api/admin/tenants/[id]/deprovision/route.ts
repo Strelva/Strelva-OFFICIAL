@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { getTenantConfig, updateTenant } from "@/lib/tenants";
 import { logAuditEvent } from "@/lib/storage";
-import { runDeprovision } from "@/lib/deprovision";
+import { runDeprovision, isValidDeprovisionTenantId } from "@/lib/deprovision";
 
 /**
  * POST /api/admin/tenants/[id]/deprovision
@@ -39,6 +39,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const { id } = await params;
+  if (!isValidDeprovisionTenantId(id)) return NextResponse.json({ error: "Invalid tenant id." }, { status: 400 });
   const tenant = await getTenantConfig(id);
   if (!tenant) {
     return NextResponse.json({ error: "Tenant not found" }, { status: 404 });

@@ -7,10 +7,10 @@
  * This script cleans up everything a tenant owns so a throwaway onboard can be
  * wiped back to zero.
  *
- * Postgres is the source of truth, so it is the primary target: every
- * tenant-scoped table is purged by tenant_id, then the `tenants` row itself.
- * Redis cache keys and the per-tenant Vercel project are torn down too, and the
- * tenant's domain-claims are cleared from the shared claim map.
+ * Postgres is the source of truth. One database transaction checks protected
+ * workspace records, then removes tenant-scoped rows and the `tenants` row
+ * atomically. Redis, domain claims, and the per-tenant Vercel project are
+ * cleaned up afterward; those cross-store operations are not one transaction.
  *
  * SAFETY (this deletes PRODUCTION data — .env.local points at prod):
  *   - DRY RUN BY DEFAULT. Nothing is deleted without --confirm.
@@ -34,7 +34,7 @@ import "../src/register-workspace-ports"; // workspace ports src/lib declares (S
 import * as readline from "node:readline";
 import { getSupabase } from "../src/platform/infra/db/client";
 import { getTenantConfig } from "../src/lib/tenants";
-import { runDeprovision } from "../src/lib/deprovision";
+import { runDeprovision, isValidDeprovisionTenantId } from "../src/lib/deprovision";
 
 interface Flags {
   confirm: boolean;
@@ -64,7 +64,7 @@ function prompt(question: string): Promise<string> {
 
 async function main() {
   const { tenantId, flags } = parseFlags();
-  if (!tenantId) {
+  if (!tenantId || !isValidDeprovisionTenantId(tenantId)) {
     console.error("Usage: npx tsx --env-file=.env.local scripts/deprovision-tenant.ts <tenantId> [--confirm] [--force] [--keep-vercel]");
     process.exit(1);
   }
@@ -141,7 +141,7 @@ async function main() {
   if (!result.executed) {
     console.log("DRY RUN — nothing was deleted. Re-run with --confirm to execute.\n");
   } else {
-    console.log("Done. If a table delete threw mid-run, re-running is safe (idempotent). Verify the tenant is gone from the admin Tenants list.\n");
+    console.log("Postgres cleanup committed atomically. Redis, domain, and Vercel cleanup ran afterward; verify those stores if any reported an error. Verify the tenant is gone from the admin Tenants list.\n");
   }
 }
 

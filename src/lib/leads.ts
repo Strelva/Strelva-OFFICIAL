@@ -84,7 +84,7 @@ export interface RecordLeadInput {
 
 export type RecordLeadResult =
   | { status: "captured"; lead: LeadRecord }
-  | { status: "duplicate"; lead?: LeadRecord }
+  | { status: "duplicate"; lead?: LeadRecord; acceptedByPostgres?: boolean }
   /** `mirrored` is true only when the Postgres copy confirmed the lead. */
   | { status: "unavailable"; mirrored?: boolean };
 
@@ -209,7 +209,14 @@ export async function captureLead(
       // id before Redis identified the accepted original submission.
       if (leadAuthorityIsPostgres()) await clearLeadMirrorPending(tenant, lead.id);
     }
-    return duplicate ? { status: "duplicate", lead: duplicate } : { status: "duplicate" };
+    if (duplicate) return { status: "duplicate", lead: duplicate };
+    // A process may stop after claiming NX but before saving the Redis row.
+    // Repair the exact claimed id; never replay its owner notice.
+    if (duplicateId && /^lead_[A-Za-z0-9_-]{1,100}$/.test(duplicateId)) {
+      const kept = await mirrorLead(tenant, { ...lead, id: duplicateId }, hash);
+      return { status: "duplicate", acceptedByPostgres: mirrorKept(kept) };
+    }
+    return { status: "duplicate" };
   }
 
   // The dedup lock is held before the writes; if a write fails we must release
@@ -276,7 +283,7 @@ async function capturePostgresFirst(
   if (kept.status === "duplicate") {
     const marker = kept.leadId ?? (redis ? await redis.get<string>(`lead-dedup:${tenant}:${hash}`).catch(() => null) : null);
     const existing = marker && marker !== "1" ? await readPostgresLead(tenant, marker).catch(() => null) : null;
-    return existing ? { status: "duplicate", lead: existing } : { status: "duplicate" };
+    return existing ? { status: "duplicate", lead: existing } : { status: "duplicate", acceptedByPostgres: true };
   }
 
   const pgKept = mirrorKept(kept);

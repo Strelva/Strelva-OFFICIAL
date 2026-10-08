@@ -13,6 +13,7 @@
  * server-side (confirmSlug === id in the request body).
  */
 
+import { RESERVED_SUBDOMAINS } from "@/lib/tenant-host";
 import { leadAuthorityIsPostgres } from "./lead-reads";
 import { getSupabase } from "@/platform/infra/db/client";
 import { getRedis } from "@/platform/infra/redis";
@@ -25,6 +26,11 @@ import { getAccountForTenant, unlinkTenant } from "@/lib/accounts";
 // Real tenants that must never be torn down by accident. A backstop only —
 // the live "has paid" guard is the primary defense (this set drifts stale).
 export const PROTECTED_TENANTS = new Set(["gldf", "rohlax"]);
+
+// Slugs must never become Redis glob syntax, including when force is set.
+export function isValidDeprovisionTenantId(id: string): boolean {
+  return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])$/.test(id) && !RESERVED_SUBDOMAINS.has(id);
+}
 
 // Subscription states that indicate a real billing relationship exists.
 const PAYING_STATUSES = new Set(["active", "trialing", "past_due"]);
@@ -91,7 +97,7 @@ export interface StoreAction {
 export interface DeprovisionResult {
   ok: boolean;
   /** Non-null when a safety guard refused the operation. */
-  refusalReason?: "protected_tenant" | "active_subscription" | "workspace_website";
+  refusalReason?: "invalid_tenant_id" | "protected_tenant" | "active_subscription" | "workspace_website";
   refusalDetail?: string;
   tenantId: string;
   executed: boolean;
@@ -152,17 +158,18 @@ export async function pauseStoredSystems(tenantId: string): Promise<{ ok: true; 
 }
 
 /** Delete every tenant-scoped row and the tenant in one transaction. */
-async function deleteTenantRowsAtomically(tenantId: string): Promise<Record<string, number>> {
+async function deleteTenantRowsAtomically(tenantId: string, force: boolean): Promise<{ counts: Record<string, number>; paused: number }> {
   const call = rpc();
-  if (!call) return {};
-  // Each switch adds one atomic wrapper; both on uses the combined wrapper.
-  const retained = process.env.STRELVA_TENANT_RECEIPT_RETENTION === "1";
-  const name = leadAuthorityIsPostgres()
-    ? retained ? "deprovision_tenant_rows_retained_after_inquiry_export" : "deprovision_tenant_rows_after_inquiry_export"
-    : retained ? "deprovision_tenant_rows_retained" : "deprovision_tenant_rows";
-  const { data, error } = await call(name, { p_tenant_id: tenantId });
+  if (!call) throw new Error("tenant_teardown_database_unavailable");
+  const { data, error } = await call("deprovision_tenant_guarded", {
+    p_tenant_id: tenantId, p_force: force,
+    p_require_inquiry_export: leadAuthorityIsPostgres(),
+    p_retain_receipts: process.env.STRELVA_TENANT_RECEIPT_RETENTION === "1",
+  });
   if (error) throw new Error(`deprovision_tenant_rows: ${error.message}`);
-  return Object.fromEntries(Object.entries((data ?? {}) as Record<string, unknown>).map(([table, n]) => [table, Number(n)]));
+  const result = data as { counts?: Record<string, unknown>; paused?: number } | null;
+  if (!result?.counts || !Number.isFinite(result.paused)) throw new Error("tenant_teardown_invalid_receipt");
+  return { counts: Object.fromEntries(Object.entries(result.counts).map(([table, n]) => [table, Number(n)])), paused: result.paused! };
 }
 
 /** Per-tenant Redis key patterns, with the tenant id pinned to its KNOWN
@@ -281,6 +288,11 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
   const executed = !dryRun;
   const summary: Record<string, StoreAction[]> = { postgres: [], redis: [], vercel: [] };
 
+  if (!isValidDeprovisionTenantId(tenantId)) {
+    return { ok: false, refusalReason: "invalid_tenant_id", refusalDetail: "Invalid tenant id.", tenantId, executed: false, pgRowTotal: 0, summary };
+  }
+  if (executed && !getSupabase()) throw new Error("tenant_teardown_database_unavailable");
+
   // Guard 1: hardcoded denylist.
   if (PROTECTED_TENANTS.has(tenantId) && !force) {
     return {
@@ -346,23 +358,18 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
     pgTotal += n;
     if (n > 0) found.push([table, n]);
   }
-  // A converted business keeps its stored Systems (and their history); they
-  // must read Paused, never Live, for a site that is gone. Done before the
-  // purge, while the tenant's stable id still resolves. Best effort: a
-  // failure is reported and never blocks the deprovision.
-  if (executed) {
-    const paused = await pauseStoredSystems(tenantId);
-    summary.postgres!.push({ target: "systems", found: paused.ok ? paused.count : "?", deleted: false, detail: paused.ok ? "stored Systems paused; records kept" : `stored Systems not paused: ${paused.error}` });
-  } else {
-    summary.postgres!.push({ target: "systems", found: "?", deleted: false, detail: "would pause any stored Systems (dry run)" });
-  }
+  // Stored Systems pause inside the same transaction as the purge. A
+  // refusal or failed delete must leave both the records and lifecycle intact.
+  if (!executed) summary.postgres!.push({ target: "systems", found: "?", deleted: false, detail: "would pause any stored Systems (dry run)" });
   if (process.env.STRELVA_TENANT_RECEIPT_RETENTION === "1") {
     for (const table of TENANT_TABLES_RETAINED_AS_RECEIPTS) {
       summary.postgres!.push({ target: table, found: await countRows(table, tenantId), deleted: false,
         detail: "kept as historical receipts; outstanding draft grants expire on teardown" });
     }
   }
-  const removed = executed ? await deleteTenantRowsAtomically(tenantId) : {};
+  const receipt = executed ? await deleteTenantRowsAtomically(tenantId, force) : null;
+  const removed = receipt?.counts ?? {};
+  if (receipt) summary.postgres!.push({ target: "systems", found: receipt.paused, deleted: false, detail: "stored Systems paused; records kept" });
   for (const [table, n] of found) {
     const cascaded = CASCADED_TENANT_TABLES.some(candidate => candidate === table) && (removed.tenants ?? 0) > 0;
     summary.postgres!.push({ target: table, found: n, deleted: executed && ((removed[table] ?? 0) > 0 || cascaded) });

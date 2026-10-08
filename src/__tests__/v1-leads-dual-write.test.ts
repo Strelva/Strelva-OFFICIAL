@@ -32,6 +32,7 @@ vi.mock("@/products/inquiries/server", () => ({
 
 import { POST } from "@/app/api/v1/leads/[tenant]/route";
 import { LEAD_MIRROR_PENDING_KEY, LEAD_MIRROR_TIMEOUT_MS, setLeadMirrorDb, type LeadMirrorDb } from "@/lib/lead-mirror";
+import { getLeads, leadSubmissionHash } from "@/lib/leads";
 
 type Rpc = (name: string, args: Record<string, unknown>) => unknown;
 let rpc: ReturnType<typeof vi.fn<Rpc>>;
@@ -161,6 +162,58 @@ describe("POST /api/v1/leads/[tenant] dual-write", () => {
     expect(await res.json()).toEqual({ ok: true });
     expect(rpc).toHaveBeenCalledTimes(1);
     expect((rpc.mock.calls[0]![1] as { p_lead: { name: string } }).p_lead.name).toBe("Ada Rivera");
+    expect(mocks.sendNewLeadEmail).not.toHaveBeenCalled();
+  });
+
+  it("refuses success when neither Redis nor Postgres accepts the submission", async () => {
+    redisAvailable = false;
+    setLeadMirrorDb(null);
+
+    const res = await post("mclears-cottage", submission);
+
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "Lead storage is temporarily unavailable.", code: "lead_storage_unavailable" });
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
+    expect(rpc).not.toHaveBeenCalled();
+    expect(mocks.sendNewLeadEmail).not.toHaveBeenCalled();
+  });
+
+  it("repairs an orphaned dedup marker through Postgres without replaying notification", async () => {
+    const first = await post("mclears-cottage", submission);
+    expect(first.status).toBe(200);
+    const [stored] = await getLeads("mclears-cottage");
+    const leadId = stored!.id;
+    const marker = `lead-dedup:mclears-cottage:${leadSubmissionHash(stored!)}`;
+    redis.store.delete(`lead:mclears-cottage:${leadId}`);
+    redis.zsets.get("leads:mclears-cottage")?.delete(leadId);
+    useDb(async () => ({ data: { status: "exists", id: "row-1", workspaceId: null }, error: null }));
+
+    const retry = await post("mclears-cottage", submission);
+
+    expect(redis.store.has(marker)).toBe(true);
+    expect(retry.status).toBe(200);
+    expect(await retry.json()).toEqual({ ok: true });
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect((rpc.mock.calls[0]![1] as { p_lead: { leadId: string } }).p_lead.leadId).toBe(leadId);
+    expect(mocks.sendNewLeadEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["1", "invalid/marker"])("does not acknowledge an unrecoverable duplicate marker %s", async (legacyMarker) => {
+    const first = await post("mclears-cottage", submission);
+    expect(first.status).toBe(200);
+    const [stored] = await getLeads("mclears-cottage");
+    const marker = `lead-dedup:mclears-cottage:${leadSubmissionHash(stored!)}`;
+    redis.store.set(marker, legacyMarker);
+    rpc.mockClear();
+    mocks.sendNewLeadEmail.mockClear();
+
+    const retry = await post("mclears-cottage", submission);
+
+    expect(retry.status).toBe(503);
+    expect(await retry.json()).toEqual({ error: "Lead storage is temporarily unavailable.", code: "lead_storage_unavailable" });
+    expect(retry.headers.get("access-control-allow-origin")).toBe("*");
+    expect(rpc).not.toHaveBeenCalled();
+    expect(mocks.sendNewLeadEmail).not.toHaveBeenCalled();
   });
 
   // Audit finding 5 (2026-10-05): with Redis gone, the beacon must not claim

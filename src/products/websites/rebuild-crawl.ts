@@ -1,10 +1,8 @@
 import { createHash } from "node:crypto";
-import * as http from "node:http";
-import * as https from "node:https";
 import * as cheerio from "cheerio";
-import { computeVisibleText, validateUrlSafety } from "@/lib/audit/checks";
-import { pinnedRequestOptions } from "@/platform/infra/pinned-lookup";
-import { isSafeFetchUrl } from "@/platform/infra/safe-fetch";
+import { computeVisibleText } from "@/lib/audit/checks";
+import { isSafeFetchUrl } from "@/lib/safe-fetch";
+import { fetchPinnedPublicResponse } from "@/lib/pinned-public-text";
 import { registrableRebuildDomain } from "./rebuild-domain-key";
 
 export const REBUILD_USER_AGENT = "StrelvaRebuild/1.0";
@@ -38,38 +36,31 @@ export function sameCrawlDomain(left: string, right: string): boolean {
   return registrableRebuildDomain(new URL(left).hostname) === registrableRebuildDomain(new URL(right).hostname);
 }
 
-/** Shares the audit's DNS safety check, pins the validated address for this
- * connection, and checks every redirect before requesting it. */
+/** Uses the shared pinned transport and checks every redirect before requesting it. */
 export const fetchRebuildPage: PageFetcher = async (raw, options) => {
-  let url = normalizeRebuildUrl(raw);
-  const deadline = Date.now() + options.timeoutMs;
-  for (let hop = 0; hop <= 5; hop++) {
-    if (options.allowUrl && !await options.allowUrl(url)) throw new Error("The redirect is outside the allowed crawl paths.");
-    const remaining = deadline - Date.now();
-    if (remaining <= 0) throw new Error("Website request timed out.");
-    let dnsTimer: ReturnType<typeof setTimeout> | undefined;
-    let address: string;
-    try { ({ address } = await Promise.race([validateUrlSafety(url), new Promise<never>((_, reject) => { dnsTimer = setTimeout(() => reject(new Error("Website DNS lookup timed out.")), remaining); })])); }
-    finally { if (dnsTimer) clearTimeout(dnsTimer); }
-    const response = await new Promise<{ status: number; headers: http.IncomingHttpHeaders; html: string }>((resolve, reject) => {
-      const parsed = new URL(url);
-      const request = (parsed.protocol === "https:" ? https : http).request(parsed, {
-        ...pinnedRequestOptions(address),
-        headers: { "User-Agent": `${REBUILD_USER_AGENT} (+https://strelva.com)`, Accept: "text/html,text/plain;q=0.9", "Accept-Encoding": "identity" },
-      }, (res) => {
-        if ([301, 302, 303, 307, 308].includes(res.statusCode ?? 0)) { res.resume(); resolve({ status: res.statusCode!, headers: res.headers, html: "" }); return; }
-        const chunks: Buffer[] = []; let bytes = 0;
-        res.on("data", (chunk: Buffer) => { bytes += chunk.length; if (bytes > options.maxBytes) { request.destroy(new Error("Website page exceeds the crawl byte limit.")); return; } chunks.push(chunk); });
-        res.on("error", reject);
-        res.on("end", () => resolve({ status: res.statusCode ?? 0, headers: res.headers, html: Buffer.concat(chunks).toString("utf8") }));
-      });
-      const timer = setTimeout(() => request.destroy(new Error("Website request timed out.")), Math.max(1, deadline - Date.now()));
-      request.on("error", reject); request.on("close", () => clearTimeout(timer)); request.end();
-    });
-    if ([301, 302, 303, 307, 308].includes(response.status) && response.headers.location) { url = normalizeRebuildUrl(new URL(response.headers.location, url).href); continue; }
-    return { url, status: response.status, html: response.html, contentType: String(response.headers["content-type"] ?? "") };
-  }
-  throw new Error("Website redirected too many times.");
+  const url = normalizeRebuildUrl(raw);
+  const response = await fetchPinnedPublicResponse(url, {
+    maxBytes: options.maxBytes,
+    timeoutMs: options.timeoutMs,
+    allowUrl: async (target) => {
+      // Keep the crawler's port, scheme, and credential policy on redirects
+      // as well as the initial URL.
+      normalizeRebuildUrl(target);
+      if (options.allowUrl && !(await options.allowUrl(target))) {
+        throw new Error("The redirect is outside the allowed crawl paths.");
+      }
+      return true;
+    },
+    userAgent: `${REBUILD_USER_AGENT} (+https://strelva.com)`,
+    headers: { Accept: "text/html,text/plain;q=0.9" },
+  });
+  if (!response) throw new Error("Website request failed or exceeded its crawl limits.");
+  return {
+    url: response.url,
+    status: response.status,
+    html: response.body.toString("utf8"),
+    contentType: response.headers.get("content-type") ?? "",
+  };
 };
 
 export function robotsAllows(text: string, url: string): boolean {
