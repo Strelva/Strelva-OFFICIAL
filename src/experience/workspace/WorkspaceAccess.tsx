@@ -56,8 +56,8 @@ export function AccessPanel({ snapshot, currentKind, currentAccess, currentRole,
   if (currentAccess === "provider_seat") return <div className="mx-auto max-w-3xl"><h1 className="font-display text-[36px]">Agency provider access.</h1><p className="mt-3 text-gray-muted">Your agency has an active provider seat and has assigned you to this business. You can work on its website. The business controls ownership and access to customer records.</p></div>;
   if (currentAccess === "delegated_read") return <DelegatedAccessSurface key={contextKey} />;
   if (currentKind === "personal") return <CreateAgency key={contextKey} postAction={postAction} isActive={isActive} onCreated={onAgencyCreated} />;
-  if (currentKind === "customer") return <CustomerAccess key={contextKey} snapshot={snapshot} currentRole={currentRole} postAction={postAction} isActive={isActive} onChanged={onChanged} setNotice={setNotice} />;
-  return <AgencyHandoff key={contextKey} snapshot={snapshot} currentRole={currentRole} selectedWork={selectedWork} postAction={postAction} isActive={isActive} onChanged={onChanged} setNotice={setNotice} />;
+  if (currentKind === "customer") return <><a href={`/workspace/access-review?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="mb-6 inline-block text-sm text-accent-text underline">Review all people and access</a><CustomerAccess key={contextKey} snapshot={snapshot} currentRole={currentRole} postAction={postAction} isActive={isActive} onChanged={onChanged} setNotice={setNotice} /></>;
+  return <><a href={`/workspace/access-review?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="mb-6 inline-block text-sm text-accent-text underline">Review all people and access</a><AgencyHandoff key={contextKey} snapshot={snapshot} currentRole={currentRole} selectedWork={selectedWork} postAction={postAction} isActive={isActive} onChanged={onChanged} setNotice={setNotice} /></>;
 }
 
 function useActiveContext(contextKey: string) {

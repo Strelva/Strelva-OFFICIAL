@@ -1039,3 +1039,21 @@ refresh. The development-only agency-release-flags fixture covers permitted,
 empty, paused, unverified, ceiling withdrawal, conflict and read-error states.
 No atom API or accepted material/type decision changed. Source/render evidence
 is local preparation, not Jacob's visual acceptance or a deployed capability.
+## People and access review (private candidate)
+
+`src/experience/workspace/AccessReview.tsx` composes shared Button and semantic
+sections/lists for the business review. Organization review uses active customer
+mappings only to locate businesses with current direct membership; unavailable
+businesses contribute a count, with no private details. Member views are read
+only. Owners are protected. Provider seat removal is an access change; ending
+the provider of record uses its notice protocol. Each available revoke is one
+click and its success names the committed audit result. Loading, denied storage,
+retry, unknown use and pending controls are explicit. The loader remounts per
+workspace and review scope so a late response cannot update another business.
+
+The development-only `/preview/strelva/access-review?state=ready` fixture supports
+`organization`, `member`, `empty`, `loading`, `error` and `permission`. Its actions
+change only fictional preview state. Native SQL and HTTP checks are separate from
+this rendered proof. Historical last use is available for agent reads/proposals;
+other access types show “Not recorded”. This is private local preparation, not
+a production or customer-adoption claim.
