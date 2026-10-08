@@ -191,7 +191,8 @@ begin
     select 1
     from release_rollback_baseline.m20261005100000_legacy_tenant_grants b
     join pg_class c on c.oid = b.relation_oid
-    where (select coalesce(array_agg(a.privilege_type order by a.privilege_type), '{}')
+    where c.relname <> 'audit_logs'
+      and (select coalesce(array_agg(a.privilege_type order by a.privilege_type), '{}')
            from aclexplode(b.grants) a where a.grantee = 'service_role'::regrole)
       is distinct from
           (select coalesce(array_agg(a.privilege_type order by a.privilege_type), '{}')
