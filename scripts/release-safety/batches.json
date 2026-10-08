@@ -1542,7 +1542,7 @@
       "items": [
         {
           "file": "20261020090040_neutral_service_requests.sql",
-          "sha256": "5528f62c48bd82217a6c45e9becab8d06e6f22ba449f9dc456a71f023fccd961",
+          "sha256": "062172540b03ab7b9fe076b05630a960168698085d860b139f04a80378e63c90",
           "rollbackStatus": "forward-only preparation; preserve data/current authority and review a successor; no inverse or production recovery is qualified"
         },
         {
@@ -1639,6 +1639,20 @@
           "rollback": "rollback-20261021112000_home_finder_native.sql",
           "rollbackSha256": "612eacbe783ddeb68c7f7d030a4f20dcdc314f54fc413bea6fa35117d902fc3d",
           "rollbackStatus": "guarded or forward-only; exact native refusal/reapply and operating recovery remain release gates"
+        },
+        {
+          "file": "20261021112100_enterprise_home_finder_portability.sql",
+          "sha256": "fdf012fb40a2e963c63df4b5541a2603e8315e608655cc65ab157ddadf91c010",
+          "rollbackStatus": "guarded or forward-only; exact native refusal/reapply and operating recovery remain release gates",
+          "rollback": "rollback-20261021112100_enterprise_home_finder_portability.sql",
+          "rollbackSha256": "7f7cfc43fc715f997063fac9e4ce6625373b11a9ec8ceaf6540fe6f93ac2386f"
+        },
+        {
+          "file": "20261021112200_home_finder_configuration.sql",
+          "sha256": "0142b6b18e4180baa2825ddfb7f5132f587b145b6af7dd388eb15b4eae127fcf",
+          "rollbackStatus": "guarded or forward-only; exact native refusal/reapply and operating recovery remain release gates",
+          "rollback": "rollback-20261021112200_home_finder_configuration.sql",
+          "rollbackSha256": "032adbedb91ac096fda79ad01d6405ac4e3aa330d54e139432847084412687ec"
         },
         {
           "file": "20261021130000_agent_payment_attempt_readback.sql",

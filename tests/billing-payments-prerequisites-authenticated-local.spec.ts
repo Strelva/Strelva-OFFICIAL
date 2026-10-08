@@ -30,12 +30,12 @@ test("native unpriced billing homes preserve payer authority and merchant prereq
     await ownerPage.goto(`/workspace/billing?workspaceId=${workspaceId}`);
     await expect(ownerPage.getByRole("heading", { name: "Business billing", exact: true })).toBeVisible();
     await expect(ownerPage.getByText("Price not recorded", { exact: true })).toBeVisible();
-    await expect(ownerPage).toContainText("No monthly price or plan is recorded.");
-    await expect(ownerPage).toContainText("This business");
+    await expect(ownerPage.locator("body")).toContainText("No monthly price or plan is recorded.");
+    await expect(ownerPage.locator("body")).toContainText("This business");
     const agencyPage = await agencyOwner.context.newPage();
     await agencyPage.goto(`/workspace/billing?workspaceId=${agencyId}`);
     await expect(agencyPage.getByRole("heading", { name: "Agency billing", exact: true })).toBeVisible();
-    await expect(agencyPage).toContainText("No business has accepted this agency as payer yet.");
+    await expect(agencyPage.locator("body")).toContainText("No business has accepted this agency as payer yet.");
     const payer = ownerPage.locator("section", { has: ownerPage.getByRole("heading", { name: "Payer for future jobs", exact: true }) });
     await payer.getByLabel("Who pays for future jobs?").selectOption("agency");
     await payer.getByLabel("Agency", { exact: true }).selectOption(agencyId);
@@ -50,10 +50,10 @@ test("native unpriced billing homes preserve payer authority and merchant prereq
     expect(accepted.current).toMatchObject({ status: "accepted", successorWorkspaceId: agencyId });
     await ownerPage.reload();
     await expect(ownerPage.getByText("Price not recorded", { exact: true })).toBeVisible();
-    await expect(ownerPage).toContainText("Native unpriced agency");
+    await expect(ownerPage.locator("body")).toContainText("Native unpriced agency");
     await agencyPage.reload();
     await expect(agencyPage.getByText("Wholesale price not set", { exact: true })).toBeVisible();
-    await expect(agencyPage).toContainText("Agency pays");
+    await expect(agencyPage.locator("body")).toContainText("Agency pays");
     await agencyPage.screenshot({ path: info.outputPath("native-agency-unpriced-billing.png"), fullPage: true });
     const invoiceInput = { action: "propose", agencyWorkspaceId: agencyId, businessWorkspaceId: workspaceId,
       kind: "pay_link", amountCents: 100, currency: "usd", description: "Local authority check", idempotencyKey: randomUUID() };
@@ -65,8 +65,8 @@ test("native unpriced billing homes preserve payer authority and merchant prereq
     await expect(readerPage.getByRole("button", { name: "Prepare client agreement", exact: true })).toHaveCount(0);
     await ownerPage.goto(`/workspace/payments?workspaceId=${workspaceId}`);
     await expect(ownerPage.getByRole("heading", { name: "Payments", exact: true })).toBeVisible();
-    await expect(ownerPage).toContainText("No customer payments have been recorded.");
-    await expect(ownerPage).toContainText("Complete Stripe setup before accepting customer payments.");
+    await expect(ownerPage.locator("body")).toContainText("No customer payments have been recorded.");
+    await expect(ownerPage.locator("body")).toContainText("Complete Stripe setup before accepting customer payments.");
     await expect(ownerPage.getByRole("button", { name: "Continue Stripe setup", exact: true })).toBeVisible();
     await ownerPage.screenshot({ path: info.outputPath("native-payments-merchant-prerequisite.png"), fullPage: true });
     const removed = await admin.from("workspace_memberships").delete().eq("workspace_id", workspaceId).eq("user_id", owner.userId);
