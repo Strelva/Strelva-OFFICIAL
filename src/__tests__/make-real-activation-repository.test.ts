@@ -70,7 +70,7 @@ function fakeDb(members: Record<string, string[]>) {
 }
 
 /** One page System, one approved calendar effect, one operating check. */
-async function runScenario(activations: ActivationRepository, businessId: string, opts: { failCheck: boolean; compensation?: "refused" | "ambiguous" }, who: WorkspaceActor = actor) {
+async function runScenario(activations: ActivationRepository, businessId: string, opts: { failCheck: boolean; compensation?: "refused" | "ambiguous"; skipRollback?: boolean }, who: WorkspaceActor = actor) {
   const actor = who;
   let tick = 0;
   const clock = () => new Date(Date.UTC(2026, 9, 6, 12, 0, tick++)).toISOString();
@@ -108,7 +108,7 @@ async function runScenario(activations: ActivationRepository, businessId: string
   });
   const started = await makeReal.start(actor, businessId, "poss-1", { approvals: [{ effectId: "kickoff", approvalId: "approval-kickoff" }] });
   let result = await makeReal.run(actor, businessId, started.id);
-  if (opts.failCheck) result = await makeReal.rollback(actor, businessId, started.id);
+  if (opts.failCheck && !opts.skipRollback) result = await makeReal.rollback(actor, businessId, started.id);
   return { result, stored: await activations.get(businessId, started.id), calendar, compensate, makeReal, possibilities };
 }
 
@@ -282,6 +282,49 @@ describe.runIf(Boolean(PSQL))("Postgres ActivationRepository (real RPCs on a thr
     expect(durable.result.status).toBe("rolled_back");
     expect(durable.result.steps.some((s) => s.status === "compensated" || s.status === "restored")).toBe(true);
     expect(shape(durable.result)).toEqual(shape(memory.result));
+  });
+
+  it("refuses forged rollback closure before any undo claim exists", async () => {
+    const { db, biz, owner } = setup();
+    const repo = createSupabaseActivationRepository(owner, db);
+    const scenario = await runScenario(repo, biz, { failCheck: true, skipRollback: true }, owner);
+    const accepted = scenario.result.steps.find((s) => s.kind === "effect")!;
+    expect(accepted).toMatchObject({ status: "completed", effect: "accepted", reversibility: "compensable" });
+    expect(accepted.compensation).toBeUndefined();
+    const forgedOutcome = structuredClone(scenario.result);
+    forgedOutcome.rollbackStartedAt = forgedOutcome.updatedAt;
+    forgedOutcome.revision++;
+    forgedOutcome.steps.find((s) => s.id === accepted.id)!.status = "compensated";
+    forgedOutcome.history.push({ revision: forgedOutcome.revision, kind: "rollback_step", actorId: owner.userId, at: forgedOutcome.updatedAt });
+    await expect(repo.save(forgedOutcome, scenario.result.revision)).rejects.toBeInstanceOf(WorkspaceStoreError);
+    const closed = structuredClone(scenario.result);
+    closed.status = "rolled_back";
+    closed.rollbackStartedAt = closed.updatedAt;
+    closed.revision++;
+    closed.history.push({ revision: closed.revision, kind: "rollback", actorId: owner.userId, at: closed.updatedAt });
+    await expect(repo.save(closed, scenario.result.revision)).rejects.toBeInstanceOf(WorkspaceStoreError);
+    expect((await repo.get(biz, scenario.result.id))?.status).toBe("needs_attention");
+  });
+
+  it("refuses closure while an internal live pointer is still switched", async () => {
+    const { db, biz, owner } = setup();
+    const repo = createSupabaseActivationRepository(owner, db);
+    const scenario = await runScenario(repo, biz, { failCheck: true, skipRollback: true }, owner);
+    const effectIndex = scenario.result.steps.findIndex((s) => s.kind === "effect");
+    // A trusted historical fixture isolates the internal restoration guard
+    // from the compensable-effect closure guard exercised above.
+    db.exec(`begin; select public.make_real_activation_set_writer(true);
+      update public.saved_product_work set payload=jsonb_set(payload,'{steps,${effectIndex},reversibility}','"irreversible"'::jsonb)
+      where workspace_id='${biz}' and product_id='operations' and resource_kind='activation'; commit;`);
+    const current = (await repo.get(biz, scenario.result.id))!;
+    expect(current.steps.some((s) => s.kind === "activate" && s.status === "completed")).toBe(true);
+    const closed = structuredClone(current);
+    closed.status = "rolled_back";
+    closed.rollbackStartedAt = closed.updatedAt;
+    closed.revision++;
+    closed.history.push({ revision: closed.revision, kind: "rollback", actorId: owner.userId, at: closed.updatedAt });
+    await expect(repo.save(closed, current.revision)).rejects.toBeInstanceOf(WorkspaceStoreError);
+    expect((await repo.get(biz, current.id))?.status).toBe("needs_attention");
   });
 
   it("keeps refused compensation durable and attached, then retries only the undo", async () => {

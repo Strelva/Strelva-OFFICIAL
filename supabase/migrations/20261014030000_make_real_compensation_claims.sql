@@ -10,7 +10,11 @@ returns boolean language plpgsql immutable set search_path=public,pg_temp as $$
 declare old_c jsonb := o->'compensation'; new_c jsonb := n->'compensation';
   old_status text := old_c->>'status'; new_status text := new_c->>'status';
 begin
-  if old_c is not distinct from new_c then return true; end if;
+  if old_c is not distinct from new_c then
+    -- Legacy terminal rows remain readable; a new terminal transition needs
+    -- the durable claim/outcome path, never a status-only assertion.
+    return not (o->>'status' is distinct from 'compensated' and n->>'status'='compensated');
+  end if;
   if not rolling_back or n->>'kind' <> 'effect' or n->>'effect' <> 'accepted'
     or n->>'status' not in ('completed','compensated') or new_c is null then return false; end if;
   if new_status = 'running' then
@@ -228,6 +232,8 @@ begin
   end if;
   if p->>'status' = 'rolled_back' and (event_kind <> 'rollback' or not (p ? 'rollbackStartedAt')
       or exists(select 1 from jsonb_array_elements(p->'steps') s where s->>'status' in ('running', 'unknown')
+        or (s->>'kind' in ('activate','connect') and s->>'status'='completed')
+        or (s->>'kind'='effect' and s->>'effect'='accepted' and s->>'reversibility'='compensable' and s->>'status'<>'compensated')
         or s->'compensation'->>'status' in ('running','unknown','failed')
         or (s->>'reversibility'='compensable' and s->'compensation'->>'status'='unavailable')
         or (not (s ? 'compensation') and s->>'reason' like 'Compensation failed:%'))) then

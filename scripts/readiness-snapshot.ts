@@ -106,6 +106,7 @@ export const SEPT30_EXTRA_APPLIED = ["20260930120000"];
  * `accounts`. "missing" there is a stop.
  */
 export const MIGRATION_SENTINELS: Record<string, string> = {
+  "20261013221000": "inquiry_retention_receipts",
   "20261012010000": "tenant_track_signing_keys",
   "20261011180000": "provider_disconnect_receipts",
   "20261011102000": "workspace_collection_entries",

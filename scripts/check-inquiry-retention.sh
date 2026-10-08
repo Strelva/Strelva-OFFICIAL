@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# An explicit Unix socket must not be overridden by ambient libpq routing.
+for postgres_env_name in "${!PG@}"; do unset "$postgres_env_name"; done
+unset postgres_env_name
 # This helper is invoked only inside the disposable local workspace SQL gate.
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 socket_path="${1:?local socket required}"
