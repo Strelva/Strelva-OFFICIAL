@@ -21,9 +21,9 @@ psql "${psql_args[@]}" --file="$repo_root/tests/public-business-verification-sch
 # The additive function must be the only catalog change across undo/reapply.
 catalog="select p.oid::regprocedure::text,p.proowner,coalesce(p.proacl,acldefault('f',p.proowner))::text,md5(pg_get_functiondef(p.oid)) from pg_proc p where p.pronamespace='public'::regnamespace and p.prokind='f' and p.oid<>'public.read_public_business_verification(text,text)'::regprocedure order by p.oid::regprocedure::text"
 psql "${psql_args[@]}" -Atc "$catalog" >"$cluster_root/before.catalog"
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261018132000_public_business_verification.sql" >/dev/null
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261020114000_public_business_verification.sql" >/dev/null
 psql "${psql_args[@]}" -Atc "select to_regprocedure('public.read_public_business_verification(text,text)') is null" | grep -qx t
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261018132000_public_business_verification.sql" >/dev/null
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261020114000_public_business_verification.sql" >/dev/null
 psql "${psql_args[@]}" -Atc "$catalog" >"$cluster_root/after.catalog"
 cmp "$cluster_root/before.catalog" "$cluster_root/after.catalog"
 psql "${psql_args[@]}" --file="$repo_root/tests/public-business-verification-schema.sql" >/dev/null

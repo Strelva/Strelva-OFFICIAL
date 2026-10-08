@@ -1270,9 +1270,9 @@
       "status": "prepared locally; unapplied; deployed-target ordering qualification required",
       "items": [
         {
-          "file": "20261018132000_public_business_verification.sql",
+          "file": "20261020114000_public_business_verification.sql",
           "sha256": "f0be8ea2c5cf5238baf136d537d5c330c814314f3d919cba7850232e85121892",
-          "rollback": "rollback-20261018132000_public_business_verification.sql"
+          "rollback": "rollback-20261020114000_public_business_verification.sql"
         }
       ]
     }
