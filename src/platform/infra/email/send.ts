@@ -115,7 +115,7 @@ export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendE
     : suppliedBrand;
   // A cached brand remains a scope signal even when the fresh lookup fails.
   const agencyId = brand?.agencyId ?? suppliedBrand?.agencyId;
-  const identity = agencyId ? await resolveAgencyEmailIdentity(agencyId) : null;
+  const identity = brand?.agencyId ? await resolveAgencyEmailIdentity(brand.agencyId) : null;
   const options = input.options && brand ? { ...input.options, brand, heading: brand.agencyId ? input.options.heading.replace(/Strelva/g, () => brand.name) : input.options.heading } : input.options;
   const html = options ? renderEmailHtml(options) : input.html!;
   const text = options ? renderEmailText(options) : input.text!;

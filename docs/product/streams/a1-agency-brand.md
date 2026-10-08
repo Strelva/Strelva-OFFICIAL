@@ -106,6 +106,8 @@ The coordinator owns canonical project/vault reconciliation and R23 review.
 
 Objective: resolve the Opus review on PR #557; no merge or production action.
 Merged moved `origin/integrate/reborn-1.0` with merge commit `0169fb10`.
+A cached brand cannot restore a provider seat after the fresh business lookup
+returns Strelva; an additional regression demonstrated that failure before its fix.
 The original migration `20261012180000` is unmerged and outside checksum-pinned
 batches; its two RPCs now validate name/member reply identity and return current
 email-effect status. Its exact rollback and configured-data refusal are retained.
@@ -125,7 +127,7 @@ normalization, provider selection, RPC exposure, rollback/reapply and refusal to
 discard configured data. Full workspace upgrade rehearsal passes.
 
 Final checks: typecheck, lint and boundaries passed; 63 targeted files passed
-(771 tests passed, 1 skipped). The single production build passed locally.
+(772 tests passed, 1 skipped). The production build passed locally.
 Final command outputs and counts are recorded in PR #557. Local evidence logs
 are under `.scratch/agency-brand-review/`; they include the known SQL failure.
 Next action: orchestrator reviews this follow-up and the separate booking-clock

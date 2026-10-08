@@ -49,6 +49,13 @@ describe("agency brand review regressions", () => {
     expect(mock.rpc).toHaveBeenCalledWith("resolve_owner_brand", { p_workspace_id: id });
     expect(payload()).toMatchObject({ from: '"Strelva" <hello@updates.strelva.com>', replyTo: "hello@strelva.com" });
   });
+  it("does not restore a cached agency after its business provider seat has ended", async () => {
+    const businessId = "b2640000-0000-4000-8000-000000000010";
+    mock.rpc.mockImplementation(async (_name: string, args: { p_workspace_id: string }) => ({ data: args.p_workspace_id === businessId ? null : row, error: null }));
+    await sendEmailWithReceipt({ ...message, workspaceId: businessId, options: { ...message.options, brand: { ...STRELVA_BRAND, agencyId: id, name: "Cached Agency", replyTo: input.replyTo } } });
+    expect(payload()).toMatchObject({ from: '"Strelva" <hello@updates.strelva.com>', replyTo: "hello@strelva.com" });
+    expect(payload().text).not.toContain("Cached Agency");
+  });
   it("normalizes a legacy workspace name again at send", async () => {
     mock.rpc.mockResolvedValue({ data: { ...row, brand: null, name: "Ｎorth\u202e\u200b Web" }, error: null });
     await sendEmailWithReceipt(message);
