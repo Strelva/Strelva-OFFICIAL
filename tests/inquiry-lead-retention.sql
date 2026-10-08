@@ -99,5 +99,5 @@ select pg_temp.ilr_assert(exists(select 1 from public.inquiry_events where lead_
 select pg_temp.ilr_assert((current_setting('strelva.purging_expired_tenant_leads',true) is distinct from 'on'),
   'purge-only event delete guard restored');
 select pg_temp.ilr_assert(exists(select 1 from public.tenant_lead_purges where tenant_slug='inquiry-retention-fixture'
-  and purged_count=1),'aggregate purge receipt retained');
+  and purged_count=1 and inquiry_purge_version='20261017110000'),'aggregate purge receipt retained with implementation marker');
 rollback;

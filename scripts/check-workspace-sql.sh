@@ -48,7 +48,10 @@ create role anon nologin;
 -- columns the isolated SQL contracts exercise in this local fixture.
 create schema auth;
 create function auth.uid() returns uuid language sql stable as $$
-  select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
+  select coalesce(
+    nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub', ''),
+    nullif(current_setting('request.jwt.claim.sub', true), '')
+  )::uuid
 $$;
 create table auth.users (
   id uuid primary key,
@@ -915,13 +918,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/catalog-reports-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010153000_newsletter_contacts.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-contacts-schema.sql"
 psql "${psql_args[@]}" <<'SQL'
-create schema auth;
-create function auth.uid() returns uuid language sql stable as $$
-  select coalesce(
-    nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub', ''),
-    nullif(current_setting('request.jwt.claim.sub', true), '')
-  )::uuid
-$$;
+-- auth.uid() and the Supabase identity fixture are shared from initial setup.
 create function auth.role() returns text language sql stable as $$
   select coalesce(
     nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role', ''),
@@ -1158,9 +1155,6 @@ psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-native-rollforward.sq
 # Integration: Postgres lead authority plus receipt retention share one teardown wrapper.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010170000_deprovision_retained_after_inquiry_export.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/deprovision-retained-after-inquiry-export-schema.sql"
-# Expired inquiry leads now remove their visitor data and reply payloads atomically.
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013220000_inquiry_lead_retention.sql"
-psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-lead-retention.sql"
 # Every stream's release flag key survives every redefinition, in any apply order (#253).
 psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 # Policy facts: confirmation/provenance/history/undo on the existing record RPC.
@@ -1499,6 +1493,34 @@ grep -q 'owner_decision_effects_rollback_requires_data_preservation' "$cluster_r
 psql "${psql_args[@]}" -Atc "select exists(select 1 from information_schema.columns where table_schema='public' and table_name='owner_decision_link_sessions' and column_name='intended_decision') and exists(select 1 from public.owner_decision_link_sessions) and to_regprocedure('public.owner_decision_provider_holds(uuid,uuid,text[])') is not null" | grep -qx t
 printf 'Owner effect rollback retained sessions and authority gates.\n'
 
+# October 17 retention precedes provider website checkpoints; deleting its fictional
+# inquiry fixtures has no inverse migration and runs only in this local cluster.
+retention_functions() {
+  psql "${psql_args[@]}" -At <<'SQL'
+select p.proname || ':' || md5(pg_get_functiondef(p.oid)) || ':' || coalesce(p.proacl::text, '')
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public' and p.proname in ('inquiry_events_immutable','purge_expired_tenant_leads')
+  order by p.proname;
+SQL
+}
+retention_functions >"$cluster_root/inquiry-retention-before.txt"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261017110000_inquiry_lead_retention.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-lead-retention.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261017110000_inquiry_lead_retention.sql"
+retention_functions >"$cluster_root/inquiry-retention-after-rollback.txt"
+if ! diff -u "$cluster_root/inquiry-retention-before.txt" "$cluster_root/inquiry-retention-after-rollback.txt"; then
+  printf 'Inquiry retention pre-purge rollback did not restore the prior function definitions and grants.\n' >&2
+  exit 1
+fi
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261017110000_inquiry_lead_retention.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-lead-retention-rollback.sql"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261017110000_inquiry_lead_retention.sql" >"$cluster_root/inquiry-retention-rollback-refusal.log" 2>&1; then
+  printf 'Inquiry retention rollback discarded visitor data after a marked purge.\n' >&2
+  exit 1
+fi
+grep -q 'inquiry_lead_retention_rollback_requires_data_preservation' "$cluster_root/inquiry-retention-rollback-refusal.log"
+printf 'Inquiry retention rollback restores functions before purge and refuses after marked deletion.\n'
+
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261018110000_provider_seat_website_access.sql"
 
 # #245: provider website saved checkpoint authority, with exact rollback/reapply.
@@ -1510,3 +1532,4 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261018110000_pro
 psql "${psql_args[@]}" --set=rollback_expected=false --file="$repo_root/tests/provider-seat-websites-schema.sql"
 diff -u "$cluster_root/provider-website-forward.txt" <(psql "${psql_args[@]}" -Atc "select md5(pg_get_functiondef('public.update_bounded_product_work(uuid,uuid,uuid,text,text,integer,jsonb)'::regprocedure))")
 printf 'Provider website saved checkpoints: forward/rollback/reapply passed.\n'
+
