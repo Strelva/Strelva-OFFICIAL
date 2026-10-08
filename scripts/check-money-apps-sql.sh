@@ -35,4 +35,8 @@ for fixture in "$@"; do
   printf 'Checking %s\n' "$fixture"
   psql "${psql_args[@]}" --file="$repo_root/$fixture"
 done
+if [[ "${MONEY_APPS_CHECK_READONLY:-0}" == 1 ]]; then
+  node "$repo_root/scripts/check-readonly-rpcs.mjs" \
+    "postgresql://$(id -un)@localhost:$cluster_port/postgres?host=$cluster_socket"
+fi
 printf 'Focused SQL contracts passed; full historical upgrade proof remains separate.\n'
