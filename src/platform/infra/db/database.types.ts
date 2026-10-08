@@ -2426,6 +2426,92 @@ export type Database = {
           },
         ]
       }
+      client_resource_mandates: {
+        Row: {
+          agency_workspace_id: string
+          customer_workspace_id: string
+          effect: string
+          end_reason: string | null
+          ended_at: string | null
+          ended_by: string | null
+          ended_by_kind: string | null
+          grant_note: string | null
+          granted_at: string
+          granted_by: string
+          granted_by_kind: string
+          granter_is_agency_member: boolean
+          id: string
+          resource_kind: string
+          resource_ref: string
+          status: string
+        }
+        Insert: {
+          agency_workspace_id: string
+          customer_workspace_id: string
+          effect: string
+          end_reason?: string | null
+          ended_at?: string | null
+          ended_by?: string | null
+          ended_by_kind?: string | null
+          grant_note?: string | null
+          granted_at?: string
+          granted_by: string
+          granted_by_kind: string
+          granter_is_agency_member: boolean
+          id?: string
+          resource_kind: string
+          resource_ref: string
+          status?: string
+        }
+        Update: {
+          agency_workspace_id?: string
+          customer_workspace_id?: string
+          effect?: string
+          end_reason?: string | null
+          ended_at?: string | null
+          ended_by?: string | null
+          ended_by_kind?: string | null
+          grant_note?: string | null
+          granted_at?: string
+          granted_by?: string
+          granted_by_kind?: string
+          granter_is_agency_member?: boolean
+          id?: string
+          resource_kind?: string
+          resource_ref?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_resource_mandates_agency_workspace_id_fkey"
+            columns: ["agency_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_resource_mandates_customer_workspace_id_fkey"
+            columns: ["customer_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_resource_mandates_ended_by_fkey"
+            columns: ["ended_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_resource_mandates_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       collection_entries: {
         Row: {
           created_at: string
@@ -12108,6 +12194,36 @@ export type Database = {
         }
         Returns: Json
       }
+      acting_provider: {
+        Args: {
+          p_effect: string
+          p_resource_kind: string
+          p_resource_ref: string
+          p_user_id: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
+      acting_provider_assert: {
+        Args: {
+          p_effect: string
+          p_resource_kind: string
+          p_resource_ref: string
+          p_user_id: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
+      acting_provider_check: {
+        Args: {
+          p_effect: string
+          p_resource_kind: string
+          p_resource_ref: string
+          p_user_id: string
+          p_workspace_id: string
+        }
+        Returns: Record<string, unknown>
+      }
       activate_offering: {
         Args: {
           p_business_id: string
@@ -12519,6 +12635,17 @@ export type Database = {
         }
         Returns: string
       }
+      assert_acting_provider: {
+        Args: {
+          p_effect: string
+          p_resource_kind: string
+          p_resource_ref: string
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       authorize_website_domain_change: {
         Args: {
           p_action: string
@@ -12867,6 +12994,53 @@ export type Database = {
           p_store: string
         }
         Returns: Json
+      }
+      client_resource_assert: {
+        Args: {
+          p_effect: string
+          p_resource_kind: string
+          p_resource_ref: string
+        }
+        Returns: string
+      }
+      client_resource_kinds: {
+        Args: {
+          p_effect: string
+        }
+        Returns: string[]
+      }
+      client_resource_mandate_insert: {
+        Args: {
+          p_agency_workspace_id: string
+          p_by: string
+          p_effect: string
+          p_kind: string
+          p_note: string
+          p_ref: string
+          p_resource_kind: string
+          p_workspace_id: string
+        }
+        Returns: Record<string, unknown>
+      }
+      client_resource_mandate_json: {
+        Args: {
+          m: unknown
+        }
+        Returns: Json
+      }
+      client_resource_ref: {
+        Args: {
+          p_kind: string
+          p_ref: string
+        }
+        Returns: string
+      }
+      client_resource_website_belongs: {
+        Args: {
+          p_system_id: string
+          p_workspace_id: string
+        }
+        Returns: boolean
       }
       commit_agency_website_document_candidate: {
         Args: {
@@ -13610,6 +13784,16 @@ export type Database = {
         }
         Returns: Json
       }
+      end_client_resource_mandate: {
+        Args: {
+          p_mandate_id: string
+          p_reason: string
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       end_provider_seat: {
         Args: {
           p_agency_workspace_id: string
@@ -13984,6 +14168,18 @@ export type Database = {
           work_id: string
           workspace_id: string
         }[]
+      }
+      grant_client_resource_mandate: {
+        Args: {
+          p_agency_workspace_id: string
+          p_effect: string
+          p_resource_kind: string
+          p_resource_ref: string
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
       }
       hold_tenant_lead_as_spam: {
         Args: {
@@ -14577,6 +14773,14 @@ export type Database = {
         }
         Returns: Json
       }
+      needs_you_provider_id: {
+        Args: {
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       needs_you_route_rank: {
         Args: {
           p_route: string
@@ -14802,6 +15006,16 @@ export type Database = {
         }
         Returns: number
       }
+      platform_provider_for_resource: {
+        Args: {
+          p_agency_workspace_id: string
+          p_effect: string
+          p_resource_kind: string
+          p_resource_ref: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       platform_serves_business: {
         Args: {
           p_effect: string
@@ -14946,6 +15160,14 @@ export type Database = {
           p_tenant_id: string
         }
         Returns: Json
+      }
+      provider_email_send_allowed: {
+        Args: {
+          p_agency_workspace_id: string
+          p_sender: string
+          p_workspace_id: string
+        }
+        Returns: boolean
       }
       provider_seat_assert_owner: {
         Args: {
@@ -15134,6 +15356,15 @@ export type Database = {
           status: string
           updated_at: string
         }[]
+      }
+      read_agency_google_listing_readback_failures: {
+        Args: {
+          p_agency_workspace_id: string
+          p_limit: number
+          p_user_id: string
+          p_verified_email: string
+        }
+        Returns: Json
       }
       read_agency_managed_website_draft_edit: {
         Args: {
@@ -15456,6 +15687,14 @@ export type Database = {
         Returns: Json
       }
       read_business_versions: {
+        Args: {
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      read_client_resource_mandates: {
         Args: {
           p_user_id: string
           p_verified_email: string
@@ -16440,6 +16679,18 @@ export type Database = {
           p_payload_hash: string
           p_public_key: string
           p_record_id: string
+        }
+        Returns: Json
+      }
+      record_conversion_resource_mandate: {
+        Args: {
+          p_agency_workspace_id: string
+          p_effect: string
+          p_note: string
+          p_operator_email: string
+          p_resource_kind: string
+          p_resource_ref: string
+          p_workspace_id: string
         }
         Returns: Json
       }

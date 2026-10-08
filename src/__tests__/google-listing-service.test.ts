@@ -357,3 +357,49 @@ describe("the HTTP client", () => {
     await expect(client.deletePost("accounts/1/locations/2/localPosts/../../x")).rejects.toThrow("google_post_name_invalid");
   });
 });
+
+describe("an agency writing for the business (#255)", () => {
+  const AGENCY = { kind: "operator_instruction", actor: "staff@agency.example.test", instructionRef: "instruction-1" } as const;
+
+  it("refuses an operator instruction with no acting-provider check, and writes nothing", async () => {
+    const { ctx, google, receipts } = context();
+    const result = await postReviewReply(ctx, { reviewId: "rev-dana", text: "Thank you, Dana.", authority: AGENCY });
+    expect(result).toMatchObject({ status: "refused", reason: "provider" });
+    expect(google.writes).toEqual([]);
+    expect(receipts.all()).toHaveLength(0);
+  });
+
+  it("refuses when the person is not the acting provider for this location", async () => {
+    const { ctx, google, receipts } = context(undefined, { authorizeProvider: async () => { throw new Error("acting_provider_no_mandate"); } });
+    expect(await postReviewReply(ctx, { reviewId: "rev-dana", text: "Thank you, Dana.", authority: AGENCY })).toMatchObject({ status: "refused", reason: "provider" });
+    expect(google.writes).toEqual([]);
+    expect(receipts.all()).toHaveLength(0);
+  });
+
+  it("rechecks just before the write; a mandate ended in between stops it with a failed receipt", async () => {
+    const authorizeProvider = vi.fn().mockResolvedValueOnce(undefined).mockRejectedValue(new Error("acting_provider_no_mandate"));
+    const { ctx, google } = context(undefined, { authorizeProvider });
+    const result = await postReviewReply(ctx, { reviewId: "rev-dana", text: "Thank you, Dana.", authority: AGENCY });
+    expect(result.status).toBe("failed");
+    if (result.status !== "failed") return;
+    expect(result.receipt.status).toBe("failed");
+    expect(result.receipt.error).toMatch(/permission ended before the write/);
+    expect(google.writes).toEqual([]);
+    expect(authorizeProvider).toHaveBeenCalledTimes(2);
+  });
+
+  it("writes for the acting provider, checking twice", async () => {
+    const authorizeProvider = vi.fn(async () => undefined);
+    const { ctx, google } = context(undefined, { authorizeProvider });
+    expect((await postReviewReply(ctx, { reviewId: "rev-dana", text: "Thank you, Dana.", authority: AGENCY })).status).toBe("posted");
+    expect(google.writes).toEqual(["updateReply:rev-dana"]);
+    expect(authorizeProvider).toHaveBeenCalledTimes(2);
+  });
+
+  it("leaves the owner's path unchanged: no provider check", async () => {
+    const authorizeProvider = vi.fn(async () => { throw new Error("never"); });
+    const { ctx } = context(undefined, { authorizeProvider });
+    expect((await postReviewReply(ctx, { reviewId: "rev-dana", text: "Thank you, Dana.", authority: OWNER })).status).toBe("posted");
+    expect(authorizeProvider).not.toHaveBeenCalled();
+  });
+});

@@ -1366,6 +1366,43 @@ psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-schema.sql"
 printf 'Owner recipient trust rollback is exact (%s schema objects compared) and reapplies.\n' \
   "$(wc -l <"$cluster_root/owner-trust-before.txt" | tr -d ' ')"
 
+# Agency 1.0 #255/#534: client-resource mandates and the acting-provider
+# gates. Forward, the effect matrix, the older contracts these replace, then
+# rollback in reverse order (wrong order refused, catalog restored exactly)
+# and reapply.
+acting_provider=(20261014100000_client_resource_mandates 20261014112000_acting_provider_gates)
+check_acting_provider() {
+  psql "${psql_args[@]}" --file="$repo_root/tests/acting-provider-gates-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/platform-service-actor-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-links-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-website-preview-schema.sql"
+}
+catalog_fingerprint >"$cluster_root/catalog-before-acting-provider.txt"
+for name in "${acting_provider[@]}"; do
+  psql "${psql_args[@]}" --single-transaction --file="$repo_root/supabase/migrations/$name.sql"
+done
+check_acting_provider
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-${acting_provider[0]}.sql" >"$cluster_root/acting-provider-wrong-order.log" 2>&1; then
+  printf 'The mandates rollback ran while the gates were still applied.\n' >&2
+  exit 1
+fi
+grep -q 'rollback_wrong_order' "$cluster_root/acting-provider-wrong-order.log"
+for (( index=${#acting_provider[@]}-1; index>=0; index-- )); do
+  psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-${acting_provider[$index]}.sql"
+done
+catalog_fingerprint >"$cluster_root/catalog-after-acting-provider-rollback.txt"
+if ! diff -u "$cluster_root/catalog-before-acting-provider.txt" "$cluster_root/catalog-after-acting-provider-rollback.txt"; then
+  printf 'Acting-provider rollback did not restore the public catalog.\n' >&2
+  exit 1
+fi
+for name in "${acting_provider[@]}"; do
+  psql "${psql_args[@]}" --single-transaction --file="$repo_root/supabase/migrations/$name.sql"
+done
+check_acting_provider
+printf 'Acting-provider gates forward, rollback and reapply passed.\n'
+
+
 # #525: owner-approved Ask changes confirm the same touched facts.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013130000_ask_confirms_owner_facts.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/ask-confirmed-facts-schema.sql"
