@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { JsonObject } from "@/platform/system-versions";
 import type { VersionsDb } from "@/platform/system-versions/supabase-store";
 const deps = vi.hoisted(() => ({ kind: "internal_app", scope: vi.fn() }));
 vi.mock("@/experience/workspace/agency/authoring-server", () => ({ requireAgencyAuthoring: deps.scope }));
@@ -9,7 +10,7 @@ const actor = { userId: crypto.randomUUID(), verifiedEmail: "native-maker@exampl
 const agencyWorkspaceId = crypto.randomUUID(), workspaceId = crypto.randomUUID(), canonicalSystemId = crypto.randomUUID();
 const source = { businessId: agencyWorkspaceId, systemId: crypto.randomUUID(), revisionId: crypto.randomUUID(), number: 1 };
 const input = { agencyWorkspaceId, workspaceId, source, context: { kind: "agency_client" as const, label: "Local client" }, name: "Client intake", commandId: crypto.randomUUID() };
-function database(definition: Record<string, unknown> = { kind: "internal_app", title: "Intake", fields: [{ id: "problem", label: "Problem", type: "text", required: true }], components: [{ kind: "form", fields: ["problem"] }] }) {
+function database(definition: JsonObject = { kind: "internal_app", title: "Intake", fields: [{ id: "problem", label: "Problem", type: "text", required: true }], components: [{ kind: "form", fields: ["problem"] }] }) {
   const rpc = vi.fn<VersionsDb["rpc"]>(async (name, args) => {
     if (name === "require_system_package_install_scope") return { data: true, error: null };
     if (name === "read_version_actor") return { data: { userId: actor.userId, memberships: [{ businessId: agencyWorkspaceId, role: "owner" }, { businessId: workspaceId, role: "admin" }] }, error: null };
