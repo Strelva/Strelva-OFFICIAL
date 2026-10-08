@@ -14,6 +14,18 @@ model area by area. The earlier
 [strelvav2](./docs/product/strelvav2.md) release shipped the workspace on Sept 30.
 This branch is for internal work and is not approved for production.
 
+## Money and agents/apps private preparation, October 7–8, 2026
+
+Private `build/money-apps-combined-20261007` implements the two money and
+agents/apps issue chains from pinned `cdf5c31a`. It is unmerged; local native
+command/rollback/authority tests and browser fixtures do not establish provider
+operation, adopted pricing, demand or commercial responsibility. The
+[prepared implementation record](./docs/operations/money-apps-prepared-2026-10-07.md)
+owns proof commands and stop points; the workspace `.scratch/agency-1.0/money-apps-2026-10-07/`
+owns exact42 issue acceptances and final receipts. Main-workspace
+`PRODUCT_MODEL.md` remains canonical. Reserved decisions, directory/legal facts,
+Sandbox dependency/resource consent and real provider proof remain explicit.
+
 ## Product model
 
 Selected by Jacob on October 4, 2026

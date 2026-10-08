@@ -973,3 +973,15 @@ uses foundation typography/spacing tokens, with long URLs and agency names
 wrapping. The doubly gated `/preview/strelva/agent-oauth?evidence=1` specimen
 provides fictional populated/empty desktop/mobile proof; the native route and
 JSON-LD contracts are covered by business-page/profile tests.
+
+### October 8 private native Version review follow-through
+
+`SystemVersionImprovements` reuses the owned Button and SelectInput for Inquiry
+pattern and FAQ preparation. Conflicts identify the customer content and local/
+source titles, not storage paths or raw JSON. Choosing content only stages the
+native draft and routes to this business's existing Needs you review; it never
+claims publication. Actual collaborative browser observation at1280px/390px
+confirmed the review link, honest staged state and no mobile horizontal overflow.
+These were fictional local data; native acceptance/readback and current-authority
+checks are separate PostgreSQL proof. Generic native-app approval remains distinct
+from Inquiry/website native publication. No new visual foundation was accepted.
