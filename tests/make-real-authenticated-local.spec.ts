@@ -53,7 +53,8 @@ test("the owner makes a website Possibility real through Needs you and sees a pa
     const systems = home.getByRole("list", { name: `${workspaceName} systems` });
     await systems.getByRole("link", { name: /Website/ }).first().click();
     await expect(home).toHaveURL(/view=system/);
-    const possibility = home.locator("li").filter({ hasText: /A rebuilt / }).first();
+    const possibility = home.getByRole("region", { name: /^Possibilities/ }).getByRole("listitem").filter({ hasText: /A rebuilt / });
+    await expect(possibility).toHaveCount(1);
     await expect(possibility).toBeVisible();
     const makeReal = possibility.getByRole("button", { name: "Make real", exact: true });
     await expect(makeReal).toBeEnabled();

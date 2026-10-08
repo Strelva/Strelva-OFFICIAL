@@ -294,6 +294,22 @@ in `/tmp/strelva-backlog-final-agency_fixture-20261008.log` and
 `test-results/backlog-agency-focused`; the corrected zero-retry rerun remains
 pending root integration. Product source and desktop/mobile layout are unchanged.
 
+The combined authenticated run passed13 of14 flags-on journeys, including both
+stale-workspace cases, but Make real failed; its fresh narrow rerun also failed.
+An initial Home/HMR hypothesis was based on compressed trace DOM and is withdrawn.
+The concrete final frame (`/tmp/strelva-make-real-failure-review.jpeg`) shows the
+website System, a Ready Possibility and enabled Make real. After detail returns,
+Waiting on you contains the same rebuilt title earlier in the document. The
+unscoped first matching `li` then switches from the Possibility to that decision
+row, which has no Make real button. The fixture now selects the single rebuilt
+list item inside the named Possibilities region. The region name includes its
+count, so matching its title prefix follows the existing SystemPanel contract.
+Enabled control, POST200, partial/isolated result, exact owner decision and member
+refusal assertions are unchanged. The narrow red log remains
+`/tmp/strelva-backlog-final-make_real-20261008.log`, with private artifacts in
+`test-results/journeys-on`. Corrected narrow and full14-on/8-off proof are pending
+root's sequential rerun; no product guard or runtime source changed.
+
 ### The CI-faithful local sim (use this before trusting a green local run)
 
 Local exports or `.env` may provide Postgres **and** Upstash, which silently masks CI-only
