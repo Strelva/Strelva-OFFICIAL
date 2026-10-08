@@ -192,4 +192,47 @@ select pg_temp.pc_assert(exists (select 1 from public.workspace_memberships wher
     where customer_workspace_id = '71000000-0000-4000-8000-000000000021' and status = 'active'),
   're-route preserves an admin membership that the old conversion did not create');
 
+-- Current-RPC sibling joins use the conversion receipt, not personal admin
+-- membership; unlinking the final site ends the conversion provider access.
+insert into public.tenants(id, stable_id, site_name, active, owner_email) values
+  ('pc-current-a', '71000000-0000-4000-8000-0000000000a4', 'Current A', true, 'pc-owner@example.test'),
+  ('pc-current-b', '71000000-0000-4000-8000-0000000000a5', 'Current B', true, 'pc-owner@example.test');
+create function pg_temp.pc_import(p_tenant text, p_target uuid default null) returns jsonb language sql as $$
+  select jsonb_strip_nulls(jsonb_build_object('tenantId', t.id, 'tenantStableId', t.stable_id,
+    'workspaceName', t.site_name, 'targetWorkspaceId', p_target))
+    || jsonb_build_object('billing', null, 'account', null, 'patch', '{}'::jsonb, 'contacts', '[]'::jsonb,
+      'agencyWorkspaceId', '71000000-0000-4000-8000-000000000010',
+      'agencyStaffEmails', jsonb_build_array('pc-staff@example.test'), 'agencySelectionBasis', 'existing_contract')
+  from public.tenants t where t.id = p_tenant
+$$;
+create temporary table pc_current as select public.convert_tenant_to_business('pc-operator@strelva.example.test',
+  'pc-current-a', pg_temp.pc_import('pc-current-a'), gen_random_uuid(), repeat('4', 64)) body;
+select pg_temp.pc_expect(format($$select public.convert_tenant_to_business('pc-operator@strelva.example.test',
+  'pc-current-b', %L::jsonb, gen_random_uuid(), repeat('5',64))$$,
+  pg_temp.pc_import('pc-current-b', (select id from pc_workspace))), 'tenant_conversion_provider_previously_ended');
+select pg_temp.pc_assert(not exists (select 1 from public.tenant_workspace_links
+  where tenant_stable_id = '71000000-0000-4000-8000-0000000000a5'), 'joining an owner-ended seat cannot restore provider access');
+select public.convert_tenant_to_business('pc-operator@strelva.example.test', 'pc-current-b',
+  pg_temp.pc_import('pc-current-b', (select (body->>'workspaceId')::uuid from pc_current)), gen_random_uuid(), repeat('6',64));
+select pg_temp.pc_assert((select count(*) = 2 from public.tenant_workspace_links
+  where workspace_id = (select (body->>'workspaceId')::uuid from pc_current))
+  and not exists (select 1 from public.workspace_memberships
+    where workspace_id = (select (body->>'workspaceId')::uuid from pc_current))
+  and (select count(*) = 1 from public.provider_seats where status = 'active'
+    and customer_workspace_id = (select (body->>'workspaceId')::uuid from pc_current)),
+  'a sibling joins with one seat and no operator membership');
+select public.unlink_tenant_from_business('pc-operator@strelva.example.test', 'pc-current-b',
+  (select (body->>'workspaceId')::uuid from pc_current), gen_random_uuid(), repeat('7',64));
+select pg_temp.pc_assert(public.provider_seat_role((select (body->>'workspaceId')::uuid from pc_current),
+  '71000000-0000-4000-8000-000000000004', false) = 'admin', 'unlinking one sibling preserves the remaining provider access');
+select public.unlink_tenant_from_business('pc-operator@strelva.example.test', 'pc-current-a',
+  (select (body->>'workspaceId')::uuid from pc_current), gen_random_uuid(), repeat('8',64));
+select pg_temp.pc_assert(not exists (select 1 from public.tenant_workspace_links
+    where workspace_id = (select (body->>'workspaceId')::uuid from pc_current))
+  and public.provider_seat_role((select (body->>'workspaceId')::uuid from pc_current),
+    '71000000-0000-4000-8000-000000000004', false) is null
+  and not exists (select 1 from public.agency_client_staff where status = 'active'
+    and customer_workspace_id = (select (body->>'workspaceId')::uuid from pc_current)),
+  'unlinking the final converted site removes provider access without a personal admin grant');
+
 rollback;
