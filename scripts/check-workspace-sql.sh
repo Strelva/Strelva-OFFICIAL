@@ -48,7 +48,10 @@ create role anon nologin;
 -- columns the isolated SQL contracts exercise in this local fixture.
 create schema auth;
 create function auth.uid() returns uuid language sql stable as $$
-  select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
+  select coalesce(
+    nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub', ''),
+    nullif(current_setting('request.jwt.claim.sub', true), '')
+  )::uuid
 $$;
 create table auth.users (
   id uuid primary key,
@@ -915,13 +918,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/catalog-reports-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010153000_newsletter_contacts.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-contacts-schema.sql"
 psql "${psql_args[@]}" <<'SQL'
-create schema auth;
-create function auth.uid() returns uuid language sql stable as $$
-  select coalesce(
-    nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub', ''),
-    nullif(current_setting('request.jwt.claim.sub', true), '')
-  )::uuid
-$$;
+-- auth.uid() and the Supabase identity fixture are shared from initial setup.
 create function auth.role() returns text language sql stable as $$
   select coalesce(
     nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role', ''),
