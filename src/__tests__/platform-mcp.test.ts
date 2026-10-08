@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const ports = vi.hoisted(() => ({
   enabled: vi.fn(), limited: vi.fn(), services: vi.fn(), slots: vi.fn(), request: vi.fn(), lookup: vi.fn(),
-  confirmable: vi.fn(), updates: vi.fn(), context: vi.fn(), rpc: vi.fn(), directory: vi.fn(),
+  confirmable: vi.fn(), updates: vi.fn(), context: vi.fn(), rpc: vi.fn(), directory: vi.fn(), scope: vi.fn(),
 }));
 vi.mock("@/platform/bookings/native", async original => ({
   ...await original<typeof import("@/platform/bookings/native")>(),
@@ -15,7 +15,7 @@ vi.mock("@/platform/bookings/store", async original => ({
   readBookingContext: ports.context, bookingStoreDb: () => ({ rpc: ports.rpc }),
 }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: ports.limited, isRateLimitedWindowedAsync: ports.limited, rateLimitKey: (_r: Request, prefix: string) => `${prefix}:ip` }));
-vi.mock("@/app/api/mcp/_directory", () => ({ tenantDirectory: { list: ports.directory } }));
+vi.mock("@/app/api/mcp/_directory", () => ({ tenantDirectory: { list: ports.directory, scope: ports.scope } }));
 
 import { DELETE, GET, POST as platform } from "@/app/api/mcp/public/route";
 import { POST as alias } from "@/app/api/mcp/bookings/[tenant]/route";
@@ -47,6 +47,8 @@ function legacy(method: string, params: Params = {}, options: { version?: string
 }
 const tool = (name: string, args: Params, options: { business?: string } = {}) => modern("tools/call", { name, arguments: args }, options);
 
+const NATIVE_WORKSPACE = "7c470000-0000-4000-8000-000000000001";
+const LATER = new Date(Date.now() + 86_400_000).toISOString();
 const fixtureContext = { workspaceId: "ws", paused: false, phone: "716-555-0100", services: [{ id: "svc", name: "Consult", active: true, durationMinutes: 30, externalRef: null }], settings: null, hours: null, tenantStableId: "stable", systemId: null };
 
 beforeEach(() => {
@@ -58,7 +60,11 @@ beforeEach(() => {
     { business: "fixture", name: "Fixture Barbers", industry: "barber", website: "https://fixture.example" },
     { business: "elmwood-dental", name: "Elmwood Dental", industry: "dentist", website: "https://elmwood.example" },
     { business: "closed-shop", name: "Closed Barbers", industry: "barber", website: null },
+    { business: "biz:native-cuts", name: "Native Cuts", industry: null, website: "https://app.strelva.test/biz/native-cuts" },
   ]);
+  ports.scope.mockImplementation(async (business: string) => business.startsWith("biz:")
+    ? business === "biz:native-cuts" ? `workspace:${NATIVE_WORKSPACE}` : null
+    : business);
 });
 
 describe("modern MCP 2026-07-28", () => {
@@ -239,10 +245,93 @@ describe("platform tools", () => {
   });
 
   it("refuses a status token issued for another business", async () => {
-    ports.lookup.mockResolvedValue({ id: "b1", tenantId: "other", status: "held", start: "s", end: "e" });
+    ports.lookup.mockResolvedValue({ id: "b1", tenantId: "other", workspaceId: null, status: "held", start: "s", end: LATER });
     const body = await (await tool("get_booking_status", { business: "fixture", statusToken: "s".repeat(43) })).json();
     expect(body.result.isError).toBe(true);
     expect(ports.lookup).toHaveBeenCalledWith(tokenHash("s".repeat(43)), "status");
+  });
+});
+
+describe("#547 review regressions", () => {
+  /** A real fixed-window counter in place of Redis, keyed exactly as called. */
+  function countingLimiter() {
+    const counts = new Map<string, number>();
+    ports.limited.mockImplementation(async (key: string, max: number) => {
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+      return counts.get(key)! > max;
+    });
+    return counts;
+  }
+
+  it("keys the flag-off limiter on the caller, so rotating an unused business argument cannot reset it", async () => {
+    const counts = countingLimiter();
+    for (let n = 0; n < 20; n += 1) expect((await tool("search_business", { query: "barber" })).status).toBe(200);
+    expect((await tool("search_business", { query: "barber" })).status).toBe(429);
+    for (let n = 0; n < 25; n += 1) expect((await tool("search_business", { query: "barber", business: `unused-${n}` })).status).toBe(429);
+    expect([...counts.keys()]).toEqual(["mcp-public:ip"]);
+  });
+
+  it("keeps directory calls out of business buckets with identity limits on", async () => {
+    vi.stubEnv("STRELVA_AGENT_IDENTITY_LIMITS", "1");
+    try {
+      const counts = countingLimiter();
+      await modern("tools/call", { name: "search_business", arguments: { query: "barber", business: "unused-1" } }, { headers: { "x-forwarded-for": "203.0.113.9" } });
+      expect(counts.size).toBeGreaterThan(0);
+      expect([...counts.keys()].some(key => key.includes("biz:"))).toBe(false);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("refuses arguments a tool does not declare", async () => {
+    const body = await (await tool("search_business", { query: "barber", business: "fixture" })).json();
+    expect(body.result).toMatchObject({ isError: true });
+    expect(ports.directory).not.toHaveBeenCalled();
+    const alias = await (await tool("list_services", { extra: true }, { business: "fixture" })).json();
+    expect(alias.result).toMatchObject({ isError: true });
+    expect(ports.services).not.toHaveBeenCalled();
+  });
+
+  it("rejects a malformed Base64 Mcp-Name with HeaderMismatch (-32020)", async () => {
+    for (const header of ["=?base64?bGlzdF9zZXJ2aWNlcw==junk?=", "=?base64?bGlzdF9zZXJ2aWNlcw?=", "=?base64?bGlzdF9zZXJ2aWNlcw=?=", "=?base64?/w==?="]) {
+      const response = await modern("tools/call", { name: "list_services", arguments: { business: "fixture" } }, { headers: { "mcp-name": header } });
+      expect(response.status).toBe(400);
+      expect((await response.json()).error.code).toBe(-32020);
+    }
+    expect(ports.services).not.toHaveBeenCalled();
+  });
+
+  it("stops answering a status token a day after the booking ends", async () => {
+    const ended = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
+    ports.lookup.mockResolvedValue({ id: "b1", tenantId: "fixture", workspaceId: null, status: "confirmed", start: ended(26), end: ended(25) });
+    expect((await (await tool("get_booking_status", { business: "fixture", statusToken: "s".repeat(43) })).json()).result)
+      .toMatchObject({ isError: true, content: [{ text: "Booking not found." }] });
+    const recent = { id: "b1", tenantId: "fixture", workspaceId: null, status: "confirmed", start: ended(2), end: ended(1) };
+    ports.lookup.mockResolvedValue(recent);
+    expect((await (await tool("get_booking_status", { business: "fixture", statusToken: "s".repeat(43) })).json()).result.structuredContent)
+      .toEqual({ reservationId: "b1", status: "confirmed", start: recent.start, end: recent.end });
+  });
+
+  it("lists and books businesses without a website through their published /biz handle", async () => {
+    const scope = `workspace:${NATIVE_WORKSPACE}`;
+    const found = await (await tool("search_business", { query: "native" })).json();
+    expect(found.result.structuredContent.businesses).toEqual([{ business: "biz:native-cuts", name: "Native Cuts", industry: null, website: "https://app.strelva.test/biz/native-cuts" }]);
+    expect(ports.context).toHaveBeenCalledWith(scope);
+    ports.services.mockResolvedValue({ services: [], timeZone: "UTC", paused: false });
+    expect((await (await tool("list_services", { business: "biz:native-cuts" })).json()).result.isError).toBe(false);
+    expect(ports.services).toHaveBeenCalledWith(scope);
+    ports.request.mockResolvedValue({ booking: { id: "b2", status: "held", start: "s", end: LATER }, statusToken: "status-only", confirmationRequired: true });
+    const booking = { serviceId: "cut", start: "2026-11-03T15:00:00Z", requestId: "native-123", agent: { name: "Assistant" }, customer: { name: "Dana", email: "dana@example.test" } };
+    await tool("request_booking", { business: "biz:native-cuts", ...booking });
+    expect(ports.request).toHaveBeenCalledWith(scope, { ...booking, origin: "agent" });
+    ports.lookup.mockResolvedValue({ id: "b2", tenantId: null, workspaceId: NATIVE_WORKSPACE, status: "held", start: "s", end: LATER });
+    expect((await (await tool("get_booking_status", { business: "biz:native-cuts", statusToken: "s".repeat(43) })).json()).result.isError).toBe(false);
+    expect((await (await tool("get_booking_status", { business: "fixture", statusToken: "s".repeat(43) })).json()).result.isError).toBe(true);
+    // Unpublished handles and raw workspace scopes never reach native services.
+    vi.clearAllMocks();
+    expect((await (await tool("list_services", { business: "biz:unpublished" })).json()).result).toMatchObject({ isError: true, content: [{ text: "This business is unavailable." }] });
+    expect((await (await tool("list_services", { business: scope })).json()).result).toMatchObject({ isError: true, content: [{ text: "Choose a business handle from search_business." }] });
+    expect(ports.services).not.toHaveBeenCalled();
   });
 });
 
@@ -259,7 +348,7 @@ describe("per-business alias delegates to the platform server", () => {
     ports.services.mockResolvedValue({ services: [], timeZone: "UTC", paused: false });
     ports.slots.mockResolvedValue({ slots: [], timeZone: "UTC", paused: false, version: 1 });
     ports.request.mockResolvedValue({ booking: { id: "b1", status: "held", start: "s", end: "e" }, statusToken: "status-only", confirmationRequired: true });
-    ports.lookup.mockResolvedValue({ id: "b1", tenantId: "fixture", status: "held", start: "s", end: "e", customer: { email: "private@example.test" } });
+    ports.lookup.mockResolvedValue({ id: "b1", tenantId: "fixture", workspaceId: null, status: "held", start: "s", end: LATER, customer: { email: "private@example.test" } });
     const results = [];
     const calls = [];
     for (const send of [
@@ -271,14 +360,14 @@ describe("per-business alias delegates to the platform server", () => {
       const body = await (await send()).json();
       results.push(body.result.structuredContent);
       calls.push([ports.services, ports.slots, ports.request, ports.lookup].map(port => port.mock.calls));
-      expect(ports.limited).toHaveBeenCalledWith("mcp-bookings:fixture:ip", 20);
+      expect(ports.limited).toHaveBeenCalledWith(results.length === 1 ? "mcp-public:ip" : "mcp-bookings:fixture:ip", 20);
     }
     expect(results[1]).toEqual(results[0]);
     expect(results[2]).toEqual(results[0]);
     expect(calls[1]).toEqual(calls[0]);
     expect(calls[2]).toEqual(calls[0]);
     if (name === "request_booking") expect(ports.request).toHaveBeenCalledWith("fixture", { ...booking, origin: "agent" });
-    if (name === "get_booking_status") expect(results[0]).toEqual({ reservationId: "b1", status: "held", start: "s", end: "e" });
+    if (name === "get_booking_status") expect(results[0]).toEqual({ reservationId: "b1", status: "held", start: "s", end: LATER });
   });
 
   it("speaks the modern era on the alias too, without directory tools", async () => {

@@ -9,10 +9,13 @@
  * unattributed calls never share one "unknown" quota.
  *
  * Declared agent names and provider addresses are forgeable or shared: they
- * only ever add a cap, never lift one. The durable per-business hold cap in
- * hold_agent_booking (10 an hour) still applies underneath.
+ * only ever add a cap, never lift one. Underneath, hold_agent_booking admits
+ * at most 10 live agent holds per business, inside the business budget and
+ * one-mailbox rule every anonymous booking request shares.
  *
- * Off (default) keeps the shipped behavior: 20 a minute per business and IP.
+ * Off (default): 20 a minute per caller address, under `legacyPrefix`
+ * (`mcp-public` for the platform MCP, `mcp-bookings:<business>` for the
+ * per-business alias, whose business comes from its URL).
  * Limits are starting values, not validated against real demand.
  */
 import { createHash } from "node:crypto";
@@ -103,8 +106,8 @@ export function agentLimitBuckets(call: AgentCall, source: { ip: string | null }
 
 export type LimitCheck = (key: string, max: number, windowMs: number) => Promise<boolean>;
 
-/** Counts the call against every bucket. `legacyPrefix` is the shipped
- * per-business IP key the flag-off path keeps (`mcp-bookings:<business>`). */
+/** Counts the call against every bucket. `legacyPrefix` keys the flag-off
+ * per-address limit. */
 export async function agentCallLimited(request: Request, call: AgentCall, options: { legacyPrefix: string; env?: Env; check?: LimitCheck }): Promise<boolean> {
   if (!agentIdentityLimitsEnabled(options.env)) return await isRateLimitedAsync(rateLimitKey(request, options.legacyPrefix), 20);
   const check = options.check ?? isRateLimitedWindowedAsync;

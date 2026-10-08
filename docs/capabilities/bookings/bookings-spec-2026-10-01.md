@@ -719,11 +719,13 @@ pattern, `public-booking.ts:489-531`) and expires after the booking ends.
   (#301), hand-rolled with no dependency (`src/platform/agent-channel`). Tools:
   `search_business`, `get_business`, then `list_services`, `find_slots`,
   `request_booking` and `get_booking_status`, each taking a `business`
-  handle. It is dual-era: MCP 2026-07-28 (no `initialize`, per-request
+  handle: a tenant id, or `biz:<handle>` for a business without a website
+  while its `/biz` page is published and public. It is dual-era: MCP 2026-07-28 (no `initialize`, per-request
   `_meta`, `server/discover`, mirrored `MCP-Protocol-Version`/`Mcp-Method`/
   `Mcp-Name` headers, `-32022` for unsupported versions) and the 2025-03-26,
   2025-06-18 and 2025-11-25 `initialize` handshake. Search lists only
-  businesses whose assistant requests can be confirmed today.
+  businesses whose assistant requests can be confirmed today. A status token
+  stops answering 24 hours after the booking ends.
   `/api/mcp/bookings/[tenant]` stays as an alias with the business fixed by
   the URL and the four booking tools. Owner and agency tools come later (#302).
 - **Site markup.** Hosted sites add JSON-LD `potentialAction: ReserveAction`
@@ -732,8 +734,13 @@ pattern, `public-booking.ts:489-531`) and expires after the booking ends.
 - **Google Business Profile booking link.** Set the profile's booking URL to
   the site's booking page. The GBP API write is blocked until Google approves
   API access, so until then an operator sets it by hand.
-- Rate limits: the durable 10 agent holds per business per hour in
-  `hold_agent_booking`, plus 20 a minute per business and IP. Hosted
+- Admission and rate limits: an agent hold is an anonymous request, so it
+  shares the business budget (20 open) and one-live-request-per-mailbox rule
+  of website and inquiry requests (`check_public_booking_budget`, #547), and
+  `hold_agent_booking` admits at most 10 live agent holds per business.
+  Expired or cancelled holds stop counting. Mailbox caps fold plus tags and
+  Gmail dots; the stored address never changes. On top, 20 calls a minute per
+  caller address (per business and address on the alias). Hosted
   assistants call from shared provider egress, so
   `STRELVA_AGENT_IDENTITY_LIMITS=1` (off by default, #310) replaces the IP
   quota with buckets per business, customer email, request id or status

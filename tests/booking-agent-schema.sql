@@ -166,16 +166,28 @@ select pg_temp.ba_expect($$select public.change_native_booking(pg_temp.ba_access
 select pg_temp.ba_assert((select start_at = now()+interval '2 days' and end_at = now()+interval '2 days 30 minutes'
   and status = 'confirmed' from public.business_bookings where id=pg_temp.ba_id('ba_main')),'failed reschedule retains original slot');
 
--- Ten holds per tenant per hour, including cancelled/expired attempts. A
--- different tenant can use the same id/slot and its own hourly allowance.
+-- At most ten agent holds per tenant: within the hour before 20261013210000,
+-- ten live (unexpired, uncancelled) holds after it, which
+-- tests/agent-booking-admission-schema.sql proves. Either way the cap is
+-- reached by the eleventh new hold. A different tenant has its own allowance.
 do $$
-declare v_count integer := (select count(*) from public.business_bookings where calendar_key='ca000000-0000-4000-8000-0000000000b1' and origin='agent'); v_i integer;
+declare v_i integer := 0;
 begin
-  for v_i in v_count+1..10 loop
-    perform pg_temp.ba_assert(public.hold_agent_booking('ba-site',pg_temp.ba_booking('ba_cap_'||v_i,10+v_i),pg_temp.ba_access(10+v_i))->>'status'='recorded','allow holds up to tenant cap');
+  loop
+    v_i := v_i + 1;
+    if v_i > 11 then raise exception 'booking agent assertion failed: tenant cap never reached'; end if;
+    begin
+      -- Named down from ba_cap_10, which the lifecycle claims below read.
+      perform public.hold_agent_booking('ba-site',pg_temp.ba_booking('ba_cap_'||(11-v_i),10+v_i,
+        jsonb_build_object('customer',jsonb_build_object('name','Cap Fixture','email','cap-'||v_i||'@example.test'))),pg_temp.ba_access(100+v_i));
+    exception when others then
+      if sqlerrm <> 'booking_agent_limit' then raise; end if;
+      exit;
+    end;
   end loop;
 end $$;
-select pg_temp.ba_expect($$select public.hold_agent_booking('ba-site',pg_temp.ba_booking('ba_cap_11',30),pg_temp.ba_access(30))$$,'booking_agent_limit');
+select pg_temp.ba_expect($$select public.hold_agent_booking('ba-site',pg_temp.ba_booking('ba_cap_11',30,
+  jsonb_build_object('customer',jsonb_build_object('name','Cap Fixture','email','cap-11@example.test'))),pg_temp.ba_access(30))$$,'booking_agent_limit');
 select pg_temp.ba_assert(public.hold_agent_booking('ba-site',pg_temp.ba_booking('ba_main',2),pg_temp.ba_access(31))->>'status'='unchanged','retry still works at cap');
 select pg_temp.ba_assert(public.hold_agent_booking('ba-other',pg_temp.ba_booking('ba_main',2),pg_temp.ba_access(32))->>'status'='recorded','other tenant has independent cap and calendar');
 select pg_temp.ba_assert(public.read_workspace_booking((select id from ba_ws where name='other'),pg_temp.ba_id('ba_main')) is null,'cross-workspace read refused');

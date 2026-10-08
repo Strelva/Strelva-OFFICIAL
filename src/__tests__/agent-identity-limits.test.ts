@@ -8,7 +8,7 @@ vi.mock("@/platform/infra/rate-limit", () => ({
 vi.mock("@/platform/bookings/native", async original => ({ ...await original<typeof import("@/platform/bookings/native")>(), requestAgentBooking: ports.request }));
 vi.mock("@/platform/bookings/updates", () => ({ deliverBookingUpdates: ports.updates }));
 
-import { AGENT_LIMITS, agentCallLimited, agentLimitBuckets, isDisposableEmail, type AgentCall, type LimitCheck } from "@/platform/agent-channel/limits";
+import { AGENT_LIMITS, agentCallLimited, agentLimitBuckets, emailCapIdentity, isDisposableEmail, type AgentCall, type LimitCheck } from "@/platform/agent-channel/limits";
 import { clientIp, egressProvider } from "@/platform/agent-channel/provider-egress";
 import { PROVIDER_EGRESS } from "@/platform/agent-channel/provider-egress-data";
 import { POST as reservations } from "@/app/api/v1/bookings/[tenant]/reservations/route";
@@ -103,6 +103,14 @@ describe("agentCallLimited", () => {
     const calls = Array.from({ length: 8 }, (_, i) => hold(`biz-${i}`, "same@example.test", { requestId: `r-${i}`, agentName: `a${i}` }));
     expect(await holdsAllowed(check, OPENAI_IP, calls)).toBe(AGENT_LIMITS.emailHolds.max);
     expect(await holdsAllowed(counter(), undefined, calls.slice(0, 4).map(c => ({ ...c, business: "one" })))).toBe(AGENT_LIMITS.emailBusinessHolds.max);
+  });
+
+  it("counts plus-tag and Gmail dot aliases as one mailbox (#547 review)", async () => {
+    const aliases = ["dana@gmail.com", "dana+0@gmail.com", "d.a.n.a@gmail.com", "Dana+x@GoogleMail.com", "dana+1@gmail.com"];
+    const calls = aliases.map((email, i) => hold("one", email, { requestId: `alias-${i}`, agentName: `a${i}` }));
+    expect(await holdsAllowed(counter(), undefined, calls)).toBe(AGENT_LIMITS.emailBusinessHolds.max);
+    expect(emailCapIdentity("D.Ana+Tag@googlemail.com")).toBe("dana@gmail.com");
+    expect(emailCapIdentity("first.last+x@example.test")).toBe("first.last@example.test");
   });
 
   it("caps one business's holds even when every request uses a new email and address", async () => {
