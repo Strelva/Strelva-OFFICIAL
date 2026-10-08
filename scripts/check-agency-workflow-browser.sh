@@ -86,7 +86,7 @@ syncBuiltinESMExports();
 JS
 export NODE_OPTIONS="--import=$work/crawl-transport.mjs"
 psql "$STRELVA_LOCAL_DB_URL" -X -Atq -v ON_ERROR_STOP=1 -c 'select count(*) from supabase_migrations.schema_migrations' > "$work/migration-count.txt"
-pnpm exec next dev --webpack --hostname localhost --port "$port" > "$work/app.log" 2>&1 & app_pid=$!
+pnpm exec next dev --hostname localhost --port "$port" > "$work/app.log" 2>&1 & app_pid=$!
 ready=0
 for _ in $(seq 1 120); do
   if curl --fail --silent --max-time 5 "$PLAYWRIGHT_BASE_URL/sign-in" > /dev/null; then ready=1; break; fi

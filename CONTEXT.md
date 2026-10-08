@@ -123,7 +123,7 @@ local Auth/Postgres/browser proof, migration order, failure evidence and next
 actions. Fictional delivery receipts and platform verification are fixtures.
 Loopback rendering is observed; public HTTPS delivery, sent email, production
 integration, adoption and economics are unproven. The branch is not deployed. Current qualification uses 260 ordered migrations;
-8,465 unit tests pass (42 skipped), the full workspace upgrade and native agency
+8,480 unit tests pass (42 skipped), the full workspace upgrade and native agency
 SQL job pass, and the fresh authenticated website journey passes. The broader
 flags-off app journey remains failed under current app creation authority.
 Deployment is authorized in this session and underway; no promotion is claimed.

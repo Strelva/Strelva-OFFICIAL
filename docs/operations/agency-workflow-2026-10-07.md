@@ -26,8 +26,9 @@ Live Gemini success remains unproven.
 
 Current local evidence:
 
-- Full unit suite: **8,465 passed, 42 skipped**, 897 passing files / two skipped.
-  `/tmp/strelva-agency-deploy-final-tests.log`.
+- Full unit suite: **8,480 passed, 42 skipped**, 899 passing files / two skipped.
+  `/tmp/strelva-agency-deploy-final-with-ai-tests.log`.
+  The subsequent packet-staging correction also passes all 27 focused tests.
 - Ordered agency SQL job: **260 migrations, passed**.
   `/tmp/strelva-agency-deploy-workflow.log`.
 - Complete workspace upgrade: **passed**, including actual staffed-provider
