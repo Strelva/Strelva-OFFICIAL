@@ -38,6 +38,12 @@ insert into public.inquiry_events(tenant_stable_id,workspace_id,lead_id,kind,act
 values ('f5390000-0000-4000-8000-000000000010','f5390000-0000-4000-8000-000000000003','lead_workspace_deleted','captured','visitor','{"body":"Detached workspace body"}',clock_timestamp()-interval '10 years');
 delete from public.workspaces where id='f5390000-0000-4000-8000-000000000003';
 select pg_temp.irl_assert((select workspace_id is null and retain_until between clock_timestamp()+interval '364 days' and clock_timestamp()+interval '366 days' from public.inquiry_events where lead_id='lead_workspace_deleted'),'workspace delete stamps deadline');
+-- A late copy arriving after deprovisioning has no origin to lock; it gets a
+-- fresh deletion deadline rather than an immortal NULL or an old-event purge.
+insert into public.inquiry_events(tenant_stable_id,lead_id,kind,actor,detail,at)
+values ('f5390000-0000-4000-8000-000000000012','lead_late_orphan_copy','delivery','system','{"status":"accepted","body":"Late copy body"}',clock_timestamp()-interval '10 years');
+select pg_temp.irl_assert((select retain_until between clock_timestamp()+interval '364 days' and clock_timestamp()+interval '366 days' from public.inquiry_events where lead_id='lead_late_orphan_copy'),'late orphan insert stamps fresh deadline');
+
 -- Expired detached orphans retain the fact/time/status of accepted work, while
 -- raw nested contact/body/arbitrary fields, emails in actor/dedupe, are removed.
 insert into public.inquiry_events(tenant_stable_id,lead_id,kind,actor,actor_id,detail,dedupe_key,at,retain_until)

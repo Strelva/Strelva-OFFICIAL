@@ -219,3 +219,40 @@ Workspace harnesses use the guard's canonical Unix-socket URL with an empty
 hostname, a single `host` and `port`, and the current OS user. The scanner and
 writer race proof passed with an inherited hostile `PGHOSTADDR` value, proving
 that ambient routing did not redirect their database connection.
+
+### Provider website reads after the origin merge
+
+`20261018130000_provider_seat_readonly_website_authority.sql` aligns the private
+website snapshot helper with the provider draft authority introduced in
+`20261014112000_acting_provider_gates.sql`. A verified person with an active
+provider seat, agency membership and client staff row can read the exact
+business website without an invented direct client membership. The helper
+uses `provider_seat_read_role(...,false)` and remains STABLE and lock-free.
+Publication/domain effects retain their separate agency verification, exact
+resource mandate and owner approval gates; no writer body or grant changes.
+
+`tests/provider-seat-readonly-websites-schema.sql` uses committed fictional
+records and actual READ ONLY service-role requests. All three website readers
+return meaningful reservation/history/approval rows for provider staff and
+for the direct owner. Wrong-email, unverified, unstaffed, other-agency, a real
+foreign website, removed staff, removed agency membership and ended seats deny.
+The helper remains private, refuses write controls, and its rollback/reapply
+restores the exact full public function catalog, including writer definitions
+and ACLs. The original 26-case proof replays this tail when it rehearses its
+older reader migration. Its Version and conversion fixtures now establish the
+real provider route required by the current origin schema.
+
+The independent final-origin PostgreSQL 18 qualification also runs the existing
+acting-provider effect matrix and the transitive reader scanner. The SQL proofs
+passed; the scanner reported 1,261 public functions and no STABLE/IMMUTABLE
+function reaching a row lock. The focused actual PostgREST check reuses an
+already-running disposable local stack:
+
+```bash
+STRELVA_LOCAL_AUTH_PROOF=1 node --import tsx --env-file=/path/to/disposable/env scripts/check-provider-seat-readonly-websites-http.mjs
+```
+
+It requires six authorized GET/POST responses to equal meaningful SQL rows,
+36 denied identity/scope/revoked-staff responses and four anonymous/authenticated
+helper ACL denials using a genuine local GoTrue browser session.
+This local evidence does not establish deployment or live customer use.

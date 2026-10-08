@@ -152,7 +152,7 @@ select pg_temp.ilr_assert(exists(select 1 from public.inquiry_events where lead_
 select pg_temp.ilr_assert((current_setting('strelva.purging_expired_tenant_leads',true) is distinct from 'on'),
   'purge-only event delete guard restored');
 select pg_temp.ilr_assert(exists(select 1 from public.tenant_lead_purges where tenant_slug='inquiry-retention-fixture'
-  and purged_count=1),'aggregate purge receipt retained');
+  and purged_count=1 and inquiry_purge_version='20261017110000'),'aggregate purge receipt retained with implementation marker');
 select pg_temp.ilr_assert(exists(select 1 from public.inquiry_workspace_messages where id='f5380000-0000-4000-8000-000000000015'),'old version reply kept');
 select pg_temp.ilr_assert(exists(select 1 from public.inquiry_workspaces where state->'capabilities'->0->'versions'='[{"version":1},{"version":2}]'::jsonb),'version configuration kept');
 select pg_temp.ilr_assert(exists(select 1 from public.inquiry_events where lead_id='lead_orphan'),'unanchored event kept until explicit policy');

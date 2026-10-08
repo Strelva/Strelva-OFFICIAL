@@ -14,6 +14,12 @@ insert into public.workspace_memberships(workspace_id,user_id,role,created_by) v
  ('13230000-0000-4000-8000-000000000011','13230000-0000-4000-8000-000000000001','admin','13230000-0000-4000-8000-000000000002'),
  ('13230000-0000-4000-8000-000000000011','13230000-0000-4000-8000-000000000002','owner','13230000-0000-4000-8000-000000000002');
 insert into public.super_admins(user_id,email) values ('13230000-0000-4000-8000-000000000001','readonly-owner@example.test');
+-- The latest acting-provider gate requires a real staffed provider seat before
+-- making the native client Version; an operator grant alone no longer does.
+select public.choose_business_provider('13230000-0000-4000-8000-000000000002','readonly-client-owner@example.test',
+ '13230000-0000-4000-8000-000000000011','13230000-0000-4000-8000-000000000010');
+select public.set_agency_client_staff('13230000-0000-4000-8000-000000000001','readonly-owner@example.test',
+ '13230000-0000-4000-8000-000000000010','13230000-0000-4000-8000-000000000011','13230000-0000-4000-8000-000000000001',true);
 create temporary table vn_source(id uuid);
 insert into vn_source select (public.create_system_version_source('13230000-0000-4000-8000-000000000010','13230000-0000-4000-8000-000000000001',
  'readonly-owner@example.test','{"name":"Source","kind":"internal_app"}','13230000-0000-4000-8000-000000000020',repeat('a',64))->'system'->>'id')::uuid;
@@ -38,7 +44,7 @@ insert into vn_created select public.create_version_system_command('13230000-000
 
 insert into public.tenants(id,stable_id,site_name,active) values('readonly-reader-site','1323ffff-0000-4000-8000-000000000010','Read-only inquiry client',true);
 create temporary table handoff_ws as select (public.convert_tenant_to_business('readonly-owner@example.test','readonly-reader-site',
- '{"tenantId":"readonly-reader-site","tenantStableId":"1323ffff-0000-4000-8000-000000000010","workspaceName":"Read-only inquiry client","billing":null,"account":null,"patch":{"facts":{"hours":{"value":{"timezone":"UTC","weekly":[{"day":5,"opens":"09:00","closes":"17:00"}]},"verified":false}},"services":[{"op":"upsert","name":"Consultation","durationMinutes":30,"active":true,"position":0,"externalRef":"consult"}]},"contacts":[]}',
+ '{"tenantId":"readonly-reader-site","tenantStableId":"1323ffff-0000-4000-8000-000000000010","workspaceName":"Read-only inquiry client","agencyWorkspaceId":"13230000-0000-4000-8000-000000000010","agencyStaffEmails":["readonly-owner@example.test"],"agencySelectionBasis":"existing_contract","billing":null,"account":null,"patch":{"facts":{"hours":{"value":{"timezone":"UTC","weekly":[{"day":5,"opens":"09:00","closes":"17:00"}]},"verified":false}},"services":[{"op":"upsert","name":"Consultation","durationMinutes":30,"active":true,"position":0,"externalRef":"consult"}]},"contacts":[]}',
  '1323ffff-0000-4000-8000-000000000020',repeat('a',64))->>'workspaceId')::uuid id;
 -- The owner has confirmed the imported details (#509).
 \ir confirm-working-record.sql
@@ -67,10 +73,6 @@ insert into public.operator_google_write_attempts(command_key,tenant_id,write_ki
  values('readonly-reader-attempt','readonly-reader-site','gbp_hours','{}','unknown');
 insert into public.google_listing_receipts(workspace_id,location_id,action,status,authority,readback,idempotency_key)
  select id,'fictional','hours_patch','posted_unverified','{"kind":"owner_approval"}','failed','readonly-reader-listing' from handoff_ws;
-select public.choose_business_provider('13230000-0000-4000-8000-000000000002','readonly-client-owner@example.test',
- '13230000-0000-4000-8000-000000000011','13230000-0000-4000-8000-000000000010');
-select public.set_agency_client_staff('13230000-0000-4000-8000-000000000001','readonly-owner@example.test',
- '13230000-0000-4000-8000-000000000010','13230000-0000-4000-8000-000000000011','13230000-0000-4000-8000-000000000001',true);
 select id as reader_workspace_id from handoff_ws \gset
 select id as reader_lead_id from handoff_lead \gset
 select (offer->>'id')::uuid as reader_offer_id from handoff_offer \gset

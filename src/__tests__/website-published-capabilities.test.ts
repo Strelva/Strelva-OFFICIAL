@@ -115,6 +115,13 @@ describe("published website capability resolution", () => {
     expect(fakes.inspect).not.toHaveBeenCalled();
   });
 
+  it("does not make inquiry or booking connections available from a provider seat alone", async () => {
+    fakes.listWorkspaces.mockResolvedValue([{ id: workspaceId, kind: "customer", access: "provider_seat" }]);
+    await expect(listPublishedWebsiteCapabilityOptions(actor, workspaceId, websiteWorkId)).resolves.toEqual({ tenants: [] });
+    expect(fakes.inspect).not.toHaveBeenCalled();
+    expect(fakes.readInquiryWorkspace).not.toHaveBeenCalled();
+  });
+
   it("resolves only the exact saved selection", async () => {
     configurePublishedConnections();
 

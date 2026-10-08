@@ -36,6 +36,18 @@ describe("Needs you on Home", () => {
     expect(html).toContain(">2</span>");
   });
 
+  it("shows a connected-site disagreement as a website follow-up the owner can acknowledge", () => {
+    const conflict = item({ kind: "fact.inferred", sourceLifecycle: "connected_site_schema", title: "Check the business facts published on bakery.example",
+      detail: "name: website “Old Bakery”; confirmed record “Mooney Law”.", approveEffect: "Acknowledge the disagreement for follow-up in your website platform. No website or business facts change.",
+      notYetEffect: "Nothing changes. The published website facts still need review." });
+    const html = renderToStaticMarkup(createElement(NeedsYouSection, { state: ready({ items: [conflict] }), pending: null, notices: {}, onDecide: noop, onRetry: noop, variant: "deck" }));
+    expect(html).toContain("Website");
+    expect(html).toContain("name: website “Old Bakery”; confirmed record “Mooney Law”.");
+    expect(html).toContain('aria-label="Acknowledge: Check the business facts published on bakery.example"');
+    expect(html).toContain("No website or business facts change.");
+    expect(html).toContain('aria-label="Not yet: Check the business facts published on bakery.example"');
+  });
+
   it("shows every value of a business-facts change, and offers no Approve when that review can't be shown (#509)", () => {
     const long = "Owner copy sentence. ".repeat(80).trim();
     const facts = item({ kind: "fact.inferred", sourceLifecycle: "business_facts", title: "Confirm changes to your business details", adminMayDecide: false,
@@ -122,6 +134,7 @@ describe("Needs you, October 6 shapes", () => {
     expect(decisionPresentation(item({ kind: "system.go_live", detail: null, sourceLifecycle: "website_document" }))).toMatchObject({ verb: "Make it live", shape: "live", source: "Website", amount: null });
     expect(decisionPresentation(item({ kind: "google.post", detail: "\"Tip of the week\"" }))).toMatchObject({ verb: "Post it", shape: "message", source: "Google" });
     expect(decisionPresentation(item({ sourceLifecycle: "booking_request", detail: "Thu 10:30" }))).toMatchObject({ verb: "Confirm", source: "Bookings" });
+    expect(decisionPresentation(item({ kind: "fact.inferred", sourceLifecycle: "connected_site_schema" }))).toMatchObject({ verb: "Acknowledge", source: "Website" });
     // A price only comes from the decision's own words.
     expect(decisionPresentation(item({ title: "Reply to Jordan", detail: "Happy to help." })).amount).toBeNull();
     expect(decisionCount(3)).toBe("Three decisions");

@@ -13,6 +13,8 @@ begin
   if expected_state is not null then raise exception 'Expected %: %',expected_state,statement; end if;
   perform pg_temp.rr_assert(ok,statement);
 end $$;
+-- A later provider-seat tail preserves the new legitimate website read scope.
+select position('public.provider_seat_read_role(' in prosrc)>0 as reader_provider_tail from pg_proc where oid='public.website_document_read_actor(uuid,uuid,uuid,text,boolean,boolean)'::regprocedure \gset
 -- The entire public catalog, including writer bodies, ACLs and volatility.
 create temporary table rr_final as select p.oid::regprocedure::text signature,pg_get_functiondef(p.oid) definition,p.proacl
   from pg_proc p where pronamespace='public'::regnamespace and prokind='f';
@@ -38,6 +40,9 @@ select format('begin read only; %s select pg_temp.rr_expect(%L,%L); rollback;',
  case when rpc_name='agency_client_overview_v2' then 'select not ('||substr(statement,8)||')' else statement end,
  case when rpc_name='agency_client_overview_v2' or (rpc_name='export_workspace_v3_category' and parameters->>'p_category'='systems') then null else '25006' end) from readonly_reader_cases \gexec
 \ir ../supabase/migrations/20261013230000_readonly_reader_authority.sql
+\if :reader_provider_tail
+\ir ../supabase/migrations/20261018130000_provider_seat_readonly_website_authority.sql
+\endif
 -- Reapply restores the exact full public function catalog; no reader is made
 -- VOLATILE to select READ WRITE. Unrelated writers keep their baseline bodies.
 select pg_temp.rr_assert(not exists(
@@ -110,6 +115,12 @@ select pg_temp.rr_assert(not exists(
  (select p.oid::regprocedure::text,pg_get_functiondef(p.oid),p.proacl from pg_proc p where pronamespace='public'::regnamespace and prokind='f' except select signature,definition,proacl from rr_baseline)
 ),'rollback restores exact baseline including writer bodies and ACLs');
 \ir ../supabase/migrations/20261013230000_readonly_reader_authority.sql
+\if :reader_provider_tail
+\ir ../supabase/migrations/20261018130000_provider_seat_readonly_website_authority.sql
+\endif
 \ir ../supabase/migrations/20261013230000_readonly_reader_authority.sql
+\if :reader_provider_tail
+\ir ../supabase/migrations/20261018130000_provider_seat_readonly_website_authority.sql
+\endif
 \o
 \echo Read-only reader proof: 26 READ ONLY calls pass after repair; baseline locking/projection failures reproduced; outsider/bearer denial; exact catalog rollback/reapply; writer definitions unchanged.

@@ -15,7 +15,8 @@ begin
   insert into public.workspaces(id,kind,name,created_by) values(ws,'customer','Connected owner notice',owner_id),(other_ws,'customer','Other notice business',owner_id);
   insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values(ws,owner_id,'owner',owner_id);
   insert into public.business_records(workspace_id,created_by,updated_by) values(ws,owner_id,owner_id);
-  -- Establish the notice recipient through the verified owner's confirmed write.
+  -- This verified-owner write serves both the pre-trust working-fact contract
+  -- and the complete schema's confirmed recipient audit.
   perform public.patch_business_record(ws,owner_id,'cno-owner@example.test','owner',0,
     '{"facts":{"owner_recipient":{"value":{"email":"cno-owner@example.test","name":"Owner"}}}}',gen_random_uuid(),repeat('a',64));
   site_id := (public.create_connected_site(ws,owner_id,'cno-owner@example.test',jsonb_build_object('publicKey',key,'verificationToken',repeat('n',32),

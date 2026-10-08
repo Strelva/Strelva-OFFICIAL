@@ -109,9 +109,9 @@ begin
     returning l.tenant_stable_id, l.tenant_slug_at_capture, l.captured_at,
       l.site_name_at_delete, l.tenant_deleted_at, l.retain_until
   ), receipts as (
-    insert into public.tenant_lead_purges(tenant_stable_id, tenant_slug, site_name, tenant_deleted_at, retain_until, purged_count)
+    insert into public.tenant_lead_purges(tenant_stable_id, tenant_slug, site_name, tenant_deleted_at, retain_until, purged_count, inquiry_purge_version)
       select tenant_stable_id, (array_agg(tenant_slug_at_capture order by captured_at desc))[1], max(site_name_at_delete),
-          min(tenant_deleted_at), max(retain_until), count(*)
+          min(tenant_deleted_at), max(retain_until), count(*), '20261017110000'
         from deleted group by tenant_stable_id
       returning purged_count
   )
@@ -181,6 +181,31 @@ create or replace trigger inquiry_events_retention_on_tenant_delete before delet
 create or replace trigger inquiry_events_retention_on_workspace_delete before delete on public.workspaces
   for each row execute function public.inquiry_events_retention_lifecycle();
 revoke all on function public.inquiry_events_retention_lifecycle() from public,anon,authenticated,service_role;
+
+-- A legacy event copy may race deprovisioning after the caller resolved its
+-- tenant. Hold the origin while inserting, or stamp a fresh orphan deadline if
+-- deletion won. The tenant/workspace deletion triggers then cannot miss it.
+create or replace function public.inquiry_events_retention_insert() returns trigger
+language plpgsql security definer set search_path=public,pg_temp as $$
+declare origin uuid; business uuid;
+begin
+  if new.workspace_id is not null then return new; end if;
+  select stable_id into origin from public.tenants where stable_id=new.tenant_stable_id for key share;
+  if found then return new; end if;
+  select business_workspace_id into business from public.connected_sites where id=new.connected_site_id for key share;
+  if found then new.workspace_id:=business; return new; end if;
+  select w.id into business from public.tenant_workspace_links k join public.workspaces w on w.id=k.workspace_id
+    where (k.tenant_stable_id=new.tenant_stable_id or k.receipt->>'tenantStableId'=new.tenant_stable_id::text)
+      and 1=(select count(distinct k2.workspace_id) from public.tenant_workspace_links k2
+        where k2.tenant_stable_id=new.tenant_stable_id or k2.receipt->>'tenantStableId'=new.tenant_stable_id::text)
+    for key share of w;
+  if found then new.workspace_id:=business; return new; end if;
+  new.retain_until:=coalesce(new.retain_until,clock_timestamp()+public.tenant_lead_retention());
+  return new;
+end $$;
+create or replace trigger inquiry_events_retention_on_insert before insert on public.inquiry_events
+  for each row execute function public.inquiry_events_retention_insert();
+revoke all on function public.inquiry_events_retention_insert() from public,anon,authenticated,service_role;
 
 -- Historical orphans lack a deletion stamp. The immutable event timestamp is
 -- their fallback, never earlier than an existing tenant's retained-lead deadline.

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { boundedStore, type BoundedStore } from "@/platform/bounded-work/repository";
+import { type BoundedStore } from "@/platform/bounded-work/repository";
+import { websiteWorkspaceStore as boundedStore } from "./workspace-store";
 import { listWork } from "@/platform/workspaces/repository";
 import {
   WorkspaceAccessError,
@@ -561,3 +562,7 @@ export const connectWebsiteCapabilities = (actor: WorkspaceActor, workId: string
 export { siteEditingFor, CONTENT_READING_REPOS, type SiteEditing } from "./site-editing";
 export { resolveWorkspaceSite, type WorkspaceSiteDeps, type WorkspaceSiteState } from "./workspace-site";
 export { createSiteChangeStore, SiteChangeOrderError } from "./site-changes";
+
+/** The public-URL crawler and fact extraction, for products that seed a business from its site (agency clients, #259). */
+export { crawlWebsite, normalizeRebuildUrl, WebsiteCrawlError } from "./rebuild-crawl";
+export { extractBusinessFacts } from "./rebuild-pipeline";

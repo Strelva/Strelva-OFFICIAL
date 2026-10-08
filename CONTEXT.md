@@ -123,6 +123,21 @@ permissions remain the 7A provider-seat policy; #241 is still a production
 decision. [The handoff](./docs/product/streams/a1-agency-team.md) owns commands,
 limits, touched shared files and the next integration action.
 
+## Provider website workspace access, October 8, 2026
+
+Prepared code for #245 lists a named provider's client workspace through
+`read_version_actor` without creating a direct membership. Seat-only saved reads
+and writes are restricted to `websites/website`; exact delegated work keeps its
+existing grant. General workspace controls, inquiry entry, inquiry/booking
+connection selection and Ask do not gain member authority from this projection.
+#241 remains Jacob's decision. The website checkpoint migration
+`20261018110000_provider_seat_website_access.sql` keeps identity, resource,
+revision, exit and existing owner/customer launch checks. Native forward,
+rollback and reapply tests exercise real website creation/checkpoint RPCs;
+browser proof uses fictional responses. No production migration, provider write
+or customer adoption is established. #245's broader relationship lifecycle
+and decision requirements remain open.
+
 ## Current product work
 
 Jacob's October 1 direction makes managed delivery the default for managed

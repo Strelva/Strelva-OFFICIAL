@@ -9,6 +9,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import manifest from "./release-safety/batches.json";
+import originalBatch8 from "./release-safety/original-batch8-scope.json";
+import { verifyReleaseInventory } from "./release-safety/inventory";
 import { createTempPostgres } from "./release-safety/temp-postgres";
 import { catalog, command, sql, type Catalog } from "./release-safety/postgres";
 
@@ -65,9 +67,11 @@ function apply(url: string, item: Item) {
 }
 
 function main() {
-  const batch8 = manifest.proposed.find((entry) => entry.batch === "8");
-  if (!batch8) throw new Error("Proposed batch 8 is missing from batches.json.");
-  const items: Item[] = batch8.items;
+  verifyReleaseInventory(root);
+  const items: Item[] = originalBatch8.items;
+  const hotfix = manifest.proposed.find(entry => entry.batch === "H");
+  const batch7a = manifest.proposed.find(entry => entry.batch === "7A");
+  if (!hotfix || !batch7a || batch7a.items.length !== 4) throw new Error("Pinned H and four-file 7A prerequisites are required.");
   const args = process.argv.slice(2), requestedTails: string[] = [];
   let currentTail = false;
   for (let i = 0; i < args.length; i++) {
@@ -79,10 +83,7 @@ function main() {
   for (const item of items) if (item.rollback !== "rollback-" + item.file) throw new Error("Rollback companion is not rollback-<file>: " + item.file);
   const inventory = readdirSync(migrations).filter((name) => /^\d{14}_[a-z0-9_]+\.sql$/.test(name)).sort();
   if (new Set(inventory.map((file) => file.slice(0, 14))).size !== inventory.length) throw new Error("Duplicate forward migration version in current inventory");
-  // 7A has no pinned manifest yet; its four files are taken from disk in order.
-  const batch7a = inventory.filter((name) => /^2026100915[1-4]000_.+\.sql$/.test(name));
-  if (batch7a.length !== 4) throw new Error("Expected the four batch 7A files.");
-  const covered = new Set([...manifest.baseline, ...manifest.batches.flat(), ...items].map((item) => item.file).concat(batch7a));
+  const covered = new Set([...manifest.baseline, ...manifest.batches.flat(), ...hotfix.items, ...batch7a.items, ...items].map(item => item.file));
   for (const file of covered) if (!inventory.includes(file)) throw new Error("Covered forward missing from current inventory: " + file);
   for (const file of requestedTails) {
     if (!inventory.includes(file)) throw new Error("Tail missing from current inventory: " + file);
@@ -113,9 +114,12 @@ function main() {
     temporary.recordPostmaster();
     sql(admin, { file: join(root, "scripts/sql/local-supabase-shim.sql") });
     for (const item of manifest.baseline) apply(admin, item);
-    for (const batch of manifest.batches) for (const item of batch) apply(admin, item);
-    for (const file of batch7a) sql(admin, { file: join(migrations, file) });
-    console.log(`Applied baseline, batches 0-${manifest.batches.length - 1} and 7A (${batch7a.length} files).`);
+    for (const [index, batch] of manifest.batches.entries()) {
+      if (index === 1) for (const item of hotfix.items) apply(admin, item);
+      for (const item of batch) apply(admin, item);
+    }
+    for (const item of batch7a.items) apply(admin, item);
+    console.log(`Applied baseline, batches 0-${manifest.batches.length - 1} and pinned H/7A.`);
     sql(admin, { text: `insert into public.users(id,email,verified_at) values
       ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','owner@release.example',now()),
       ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','unverified@release.example',null);

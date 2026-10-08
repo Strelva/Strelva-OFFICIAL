@@ -12,9 +12,11 @@ begin
   insert into public.workspaces(id,kind,name,created_by) values(ws,'customer','Notice fixture',owner_id);
   insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values(ws,owner_id,'owner',owner_id);
   insert into public.business_records(workspace_id,created_by,updated_by) values(ws,owner_id,owner_id);
-  -- Establish the notice recipient through the verified owner's confirmed write.
-  perform public.patch_business_record(ws,owner_id,'idne-owner@example.test','owner',0,
-    '{"facts":{"owner_recipient":{"value":{"email":"idne-owner@example.test"}}}}',gen_random_uuid(),repeat('a',64));
+  -- The owner's real write confirms this address and establishes audited trust
+  -- on the complete schema; the predecessor schema uses the same working fact.
+  perform public.patch_business_record(ws,owner_id,'idne-owner@example.test','owner',0::bigint,
+    '{"facts":{"owner_recipient":{"value":{"email":"idne-owner@example.test"},"verified":true}}}'::jsonb,
+    'c1750000-0000-4000-8000-000000000005'::uuid,repeat('c',64));
   insert into public.owner_decisions(id,workspace_id,change_kind,route,title,approve_effect,not_yet_effect,source_lifecycle,source_id,revision_hash,urgent,sign_in_required,expires_at)
     values(item,ws,'customer.commitment','owner_decides','Reply','Reply sends','Nothing sends','tenant_event','fixture:evt',repeat('a',64),true,false,now()+interval '14 days');
   perform public.claim_inquiry_decision_notice_v2(ws,item,repeat('a',64),'idne-owner@example.test','Exact subject');

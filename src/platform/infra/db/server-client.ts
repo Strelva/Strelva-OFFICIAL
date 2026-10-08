@@ -73,9 +73,25 @@ export async function createUserClient(): Promise<UserDb | null> {
  * without verifying it.
  */
 export async function getSessionUser() {
+  return (await getSessionAuthContext())?.user ?? null;
+}
+
+/**
+ * Verified auth user and the signed session's `auth_time` claim. Step-up
+ * actions use this instead of a caller-supplied timestamp or a decoded cookie.
+ */
+export async function getSessionAuthContext(): Promise<{
+  user: NonNullable<Awaited<ReturnType<NonNullable<UserDb>["auth"]["getUser"]>>["data"]["user"]>;
+  authTime: number | null;
+} | null> {
   const db = await createUserClient();
   if (!db) return null;
-  const { data, error } = await db.auth.getUser();
-  if (error) return null;
-  return data.user ?? null;
+  const { data: userData, error: userError } = await db.auth.getUser();
+  if (userError || !userData.user) return null;
+  const { data: claimsData, error: claimsError } = await db.auth.getClaims();
+  const claims = claimsData?.claims as { auth_time?: unknown } | undefined;
+  const authTime = !claimsError && typeof claims?.auth_time === "number" && Number.isFinite(claims.auth_time)
+    ? claims.auth_time
+    : null;
+  return { user: userData.user, authTime };
 }

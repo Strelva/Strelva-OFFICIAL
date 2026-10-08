@@ -12,7 +12,7 @@ export interface WorkspaceSummary {
   id: string;
   kind: "personal" | "agency" | "customer";
   name: string;
-  access?: "member" | "delegated_read";
+  access?: "member" | "delegated_read" | "provider_seat";
   role?: "owner" | "admin" | "member";
 }
 
@@ -183,6 +183,8 @@ export interface WorkspaceReleases {
   connectedSites?: boolean;
   /** STRELVA_AGENCY_SIGNUP_RELEASE: agency Home links to the setup checklist at /workspace/agency/start. */
   agencySetup?: boolean;
+  /** STRELVA_AGENCY_ADD_CLIENT_RELEASE: agency Home links to /workspace/agency/clients/new (#259). */
+  agencyAddClient?: boolean;
 }
 
 /**

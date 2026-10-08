@@ -136,6 +136,14 @@
     for (var i = 0; i < s.length; i++) if (BIZ_LD.test(s[i].textContent || "")) return true;
     return false;
   }
+  // The browser sends only a presence hint. The server fetches the verified
+  // site's stored URL and compares its public JSON-LD to confirmed facts.
+  function ownBusinessSchema() {
+    return { present: true };
+  }
+  function reportOwnBusinessSchema() {
+    if (granted && hasOwnBusinessLd()) post("/events", { events: [], platformSchema: ownBusinessSchema() }, false);
+  }
   function injectLd(ld) {
     if (hasOwnBusinessLd()) return;
     var el = d.querySelector("script[data-strelva]");
@@ -152,7 +160,10 @@
         context = c;
         api.facts = c.facts || {};
         fill(api.facts);
-        if (c.site.injectSchema && c.jsonLd) injectLd(c.jsonLd);
+        if (c.site.injectSchema) {
+          reportOwnBusinessSchema();
+          if (c.jsonLd) injectLd(c.jsonLd);
+        }
       })
       .catch(function () { /* the site keeps working without Strelva */ });
   }

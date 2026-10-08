@@ -368,6 +368,14 @@ export const tenantImportPayloadSchema = z.object({
    *  true, so default payloads and their digests are unchanged. Needs
    *  20261008160000_convert_separate_business; older databases refuse it. */
   separateBusiness: z.literal(true).optional(),
+  /** Required by conversion; optional in the shared plan type so historical
+   * migration fixtures can still build their original payloads. The CLI
+   * requires all three before planning a real conversion. */
+  agencyWorkspaceId: uuid.optional(),
+  agencyStaffEmails: z.array(z.string().trim().email().transform((email) => email.toLowerCase()))
+    .min(1).max(100)
+    .refine((emails) => new Set(emails).size === emails.length, "Agency staff emails must be unique.").optional(),
+  agencySelectionBasis: z.enum(["existing_contract", "owner_choice"]).optional(),
   billing: conversionBillingSchema.nullable(),
   account: conversionAccountSchema.nullable(),
   patch: z.object({
@@ -378,6 +386,45 @@ export const tenantImportPayloadSchema = z.object({
   contacts: z.array(contactInputSchema).max(1000),
 }).strict();
 export type TenantImportPayload = z.infer<typeof tenantImportPayloadSchema>;
+
+export const providerRouteReceiptSchema = z.object({
+  agencyWorkspaceId: uuid,
+  selectionBasis: z.enum(["existing_contract", "owner_choice"]),
+  source: z.enum(["tenant_conversion", "operator", "business_choice"]),
+  providerId: uuid,
+  providerCreatedByConversion: z.boolean(),
+  providerToEndId: uuid.nullable(),
+  providerToEndWorkspaceId: uuid.nullable(),
+  seatId: uuid,
+  seatGrantedByKind: z.enum(["conversion", "owner"]),
+  staff: z.array(z.object({ staffId: uuid, userId: uuid, email: z.string().email(), createdByConversion: z.boolean() }).strict()).max(100),
+  routedAt: timestamp,
+}).strict();
+export type ProviderRouteReceipt = z.infer<typeof providerRouteReceiptSchema>;
+
+export const providerRepathResultSchema = z.object({
+  tenantId: z.string(),
+  workspaceId: uuid,
+  providerRoute: z.object({
+    agencyWorkspaceId: uuid,
+    selectionBasis: z.enum(["existing_contract", "owner_choice"]),
+    source: z.enum(["tenant_conversion", "operator", "business_choice"]),
+    providerId: uuid.nullable(),
+    providerCreatedByConversion: z.boolean(),
+    providerToEndId: uuid.nullable(),
+    providerToEndWorkspaceId: uuid.nullable(),
+    seatId: uuid.nullable(),
+    seatGrantedByKind: z.enum(["conversion", "owner"]),
+    staff: z.array(z.object({ staffId: uuid.nullable(), userId: uuid, email: z.string().email(), createdByConversion: z.boolean() }).strict()).max(100),
+    routedAt: timestamp.nullable(),
+  }).strict(),
+  staffToAdd: z.array(z.string().email()).max(100),
+  legacyAdminMemberships: z.number().int().min(0),
+  legacyAdminMembershipsRemoved: z.number().int().min(0),
+  alreadyRouted: z.boolean(),
+  applied: z.boolean(),
+}).strict();
+export type ProviderRepathResult = z.infer<typeof providerRepathResultSchema>;
 
 export const conversionReceiptSchema = z.object({
   kind: z.literal("tenant_conversion"),
@@ -391,7 +438,11 @@ export const conversionReceiptSchema = z.object({
   /** Absent on receipts written before 20261008160000. */
   separateBusiness: z.boolean().optional(),
   operatorId: uuid,
-  operatorRole: z.literal("admin"),
+  /** Older receipts record the conversion-created admin membership. New
+   * conversions record `none`; the agency access is in providerRoute. */
+  operatorRole: z.enum(["admin", "none"]),
+  operatorMembershipCreated: z.literal(false).optional(),
+  providerRoute: providerRouteReceiptSchema.optional(),
   billing: conversionBillingSchema.nullable(),
   account: conversionAccountSchema.nullable(),
   sequence: z.number().int().positive(),

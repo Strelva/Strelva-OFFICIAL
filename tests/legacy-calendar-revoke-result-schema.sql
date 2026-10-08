@@ -17,7 +17,12 @@ insert into public.workspace_calendar_connections(workspace_id,provider,calendar
 set local role service_role;
 select pg_temp.lc_assert(public.revoke_workspace_calendar_connection('fc000000-0000-4000-8000-000000000010','fc000000-0000-4000-8000-000000000001','google'),'legacy existing row returns true');
 select pg_temp.lc_assert(not public.revoke_workspace_calendar_connection('fc000000-0000-4000-8000-000000000010','fc000000-0000-4000-8000-000000000001','outlook'),'legacy absent row returns false');
-select pg_temp.lc_assert((public.disconnect_workspace_calendar_connection('fc000000-0000-4000-8000-000000000010','fc000000-0000-4000-8000-000000000001','outlook','no_token',null)->>'disconnected')::boolean,'modern absent row still completes cleanup');
+select pg_temp.lc_assert((select result->>'disconnected'='false'
+  and result->>'localCleanupStatus'='complete'
+  and result->>'receiptId' is not null
+  and result->'clearedStores'='[]'::jsonb
+  from (select public.disconnect_workspace_calendar_connection('fc000000-0000-4000-8000-000000000010','fc000000-0000-4000-8000-000000000001','outlook','no_token',null) result) x),
+  'modern absent row reports no existing connection with completed cleanup and receipt');
 reset role;
 select pg_temp.lc_assert((select count(*)=3 from public.provider_disconnect_receipts where workspace_id='fc000000-0000-4000-8000-000000000010'),'every result retains its receipt');
 select pg_temp.lc_assert((select status='revoked' and access_token_ciphertext is null and refresh_token_ciphertext is null and token_expires_at is null from public.workspace_calendar_connections where workspace_id='fc000000-0000-4000-8000-000000000010' and provider='google'),'legacy cleanup clears credentials');

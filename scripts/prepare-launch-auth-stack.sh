@@ -22,8 +22,15 @@ mkdir -p "$stack/supabase/migrations"
 # Validate the full inventory, then stage only forward migrations. Supabase skips
 # helpers with a filename notice; keep them out of the disposable stack entirely.
 node "$root/scripts/copy-forward-migrations.mjs" "$root/supabase/migrations" "$stack/supabase/migrations"
+# Docker/Postgres hostnames truncate long identifiers; keep every service's
+# generated host below that boundary, while each run remains isolated.
+proof_project_id="$(python3 - "${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}" <<'PY_ID'
+import hashlib, sys
+print('strelva-proof-' + hashlib.sha256(sys.argv[1].encode()).hexdigest()[:16])
+PY_ID
+)"
 cat > "$stack/supabase/config.toml" <<CONFIG
-project_id = "strelva-proof-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}"
+project_id = "$proof_project_id"
 [api]
 enabled = true
 port = $api_port

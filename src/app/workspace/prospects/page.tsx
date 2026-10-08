@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getSessionUser } from "@/platform/infra/db/server-client";
 import { listAgencyProspects, AgencyProspectingError } from "@/platform/agency-prospecting/server";
+import { agencyAddClientReleaseEnabled } from "@/products/agency-clients";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Agency prospects", robots: { index: false, follow: false }, referrer: "no-referrer" };
@@ -17,6 +18,7 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
     try { prospects = await listAgencyProspects(workspace, user.id, user.email); }
     catch (cause) { error = cause instanceof AgencyProspectingError ? cause.message : "Prospects are temporarily unavailable."; }
   }
+  const addClient = agencyAddClientReleaseEnabled() && workspace ? (id: string) => `/workspace/agency/clients/new?${new URLSearchParams({ workspaceId: workspace, prospect: id })}` : null;
   return <main className="product-surface min-h-screen px-6 py-8 md:px-12">
     <div className="mx-auto max-w-5xl">
       <Link href="/workspace" className="text-sm text-m-text-2 underline">Back to workspace</Link>
@@ -30,7 +32,7 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
             <td className="px-4 py-4">{prospect.business}<p className="text-m-text-3">{prospect.url}</p></td>
             <td className="px-4 py-4">{prospect.name}<p>{prospect.email}</p></td>
             <td className="px-4 py-4">{prospect.source} · {prospect.grade} ({prospect.score}/100)</td>
-            <td className="whitespace-nowrap px-4 py-4">{new Date(prospect.created_at).toLocaleDateString("en-US")}</td>
+            <td className="whitespace-nowrap px-4 py-4">{new Date(prospect.created_at).toLocaleDateString("en-US")}{addClient ? <p><Link href={addClient(prospect.id)} className="underline">Add as client</Link></p> : null}</td>
           </tr>)}</tbody>
         </table></div>}
     </div>

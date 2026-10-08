@@ -565,6 +565,43 @@
   ],
   "proposed": [
     {
+      "batch": "H",
+      "position": "after batch 0, before batch 1",
+      "items": [
+        {
+          "file": "20261005100000_restrict_legacy_tenant_client_access.sql",
+          "sha256": "1b5d5c9dc5bebe3dc88c5fdbd39d7ac635f6ab259222ae3f94d3f99e90e932aa",
+          "rollback": "rollback-20261005100000_restrict_legacy_tenant_client_access.sql"
+        }
+      ]
+    },
+    {
+      "batch": "7A",
+      "position": "after batch 7, before batch 8",
+      "items": [
+        {
+          "file": "20261009151000_provider_seats.sql",
+          "sha256": "d1ec7026cf1c1749f009a0fce9ef90a3dff3d7a5f4e2f2a9746eb4a4ca31f4b7",
+          "rollback": "rollback-20261009151000_provider_seats.sql"
+        },
+        {
+          "file": "20261009152000_agency_verifications.sql",
+          "sha256": "5dfc40731f7a2b8fae9d3c6d782abafdc9d449aa32457c9bcd23062eb19e130f",
+          "rollback": "rollback-20261009152000_agency_verifications.sql"
+        },
+        {
+          "file": "20261009153000_platform_service_actor.sql",
+          "sha256": "0b567fdde0443a314f56132c66f7ff3e74a8089b9598e2bfc2a1bb4fe99211f4",
+          "rollback": "rollback-20261009153000_platform_service_actor.sql"
+        },
+        {
+          "file": "20261009154000_payer_party.sql",
+          "sha256": "14c64f9f4c8fe52a73c404ae18b286ce307a80539cd0c5abd137f4937db7cf4c",
+          "rollback": "rollback-20261009154000_payer_party.sql"
+        }
+      ]
+    },
+    {
       "batch": "8",
       "status": "proposed, not rehearsed",
       "note": "Readers fix #252 and every w6 stream migration (integrate w6 rounds 1-3, #455). Applies after batch 7A (packet order 0-7, 7A, 8): 20261010102000 and 20261010163100 now depend on 7A objects. Every rollback companion is rollback-<file>; rehearsal status is recorded in the packet.",
@@ -573,6 +610,13 @@
           "file": "20261009150000_reader_rpc_volatility.sql",
           "sha256": "e0bb71275ff55c3e177c3973100e3b8fa2f2de6314bc8090d542d6e365e30e31",
           "rollback": "rollback-20261009150000_reader_rpc_volatility.sql"
+        },
+        {
+          "file": "20261009160000_business_effort_coverage.sql",
+          "sha256": "3e4c097db958265b3eb2cb43f3a99a67329faca81612015b2c102f5b6855f4bd",
+          "rollback": "rollback-business-effort-coverage.sql",
+          "rollbackKind": "manual",
+          "rollbackSha256": "a217f2247f738b7b1febeef1d83bde9e93ca7a2e54d492d4dc8adf479ecff9f0"
         },
         {
           "file": "20261010100000_owner_invitation_claim.sql",
@@ -990,9 +1034,217 @@
           "rollback": "rollback-20261010170000_deprovision_retained_after_inquiry_export.sql"
         },
         {
+          "file": "20261011100000_workspace_newsletter_sender.sql",
+          "sha256": "c53f48920610ff2a0aa0a9d448d49564d441845eb9b8ce6453a1c444de1bbadb",
+          "rollback": "rollback-workspace-newsletter-sender.sql",
+          "rollbackKind": "manual",
+          "rollbackSha256": "d6ef5c70e5a4f83bb0be13caaf3b940eb5d239f437f93950d8a4aa79b9f5d046"
+        },
+        {
+          "file": "20261011100100_newsletter_backfill_identity.sql",
+          "sha256": "e3ec0219feb972fe760a7a4fb59d98e97f02f43a4922e87134755f3c08cb20ee",
+          "rollback": "rollback-newsletter-backfill-identity.sql",
+          "rollbackKind": "manual",
+          "rollbackSha256": "21014ffe908eff781f76f73984407b804a244ede4a1613b1cb2def8dd80d627d"
+        },
+        {
+          "file": "20261011101000_business_booking_email.sql",
+          "sha256": "c9f4889b9625d3c6452bcae73f62325a2a74bb16d537a8f0f3f18d13da791fe3",
+          "rollback": "rollback-20261011101000_business_booking_email.sql"
+        },
+        {
+          "file": "20261011102000_native_publishing_targets.sql",
+          "sha256": "98f947e5b89e31436856cbffe2bbf5118b08a01b742fb01237151d44426acacd",
+          "rollback": "rollback-20261011102000_native_publishing_targets.sql"
+        },
+        {
+          "file": "20261011120000_business_policies.sql",
+          "sha256": "e6092e1868a4ff499bbb835ef198bb32ed76e3bcb0ffac1a188d58cee90b54b6",
+          "rollback": "rollback-20261011120000_business_policies.sql"
+        },
+        {
+          "file": "20261011133700_business_facts_owner_decision.sql",
+          "sha256": "8fc5767832a8bfa201d8ac32f87ab198e1a4912d69582847bf39f331dd4b37f1",
+          "rollback": "rollback-20261011133700_business_facts_owner_decision.sql"
+        },
+        {
+          "file": "20261011140000_agent_booking_visibility.sql",
+          "sha256": "5523269ee221c57c82dfc61fac7bbf31035484c5ab75be897abe0713e9b26074",
+          "rollback": "rollback-20261011140000_agent_booking_visibility.sql"
+        },
+        {
+          "file": "20261011150000_public_booking_admission.sql",
+          "sha256": "27276ac961996f5eb5cdbe222433a7969acfb109e97c3c6ba568e9f725207fa7",
+          "rollback": "rollback-20261011150000_public_booking_admission.sql"
+        },
+        {
           "file": "20261011153000_operator_owner_decisions.sql",
           "sha256": "1859f9b74b7cf6f91fad481b60bd2d097d036223b593b8d83466aff2a030935a",
           "rollback": "rollback-20261011153000_operator_owner_decisions.sql"
+        },
+        {
+          "file": "20261011160000_agency_team.sql",
+          "sha256": "e36ff90f9bda62aaf42bbaec9bc456712cacbf92171aac23c6589f4ee7aed280",
+          "rollback": "rollback-20261011160000_agency_team.sql"
+        },
+        {
+          "file": "20261011170000_agency_prospects.sql",
+          "sha256": "caf8931138737a95c65002696b91aa61f8e317aace88dcf7441753f62293fd31",
+          "rollback": "rollback-20261011170000_agency_prospects.sql"
+        },
+        {
+          "file": "20261011180000_provider_disconnect_receipts.sql",
+          "sha256": "c87d645cdbec858e6251d5d40c86f8e36e0efd4c6d12b8b8e4a4c86639799ac9",
+          "rollback": "rollback-20261011180000_provider_disconnect_receipts.sql"
+        },
+        {
+          "file": "20261012010000_tenant_track_signing_keys.sql",
+          "sha256": "3e9e570d92ac5155af6b03b3d4f93f6d95da323829667542f3ef5911b91c5822",
+          "rollback": "rollback-20261012010000_tenant_track_signing_keys.sql"
+        },
+        {
+          "file": "20261012110000_business_pages.sql",
+          "sha256": "f94551c649e582a4606eb43624be2ea4a38f4765d6c6f7aa83f72d04d702d490",
+          "rollback": "rollback-20261012110000_business_pages.sql"
+        },
+        {
+          "file": "20261012120000_track_signing_key_rotation.sql",
+          "sha256": "b93843ae4d0b83f91a8beef459cf2d0ef027849c4bc1991a9d4f17a1dabdef95",
+          "rollback": "rollback-20261012120000_track_signing_key_rotation.sql"
+        },
+        {
+          "file": "20261012180000_agency_brand.sql",
+          "sha256": "309f5b5fb0ca4cd2d47efaaef86d53ac398740569af5a30e2746306098df2623",
+          "rollback": "rollback-20261012180000_agency_brand.sql"
+        },
+        {
+          "file": "20261013110000_public_facts_read_confirmed.sql",
+          "sha256": "298161ff4663879f80be739b900c3ef86640b23290573553068c435476f44798",
+          "rollback": "rollback-20261013110000_public_facts_read_confirmed.sql"
+        },
+        {
+          "file": "20261013115000_booking_reads_confirmed_facts.sql",
+          "sha256": "e341acdf38a5d137a9cbac405226bea29d0c2ebe93e9c0600f789d32114a13e2",
+          "rollback": "rollback-20261013115000_booking_reads_confirmed_facts.sql"
+        },
+        {
+          "file": "20261013120000_owner_recipient_trust.sql",
+          "sha256": "8e063179f6e0a520e760d358e65bf62390a603dee2c86781ad0cb21339ec8c6b",
+          "rollback": "rollback-20261013120000_owner_recipient_trust.sql"
+        },
+        {
+          "file": "20261013130000_ask_confirms_owner_facts.sql",
+          "sha256": "b33ab699b6ea5b9894c55ff5a1c7b4da21d751b10480861178b47bf557537674",
+          "rollback": "rollback-20261013130000_ask_confirms_owner_facts.sql"
+        },
+        {
+          "file": "20261013210000_agent_booking_admission.sql",
+          "sha256": "3bc19183b7ba8f12ff4f4d8fb1c7fafb84492b10aab240bf461d574be6404303",
+          "rollback": "rollback-20261013210000_agent_booking_admission.sql"
+        },
+        {
+          "file": "20261013220000_provider_seat_tenant_conversion.sql",
+          "sha256": "23138c80bf991fa821c5bdac2d5758a746434ab57dad175228f95326a46ccdcd",
+          "rollback": "rollback-20261013220000_provider_seat_tenant_conversion.sql"
+        },
+        {
+          "file": "20261014100000_client_resource_mandates.sql",
+          "sha256": "07fc4948ba20fb23a14a75908b96da10d3112d7b0e286fb927f803c91dead039",
+          "rollback": "rollback-20261014100000_client_resource_mandates.sql"
+        },
+        {
+          "file": "20261014110000_owner_decision_effects.sql",
+          "sha256": "3f9864a58acca79ae28fdb4f93f56a3320514a9c5f7ca558b2b5c5f3ff6a44ea",
+          "rollback": "rollback-20261014110000_owner_decision_effects.sql"
+        },
+        {
+          "file": "20261014112000_acting_provider_gates.sql",
+          "sha256": "399a95b0673de860a142d9b78074cabf73faa7d49ae60f92b82848b19941af72",
+          "rollback": "rollback-20261014112000_acting_provider_gates.sql"
+        },
+        {
+          "file": "20261015100000_agency_add_client.sql",
+          "sha256": "d280795634bb1392733f46531a32c3f46d433b4e2260a9357dd1f84584ec6a89",
+          "rollback": "rollback-20261015100000_agency_add_client.sql"
+        },
+        {
+          "file": "20261016110000_operator_action_approvals.sql",
+          "sha256": "e9e4a204e497caa46acc2e113c74e11b18dd1e8aa0996b629dabb650dafee002",
+          "rollback": "rollback-20261016110000_operator_action_approvals.sql"
+        },
+        {
+          "file": "20261017110000_inquiry_lead_retention.sql",
+          "sha256": "d0199c3454922624c677d3045b49ff12fae3cd2af9f37385525163e60b84e047",
+          "rollback": "rollback-20261017110000_inquiry_lead_retention.sql"
+        },
+        {
+          "file": "20261017120000_owner_decision_operator_refusal.sql",
+          "sha256": "616c861132f58c6f8aa10c69974a0548cbaf213444202b49db213394f134a80f",
+          "rollback": "rollback-20261017120000_owner_decision_operator_refusal.sql"
+        },
+        {
+          "file": "20261018110000_provider_seat_website_access.sql",
+          "sha256": "b108d67d2d968bf4dfa8ae7551997b07d653eac8cefcc97f8e123b579cc9c6d4",
+          "rollback": "rollback-20261018110000_provider_seat_website_access.sql"
+        },
+        {
+          "file": "20261018120000_connected_site_schema_conflicts.sql",
+          "sha256": "c636ee4328ba2da0bd0e922c89c60ac5c53e9480aa6d14f3e35816bde51a40e9",
+          "rollback": "rollback-20261018120000_connected_site_schema_conflicts.sql"
+        }
+      ]
+    },
+    {
+      "batch": "9",
+      "status": "proposed, not rehearsed",
+      "note": "Audited super-admin grant/revoke, zero-active break-glass bootstrap and legacy bootstrap-table retirement. Applies after batch 8; rollback refuses after the first successful grant, revoke or bootstrap event.",
+      "items": [
+        {
+          "file": "20261015110000_super_admin_grants.sql",
+          "sha256": "2804c89c47c905d12bb8a2b598207c31e16c1081a5983393257ca11966b94349",
+          "rollback": "rollback-20261015110000_super_admin_grants.sql"
+        }
+      ]
+    },
+    {
+      "batch": "10",
+      "description": "Integrated security/runtime corrections; forward-only data/schema, guarded permission recovery",
+      "items": [
+        {
+          "file": "20261013230000_readonly_reader_authority.sql",
+          "sha256": "bd3f56734bf7a6d0d295bb4a028a1ec2d95d7c9e02a0119ffcea6ff50672f61d",
+          "rollback": "rollback-20261013230000_readonly_reader_authority.sql",
+          "rollbackStatus": "guarded; runtime recovery preserves accepted work"
+        },
+        {
+          "file": "20261014030000_make_real_compensation_claims.sql",
+          "sha256": "748ad3b9ffe8ae098431fa43f1dec9d39bd4348635caf64ebe09d127a0bd1cc9",
+          "rollback": "rollback-20261014030000_make_real_compensation_claims.sql",
+          "rollbackStatus": "guarded; runtime recovery preserves accepted work"
+        },
+        {
+          "file": "20261014120000_legacy_calendar_revoke_result.sql",
+          "sha256": "16c5c5b2c1dd69488535eacb9db2c90bdded8b03b1c56e3078ab71438122bddc",
+          "rollback": "rollback-20261014120000_legacy_calendar_revoke_result.sql",
+          "rollbackStatus": "guarded; runtime recovery preserves accepted work"
+        },
+        {
+          "file": "20261017111000_inquiry_retention_lifecycle.sql",
+          "sha256": "3d359f359977e7ceb33c4fe72dacc806bee37120fcee920027ec2f2204c55ffc",
+          "rollback": "rollback-20261017111000_inquiry_retention_lifecycle.sql",
+          "rollbackStatus": "guarded; runtime recovery preserves accepted work"
+        },
+        {
+          "file": "20261018130000_provider_seat_readonly_website_authority.sql",
+          "sha256": "91e3b8ffa59318ba894bff16d21706c604427c3f9cb6dc2901ef14830a9323b0",
+          "rollback": "rollback-20261018130000_provider_seat_readonly_website_authority.sql",
+          "rollbackStatus": "guarded; runtime recovery preserves accepted work"
+        },
+        {
+          "file": "20261018131000_owner_decision_runtime_authority.sql",
+          "sha256": "748efe03138425400405087f66972d481cbe2b77b1425bd974b5f9d90b11176a",
+          "rollback": "rollback-20261018131000_owner_decision_runtime_authority.sql",
+          "rollbackStatus": "guarded; runtime recovery preserves accepted work"
         }
       ]
     }

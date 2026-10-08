@@ -11,8 +11,8 @@ declare v_result jsonb;
 begin
   v_result := public.disconnect_workspace_calendar_connection(
     p_workspace_id, p_user_id, p_provider, 'not_attempted', 'revocation_not_requested');
-  -- `disconnected` means cleanup completed, including an already absent row.
-  -- Legacy callers need whether their connection row existed at this call.
+  -- Derive the legacy row-existed boolean from the receipt's cleared stores.
+  -- Cleanup completion and its durable receipt also cover an absent row.
   return coalesce((v_result->'clearedStores') ? 'workspace_calendar_connections', false);
 end;
 $$;

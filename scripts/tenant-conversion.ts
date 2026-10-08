@@ -48,6 +48,9 @@ export interface ConversionOptions {
   /** Reverse the conversion instead of running it. */
   rollback?: boolean;
   operatorEmail?: string;
+  agencyWorkspaceId?: string;
+  agencyStaffEmails?: string[];
+  agencySelectionBasis?: "existing_contract" | "owner_choice";
   /** Make this site its own business even when a sibling site of its
    *  multi-site account is already converted (default: join that business). */
   separateBusiness?: boolean;
@@ -78,16 +81,42 @@ export function isLocalDatabaseUrl(value: string | undefined): boolean {
 
 export function parseConversionArgs(argv: string[]): ConversionOptions & { json: boolean; rollback: boolean } {
   const slug = argv.find((arg) => !arg.startsWith("--"));
-  if (!slug) throw new Error("Usage: convert-tenant-to-workspace <tenant-slug> [--rollback] [--apply] [--separate-business] [--operator-email=<email>] [--json]");
+  if (!slug) throw new Error("Usage: convert-tenant-to-workspace <tenant-slug> --agency=<workspace-uuid> --agency-staff=<email[,email...]> --agency-basis=<existing_contract|owner_choice> [--rollback] [--apply] [--separate-business] [--operator-email=<email>] [--json]");
   const operator = argv.find((arg) => arg.startsWith("--operator-email="))?.slice("--operator-email=".length);
-  const unknown = argv.filter((arg) => arg.startsWith("--") && !/^--(?:apply|dry-run|rollback|json|separate-business|i-have-jacobs-yes|operator-email=.+)$/.test(arg));
+  const agencyFlags = argv.filter((arg) => arg.startsWith("--agency="));
+  const agency = agencyFlags[0]?.slice("--agency=".length).trim();
+  const staffFlags = argv.filter((arg) => arg.startsWith("--agency-staff="));
+  const staffText = staffFlags[0]?.slice("--agency-staff=".length) ?? "";
+  const agencyStaffEmails = staffText.split(",").map((email) => email.trim().toLowerCase()).filter(Boolean);
+  const basisFlags = argv.filter((arg) => arg.startsWith("--agency-basis="));
+  const agencySelectionBasis = basisFlags[0]?.slice("--agency-basis=".length) as ConversionOptions["agencySelectionBasis"];
+  if (agencyFlags.length > 1 || staffFlags.length > 1 || basisFlags.length > 1) throw new Error("Use one --agency, one --agency-staff list, and one --agency-basis.");
+  const unknown = argv.filter((arg) => arg.startsWith("--") && !/^--(?:apply|dry-run|rollback|json|separate-business|i-have-jacobs-yes|operator-email=.+|agency=.+|agency-staff=.+|agency-basis=.+)$/.test(arg));
   if (unknown.length) throw new Error(`Unknown flag(s): ${unknown.join(", ")}`);
   const apply = argv.includes("--apply");
   if (apply && argv.includes("--dry-run")) throw new Error("Choose --dry-run or --apply, not both.");
   const separateBusiness = argv.includes("--separate-business");
   if (separateBusiness && argv.includes("--rollback")) throw new Error("--separate-business applies to a conversion, not a rollback.");
+  const rollback = argv.includes("--rollback");
+  if (rollback && (agencyFlags.length || staffFlags.length || basisFlags.length)) throw new Error("Agency route flags apply to a conversion, not a rollback.");
+  if (!rollback && agency && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(agency)) {
+    throw new Error("--agency must be an agency workspace UUID.");
+  }
+  if (agencyStaffEmails.some((email) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    || new Set(agencyStaffEmails).size !== agencyStaffEmails.length) {
+    throw new Error("--agency-staff must be a comma-separated list of unique email addresses.");
+  }
+  if (!rollback && basisFlags.length && agencySelectionBasis !== "existing_contract" && agencySelectionBasis !== "owner_choice") {
+    throw new Error("--agency-basis must be existing_contract or owner_choice.");
+  }
+  if (!rollback && !agency) throw new Error("--agency=<agency workspace UUID> is required; conversion has no default agency.");
+  if (!rollback && !agencyStaffEmails.length) throw new Error("--agency-staff=<member email[,email...]> is required; name the agency members who will receive access.");
+  if (!rollback && !agencySelectionBasis) throw new Error("--agency-basis=<existing_contract|owner_choice> is required and recorded with the conversion.");
   return {
-    slug, apply, rollback: argv.includes("--rollback"), operatorEmail: operator, separateBusiness,
+    slug, apply, rollback, operatorEmail: operator,
+    agencyWorkspaceId: agency, agencyStaffEmails: agencyStaffEmails.length ? agencyStaffEmails : undefined,
+    agencySelectionBasis: agencySelectionBasis === "existing_contract" || agencySelectionBasis === "owner_choice" ? agencySelectionBasis : undefined,
+    separateBusiness,
     jacobsYes: argv.includes("--i-have-jacobs-yes"), json: argv.includes("--json"),
   };
 }
@@ -137,6 +166,9 @@ function describe(value: unknown): string {
 export async function runTenantConversion(options: ConversionOptions, deps: ConversionDeps): Promise<ConversionOutcome> {
   const mode = options.apply ? "apply" : "dry-run";
   assertApplyAllowed(options);
+  if (!options.agencyWorkspaceId) throw new Error("--agency=<agency workspace UUID> is required; conversion has no default agency.");
+  if (!options.agencyStaffEmails?.length) throw new Error("--agency-staff=<member email[,email...]> is required; name the agency members who will receive access.");
+  if (!options.agencySelectionBasis) throw new Error("--agency-basis=<existing_contract|owner_choice> is required and recorded with the conversion.");
   const sources = await deps.read(options.slug);
   if (!sources.tenant) throw new Error(`No tenant "${options.slug}".`);
 
@@ -159,7 +191,13 @@ export async function runTenantConversion(options: ConversionOptions, deps: Conv
   // Only a multi-site account ever joins a sibling, so the option only
   // means something there; on a single site it is ignored (and said so).
   const separate = Boolean(options.separateBusiness && sources.account?.multiSite);
-  const plan = planTenantImport(sourceFor(sources), targetWorkspaceId ? { targetWorkspaceId } : separate ? { separateBusiness: true } : {});
+  const plan = planTenantImport(sourceFor(sources), {
+    ...(targetWorkspaceId ? { targetWorkspaceId } : {}),
+    ...(separate ? { separateBusiness: true } : {}),
+    agencyWorkspaceId: options.agencyWorkspaceId,
+    agencyStaffEmails: options.agencyStaffEmails,
+    agencySelectionBasis: options.agencySelectionBasis,
+  });
   const log = deps.log;
   log(`Tenant conversion: ${options.slug} (${mode})`);
   log(`  database: ${options.databaseUrl ? (isLocalDatabaseUrl(options.databaseUrl) ? "local" : "NOT local") : "not configured"}`);
@@ -171,7 +209,11 @@ export async function runTenantConversion(options: ConversionOptions, deps: Conv
   log(`  account: ${account ? `${account.name} (${account.tenantIds.length} site${account.tenantIds.length === 1 ? "" : "s"})${account.multiSite ? (separate ? " MULTI-SITE, --separate-business: this site becomes its own business; billing records only its own line item and the shared subscription is left for Stripe review" : " MULTI-SITE: all sites share one business workspace (pass --separate-business to make this site its own business)") : ""}` : "none"}`);
   if (siblingLinks.length) log(`  sibling sites already converted: ${siblingLinks.join(", ")}${separate ? " (not joined: --separate-business)" : ""}`);
   if (options.separateBusiness && !separate) log("  --separate-business: ignored, this site has no multi-site account and becomes its own business anyway");
-  log(`  would ${link?.link ? "do nothing" : targetWorkspaceId ? `join business ${targetWorkspaceId} (fill only missing facts)` : `create ${separate ? "a separate " : ""}customer business "${plan.payload.workspaceName}" with the operator as admin (no client membership, no invite, no email; marked as operated by Strelva once its agency workspace is designated, which grants nothing)`}`);
+  log(`  provider: agency=${options.agencyWorkspaceId} source=tenant_conversion basis=${options.agencySelectionBasis}`);
+  log(`  agency staff to receive access: ${options.agencyStaffEmails.join(", ")}`);
+  log(`  operator client membership: none; owner invitation/email: unchanged and not sent`);
+  if (link?.link && !link.link.receipt.providerRoute) log("  existing legacy conversion: use scripts/repath-provider.ts to route its existing access before treating it as complete");
+  log(`  would ${link?.link ? "do nothing" : targetWorkspaceId ? `join business ${targetWorkspaceId} (fill only missing facts; require the same provider)` : `create ${separate ? "a separate " : ""}customer business "${plan.payload.workspaceName}" with no personal admin membership`}`);
   log(`  facts (${plan.counts.facts}, source tenant_import, unverified):`);
   for (const [key, entry] of Object.entries(plan.payload.patch.facts ?? {})) log(`    ${key}: ${describe(entry?.value)}`);
   log(`  services: ${plan.counts.services}${plan.payload.patch.services?.length ? ` (${plan.payload.patch.services.map((item) => item.op === "upsert" ? item.name : item.id).join(", ")})` : ""}`);

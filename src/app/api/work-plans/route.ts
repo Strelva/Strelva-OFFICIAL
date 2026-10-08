@@ -1,4 +1,4 @@
-import { WorkspaceMakeSystemsError } from "@/platform/workspaces/types";
+import { MAKE_SYSTEMS_REQUIRED_MESSAGE, WorkspaceMakeSystemsError } from "@/platform/workspaces/types";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionUser } from "@/platform/infra/db/server-client";
@@ -75,7 +75,7 @@ async function readBody(request: Request): Promise<unknown> {
 }
 
 function failure(error: unknown) {
-  if (error instanceof WorkspaceMakeSystemsError) return json({ error: "Ask Strelva to build this.", code: "make_systems_required" }, 403);
+  if (error instanceof WorkspaceMakeSystemsError) return json({ error: MAKE_SYSTEMS_REQUIRED_MESSAGE, code: "make_systems_required" }, 403);
   if (error instanceof WorkspaceAccessError) return json({ error: "This workspace is unavailable to your account." }, 403);
   if (error instanceof WorkPlanNotFoundError) return json({ error: "This saved plan is unavailable." }, 404);
   if (error instanceof WorkPlanFundingRequiredError) return json({ error: error.message, code: "planning_funding_required" }, 428);

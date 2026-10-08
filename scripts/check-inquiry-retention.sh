@@ -20,10 +20,12 @@ psql "${psql_args[@]}" --dbname=postgres -c 'create database inquiry_retention_c
 sed 's/^rollback;$/commit;/' "$repo_root/tests/inquiry-lead-retention.sql" |
   psql "${psql_args[@]}" --dbname=inquiry_retention_case >/dev/null
 psql "${psql_args[@]}" --dbname=inquiry_retention_case <<'SQL' >/dev/null
+alter table public.inquiry_events disable trigger inquiry_events_retention_on_insert;
 insert into public.inquiry_events(tenant_stable_id,lead_id,kind,actor,detail,at) values ('f5380000-0000-4000-8000-000000000099','lead_historical_orphan','delivery','system','{"status":"accepted","body":"Historical raw visitor body"}',clock_timestamp()-interval '366 days');
 insert into public.tenant_workspace_links(tenant_stable_id,tenant_slug_at_link,workspace_id,linked_by,command_id,command_digest,receipt)
 values (null,'historical-converted-fixture','f5380000-0000-4000-8000-000000000002','f5380000-0000-4000-8000-000000000001',gen_random_uuid(),repeat('f',64),'{"tenantStableId":"f5380000-0000-4000-8000-000000000097"}');
 insert into public.inquiry_events(tenant_stable_id,lead_id,kind,actor,detail,at) values ('f5380000-0000-4000-8000-000000000097','lead_historical_converted_orphan','captured','visitor','{"body":"Retained converted visitor body"}',clock_timestamp()-interval '10 years');
+alter table public.inquiry_events enable trigger inquiry_events_retention_on_insert;
 create table public.retention_recovery_snapshot (relation text primary key, rows jsonb not null);
 do $$ declare relation record; rows jsonb; begin
   for relation in select tablename from pg_tables where schemaname='public' and
@@ -34,8 +36,11 @@ do $$ declare relation record; rows jsonb; begin
   end loop;
 end $$;
 SQL
-psql "${psql_args[@]}" --dbname=inquiry_retention_case --file="$repo_root/supabase/migrations/rollback-20261013221000_inquiry_retention_lifecycle.sql" >/dev/null
-psql "${psql_args[@]}" --dbname=inquiry_retention_case --file="$repo_root/supabase/migrations/rollback-20261013220000_inquiry_lead_retention.sql" >/dev/null
+psql "${psql_args[@]}" --dbname=inquiry_retention_case --file="$repo_root/supabase/migrations/rollback-20261017111000_inquiry_retention_lifecycle.sql" >/dev/null
+if psql "${psql_args[@]}" --dbname=inquiry_retention_case --file="$repo_root/supabase/migrations/rollback-20261017110000_inquiry_lead_retention.sql" >"$socket_path/inquiry-retention-base-refusal.log" 2>&1; then
+  printf 'Base rollback discarded a marked purge.\n' >&2; exit 1
+fi
+grep -q inquiry_lead_retention_rollback_requires_data_preservation "$socket_path/inquiry-retention-base-refusal.log"
 psql "${psql_args[@]}" --dbname=inquiry_retention_case <<'SQL' >/dev/null
 do $$ declare snapshot record; actual jsonb; begin
   for snapshot in select * from public.retention_recovery_snapshot loop
@@ -49,8 +54,7 @@ do $$ declare snapshot record; actual jsonb; begin
   exception when others then if sqlerrm<>'inquiry_events_immutable' then raise; end if; end;
 end $$;
 SQL
-psql "${psql_args[@]}" --dbname=inquiry_retention_case --file="$repo_root/supabase/migrations/20261013220000_inquiry_lead_retention.sql" >/dev/null
-psql "${psql_args[@]}" --dbname=inquiry_retention_case --file="$repo_root/supabase/migrations/20261013221000_inquiry_retention_lifecycle.sql" >/dev/null
+psql "${psql_args[@]}" --dbname=inquiry_retention_case --file="$repo_root/supabase/migrations/20261017111000_inquiry_retention_lifecycle.sql" >/dev/null
 psql "${psql_args[@]}" --dbname=inquiry_retention_case <<'SQL' >/dev/null
 do $$ declare result jsonb; begin
   if not exists(select 1 from public.inquiry_events where lead_id='lead_historical_orphan' and retain_until<=clock_timestamp()) then raise exception 'historical orphan fallback deadline missing'; end if;
@@ -139,4 +143,5 @@ do $$ begin
   if (select count(*) from public.inquiry_retention_receipts where tenant_stable_id='f5380000-0000-4000-8000-000000000098')<>2 then raise exception 'orphan batch bound violated'; end if;
 end $$;
 SQL
+psql "${psql_args[@]}" --dbname=inquiry_retention_case --file="$repo_root/tests/inquiry-retention-insert-concurrency.sql" >/dev/null
 printf 'Inquiry retention passed: exact rollback preservation, reapply, overlapping SKIP LOCKED workers and bounded batches.\n'

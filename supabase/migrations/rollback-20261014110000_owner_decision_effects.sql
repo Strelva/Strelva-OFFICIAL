@@ -1,10 +1,5 @@
 -- Restore the previous owner-link implementation before adoption.
 begin;
-set local lock_timeout = '3s';
-set local statement_timeout = '120s';
-alter function public.strelva_service_session(uuid,uuid,text) stable;
--- Pre-adoption only: serialize concurrent admission before inspecting sessions.
-lock table public.owner_decision_link_sessions in access exclusive mode;
 do $$ begin
   if exists(select 1 from public.owner_decision_link_sessions) then
     raise exception 'owner_decision_effects_rollback_requires_data_preservation';
@@ -113,16 +108,13 @@ language sql stable security definer set search_path = public, pg_temp as $$
 $$;
 
 create or replace function public.platform_service_effect(p_purpose text) returns text
-language sql immutable set search_path = public, pg_temp as $$
-  select case p_purpose
-    when 'needs_you_sync' then 'email'
-    when 'make_real_resume' then 'publish'
-    when 'make_real_link' then 'publish'
+language sql immutable set search_path=public,pg_temp as $$
+  select case p_purpose when 'needs_you_sync' then 'email'
+    when 'make_real_resume' then 'publish' when 'make_real_link' then 'publish'
     when 'owner_decision_link' then 'email' end
 $$;
 drop function public.strelva_owner_decision_link_session(uuid,uuid,text,text,text);
 drop function public.owner_decision_provider_holds(uuid,uuid,text[]);
 drop function public.owner_decision_execution_effects(text,text,text);
 alter table public.owner_decision_link_sessions drop column intended_decision;
-alter table public.owner_decision_link_sessions drop column provider_assignment_id;
 commit;

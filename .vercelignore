@@ -11,3 +11,9 @@ coverage
 test-results
 playwright-report
 tests/ux-shots
+
+# Private release proof and local credentials.
+.env*
+.scratch
+output
+.next-*

@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 # Shared lifecycle for disposable SQL checks. Source before allocating anything.
 # PostgreSQL 18 on macOS needs a valid process locale even with initdb --locale=C.
-# libpq accepts PGHOSTADDR in preference to an explicit Unix --host. Strip
-# every inherited PostgreSQL setting before initdb/pg_ctl/psql can run; tests
-# may explicitly set PGOPTIONS afterwards for a particular local race.
-for postgres_env_name in "${!PG@}"; do
-  unset "$postgres_env_name"
-done
+# Explicit local socket routing must never inherit a libpq override.
+for postgres_env_name in "${!PG@}"; do unset "$postgres_env_name"; done
 unset postgres_env_name
-export LC_ALL=C
+# Preserve an explicit valid caller locale.
+if [[ -z "${LC_ALL:-}" || "$LC_ALL" == "C.UTF-8" || "$LC_ALL" == "C.utf8" ]]; then
+  export LC_ALL=C
+fi
 cluster_root=''
 cluster_data=''
 cluster_socket=''
