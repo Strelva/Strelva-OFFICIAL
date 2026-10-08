@@ -12,7 +12,7 @@ export interface WorkspaceSummary {
   id: string;
   kind: "personal" | "agency" | "customer";
   name: string;
-  access?: "member" | "delegated_read";
+  access?: "member" | "delegated_read" | "provider_seat";
   role?: "owner" | "admin" | "member";
 }
 

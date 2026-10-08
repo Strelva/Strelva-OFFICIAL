@@ -1,4 +1,4 @@
--- Rollback for 20261013221000_provider_seat_tenant_conversion.sql
+-- Rollback for 20261013220000_provider_seat_tenant_conversion.sql
 -- Prepared SQL only. Refuses after any providerRoute receipt was written.
 -- No data or tables are dropped; route receipts remain available for a later
 -- forward migration if rollback is needed before conversion use.

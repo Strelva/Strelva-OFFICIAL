@@ -55,18 +55,16 @@ select pg_temp.ap_assert(
   and not has_function_privilege('authenticated', 'public.assert_acting_provider(uuid,uuid,text,text,text,text)', 'execute')
   and not has_function_privilege('anon', 'public.grant_client_resource_mandate(uuid,text,uuid,uuid,text,text,text)', 'execute'),
   'the predicate is internal; the app gets the assert, the email gate and the commands');
--- No client-serving gate grants authority through platform privilege. The
--- exact negative owner-only exclusion still identifies an active operator so
--- their direct client-admin membership cannot approve the owner's item.
+-- Provider admission never uses the platform operator registry. The owner
+-- claimant separately reads it only to refuse an operator on an owner item;
+-- operator-owner-decisions-schema.sql exercises that refusal and the owner exception.
 select pg_temp.ap_assert(not exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace
     and p.proname in ('website_document_launch_authority', 'authorize_website_domain_change', 'record_website_change_receipt',
-      'workspace_make_systems_authority', 'set_decision_policy', 'read_decision_policies', 'claim_owner_decision',
+      'workspace_make_systems_authority', 'set_decision_policy', 'read_decision_policies',
       'escalate_owner_decision', 'list_owner_decisions', 'read_strelva_handled', 'prepare_website_domain_request',
       'claim_native_website_fact_review', 'read_catalog_report_receipts')
-    and (p.prosrc ~ 'super_admins' or (case when p.proname='claim_owner_decision' then
-      replace(p.prosrc,E'if actor_role <> ''owner'' and (\n      public.needs_you_operator_id(p_user_id, p_verified_email) is not null\n      or public.needs_you_provider_id(p_workspace_id, p_user_id, p_verified_email) is not null\n    ) then','')
-      else p.prosrc end) ~ 'needs_you_operator_id')),
-  'no platform privilege grant in a client-serving gate');
+    and (p.prosrc ~ 'super_admins' or p.prosrc ~ 'needs_you_operator_id')),
+  'no super_admins admission branch in a client-serving gate');
 select pg_temp.ap_assert(
   public.client_resource_ref('domain', ' WWW.Example.TEST ') = 'www.example.test'
   and public.client_resource_ref('domain', 'not a host') is null

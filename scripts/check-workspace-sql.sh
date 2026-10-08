@@ -48,7 +48,10 @@ create role anon nologin;
 -- columns the isolated SQL contracts exercise in this local fixture.
 create schema auth;
 create function auth.uid() returns uuid language sql stable as $$
-  select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
+  select coalesce(
+    nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub', ''),
+    nullif(current_setting('request.jwt.claim.sub', true), '')
+  )::uuid
 $$;
 create table auth.users (
   id uuid primary key,
@@ -915,14 +918,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/catalog-reports-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010153000_newsletter_contacts.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-contacts-schema.sql"
 psql "${psql_args[@]}" <<'SQL'
--- Auth fixtures were established for the operator approval tests above.
-create schema if not exists auth;
-create or replace function auth.uid() returns uuid language sql stable as $$
-  select coalesce(
-    nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub', ''),
-    nullif(current_setting('request.jwt.claim.sub', true), '')
-  )::uuid
-$$;
+-- auth.uid() and the Supabase identity fixture are shared from initial setup.
 create or replace function auth.role() returns text language sql stable as $$
   select coalesce(
     nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role', ''),
@@ -1159,9 +1155,6 @@ psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-native-rollforward.sq
 # Integration: Postgres lead authority plus receipt retention share one teardown wrapper.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010170000_deprovision_retained_after_inquiry_export.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/deprovision-retained-after-inquiry-export-schema.sql"
-# Expired inquiry leads now remove their visitor data and reply payloads atomically.
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013220000_inquiry_lead_retention.sql"
-psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-lead-retention.sql"
 # Every stream's release flag key survives every redefinition, in any apply order (#253).
 psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 # Policy facts: confirmation/provenance/history/undo on the existing record RPC.
@@ -1371,7 +1364,7 @@ printf 'Owner recipient trust rollback is exact (%s schema objects compared) and
 # gates. Forward, the effect matrix, the older contracts these replace, then
 # rollback in reverse order (wrong order refused, catalog restored exactly)
 # and reapply.
-acting_provider=(20261014100000_client_resource_mandates 20261014112000_acting_provider_gates 20261015120000_owner_link_provider_identity 20261015121000_owner_decision_operator_exclusion)
+acting_provider=(20261014100000_client_resource_mandates 20261014112000_acting_provider_gates 20261015120000_owner_link_provider_identity 20261017120000_owner_decision_operator_refusal)
 check_acting_provider() {
   psql "${psql_args[@]}" --file="$repo_root/tests/acting-provider-gates-schema.sql"
   psql "${psql_args[@]}" --file="$repo_root/tests/operator-owner-decisions-schema.sql"
@@ -1382,6 +1375,13 @@ check_acting_provider() {
 }
 catalog_fingerprint >"$cluster_root/catalog-before-acting-provider.txt"
 for name in "${acting_provider[@]}"; do
+  if [[ "$name" == 20261017120000_owner_decision_operator_refusal ]]; then
+    if psql "${psql_args[@]}" --file="$repo_root/tests/operator-owner-decisions-schema.sql" >"$cluster_root/operator-refusal-before.log" 2>&1; then
+      printf 'The predecessor unexpectedly refused operator session decisions.\n' >&2
+      exit 1
+    fi
+    grep -q 'expected owner_decision_owner_only but the statement succeeded' "$cluster_root/operator-refusal-before.log"
+  fi
   psql "${psql_args[@]}" --single-transaction --file="$repo_root/supabase/migrations/$name.sql"
 done
 check_acting_provider
@@ -1444,7 +1444,7 @@ provider_conversion_catalog() {
       'operator_owner_invitation_assert','accept_workspace_invitation') order by p.proname;"
 }
 provider_conversion_catalog >"$cluster_root/provider-conversion-before.txt"
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013221000_provider_seat_tenant_conversion.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013220000_provider_seat_tenant_conversion.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/provider-seat-tenant-conversion-schema.sql"
 psql "${psql_args[@]}" --tuples-only --no-align --command="select p.proname || ':' || md5(pg_get_functiondef(p.oid))
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -1454,18 +1454,18 @@ psql "${psql_args[@]}" --tuples-only --no-align --command="select p.proname || '
     'accept_workspace_invitation') order by p.proname;" \
   >"$cluster_root/provider-conversion-forward-hashes.txt"
 cat "$cluster_root/provider-conversion-forward-hashes.txt"
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013221000_provider_seat_tenant_conversion.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013220000_provider_seat_tenant_conversion.sql"
 provider_conversion_catalog >"$cluster_root/provider-conversion-after-rollback.txt"
 if ! diff -u "$cluster_root/provider-conversion-before.txt" "$cluster_root/provider-conversion-after-rollback.txt"; then
   printf 'Provider-seat conversion rollback did not restore the prior functions.\n' >&2
   exit 1
 fi
-if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013221000_provider_seat_tenant_conversion.sql" >"$cluster_root/provider-conversion-wrong-order.log" 2>&1; then
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013220000_provider_seat_tenant_conversion.sql" >"$cluster_root/provider-conversion-wrong-order.log" 2>&1; then
   printf 'Provider-seat conversion rollback incorrectly accepted a second application.\n' >&2
   exit 1
 fi
 grep -q 'rollback_wrong_order_or_function_drift' "$cluster_root/provider-conversion-wrong-order.log"
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013221000_provider_seat_tenant_conversion.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013220000_provider_seat_tenant_conversion.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/provider-seat-tenant-conversion-schema.sql"
 printf 'Provider-seat conversion, populated fictional contract, rollback and reapply passed.\n'
 # Agency-sourced public checks: real RLS, quota races and rollback stop points.
@@ -1500,3 +1500,60 @@ fi
 grep -q 'owner_decision_effects_rollback_requires_data_preservation' "$cluster_root/owner-effects-rollback.log"
 psql "${psql_args[@]}" -Atc "select exists(select 1 from information_schema.columns where table_schema='public' and table_name='owner_decision_link_sessions' and column_name='intended_decision') and exists(select 1 from public.owner_decision_link_sessions) and to_regprocedure('public.owner_decision_provider_holds(uuid,uuid,text[])') is not null" | grep -qx t
 printf 'Owner effect rollback retained sessions and authority gates.\n'
+
+# October 17 retention precedes provider website checkpoints; deleting its fictional
+# inquiry fixtures has no inverse migration and runs only in this local cluster.
+retention_functions() {
+  psql "${psql_args[@]}" -At <<'SQL'
+select p.proname || ':' || md5(pg_get_functiondef(p.oid)) || ':' || coalesce(p.proacl::text, '')
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public' and p.proname in ('inquiry_events_immutable','purge_expired_tenant_leads')
+  order by p.proname;
+SQL
+}
+retention_functions >"$cluster_root/inquiry-retention-before.txt"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261017110000_inquiry_lead_retention.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-lead-retention.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261017110000_inquiry_lead_retention.sql"
+retention_functions >"$cluster_root/inquiry-retention-after-rollback.txt"
+if ! diff -u "$cluster_root/inquiry-retention-before.txt" "$cluster_root/inquiry-retention-after-rollback.txt"; then
+  printf 'Inquiry retention pre-purge rollback did not restore the prior function definitions and grants.\n' >&2
+  exit 1
+fi
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261017110000_inquiry_lead_retention.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-lead-retention-rollback.sql"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261017110000_inquiry_lead_retention.sql" >"$cluster_root/inquiry-retention-rollback-refusal.log" 2>&1; then
+  printf 'Inquiry retention rollback discarded visitor data after a marked purge.\n' >&2
+  exit 1
+fi
+grep -q 'inquiry_lead_retention_rollback_requires_data_preservation' "$cluster_root/inquiry-retention-rollback-refusal.log"
+printf 'Inquiry retention rollback restores functions before purge and refuses after marked deletion.\n'
+
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261018110000_provider_seat_website_access.sql"
+
+# #245: provider website saved checkpoint authority, with exact rollback/reapply.
+psql "${psql_args[@]}" -Atc "select md5(pg_get_functiondef('public.update_bounded_product_work(uuid,uuid,uuid,text,text,integer,jsonb)'::regprocedure))" >"$cluster_root/provider-website-forward.txt"
+psql "${psql_args[@]}" --set=rollback_expected=false --file="$repo_root/tests/provider-seat-websites-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261018110000_provider_seat_website_access.sql"
+psql "${psql_args[@]}" --set=rollback_expected=true --file="$repo_root/tests/provider-seat-websites-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261018110000_provider_seat_website_access.sql"
+psql "${psql_args[@]}" --set=rollback_expected=false --file="$repo_root/tests/provider-seat-websites-schema.sql"
+diff -u "$cluster_root/provider-website-forward.txt" <(psql "${psql_args[@]}" -Atc "select md5(pg_get_functiondef('public.update_bounded_product_work(uuid,uuid,uuid,text,text,integer,jsonb)'::regprocedure))")
+printf 'Provider website saved checkpoints: forward/rollback/reapply passed.\n'
+
+# Schema-conflict reports add service-only functions. Rollback restores the
+# pre-report catalog before any records exist and refuses after an owner ask
+# would depend on the adapter for resolution.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261018120000_connected_site_schema_conflicts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-site-schema-conflicts.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261018120000_connected_site_schema_conflicts.sql"
+psql "${psql_args[@]}" -Atc "select to_regprocedure('public.record_connected_site_schema_conflict(text,text,jsonb)') is null and to_regprocedure('public.read_connected_site_schema_conflict(uuid,uuid)') is null" | grep -qx t
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261018120000_connected_site_schema_conflicts.sql"
+psql "${psql_args[@]}" --set=keep_fixture=true --file="$repo_root/tests/connected-site-schema-conflicts.sql"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261018120000_connected_site_schema_conflicts.sql" >"$cluster_root/schema-conflicts-rollback-refusal.log" 2>&1; then
+  printf 'Schema-conflict rollback discarded owner decisions needed by the source adapter.\n' >&2
+  exit 1
+fi
+grep -q 'connected_site_schema_conflicts_rollback_requires_data_preservation' "$cluster_root/schema-conflicts-rollback-refusal.log"
+psql "${psql_args[@]}" -Atc "select to_regprocedure('public.record_connected_site_schema_conflict(text,text,jsonb)') is not null and to_regprocedure('public.read_connected_site_schema_conflict(uuid,uuid)') is not null" | grep -qx t
+printf 'Schema-conflict rollback removes unused functions and refuses after source decisions exist.\n'

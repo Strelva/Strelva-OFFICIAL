@@ -349,7 +349,7 @@ more (`20261009130000`, `20261009131000`) as batch 7, on top: 50 in all.
 Wave 5 adds `20261009140000` (the owner-link flag key) to batch 7: 51.
 Batch 0 is done, leaving 50 files in batches 1–7 from this inventory.
 Batch 7A and w6 files are additional. The readers fix and w6 are listed as
-proposed batch 8 (not rehearsed) with digests; 7A still needs its own manifest.
+proposed batch 8 with digests. The October 7 reconciliation below pins proposed H and 7A and includes the later integrated files.
 
 ### Before batch 0: a backup you have restored
 
@@ -417,7 +417,7 @@ After each batch:
 | 5 | `20261008110000`, `20261008111000`, `20261008123000`, `20261008124000`, `20261008130000`, `20261008131000`, `20261008140000` | No Sept 30 objects. Triggers on batch 1–2 tables (`systems`, `tenant_workspace_links`), wraps `tenant_unlink_plan`, replaces `workspace_release_flag_names` | Ask history, website change receipts, listing read-back queue, Needs you policy imports, Possibilities, Make real live, lead reads |
 | 6 | `20261008141000`, `20261008150000`, `20261008150100`, `20261008151000`, `20261009100000`, `20261009110000`, `20261009113000` | Yes: `btree_gist` extension, a column + FK and an index on live `public_website_bookings`; checks, columns and indexes on `tenant_leads` (written since `0.2.1`); a column + trigger on `owner_decisions`; replaces batch 1–5 functions | Booking store and lifecycle, linked-tenant publishing, domain approvals, connected sites, the Strelva service actor, inquiry records |
 | 7 | `20261009130000`, `20261009131000`, `20261009140000` | Yes, small: replaces two batch 3/6 functions (`read_strelva_handled`, `record_strelva_service_action`) with the same signatures, swaps the `purpose` check on `strelva_service_actions` (batch 6, append-only), and replaces `workspace_release_flag_names()` (batch 6) with one more key | Strelva handled lists decided Needs you items; Make real by signed link for an owner with no account, behind its own `make_real_owner_link` flag |
-| 8 (proposed; rehearsal fails catalog restore) | `20261009150000`, 83 w6 files (`20261010100000`–`20261010170000`) and `20261011153000` (#530); see "Batch 8 · proposed" | Not classified yet: live-object and lock impact unreviewed | Nothing until rehearsed; listed for review only |
+| 8 (proposed; rehearsal fails catalog restore) | Complete filename-sorted prepared inventory in "Batch 8 · proposed", including integrated amendments after w6 | Not classified yet: live-object and lock impact unreviewed | Nothing until rehearsed; listed for review only |
 
 Batches 5 and 6 are in filename order; batch 6 depends on batch 5
 (`20261009100000` keeps every flag name `20261008131000` adds;
@@ -437,24 +437,68 @@ batch rehearsal for Gate 2 step 4; integrate its exact results rather than
 treating this older filename-order check as equivalent. Preview (section 5)
 is the place to qualify the batches against the old app on hosted Postgres 17.
 
+### October 7 prepared inventory reconciliation (local only)
+
+The approved baseline and batches 0–7 keep their existing files, indices and
+checksums. Prepared order is: baseline → batch 0 → **H** → batches 1–7 →
+**7A** → **8** → **9**. H and 7A are checksum-pinned under `proposed`; they are not
+asserted to be applied. Offline staging of approved batches 0–7 is unchanged;
+its output alone does not stage or qualify these proposed steps.
+
+H is `20261005100000_restrict_legacy_tenant_client_access.sql`, after batch 0
+and before batch 1. 7A is the four files `20261009151000_provider_seats`,
+`20261009152000_agency_verifications`, `20261009153000_platform_service_actor`
+and `20261009154000_payer_party`, in that order. Batch 8 follows the filename
+order in the table below, including the later confirmed-facts, recipient-trust,
+Ask confirmation, provider disconnect, agency branding, conversion and owner
+effect changes, including provider-seat website checkpoint access. The separately proposed batch 9 retains the audited super-admin
+grant/revoke migration and its post-event rollback refusal. Nothing here
+rewrites or applies a migration.
+
+`check:release-safety:batch8` now checks complete inventory coverage, unique
+migration versions, pinned forward digests and the named manual rollback helper
+digests before initializing its private cluster. It applies H between 0 and 1,
+and pinned 7A before 8. A new migration absent from the packet stops the check.
+The manual companions for effort coverage, newsletter sender and newsletter
+backfill are explicitly mapped; their untimestamped names are retained.
+Newsletter sender rollback drops delivery/receipt tables, so it is unsafe after
+receipt adoption without a separate preservation plan. Retention rollback serializes on purge receipts and restores the old functions
+only before its first marked purge; after that it refuses. Expired inquiry data
+cannot be recreated by rolling back its function implementation.
+
+Current local rehearsal at `d8604ce0`: all 114 batch-8 forward files applied
+and every rollback companion ran without refusal. The catalog was not restored
+(tables (20), columns (168), indexes (6), triggers (6), functions (60), constraints (111)). Batch 8 stays proposed; no second forward or
+production qualification is claimed.
+
+RL-14 readiness output now reports agency workspace counts, provider rows by
+source, Strelva designation row count, and accounts by `payer_kind`. An existing
+designation stops rollout unless the applied-version read verifies all four 7A
+versions. Missing applied-version access remains unproven; table presence alone
+cannot prove the payer or service-function amendments. This code was tested
+with local fixtures; no production readiness snapshot was taken.
+
 <!-- proposed-batch-8:start -->
 ### Batch 8 · proposed, rehearsal fails catalog restore: readers fix and w6
 
-Status: **proposed; forward and every companion run, catalog not restored.** Integrated on `a1/integrate-w6-r2`
+Historical w6 status: **forward and every companion run, catalog not restored.**
+The expanded current inventory below remains proposed and needs its own complete
+rehearsal. Original integration on `a1/integrate-w6-r2`
 (#455): the readers fix (#252) and every w6 stream (release-safety, website,
 publishing, catalog, bookings, journeys, inquiries, owner-ask,
 agency-operator), plus one integration wrapper (`20261010170000`). 84
-files. They are listed in `scripts/release-safety/batches.json` under
+files at that historical rehearsal. The reconciled current inventory is listed in `scripts/release-safety/batches.json` under
 `proposed`, which `check:release-safety` does not read. Nothing here is
-staged, pushed or approved.
+staged for production or approved.
 
-- Proven locally: forward replay of every migration in filename order on a
+- Original w6 proof: forward replay of every migration in filename order on a
   fresh cluster, `check:workspace-sql` (per-stream forward and rollback
   fixtures) and `check:workspace-upgrade`. Not proven: release-safety's
   forward, reverse, forward with catalog/ACL comparison, the restored Oct 7
   copy, hosted Postgres 17.
-- Every companion is now `rollback-<forward-file>` (release-safety's and
-  #527's contract); the shared owner-link companion is split per file.
+- Original w6 companions use `rollback-<forward-file>` (#527); the shared
+  owner-link companion is split per file. The expanded inventory also pins
+  the three explicitly mapped manual helpers described above.
 - Applies after batch 7A. Round 3 made two w6 files 7A-aware: owner decision
   link sessions (`20261010102000`) are served and rechecked through the
   verified agency of record like every other service session, and
@@ -491,9 +535,10 @@ staged, pushed or approved.
 - Who says yes: Jacob, per file set, after release-safety supplies rehearsal
   evidence. This entry authorizes nothing.
 
-| Forward file | SHA-256 (12) | Rollback companion |
+| Forward file | SHA-256 prefix | Rollback companion |
 | --- | --- | --- |
 | `20261009150000_reader_rpc_volatility` | `e0bb71275ff5` | `rollback-20261009150000_reader_rpc_volatility.sql` |
+| `20261009160000_business_effort_coverage` | `3e4c097db958` | `rollback-business-effort-coverage.sql` |
 | `20261010100000_owner_invitation_claim` | `f9f5d643cc0d` | `rollback-20261010100000_owner_invitation_claim.sql` |
 | `20261010102000_owner_decision_links` | `5b6a58caea0e` | `rollback-20261010102000_owner_decision_links.sql` |
 | `20261010102100_website_owner_link_launch` | `f6b16719de69` | `rollback-20261010102100_website_owner_link_launch.sql` |
@@ -577,8 +622,37 @@ staged, pushed or approved.
 | `20261010165800_unbounded_export_archive` | `8bb45a0d6921` | `rollback-20261010165800_unbounded_export_archive.sql` |
 | `20261010165900_export_build_access` | `e2dd7c05fc27` | `rollback-20261010165900_export_build_access.sql` |
 | `20261010170000_deprovision_retained_after_inquiry_export` | `172e31fd9858` | `rollback-20261010170000_deprovision_retained_after_inquiry_export.sql` |
+| `20261011100000_workspace_newsletter_sender` | `c53f48920610` | `rollback-workspace-newsletter-sender.sql` |
+| `20261011100100_newsletter_backfill_identity` | `e3ec0219feb9` | `rollback-newsletter-backfill-identity.sql` |
+| `20261011101000_business_booking_email` | `c9f4889b9625` | `rollback-20261011101000_business_booking_email.sql` |
+| `20261011102000_native_publishing_targets` | `98f947e5b89e` | `rollback-20261011102000_native_publishing_targets.sql` |
+| `20261011120000_business_policies` | `e6092e1868a4` | `rollback-20261011120000_business_policies.sql` |
+| `20261011133700_business_facts_owner_decision` | `8fc5767832a8` | `rollback-20261011133700_business_facts_owner_decision.sql` |
+| `20261011140000_agent_booking_visibility` | `5523269ee221` | `rollback-20261011140000_agent_booking_visibility.sql` |
+| `20261011150000_public_booking_admission` | `27276ac96199` | `rollback-20261011150000_public_booking_admission.sql` |
 | `20261011153000_operator_owner_decisions` | `1859f9b74b7c` | `rollback-20261011153000_operator_owner_decisions.sql` |
-
+| `20261011160000_agency_team` | `e36ff90f9bda` | `rollback-20261011160000_agency_team.sql` |
+| `20261011170000_agency_prospects` | `caf893113873` | `rollback-20261011170000_agency_prospects.sql` |
+| `20261011180000_provider_disconnect_receipts` | `c87d645cdbec` | `rollback-20261011180000_provider_disconnect_receipts.sql` |
+| `20261012010000_tenant_track_signing_keys` | `3e9e570d92ac` | `rollback-20261012010000_tenant_track_signing_keys.sql` |
+| `20261012110000_business_pages` | `f94551c649e5` | `rollback-20261012110000_business_pages.sql` |
+| `20261012120000_track_signing_key_rotation` | `b93843ae4d0b` | `rollback-20261012120000_track_signing_key_rotation.sql` |
+| `20261012180000_agency_brand` | `309f5b5fb0ca` | `rollback-20261012180000_agency_brand.sql` |
+| `20261013110000_public_facts_read_confirmed` | `298161ff4663` | `rollback-20261013110000_public_facts_read_confirmed.sql` |
+| `20261013115000_booking_reads_confirmed_facts` | `e341acdf38a5` | `rollback-20261013115000_booking_reads_confirmed_facts.sql` |
+| `20261013120000_owner_recipient_trust` | `8e063179f6e0` | `rollback-20261013120000_owner_recipient_trust.sql` |
+| `20261013130000_ask_confirms_owner_facts` | `b33ab699b6ea` | `rollback-20261013130000_ask_confirms_owner_facts.sql` |
+| `20261013210000_agent_booking_admission` | `3bc19183b7ba` | `rollback-20261013210000_agent_booking_admission.sql` |
+| `20261013220000_provider_seat_tenant_conversion` | `23138c80bf99` | `rollback-20261013220000_provider_seat_tenant_conversion.sql` |
+| `20261014100000_client_resource_mandates` | `07fc4948ba20` | `rollback-20261014100000_client_resource_mandates.sql` |
+| `20261014110000_owner_decision_effects` | `3f9864a58acc` | `rollback-20261014110000_owner_decision_effects.sql` |
+| `20261014112000_acting_provider_gates` | `399a95b0673d` | `rollback-20261014112000_acting_provider_gates.sql` |
+| `20261015100000_agency_add_client` | `d280795634bb` | `rollback-20261015100000_agency_add_client.sql` |
+| `20261016110000_operator_action_approvals` | `e9e4a204e497` | `rollback-20261016110000_operator_action_approvals.sql` |
+| `20261017110000_inquiry_lead_retention` | `d0199c345492` | `rollback-20261017110000_inquiry_lead_retention.sql` |
+| `20261017120000_owner_decision_operator_refusal` | `616c861132f5` | `rollback-20261017120000_owner_decision_operator_refusal.sql` |
+| `20261018110000_provider_seat_website_access` | `b108d67d2d96` | `rollback-20261018110000_provider_seat_website_access.sql` |
+| `20261018120000_connected_site_schema_conflicts` | `c636ee4328ba` | `rollback-20261018120000_connected_site_schema_conflicts.sql` (refuses once source decisions exist) |
 <!-- proposed-batch-8:end -->
 
 <!-- proposed-batch-9:start -->
@@ -1810,7 +1884,7 @@ bypass for an ordinary agency action.
   remove the standing operator-admin path created by conversion. Expected
   count: zero; verify it.
 - Command/approach: after batch 7A and migration
-  `20261013221000_provider_seat_tenant_conversion.sql`, and before client
+  `20261013220000_provider_seat_tenant_conversion.sql`, and before client
   flags or invites, inventory `tenant_workspace_links`, providers and
   conversion-created operator memberships. Record a zero-result receipt if
   none need repair. Otherwise preview each legacy conversion:
@@ -1924,9 +1998,9 @@ bypass for an ordinary agency action.
   terms still need Jacob; each of the 9 clients' `existing_contract` evidence
   and Twin Trees' business structure must be confirmed before conversion.
 - Audit H reports release-safety's local restored-copy rehearsal and rollback
-  companions for batches 1–7. This branch does not contain that harness or
-  batch 7A. Integrate its manifest/evidence and record 7A's forward, reverse,
-  forward rehearsal; hosted Postgres 17 qualification remains a separate gate.
+  companions for batches 1–7. The current branch contains that harness and
+  pins proposed H, 7A, 8 and 9. The expanded packet still needs complete local
+  rollback/catalog qualification; hosted Postgres 17 remains a separate gate.
 - The exact signup kill switch, verification/re-path tools, amended
   `--agency` conversion option and `payerKind` metadata writer are prerequisites,
   not runnable completion claims in this checkout.

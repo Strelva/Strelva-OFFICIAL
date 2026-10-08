@@ -26,6 +26,17 @@ select pg_temp.if_assert(public.stage_inquiry_business_fact((select id from if_w
 update if_proposal set decision=(public.open_owner_decision((select id from if_ws),jsonb_build_object('kind','fact.inferred','route','owner_decides','title','Use this business name?',
   'approveEffect','Save this detail.','notYetEffect','Nothing changes.','sourceLifecycle','inquiry_fact','sourceId',id::text,'revisionHash',hash,'adminMayDecide',false))->>'id')::uuid;
 select pg_temp.if_expect(format('select public.confirm_inquiry_business_fact(%L,%L,%L,%L)',(select id from if_ws),id,decision,hash),'inquiry_access_denied') from if_proposal;
+-- A signed link is authoritative only after this exact item was accepted for
+-- delivery to the trusted owner. Rehearsals before recipient trust keep their
+-- predecessor contract; the complete schema also proves the unsent refusal.
+do $$ begin
+  if to_regclass('public.owner_decision_link_bindings') is not null then
+    perform pg_temp.if_expect(format('select public.claim_owner_decision(%L,%L,%L,%L,%L,null,null,%L)',
+      (select id from if_ws),(select decision from if_proposal),(select hash from if_proposal),'approve','owner_link','unclaimed-owner@example.test'),
+      'owner_decision_recipient_not_owner');
+  end if;
+end $$;
+select public.record_owner_decision_delivery((select id from if_ws),decision,'digest','sent','unclaimed-owner@example.test','if-fictional-accepted-first',null) from if_proposal;
 select pg_temp.if_assert((public.claim_owner_decision((select id from if_ws),decision,hash,'approve','owner_link',null,null,'unclaimed-owner@example.test')->>'status')='claimed','signed owner without an account approves') from if_proposal;
 select public.confirm_inquiry_business_fact((select id from if_ws),id,decision,hash) from if_proposal;
 select pg_temp.if_assert(public.business_record_entity_state((select id from if_ws),'fact','display_name')->'verified'='true'::jsonb
@@ -39,6 +50,7 @@ insert into if_proposal(id) select public.stage_inquiry_business_fact(id,'f63000
 update if_proposal set hash=(select revision_hash from public.inquiry_business_fact_proposals p where p.id=if_proposal.id);
 update if_proposal set decision=(public.open_owner_decision((select id from if_ws),jsonb_build_object('kind','fact.inferred','route','owner_decides','title','Use changed name?',
   'approveEffect','Save.','notYetEffect','Nothing.','sourceLifecycle','inquiry_fact','sourceId',id::text,'revisionHash',hash,'adminMayDecide',false))->>'id')::uuid;
+select public.record_owner_decision_delivery((select id from if_ws),decision,'digest','sent','unclaimed-owner@example.test','if-fictional-accepted-second',null) from if_proposal;
 select public.claim_owner_decision((select id from if_ws),decision,hash,'approve','owner_link',null,null,'unclaimed-owner@example.test') from if_proposal;
 update public.business_record_facts set value='"Owner corrected it"',updated_at=clock_timestamp() where workspace_id=(select id from if_ws) and fact_key='display_name';
 select pg_temp.if_assert(public.inquiry_business_fact_revision((select id from if_ws),(select id from if_proposal)) is null,'old email revision is no longer current');

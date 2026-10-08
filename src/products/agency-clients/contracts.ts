@@ -108,8 +108,8 @@ export interface ClientSiteScan {
 export interface ClientWebsiteEntries {
   connect: string;
   rebuild: string;
-  /** Staffed provider seats can open the rebuild; the server rechecks current
-   * full-work scope and every native write still enforces its own authority. */
+  /** Named staff can open website work through the verified provider seat.
+   * Individual reads and writes recheck current seat/staff/agency membership. */
   rebuildOpenToAgency: boolean;
 }
 

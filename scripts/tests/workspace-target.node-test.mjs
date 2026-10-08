@@ -12,6 +12,7 @@ test("reads the repository's forward history without manual rollback or verifica
   const migrations = readCandidateMigrations(new URL("../../supabase/migrations", import.meta.url));
   assert.ok(migrations.some(item => item.version === "20260921220000"));
   assert.ok(migrations.every(item => /^\d{14}$/.test(item.version)));
+  assert.equal(new Set(migrations.map(item => item.version)).size, migrations.length, "forward migration versions must be unique");
 });
 test("duplicate forward versions refuse before staging any migration", () => {
   const directory = mkdtempSync(join(tmpdir(), "strelva-duplicate-migrations-"));

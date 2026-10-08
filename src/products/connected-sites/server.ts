@@ -25,6 +25,7 @@ import {
   type ConnectedInquiry, type ConnectedSite, type PublicContext, type ResolvedConnectedSite,
 } from "./contracts";
 import { ConnectedSiteInputError, connectedInquiryRecordsEnabled, connectedSitesStore, type ConnectedSitesStore } from "./store";
+import { recordPlatformSchema } from "./schema-conflicts";
 import { systemOriginId } from "@/platform/systems/invariants";
 
 export { ConnectedSiteInputError, ConnectedSiteRefusedError } from "./store";
@@ -150,7 +151,7 @@ export async function readPublicContext(publicKey: string, site: ResolvedConnect
 }
 
 const DAY_MS = 86_400_000;
-export async function recordBeacon(publicKey: string, site: ResolvedConnectedSite, origin: string | null, raw: unknown, now = Date.now(), store: ConnectedSitesStore = connectedSitesStore()): Promise<number> {
+export async function recordBeacon(publicKey: string, site: ResolvedConnectedSite, origin: string | null, raw: unknown, now = Date.now(), store: ConnectedSitesStore = connectedSitesStore(), deps: { fetchPage?: (url: string) => Promise<string | null> } = {}): Promise<number> {
   const batch = beaconBatchSchema.parse(raw);
   const events = batch.events.filter(event => (BEACON_EVENT_KINDS as readonly string[]).includes(event.kind)).map(event => ({
     kind: event.kind,
@@ -162,7 +163,9 @@ export async function recordBeacon(publicKey: string, site: ResolvedConnectedSit
     target: event.target ? event.target.split(/[?#]/)[0]!.slice(0, 500) : null,
     dedupeKey: `${site.id.slice(0, 8)}:${event.id}`,
   }));
-  return store.recordEvents(publicKey, normalizeOrigin(origin ?? "") , events);
+  const accepted = events.length ? await store.recordEvents(publicKey, normalizeOrigin(origin ?? "") , events) : 0;
+  if (batch.platformSchema) await recordPlatformSchema(publicKey, site, normalizeOrigin(origin ?? ""), batch.platformSchema, store, deps);
+  return accepted;
 }
 
 export type InquiryOutcome = { status: "recorded" | "duplicate"; id: string } | { status: "held_as_spam" } | { status: "ignored" };

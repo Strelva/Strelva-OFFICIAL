@@ -78,7 +78,7 @@ for migration in $(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -na
     fi
     tail_started=1
   fi
-  if [[ "$migration_name" == "20261013221000_provider_seat_tenant_conversion.sql" ]]; then
+  if [[ "$migration_name" == "20261013220000_provider_seat_tenant_conversion.sql" ]]; then
     # Apply it after the historical conversion fixtures below so they
     # continue to prove their original RPC;
     # its new route behavior has a dedicated contract immediately afterward.
@@ -368,6 +368,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/owner-recipient-trust-schema.sql
 catalog_fingerprint >"$cluster_root/catalog-full.txt"
 # The newest gate patches the owner-trust claimant. Undo it first and reapply
 # after those reader/trust rehearsals, preserving #560's actual effect gate.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261017120000_owner_decision_operator_refusal.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261014112000_acting_provider_gates.sql"
 # Newest first; the public-facts reader is last.
 public_facts_rollbacks=(20261013120000_owner_recipient_trust 20261013115000_booking_reads_confirmed_facts 20261013110000_public_facts_read_confirmed)
@@ -400,6 +401,7 @@ for (( index=${#public_facts_rollbacks[@]}-1; index>=0; index-- )); do
   psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/${public_facts_rollbacks[$index]}.sql"
 done
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261014112000_acting_provider_gates.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261017120000_owner_decision_operator_refusal.sql"
 catalog_fingerprint >"$cluster_root/catalog-full-reapplied.txt"
 if ! diff -u "$cluster_root/catalog-full.txt" "$cluster_root/catalog-full-reapplied.txt"; then
   printf 'Reapplying #509, the public-facts and booking readers did not restore the full catalog.\n' >&2
@@ -444,6 +446,16 @@ psql "${psql_args[@]}" --file="$repo_root/tests/agency-team-schema.sql"
 
 psql "${psql_args[@]}" --file="$repo_root/tests/ask-confirmed-facts-schema.sql"
 # Apply the new conversion contract after historical callers have been proven.
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013221000_provider_seat_tenant_conversion.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013220000_provider_seat_tenant_conversion.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/provider-seat-tenant-conversion-schema.sql"
 printf 'Provider-seat tenant conversion upgrade contract passed.\n'
+
+# #245: provider website saved checkpoint authority, with exact rollback/reapply.
+psql "${psql_args[@]}" -Atc "select md5(pg_get_functiondef('public.update_bounded_product_work(uuid,uuid,uuid,text,text,integer,jsonb)'::regprocedure))" >"$cluster_root/provider-website-forward.txt"
+psql "${psql_args[@]}" --set=rollback_expected=false --file="$repo_root/tests/provider-seat-websites-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261018110000_provider_seat_website_access.sql"
+psql "${psql_args[@]}" --set=rollback_expected=true --file="$repo_root/tests/provider-seat-websites-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261018110000_provider_seat_website_access.sql"
+psql "${psql_args[@]}" --set=rollback_expected=false --file="$repo_root/tests/provider-seat-websites-schema.sql"
+diff -u "$cluster_root/provider-website-forward.txt" <(psql "${psql_args[@]}" -Atc "select md5(pg_get_functiondef('public.update_bounded_product_work(uuid,uuid,uuid,text,text,integer,jsonb)'::regprocedure))")
+printf 'Provider website saved checkpoints: forward/rollback/reapply passed.\n'

@@ -9,3 +9,6 @@
 export function needsYouReleaseEnabled(environment: { STRELVA_NEEDS_YOU_RELEASE?: string } = { STRELVA_NEEDS_YOU_RELEASE: process.env.STRELVA_NEEDS_YOU_RELEASE }): boolean {
   return environment.STRELVA_NEEDS_YOU_RELEASE === "1";
 }
+
+/** Connected-site published-fact observations: record only, off by default. */
+export const schemaConflictReleaseEnabled = () => process.env.STRELVA_CONNECTED_SITE_SCHEMA_CONFLICTS_RELEASE === "1";

@@ -48,6 +48,7 @@ insert into public.workspace_memberships(workspace_id, user_id, role, created_by
   ('af530000-0000-4000-8000-000000000010', 'af530000-0000-4000-8000-000000000003', 'admin', 'af530000-0000-4000-8000-000000000001'),
   ('af530000-0000-4000-8000-000000000010', 'af530000-0000-4000-8000-000000000005', 'admin', 'af530000-0000-4000-8000-000000000001'),
   ('af530000-0000-4000-8000-000000000011', 'af530000-0000-4000-8000-000000000004', 'owner', 'af530000-0000-4000-8000-000000000004'),
+  ('af530000-0000-4000-8000-000000000010', 'af530000-0000-4000-8000-000000000004', 'admin', 'af530000-0000-4000-8000-000000000001'),
   -- Agency staff holding a direct admin seat on the business, and an
   -- unstaffed member of the same agency with one too.
   ('af530000-0000-4000-8000-000000000010', 'af530000-0000-4000-8000-000000000006', 'admin', 'af530000-0000-4000-8000-000000000001'),
@@ -73,6 +74,10 @@ select 'item-' || n, (public.open_owner_decision('af530000-0000-4000-8000-000000
   'notYetEffect','Nothing goes live','sourceLifecycle','website_document','sourceId','od-page-' || n,'revisionHash', repeat(n::text, 64),
   'adminMayDecide', true))->>'id')::uuid
 from generate_series(1, 6) n;
+insert into od_items select 'second-operator-admin', (public.open_owner_decision('af530000-0000-4000-8000-000000000010', jsonb_build_object(
+  'kind','system.go_live','route','owner_decides','title','Second operator is not this owner','approveEffect','It goes live',
+  'notYetEffect','Nothing goes live','sourceLifecycle','website_document','sourceId','od-second-operator','revisionHash', repeat('7',64),
+  'adminMayDecide',true))->>'id')::uuid;
 insert into od_items select 'owned', (public.open_owner_decision('af530000-0000-4000-8000-000000000011', jsonb_build_object(
   'kind','system.go_live','route','owner_decides','title','Put the operator''s own page live','approveEffect','It goes live',
   'notYetEffect','Nothing goes live','sourceLifecycle','website_document','sourceId','od-owned','revisionHash', repeat('5', 64),
@@ -142,6 +147,14 @@ select pg_temp.od_expect(format($$select public.claim_owner_decision('af530000-0
 reset role;
 select pg_temp.od_assert((select state = 'open' and decided_by is null from public.owner_decisions where id = (select id from od_items where name = 'item-1')),
   'the refused item stays open and undecided');
+-- Every active operator is refused, not just a representative registry row.
+-- This second operator owns another business, but is only an admin here.
+select pg_temp.od_expect(format($$select public.claim_owner_decision('af530000-0000-4000-8000-000000000010',%L,%L,'approve','session','af530000-0000-4000-8000-000000000004','od-operator-owner@strelva.example.test',null)$$,
+  (select id from od_items where name='second-operator-admin'),repeat('7',64)), 'owner_decision_owner_only');
+select pg_temp.od_expect(format($$select public.claim_owner_decision('af530000-0000-4000-8000-000000000010',%L,%L,'not_yet','session','af530000-0000-4000-8000-000000000004','od-operator-owner@strelva.example.test',null)$$,
+  (select id from od_items where name='second-operator-admin'),repeat('7',64)), 'owner_decision_owner_only');
+select pg_temp.od_assert((select state='open' and decided_by is null from public.owner_decisions where id=(select id from od_items where name='second-operator-admin')),
+  'both active operators remain unable to decide for this owner');
 -- A revoked super admin is no longer an operator: their admin seat decides as an admin.
 set local role service_role;
 select pg_temp.od_assert((public.claim_owner_decision('af530000-0000-4000-8000-000000000010',(select id from od_items where name = 'item-2'),repeat('2',64),'approve','session','af530000-0000-4000-8000-000000000005','od-revoked-operator@strelva.example.test',null)->>'status') = 'claimed',

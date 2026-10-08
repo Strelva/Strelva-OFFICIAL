@@ -7,6 +7,7 @@
 import { z } from "zod";
 import { dualWritePgEnabled } from "@/platform/infra/db/dual-write";
 import { businessRecordSchema, type BusinessRecord } from "@/platform/business-record/contracts";
+import { ownerDecisionSchema, type OwnerDecision, type ProposedItem } from "@/platform/needs-you/contracts";
 import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { connectedSiteSchema, resolvedConnectedSiteSchema, type ConnectedInquiry, type ConnectedSite, type ResolvedConnectedSite } from "./contracts";
@@ -36,6 +37,7 @@ export interface ConnectedSitesStore {
   resolve(publicKey: string): Promise<ResolvedConnectedSite | null>;
   context(publicKey: string): Promise<{ policyFacts?: BusinessRecord["facts"]; revision: number; facts: Record<string, unknown>; services: Array<{ name: string; description: string | null; priceText: string | null }>; site: { captureForms: boolean; injectSchema: boolean } } | null>;
   recordEvents(publicKey: string, origin: string | null, events: StoredEvent[]): Promise<number>;
+  recordSchemaConflict(publicKey: string, origin: string | null, item: ProposedItem): Promise<OwnerDecision>;
   recordInquiry(publicKey: string, origin: string | null, lead: StoredLead): Promise<{ status: "recorded" | "exists" | "duplicate"; id: string; workspaceId: string }>;
   recordSpam(publicKey: string, origin: string | null, input: { recordId: string; payload: Record<string, unknown>; payloadHash: string; capturedAt: string }): Promise<{ status: "recorded" | "exists" }>;
   purge(limit: number): Promise<{ events: number; spam: number }>;
@@ -87,6 +89,7 @@ export function createConnectedSitesStore(db?: ConnectedSitesRpc): ConnectedSite
       }).parse(data);
     },
     async recordEvents(publicKey, origin, events) { return z.number().int().parse(await rpc("record_connected_site_events", { p_public_key: publicKey, p_origin: origin, p_events: events })); },
+    async recordSchemaConflict(publicKey, origin, item) { return ownerDecisionSchema.parse(await rpc("record_connected_site_schema_conflict", { p_public_key: publicKey, p_origin: origin, p_item: item })); },
     async recordInquiry(publicKey, origin, lead) {
       return z.object({ status: z.enum(["recorded", "exists", "duplicate"]), id: z.string(), workspaceId: z.string() })
         .parse(await rpc(connectedInquiryRecordsEnabled() ? "record_connected_site_inquiry_v2" : "record_connected_site_inquiry", { p_public_key: publicKey, p_origin: origin, p_lead: lead }));

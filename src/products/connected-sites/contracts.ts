@@ -12,6 +12,7 @@ import { z } from "zod";
 import type { BusinessRecord } from "@/platform/business-record/contracts";
 import { selectPublishedBusinessPolicies, type PublishedPolicies } from "@/platform/business-record/policies";
 import { publishedPolicyRows, PAYMENT_LABELS } from "./published-policies";
+import { platformSchemaHintSchema } from "./schema-hint";
 
 export const SITE_KEY_PATTERN = /^sk_pub_[a-z0-9]{24}$/;
 export const VERIFICATION_TOKEN_PATTERN = /^[a-z0-9]{32}$/;
@@ -216,7 +217,8 @@ export const beaconEventSchema = z.object({
   ref: z.string().max(500).optional(),
   target: z.string().max(500).optional(),
 });
-export const beaconBatchSchema = z.object({ sid: clientId.optional(), events: z.array(beaconEventSchema).min(1).max(20) });
+export const beaconBatchSchema = z.object({ sid: clientId.optional(), events: z.array(beaconEventSchema).max(20), platformSchema: platformSchemaHintSchema.optional() })
+  .refine(batch => batch.events.length > 0 || batch.platformSchema !== undefined, "An event or schema report is required");
 export type BeaconBatch = z.infer<typeof beaconBatchSchema>;
 
 export const publicInquirySchema = z.object({

@@ -20,7 +20,7 @@ while IFS= read -r migration; do
   if [[ "$(basename "$migration")" == "20261015120000_owner_link_provider_identity.sql" ]]; then
     psql "${psql_args[@]}" -Atc "$owner_link_fingerprint_query" >"$cluster_root/owner-link-before.hashes"
   fi
-  if [[ "$(basename "$migration")" == "20261015121000_owner_decision_operator_exclusion.sql" ]]; then
+  if [[ "$(basename "$migration")" == "20261017120000_owner_decision_operator_refusal.sql" ]]; then
     psql "${psql_args[@]}" -Atc "select md5(pg_get_functiondef('public.claim_owner_decision(uuid,uuid,text,text,text,uuid,text,text)'::regprocedure))" >"$cluster_root/owner-boundary-before.hash"
   fi
   if ! psql "${psql_args[@]}" --file="$migration" >"$cluster_root/migration.log" 2>&1; then
@@ -43,10 +43,10 @@ cmp "$cluster_root/owner-link-after.hashes" "$cluster_root/owner-link-reapplied.
 psql "${psql_args[@]}" --file="$repo_root/tests/operator-owner-decisions-schema.sql" >/dev/null
 owner_boundary_query="select md5(pg_get_functiondef('public.claim_owner_decision(uuid,uuid,text,text,text,uuid,text,text)'::regprocedure))"
 psql "${psql_args[@]}" -Atc "$owner_boundary_query" >"$cluster_root/owner-boundary-after.hash"
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261015121000_owner_decision_operator_exclusion.sql" >/dev/null
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261017120000_owner_decision_operator_refusal.sql" >/dev/null
 psql "${psql_args[@]}" -Atc "$owner_boundary_query" >"$cluster_root/owner-boundary-rollback.hash"
 cmp "$cluster_root/owner-boundary-before.hash" "$cluster_root/owner-boundary-rollback.hash"
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261015121000_owner_decision_operator_exclusion.sql" >/dev/null
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261017120000_owner_decision_operator_refusal.sql" >/dev/null
 psql "${psql_args[@]}" -Atc "$owner_boundary_query" >"$cluster_root/owner-boundary-reapplied.hash"
 cmp "$cluster_root/owner-boundary-after.hash" "$cluster_root/owner-boundary-reapplied.hash"
 psql "${psql_args[@]}" --file="$repo_root/tests/operator-owner-decisions-schema.sql" >/dev/null

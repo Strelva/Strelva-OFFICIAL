@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { boundedStore, type BoundedStore } from "@/platform/bounded-work/repository";
+import { type BoundedStore } from "@/platform/bounded-work/repository";
+import { websiteWorkspaceStore as boundedStore } from "./workspace-store";
 import { listWork } from "@/platform/workspaces/repository";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type SavedWork, type WorkspaceActor, type AcceptedHandoff } from "@/platform/workspaces/types";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";

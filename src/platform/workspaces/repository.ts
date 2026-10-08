@@ -1,5 +1,5 @@
-import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
+import { createHash, randomBytes } from "node:crypto";
 import { getSupabase } from "@/platform/infra/db/client";
 import type { WorkspaceDb } from "./schema";
 import {
@@ -200,35 +200,6 @@ async function agencyWorkspaceIds(userId: string): Promise<string[]> {
   return (data ?? []).map((row) => asString((row as DbRow).workspace_id)).filter(Boolean);
 }
 
-const providerActorSchema = z.object({
-  userId: z.string().uuid(),
-  memberships: z.array(z.object({
-    businessId: z.string().uuid(),
-    role: z.enum(["owner", "admin", "member"]),
-    via: z.enum(["membership", "provider_seat"]).optional(),
-  }).strict()),
-}).strict();
-
-/** Only a standing, fully scoped provider seat resolves to a workspace role.
- * SQL checks the current seat, agency membership and client staff row for this
- * verified actor. A per-work delegation or assignment never becomes membership.
- * Do not cache: ending a seat or removing staff closes the next read or write. */
-async function providerMemberships(a: WorkspaceActor, agencyIds?: string[]): Promise<Array<{ businessId: string; role: WorkspaceRole }>> {
-  if (!(agencyIds ?? await agencyWorkspaceIds(a.userId)).length) return [];
-  const { data, error } = await rpc("read_version_actor", { p_user_id: a.userId, p_verified_email: a.verifiedEmail });
-  if (error) workspaceDbFailure(error, "Provider workspace access is unavailable");
-  const parsed = providerActorSchema.safeParse(data);
-  if (!parsed.success || parsed.data.userId !== a.userId) throw new WorkspaceStoreError("Provider workspace access is unreadable");
-  return parsed.data.memberships.filter(membership => membership.via === "provider_seat")
-    .map(({ businessId, role }) => ({ businessId, role }));
-}
-
-async function workRole(a: WorkspaceActor, workspaceId: string): Promise<WorkspaceRole | null> {
-  return await directRole(a.userId, workspaceId)
-    ?? (await providerMemberships(a)).find(membership => membership.businessId === workspaceId)?.role
-    ?? null;
-}
-
 async function requireMember(userId: string, workspaceId: string, roles?: WorkspaceRole[]): Promise<WorkspaceRole> {
   const role = await directRole(userId, workspaceId);
   if (!role || (roles && !roles.includes(role))) throw new WorkspaceAccessError();
@@ -241,6 +212,36 @@ async function requirePermission(userId: string, workspaceId: string, permission
   return requireMember(userId, workspaceId, rolesAllowing(permission));
 }
 
+/** Current verified identity ∩ provider seat ∩ agency membership ∩ named staff.
+ * This is website authority, not a direct business membership or a contacts grant. */
+async function providerSeatWorkspaceIds(input: WorkspaceActor): Promise<string[]> {
+  const a = actor(input);
+  const { data, error } = await rpc("read_version_actor", {
+    p_user_id: a.userId, p_verified_email: a.verifiedEmail,
+  });
+  if (error) workspaceDbFailure(error, "Provider seat access is unavailable");
+  const result = z.object({ userId: z.string(), memberships: z.array(z.object({
+    businessId: z.string().uuid(), role: z.enum(["owner", "admin", "member"]),
+    via: z.enum(["membership", "provider_seat"]),
+  })) }).safeParse(data);
+  if (!result.success || result.data.userId !== a.userId) throw new WorkspaceStoreError("Provider seat access is unavailable");
+  return result.data.memberships.filter(row => row.via === "provider_seat").map(row => row.businessId);
+}
+
+export async function providerSeatWorkspaceAccess(input: WorkspaceActor, workspaceId: string): Promise<boolean> {
+  return (await providerSeatWorkspaceIds(input)).includes(workspaceId);
+}
+
+/** Website-only preflight. Each mutation's RPC rechecks authority under lock. */
+export async function assertWorkspaceWebsiteAccess(input: WorkspaceActor, workspaceId: string): Promise<void> {
+  const a = actor(input);
+  if (await directRole(a.userId, workspaceId) || await providerSeatWorkspaceAccess(a, workspaceId)) return;
+  throw new WorkspaceAccessError();
+}
+
+const isWebsiteWork = (work: Pick<SavedWork, "productId" | "resourceKind">) =>
+  work.productId === "websites" && work.resourceKind === "website";
+
 export async function listWorkspaces(input: WorkspaceActor): Promise<Workspace[]> {
   const a = actor(input);
   const { data: memberships, error } = await db().from("workspace_memberships")
@@ -251,22 +252,20 @@ export async function listWorkspaces(input: WorkspaceActor): Promise<Workspace[]
     return mapWorkspace(row.workspaces as DbRow, "member", asString(row.role) as WorkspaceRole);
   });
 
-  const agencyIds = direct.filter((w) => w.kind === "agency").map((w) => w.id);
-  if (!agencyIds.length) return direct;
-  const seats = await providerMemberships(a, agencyIds);
+  const seatIds = await providerSeatWorkspaceIds(a);
   const seen = new Set(direct.map((w) => w.id));
-  const seatIds = seats.filter(seat => !seen.has(seat.businessId)).map(seat => seat.businessId);
   if (seatIds.length) {
-    const { data: customers, error: customerError } = await db().from("workspaces")
+    const { data: seats, error: seatError } = await db().from("workspaces")
       .select("*").in("id", seatIds).eq("kind", "customer");
-    if (customerError) workspaceDbFailure(customerError, "Provider workspaces are unavailable");
-    for (const customer of customers ?? []) {
-      const row = customer as DbRow;
-      const seat = seats.find(item => item.businessId === asString(row.id));
-      if (seat && !seen.has(seat.businessId)) direct.push(mapWorkspace(row, "member", seat.role));
-      seen.add(asString(row.id));
+    if (seatError) workspaceDbFailure(seatError, "Provider workspaces are unavailable");
+    for (const row of seats ?? []) {
+      const workspace = mapWorkspace(row as DbRow, "provider_seat");
+      if (!seen.has(workspace.id)) direct.push(workspace);
+      seen.add(workspace.id);
     }
   }
+  const agencyIds = direct.filter((w) => w.kind === "agency").map((w) => w.id);
+  if (!agencyIds.length) return direct;
   const { data: delegations, error: delegationError } = await db().from("workspace_delegations")
     .select("customer_workspace_id, workspaces!workspace_delegations_customer_workspace_id_fkey(*)")
     .in("agency_workspace_id", agencyIds).eq("status", "active");
@@ -359,12 +358,19 @@ export async function agencyAssignedWorkAccess(input: WorkspaceActor, workspaceI
 
 export async function listWork(input: WorkspaceActor, workspaceId: string): Promise<SavedWork[]> {
   const a = actor(input);
-  const role = await workRole(a, workspaceId);
+  const role = await directRole(a.userId, workspaceId);
   let query = db().from("saved_product_work").select("*").eq("workspace_id", workspaceId);
   if (!role) {
     const ids = await delegatedWorkIds(a.userId, workspaceId);
-    if (!ids.length) throw new WorkspaceAccessError();
-    query = query.in("id", ids);
+    const seat = await providerSeatWorkspaceAccess(a, workspaceId);
+    if (!seat && !ids.length) throw new WorkspaceAccessError();
+    if (!seat) query = query.in("id", ids);
+    else if (!ids.length) query = query.eq("product_id", "websites").eq("resource_kind", "website");
+    else {
+      // Seat grants only website work. Explicit shared work keeps its existing grant.
+      const safeIds = z.array(z.string().uuid()).parse(ids);
+      query = query.or(`and(product_id.eq.websites,resource_kind.eq.website),id.in.(${safeIds.join(",")})`);
+    }
   }
   const { data, error } = await query.order("updated_at", { ascending: false }).limit(MAX_WORK_PER_WORKSPACE);
   if (error) workspaceDbFailure(error, "Saved work is unavailable");
@@ -377,32 +383,32 @@ export async function getWork(input: WorkspaceActor, id: string): Promise<SavedW
   if (error) workspaceDbFailure(error, "Saved work is unavailable");
   if (!data) return null;
   const work = mapWork(data as DbRow);
-  if (await workRole(a, work.workspaceId)) return work;
+  if (await directRole(a.userId, work.workspaceId)) return work;
+  if (isWebsiteWork(work) && await providerSeatWorkspaceAccess(a, work.workspaceId)) return work;
   const delegated = await delegatedWorkIds(a.userId, work.workspaceId);
   if (delegated.includes(id) || await assignedAgencyWorkAccess(a.userId, a.verifiedEmail, work.workspaceId, id)) return work;
   throw new WorkspaceAccessError();
 }
 
-export async function assertCanSaveWork(input: WorkspaceActor, workspaceId: string): Promise<void> {
+export async function assertCanSaveWork(input: WorkspaceActor, workspaceId: string, work?: Pick<SaveWorkInput, "productId" | "resourceKind">): Promise<void> {
   const a = actor(input);
-  const role = await workRole(a, workspaceId);
-  if (!role || !rolesAllowing("create_work").includes(role)) throw new WorkspaceAccessError();
+  if (work && isWebsiteWork(work)) await assertWorkspaceWebsiteAccess(a, workspaceId);
+  else await requirePermission(a.userId, workspaceId, "create_work");
   const { count, error } = await db().from("saved_product_work")
     .select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId);
   if (error) workspaceDbFailure(error, "Saved work storage is unavailable");
   if ((count ?? 0) >= MAX_WORK_PER_WORKSPACE) throw new WorkspaceConflictError("Saved work limit reached");
 }
 
-/** Authorize workspace work access without consuming the saved-work cap.
- * Standing provider seats carry their SQL-resolved role; narrow grants do not. */
+/** Authorize a direct workspace member without consuming the saved-work cap. */
 export async function assertWorkspaceMember(input: WorkspaceActor, workspaceId: string): Promise<void> {
   const a = actor(input);
-  if (!await workRole(a, workspaceId)) throw new WorkspaceAccessError();
+  await requireMember(a.userId, workspaceId);
 }
 
 export async function saveWork(input: WorkspaceActor, workspaceId: string, work: SaveWorkInput): Promise<SavedWork> {
   const a = actor(input);
-  await assertCanSaveWork(a, workspaceId);
+  await assertCanSaveWork(a, workspaceId, work);
   const title = work.title?.trim().slice(0, 160) || null;
   const { data, error } = await rpc("save_workspace_work", {
     p_workspace_id: workspaceId,

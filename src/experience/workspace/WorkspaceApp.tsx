@@ -228,7 +228,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   }
 
   const currentWorkspace = snapshot?.workspaces.find((workspace) => workspace.id === snapshot.workspaceId) ?? null;
-  const delegatedRead = currentWorkspace?.access === "delegated_read";
+  const delegatedRead = currentWorkspace?.access === "delegated_read" || currentWorkspace?.access === "provider_seat";
   const workspaceReadOnly = Boolean(delegatedRead || workspaceExitBlocks);
   const calendarRecoveryAllowed = Boolean(workspaceStopped && !delegatedRead && (currentWorkspace?.role === "owner" || currentWorkspace?.role === "admin"));
   const canShowWorkBudget = Boolean(snapshot && !snapshot.actor.localPreview && !delegatedRead);
@@ -655,7 +655,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
               onOpenStanding={openStanding}
               onSaved={horizontalSaved}
             />
-              : view === "websites" ? <WebsiteExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} rebuildEnabled={snapshot.releases?.websiteRebuild ?? rebuildEnabled} rebuildVersion={websiteDocumentVersion(selectedWork?.payload)} managed={Boolean(snapshot.managedWork?.length)} agency={currentWorkspace?.kind === "agency"} readOnly={workspaceReadOnly} initialRequest={horizontalRequest} onSaved={horizontalSaved} />
+              : view === "websites" ? <WebsiteExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} rebuildEnabled={snapshot.releases?.websiteRebuild ?? rebuildEnabled} rebuildVersion={websiteDocumentVersion(selectedWork?.payload)} managed={Boolean(snapshot.managedWork?.length)} agency={currentWorkspace?.kind === "agency" || currentWorkspace?.access === "provider_seat"} readOnly={workspaceExitBlocks || (workspaceReadOnly && currentWorkspace?.access !== "provider_seat")} initialRequest={horizontalRequest} onSaved={horizontalSaved} />
               : view === "custom-applications" ? selectedWork?.productId === view ? <CustomApplicationManageExperience key={selectedWork.id} workId={selectedWork.id} readOnly={Boolean(workspaceReadOnly || currentWorkspace?.role === "member")} /> : <p role="status">Select a saved custom application to review its delivery.</p>
               : view === "onboarding" ? <OnboardingWorkspaceExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} initialCaseId={selectedWork?.productId === view ? selectedWork.id : undefined} initialRequest={horizontalRequest} readOnly={workspaceReadOnly} onSaved={horizontalSaved} />
               : view === "product-learning" ? <LearningExperience workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} sources={snapshot.work} readOnly={workspaceReadOnly} onSaved={horizontalSaved} />
