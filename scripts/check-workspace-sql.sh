@@ -965,6 +965,9 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125950_inq
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-operator-review-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125955_inquiry_operator_revocation.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-operator-revocation-schema.sql"
+# The durable runner now requires typed compensation claims before its RPC proof.
+# The ordered full-schema proof also applies this additive migration at its tail.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261014030000_make_real_compensation_claims.sql"
 STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/make-real-activation-repository.test.ts
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010130000_booking_parity.sql"

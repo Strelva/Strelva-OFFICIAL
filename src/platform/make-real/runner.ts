@@ -10,7 +10,7 @@ import { initialChecks, planActivation } from "./plan";
 import { BaselineMovedError, selectAdapter, type AuthorityPort, type EffectAdapter, type LiveSystemsPort, type OperatingChecksPort } from "./ports";
 import type { ActivationRepository } from "./repository";
 
-/** A worker that started a step this recently may still be running it. */
+/** A worker that claimed this step or compensation recently may still be active. */
 export const RUNNING_STEP_GRACE_MS = 120_000;
 const MAX_ATTEMPTS = 3;
 
@@ -65,9 +65,37 @@ function introducedKey(target: string): string | null {
   return target.startsWith("introduced:") ? target.slice("introduced:".length) : null;
 }
 
+/** Activation rows predate the typed compensation outcome and only kept this
+ * detail in `reason`. Read those rows without making prose the current state. */
+function legacyCompensationFailed(step: ActivationStep): boolean {
+  return step.compensation === undefined && step.reason?.startsWith("Compensation failed:") === true;
+}
+
+function compensationFailed(step: ActivationStep): boolean {
+  return step.compensation?.status === "failed" || legacyCompensationFailed(step);
+}
+
+function compensationUnknown(step: ActivationStep): boolean {
+  return step.compensation?.status === "unknown";
+}
+
+function compensationRunning(step: ActivationStep): boolean {
+  return step.compensation?.status === "running";
+}
+
 export function createMakeReal(deps: MakeRealDeps) {
   const now = deps.clock ?? (() => new Date().toISOString());
   const newId = deps.ids ?? randomUUID;
+  const activeCompensationClaims = new Set<string>();
+
+  function compensationClaimKey(businessId: string, activationId: string, stepId: string, claimId: string): string {
+    return `${businessId}\u0000${activationId}\u0000${stepId}\u0000${claimId}`;
+  }
+
+  function compensationClaimActive(a: Activation, step: ActivationStep): boolean {
+    const claimId = step.compensation?.claimId;
+    return Boolean(claimId && activeCompensationClaims.has(compensationClaimKey(a.businessId, a.id, step.id, claimId)));
+  }
 
   async function load(businessId: string, id: string): Promise<Activation> {
     const a = await deps.activations.get(businessId, id);
@@ -447,13 +475,43 @@ export function createMakeReal(deps: MakeRealDeps) {
 
     /** Operator evidence for an unknown outcome. An accepted write can never
      * be declared safe to replay. */
-    async reconcile(actor: WorkspaceActor, businessId: string, id: string, input: { stepId: string; resolution: "completed" | "not_applied"; evidence: string; providerRef?: string; note?: string }): Promise<Activation> {
+    async reconcile(actor: WorkspaceActor, businessId: string, id: string, input: { stepId: string; resolution: "completed" | "not_applied"; evidence: string; providerRef?: string; note?: string; target?: "effect" | "compensation" }): Promise<Activation> {
       const a = await load(businessId, id);
       const step = a.steps.find((s) => s.id === input.stepId);
       // Declaring what happened outside is an authority act, rechecked now.
       const decision = await deps.authority.check(actor, { businessId, scope: step?.scope ?? "system.activate" });
       if (!decision.allowed) throw new WorkspaceAccessError(decision.reason);
-      if (!step || step.status !== "unknown" || !input.evidence.trim()) conflict("Reconciliation needs an unknown step and evidence of its outcome.");
+      if (!step || !input.evidence.trim()) conflict("Reconciliation needs an unknown step and evidence of its outcome.");
+      const target = input.target ?? (compensationUnknown(step) ? "compensation" : "effect");
+      if (target === "compensation") {
+        if (step.kind !== "effect" || step.effect !== "accepted") {
+          conflict("Reconciliation needs an accepted effect with an unknown compensation outcome.");
+        }
+        if (compensationRunning(step)) {
+          conflict("A compensation request is still active or claimed. Wait before reconciling its outcome.");
+        }
+        if (!compensationUnknown(step)) {
+          conflict("Reconciliation needs an accepted effect with an unknown compensation outcome.");
+        }
+        if (compensationClaimActive(a, step)) {
+          conflict("A compensation request is still settling. Wait before reconciling its outcome.");
+        }
+        const evidence = input.evidence.slice(0, 2000);
+        if (input.resolution === "completed") {
+          step.status = "compensated";
+          step.compensation = { status: "compensated", detail: evidence, at: now() };
+          step.reason = undefined;
+        } else {
+          const detail = `Evidence confirms compensation did not apply: ${evidence}`.slice(0, 2000);
+          step.compensation = { status: "failed", detail, at: now() };
+          step.reason = `Compensation failed: ${detail}`.slice(0, 2000);
+        }
+        a.status = deriveStatus(a);
+        const next = record(a, "reconcile", actor.userId, now(), `${step.id} compensation: ${input.resolution}`);
+        await deps.activations.save(next, a.revision);
+        return next;
+      }
+      if (step.status !== "unknown") conflict("Reconciliation needs an unknown step and evidence of its outcome.");
       if (input.resolution === "not_applied" && step.effect === "accepted") conflict("An accepted write cannot be declared safe to replay.");
       if (input.resolution === "completed") {
         step.status = "completed"; step.effect = "accepted";
@@ -499,9 +557,15 @@ export function createMakeReal(deps: MakeRealDeps) {
       }
 
       for (const stepId of [...a.steps].reverse().map((s) => s.id)) {
-        const step = a.steps.find((s) => s.id === stepId)!;
+        let step = a.steps.find((s) => s.id === stepId)!;
         if (step.status !== "completed") continue;
-        const before = `${step.status}|${step.reason ?? ""}`;
+        const before = `${step.status}|${step.reason ?? ""}|${JSON.stringify(step.compensation ?? null)}`;
+        let attemptedCompensation = false;
+        let activeClaimKey: string | undefined;
+        if (step.kind === "connect" || step.kind === "activate") {
+          const permission = await deps.authority.check(actor, { businessId, scope: "system.activate" });
+          if (!permission.allowed) throw new WorkspaceAccessError(permission.reason);
+        }
         if (step.kind === "connect") {
           const row = a.connections.find((c) => c.id === step.target);
           if (row?.connectionId) await deps.live.disconnect(businessId, row.connectionId);
@@ -520,24 +584,93 @@ export function createMakeReal(deps: MakeRealDeps) {
             step.status = "restored"; step.reason = `Live reference restored to ${pin.baselineRevisionId}.`;
           }
         } else if (step.kind === "effect" && step.effect === "accepted") {
+          if (compensationRunning(step)) {
+            const claim = step.compensation!;
+            const claimAge = Date.parse(now()) - Date.parse(claim.at);
+            if (compensationClaimActive(a, step) || claimAge < RUNNING_STEP_GRACE_MS) break;
+            const detail = "A compensation claim expired without a recorded provider outcome.";
+            step.compensation = { status: "unknown", detail, at: now(), claimId: claim.claimId };
+            step.reason = `Compensation outcome is unknown: ${detail}`;
+          }
           const effect = p.effects.find((e) => e.id === step.target)!;
-          const adapter = adapterFor(effect);
-          if (step.reversibility === "compensable" && adapter.compensate && step.receipt?.providerRef) {
-            const r = await adapter.compensate({ businessId, providerRef: step.receipt.providerRef, idempotencyKey: `${step.idempotencyKey}:compensate` });
-            if (r.ok) { step.status = "compensated"; step.reason = r.detail; } else { step.reason = `Compensation failed: ${r.detail}`; }
+          const adapter = selectAdapter(deps.adapters, effect);
+          const providerRef = step.receipt?.providerRef;
+          if (compensationUnknown(step)) {
+            // Reconciliation must establish the provider outcome before retry.
+          } else if (step.reversibility === "compensable" && adapter?.compensate && providerRef) {
+            const permission = await deps.authority.check(actor, { businessId, scope: step.scope ?? EFFECT_SCOPE[effect.kind] });
+            if (!permission.allowed) {
+              step.compensation = { status: "unavailable", detail: `Undo authority is not current: ${permission.reason}`.slice(0, 2000), at: now() };
+              step.reason = step.compensation.detail;
+              await checkpoint("rollback_step", `${step.id}: undo authority unavailable`);
+              continue;
+            }
+            const claimId = newId();
+            step.compensation = { status: "running", detail: "A compensation request is in progress.", at: now(), claimId };
+            step.reason = undefined;
+            activeClaimKey = compensationClaimKey(businessId, a.id, step.id, claimId);
+            activeCompensationClaims.add(activeClaimKey);
+            try {
+              await checkpoint("rollback_compensation_claim", `${step.id}: compensation claimed`);
+            } catch (error) {
+              activeCompensationClaims.delete(activeClaimKey);
+              throw error;
+            }
+            // checkpoint() advances the activation copy, so reacquire the step
+            // that carries the persisted claim before recording the result.
+            step = a.steps.find((s) => s.id === stepId)!;
+            attemptedCompensation = true;
+            try {
+              const r = await adapter.compensate({ businessId, providerRef, idempotencyKey: `${step.idempotencyKey}:compensate` });
+              if (r.ok) {
+                step.status = "compensated";
+                step.compensation = { status: "compensated", detail: r.detail.slice(0, 2000), at: now(), claimId };
+                step.reason = r.detail.slice(0, 2000);
+              } else {
+                step.compensation = { status: "failed", detail: r.detail.slice(0, 2000), at: now(), claimId };
+                step.reason = `Compensation failed: ${step.compensation.detail}`.slice(0, 2000);
+              }
+            } catch (error) {
+              const detail = error instanceof Error ? error.message : "The provider did not confirm whether compensation succeeded.";
+              step.compensation = { status: "unknown", detail: detail.slice(0, 2000), at: now(), claimId };
+              step.reason = `Compensation outcome is unknown: ${step.compensation.detail}`.slice(0, 2000);
+            }
+
           } else {
+            const detail = step.reversibility !== "compensable" ? "This accepted effect is irreversible."
+              : !adapter ? `The ${effect.kind} adapter is unavailable.`
+                : !adapter.compensate ? `The ${effect.kind} adapter has no compensation operation.`
+                  : "The accepted effect has no provider reference for compensation.";
+            step.compensation = { status: "unavailable", detail, at: now() };
             step.reason = "Already happened and cannot be undone.";
           }
         } else if (step.kind === "stage" || step.kind === "introduce") {
           step.status = "restored"; step.reason = "Prepared revision kept as history; never live.";
         }
-        if (`${step.status}|${step.reason ?? ""}` !== before) await checkpoint("rollback_step", `${step.id}: ${step.status}`);
+        if (`${step.status}|${step.reason ?? ""}|${JSON.stringify(step.compensation ?? null)}` !== before || attemptedCompensation) {
+          try {
+            await checkpoint("rollback_step", `${step.id}: ${step.status}`);
+          } finally {
+            if (activeClaimKey) activeCompensationClaims.delete(activeClaimKey);
+          }
+        } else if (activeClaimKey) {
+          activeCompensationClaims.delete(activeClaimKey);
+        }
       }
 
-      const unknown = a.steps.filter((s) => s.status === "unknown");
+      const unknown = a.steps.filter((s) => s.status === "unknown" || compensationUnknown(s));
       if (unknown.length) {
         // Nothing may claim this is over while an outside outcome is unknown.
-        await checkpoint("rollback_waiting", `Needs reconciliation: ${unknown.map((s) => s.id).join(", ")}`);
+        return a;
+      }
+      if (a.steps.some(compensationRunning)) return a;
+      const failedCompensations = a.steps.filter((s) => s.kind === "effect" && s.effect === "accepted"
+        && s.status === "completed" && (compensationFailed(s)
+          || (s.reversibility === "compensable" && s.compensation?.status === "unavailable")));
+      if (failedCompensations.length) {
+        // Keep the activation attached and open. A failed compensation may be
+        // retried after the provider issue is fixed; calling it rolled back
+        // would strand an accepted effect that is still live.
         return a;
       }
       a.status = "rolled_back";

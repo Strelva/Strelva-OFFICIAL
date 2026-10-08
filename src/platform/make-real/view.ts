@@ -20,22 +20,57 @@ export interface ActivationView {
   checks: Activation["checks"];
 }
 
+/** Older activation rows carry compensation details only in `reason`. */
+function compensationFailed(step: Activation["steps"][number]): boolean {
+  return step.compensation?.status === "failed"
+    || (step.compensation === undefined && step.reason?.startsWith("Compensation failed:") === true);
+}
+
+function compensationUnknown(step: Activation["steps"][number]): boolean {
+  return step.compensation?.status === "unknown";
+}
+
+function compensationRunning(step: Activation["steps"][number]): boolean {
+  return step.compensation?.status === "running";
+}
+
+function cannotUndo(step: Activation["steps"][number], activationStatus: Activation["status"]): boolean {
+  const legacyUnavailable = step.compensation === undefined && step.reason === "Already happened and cannot be undone.";
+  const legacyFailedAndClosed = step.compensation === undefined && activationStatus === "rolled_back"
+    && step.reason?.startsWith("Compensation failed:") === true;
+  return step.reversibility === "irreversible" || step.compensation?.status === "unavailable"
+    || legacyUnavailable || legacyFailedAndClosed;
+}
+
 /** The partial state a customer or operator sees. No fake atomicity: each
  * accepted effect is listed on its own, including ones that cannot be undone. */
 export function describeActivation(a: Activation): ActivationView {
   const switched = a.steps.some((s) => s.kind === "activate" && s.status === "completed");
-  const done = a.steps.filter((s) => s.status === "completed").map((s) => ({
+  const unresolvedCompensation = (s: Activation["steps"][number]) => s.kind === "effect" && s.effect === "accepted"
+    && s.status === "completed" && (compensationFailed(s) || compensationUnknown(s) || compensationRunning(s));
+  const done = a.steps.filter((s) => s.status === "completed" && !unresolvedCompensation(s)).map((s) => ({
     step: s.id, label: s.label,
     ...(s.receipt?.providerRef ? { provider: s.receipt.providerRef } : {}),
     ...(s.receipt ? { mode: s.receipt.adapterMode } : {}),
     ...(s.readBack ? { readBack: s.readBack.status } : {}),
   }));
-  const waiting = a.steps.filter((s) => s.status === "blocked" || s.status === "failed").map((s) => ({ step: s.id, label: s.label, reason: s.reason ?? "" }));
-  const unknown = a.steps.filter((s) => s.status === "unknown").map((s) => ({ step: s.id, label: s.label }));
+  const waiting = a.steps.filter((s) => s.status === "blocked" || s.status === "failed" || compensationFailed(s) || compensationRunning(s))
+    .map((s) => ({
+      step: s.id, label: s.label,
+      reason: s.compensation?.status === "failed" ? `Compensation failed: ${s.compensation.detail}`
+        : compensationRunning(s) ? "A compensation request is in progress. Wait before retrying."
+          : s.reason ?? "",
+    }));
+  const unknown = a.steps.flatMap((s) => [
+    ...(s.status === "unknown" ? [{ step: s.id, label: s.label }] : []),
+    ...(compensationUnknown(s) ? [{ step: `compensation:${s.id}`, label: `Undo: ${s.label}` }] : []),
+  ]);
   const accepted = a.steps.filter((s) => s.kind === "effect" && s.effect === "accepted" && s.status !== "compensated");
   const rollbackWaiting = Boolean(a.rollbackStartedAt) && a.status !== "rolled_back";
+  const compensationInProgress = a.steps.some(compensationRunning);
   const headline =
     a.status === "made_real" ? "Made real. Every operating check passed."
+      : rollbackWaiting && compensationInProgress ? "Rollback is not finished. A compensation request is still in progress."
       : rollbackWaiting && unknown.length ? `Rollback is not finished. ${unknown.length} outside effect(s) have an unknown outcome and need reconciliation with evidence before anything can be called undone.`
       : rollbackWaiting ? "Rollback is not finished. Run it again to complete it."
       : a.status === "rolled_back" ? `Rolled back. ${accepted.length ? `${accepted.length} outside effect(s) already happened and are listed.` : "No outside effect remains."}`
@@ -50,7 +85,8 @@ export function describeActivation(a: Activation): ActivationView {
     notStarted: a.steps.filter((s) => s.status === "pending").map((s) => s.id),
     liveUnchanged: !switched,
     needsReconciliation: unknown.length > 0,
-    cannotUndo: accepted.filter((s) => s.reversibility === "irreversible").map((s) => s.label),
+    cannotUndo: accepted.filter((s) => cannotUndo(s, a.status))
+      .map((s) => s.label),
     checks: a.checks,
   };
 }
@@ -102,7 +138,13 @@ export function customerStepLines(a: Activation): CustomerStepLine[] {
     let detail: string | null = null;
     switch (s.status) {
       case "completed":
-        if (s.kind === "effect" && s.effect === "accepted" && a.rollbackStartedAt) {
+        if (compensationUnknown(s)) {
+          state = "Not sure yet";
+          detail = "The undo outcome needs evidence before another attempt.";
+        } else if (compensationRunning(s) || compensationFailed(s)) {
+          state = "Waiting";
+          detail = plainReason(s.compensation?.detail ?? s.reason);
+        } else if (s.kind === "effect" && s.effect === "accepted" && a.rollbackStartedAt) {
           state = "Can't be undone";
           detail = plainReason(s.reason) ?? "It already happened outside Strelva.";
         } else if (s.kind === "effect" && s.readBack?.status === "failed") {
@@ -137,12 +179,12 @@ export function customerActivationView(a: Activation, name: string): CustomerAct
   const done = a.steps.filter((s) => s.status === "completed").length;
   const total = a.steps.length;
   const landed = a.steps.some((s) => (s.kind === "effect" && s.effect === "accepted") || (s.kind === "activate" && s.status === "completed"));
-  const checking = a.steps.some((s) => s.status === "unknown");
+  const checking = a.steps.some((s) => s.status === "unknown" || compensationUnknown(s));
   const cutoverWaiting = lines.some((line) => line.step.includes(":domain_moved") && line.state === "Waiting");
   const partlyLive = (a.status === "needs_attention" || cutoverWaiting) && landed && !a.rollbackStartedAt;
   const headline =
     a.status === "made_real" ? (cutoverWaiting ? "Live at its Strelva address. Your domain is waiting on DNS." : "Live.")
-      : a.status === "rolled_back" ? "Undone."
+      : a.status === "rolled_back" ? (a.steps.some((s) => s.kind === "effect" && s.effect === "accepted" && s.status !== "compensated") ? "Undo finished. Some outside effects remain." : "Undone.")
         : a.rollbackStartedAt ? (checking ? "Undoing. Strelva is checking what already happened." : "Undoing.")
           : a.status === "needs_attention" ? (landed ? "Partly live" : "Nothing changed yet. Strelva is on it.")
             : `Making ${name} live: ${done} of ${total} done`;

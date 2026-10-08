@@ -32,6 +32,10 @@ export interface EffectAdapter extends IsolatedEffectRehearsal {
    * declared effect is passed when known, for providers keyed by its content. */
   find(input: { businessId: string; idempotencyKey: string; effect?: DeclaredEffect }): Promise<{ found: true; providerRef: string } | { found: false } | null>;
   readBack(input: { businessId: string; providerRef: string }): Promise<{ ok: boolean; detail: string }>;
+  /** Compensation may not be idempotent; the runner persists a CAS claim
+   * before invoking it. `ok: false` means it was refused without taking effect
+   * and may be retried. If the provider cannot establish its outcome, throw so
+   * the activation records it as unknown and requires evidence before retrying. */
   compensate?(input: { businessId: string; providerRef: string; idempotencyKey: string }): Promise<{ ok: boolean; detail: string }>;
 }
 

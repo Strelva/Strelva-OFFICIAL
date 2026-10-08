@@ -15,6 +15,7 @@ import {
   type Activation,
   type ActivationRepository,
   type EffectAdapter,
+  activationSchema,
 } from "@/platform/make-real";
 import { uuidFromSeed } from "@/platform/business-record/tenant-import";
 import { systemOriginId } from "@/platform/systems";
@@ -142,6 +143,214 @@ describe("Make real: unknown outside effects block rollback (audit 1)", () => {
     expect(w.payment.ledger[0]!.state).toBe("compensated");
     expect(describeActivation(rolled).headline).toBe("Rolled back. No outside effect remains.");
     expect((await w.possibilities.get(BIZ, "p1"))!.activationId).toBeUndefined();
+  });
+
+  it("keeps rollback open when a compensable effect could not be undone, then retries it", async () => {
+    const w = await setup();
+    const a = await started(w);
+    w.revoked.add("site.publish");
+    await w.makeReal.run(owner, BIZ, a.id);
+    const performCalls = w.calendarBase.calls.perform;
+    expect(stepOf(await w.makeReal.get(BIZ, a.id), "effect:slot").status).toBe("completed");
+
+    const compensate = w.calendar.compensate!;
+    w.calendar.compensate = async () => ({ ok: false, detail: "Temporary provider outage." });
+    const waiting = await w.makeReal.rollback(owner, BIZ, a.id);
+    expect(waiting.status).toBe("needs_attention");
+    expect(waiting.rollbackStartedAt).toBeDefined();
+    expect(stepOf(waiting, "effect:slot")).toMatchObject({
+      status: "completed", reason: "Compensation failed: Temporary provider outage.",
+      compensation: { status: "failed", detail: "Temporary provider outage." },
+    });
+    expect(describeActivation(waiting).waiting).toContainEqual(expect.objectContaining({
+      step: "effect:slot", reason: "Compensation failed: Temporary provider outage.",
+    }));
+    expect(describeActivation(waiting).done.map((item) => item.step)).not.toContain("effect:slot");
+    expect((await w.possibilities.get(BIZ, "p1"))!.activationId).toBe(a.id);
+
+    w.calendar.compensate = compensate;
+    const rolled = await w.makeReal.rollback(owner, BIZ, a.id);
+    expect(rolled.status).toBe("rolled_back");
+    expect(stepOf(rolled, "effect:slot").status).toBe("compensated");
+    expect(describeActivation(rolled).cannotUndo).toEqual([]);
+    expect(w.calendarBase.calls.perform).toBe(performCalls);
+    expect((await w.possibilities.get(BIZ, "p1"))!.activationId).toBeUndefined();
+  });
+
+  it("claims compensation before calling a non-idempotent provider and blocks concurrent rollback", async () => {
+    const w = await setup();
+    const a = await started(w);
+    w.revoked.add("site.publish");
+    await w.makeReal.run(owner, BIZ, a.id);
+
+    const providerCompensate = w.calendarBase.compensate!;
+    let calls = 0;
+    let markEntered!: () => void;
+    let release!: () => void;
+    const entered = new Promise<void>((resolve) => { markEntered = resolve; });
+    const blocked = new Promise<void>((resolve) => { release = resolve; });
+    w.calendar.compensate = async (input) => {
+      calls += 1;
+      markEntered();
+      await blocked;
+      return providerCompensate(input);
+    };
+
+    const firstRollback = w.makeReal.rollback(owner, BIZ, a.id);
+    await entered;
+    const waiting = await w.makeReal.rollback(owner, BIZ, a.id);
+    expect(waiting.status).toBe("needs_attention");
+    expect(stepOf(waiting, "effect:slot").compensation).toMatchObject({ status: "running", claimId: expect.any(String) });
+    expect(describeActivation(waiting).waiting).toContainEqual(expect.objectContaining({
+      step: "effect:slot", reason: "A compensation request is in progress. Wait before retrying.",
+    }));
+    expect((await w.possibilities.get(BIZ, "p1"))!.activationId).toBe(a.id);
+    expect(calls).toBe(1);
+    await expect(w.makeReal.reconcile(owner, BIZ, a.id, {
+      stepId: "effect:slot", target: "compensation", resolution: "not_applied",
+      evidence: "Provider lookup says cancellation is absent.",
+    })).rejects.toThrow(/still active or claimed/);
+
+    release();
+    const rolled = await firstRollback;
+    expect(rolled.status).toBe("rolled_back");
+    expect(calls).toBe(1);
+    expect(w.calendarBase.calls.compensate).toBe(1);
+    expect((await w.possibilities.get(BIZ, "p1"))!.activationId).toBeUndefined();
+  });
+
+  it("does not repeat accepted compensation when its result checkpoint is interrupted", async () => {
+    const w = await setup();
+    const a = await started(w);
+    w.revoked.add("site.publish");
+    await w.makeReal.run(owner, BIZ, a.id);
+    w.faults.beforeSave = (value) => {
+      if (value.history.at(-1)?.detail === "effect:slot: compensated") {
+        w.faults.beforeSave = undefined;
+        throw new Error("process lost after provider accepted compensation");
+      }
+    };
+
+    await expect(w.makeReal.rollback(owner, BIZ, a.id)).rejects.toThrow(/provider accepted compensation/);
+    expect(w.calendarBase.calls.compensate).toBe(1);
+    expect(w.calendarBase.ledger.find((entry) => entry.effectId === "slot")!.state).toBe("compensated");
+    expect(stepOf(await w.makeReal.get(BIZ, a.id), "effect:slot").compensation).toMatchObject({ status: "running", claimId: expect.any(String) });
+
+    const stillClaimed = await w.makeReal.rollback(owner, BIZ, a.id);
+    expect(stepOf(stillClaimed, "effect:slot").compensation?.status).toBe("running");
+    expect(w.calendarBase.calls.compensate).toBe(1);
+
+    w.advance(RUNNING_STEP_GRACE_MS + 1);
+    const unknown = await w.makeReal.rollback(owner, BIZ, a.id);
+    expect(stepOf(unknown, "effect:slot").compensation?.status).toBe("unknown");
+    expect(w.calendarBase.calls.compensate).toBe(1);
+
+    await w.makeReal.reconcile(owner, BIZ, a.id, {
+      stepId: "effect:slot", target: "compensation", resolution: "completed",
+      evidence: "The provider's cancellation ledger confirms the booking type is removed.",
+    });
+    const rolled = await w.makeReal.rollback(owner, BIZ, a.id);
+    expect(rolled.status).toBe("rolled_back");
+    expect(w.calendarBase.calls.compensate).toBe(1);
+  });
+
+  it("does not repeat an unknown compensation until evidence says it was not applied", async () => {
+    const w = await setup();
+    const a = await started(w);
+    w.revoked.add("site.publish");
+    await w.makeReal.run(owner, BIZ, a.id);
+    const performCalls = w.calendarBase.calls.perform;
+    const compensate = w.calendar.compensate!;
+    let compensationAttempts = 0;
+    w.calendar.compensate = async () => {
+      compensationAttempts += 1;
+      throw new Error("Connection lost after cancellation request.");
+    };
+
+    const unknown = await w.makeReal.rollback(owner, BIZ, a.id);
+    expect(unknown.status).toBe("needs_attention");
+    expect(stepOf(unknown, "effect:slot")).toMatchObject({
+      status: "completed", effect: "accepted",
+      compensation: { status: "unknown", detail: "Connection lost after cancellation request." },
+    });
+    expect(describeActivation(unknown).unknown).toContainEqual(expect.objectContaining({
+      step: "compensation:effect:slot", label: "Undo: Create the fitting booking type",
+    }));
+    expect((await w.possibilities.get(BIZ, "p1"))!.activationId).toBe(a.id);
+
+    await w.makeReal.rollback(owner, BIZ, a.id);
+    expect(compensationAttempts).toBe(1);
+    expect(w.calendarBase.calls.perform).toBe(performCalls);
+
+    await w.makeReal.reconcile(owner, BIZ, a.id, {
+      stepId: "effect:slot", target: "compensation", resolution: "not_applied",
+      evidence: "Provider lookup confirms no cancellation was created.",
+    });
+    w.calendar.compensate = compensate;
+    const rolled = await w.makeReal.rollback(owner, BIZ, a.id);
+    expect(rolled.status).toBe("rolled_back");
+    expect(stepOf(rolled, "effect:slot").status).toBe("compensated");
+    expect(compensationAttempts).toBe(1);
+    expect(w.calendarBase.calls.compensate).toBe(1);
+    expect(w.calendarBase.calls.perform).toBe(performCalls);
+  });
+
+  it("rechecks each effect's current authority before undo and keeps revoked undo open", async () => {
+    const w = await setup();
+    const a = await started(w);
+    w.revoked.add("site.publish");
+    await w.makeReal.run(owner, BIZ, a.id);
+    w.revoked.add("calendar.write");
+    const waiting = await w.makeReal.rollback(owner, BIZ, a.id);
+    expect(waiting.status).toBe("needs_attention");
+    expect(w.calendarBase.calls.compensate).toBe(0);
+    expect(stepOf(waiting, "effect:slot").compensation).toMatchObject({ status: "unavailable" });
+    expect((await w.possibilities.get(BIZ, "p1"))?.activationId).toBe(a.id);
+    w.revoked.delete("calendar.write");
+    expect((await w.makeReal.rollback(owner, BIZ, a.id)).status).toBe("rolled_back");
+    expect(w.calendarBase.calls.compensate).toBe(1);
+  });
+
+  it.each(["missing adapter compensation", "missing provider reference"] as const)("reports %s as not undone", async (missing) => {
+    const w = await setup();
+    const a = await started(w);
+    w.revoked.add("site.publish");
+    await w.makeReal.run(owner, BIZ, a.id);
+
+    if (missing === "missing adapter compensation") {
+      delete w.calendar.compensate;
+    } else {
+      const current = await w.makeReal.get(BIZ, a.id);
+      const slot = stepOf(current, "effect:slot");
+      const receipt = { ...slot.receipt! };
+      delete receipt.providerRef;
+      slot.receipt = receipt;
+      const next: Activation = {
+        ...current,
+        revision: current.revision + 1,
+        history: [...current.history, { revision: current.revision + 1, kind: "fixture", actorId: owner.userId, at: w.clock() }],
+      };
+      await w.activations.save(activationSchema.parse(next), current.revision);
+    }
+
+    const rolled = await w.makeReal.rollback(owner, BIZ, a.id);
+    expect(rolled.status).toBe("needs_attention");
+    expect(stepOf(rolled, "effect:slot")).toMatchObject({
+      status: "completed", effect: "accepted", compensation: { status: "unavailable" },
+    });
+    expect(describeActivation(rolled).cannotUndo).toContain("Create the fitting booking type");
+
+    // Old rows have no typed outcome; their original reason still renders honestly.
+    const legacy = structuredClone(rolled);
+    for (const step of legacy.steps) delete step.compensation;
+    expect(describeActivation(activationSchema.parse(legacy)).cannotUndo).toContain("Create the fitting booking type");
+
+    const legacyFailure = structuredClone(legacy);
+    stepOf(legacyFailure, "effect:slot").reason = "Compensation failed: The older adapter rejected cancellation.";
+    const legacyView = describeActivation(activationSchema.parse(legacyFailure));
+    expect(legacyView.waiting).toContainEqual(expect.objectContaining({ step: "effect:slot" }));
+    expect(legacyView.done.map((item) => item.step)).not.toContain("effect:slot");
+    expect(legacyView.cannotUndo).not.toContain("Create the fitting booking type");
   });
 
   it("restart after rollback reuses the key of a charge whose outcome was never settled, and a fresh key for undone steps", async () => {
