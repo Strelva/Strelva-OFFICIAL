@@ -10,6 +10,7 @@ beforeEach(() => {
   vi.resetModules();
   vi.stubEnv("NEXT_PUBLIC_APP_ROOT_DOMAIN", "");
   vi.stubEnv("NEXT_PUBLIC_SITES_ROOT_DOMAIN", "");
+  vi.stubEnv("NEXT_PUBLIC_APP_URL", "");
   vi.stubEnv("CUSTOM_DOMAIN_MAP", "{}");
   vi.stubEnv("STRELVA_WEBSITE_REBUILD_RELEASE", "0");
   vi.stubEnv("STRELVA_UI_PREVIEW", "0");
@@ -79,7 +80,7 @@ describe("separate sites apex configuration", () => {
     expect(parseTenantHost("example.sites.example.attacker.example")).toEqual({ tenant: null, isAdmin: false });
   });
 
-  it("sets trusted tenant headers on public pages for both roots and strips forged tenant headers on reserved sites hosts", async () => {
+  it("sets trusted tenant headers on public pages for both roots and rejects reserved sites hosts with forged tenant headers", async () => {
     vi.stubEnv("NEXT_PUBLIC_SITES_ROOT_DOMAIN", "sites.example");
     const { default: proxy } = await import("@/proxy");
     for (const host of ["example.strelva.com", "example.sites.example"]) {
@@ -91,6 +92,80 @@ describe("separate sites apex configuration", () => {
       const response = await proxy(new NextRequest(`https://${host}/about`, { headers: { host, "x-tenant": "forged" } }));
       expect(response.headers.get("x-middleware-request-x-tenant")).toBeNull();
       expect(response.headers.get("x-middleware-rewrite")).toBeNull();
+      expect(response.status).toBe(404);
+    }
+  });
+
+  it("moves tenant dashboard and sign-in requests to the app fallback without writing site cookies", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITES_ROOT_DOMAIN", "sites.example");
+    const { default: proxy } = await import("@/proxy");
+    for (const path of ["/dashboard", "/dashboard/settings", "/sign-in", "/sign-up", "/no-access", "/%64ashboard/settings", "//dashboard/settings"]) {
+      const response = await proxy(new NextRequest(`https://example.sites.example${path}?view=details`, { headers: { host: "example.sites.example", "x-tenant": "forged" } }));
+      expect(response.status).toBe(307);
+      expect(response.headers.get("location")).toBe(`https://app.strelva.com/client/example${decodeURI(path).replace(/\/\/+/g, "/")}?view=details`);
+      expect(response.headers.get("set-cookie")).toBeNull();
+      expect(response.headers.get("x-middleware-request-x-tenant")).toBeNull();
+    }
+  });
+
+  it("moves callbacks to the app callback and preserves the tenant return path", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITES_ROOT_DOMAIN", "sites.example");
+    const { default: proxy } = await import("@/proxy");
+    const response = await proxy(new NextRequest("https://example.sites.example/auth/callback?code=test-code&next=%2Fdashboard%2Fsettings", { headers: { host: "example.sites.example" } }));
+    const location = new URL(response.headers.get("location")!);
+    expect(location.origin + location.pathname).toBe("https://app.strelva.com/auth/callback");
+    expect(location.searchParams.get("code")).toBe("test-code");
+    expect(location.searchParams.get("next")).toBe("/client/example/dashboard/settings");
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("keeps unsafe callback destinations for the app callback to reject without throwing", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITES_ROOT_DOMAIN", "sites.example");
+    const { default: proxy } = await import("@/proxy");
+    for (const next of ["https://attacker.example", "http://[", "//attacker.example/dashboard", "/\\attacker.example/dashboard"]) {
+      const response = await proxy(new NextRequest(`https://example.sites.example/auth/callback?next=${encodeURIComponent(next)}`, { headers: { host: "example.sites.example" } }));
+      const location = new URL(response.headers.get("location")!);
+      expect(location.origin).toBe("https://app.strelva.com");
+      expect(location.pathname).toBe("/auth/callback");
+      expect(location.searchParams.get("next")).toBe(next);
+    }
+  });
+
+  it("rejects malformed request paths without creating a sites session", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITES_ROOT_DOMAIN", "sites.example");
+    const { default: proxy } = await import("@/proxy");
+    const response = await proxy(new NextRequest("https://example.sites.example/%ZZdashboard", { headers: { host: "example.sites.example" } }));
+    expect(response.status).toBe(404);
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("moves global app routes to the app host while public website routes and v1 APIs retain tenant routing", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITES_ROOT_DOMAIN", "sites.example");
+    const { default: proxy } = await import("@/proxy");
+    for (const path of ["/workspace", "/account", "/auth/entry", "/client/example/dashboard", "/admin", "/api/workspace", "/api/internal/domain-map"]) {
+      const response = await proxy(new NextRequest(`https://example.sites.example${path}?keep=value`, { headers: { host: "example.sites.example" } }));
+      expect(response.headers.get("location")).toBe(`https://app.strelva.com${path}?keep=value`);
+      expect(response.headers.get("set-cookie")).toBeNull();
+    }
+    for (const path of ["/", "/about", "/api/v1/leads/example"]) {
+      const response = await proxy(new NextRequest(`https://example.sites.example${path}`, { headers: { host: "example.sites.example" } }));
+      expect(response.headers.get("location")).toBeNull();
+      expect(response.headers.get("x-middleware-request-x-tenant")).toBe("example");
+    }
+  });
+
+  it("rejects bare, reserved and deep sites hosts before app, callback, API or client fallback routing", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SITES_ROOT_DOMAIN", "sites.example");
+    vi.stubEnv("REB_DEV_UNGATED_ACCESS", "1");
+    const { default: proxy } = await import("@/proxy");
+    for (const host of ["sites.example", "www.sites.example", "app.sites.example", "api.sites.example", "admin.sites.example", "admin.example.sites.example"]) {
+      for (const path of ["/", "/sign-in", "/dashboard", "/auth/callback", "/api/v1/leads/example", "/api/internal/domain-map", "/client/example/sign-in", "/embed/agency/example/audit"]) {
+        const response = await proxy(new NextRequest(`https://${host}${path}?tenant=example`, { headers: { host, "x-tenant": "example" } }));
+        expect(response.status).toBe(404);
+        expect(response.headers.get("location")).toBeNull();
+        expect(response.headers.get("x-middleware-rewrite")).toBeNull();
+        expect(response.headers.get("set-cookie")).toBeNull();
+      }
     }
   });
 
