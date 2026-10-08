@@ -21,7 +21,9 @@ read-only. No commercial plan, monthly price, Stripe customer, payment intent or
 business subscription is selected. An existing agency foundation's wholesale
 container and nullable client line are existing protocol behavior, not a new
 subscription policy. Native amount and plan remain null; the existing business
-serializer's zero amount is not evidence of a free commercial plan.
+serializer's zero amount is not evidence of a free commercial plan. The billing
+page's none state renders "Price not recorded" and omits the old monthly/plan
+and legacy-agreement claims; priced states retain their existing display.
 
 Completion triggers deliberately avoid bare workspace insertion. Legacy
 conversion inserts its workspace before linking the tenant; provisioning there
@@ -55,8 +57,13 @@ account/line JSON equality. The script stops only its own cluster.
 
 The successor's real local Auth/browser neutral journey also checks native
 account provenance/nullable price, the agency's actual unpriced billing read,
-and the owner's ordinary business-entry HTTP route. No accounts are manually
-inserted by that browser fixture. Its source-specific packet must pin the final
+and the owner's ordinary business-entry HTTP route. With scoped
+`STRELVA_BUSINESS_BILLING=1` it checks the actual signed-in owner billing page at
+desktop/390px, unresolved price, actual agency payer and absence of a zero-dollar
+monthly-plan claim. The flags-off phase explicitly uses that flag as zero. No accounts are manually
+inserted by that browser fixture. The deterministic 21st review CLI was unavailable; no tool or dependency was
+installed. Source inspection and actual rendered assertions own this correction.
+Its source-specific packet must pin the final
 commit and actual results before promotion.
 
 ## Preserved failures and limits
