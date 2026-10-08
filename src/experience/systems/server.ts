@@ -1,3 +1,5 @@
+import { getInquiryRepository } from "@/products/inquiries/server";
+import type { InquiryWorkspaceSnapshot } from "@/products/inquiries/repository";
 import { publishingEnabledForWorkspace } from "@/products/publishing/server";
 /**
  * Server projection for the Systems experience. Server only: it reads the
@@ -277,7 +279,9 @@ export async function readSystemsEvidence(listing: BusinessSystems, now: number 
     observations.push(trafficObservation(site.system.id, daily), searchConsoleObservation(site.system.id, search));
   }));
   for (const inquiry of inquiries) {
-    observations.push(inquiryFormUnchecked(inquiry.system.id));
+    const tenantId = inquiry.references.tenantId ?? listing.systems.find(site => site.system.kind === "website" && site.references.tenantStableId === inquiry.references.tenantStableId)?.references.tenantId;
+    const snapshot = tenantId ? await getInquiryRepository().getSnapshot(tenantId, inquiry.references.inquiryBusinessId ?? listing.businessId).catch(() => null) : null;
+    observations.push(inquiryPublicationObservation(inquiry.system.id, snapshot));
     observations.push(...heartbeatObservations(inquiry.system.id, heartbeats, ["inquiry-follow-ups"]));
   }
   return [...observations, ...connected];
@@ -288,6 +292,17 @@ export function connectedSiteObservation(subjectId: string, site: { siteHost: st
   if (!site.verified) return { subjectId, signal: "connected_site.reporting", outcome: "unknown", observedAt: null, maxAgeSeconds: 7 * 24 * 3600, source: "connected-site", message: `Waiting for proof that ${site.siteHost} is this business's site.` };
   if (!site.lastEventAt) return { subjectId, signal: "connected_site.reporting", outcome: "unknown", observedAt: null, maxAgeSeconds: 7 * 24 * 3600, source: "connected-site", message: `${site.siteHost} has not reported a visit yet. Check the Strelva script is on the page.` };
   return { subjectId, signal: "connected_site.reporting", outcome: "pass", observedAt: site.lastEventAt, maxAgeSeconds: 7 * 24 * 3600, source: "connected-site", message: `${site.siteHost} is reporting visits.` };
+}
+
+/** Only readback for the currently live version establishes publication health. */
+export function inquiryPublicationObservation(subjectId: string, snapshot: InquiryWorkspaceSnapshot | null): Observation {
+  const capability = snapshot?.state.capabilities.find(capability => capability.live !== null);
+  const current = capability?.live;
+  if (!capability || !current) return inquiryFormUnchecked(subjectId);
+  const receipt = [...(snapshot?.state.changes ?? [])].reverse().find(change => change.capabilityId === capability.id && change.verification?.version === current.version);
+  const verification = receipt?.verification;
+  if (!verification) return inquiryFormUnchecked(subjectId);
+  return { subjectId, signal: "inquiry.publication", outcome: verification.verified ? "pass" : "fail", observedAt: verification.checkedAt, maxAgeSeconds: 7 * 24 * 3600, source: "inquiry-capability", message: verification.verified ? "The current form passed publication readback." : "The current form failed publication readback." };
 }
 
 /** Follow-ups running says nothing about whether the form on the site works. */
@@ -374,7 +389,8 @@ async function liveProjectionInput(deps: LiveSystemsDeps): Promise<SystemsProjec
 /**
  * Stored Version lineage joined onto the projection. A hidden same-business
  * source is never listed as a System. If lineage cannot be read, the
- * Systems still show and no lineage is claimed (`versions` stays absent).
+ * null is supported for isolated projections; live lineage read errors fail
+ * the complete Systems response before any action can use inferred state.
  */
 export function withVersions(projection: WorkspaceSystems, lineage: { hiddenSources: string[]; versions: NonNullable<WorkspaceSystems["versions"]> } | null): WorkspaceSystems {
   if (!lineage || projection.status !== "ready") return projection;
@@ -393,8 +409,8 @@ export async function readWorkspaceSystems(deps: LiveSystemsDeps): Promise<Works
   try {
     const input = await liveProjectionInput(deps);
     const projection = await projectWorkspaceSystems(input);
-    const stored = await withStoredPossibilities(projection, input, deps).catch(() => projection);
-    const lineage = await readBusinessVersions(deps.actor, deps.businessId).catch(() => null);
+    const stored = await withStoredPossibilities(projection, input, deps);
+    const lineage = await readBusinessVersions(deps.actor, deps.businessId);
     const releases = await readToolReleases(deps.actor, deps.businessId);
     const releaseHistory = releases.flatMap(release => {
       const system = input.listing.systems.find(item => item.references.savedWorkId === release.workId);
@@ -413,7 +429,7 @@ const HANDLED_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
  * Possibilities in Postgres, Make real activations, History and Strelva
  * handled receipts, laid over the per-request projection. A stored
  * Possibility replaces the per-request one for the same rebuild. Any read
- * failure leaves the projection as it was and claims none of these.
+ * failure is surfaced by readWorkspaceSystems as unavailable.
  */
 export async function withStoredPossibilities(projection: WorkspaceSystems, input: SystemsProjectionInput, deps: LiveSystemsDeps): Promise<WorkspaceSystems> {
   if (projection.status !== "ready") return projection;

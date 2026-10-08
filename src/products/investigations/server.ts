@@ -1,3 +1,4 @@
+import { investigationHistory, type InvestigationHistory } from "./history";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { investigationSchema, investigationInputSchema, investigationSourceSchema } from "./contracts";
@@ -105,10 +106,12 @@ function publicReferenceEntries(reference: InvestigationReference): Array<[strin
 }
 
 export interface InvestigationServiceDependencies {
+  history?: InvestigationHistory;
   readPublicWebsite?: (input: { url: string }) => Promise<PublicWebsiteSourceRead>;
 }
 
 export function createInvestigationService(store: BoundedStore = boundedStore, dependencies: InvestigationServiceDependencies = {}) {
+  const history = dependencies.history ?? (store === boundedStore ? investigationHistory : undefined);
   const readPublicWebsite = dependencies.readPublicWebsite ?? createPublicWebsiteSourceAdapter().read;
   const read = (actor: WorkspaceActor, id: string) => readBounded(store, actor, id, "investigations", investigationSchema);
   async function sources(actor: WorkspaceActor, workspaceId: string, selectors: readonly InvestigationSource[]) {
@@ -207,14 +210,16 @@ export function createInvestigationService(store: BoundedStore = boundedStore, d
     next.runs = [...next.runs, {
       requestId: command.requestId,
       at: now.toISOString(),
-      result: "unavailable",
+      result: "unavailable" as const,
       fingerprint,
       sources: evidence.map(source => ({ ...source })),
       differences: [],
       unavailableReason: error.reason,
       retryable: true,
       sourceStates: sourceStates(work.payload, error.reason, error.workId, evidence, error.sourceStatus, error.sourceUrl),
-    }];
+    }].slice(-200);
+    next.lastSuccessfulRun ??= [...work.payload.runs].reverse().find(run => run.result !== "unavailable");
+    next.history = next.history.slice(-500);
     // A failed read is retryable after a short backoff. This gives a standing
     // run a real wake time while keeping the recovery local and bounded.
     next.nextRunAt = new Date(now.getTime() + 60_000).toISOString();
@@ -223,6 +228,15 @@ export function createInvestigationService(store: BoundedStore = boundedStore, d
   }
   return {
     read,
+    async history(actor: WorkspaceActor, id: string, options: { beforeRevision?: number; limit?: number } = {}) {
+      const work = await read(actor, id);
+      await store.member(actor, work.workspaceId);
+      const limit = z.number().int().min(1).max(100).parse(options.limit ?? 50);
+      const before = options.beforeRevision === undefined ? null : z.number().int().nonnegative().parse(options.beforeRevision);
+      if (!history) throw new WorkspaceConflictError("Complete investigation history is unavailable.");
+      const rows = await history.page(actor, id, before, limit + 1);
+      return { runs: rows.slice(0, limit), nextBeforeRevision: rows.length > limit ? rows[limit - 1]!.revision : null };
+    },
     async create(actor: WorkspaceActor, workspaceId: string, raw: unknown) {
       await store.member(actor, workspaceId);
       const input = investigationInputSchema.parse(raw);
@@ -238,13 +252,15 @@ export function createInvestigationService(store: BoundedStore = boundedStore, d
     async command(actor: WorkspaceActor, id: string, raw: unknown) {
       const command = z.object({ kind: z.enum(["pause", "resume"]), expectedRevision: z.number().int().nonnegative() }).strict().parse(raw);
       const work = await read(actor, id); await store.member(actor, work.workspaceId);
-      const payload = investigationSchema.parse({ ...advance(work.payload, command.expectedRevision, command.kind, actor), status: command.kind === "pause" ? "paused" : "active" });
+      const advanced = advance(work.payload, command.expectedRevision, command.kind, actor);
+      advanced.history = advanced.history.slice(-500);
+      const payload = investigationSchema.parse({ ...advanced, status: command.kind === "pause" ? "paused" : "active" });
       const saved = await store.update(actor, work, command.expectedRevision, payload); return { ...saved, payload: investigationSchema.parse(saved.payload) };
     },
     async run(actor: WorkspaceActor, id: string, raw: unknown, now = new Date()) {
       const command = z.object({ expectedRevision: z.number().int().nonnegative(), requestId: z.string().min(1).max(100) }).strict().parse(raw);
       const work = await read(actor, id); await store.member(actor, work.workspaceId);
-      if (work.payload.runs.some(run => run.requestId === command.requestId)) return work;
+      if (work.payload.runs.some(run => run.requestId === command.requestId) || await history?.find(actor, id, command.requestId)) return work;
       if (work.payload.status !== "active") throw new WorkspaceConflictError("This investigation is paused.");
       if (Date.parse(work.payload.nextRunAt) > now.getTime()) throw new WorkspaceConflictError("The next investigation is not due yet.");
       const next = advance(work.payload, command.expectedRevision, "investigate", actor);
@@ -258,7 +274,7 @@ export function createInvestigationService(store: BoundedStore = boundedStore, d
       const temporal = work.payload.mode === "public_website";
       const currentEntries = new Map(evidence[0]!.entries);
       const previousRun = temporal
-        ? [...work.payload.runs].reverse().find(run => run.result !== "unavailable")
+        ? work.payload.lastSuccessfulRun ?? [...work.payload.runs].reverse().find(run => run.result !== "unavailable")
         : undefined;
       const previousEntries = previousRun ? publicReferenceEntries(previousRun.sources[0] as InvestigationReference) : null;
       const left = temporal && previousEntries ? new Map(previousEntries) : currentEntries;
@@ -287,10 +303,12 @@ export function createInvestigationService(store: BoundedStore = boundedStore, d
       const result = temporal
         ? previousRun ? differences.length ? "changed" as const : "no_change" as const : "baseline" as const
         : next.runs.at(-1)?.fingerprint === fingerprint ? "no_change" as const : differences.length ? "discrepancy" as const : "agreement" as const;
-      next.runs = [...next.runs, { requestId: command.requestId, at: now.toISOString(), result, fingerprint, sources: evidence.map(source => source.reference), differences }];
+      next.runs = [...next.runs, { requestId: command.requestId, at: now.toISOString(), result, fingerprint, sources: evidence.map(source => source.reference), differences }].slice(-200);
+      next.lastSuccessfulRun = next.runs.at(-1)!;
+      next.history = next.history.slice(-500);
       next.nextRunAt = new Date(now.getTime() + next.intervalMinutes * 60000).toISOString();
       const saved = await store.update(actor, work, command.expectedRevision, investigationSchema.parse(next)); return { ...saved, payload: investigationSchema.parse(saved.payload) };
     },
   };
 }
-export const { create: createWorkspaceInvestigation, read: readWorkspaceInvestigation, command: changeWorkspaceInvestigation, run: runWorkspaceInvestigation } = createInvestigationService();
+export const { create: createWorkspaceInvestigation, read: readWorkspaceInvestigation, command: changeWorkspaceInvestigation, run: runWorkspaceInvestigation, history: readWorkspaceInvestigationHistory } = createInvestigationService();

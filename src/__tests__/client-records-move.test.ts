@@ -182,33 +182,33 @@ describe.skipIf(!isolatedRedisAvailable)("client-record move pattern (isolated R
     expect(replies).toEqual([{ recordId: "lead_a", payload: { firstReplyAt: "2026-10-05T12:30:00Z", by: "strelva", action: "send_message" }, capturedAt: "2026-10-05T12:30:00Z" }]);
   });
 
-  it("reads stay on Redis until the store's flag is on and parity has held 7 days, and fall back on failure", async () => {
+  it("requires qualified parity for a selected cutover and keeps durable read failures explicit", async () => {
     expect(await clientRecordReadSource("spam_held")).toBe("redis");
     expect(fake.calls).toEqual([]);
     vi.stubEnv("STRELVA_CLIENT_RECORDS_READ", "spam_held,booking_config");
     fake.state.streak = 6;
-    expect(await clientRecordReadSource("spam_held")).toBe("redis");
+    await expect(clientRecordReadSource("spam_held")).rejects.toThrow("cutover_not_qualified");
     fake.state.streak = 7;
     expect(await clientRecordReadSource("spam_held")).toBe("postgres");
     vi.stubEnv("DUAL_WRITE_PG", "0");
-    expect(await clientRecordReadSource("spam_held")).toBe("redis");
+    await expect(clientRecordReadSource("spam_held")).rejects.toThrow("cutover_disabled");
     vi.stubEnv("DUAL_WRITE_PG", "1");
     vi.stubEnv("STRELVA_CLIENT_RECORDS_DUAL_WRITE", "0");
-    expect(await clientRecordReadSource("spam_held")).toBe("redis");
+    await expect(clientRecordReadSource("spam_held")).rejects.toThrow("cutover_disabled");
     vi.stubEnv("STRELVA_CLIENT_RECORDS_DUAL_WRITE", "1");
     expect(await clientRecordReadSource("account_grouping")).toBe("redis");
     fake.state.streakError = true;
-    expect(await clientRecordReadSource("spam_held")).toBe("redis");
+    await expect(clientRecordReadSource("spam_held")).rejects.toThrow("parity_unavailable");
     fake.state.streakError = false;
 
     // Flipped: an item past Redis's TTL is still served from Postgres.
     const kept = await recordSpam("acme", { reason: "honeypot", name: "Real customer" });
     cli("DEL", `reb:spam-pit:item:acme:${kept!.id}`);
     expect((await getSpam("acme")).map((s) => s.id)).toEqual([kept!.id]);
-    // A failed Postgres read serves Redis instead of nothing.
+    // A failed complete Postgres read must not serve an expired Redis window.
     fake.state.readError = true;
-    expect(await getSpam("acme")).toEqual([]);
-    expect(await readThroughFlag("spam_held", "acme", async () => "redis", () => "postgres")).toBe("redis");
+    await expect(getSpam("acme")).rejects.toThrow("page_failed");
+    await expect(readThroughFlag("spam_held", "acme", async () => "redis", () => "postgres")).rejects.toThrow("page_failed");
   });
 
   it("backfills every new store dry-run first and detects payload drift", async () => {

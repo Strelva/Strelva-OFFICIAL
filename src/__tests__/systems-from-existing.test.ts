@@ -41,6 +41,18 @@ const snapshot: ExistingSystemsSnapshot = {
 };
 
 describe("systems from existing things", () => {
+  it("connects booking only to its selected published provider and never treats consent alone as connected", () => {
+    const graph = systemsFromExisting({ ...snapshot, calendarConnections: [
+      { ...snapshot.calendarConnections[0]!, status: "authorized" },
+      { id: "5e000000-0000-4000-8000-0000000000e2", provider: "outlook", calendarName: "Other calendar", status: "connected" },
+    ] });
+    const calendars = graph.connections.filter(item => item.connection.target.type === "account_binding");
+    expect(calendars).toHaveLength(1);
+    expect(calendars[0]!.connection.state).toBe("disconnected");
+    const revoked = systemsFromExisting({ ...snapshot, bookingGrants: snapshot.bookingGrants.map(grant => ({ ...grant, status: "revoked" })) });
+    expect(revoked.connections.filter(item => item.connection.target.type === "account_binding")).toEqual([]);
+  });
+
   it("lists real Systems for a business and skips work that is not a System", () => {
     const { systems } = systemsFromExisting(snapshot);
     expect(systems.map(({ system }) => [system.name, system.kind, system.lifecycle])).toEqual([

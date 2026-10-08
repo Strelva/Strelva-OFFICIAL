@@ -151,7 +151,7 @@ describe("per-workspace resolution through the store", () => {
   it("covers every flag the spec names", () => {
     expect([...RELEASE_FLAGS].sort()).toEqual([
       "agent_channel", "approval_store", "catalog_reports", "connected_sites", "finite_jobs", "inquiries", "internal_tool_notices",
-      "make_real_live:booking_page", "make_real_live:hosted_website", "make_real_live:inquiry_form",
+      "make_real_live:booking_page", "make_real_live:google_listing", "make_real_live:hosted_website", "make_real_live:inquiry_form",
       "make_real_live:internal_app", "make_real_live:tenant_content",
       "make_real_owner_link", "newsletter_contacts", "owner_decision_links", "owner_entry", "publishing", "publishing_record_google_policy", "systems", "website_rebuild",
     ]);

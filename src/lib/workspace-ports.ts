@@ -35,11 +35,13 @@ export interface ClientRecordCopy {
 }
 
 export interface ClientRecordsPort {
+  clientRecordReadSource(store: ClientRecordStoreName): Promise<"redis" | "postgres">;
+  writeClientRecord(store: ClientRecordStoreName, tenant: string, record: ClientRecordCopy | { recordId: string; remove: true; capturedAt?: string }, via: "dual_write", mode?: "replace" | "keep_first"): Promise<{ status: string; reason?: string }>;
   /** Dual-write one record after the Redis write. Never throws. */
   mirrorClientRecord(store: ClientRecordStoreName, tenant: string, record: ClientRecordCopy, mode?: "replace" | "keep_first"): Promise<unknown>;
   /** Dual-write a removal. Never throws. */
   mirrorClientRecordRemoval(store: ClientRecordStoreName, tenant: string, recordId: string): Promise<unknown>;
-  /** Read one store through STRELVA_CLIENT_RECORDS_READ, falling back to Redis. */
+  /** Read one store through STRELVA_CLIENT_RECORDS_READ; durable outages fail explicitly. */
   readThroughFlag<T>(store: ClientRecordStoreName, tenant: string, fromRedis: () => Promise<T>, fromPostgres: (records: ClientRecordCopy[]) => T): Promise<T>;
 }
 

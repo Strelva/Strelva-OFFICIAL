@@ -22,6 +22,8 @@ export const workspacePortLoaders = {
       mirrorClientRecord: mirror.mirrorClientRecord,
       mirrorClientRecordRemoval: mirror.mirrorClientRecordRemoval,
       readThroughFlag: move.readThroughFlag,
+      clientRecordReadSource: move.clientRecordReadSource,
+      writeClientRecord: mirror.writeClientRecord,
     };
   },
 

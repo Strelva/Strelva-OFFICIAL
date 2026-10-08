@@ -53,9 +53,7 @@ const sourceReferenceSchema = z.object({
   revision: z.number().int(),
   updatedAt: z.string().datetime(),
 }).strict();
-export const investigationSchema = baseSchema.extend({
-  mode: investigationModeSchema.default("comparison"), sources: investigationSourcesSchema, intervalMinutes: z.number().int().min(15).max(43200), status: z.enum(["active", "paused"]), nextRunAt: z.string().datetime(),
-  runs: z.array(z.object({
+export const investigationRunSchema = z.object({
     requestId: z.string(),
     at: z.string().datetime(),
     result: z.enum(["baseline", "agreement", "discrepancy", "changed", "no_change", "unavailable"]),
@@ -65,7 +63,11 @@ export const investigationSchema = baseSchema.extend({
     unavailableReason: z.enum(["missing_source", "inaccessible_source", "source_changed", "limited_evidence"]).optional(),
     retryable: z.boolean().optional(),
     sourceStates: z.array(sourceStateSchema).min(1).max(2).optional(),
-  })).max(200),
+  });
+export const investigationSchema = baseSchema.extend({
+  mode: investigationModeSchema.default("comparison"), sources: investigationSourcesSchema, intervalMinutes: z.number().int().min(15).max(43200), status: z.enum(["active", "paused"]), nextRunAt: z.string().datetime(),
+  runs: z.array(investigationRunSchema).max(200),
+  lastSuccessfulRun: investigationRunSchema.optional(),
 }).superRefine((value, context) => {
   const source = value.sources[0];
   if (value.mode === "public_website" && (value.sources.length !== 1 || !source || !("kind" in source) || source.kind !== "public_website")) {

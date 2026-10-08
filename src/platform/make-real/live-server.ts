@@ -4,6 +4,8 @@
  * and the per-workspace flags. Server only. Every outside write here is a
  * call into the path that already owns it (live-adapters.ts has the table).
  */
+import { createGoogleListingAdapter } from "./google-adapter";
+import { googleMakeRealPorts } from "@/products/google-listing/server";
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import { getTenantConfig } from "@/lib/tenants";
@@ -24,7 +26,6 @@ import {
   createInquiryFormAdapter,
   createInternalAppAdapter,
   createTenantContentAdapter,
-  createWaitingAdapter,
   type LiveChannelContext,
 } from "./live-adapters";
 import { createLiveMakeRealService, liveReadyPlan, startLiveApproved, type DueActivation } from "./live";
@@ -36,14 +37,13 @@ import { createSystemStoreLiveSystems } from "./systems-adapter";
 
 /** Systems must be on for the workspace, and the channel's own key. */
 export async function makeRealChannelEnabled(workspaceId: string, channel: MakeRealChannel): Promise<boolean> {
-  if (channel === "google_listing") return false;
   if (!(await workspaceReleaseFlagEnabled("systems", workspaceId))) return false;
   return workspaceReleaseFlagEnabled(`make_real_live:${channel}`, workspaceId);
 }
 
 /** Whether any live channel is on for this workspace: the route stays isolated otherwise. */
 export async function anyMakeRealChannelEnabled(workspaceId: string): Promise<boolean> {
-  for (const channel of ["hosted_website", "tenant_content", "inquiry_form", "booking_page", "internal_app"] as const) {
+  for (const channel of ["hosted_website", "tenant_content", "inquiry_form", "booking_page", "internal_app", "google_listing"] as const) {
     if (await makeRealChannelEnabled(workspaceId, channel)) return true;
   }
   return false;
@@ -86,7 +86,7 @@ export function liveChannelAdapters(actor: WorkspaceActor, workspaceId: string) 
       publish: async (a, workId, raw) => (await import("@/products/applications/server")).publishApplication(a, workId, raw),
       rollback: async (a, workId, raw) => (await import("@/products/applications/server")).rollbackApplication(a, workId, raw),
     }, ctx),
-    createWaitingAdapter("google_listing", "Google hasn't approved Strelva's access yet. Strelva adds it when Google does."),
+    createGoogleListingAdapter(googleMakeRealPorts, ctx),
   ];
 }
 

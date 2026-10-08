@@ -125,20 +125,18 @@ export function clientRecordReadStores(): Set<ClientRecordStore> {
 /**
  * Where reads for a store come from. Redis unless the store's read flag is on
  * AND parity has held for 7 consecutive days. Without the flag this does no
- * I/O. Any doubt (no database, a failed streak read) answers Redis.
+ * I/O. A requested but unqualified/unavailable cutover fails explicitly.
  */
 export async function clientRecordReadSource(store: ClientRecordStore, db: ClientRecordDb | null = null): Promise<"redis" | "postgres"> {
-  if (!clientRecordDualWriteEnabled() || !clientRecordReadStores().has(store)) return "redis";
+  if (!clientRecordReadStores().has(store)) return "redis";
+  if (!clientRecordDualWriteEnabled()) throw new Error("client_records_cutover_disabled");
   const client = db ?? clientRecordDb();
-  if (!client) return "redis";
-  try {
-    const { data, error } = await client.rpc("client_record_parity_streak", { p_store: store });
-    if (error) return "redis";
-    const days = Number((data as { days?: unknown } | null)?.days ?? 0);
-    return days >= PARITY_DAYS_REQUIRED ? "postgres" : "redis";
-  } catch {
-    return "redis";
-  }
+  if (!client) throw new Error("client_records_db_unconfigured");
+  const { data, error } = await client.rpc("client_record_parity_streak", { p_store: store });
+  if (error) throw new Error("client_records_parity_unavailable");
+  const days = Number((data as { days?: unknown } | null)?.days ?? 0);
+  if (!Number.isFinite(days) || days < PARITY_DAYS_REQUIRED) throw new Error("client_records_cutover_not_qualified");
+  return "postgres";
 }
 
 /** Postgres read of one store for one tenant, newest first. */
@@ -162,6 +160,7 @@ export async function readAllClientRecords(store: ClientRecordStore, tenant: str
     const { data, error } = await db.rpc("read_tenant_client_records_page", { p_tenant_id: tenant, p_store: store, p_limit: 1000, p_before: before, p_after_record_id: after });
     if (error || !Array.isArray(data)) throw new Error("client_records_page_failed");
     const page = data as ClientRecord[];
+    if (page.some(row => !row || typeof row.recordId !== "string" || !row.recordId || typeof row.capturedAt !== "string" || !Number.isFinite(Date.parse(row.capturedAt)) || !row.payload || typeof row.payload !== "object" || Array.isArray(row.payload))) throw new Error("client_records_page_malformed");
     rows.push(...page);
     if (page.length < 1000) return rows;
     const last = page[page.length - 1]!;
@@ -173,22 +172,17 @@ export async function readAllClientRecords(store: ClientRecordStore, tenant: str
 export async function findCalendlyTenant(userUri: string): Promise<string | null> {
   if ((await clientRecordReadSource("provider_metadata")) !== "postgres") return null;
   const result = await clientRecordDb()?.rpc("find_client_calendly_tenant", { p_user_uri: userUri });
-  if (result?.error) return null;
+  if (!result || result.error) throw new Error("client_records_calendly_lookup_failed");
   return typeof result?.data === "string" ? result.data : null;
 }
 
 /**
- * Reads one store through the flag, falling back to Redis on any Postgres
- * failure so a flipped store never serves less than Redis would.
+ * Reads one store through the flag. Qualified Postgres failures stay explicit;
+ * capped/expired Redis cannot stand in for the complete durable store.
  */
 export async function readThroughFlag<T>(store: ClientRecordStore, tenant: string, fromRedis: () => Promise<T>, fromPostgres: (records: ClientRecord[]) => T): Promise<T> {
   if ((await clientRecordReadSource(store)) !== "postgres") return fromRedis();
-  try {
-    return fromPostgres(await readAllClientRecords(store, tenant));
-  } catch (error) {
-    console.error("[client-records] Postgres read failed; serving Redis", { store, tenant, error: error instanceof Error ? error.message : String(error) });
-    return fromRedis();
-  }
+  return fromPostgres(await readAllClientRecords(store, tenant));
 }
 
 export interface RepairReport {

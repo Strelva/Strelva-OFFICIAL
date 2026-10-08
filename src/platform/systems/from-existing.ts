@@ -162,7 +162,7 @@ export interface SystemListing {
   /** Why the lifecycle reads as it does, for an existing thing. */
   basis: string | null;
   /** Native ids this System stands for (work id, tenant id, connected site). */
-  references: { savedWorkId: string | null; tenantStableId: string | null; tenantId: string | null; connectedSiteId?: string | null };
+  references: { savedWorkId: string | null; tenantStableId: string | null; tenantId: string | null; connectedSiteId?: string | null; inquiryBusinessId?: string };
   /** A connected site's address and reporting, for its surface and health. */
   connectedSite?: { siteUrl: string; siteHost: string; verified: boolean; lastEventAt: string | null };
 }
@@ -256,7 +256,7 @@ function inquiryWorkspaceLifecycle(
 }
 
 const calendarState = (status: string): ConnectionState =>
-  status === "revoked" ? "disconnected" : status === "error" ? "stale" : "connected";
+  status === "connected" ? "connected" : status === "error" ? "stale" : "disconnected";
 
 /** Pure projection of a snapshot. Deterministic: the same snapshot always
  * yields the same ids, order and states. */
@@ -357,7 +357,7 @@ export function systemsFromExisting(raw: ExistingSystemsSnapshot): BusinessSyste
     systems.push({
       system, provenance: "existing",
       basis: state.basis,
-      references: { savedWorkId: null, tenantStableId: inquiry.tenantStableId, tenantId: null },
+      references: { savedWorkId: null, tenantStableId: inquiry.tenantStableId, tenantId: null, inquiryBusinessId: inquiry.businessId },
     });
     if (website) {
       connections.push({ provenance: "existing", connection: existingConnection(system, "appear",
@@ -374,7 +374,8 @@ export function systemsFromExisting(raw: ExistingSystemsSnapshot): BusinessSyste
         { type: "system", system: { businessId, systemId: website.id } },
         grant.status === "published" ? "connected" : "disconnected", `Booking on the site as ${grant.displayName}`) });
     }
-    for (const calendar of snapshot.calendarConnections) {
+    const selectedProviders = new Set(snapshot.bookingGrants.filter(grant => grant.workId === listing.references.savedWorkId && grant.status === "published").map(grant => grant.provider));
+    for (const calendar of snapshot.calendarConnections.filter(calendar => selectedProviders.has(calendar.provider))) {
       connections.push({ provenance: "existing", connection: existingConnection(source, "read",
         { type: "account_binding", bindingId: calendar.id }, calendarState(calendar.status),
         `Availability from ${calendar.provider} calendar ${calendar.calendarName}`) });

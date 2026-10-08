@@ -25,6 +25,7 @@ export const MAKE_REAL_LIVE_FLAGS = [
   "make_real_live:inquiry_form",
   "make_real_live:booking_page",
   "make_real_live:internal_app",
+  "make_real_live:google_listing",
 ] as const;
 export type MakeRealLiveFlag = (typeof MAKE_REAL_LIVE_FLAGS)[number];
 
@@ -61,6 +62,7 @@ export const RELEASE_FLAG_ENV: Record<ReleaseFlag, string> = {
   "make_real_live:inquiry_form": "STRELVA_MAKE_REAL_LIVE",
   "make_real_live:booking_page": "STRELVA_MAKE_REAL_LIVE",
   "make_real_live:internal_app": "STRELVA_MAKE_REAL_LIVE",
+  "make_real_live:google_listing": "STRELVA_GOOGLE_MAKE_REAL_RELEASE",
   connected_sites: "STRELVA_CONNECTED_SITES_RELEASE",
   make_real_owner_link: "STRELVA_MAKE_REAL_OWNER_LINK_RELEASE",
   publishing: "STRELVA_PUBLISHING_RELEASE",
@@ -84,6 +86,7 @@ export const RELEASE_FLAG_LABELS: Record<ReleaseFlag, string> = {
   "make_real_live:inquiry_form": "Make real live: inquiry form",
   "make_real_live:booking_page": "Make real live: booking page",
   "make_real_live:internal_app": "Make real live: internal app",
+  "make_real_live:google_listing": "Make real live: Google listing",
   connected_sites: "Connected sites",
   make_real_owner_link: "Make real by owner email link",
   publishing: "Publishing",

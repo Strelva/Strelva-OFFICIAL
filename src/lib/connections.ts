@@ -1,4 +1,4 @@
-import { mirrorRecord, removeRecord, readRecord, readRecords } from "./client-records";
+import { mirrorRecord, removeRecord, readRecord, readRecords, durableRecordAuthority, writeDurableRecord, removeDurableRecord } from "./client-records";
 import { getRedis } from "@/platform/infra/redis";
 import { decryptSecret, encryptSecret } from "@/platform/infra/crypto/secrets";
 import type { IntegrationProvider, Connection } from "./types";
@@ -81,10 +81,20 @@ async function getRedisConnections(tenantId: string): Promise<Connection[]> {
 }
 
 export async function saveConnection(connection: Connection): Promise<void> {
-  const redis = getRedis();
-  if (!redis) return;
+  return saveConnectionAt(connection, new Date().toISOString());
+}
 
+async function saveConnectionAt(connection: Connection, capturedAt: string): Promise<void> {
+  const redis = getRedis();
+  const durable = await durableRecordAuthority("provider_connections");
   const encoded = encodeConnection(connection);
+  if (durable) {
+    const status = await writeDurableRecord("provider_connections", connection.tenantId, connection.provider, encoded, capturedAt);
+    if (status === "kept") throw new Error("Connection update was superseded by a newer change.");
+    if (redis) await redis.set(connectionKey(connection.tenantId, connection.provider), encoded).catch(() => {});
+    return;
+  }
+  if (!redis) throw new Error("Connection storage is unavailable");
   await redis.set(connectionKey(connection.tenantId, connection.provider), encoded);
   await mirrorRecord("provider_connections", connection.tenantId, connection.provider, encoded);
 }
@@ -93,18 +103,16 @@ export async function updateLastSynced(
   tenantId: string,
   provider: IntegrationProvider
 ): Promise<void> {
-  const redis = getRedis();
-  if (!redis) return;
-
+  const capturedAt = new Date().toISOString();
   const existing = await getConnection(tenantId, provider);
   if (!existing) return;
 
   // getConnection returns a DECODED (plaintext) object, so write it back through
   // saveConnection to re-encrypt — a direct redis.set here would persist plaintext.
-  await saveConnection({
+  await saveConnectionAt({
     ...existing,
-    lastSyncedAt: new Date().toISOString(),
-  });
+    lastSyncedAt: capturedAt,
+  }, capturedAt);
 }
 
 export async function deleteConnection(
@@ -112,7 +120,13 @@ export async function deleteConnection(
   provider: IntegrationProvider
 ): Promise<boolean> {
   const redis = getRedis();
-  if (redis) await redis.del(connectionKey(tenantId, provider));
+  if (await durableRecordAuthority("provider_connections")) {
+    await removeDurableRecord("provider_connections", tenantId, provider);
+    if (redis) await redis.del(connectionKey(tenantId, provider)).catch(() => {});
+    return true;
+  }
+  if (!redis) throw new Error("Connection storage is unavailable");
+  await redis.del(connectionKey(tenantId, provider));
   await removeRecord("provider_connections", tenantId, provider);
   return true;
 }

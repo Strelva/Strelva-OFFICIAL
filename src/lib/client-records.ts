@@ -31,3 +31,20 @@ export async function readProviderMetadata<T>(tenant: string, provider: string, 
   const row = await readRecord<{ value: T }>("provider_metadata", tenant, provider, async () => { const value = await redis(); return value === null ? null : { value }; });
   return row?.value ?? null;
 }
+
+/** A selected Postgres store must prove qualification before writing. */
+export async function durableRecordAuthority(store: ClientRecordStoreName): Promise<boolean> {
+  if (!(process.env.STRELVA_CLIENT_RECORDS_READ ?? "").split(",").map(s => s.trim()).includes(store)) return false;
+  if (process.env.STRELVA_CLIENT_RECORDS_DUAL_WRITE !== "1" || process.env.DUAL_WRITE_PG === "0") throw new Error("client_records_cutover_disabled");
+  return (await (await workspacePorts().clientRecords()).clientRecordReadSource(store)) === "postgres";
+}
+export async function writeDurableRecord(store: ClientRecordStoreName, tenant: string, recordId: string, value: unknown, capturedAt = new Date().toISOString(), mode: "replace" | "keep_first" = "replace"): Promise<string> {
+  const payload = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : { value };
+  const result = await (await workspacePorts().clientRecords()).writeClientRecord(store, tenant, { recordId, payload, capturedAt }, "dual_write", mode);
+  if (["failed", "skipped"].includes(result.status)) throw new Error(`client_records_write_failed:${result.reason ?? result.status}`);
+  return result.status;
+}
+export async function removeDurableRecord(store: ClientRecordStoreName, tenant: string, recordId: string): Promise<void> {
+  const result = await (await workspacePorts().clientRecords()).writeClientRecord(store, tenant, { recordId, remove: true }, "dual_write");
+  if (["failed", "skipped"].includes(result.status)) throw new Error(`client_records_remove_failed:${result.reason ?? result.status}`);
+}

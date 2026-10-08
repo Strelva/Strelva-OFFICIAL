@@ -33,3 +33,5 @@ export { prepareBundleMaintenance, checkBundleMaintenanceEvent } from "./mainten
 export type { MaintenanceDeps, MaintenanceRpc } from "./maintenance";
 export { undoListingChange } from "./service";
 export { createSupabaseReceiptStore } from "./receipts";
+
+export { googleMakeRealPorts, googleMakeRealDraftDigest } from "./make-real";
