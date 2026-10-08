@@ -17,6 +17,7 @@ import { isContentSection } from "@/lib/types";
 import { siteEditingFor, siteChangeRequestCommand, type WebsiteRebuildRecord } from "@/products/websites/client";
 import { getSiteSnapshots } from "@/lib/storage/site-snapshot-store";
 import { websiteRebuildReleasedFor, websiteDocumentStore } from "@/products/websites/index";
+import { logAuditEvent } from "@/lib/storage";
 
 // App-edge composition: resolve workspace authority, then adapt the existing
 // tenant review stores. Neither product code nor src/lib imports this adapter.
@@ -44,6 +45,7 @@ const live = {
   subscribed: async (tenantId: string) => !(await requireActiveSubscription(tenantId)),
   versions: (...args: Parameters<typeof getVersions>) => getVersions(...args),
   apply: (...args: Parameters<typeof applySectionUpdate>) => applySectionUpdate(...args),
+  audit: logAuditEvent,
 };
 
 const history = {
@@ -109,8 +111,23 @@ export function createWebsiteContentRestoreService(ports: typeof live & Partial<
     if (!isContentSection(input.section) || !template.contentSections.includes(input.section)) throw new WorkspaceConflictError("This section is not editable on this website.");
     const version = (await ports.versions(input.section, tenantId)).find(item => item.id === input.versionId);
     if (!version || !version.data || typeof version.data !== "object" || Array.isArray(version.data)) throw new WorkspaceConflictError("That saved content version is unavailable on this website.");
-    return ports.apply({ tenantId, section: input.section, data: version.data as Record<string, unknown>, tenantConfig: tenant,
-      siteManifest: await ports.capabilities(tenantId), forceReview: true });
+    const preparer = { userId: actor.userId, email: actor.verifiedEmail, kind: workspace.role === "owner" ? "owner" as const : "operator" as const };
+    const siteManifest = await ports.capabilities(tenantId);
+    const audit = { tenant: tenantId, action: "website.section.restore.prepare", targetType: "content_version", targetId: input.versionId,
+      actor: { userId: actor.userId, email: actor.verifiedEmail, type: preparer.kind === "owner" ? "user" as const : "super_admin" as const, isSuperAdmin: preparer.kind === "operator" },
+      metadata: { workspaceId: input.workspaceId, systemId: input.systemId, section: input.section } };
+    await ports.audit({ ...audit, metadata: { ...audit.metadata, phase: "attempt" } });
+    try {
+      const result = await ports.apply({ tenantId, section: input.section, data: version.data as Record<string, unknown>, tenantConfig: tenant,
+        siteManifest, forceReview: true, preparer });
+      await ports.audit({ ...audit, metadata: { ...audit.metadata, phase: "result", status: result.status, eventId: result.status === "queued" ? result.eventId : null } })
+        .catch(() => console.error("[website-restore] audit result unavailable; its attempt stands."));
+      return result;
+    } catch (error) {
+      await ports.audit({ ...audit, metadata: { ...audit.metadata, phase: "result", status: "unconfirmed" } })
+        .catch(() => console.error("[website-restore] audit result unavailable; its attempt stands."));
+      throw error;
+    }
   };
 }
 
