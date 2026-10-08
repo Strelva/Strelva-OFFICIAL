@@ -106,6 +106,16 @@ export const SEPT30_EXTRA_APPLIED = ["20260930120000"];
  * `accounts`. "missing" there is a stop.
  */
 export const MIGRATION_SENTINELS: Record<string, string> = {
+  // Full-model additions: private/denied probes remain unknown.
+  "20261021090031": "agent_business_discovery_days",
+  "20261021093000": "agency_release_flag_ceilings",
+  "20261021094000": "provider_client_queue_catalog_guard",
+  "20261021100000": "investigation_history_events",
+  "20261021110000": "enterprise_units",
+  "20261021112000": "home_finder_bindings",
+  "20261021130100": "custom_sandbox_runtime_qualifications",
+  "20261021131100": "assistant_connections",
+  "20261021131200": "assistant_website_proposals",
   "20261020090037": "provider_completion_rollback_state",
   "20261020090033": "business_attributions",
   // A denied private audit probe is unknown, not proof of absence.

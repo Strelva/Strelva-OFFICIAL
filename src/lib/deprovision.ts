@@ -291,7 +291,6 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
   if (!isValidDeprovisionTenantId(tenantId)) {
     return { ok: false, refusalReason: "invalid_tenant_id", refusalDetail: "Invalid tenant id.", tenantId, executed: false, pgRowTotal: 0, summary };
   }
-  if (executed && !getSupabase()) throw new Error("tenant_teardown_database_unavailable");
 
   // Guard 1: hardcoded denylist.
   if (PROTECTED_TENANTS.has(tenantId) && !force) {
@@ -305,6 +304,8 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
       summary,
     };
   }
+
+  if (executed && !getSupabase()) throw new Error("tenant_teardown_database_unavailable");
 
   // Guard 2: live "has paid" signal — the denylist drifts stale as clients onboard.
   const buildPayments = await countRows("build_payments", tenantId);

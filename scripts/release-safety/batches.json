@@ -1508,7 +1508,7 @@
       ]
     },
     {
-      "batch": "17",
+      "batch": "20",
       "description": "Isolated #251 operator support read and newsletter repair attribution",
       "status": "prepared locally, not deployed",
       "note": "Based on remote release3f3eac4f; isolated from private money/apps tails. Audit failure refuses sensitive read or rolls back repair. Dry run adds operator audit only. Inverse quarantines new app read and existing repair entry, preserving all accepted data and protections.",
@@ -1523,7 +1523,7 @@
       ]
     },
     {
-      "batch": "18",
+      "batch": "21",
       "status": "prepared locally; unapplied",
       "description": "Eleven platform-wide support reader compositions and seventeen app admission powers with attributed access history (#251)",
       "note": "Independent branch reservation after batch17 inquiry/operator audit source integration; no source dependency on17. Pure snapshot bodies/ACLs remain unchanged. Eleven typed wrapper reads append atomically; seventeen admission powers precede separate downstream app reads. Inverse disables all three public entrypoints, preserving immutable history. Not universal service-role SQL read auditing or selected retention policy.",
@@ -1533,6 +1533,152 @@
           "sha256": "7bcd8d8a942a591136584f20282ed327c68668b136035fcbb598b52dd96a69ff",
           "rollback": "rollback-20261020090039_platform_operator_read_audit.sql",
           "rollbackSha256": "882a103455fa27e8d5249f5416e324b8401cbbb20a24f38944299a1bf35aa6a6"
+        }
+      ]
+    },
+    {
+      "batch": "22",
+      "status": "full-model source convergence; exact-source ordered upgrade, actual client/provider and production qualification pending; not production-authorized",
+      "items": [
+        {
+          "file": "20261020090040_neutral_service_requests.sql",
+          "sha256": "5528f62c48bd82217a6c45e9becab8d06e6f22ba449f9dc456a71f023fccd961",
+          "rollbackStatus": "forward-only preparation; preserve data/current authority and review a successor; no inverse or production recovery is qualified"
+        },
+        {
+          "file": "20261020111000_audit_service_role_append_only.sql",
+          "sha256": "eae9458d3cac3bf13feb5a0dfbf195665c7f579f0db679068443db6a86e5a277",
+          "rollback": "rollback-20261020111000_audit_service_role_append_only.sql",
+          "rollbackSha256": "e19e85259bd73ba910dd42f6d3926d17646e5625b5a95cd0749d42264c920a08",
+          "rollbackStatus": "guarded or forward-only; exact native refusal/reapply and operating recovery remain release gates"
+        },
+        {
+          "file": "20261021090031_agent_booking_outcomes.sql",
+          "sha256": "692313d4d88be319103b9851f2a34244a7bb06c2a069c6739919c65096ea05d4",
+          "rollback": "rollback-20261021090031_agent_booking_outcomes.sql",
+          "rollbackSha256": "a71d6579b034f10cfa6fbc6c6f521e1ba73d83195f9a080daeb4187c0b713026",
+          "rollbackStatus": "guarded or forward-only; exact native refusal/reapply and operating recovery remain release gates"
+        },
+        {
+          "file": "20261021091000_access_review.sql",
+          "sha256": "374cf1b9b5a32dfea91b90958f381a17de195f1a2c274dddc4495482889a9aad",
+          "rollback": "rollback-20261021091000_access_review.sql",
+          "rollbackSha256": "8c0f0069d3486e89c07b7bdd5b801cf7e6c2292378d4e01014868d3ac9b54950",
+          "rollbackStatus": "guarded or forward-only; exact native refusal/reapply and operating recovery remain release gates"
+        },
+        {
+          "file": "20261021093000_agency_release_flag_ceiling.sql",
+          "sha256": "7627bfcb50b7272bbe038e171f9e0d1d9a39bb271256b4941a1d55cbe7238da3",
+          "rollback": "rollback-20261021093000_agency_release_flag_ceiling.sql",
+          "rollbackSha256": "2a6449d7f206a5577645953e27014b4bf47859388c2b18ce26af5d175a371c25",
+          "rollbackStatus": "guarded or forward-only; exact native refusal/reapply and operating recovery remain release gates"
+        },
+        {
+          "file": "20261021094000_provider_client_queue.sql",
+          "sha256": "f75db0d5e721a208440c8f2232b124f117b2da021ab77e2a18256640237c574d",
+          "rollback": "rollback-20261021094000_provider_client_queue.sql",
+          "rollbackSha256": "3e877b2fe748acb35a159b0aac58bfa4a354c6243601201090db096a5aed0080",
+          "rollbackStatus": "guarded or forward-only; exact native refusal/reapply and operating recovery remain release gates"
+        },
+        {
+          "file": "20261021095000_native_business_billing_home.sql",
+          "sha256": "8074b132b3ed1bef6bbcd4db40d658b0a1e050c2820032762bc0c25a2298e489",
+          "rollback": "rollback-20261021095000_native_business_billing_home.sql",
+          "rollbackSha256": "31f5e643a4e9462c824eecd16df409dd2e077ca232beb0406599f16eed580341",
+          "rollbackStatus": "guarded or forward-only; exact native refusal/reapply and operating recovery remain release gates"
+        },
+        {
+          "file": "20261021096000_agency_release_flag_lock_order.sql",
+          "sha256": "921961262bb228d445c7e065a6cff49d9f8a467b1cc6de32f7068dfb8ab1d5df",
+          "rollback": "rollback-20261021096000_agency_release_flag_lock_order.sql",
+          "rollbackSha256": "29a5101284a7f026fc606e9f0eda1dde4d1b26dd3f9f8f73a1422f86573fca7a",
+          "rollbackStatus": "guarded or forward-only; exact native refusal/reapply and operating recovery remain release gates"
+        },
+        {
+          "file": "20261021100000_investigation_paged_history.sql",
+          "sha256": "750b0d6e4f5c1fea388a20b74df02b2fa02978d568f902aa335e93b02d938762",
+          "rollbackStatus": "forward-only preparation; preserve data/current authority and review a successor; no inverse or production recovery is qualified"
+        },
+        {
+          "file": "20261021100100_order_external_identity.sql",
+          "sha256": "5a2c54a5e715c3e22c175cc47a475374427dfd7696c38a3d470fbb6996c59cb4",
+          "rollbackStatus": "forward-only preparation; preserve data/current authority and review a successor; no inverse or production recovery is qualified"
+        },
+        {
+          "file": "20261021100200_google_receipt_key_read.sql",
+          "sha256": "4384d30d6f30af8ef363aa24df90e3022dec9f043c876c1662e2f8ae13113f3d",
+          "rollbackStatus": "forward-only preparation; preserve data/current authority and review a successor; no inverse or production recovery is qualified"
+        },
+        {
+          "file": "20261021100300_investigation_history_export.sql",
+          "sha256": "b76944a18fd3439aacd65664d86551d51a56670b900bca8a41c348bd5ea22313",
+          "rollbackStatus": "forward-only preparation; preserve data/current authority and review a successor; no inverse or production recovery is qualified"
+        },
+        {
+          "file": "20261021100400_google_make_real_flag.sql",
+          "sha256": "0eaa90f5bebe1aa98df32535c40aaf67cbc2ba42f1195c08c108d8bf2bebb8ac",
+          "rollbackStatus": "forward-only preparation; preserve data/current authority and review a successor; no inverse or production recovery is qualified"
+        },
+        {
+          "file": "20261021110000_enterprise_units.sql",
+          "sha256": "b8072aac9f1b4eb254344877008f2303fa4ef8199cbd8aab875d7ba8c810386b",
+          "rollback": "rollback-20261021110000_enterprise_units.sql",
+          "rollbackSha256": "59e23ea73e046a8b516c948f5386ededd7df6282eb1183ba07b76e7d0b65f4bb",
+          "rollbackStatus": "guarded or forward-only; exact native refusal/reapply and operating recovery remain release gates"
+        },
+        {
+          "file": "20261021111000_enterprise_standards.sql",
+          "sha256": "4763d5f8c03aa989c977444161a40e06398982a4fa0dedfa43c5e1e28f648a6e",
+          "rollback": "rollback-20261021111000_enterprise_standards.sql",
+          "rollbackSha256": "1746ca1cab839f813bc75dbbd15f612d60131668a1c0fc216d5105f03760a364",
+          "rollbackStatus": "guarded or forward-only; exact native refusal/reapply and operating recovery remain release gates"
+        },
+        {
+          "file": "20261021112000_home_finder_native.sql",
+          "sha256": "b3feb5f74da3bd6a0d5e5e927ffdb62dc059215ce463063b50e9fb1bf0ac5448",
+          "rollback": "rollback-20261021112000_home_finder_native.sql",
+          "rollbackSha256": "612eacbe783ddeb68c7f7d030a4f20dcdc314f54fc413bea6fa35117d902fc3d",
+          "rollbackStatus": "guarded or forward-only; exact native refusal/reapply and operating recovery remain release gates"
+        },
+        {
+          "file": "20261021130000_agent_payment_attempt_readback.sql",
+          "sha256": "f4e421b6bca684c97e05cd669e8d892ce98ecc201cd6c234a70cf7d5e7114329",
+          "rollbackStatus": "forward-only preparation; preserve data/current authority and review a successor; no inverse or production recovery is qualified"
+        },
+        {
+          "file": "20261021130100_custom_sandbox_runtime_qualification.sql",
+          "sha256": "40ff62b02b0cf9c55c70cbb1a52b901dada8ebd9333c3a2cd581d8847af105af",
+          "rollback": "rollback-20261021130100_custom_sandbox_runtime_qualification.sql",
+          "rollbackSha256": "cc3ad7444478d3977bab5f2b705f3fa59ed125bf14144e9d07beba784f37b685",
+          "rollbackStatus": "guarded or forward-only; exact native refusal/reapply and operating recovery remain release gates"
+        },
+        {
+          "file": "20261021131000_agent_oauth_connection_context.sql",
+          "sha256": "766616040d25633fb3e1d1b70e905e6319282a5362becab38207fe4ce81d9234",
+          "rollback": "rollback-20261021131000_agent_oauth_connection_context.sql",
+          "rollbackSha256": "3aa01e92232fbd42855f2f01b7fea971361e553dd51603331506a13e83228f72",
+          "rollbackStatus": "guarded or forward-only; exact native refusal/reapply and operating recovery remain release gates"
+        },
+        {
+          "file": "20261021131100_agent_oauth_renewable.sql",
+          "sha256": "201171cbf14e1cc103d751832ffbeb373721e748bfad7097f75db1cb262c706f",
+          "rollback": "rollback-20261021131100_agent_oauth_renewable.sql",
+          "rollbackSha256": "2b98e9908b7ef26c63cb38d7302e9feec78cdaa730c9844a55e08bbba25bc08f",
+          "rollbackStatus": "guarded or forward-only; exact native refusal/reapply and operating recovery remain release gates"
+        },
+        {
+          "file": "20261021131200_agent_website_tools.sql",
+          "sha256": "7733edefcac30233c500e6330658ba34c87f3096cc27610bbdabf3933223d2b9",
+          "rollback": "rollback-20261021131200_agent_website_tools.sql",
+          "rollbackSha256": "78a40bed9a22a35e3412233641386988395b11008dbf794c0bbbd984e7cb64cb",
+          "rollbackStatus": "guarded or forward-only; exact native refusal/reapply and operating recovery remain release gates"
+        },
+        {
+          "file": "20261022090000_guarded_tenant_teardown.sql",
+          "sha256": "dca6f63b5395b4e755f7e0345ca4c602722676fe1931b704ac9f08e85c907205",
+          "rollback": "rollback-20261022090000_guarded_tenant_teardown.sql",
+          "rollbackSha256": "5ee1cd26ed5cfee06c354c1c564034f41f2d3d456aaa46c217e537dcae11920c",
+          "rollbackStatus": "guarded or forward-only; exact native refusal/reapply and operating recovery remain release gates"
         }
       ]
     }

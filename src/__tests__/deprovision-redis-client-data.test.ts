@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { isolatedRedisAvailable, startIsolatedRedis, type IsolatedRedis } from "./support/isolated-redis";
 
-const holder = vi.hoisted(() => ({ client: null as unknown }));
+const holder = vi.hoisted(() => ({ client: null as unknown, db: null as unknown, rpcs: [] as string[] }));
 vi.mock("@/platform/infra/redis", () => ({ getRedis: () => holder.client }));
-vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => null }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => holder.db }));
 vi.mock("@/lib/vercel", () => ({ isVercelConfigured: () => false, deleteVercelProject: vi.fn() }));
 import { runDeprovision, tenantRedisPatterns } from "@/lib/deprovision";
 
@@ -34,7 +34,18 @@ function seedClient(slug: string) {
 describe.skipIf(!isolatedRedisAvailable)("deprovision clears the client's Redis data (isolated Redis)", () => {
   beforeAll(async () => { redis = await startIsolatedRedis("deprovision"); holder.client = redis.client; });
   afterAll(async () => { if (redis) await redis.stop(); });
-  beforeEach(() => { cli("FLUSHDB"); });
+  beforeEach(() => {
+    cli("FLUSHDB"); holder.rpcs.length = 0;
+    holder.db = {
+      from: () => ({ select: () => ({ eq: async () => ({ count: 0, error: null }) }) }),
+      rpc: async (name: string) => {
+        holder.rpcs.push(name);
+        if (name === "tenant_teardown_blockers") return { data: { publications: 0, reservations: 0 }, error: null };
+        if (name === "deprovision_tenant_guarded") return { data: { counts: {}, paused: 0 }, error: null };
+        throw new Error(`Unexpected teardown RPC: ${name}`);
+      },
+    };
+  });
 
   it("covers every client store the spec lists, pinned to the tenant", () => {
     const patterns = tenantRedisPatterns("acme");
@@ -64,10 +75,19 @@ describe.skipIf(!isolatedRedisAvailable)("deprovision clears the client's Redis 
 
     const done = await runDeprovision({ tenantId: "acme", tenant: null, dryRun: false });
     expect(done.ok).toBe(true);
+    expect(holder.rpcs).toContain("deprovision_tenant_guarded");
     const left = (cli("KEYS", "*") as string[]).sort();
     expect(left.filter((k) => /(^|:)acme(:|$)/.test(k))).toEqual(["crm:acme"]);
     expect(cli("EXISTS", "leads:acmeco", "event:evt_acmeco", "connections:acmeco:google", "account-of:acmeco")).toBe(4);
     expect(JSON.parse(cli("GET", "account:acct-1") as string).tenantIds).toEqual(["acmeco"]);
+  });
+
+  it("refuses execution when PostgreSQL is unavailable and preserves Redis", async () => {
+    seedClient("acme"); holder.db = null;
+    const before = cli("DBSIZE");
+    await expect(runDeprovision({ tenantId: "acme", tenant: null, dryRun: false })).rejects.toThrow("tenant_teardown_database_unavailable");
+    expect(cli("DBSIZE")).toBe(before);
+    expect(holder.rpcs).toEqual([]);
   });
 
   it("refuses a protected tenant before touching Redis", async () => {
