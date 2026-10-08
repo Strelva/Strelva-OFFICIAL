@@ -55,7 +55,8 @@ it("uses recorded agency identity equally and never claims a requested provider 
     const projected = { ...mooney, providerOfRecord: { agencyWorkspaceId: "20000000-0000-4000-8000-000000000001", name } };
     expect(readBusinessSystems({ snapshot: snapshot([], projected), sites: [mooneySite] }).systems[0]?.operatedBy).toBe(name);
   }
-  expect(readBusinessSystems({ snapshot: snapshot([], mooney), sites: [mooneySite] }).systems[0]?.operatedBy).toBeUndefined();
+  expect(readBusinessSystems({ snapshot: snapshot([], mooney), sites: [mooneySite] }).systems[0]).toMatchObject({ operatedBy: undefined, providerIdentityStatus: "unavailable" });
+  expect(readBusinessSystems({ snapshot: snapshot([], { ...mooney, providerOfRecord: null }), sites: [mooneySite] }).systems[0]).toMatchObject({ operatedBy: undefined, providerIdentityStatus: "unassigned" });
 });
 
 describe("Systems read adapter over the spine projection", () => {

@@ -128,6 +128,8 @@ export interface SystemView {
   surface: SystemSurface;
   /** Who builds and runs it, when recorded. Managed customers never have to. */
   operatedBy?: string;
+  /** Identity read only, independent of grants or outside-effect permission. */
+  providerIdentityStatus?: "recorded" | "unassigned" | "unavailable";
   /** Set only by the released publishing projection for a linked tenant. */
   publishing?: boolean;
   connections: SystemConnection[];

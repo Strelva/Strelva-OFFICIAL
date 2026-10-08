@@ -109,7 +109,7 @@ export function SystemPage(props: SystemPageProps) {
           <span><Icon size={16} aria-hidden="true" className="mr-2 inline align-[-3px]" />{SYSTEM_KIND_LABEL[system.kind]}{titled && system.detail ? ` · ${system.detail}` : ""}</span>
           <LifecyclePill lifecycle={system.lifecycle} />
           <HealthSignal health={system.health} detailed />
-          {system.operatedBy ? <span>Run by {system.operatedBy}</span> : null}
+          {system.operatedBy ? <span>Agency of record: {system.operatedBy}</span> : system.providerIdentityStatus === "unavailable" ? <span>Agency identity could not be loaded</span> : system.providerIdentityStatus === "unassigned" ? <span>No agency of record</span> : null}
         </p>
         {system.storedVersionId ? <SystemCreator workspaceId={props.workspaceId} systemId={system.id} /> : null}
         {system.health.signals?.length ? <ul aria-label="Website health evidence" className="mt-3 space-y-1 text-sm text-gray-muted">{system.health.signals.map(signal => <li key={signal}>{signal}</li>)}</ul> : null}

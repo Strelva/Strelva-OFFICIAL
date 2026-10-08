@@ -177,6 +177,7 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
       ...(publishing && (kind === "website" || kind === "newsletter") ? { publishing: true } : {}),
       surface: surface ?? { kind: "work", workId: entry.savedWorkId ?? entry.ref.systemId, productId: "unknown" },
       operatedBy: projection?.providerOfRecord?.name,
+      providerIdentityStatus: projection?.providerOfRecord === undefined ? "unavailable" : projection.providerOfRecord === null ? "unassigned" : "recorded",
       ...(kind === "bookings" && entry.views?.length ? { views: bookingViews(entry.views, entry.tenantId ? siteById.get(entry.tenantId) : undefined) } : {}),
       ...(kind === "website" && domain ? auditsFor(domain, snapshot.work) : {}),
       connections: [], possibilities: [], versions,
