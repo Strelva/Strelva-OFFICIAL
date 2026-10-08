@@ -6,6 +6,8 @@ export interface WorkspaceActor {
   verifiedEmail: string;
 }
 
+/** The per-user cap in `create_owned_workspace` (five workspaces created by one person). */
+export const WORKSPACE_LIMIT_MESSAGE = "You have reached the limit of five workspaces for one account.";
 export const WORKSPACE_EXIT_STOPPED_MESSAGE = "New work is stopped for this workspace. Existing records remain available for review.";
 export const WORKSPACE_EXIT_RESOURCES_STOPPED_MESSAGE = "Resources are stopped for this workspace. Existing records remain available for review.";
 

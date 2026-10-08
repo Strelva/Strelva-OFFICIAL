@@ -11,7 +11,9 @@ import {
   type OperatorQueue, type QueueBusiness, type QueueItem, type QueuePriority,
 } from "@/platform/operator-queue/contracts";
 import { prefillMinutes } from "@/platform/operator-queue/rules";
-import { closeQueueItemAction, markQueueItemAction, type QueueActionResult } from "./actions";
+import { closeQueueItemAction, markQueueItemAction, resolveQueueDraftsAction, type QueueActionResult } from "./actions";
+import { QueueEventDetail, hasQueueEventDetail } from "@/components/dashboard/QueueEventDetail";
+import { QueueSourceActions } from "./QueueSourceActions";
 
 type Tone = "good" | "warn" | "crit" | "neutral" | "accent";
 const PRIORITY_TONE: Record<QueuePriority, Tone> = { P1: "crit", P2: "warn", P3: "accent", P4: "neutral" };
@@ -64,8 +66,9 @@ function useFocusedTime(open: boolean) {
 
 function newId() { return crypto.randomUUID(); }
 
-function Row({ item, me, operators, now, onResult }: {
-  item: QueueItem; me: string; operators: OperatorQueue["operators"]; now: number; onResult: (result: QueueActionResult) => void;
+function Row({ item, me, operators, now, onResult, actionsEnabled, businessLeads }: {
+  item: QueueItem; me: string; operators: OperatorQueue["operators"]; now: number; onResult: (result: QueueActionResult) => void; actionsEnabled: boolean;
+  businessLeads?: OperatorQueue["businessLeads"];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -85,6 +88,8 @@ function Row({ item, me, operators, now, onResult }: {
   const late = item.late;
   const due = dueLabel(item, now);
   const reach = ownerReachLabel(item);
+  const businessKey = item.business.kind === "workspace" ? `w:${item.business.workspaceId}` : item.business.kind === "tenant" ? `t:${item.business.tenantId}` : "strelva";
+  const leadCount = businessLeads?.find(summary => summary.businessKey === businessKey);
 
   function mark(action: Parameters<typeof markQueueItemAction>[0]["action"], payload?: Record<string, unknown>) {
     start(async () => {
@@ -95,6 +100,7 @@ function Row({ item, me, operators, now, onResult }: {
   }
 
   function openClose() {
+    if (actionsEnabled && item.move === "owner") setCloseState("dismissed");
     setMinutes(String(prefillMinutes(focused.current)));
     setPanel("close");
   }
@@ -105,7 +111,7 @@ function Row({ item, me, operators, now, onResult }: {
     const sendMinutes = logMinutes && /^\d+$/.test(minutes) && value >= 1;
     start(async () => {
       const result = await closeQueueItemAction({
-        commandId: closeId, key: item.key, state: closeState, reason: reason.trim() || (closeState === "done" ? "Handled" : "Not needed"),
+        commandId: closeId, key: item.key, state: closeState, reason: reason.trim() || (actionsEnabled ? "" : closeState === "done" ? "Handled" : "Not needed"),
         minutes: sendMinutes ? { entryId, minutes: value } : null,
       });
       onResult(result);
@@ -130,6 +136,7 @@ function Row({ item, me, operators, now, onResult }: {
             {item.business.kind === "tenant" && <span className="text-gray-faint"> · not yet a workspace</span>}
             {item.system && <> · {item.system.label}</>}
             {" · "}{age(item.ageMs)} old
+            {leadCount && <> · {leadCount.lastSevenDays === null ? "Lead count unavailable" : `${leadCount.lastSevenDays} leads in 7 days`}</>}
             {due && <> · <span className={late ? "text-critical" : undefined}>{due}</span></>}
           </span>
           {(item.priorityReason || reach || item.assignee) && (
@@ -139,24 +146,32 @@ function Row({ item, me, operators, now, onResult }: {
           )}
         </button>
         <div className="flex shrink-0 flex-wrap gap-1.5">
-          <Link href={item.href} className="rounded-full px-3 py-1.5 text-[12px] font-medium text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+          <Link href={item.href} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full px-3 py-1.5 text-[12px] font-medium text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
             Open
           </Link>
           {mine
-            ? <Button size="sm" variant="ghost" disabled={pending} onClick={() => mark("release")}>Release</Button>
-            : <Button size="sm" variant="secondary" disabled={pending} onClick={() => mark("take")}>Take</Button>}
-          <Button size="sm" variant="primary" disabled={pending} onClick={openClose}>Close</Button>
+            ? <Button size="lg" variant="ghost" disabled={pending} onClick={() => mark("release")}>Release</Button>
+            : <Button size="lg" variant="secondary" disabled={pending} onClick={() => mark("take")}>Take</Button>}
+          <Button size="lg" variant="primary" disabled={pending} onClick={openClose}>Close</Button>
         </div>
       </div>
 
       {open && (
         <div className="mt-3 rounded-xl border border-glass-border bg-white/[0.02] p-3">
+          {actionsEnabled && <QueueSourceActions item={item} onResult={onResult} />}
+          {actionsEnabled && item.kind === "draft_review" && item.review && hasQueueEventDetail(item.review) && <QueueEventDetail event={item.review} />}
+          {actionsEnabled && item.kind === "draft_review" && item.move === "strelva" && <div className="mb-3 flex flex-wrap gap-2">
+            {(["approve", "skip", "escalate"] as const).map((action) => <Button key={action} size="lg" disabled={pending} onClick={() => start(async () => {
+              const result = await resolveQueueDraftsAction({ keys: [item.key], action });
+              onResult(result); router.refresh();
+            })}>{action === "approve" ? "Approve" : action === "skip" ? "Skip" : "Ask the owner"}</Button>)}
+          </div>}
           <div className="flex flex-wrap gap-1.5">
-            <Button size="sm" variant="ghost" disabled={pending} onClick={() => mark(item.pinned ? "unpin" : "pin")}>{item.pinned ? "Unpin" : "Pin for a day"}</Button>
-            <Button size="sm" variant="ghost" disabled={pending || item.priority === "P1"} title={item.priority === "P1" ? "Harm-now items can't be snoozed" : undefined} onClick={() => setPanel("snooze")}>Snooze</Button>
-            <Button size="sm" variant="ghost" disabled={pending} onClick={() => setPanel("note")}>Add note</Button>
-            {operators.length > 1 && <Button size="sm" variant="ghost" disabled={pending} onClick={() => setPanel("handoff")}>Hand off</Button>}
-            {item.move === "owner" && <Button size="sm" variant="ghost" disabled={pending} onClick={() => mark("owner_told", { via: "email" })}>Owner told by email</Button>}
+            <Button size="lg" variant="ghost" disabled={pending} onClick={() => mark(item.pinned ? "unpin" : "pin")}>{item.pinned ? "Unpin" : "Pin for a day"}</Button>
+            <Button size="lg" variant="ghost" disabled={pending || item.priority === "P1"} title={item.priority === "P1" ? "Harm-now items can't be snoozed" : undefined} onClick={() => setPanel("snooze")}>Snooze</Button>
+            <Button size="lg" variant="ghost" disabled={pending} onClick={() => setPanel("note")}>Add note</Button>
+            {operators.length > 1 && <Button size="lg" variant="ghost" disabled={pending} onClick={() => setPanel("handoff")}>Hand off</Button>}
+            {item.move === "owner" && <Button size="lg" variant="ghost" disabled={pending} onClick={() => mark("owner_told", { via: "email" })}>Owner told by email</Button>}
           </div>
           {item.notes.length > 0 && (
             <ul className="mt-3 space-y-1.5 text-[12px] leading-5 text-gray-muted">
@@ -170,7 +185,7 @@ function Row({ item, me, operators, now, onResult }: {
               <div className="min-w-[200px] flex-1">
                 <TextInput label="Reason" value={text} onChange={(event) => setText(event.target.value)} maxLength={280} required />
               </div>
-              <Button size="sm" type="submit" disabled={pending || !text.trim()}>Snooze</Button>
+              <Button size="lg" type="submit" disabled={pending || !text.trim()}>Snooze</Button>
             </form>
           )}
           {panel === "note" && (
@@ -178,7 +193,7 @@ function Row({ item, me, operators, now, onResult }: {
               <div className="min-w-[200px] flex-1">
                 <TextInput label="Note" value={text} onChange={(event) => setText(event.target.value)} maxLength={1000} required />
               </div>
-              <Button size="sm" type="submit" disabled={pending || !text.trim()}>Add note</Button>
+              <Button size="lg" type="submit" disabled={pending || !text.trim()}>Add note</Button>
             </form>
           )}
           {panel === "handoff" && (
@@ -187,7 +202,7 @@ function Row({ item, me, operators, now, onResult }: {
                 <SelectInput label="Hand to" value={handTo} onChange={(event) => setHandTo(event.target.value)} required
                   options={[{ value: "", label: "Choose an operator" }, ...operators.filter((operator) => operator.userId !== me).map((operator) => ({ value: operator.userId, label: operator.email }))]} />
               </div>
-              <Button size="sm" type="submit" disabled={pending || !handTo}>Hand off</Button>
+              <Button size="lg" type="submit" disabled={pending || !handTo}>Hand off</Button>
             </form>
           )}
         </div>
@@ -197,22 +212,22 @@ function Row({ item, me, operators, now, onResult }: {
         <form onSubmit={submitClose} className="mt-3 rounded-xl border border-accent/30 bg-accent-dim/40 p-3" aria-label={`Close ${item.title}`}>
           <div className="flex flex-wrap items-end gap-2">
             <SelectInput label="Outcome" value={closeState} onChange={(event) => setCloseState(event.target.value as "done" | "dismissed")}
-              options={[{ value: "done", label: "Done" }, { value: "dismissed", label: "Dismissed" }]} />
+              options={actionsEnabled && item.move === "owner" ? [{ value: "dismissed", label: "Stop chasing" }] : [{ value: "done", label: "Done" }, { value: "dismissed", label: "Dismissed" }]} />
             <div className="min-w-[180px] flex-1">
-              <TextInput label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={280} placeholder={closeState === "done" ? "Handled" : "Not needed"} />
+              <TextInput label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={280} required={actionsEnabled} placeholder={closeState === "done" ? "What happened?" : "Why is it not needed?"} />
             </div>
           </div>
           <div className="mt-3 flex flex-wrap items-end gap-2">
             <div className="w-32">
               <TextInput label="Minutes on this?" inputMode="numeric" value={minutes} onChange={(event) => setMinutes(event.target.value.replace(/[^\d]/g, ""))} disabled={!logMinutes} aria-describedby={`${item.key}-minutes-hint`} />
             </div>
-            <label className="flex items-center gap-2 pb-2 text-[12px] text-gray-muted">
+            <label className="flex min-h-12 items-center gap-2 pb-2 text-[12px] text-gray-muted">
               <input type="checkbox" checked={logMinutes} onChange={(event) => setLogMinutes(event.target.checked)} className="accent-[var(--color-accent)]" />
               Log minutes
             </label>
             <div className="ml-auto flex gap-1.5">
-              <Button size="sm" variant="ghost" disabled={pending} onClick={() => setPanel("none")}>Cancel</Button>
-              <Button size="sm" type="submit" loading={pending} disabled={pending}>Close item</Button>
+              <Button size="lg" variant="ghost" disabled={pending} onClick={() => setPanel("none")}>Cancel</Button>
+              <Button size="lg" type="submit" loading={pending} disabled={pending}>Close item</Button>
             </div>
           </div>
           <p id={`${item.key}-minutes-hint`} className="mt-2 text-[11.5px] leading-5 text-gray-faint">
@@ -225,7 +240,7 @@ function Row({ item, me, operators, now, onResult }: {
   );
 }
 
-export function QueueBoard({ queue, me }: { queue: OperatorQueue; me: string }) {
+export function QueueBoard({ queue, me, actionsEnabled = false }: { queue: OperatorQueue; me: string; actionsEnabled?: boolean }) {
   const [message, setMessage] = useState<QueueActionResult | null>(null);
   const [showParked, setShowParked] = useState(false);
   const now = Date.parse(queue.generatedAt);
@@ -238,7 +253,7 @@ export function QueueBoard({ queue, me }: { queue: OperatorQueue; me: string }) 
     group.items.push(item);
     groups.set(key, group);
   }
-  const rowProps = { me, operators: queue.operators, now, onResult: setMessage };
+  const rowProps = { me, operators: queue.operators, now, onResult: setMessage, actionsEnabled, businessLeads: queue.businessLeads };
 
   return (
     <div className="space-y-4">
@@ -270,6 +285,7 @@ export function QueueBoard({ queue, me }: { queue: OperatorQueue; me: string }) 
             <h2 className="text-[13.5px] font-semibold tracking-[-0.01em] text-warm-white">{group.name}</h2>
             <span className="text-[11px] font-mono text-gray-faint tabular-nums">{group.items.length}</span>
           </div>
+          {actionsEnabled && <BulkDraftReview items={group.items} onResult={setMessage} />}
           <ul className="divide-y divide-glass-border border-t border-glass-border">{group.items.map((item) => <Row key={item.key} item={item} {...rowProps} />)}</ul>
         </section>
       ))}
@@ -302,12 +318,35 @@ export function QueueBoard({ queue, me }: { queue: OperatorQueue; me: string }) 
   );
 }
 
+/** Review the actual proposed changes before a per-business bulk approval. */
+function BulkDraftReview({ items, onResult }: { items: QueueItem[]; onResult: (result: QueueActionResult) => void }) {
+  const drafts = items.filter((item) => item.kind === "draft_review" && item.move === "strelva" && item.review);
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [pending, start] = useTransition();
+  const router = useRouter();
+  if (drafts.length < 2) return null;
+  return <div className="border-t border-glass-border p-4">
+    <Button size="lg" variant="secondary" onClick={() => setOpen(!open)} aria-expanded={open}>Review {drafts.length} drafts together</Button>
+    {open && <div className="mt-3 space-y-3">
+      {drafts.map((item) => <div key={item.key} className="space-y-2">
+        <label className="flex min-h-12 items-center gap-2 text-[13px] text-warm-white"><input type="checkbox" checked={selected.includes(item.key)} disabled={pending} onChange={(event) => setSelected((keys) => event.target.checked ? [...keys, item.key] : keys.filter((key) => key !== item.key))} />{item.title}</label>
+        {item.review && <QueueEventDetail event={item.review} />}
+      </div>)}
+      <Button size="lg" loading={pending} disabled={pending || !selected.length} onClick={() => start(async () => {
+        const result = await resolveQueueDraftsAction({ keys: selected, action: "approve" }); onResult(result);
+        setSelected((keys) => keys.filter((key) => !result.results.some((row) => row.key === key && row.changed))); router.refresh();
+      })}>Approve {selected.length} reviewed drafts</Button>
+    </div>}
+  </div>;
+}
+
 function ParkedAction({ item, onResult }: { item: QueueItem; onResult: (result: QueueActionResult) => void }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const action = item.closed ? "reopen" : "unsnooze";
   return (
-    <Button size="sm" variant="ghost" disabled={pending} onClick={() => start(async () => {
+    <Button size="lg" variant="ghost" disabled={pending} onClick={() => start(async () => {
       const result = await markQueueItemAction({ commandId: newId(), key: item.key, action });
       onResult(result);
       if (result.ok) router.refresh();

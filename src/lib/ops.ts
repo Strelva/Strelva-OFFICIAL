@@ -12,7 +12,7 @@ import { getRedis } from "@/platform/infra/redis";
 import { getAllTenants } from "./tenants";
 import { getTenantPrimaryDomain } from "./tenant-urls";
 import { getRecentFailures } from "./revalidate-client";
-import { getEvents, getQueueCount } from "./events";
+import { getEvents, getEventsRaw, getQueueCount } from "./events";
 import { mapPool } from "./concurrency";
 
 /**
@@ -24,7 +24,8 @@ import { mapPool } from "./concurrency";
 async function scanKeyCount(
   redis: NonNullable<ReturnType<typeof getRedis>>,
   pattern: string,
-  cap = 10000
+  cap = 10000,
+  requireComplete = false
 ): Promise<number> {
   let cursor = "0";
   let count = 0;
@@ -33,7 +34,10 @@ async function scanKeyCount(
     const [next, keys] = await redis.scan(cursor, { match: pattern, count: 250 });
     cursor = String(next);
     count += keys.length;
-    if (++iterations >= 100 || count >= cap) break;
+    if (++iterations >= 100 || count >= cap) {
+      if (requireComplete && cursor !== "0") throw new Error("Webhook failure scan incomplete");
+      break;
+    }
   } while (cursor !== "0");
   return count;
 }
@@ -79,10 +83,11 @@ export interface OpsReport {
  * Compute the full operational report. Null-safe on Redis; degrades to the
  * non-Redis subset rather than throwing.
  */
-export async function buildOpsReport(): Promise<OpsReport> {
+export async function buildOpsReport(options: { requireStore?: boolean } = {}): Promise<OpsReport> {
   const redis = getRedis();
+  if (options.requireStore && !redis) throw new Error("Operations alerts unavailable: Redis unavailable");
   const tenants = await getAllTenants();
-  const active = tenants.filter((t) => t.active);
+  const active = tenants.filter((t) => options.requireStore ? t.active !== false : t.active);
 
   const metrics: OpsMetrics = {
     webhookFailures: 0,
@@ -94,11 +99,11 @@ export async function buildOpsReport(): Promise<OpsReport> {
     tenantDomainDrift: [],
   };
 
-  const revalidationFailures = await getRecentFailures();
+  const revalidationFailures = await getRecentFailures(options);
   metrics.revalidationFailures = revalidationFailures.length;
 
   if (redis) {
-    metrics.webhookFailures = await scanKeyCount(redis, "stripe:event:error:*");
+    metrics.webhookFailures = await scanKeyCount(redis, "stripe:event:error:*", 10000, options.requireStore);
   }
 
   const envDomainMap: Record<string, string> = (() => {
@@ -123,7 +128,10 @@ export async function buildOpsReport(): Promise<OpsReport> {
     const result: PerTenantResult = { pendingCount: 0, failedWrites: [] };
 
     // Queue count + failed AI writes
-    const [count, events] = await Promise.all([
+    const [count, events] = options.requireStore ? await (async () => {
+      const records = await getEventsRaw(tenant.id, { all: true, requireStore: true });
+      return [records.filter(event => event.status === "pending").length, records.filter(event => event.status === "auto_approved")] as const;
+    })() : await Promise.all([
       getQueueCount(tenant.id),
       getEvents(tenant.id, { status: "auto_approved", limit: 100 }),
     ]);
@@ -181,6 +189,6 @@ export async function buildOpsReport(): Promise<OpsReport> {
     timestamp: new Date().toISOString(),
     activeTenants: active.length,
     metrics,
-    revalidationFailures: revalidationFailures.slice(0, 10),
+    revalidationFailures: options.requireStore ? revalidationFailures : revalidationFailures.slice(0, 10),
   };
 }

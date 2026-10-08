@@ -1,3 +1,4 @@
+import { findCalendlyTenant } from "@/platform/client-records/move";
 import { NextResponse } from "next/server";
 import { addEvent } from "@/lib/events";
 import { getRedis } from "@/platform/infra/redis";
@@ -89,6 +90,8 @@ function verifySignature(payload: string, signature: string, secret: string): bo
 }
 
 async function findTenantByUserUri(userUri: string): Promise<string | null> {
+  const durable = await findCalendlyTenant(userUri);
+  if (durable) return durable;
   const redis = getRedis();
   if (!redis) return null;
 

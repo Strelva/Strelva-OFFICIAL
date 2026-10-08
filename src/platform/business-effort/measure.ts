@@ -177,3 +177,17 @@ export function measureBusinessEffort(input: {
     },
   };
 }
+
+/** Queue effort by kind and System. A manual entry has no queue attribution;
+ * it is counted in business totals and is never silently assigned a System. */
+export function measureQueueEffort(entries: BusinessEffortEntry[], month: string) {
+  const groups = new Map<string, { businessId: string; kind: string; systemId: string | null; systemLabel: string | null; minutes: number }>();
+  for (const entry of entries) {
+    if (entry.void || !entry.queue || entry.occurredOn.slice(0, 7) !== month) continue;
+    const { kind, systemId, systemLabel } = entry.queue;
+    const key = JSON.stringify([entry.businessId, kind, systemId, systemLabel]);
+    const group = groups.get(key) ?? { businessId: entry.businessId, kind, systemId, systemLabel, minutes: 0 };
+    group.minutes += entry.minutes; groups.set(key, group);
+  }
+  return [...groups.values()].sort((a, b) => b.minutes - a.minutes || a.kind.localeCompare(b.kind));
+}

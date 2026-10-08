@@ -51,7 +51,8 @@ export interface InquiryMessageReviewEventMetadata {
   preparedAt: string;
   expiresAt: string | null;
   reviewTokenHash: string;
-  reviewAudience: "owner";
+  reviewAudience: "owner" | "operator";
+  authoredReply?: string;
 }
 
 export function dependency<T>(value: T | undefined, fallback: T): T {
@@ -120,6 +121,7 @@ export function tokenFor(metadata: Omit<InquiryMessageReviewEventMetadata, "revi
     messageDigest: metadata.messageDigest,
     preparedAt: metadata.preparedAt,
     expiresAt: metadata.expiresAt,
+    ...(metadata.authoredReply === undefined ? {} : { authoredReply: metadata.authoredReply }),
   })).digest("hex");
 }
 
@@ -205,6 +207,7 @@ export function inquiryFromLead(
   return {
     id: lead.id,
     tenantId,
+    businessId: definition.businessId,
     name: lead.name,
     email: lead.email || "",
     message: lead.message || lead.fields?.message || lead.fields?.request || null,

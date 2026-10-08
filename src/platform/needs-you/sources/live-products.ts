@@ -2,6 +2,7 @@
  * The real ports for the application, work plan, money and exit sources.
  * Each port calls the lifecycle's own service; the adapters never write.
  */
+import { readBusinessBilling } from "@/platform/business-billing";
 import { listWork } from "@/platform/workspaces";
 import type { SavedWork, WorkspaceActor } from "@/platform/workspaces/types";
 import { readJobEconomics } from "@/platform/work-economics";
@@ -95,6 +96,7 @@ export function productSourceAdapters(): SourceAdapter[] {
       execute: (actor, input) => executeWorkPlanOutput({ actor, ...input }),
     }),
     workMoneyAdapter({
+      billing: readBusinessBilling,
       allowances: async (actor, workspaceId) => (await inspectWorkAllowances(actor, { workspaceId })).allowances,
       inbox: async (actor) => {
         const inbox = await readPayerTransitionInbox(actor);

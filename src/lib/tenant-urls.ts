@@ -174,3 +174,48 @@ export function getTenantPublicUrl(
   const subdomain = tenant.subdomain || tenant.id;
   return `http://${subdomain}.localhost:3000`;
 }
+
+/** Public origins that may sign server-side tracking outcomes for this tenant. */
+export function getTenantPublicOrigins(
+  tenant: TenantConfig,
+  environment = process.env.NODE_ENV,
+): string[] {
+  const origins = new Set<string>();
+  const subdomain = tenant.subdomain || tenant.id;
+
+  if (environment === "production") {
+    // The hosted tenant address remains valid even when a custom domain is primary.
+    origins.add(new URL(tenantSiteOrigin(subdomain)).origin);
+  }
+
+  const configuredSites = [
+    tenant.productionDomain,
+    tenant.siteUrl,
+    ...(tenant.customDomains ?? []),
+  ];
+  for (const configuredSite of configuredSites) {
+    if (!configuredSite) continue;
+    try {
+      const value = configuredSite.trim();
+      const parsed = new URL(value.includes("://") ? value : `https://${value}`);
+      const hostname = parsed.hostname.toLowerCase();
+      if (
+        parsed.protocol !== "https:" ||
+        parsed.username ||
+        parsed.password ||
+        !hostname ||
+        isAdminDomain(hostname) ||
+        hostname === "vercel.app" ||
+        hostname.endsWith(".vercel.app") ||
+        isPlatformDomain(hostname)
+      ) {
+        continue;
+      }
+      origins.add(parsed.origin);
+    } catch {
+      // Invalid or non-origin tenant URL fields cannot authorize tracking.
+    }
+  }
+
+  return [...origins];
+}

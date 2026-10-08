@@ -1,3 +1,5 @@
+import type { AgencyAttribution } from "@/platform/infra/agency-attribution";
+
 /**
  * Browser-safe contracts for the AI Visibility product.
  *
@@ -25,6 +27,7 @@ export interface CitationProbe {
 }
 
 export interface AiVisibilityResult {
+  agency?: AgencyAttribution;
   business: string;
   url?: string;
   score: number;

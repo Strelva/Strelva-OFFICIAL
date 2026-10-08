@@ -17,6 +17,7 @@ import {
   Loader2,
   Download,
 } from "lucide-react";
+import type { AgencyAttribution } from "@/platform/infra/agency-attribution";
 import type { AuditResult, CheckStatus, CategoryResult } from "@/lib/audit/types";
 import { topFixes } from "@/lib/audit/impact";
 
@@ -140,7 +141,7 @@ function CategoryCard({ category }: { category: CategoryResult }) {
   );
 }
 
-export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReportId, initialError, workspaceEnabled = false, saved = false }: { initialUrl?: string; initialResult?: AuditResult; initialReportId?: string; initialError?: string; workspaceEnabled?: boolean; saved?: boolean }) {
+export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReportId, initialError, workspaceEnabled = false, saved = false, agency }: { agency?: AgencyAttribution; initialUrl?: string; initialResult?: AuditResult; initialReportId?: string; initialError?: string; workspaceEnabled?: boolean; saved?: boolean }) {
   const [url, setUrl] = useState(initialUrl);
   const [state, setState] = useState<ScanState>(initialResult ? "done" : "idle");
   const [result, setResult] = useState<AuditResult | null>(initialResult || null);
@@ -176,7 +177,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
       const res = await fetch("/api/audit/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: cleaned }),
+        body: JSON.stringify({ url: cleaned, ...(agency ? { agency: agency.slug } : {}) }),
       });
 
 
@@ -219,7 +220,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
     if (!result || reportLoading) return;
     setReportLoading(true);
     try {
-      const res = await fetch("/api/audit/report", {
+      const res = await fetch(result.agency ? `/api/audit/report?agency=${encodeURIComponent(result.agency.slug)}` : "/api/audit/report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(result),
@@ -245,6 +246,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
   return (
     <div className={saved ? "product-surface py-8" : "product-surface px-6 py-8 md:px-12"}>
       <div className="relative z-10 mx-auto max-w-[960px] pb-16">
+        {agency && <p data-agency-brand={agency.slug} className="mb-6 text-sm text-m-text-2">{agency.name} on Strelva</p>}
         {/* Input form */}
         {(state === "idle" || state === "error") && (
           <div className="motion-rise">
@@ -438,9 +440,10 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
                 Inspect the findings and export the report. This assessment does not change your website or activate monitoring.
               </p>
               {saved ? <p className="mt-4 text-sm text-m-text-2">Saved privately to this workspace.</p> : reportId && workspaceEnabled ? <Link className="marketing-button-primary mt-4 min-h-12 px-6" href={`/workspace?save=${reportId}`}>Save to my work</Link> : <p className="mt-4 text-sm text-m-text-2">Account saving is unavailable for this result. You can still export it.</p>}
+              {result.agency && <Link href={result.agency.contactUrl} target="_blank" rel="noopener noreferrer" className="marketing-button-primary mt-4 min-h-12 px-6">Get this fixed by {result.agency.name}</Link>}
               <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <Link
-                  href="/ai-visibility"
+                  href={result.agency ? `/ai-visibility?agency=${encodeURIComponent(result.agency.slug)}` : "/ai-visibility"}
                   className="marketing-button-primary h-12 px-6"
                 >
                   Check AI Visibility

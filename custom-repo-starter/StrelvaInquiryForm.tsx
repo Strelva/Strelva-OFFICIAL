@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState, type FormEvent } from "react";
-import { isPublicInquiryForm, loadInquiryForm, submitInquiryForm, type PublicInquiryForm, type PublicInquiryBookingOffer } from "./inquiry-client";
+import { isInquiryBookingOffer, isPublicInquiryForm, loadInquiryForm, submitInquiryFormWithReceipt, type InquirySubmissionReceipt, type PublicInquiryBookingOffer, type PublicInquiryForm } from "./inquiry-client";
 
 type ConnectedProps = { baseUrl: string; tenant: string; capabilityId: string; expectedVersion?: number };
 
@@ -23,20 +23,21 @@ function InquiryFormLoader({ baseUrl, tenant, capabilityId, expectedVersion }: C
   if (result === null) return <p role="status">Loading inquiry form…</p>;
   if (result instanceof Error) return <p role="alert">{result.message}</p>;
   if (expectedVersion !== undefined && result.version !== expectedVersion) return <p role="alert">This form changed. Please contact the business directly.</p>;
-  return <StrelvaInquiryForm definition={result} onSubmit={(fields) => submitInquiryForm(baseUrl, tenant, result, fields)} />;
+  return <StrelvaInquiryForm definition={result} onSubmit={(fields) => submitInquiryFormWithReceipt(baseUrl, tenant, result, fields)} />;
 }
 
 /** Fixed renderer shared by the owner preview and client-site inquiry surface. */
 export function StrelvaInquiryForm({ definition, onSubmit, submitLabel = "Send request" }: {
   definition: PublicInquiryForm;
-  onSubmit?: (fields: Record<string, string>) => Promise<PublicInquiryBookingOffer | void>;
+  onSubmit?: (fields: Record<string, string>) => Promise<void | PublicInquiryBookingOffer | InquirySubmissionReceipt>;
   submitLabel?: string;
 }) {
   const prefix = useId();
-  const [bookingOffer, setBookingOffer] = useState<PublicInquiryBookingOffer | null>(null);
   const [pending, setPending] = useState(false);
+  const [receipt, setReceipt] = useState<InquirySubmissionReceipt | null>(null);
   const [status, setStatus] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   if (!isPublicInquiryForm(definition)) return <p role="alert">This inquiry form is unavailable.</p>;
+  const offer = receipt?.bookingOffer;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -46,10 +47,10 @@ export function StrelvaInquiryForm({ definition, onSubmit, submitLabel = "Send r
     const fields = Object.fromEntries(definition.form.fields.map((field) => [field.id, String(data.get(field.id) ?? "").trim()]));
     setPending(true);
     setStatus(null);
-    setBookingOffer(null);
+    setReceipt(null);
     try {
-      const offer = await onSubmit(fields);
-      setBookingOffer(offer ?? null);
+      const received = await onSubmit(fields);
+      setReceipt(isInquiryBookingOffer(received) ? { bookingOffer: received } : received ?? null);
       setStatus({ kind: "success", text: "Your request has been received." });
       form.reset();
     } catch (error) {
@@ -73,7 +74,12 @@ export function StrelvaInquiryForm({ definition, onSubmit, submitLabel = "Send r
     </fieldset>
     <p>Strelva helps this business handle your request.</p>
     {onSubmit ? <button type="submit" disabled={pending} style={{ minHeight: "2.75rem", padding: ".65rem 1rem", font: "inherit" }}>{pending ? "Sending…" : submitLabel}</button> : <p>Preview only. This form does not send a request.</p>}
-    {bookingOffer ? <section aria-label="Suggested booking times"><p>You can also request a time. The business will confirm it.</p><ul>{bookingOffer.slots.map(slot => <li key={slot.start}>{bookingOffer.serviceName} · {new Intl.DateTimeFormat(undefined, { timeZone: bookingOffer.timeZone, dateStyle: "medium", timeStyle: "short" }).format(new Date(slot.start))}</li>)}</ul><a href={bookingOffer.url}>Choose a time to request</a></section> : null}
+    {offer && "url" in offer ? <section aria-label="Suggested booking times"><p>You can also request a time. The business will confirm it.</p><ul>{offer.slots.map(slot => <li key={slot.start}>{offer.serviceName} · {new Intl.DateTimeFormat(undefined, { timeZone: offer.timeZone, dateStyle: "medium", timeStyle: "short" }).format(new Date(slot.start))}</li>)}</ul><a href={offer.url}>Choose a time to request</a></section> : null}
+    {offer && !("url" in offer) ? <section aria-label="Appointment times" style={{ marginTop: "1.5rem" }}>
+      <h3>Request a time for {offer.serviceName}</h3>
+      <p>The business must confirm your appointment.</p>
+      <ul style={{ display: "grid", gap: ".75rem", padding: 0, listStyle: "none" }}>{offer.slots.map((slot) => <li key={slot.chooseUrl}><a href={slot.chooseUrl} style={{ display: "inline-flex", minHeight: "2.75rem", alignItems: "center" }}>{slot.label}</a></li>)}</ul>
+    </section> : null}
     {status ? <p role={status.kind === "error" ? "alert" : "status"}>{status.text}</p> : null}
   </form>;
 }

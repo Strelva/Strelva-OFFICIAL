@@ -108,7 +108,7 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
     workspaces: [
       { id: PERSONAL, kind: "personal", name: "Alex’s work" },
       ...(scenario === "agency" || scenario === "read-only" || scenario === "business" ? [
-        { id: AGENCY, kind: "agency" as const, name: "North Studio" },
+        { id: AGENCY, kind: "agency" as const, name: "North Studio", role: "owner" as const },
         { id: CUSTOMER, kind: "customer" as const, name: "Harbor Dental", ...(scenario === "business" ? { role: "owner" as const } : { access: "delegated_read" as const }) },
         ...(scenario === "agency" ? [{ id: SECOND_CUSTOMER, kind: "customer" as const, name: "Lake Bakery", access: "delegated_read" as const }] : []),
       ] : []),

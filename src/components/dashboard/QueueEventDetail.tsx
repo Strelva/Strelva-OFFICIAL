@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import type { UnifiedEvent } from "@/lib/types";
 import type { PreviewDiff } from "@/lib/agent-risk";
 
 /**
@@ -10,7 +9,7 @@ import type { PreviewDiff } from "@/lib/agent-risk";
  * (QueuePage) and the operator bulk-approve queue (`/admin/actions`) both back
  * onto this one component, so a bulk-approver reads the real change, not a label.
  */
-export type QueueEventLike = Pick<UnifiedEvent, "type" | "metadata">;
+export interface QueueEventLike { type: string; metadata?: Record<string, unknown> }
 
 /**
  * Field-level BEFORE→AFTER diff for a pending content-change event. The AI's

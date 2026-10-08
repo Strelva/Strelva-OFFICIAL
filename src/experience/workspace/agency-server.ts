@@ -15,6 +15,15 @@ import { bookingAgentVisibilityEnabled } from "@/platform/bookings/flags";
  *   here: going live is a separate release through the release gate.
  */
 import { z } from "zod";
+import { inquiryReleaseMayBeOn, inquiryReleaseEnabledForWorkspace, inquiryReleasedForCurrentUser, discoverInquiryPortfolio } from "@/products/inquiries";
+import { readLinkedSites } from "@/platform/owner-entry/linked-sites";
+import { resolveInquiryWorkspace } from "@/products/inquiries/server";
+import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
+import { addAgencyOperatorOverview } from "./agency/operator-overview";
+import { systemsReleasedFor } from "@/platform/systems-release";
+import { prepareVersionRelease, type VersionPreparationReceipt } from "@/platform/system-versions/preparation";
+import type { VersionLineage } from "@/platform/system-versions";
+import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
 import { createSystemVersions, improvementState, type VersionActor } from "@/platform/system-versions";
 import {
   createSupabaseConnectionOwnership,
@@ -52,14 +61,16 @@ export async function readAgencyClientsPage(
   cursor: string | null,
   db: VersionsDb = versionsDb(),
 ): Promise<AgencyClientsPage> {
-  const data = await rpc(db, "agency_client_overview", {
+  const released = operatorQueueReleaseEnabled();
+  const data = await rpc(db, released ? "agency_client_overview_v2" : "agency_client_overview", {
     p_agency_workspace_id: uuid.parse(agencyWorkspaceId), ...actorArgs(actor),
     p_cursor: cursor ? uuid.parse(cursor) : null, p_limit: AGENCY_CLIENT_PAGE_SIZE,
   }, "Clients could not be loaded.");
   const parsed = agencyClientsPageSchema.safeParse(data);
   if (!parsed.success || parsed.data.agencyWorkspaceId !== agencyWorkspaceId) throw new WorkspaceStoreError("Clients could not be loaded. The response was malformed.");
-  return { ...parsed.data, clients: parsed.data.clients.map(client => ({ ...client,
+  const page = { ...parsed.data, clients: parsed.data.clients.map(client => ({ ...client,
     ...(bookingAgentVisibilityEnabled() && client.systems.some(system => ["booking", "bookings"].includes(system.kind)) ? { agentBookings: true } : {}) })) };
+  return released ? addAgencyOperatorOverview(actor, page) : page;
 }
 
 const sourcesSchema = z.object({
@@ -132,6 +143,19 @@ export async function readAgencyLibrary(actor: WorkspaceActor, agencyWorkspaceId
       versions: rows,
     });
   }
+  if (inquiryReleaseMayBeOn() && await inquiryReleaseEnabledForWorkspace(agencyWorkspaceId, { userId: actor.userId, operator: false, tester: false })) {
+    try {
+      // Source access is the agency's own current links; target access is the
+      // existing portfolio's freshly checked tenant membership. No definition,
+      // credential, inquiry, approval or connection is copied into lineage.
+      const linked = await readLinkedSites(actor, agencyWorkspaceId);
+      const sourceIds = new Set([agencyWorkspaceId, ...await Promise.all(linked.sites.map(async site =>
+        (await resolveInquiryWorkspace({ tenantId: site.tenantId, tenantStableId: site.tenantStableId, fallbackBusinessId: site.tenantStableId })).businessId))]);
+      const portfolio = await discoverInquiryPortfolio(undefined, inquiryReleasedForCurrentUser);
+      result.inquiryVersions = (portfolio.versions ?? []).filter(item => sourceIds.has(item.sourceBusinessId));
+      if (portfolio.unavailableTenantIds.length) result.inquiryVersionsUnavailable = true;
+    } catch { result.inquiryVersionsUnavailable = true; }
+  }
   return result;
 }
 
@@ -139,6 +163,7 @@ export async function reviewAllImprovements(
   actor: WorkspaceActor,
   input: { agencyWorkspaceId: string; sourceSystemId: string; revision: number; versionIds: string[] },
   db: VersionsDb = versionsDb(),
+  prepare: ((actor: WorkspaceActor, lineage: VersionLineage) => Promise<VersionPreparationReceipt | null>) | null = needsYouReleaseEnabled() ? (actor, lineage) => prepareVersionRelease(actor, lineage, { db }) : null,
 ): Promise<AgencyBulkReviewResult> {
   const sources = await readSources(actor, input.agencyWorkspaceId, db);
   const source = sources.find((item) => item.systemId === input.sourceSystemId);
@@ -156,9 +181,16 @@ export async function reviewAllImprovements(
     }
     const named = { versionId, workspaceId: item.workspaceId, clientName: item.clientName };
     try {
+      if (!prepare || !(await systemsReleasedFor(actor, item.workspaceId))) throw new WorkspaceStoreError("Review is not enabled for this business. Nothing was adopted.");
       // One business, one decision: each Version is prepared on its own.
       const comparison = await versions.compareImprovement(versionActor, versionId, input.revision);
-      if (comparison.status === "up_to_date") { results.push({ ...named, outcome: "skipped_up_to_date", detail: "Already includes this revision." }); continue; }
+      if (comparison.status === "up_to_date") {
+        // A reply lost after adoption can resume the decision/receipt without adopting twice.
+        const existing = await store.getLineage(versionActor, versionId);
+        const receipt = existing ? await prepare(actor, existing) : null;
+        results.push(receipt ? { ...named, outcome: "prepared", detail: "The draft and its release decision are ready. Nothing went live.", ...receipt } : { ...named, outcome: "skipped_up_to_date", detail: "Already includes this revision." });
+        continue;
+      }
       if (comparison.conflicts.length) {
         results.push({ ...named, outcome: "skipped_conflicts", detail: `Needs a choice on ${comparison.conflicts.length} change${comparison.conflicts.length === 1 ? "" : "s"}.` });
         continue;
@@ -169,8 +201,9 @@ export async function reviewAllImprovements(
       }
       const lineage = await store.getLineage(versionActor, versionId);
       if (!lineage) throw new Error("This Version is unavailable.");
-      await versions.adoptImprovement(versionActor, versionId, { revision: input.revision, expectedRowRevision: lineage.rowRevision });
-      results.push({ ...named, outcome: "prepared", detail: `Ready for ${item.clientName} to approve. Nothing is live yet.` });
+      const adopted = await versions.adoptImprovement(versionActor, versionId, { revision: input.revision, expectedRowRevision: lineage.rowRevision });
+      const receipt = await prepare(actor, adopted);
+      results.push({ ...named, outcome: "prepared", detail: receipt ? `Ready for ${item.clientName}'s release decision. Nothing is live yet.` : "The working definition is prepared. Needs you is off; no release decision was opened.", ...(receipt ?? {}) });
     } catch (error) {
       results.push({ ...named, outcome: "failed", detail: error instanceof Error ? error.message.slice(0, 300) : "Could not prepare." });
     }

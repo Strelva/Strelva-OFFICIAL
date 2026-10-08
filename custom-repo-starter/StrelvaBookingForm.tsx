@@ -110,6 +110,7 @@ export function StrelvaBookingForm({
   onReconcile,
   initialRequestDraft,
   submitLabel = "Reserve time",
+  testOnly = false,
 }: {
   schedule: PublicBookingSchedule;
   receipt?: PublicBookingReceipt | null;
@@ -119,6 +120,8 @@ export function StrelvaBookingForm({
   onReconcile?: (receipt: PublicBookingReceipt) => Promise<PublicBookingReceipt>;
   initialRequestDraft?: PublicBookingRequestDraft | null;
   submitLabel?: string;
+  /** Isolated Strelva candidate preview: callbacks must be supplied locally. */
+  testOnly?: boolean;
 }) {
   const prefix = useId();
   const [pending, setPending] = useState(false);
@@ -150,7 +153,7 @@ export function StrelvaBookingForm({
     : receipt?.status === "cancelled"
       ? "This reservation is cancelled."
       : receipt
-        ? native ? "Your request is waiting for the business to confirm. This time is not confirmed yet." : "We could not confirm this reservation yet. Check the calendar before trying again."
+        ? native ? "If you received a confirmation email, confirm within 15 minutes. Your request is waiting for the business to confirm. This time is not confirmed yet." : "If you received a confirmation email, confirm within 15 minutes. We could not confirm this reservation yet. Check the calendar before trying again."
         : null;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -165,7 +168,7 @@ export function StrelvaBookingForm({
       setEmail("");
       setPhone("");
       setMessage("");
-      setStatus({ kind: "success", text: next.status === "confirmed" ? "Your time is reserved." : "Your request was received for confirmation." });
+      setStatus({ kind: "success", text: testOnly ? "Test booking completed. Nobody was told, no calendar changed, and no real record was kept." : next.status === "confirmed" ? "Your time is reserved." : "Your request was received for confirmation." });
     } catch (error) {
       showConflict(error);
       setStatus({ kind: "error", text: error instanceof Error ? error.message : "Your booking was not confirmed. Please try again." });
@@ -213,6 +216,12 @@ export function StrelvaBookingForm({
     } finally { setReconciling(false); }
   }
 
+  if (testOnly && receipt) return <section aria-label={schedule.name}>
+    <h2>{schedule.name}</h2>
+    <p role="status">Test booking completed. Nobody was told, no calendar changed, and no real record was kept.</p>
+    <button type="button" onClick={() => { setReceipt(null); setStatus(null); }}>Try another test</button>
+  </section>;
+
   if (!schedule.slots.length) {
     return <p role="status">No booking times are available right now. Please contact the business directly.</p>;
   }
@@ -220,8 +229,8 @@ export function StrelvaBookingForm({
   return (
     <section aria-label={schedule.name}>
       <h2>{schedule.name}</h2>
-      <p>{native ? "Choose a time. The business confirms your booking; a connected calendar receives a copy." : `Choose a time. ${providerLabel(schedule.provider)} will confirm the reservation.`}</p>
-      {native ? <p>Times shown in {visitorTimeZone}.</p> : null}
+      <p>{testOnly ? "Choose a configured test time. Live availability is checked only after publication; this test goes nowhere." : native ? "Choose a time. The business confirms your booking; a connected calendar receives a copy." : `Choose a time. ${providerLabel(schedule.provider)} will confirm the reservation.`}</p>
+      {native && !testOnly ? <p>Times shown in {visitorTimeZone}.</p> : null}
       <form onSubmit={(event) => void submit(event)} aria-label="Reserve a time">
         <label htmlFor={`${prefix}-slot`}>Available time</label>
         <select id={`${prefix}-slot`} value={slotId} disabled={pending} onChange={event => setSlotId(event.target.value)}>

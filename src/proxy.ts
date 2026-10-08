@@ -1,3 +1,4 @@
+import { resolveAgencyAttribution } from "@/platform/agency-prospecting/server";
 import {
   applyMiddlewareSupabaseResponse,
   createMiddlewareSupabase,
@@ -85,6 +86,9 @@ const PUBLIC_EXACT = new Set([
   "/api/publishing/google/reconnect/callback",
   "/api/track",
   "/api/billing/webhook",
+  // The public agent channel: reads and confirmation-gated holds only, behind
+  // STRELVA_BOOKING_AGENTS. Owner/agency MCP paths stay session-gated (#302).
+  "/api/mcp/public",
 ]);
 // Prefix public paths (the old `/foo(.*)` patterns — literal-prefix match, so
 // `/sign-in`, `/sign-in/x`, `/sign-integration` are all public, matching Clerk).
@@ -110,6 +114,8 @@ const PUBLIC_PREFIXES = [
   "/api/agent-access/work/",
   "/api/approve",
   "/api/v1/",
+  // Per-business alias of /api/mcp/public (same tools and gates).
+  "/api/mcp/bookings/",
   "/api/cron/",
   "/api/internal/",
 ];
@@ -508,6 +514,19 @@ export async function requestIsSuperAdmin(req: NextRequest): Promise<boolean> {
 export default async function proxy(req: NextRequest) {
   const host = req.headers.get("host") || "";
   const pathname = req.nextUrl.pathname;
+  // Embeds admit only the enabled agency's configured HTTPS contact origin.
+  // Every other surface retains DENY. Query params cannot alter frame authority.
+  const agencyEmbed = /^\/embed\/agency\/([a-z0-9][a-z0-9-]{0,63})\/(ai-visibility|audit)$/.exec(pathname);
+  if (agencyEmbed) {
+    const agency = await resolveAgencyAttribution(agencyEmbed[1]).catch(() => null);
+    if (!agency) return applySecurityHeaders(new NextResponse("Agency check unavailable", { status: 404 }), req);
+    const response = applySecurityHeaders(NextResponse.next(), req);
+    const origin = new URL(agency.contactUrl).origin;
+    response.headers.set("Content-Security-Policy", response.headers.get("Content-Security-Policy")!.replace(/frame-ancestors [^;]+/, `frame-ancestors 'self' ${origin}`));
+    response.headers.delete("X-Frame-Options");
+    response.headers.set("Cache-Control", "no-store");
+    return response;
+  }
   // HTML assets skipped the proxy before the v2 redirect matcher was added.
   // Keep the original passthrough bytes while the rebuild release is disabled.
   if (/\.html?$/i.test(pathname) && !websiteRebuildReleaseMayBeOn()) return NextResponse.next();

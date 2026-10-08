@@ -8,6 +8,7 @@ const fakes = vi.hoisted(() => ({
   listPublicWebsiteBookingGrants: vi.fn(),
   readWorkspaceSchedule: vi.fn(),
   listWorkspaces: vi.fn(),
+  listWorkspaceCalendarConnections: vi.fn(),
 }));
 
 vi.mock("@/platform/offerings/store", () => ({
@@ -24,6 +25,7 @@ vi.mock("@/products/inquiries/server", () => ({
 vi.mock("@/products/scheduling/server", () => ({
   listPublicWebsiteBookingGrants: fakes.listPublicWebsiteBookingGrants,
   readWorkspaceSchedule: fakes.readWorkspaceSchedule,
+  listWorkspaceCalendarConnections: fakes.listWorkspaceCalendarConnections,
   scheduleSchema: { safeParse: (value: unknown) => ({ success: true, data: value }) },
 }));
 
@@ -48,6 +50,7 @@ describe("published website capability resolution", () => {
     fakes.projectPublishedInquiry.mockReturnValue(null);
     fakes.listPublicWebsiteBookingGrants.mockResolvedValue([]);
     fakes.readWorkspaceSchedule.mockResolvedValue({ payload: { availability: [] } });
+    fakes.listWorkspaceCalendarConnections.mockResolvedValue([{ provider: "outlook", status: "connected" }]);
   });
 
   afterEach(() => {
@@ -139,6 +142,18 @@ describe("published website capability resolution", () => {
       tenantId: "northstar",
       bookingGrantId: "66666666-6666-4666-8666-666666666666",
     })).resolves.toBeUndefined();
+  });
+  it("refuses publication if the selected booking calendar was revoked after preparation", async () => {
+    configurePublishedConnections();
+    fakes.listWorkspaceCalendarConnections.mockResolvedValue([{ provider: "outlook", status: "revoked" }]);
+    await expect(resolvePublishedWebsiteCapabilities(actor, workspaceId, websiteWorkId, { tenantId: "northstar", inquiryCapabilityId: "inquiry-main", bookingGrantId }, { requireConnectedCalendar: true })).resolves.toBeUndefined();
+  });
+  it("preserves existing capability resolution when Ask is off and no Ask candidate requests the added check", async () => {
+    vi.stubEnv("STRELVA_ASK_RELEASE", "0");
+    configurePublishedConnections();
+    fakes.listWorkspaceCalendarConnections.mockResolvedValue([{ provider: "outlook", status: "revoked" }]);
+    await expect(resolvePublishedWebsiteCapabilities(actor, workspaceId, websiteWorkId, { tenantId: "northstar", inquiryCapabilityId: "inquiry-main", bookingGrantId })).resolves.toMatchObject({ booking: { capabilityId: "booking-main" } });
+    expect(fakes.listWorkspaceCalendarConnections).not.toHaveBeenCalled();
   });
 
   it("keeps multiple tenant options explicit rather than using the first binding", async () => {

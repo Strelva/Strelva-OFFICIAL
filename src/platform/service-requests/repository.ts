@@ -1,9 +1,11 @@
+import { finiteJobRequests, readFiniteJobs } from "@/platform/finite-jobs";
+import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 import { getSupabase } from "@/platform/infra/db/client";
 import {
   ServiceRequestAccessError, ServiceRequestConflictError, ServiceRequestNotFoundError,
   ServiceRequestStoreError, serviceRequestSchema, type ServiceRequest, type ServiceRequestActor,
 } from "./types";
-import { WORKSPACE_EXIT_STOPPED_MESSAGE } from "@/platform/workspaces/types";
+import { WorkspaceAccessError, WORKSPACE_EXIT_STOPPED_MESSAGE } from "@/platform/workspaces/types";
 import type { ServiceRequestListQuery, ServiceRequestStore } from "./service";
 import type { DeliveryCommitmentMutation } from "./delivery-commitment-service";
 
@@ -67,7 +69,16 @@ export async function readServiceDeliveryPermissions(actor: ServiceRequestActor,
 }
 export const PostgresServiceRequestStore: ServiceRequestStore = {
   async list(actor, query: ServiceRequestListQuery) {
-    if ("businessId" in query) return listRows(await rpc("read_service_requests_for_business", { ...identity(actor), p_business_id: query.businessId }));
+    if ("businessId" in query) {
+      if (await workspaceReleaseFlagEnabled("finite_jobs", query.businessId)) {
+        try { return finiteJobRequests(await readFiniteJobs(actor, query.businessId)).map(map); }
+        catch (error) {
+          if (error instanceof WorkspaceAccessError) throw new ServiceRequestAccessError();
+          throw new ServiceRequestStoreError("The finite job request snapshot could not be read.");
+        }
+      }
+      return listRows(await rpc("read_service_requests_for_business", { ...identity(actor), p_business_id: query.businessId }));
+    }
     if ("providerWorkspaceId" in query) return listRows(await rpc("read_service_requests_for_agency", { ...identity(actor), p_agency_workspace_id: query.providerWorkspaceId }));
     return listRows(await rpc("read_service_requests_for_strelva", identity(actor)));
   },

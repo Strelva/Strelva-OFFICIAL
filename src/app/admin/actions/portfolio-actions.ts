@@ -8,14 +8,15 @@
  * (`resolveEventAction`) — never a shortcut that bypasses approval — so an
  * external write that fails leaves its item pending and is reported honestly.
  *
- * Pure of auth/HTTP: the page reads `getPortfolioActions`, the server action
- * gates super-admin then calls `bulkResolvePortfolioActions`. A transient read
+ * The page reads `getPortfolioActions`; the server action resolves the
+ * verified operator, then calls `bulkResolvePortfolioActions` as that operator. A transient read
  * failure keeps the overview usable, but is carried as an explicit incomplete
  * source so an empty result can never masquerade as a verified clear queue.
  */
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
 import { getEvents } from "@/lib/events";
 import { resolveEventAction } from "@/lib/event-actions";
+import { auditOperatorDecision, operatorStillActive, type VerifiedOperator } from "../operator-audit";
 import type { UnifiedEvent } from "@/lib/types";
 
 export interface PortfolioActionItem {
@@ -215,28 +216,54 @@ export interface PortfolioResolveResult {
  * write that fails comes back `changed:false` with the underlying reason and the
  * item stays pending, never silently marked done. Sequential so concurrent
  * external writes don't stampede an integration; the batch is a handful of items.
+ *
+ * Every item runs as the verified operator, never as the owner, re-checks that
+ * the operator is still active, and writes an audit row before and after.
  */
 export async function bulkResolvePortfolioActions(
   items: PortfolioResolveInput[],
+  operator: VerifiedOperator,
 ): Promise<PortfolioResolveResult[]> {
   const results: PortfolioResolveResult[] = [];
+  let revoked = false;
   for (const item of items) {
+    let attempted = false;
     try {
-      const res = await resolveEventAction(item.tenantId, item.eventId, "approved");
+      if (revoked || !(await operatorStillActive(operator))) {
+        revoked = true;
+        results.push({ tenantId: item.tenantId, eventId: item.eventId, changed: false, reason: "operator_access_changed" });
+        continue;
+      }
+      const audit = { operator, tenantId: item.tenantId, eventId: item.eventId, action: "portfolio.draft.approve" };
+      try {
+        await auditOperatorDecision({ ...audit, phase: "attempt" });
+      } catch {
+        results.push({ tenantId: item.tenantId, eventId: item.eventId, changed: false, reason: "audit_unavailable" });
+        continue;
+      }
+      attempted = true;
+      const res = await resolveEventAction(item.tenantId, item.eventId, "approved", operator.actorId);
       results.push({
         tenantId: item.tenantId,
         eventId: item.eventId,
         changed: res.changed,
         reason: res.reason,
       });
+      await auditOperatorDecision({ ...audit, phase: "result", detail: { changed: res.changed, reason: res.reason ?? null } })
+        .catch(() => console.error(`[admin/actions] audit result row failed for ${item.eventId}; its attempt row stands.`));
     } catch (err) {
       // A single item throwing must not abort the rest of the batch.
+      const reason = err instanceof Error ? err.message : "error";
       results.push({
         tenantId: item.tenantId,
         eventId: item.eventId,
         changed: false,
-        reason: err instanceof Error ? err.message : "error",
+        reason,
       });
+      if (attempted) {
+        await auditOperatorDecision({ operator, tenantId: item.tenantId, eventId: item.eventId, action: "portfolio.draft.approve", phase: "result", detail: { changed: false, reason: reason.slice(0, 200) } })
+          .catch(() => console.error(`[admin/actions] audit result row failed for ${item.eventId}; its attempt row stands.`));
+      }
     }
   }
   return results;

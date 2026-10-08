@@ -7,6 +7,7 @@ import {
   WorkspaceMakeSystemsError,
   WorkspaceStoreError,
   WORKSPACE_EXIT_STOPPED_MESSAGE,
+  WORKSPACE_LIMIT_MESSAGE,
   type AcceptedHandoff,
   type Delegation,
   type Handoff,
@@ -62,7 +63,8 @@ function workspaceDbFailure(error: DbFailure, fallback: string): never {
     throw new WorkspaceAccessError();
   }
   if (CONFLICT_FAILURES.some((value) => detail.includes(value))) {
-    throw new WorkspaceConflictError(detail.includes("workspace_exit_future_work_blocked") ? WORKSPACE_EXIT_STOPPED_MESSAGE : undefined);
+    throw new WorkspaceConflictError(detail.includes("workspace_exit_future_work_blocked") ? WORKSPACE_EXIT_STOPPED_MESSAGE
+      : detail.includes("workspace_limit_reached") ? WORKSPACE_LIMIT_MESSAGE : undefined);
   }
   throw new WorkspaceStoreError(fallback);
 }

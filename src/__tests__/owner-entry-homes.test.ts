@@ -261,18 +261,18 @@ describe("the pages that moved (owner-entry spec §5)", () => {
     expect(route("/dashboard/analytics")).toMatchObject({ kind: "redirect", location: `/workspace/results?workspaceId=${WS}` });
   });
 
-  it("keeps Settings on /dashboard until owners can edit branding and domains in the workspace", () => {
+  it("retains Settings at launch while ownership has its own workspace home", () => {
     expect(DASHBOARD_DISPOSITIONS.find((item) => item.route === "/settings")!.state).toBe("stay");
     expect(route("/dashboard/settings").kind).not.toBe("redirect");
-    expect(route("/dashboard/ownership").kind).not.toBe("redirect");
-    expect(pagesBlockingOwnerEntry(new Set(["always", "local"])).map((entry) => entry.route)).toContain("/settings");
+    expect(route("/dashboard/ownership")).toMatchObject({ kind: "redirect", location: `/workspace/business-details?workspaceId=${WS}#ownership` });
+    expect(pagesBlockingOwnerEntry(new Set(["always", "local"]))).toEqual([]);
   });
 
   it("keeps meaning carried in the query", () => {
     expect(route("/dashboard/analytics?range=month")).toMatchObject({ location: `/workspace/results?workspaceId=${WS}&range=month` });
     expect(route("/dashboard/analytics?range=custom&from=2026-09-01&to=2026-09-30")).toMatchObject({ location: `/workspace/results?workspaceId=${WS}&range=custom&from=2026-09-01&to=2026-09-30` });
     expect(route("/dashboard/analytics?range=bogus")).toMatchObject({ location: `/workspace/results?workspaceId=${WS}` });
-    expect(route("/dashboard/health")).toMatchObject({ location: `/workspace/results?workspaceId=${WS}` });
+    expect(route("/dashboard/health")).toMatchObject({ location: `/workspace/results?workspaceId=${WS}#site-health` });
     expect(route("/dashboard?checkout=success", ["needs_you"])).toMatchObject({ location: `/workspace?view=settings&workspaceId=${WS}` });
   });
 
@@ -294,11 +294,12 @@ describe("the pages that moved (owner-entry spec §5)", () => {
     expect(routeDashboardRequest({ decision: { kind: "dashboard", reason: "entry_off" }, pathWithSearch: "/dashboard/leads" })).toEqual({ kind: "render" });
   });
 
-  it("no longer blocks owner entry for these pages; Settings still does", () => {
+  it("no longer blocks owner entry; Settings is explicitly retained", () => {
     const blocking = pagesBlockingOwnerEntry(new Set(["always", "local"])).map((entry) => entry.route);
     for (const path of ["/", "/review", "/leads", "/reviews", "/analytics", "/health", "/site"]) expect(blocking, path).not.toContain(path);
-    expect(blocking).toContain("/settings");
-    expect(effectiveDisposition("/health").route).toBe("/analytics");
+    expect(blocking).toEqual([]);
+    expect(effectiveDisposition("/settings")).toMatchObject({ state: "stay", retainedAtLaunch: true });
+    expect(effectiveDisposition("/health").route).toBe("/health");
   });
 
   it("maps every old settings anchor somewhere that survives sign-in", () => {
