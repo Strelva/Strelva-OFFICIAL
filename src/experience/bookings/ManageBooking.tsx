@@ -12,6 +12,7 @@ export type { ManageBookingState, ManagedBookingView };
  */
 
 const STATUS: Record<ManagedBookingView["status"], string> = {
+  held: "Waiting for your confirmation",
   confirmed: "Confirmed",
   pending: "Waiting for the business to confirm",
   cancelled: "Cancelled",
@@ -39,6 +40,7 @@ function Summary({ booking }: { booking: ManagedBookingView }) {
         </dd>
         <dt className="text-gray-muted">Status</dt>
         <dd>{STATUS[booking.status]}</dd>
+        {booking.agentSource ? <><dt className="text-gray-muted">Source</dt><dd className="break-words">{booking.agentSource}</dd></> : null}
       </dl>
     </Card>
   );
@@ -72,8 +74,8 @@ export function ManageBooking({ state, actionUrl }: { state: ManageBookingState;
     return (
       <Shell>
         <p className="text-xs font-medium uppercase tracking-[0.14em] text-gray-muted">{booking.siteName || "Your booking"}</p>
-        <h1 className="mt-3 font-display text-[32px] font-medium leading-tight">This booking has passed</h1>
-        <p className="mt-3 text-base leading-7 text-gray-muted">The link stops working once the appointment is over. To book again, visit the business&apos;s website.</p>
+        <h1 className="mt-3 font-display text-[32px] font-medium leading-tight">This booking link has expired</h1>
+        <p className="mt-3 text-base leading-7 text-gray-muted">The appointment has ended or the confirmation window has closed. To book again, visit the business&apos;s website.</p>
         <Summary booking={booking} />
       </Shell>
     );
@@ -84,18 +86,29 @@ export function ManageBooking({ state, actionUrl }: { state: ManageBookingState;
       <p className="text-xs font-medium uppercase tracking-[0.14em] text-gray-muted">{booking.siteName || "Your booking"}</p>
       <h1 className="mt-3 font-display text-[32px] font-medium leading-tight">{cancelled ? "Your booking is cancelled" : "Your booking"}</h1>
 
-      {state.notice === "rescheduled" ? (
+      {state.notice === "confirmed" ? (
+        <p role="status" className="mt-4 rounded-lg bg-gray-bg px-4 py-3 text-sm">Your booking is confirmed.</p>
+      ) : state.notice === "rescheduled" ? (
         <p role="status" className="mt-4 rounded-lg bg-gray-bg px-4 py-3 text-sm">Your new time is booked. A confirmation is on its way when email is on for this business.</p>
       ) : state.notice === "pending" ? (
-        <p role="status" className="mt-4 rounded-lg bg-gray-bg px-4 py-3 text-sm">Your change was sent. The business&apos;s calendar hasn&apos;t confirmed it yet; this page shows it once it does.</p>
+        <p role="status" className="mt-4 rounded-lg bg-gray-bg px-4 py-3 text-sm">Your request is waiting for confirmation. This time is not confirmed yet.</p>
       ) : state.notice === "cancelled" ? (
-        <p role="status" className="mt-4 rounded-lg bg-gray-bg px-4 py-3 text-sm">Cancelled. The business has been told, and the time is open for someone else.</p>
+        <p role="status" className="mt-4 rounded-lg bg-gray-bg px-4 py-3 text-sm">Cancelled. The time is open for someone else.</p>
       ) : null}
       {state.error ? <p role="alert" className="mt-4 rounded-lg border border-critical/40 px-4 py-3 text-sm text-critical">{state.error}</p> : null}
 
       <Summary booking={booking} />
 
-      {cancelled ? null : (
+      {booking.status === "held" ? (
+        <section className="mt-10" aria-labelledby="confirm-booking">
+          <h2 id="confirm-booking" className="text-lg font-medium">Confirm this request</h2>
+          <p className="mt-2 text-sm leading-6 text-gray-muted">An assistant requested this time. It is held for 15 minutes. Confirm only if you asked for it; otherwise let the hold expire.</p>
+          {booking.confirmationRequired ? <form method="post" action={actionUrl} className="mt-4">
+            <input type="hidden" name="action" value="confirm" />
+            <button type="submit" className={`${buttonBase} bg-accent text-on-accent`}>Confirm my request</button>
+          </form> : null}
+        </section>
+      ) : cancelled ? null : (
         <>
           <section className="mt-10" aria-labelledby="change-time">
             <h2 id="change-time" className="text-lg font-medium">Change the time</h2>

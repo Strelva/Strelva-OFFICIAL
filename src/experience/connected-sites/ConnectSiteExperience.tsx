@@ -31,6 +31,7 @@ const PLATFORM_OPTIONS = PLATFORMS.filter(value => PLATFORM_LABEL[value]).map(va
 export function ConnectSiteExperience({ workspaceId, canManage, initialSites, appBase = "" }: { workspaceId: string; canManage: boolean; initialSites: ConnectableSite[]; appBase?: string }) {
   const request = useWorkspaceRequest();
   const [site, setSite] = useState<ConnectableSite | null>(() => initialSites.find(item => item.status === "active") ?? null);
+  const [sites, setSites] = useState(initialSites.filter(item => item.status === "active"));
   const [url, setUrl] = useState("");
   const [platform, setPlatform] = useState<SitePlatform>("unknown");
   const [busy, setBusy] = useState(false);
@@ -41,10 +42,12 @@ export function ConnectSiteExperience({ workspaceId, canManage, initialSites, ap
     const response = await request("/api/workspace/connected-sites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, ...body }) });
     const result = await response.json().catch(() => null) as { site?: ConnectableSite; error?: string } | null;
     if (!response.ok || !result?.site) { setError(result?.error || "That didn't go through. Nothing changed."); return null; }
+    setSites(items => [...items.filter(item => item.id !== result.site!.id), result.site!]);
     return result.site;
   }
   async function connect(event: FormEvent) {
     event.preventDefault();
+    if (!canManage || busy) return;
     if (!url.trim()) { setError("Enter your site's address, like yourbusiness.com."); return; }
     setBusy(true); setError("");
     try { const next = await post({ action: "connect", siteUrl: url.trim(), platform }); if (next) setSite(next); }
@@ -52,7 +55,7 @@ export function ConnectSiteExperience({ workspaceId, canManage, initialSites, ap
     finally { setBusy(false); }
   }
   async function verify() {
-    if (!site) return;
+    if (!site || !canManage || busy) return;
     setBusy(true); setError("");
     try { const next = await post({ action: "verify", siteId: site.id }); if (next) setSite(next); }
     catch { setError("We couldn't reach Strelva just now. Nothing changed."); }
@@ -64,6 +67,10 @@ export function ConnectSiteExperience({ workspaceId, canManage, initialSites, ap
       <h1 className="font-display text-[32px] leading-10">Bring the website you already have</h1>
       <p className="text-sm text-gray-muted">Keep your site where it is: Wix, Squarespace, WordPress or anything else. Strelva fills in your confirmed details, takes its inquiries and counts visits. It never edits your pages.</p>
     </header>
+    {sites.length ? <div className="grid gap-3">
+      <SelectInput label="Connected website" value={site?.id ?? ""} options={[{ value: "", label: "Connect another website" }, ...sites.map(item => ({ value: item.id, label: item.siteHost }))]} onChange={event => { setSite(sites.find(item => item.id === event.target.value) ?? null); setError(""); }} disabled={busy} />
+      {site && canManage ? <Button type="button" variant="ghost" className="justify-self-start" disabled={busy} onClick={() => { setSite(null); setError(""); }}>Connect another website</Button> : null}
+    </div> : null}
     {!site ? canManage ? <form className="grid gap-4" onSubmit={connect} noValidate aria-label="Connect your website">
       <TextInput label="Your site's address" type="url" inputMode="url" autoComplete="url" placeholder="yourbusiness.com" value={url} disabled={busy} spellCheck={false} autoCapitalize="none" onChange={event => { setUrl(event.target.value); setError(""); }} />
       <SelectInput label="Built with" value={platform} options={PLATFORM_OPTIONS} disabled={busy} onChange={event => setPlatform(event.target.value as SitePlatform)} />

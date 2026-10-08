@@ -36,7 +36,18 @@ function withSystems(base: typeof fetch, systems: PreviewSystems | undefined, we
       if (websiteDetail === "loading") return new Promise<Response>(() => undefined);
       if (websiteDetail === "error") return previewJson({ error: "This website's details could not be loaded." }, 503);
       if (websiteDetail === "permission") return previewJson({ error: "This business is unavailable to your account." }, 403);
-      return previewJson({ detail: previewWebsiteDetail(url.searchParams.get("systemId") ?? "", websiteDetail) });
+      return previewJson({ detail: previewWebsiteDetail(url.searchParams.get("systemId") ?? "", websiteDetail, undefined, url.searchParams.get("workspaceId") ?? undefined) });
+    }
+    if (url.pathname === "/api/workspace/systems/website/restore" && method === "POST") {
+      if (!systems.released) return previewJson({ error: "Website restore is not enabled." }, 503);
+      const body = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as Record<string, unknown>;
+      if (typeof body.workspaceId !== "string" || !systems.owners.includes(body.workspaceId)) return previewJson({ error: "Only the owner or a Strelva operator can prepare a restore." }, 403);
+      const detail = previewWebsiteDetail(String(body.systemId ?? ""), websiteDetail, undefined, body.workspaceId);
+      const row = detail.history.find(item => item.restore && Object.entries(item.restore).every(([key, value]) => body[key] === value));
+      if (!row) return previewJson({ error: "That saved website change is unavailable." }, 409);
+      return previewJson(body.kind === "snapshot"
+        ? { status: "requested", requestId: "00000000-0000-4000-8000-00000000c4a2", message: "Strelva has your Request to restore this exact saved copy. A preview still needs to be prepared and approved. Your live website is unchanged." }
+        : { status: "queued", message: "The earlier website change is prepared for review. Your live website is unchanged." });
     }
     if (url.pathname === "/api/workspace/site-changes" && method === "POST") {
       // Ask for a change on a managed site: a Request at Asked. Words containing "refuse" show the refusal.

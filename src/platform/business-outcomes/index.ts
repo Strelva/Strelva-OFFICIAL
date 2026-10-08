@@ -6,6 +6,7 @@
  * line falls back to the plain count and claims nothing more.
  */
 import type { WorkspaceActor } from "@/platform/workspaces";
+import { inquiryOutcomeCountsSchema, inquiryReplyDuration } from "./inquiry-proof";
 
 export interface OutcomeFigure { kind: "counted" | "linked"; value: number | null; reason?: string | null }
 
@@ -15,7 +16,7 @@ export interface BusinessOutcomeMonth {
   sites: number | null;
   visits: OutcomeFigure;
   inquiries: OutcomeFigure;
-  answered: OutcomeFigure & { withinDay: number | null };
+  answered: OutcomeFigure & { withinDay: number | null; averageReplySeconds?: number | null; medianReplySeconds?: number | null };
   bookings: OutcomeFigure & { native: number; legacy: number | null };
   bookingsFromInquiry: OutcomeFigure & { joins: string[] };
   reviews: OutcomeFigure;
@@ -29,7 +30,7 @@ export class BusinessOutcomeError extends Error {
 
 export async function readBusinessOutcomeMonth(actor: WorkspaceActor, workspaceId: string, month: string, rpc: OutcomeRpc): Promise<BusinessOutcomeMonth> {
   if (!/^\d{4}-\d{2}$/.test(month)) throw new BusinessOutcomeError("invalid");
-  const { data, error } = await rpc("business_outcome_month", { p_workspace_id: workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail, p_month: `${month}-01` });
+  const { data, error } = await rpc(process.env.STRELVA_INQUIRY_OUTCOMES === "1" ? "business_outcome_month_inquiries" : "business_outcome_month", { p_workspace_id: workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail, p_month: `${month}-01` });
   if (error) throw new BusinessOutcomeError(error.message?.includes("business_outcome_denied") ? "denied" : error.message?.includes("invalid") ? "invalid" : "unavailable");
   return data as BusinessOutcomeMonth;
 }
@@ -60,10 +61,18 @@ export function formatOutcomeLine(outcome: BusinessOutcomeMonth): OutcomeLine {
     figures.push({ label: "inquiries", value: inquiries, kind: "counted" });
     let inquiry = plural(inquiries, "inquiry", "inquiries");
     if (inquiries > 0 && outcome.answered.withinDay !== null && outcome.answered.value !== null) {
-      inquiry += `; ${outcome.answered.withinDay.toLocaleString("en-US")} answered within a day`;
+      // The new cohort includes all first replies and their times. Older month
+      // payloads retain the existing sentence verbatim while the flag is off.
+      const measured = outcome.answered.averageReplySeconds !== undefined && outcome.answered.medianReplySeconds !== undefined;
+      inquiry += measured
+        ? `; ${outcome.answered.value.toLocaleString("en-US")} answered, ${outcome.answered.withinDay.toLocaleString("en-US")} within a day`
+        : `; ${outcome.answered.withinDay.toLocaleString("en-US")} answered within a day`;
       figures.push({ label: "answered within a day", value: outcome.answered.withinDay, kind: "linked" });
     }
     sentences.push(`${inquiry}.`);
+    if (outcome.answered.averageReplySeconds != null && outcome.answered.medianReplySeconds != null) {
+      sentences.push(`First reply: ${inquiryReplyDuration(outcome.answered.averageReplySeconds)} average; ${inquiryReplyDuration(outcome.answered.medianReplySeconds)} median. Replies count when the email provider accepts them.`);
+    }
   } else {
     sentences.push(outcome.inquiries.reason ? `Inquiries unavailable: ${outcome.inquiries.reason}` : "Inquiries unavailable.");
   }
@@ -84,4 +93,24 @@ export function formatOutcomeLine(outcome: BusinessOutcomeMonth): OutcomeLine {
     figures.push({ label: "new reviews", value: outcome.reviews.value, kind: "counted" });
   }
   return { text: sentences.join(" "), figures };
+}
+
+/** Weekly proof uses a half-open intake cohort, never a proxy from visits. */
+export interface BusinessInquiryOutcomes {
+  workspaceId: string; from: string; to: string;
+  inquiries: number; answered: number; withinDay: number; unanswered: number;
+  averageReplySeconds: number | null; medianReplySeconds: number | null; evidence: string;
+}
+export async function readBusinessInquiryOutcomes(actor: WorkspaceActor, workspaceId: string, from: string, to: string, rpc: OutcomeRpc): Promise<BusinessInquiryOutcomes> {
+  if (process.env.STRELVA_INQUIRY_OUTCOMES !== "1") throw new BusinessOutcomeError("unavailable");
+  if (!Number.isFinite(Date.parse(from)) || !Number.isFinite(Date.parse(to)) || Date.parse(from) >= Date.parse(to)
+    || Date.parse(to) - Date.parse(from) > 366 * 86400_000) throw new BusinessOutcomeError("invalid");
+  const { data, error } = await rpc("business_inquiry_outcomes", { p_workspace_id: workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail, p_from: from, p_to: to });
+  if (error) throw new BusinessOutcomeError(error.message?.includes("denied") ? "denied" : "unavailable");
+  const counts = inquiryOutcomeCountsSchema.safeParse(data);
+  const scope = data as Partial<BusinessInquiryOutcomes> | null;
+  if (!counts.success || !scope || scope.workspaceId !== workspaceId || typeof scope.from !== "string" || typeof scope.to !== "string"
+    || Date.parse(scope.from) !== Date.parse(from) || Date.parse(scope.to) !== Date.parse(to)) throw new BusinessOutcomeError("unavailable");
+  return { ...counts.data, workspaceId, from: scope.from, to: scope.to,
+    evidence: "First provider acceptance; delivery and customer response are separate evidence." };
 }

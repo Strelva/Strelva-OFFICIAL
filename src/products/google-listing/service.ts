@@ -42,21 +42,25 @@ export interface ListingContext {
   client: GoogleListingClient;
   receipts: ListingReceiptStore;
   /** SSRF guard for URLs Google will fetch. Defaults to the audit check. */
+  onWriteAccepted?: () => Promise<void>;
+  onWriteUnconfirmed?: () => Promise<void>;
   checkUrl?: (url: string) => Promise<void>;
 }
 
 export type ListingWriteOutcome =
+  | { status: "write_unconfirmed"; receipt: ListingReceipt; message: string }
   | { status: "posted" | "posted_unverified" | "held_by_google"; receipt: ListingReceipt; message: string }
   | { status: "failed"; receipt: ListingReceipt; message: string; accessPending: boolean }
   | { status: "refused"; reason: ListingRefusal; message: string };
 
-export type ListingRefusal = "paused" | "authority" | "invalid" | "snapshot_unavailable" | "not_undoable" | "unsafe_url" | "nothing_to_change";
+export type ListingRefusal = "paused" | "authority" | "invalid" | "snapshot_unavailable" | "api_access_pending" | "not_undoable" | "unsafe_url" | "nothing_to_change";
 
 const MESSAGES = {
   paused: "The Google listing is paused, so Strelva isn't changing it.",
   authority: "This change needs the owner's approval.",
   invalid: "That change can't be sent to Google as written.",
   snapshot_unavailable: "Strelva couldn't read Google's current listing, so nothing was changed.",
+  api_access_pending: "Waiting for Google to approve API access. Your draft is kept. Nothing was sent.",
   not_undoable: "This change can't be undone.",
   unsafe_url: "That link can't be used on Google.",
   nothing_to_change: "Google already matches.",
@@ -89,7 +93,7 @@ export function receiptHeadline(receipt: Pick<ListingReceipt, "status" | "action
   if (receipt.status === "undone") return "Strelva undid this change on Google.";
   if (receipt.status === "posted_unverified") return "Posted. Google hasn't shown it yet.";
   if (receipt.status === "held_by_google") return "Google is reviewing this change.";
-  if (receipt.status === "posting") return "Sending to Google.";
+  if (receipt.status === "posting") return "Google write in progress or unconfirmed. Check Google before trying again; Strelva will not repeat it.";
   switch (receipt.action) {
     case "reply_post": return `Strelva replied to ${who} on Google.`;
     case "reply_update": return `Strelva updated the reply to ${who} on Google.`;
@@ -109,6 +113,7 @@ interface WritePlan<T> {
   after: Record<string, unknown> | null;
   undoesReceiptId?: string;
   idempotencyKey?: string;
+  retryFailed?: boolean;
   write(): Promise<GoogleResult<T>>;
   /** Read Google back after the write. */
   verify(written: T): Promise<{ readback: "matched" | "differs" | "failed" | "held_by_google"; after?: Record<string, unknown> }>;
@@ -122,28 +127,41 @@ async function governedWrite<T>(ctx: ListingContext, plan: WritePlan<T>): Promis
   const undoKinds = parsed.data.kind === "owner_undo" || parsed.data.kind === "operator_undo";
   if (undoKinds !== Boolean(plan.undoesReceiptId)) return refused("authority");
   const idempotencyKey = plan.idempotencyKey ?? `${plan.action}:${key([plan.targetRef, plan.after, plan.undoesReceiptId ?? null, ctx.location.locationId])}`;
-  const { receipt, replayed } = await ctx.receipts.record({
+  const receiptInput = {
     workspaceId: ctx.workspaceId, bindingId: ctx.bindingId, locationId: ctx.location.locationId, action: plan.action,
     targetRef: plan.targetRef, authority: parsed.data, before: plan.before, after: plan.after,
     undoesReceiptId: plan.undoesReceiptId ?? null, idempotencyKey,
-  });
+  };
+  let { receipt, replayed } = await ctx.receipts.record(receiptInput);
+  // Only a durable, definitive refusal permits another dispatch. Each retry
+  // follows the previous failed receipt, so later attempts find any accepted
+  // or uncertain retry even when the event marker was lost. Bound the walk.
+  for (let retry = 0; plan.retryFailed && replayed && receipt.status === "failed" && retry < 20; retry += 1) {
+    ({ receipt, replayed } = await ctx.receipts.record({ ...receiptInput, idempotencyKey: `${idempotencyKey}:retry:${receipt.id}` }));
+  }
   if (replayed && receipt.status !== "posting") {
     // Already decided. Never a second write.
     return receipt.status === "failed"
-      ? { status: "failed", receipt, message: receiptHeadline(receipt), accessPending: false }
+      ? { status: "failed", receipt, message: receiptHeadline(receipt), accessPending: receipt.error?.startsWith("Google API access is still pending") ?? false }
       : { status: receipt.status === "undone" ? "posted" : receipt.status as "posted" | "posted_unverified" | "held_by_google", receipt, message: receiptHeadline(receipt) };
   }
   if (replayed) {
     // An earlier attempt stopped mid-way. Google may or may not have it; we
     // never send it again. Record what is known and let a person decide.
-    const settled = await ctx.receipts.settle(receipt.id, ctx.workspaceId, {
-      status: "failed", error: "An earlier attempt did not finish. Nothing was sent again; check Google before retrying.",
-    });
-    return { status: "failed", receipt: settled, message: receiptHeadline(settled), accessPending: false };
+    return { status: "write_unconfirmed", receipt, message: receiptHeadline(receipt) };
   }
 
-  const written = await plan.write();
+  let written: GoogleResult<T>;
+  try { written = await plan.write(); }
+  catch {
+    await ctx.onWriteUnconfirmed?.();
+    return { status: "write_unconfirmed", receipt, message: receiptHeadline(receipt) };
+  }
   if (!written.ok) {
+    if (written.status === 0 || written.status >= 500) {
+      await ctx.onWriteUnconfirmed?.();
+      return { status: "write_unconfirmed", receipt, message: receiptHeadline(receipt) };
+    }
     const accessPending = written.kind === "setup_pending";
     const settled = await ctx.receipts.settle(receipt.id, ctx.workspaceId, {
       status: "failed",
@@ -152,10 +170,11 @@ async function governedWrite<T>(ctx: ListingContext, plan: WritePlan<T>): Promis
     });
     return {
       status: "failed", receipt: settled, accessPending,
-      message: accessPending ? "Google access is still being set up. This will go out once Google approves." : receiptHeadline(settled),
+      message: accessPending ? "Waiting for Google to approve API access. Your draft is kept. Nothing was sent." : receiptHeadline(settled),
     };
   }
 
+  await ctx.onWriteAccepted?.();
   // Google took it. From here the approval is done and nothing is retried.
   let readback: Awaited<ReturnType<WritePlan<T>["verify"]>>;
   try {
@@ -183,14 +202,15 @@ async function readReview(ctx: ListingContext, reviewId: string): Promise<Google
 // ---- review replies ----
 
 export async function postReviewReply(ctx: ListingContext, input: {
-  reviewId: string; text: string; authority: ListingAuthority; idempotencyKey?: string;
+  reviewId: string; text: string; authority: ListingAuthority; idempotencyKey?: string; retryFailed?: boolean;
 }): Promise<ListingWriteOutcome> {
   const paused = checkRefusal(ctx);
   if (paused) return paused;
   const text = input.text.trim();
   if (!text || Buffer.byteLength(text, "utf8") > REVIEW_REPLY_MAX_BYTES || !/^[A-Za-z0-9_-]{1,300}$/.test(input.reviewId)) return refused("invalid");
-  const review = await readReview(ctx, input.reviewId);
-  if (!review) return refused("snapshot_unavailable");
+  const read = await ctx.client.getReview(ctx.location, input.reviewId);
+  if (!read.ok) return refused(read.kind === "setup_pending" ? "api_access_pending" : "snapshot_unavailable");
+  const review = read.data;
   const previous = review.reviewReply?.comment ?? null;
   if (previous !== null && normalize(previous) === normalize(text)) return refused("nothing_to_change");
   const action: ListingAction = previous === null ? "reply_post" : "reply_update";
@@ -200,7 +220,7 @@ export async function postReviewReply(ctx: ListingContext, input: {
     if (action !== "reply_post" || !autoReplyAllowed(rating) || rating !== input.authority.rating) return refused("authority");
   }
   return governedWrite(ctx, {
-    action, targetRef: input.reviewId, authority: input.authority, idempotencyKey: input.idempotencyKey,
+    action, targetRef: input.reviewId, authority: input.authority, idempotencyKey: input.idempotencyKey, retryFailed: input.retryFailed,
     before: { reply: previous }, after: { reply: text },
     write: () => ctx.client.updateReply(ctx.location, input.reviewId, text),
     verify: async () => {
@@ -216,17 +236,18 @@ export async function postReviewReply(ctx: ListingContext, input: {
 
 /** Withdraw a published reply: Google deleteReply, previous text kept for undo. */
 export async function withdrawReviewReply(ctx: ListingContext, input: {
-  reviewId: string; authority: ListingAuthority; idempotencyKey?: string;
+  reviewId: string; authority: ListingAuthority; idempotencyKey?: string; retryFailed?: boolean;
 }): Promise<ListingWriteOutcome> {
   const paused = checkRefusal(ctx);
   if (paused) return paused;
   if (input.authority.kind === "auto_reply_policy") return refused("authority");
-  const review = await readReview(ctx, input.reviewId);
-  if (!review) return refused("snapshot_unavailable");
+  const read = await ctx.client.getReview(ctx.location, input.reviewId);
+  if (!read.ok) return refused(read.kind === "setup_pending" ? "api_access_pending" : "snapshot_unavailable");
+  const review = read.data;
   const previous = review.reviewReply?.comment ?? null;
   if (previous === null) return refused("nothing_to_change");
   return governedWrite(ctx, {
-    action: "reply_delete", targetRef: input.reviewId, authority: input.authority, idempotencyKey: input.idempotencyKey,
+    action: "reply_delete", targetRef: input.reviewId, authority: input.authority, idempotencyKey: input.idempotencyKey, retryFailed: input.retryFailed,
     before: { reply: previous }, after: { reply: null },
     write: () => ctx.client.deleteReply(ctx.location, input.reviewId),
     verify: async () => {
@@ -250,7 +271,7 @@ function pick(state: GoogleLocationState, mask: string[]): Record<string, unknow
 }
 
 async function patchFromRecord(ctx: ListingContext, input: {
-  action: "hours_patch" | "info_patch"; mask: string[]; body: Record<string, unknown>; authority: ListingAuthority; idempotencyKey?: string;
+  action: "hours_patch" | "info_patch"; mask: string[]; body: Record<string, unknown>; authority: ListingAuthority; idempotencyKey?: string; retryFailed?: boolean;
   matches(state: GoogleLocationState | undefined): boolean;
 }): Promise<ListingWriteOutcome> {
   const paused = checkRefusal(ctx);
@@ -258,11 +279,11 @@ async function patchFromRecord(ctx: ListingContext, input: {
   if (input.authority.kind === "auto_reply_policy") return refused("authority");
   if (!input.mask.length) return refused("nothing_to_change");
   const current = await ctx.client.getLocation(ctx.location, [...input.mask, "metadata"]);
-  if (!current.ok) return refused("snapshot_unavailable");
+  if (!current.ok) return refused(current.kind === "setup_pending" ? "api_access_pending" : "snapshot_unavailable");
   if (input.matches(current.data)) return refused("nothing_to_change");
   const snapshot = pick(current.data, input.mask);
   return governedWrite(ctx, {
-    action: input.action, targetRef: null, authority: input.authority, idempotencyKey: input.idempotencyKey,
+    action: input.action, targetRef: null, authority: input.authority, idempotencyKey: input.idempotencyKey, retryFailed: input.retryFailed,
     before: snapshot, after: input.body,
     write: () => ctx.client.patchLocation(ctx.location, input.mask, input.body),
     verify: async () => {
@@ -278,19 +299,19 @@ async function patchFromRecord(ctx: ListingContext, input: {
 
 /** One approval covers the record change; this is its Google half. */
 export async function syncHoursFromRecord(ctx: ListingContext, input: {
-  hours: FactValues["hours"]; authority: ListingAuthority; idempotencyKey?: string;
+  hours: FactValues["hours"] | null; authority: ListingAuthority; idempotencyKey?: string; retryFailed?: boolean;
 }): Promise<ListingWriteOutcome> {
-  const body = hoursToGoogle(input.hours) as unknown as Record<string, unknown>;
+  const body = (input.hours ? hoursToGoogle(input.hours) : {}) as Record<string, unknown>;
   const mask = ["regularHours", "specialHours"];
   return patchFromRecord(ctx, {
-    action: "hours_patch", mask, body, authority: input.authority, idempotencyKey: input.idempotencyKey,
+    action: "hours_patch", mask, body, authority: input.authority, idempotencyKey: input.idempotencyKey, retryFailed: input.retryFailed,
     matches: (state) => hoursMatch(body as GoogleHours, state),
   });
 }
 
 /** Phone, website and description from the record. New at 1.0.0. */
 export async function syncInfoFromRecord(ctx: ListingContext, input: {
-  record: RecordInfo; authority: ListingAuthority; idempotencyKey?: string;
+  record: RecordInfo; authority: ListingAuthority; idempotencyKey?: string; retryFailed?: boolean;
 }): Promise<ListingWriteOutcome> {
   const { body, updateMask } = infoToGoogle(input.record);
   if (body.websiteUri) {
@@ -301,7 +322,7 @@ export async function syncInfoFromRecord(ctx: ListingContext, input: {
     }
   }
   return patchFromRecord(ctx, {
-    action: "info_patch", mask: updateMask, body: body as Record<string, unknown>, authority: input.authority, idempotencyKey: input.idempotencyKey,
+    action: "info_patch", mask: updateMask, body: body as Record<string, unknown>, authority: input.authority, idempotencyKey: input.idempotencyKey, retryFailed: input.retryFailed,
     matches: (state) => infoMatches(body, state as GoogleInfo, updateMask),
   });
 }
@@ -326,7 +347,7 @@ async function defaultCheckUrl(url: string): Promise<void> {
 }
 
 export async function createListingPost(ctx: ListingContext, input: {
-  post: ListingPostInput; authority: ListingAuthority; idempotencyKey?: string;
+  post: ListingPostInput; authority: ListingAuthority; idempotencyKey?: string; retryFailed?: boolean;
 }): Promise<ListingWriteOutcome> {
   const paused = checkRefusal(ctx);
   if (paused) return paused;
@@ -343,7 +364,7 @@ export async function createListingPost(ctx: ListingContext, input: {
   }
   const body = googlePostBody(parsed.data);
   return governedWrite(ctx, {
-    action: "post_create", targetRef: null, authority: input.authority, idempotencyKey: input.idempotencyKey,
+    action: "post_create", targetRef: null, authority: input.authority, idempotencyKey: input.idempotencyKey, retryFailed: input.retryFailed,
     before: null, after: body,
     write: () => ctx.client.createPost(ctx.location, body),
     verify: async (created) => {
@@ -360,14 +381,14 @@ export async function createListingPost(ctx: ListingContext, input: {
 // ---- undo ----
 
 export async function undoListingChange(ctx: ListingContext, input: {
-  receiptId: string; authority: Extract<ListingAuthority, { kind: "owner_undo" | "operator_undo" }>;
+  receiptId: string; authority: Extract<ListingAuthority, { kind: "owner_undo" | "operator_undo" }>; idempotencyKey?: string; retryFailed?: boolean;
 }): Promise<ListingWriteOutcome> {
   const paused = checkRefusal(ctx);
   if (paused) return paused;
   const original = await ctx.receipts.get(input.receiptId, ctx.workspaceId);
-  if (!original || !original.undo || !["posted", "posted_unverified", "held_by_google"].includes(original.status)) return refused("not_undoable");
+  if (!original || original.locationId !== ctx.location.locationId || original.bindingId !== ctx.bindingId || !original.undo || !["posted", "posted_unverified", "held_by_google"].includes(original.status)) return refused("not_undoable");
   const undo = original.undo;
-  const common = { targetRef: original.targetRef, authority: input.authority, undoesReceiptId: original.id, idempotencyKey: `undo:${original.id}` };
+  const common = { targetRef: original.targetRef, authority: input.authority, undoesReceiptId: original.id, idempotencyKey: input.idempotencyKey ?? `undo:${original.id}`, retryFailed: input.retryFailed };
   switch (undo.kind) {
     case "delete_reply":
       return governedWrite(ctx, {

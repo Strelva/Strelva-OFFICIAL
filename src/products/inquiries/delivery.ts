@@ -14,24 +14,30 @@
  * "delivered" unless a transport supplies verification evidence.
  */
 
-import { createHash } from "node:crypto";
 import { ownerNoticeEmail, businessRecordReadsEnabled } from "@/lib/owner-recipient";
 import { readReleasedTenantBusinessContext } from "@/platform/business-record/public-reader";
 
-import type { InquiryTimelineEventType, ResponsibilityAction, ResponsibilityEvaluation, ResponsibilityPolicy } from "@/products/inquiries/contracts";
+import type { InquiryTimelineEventType } from "@/products/inquiries/contracts";
 import type { LeadRecord } from "@/lib/leads";
+export type { LeadRecord } from "@/lib/leads";
 import { getTenantConfig } from "@/lib/tenants";
 import { addTenantActivity } from "@/lib/tenant-crm";
 import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
 import { createEmailInquiryTransport } from "./delivery-email";
 import { createRedisInquiryDeliveryStore } from "./delivery-store";
+import { claimInquiryMessagePurpose, releaseRejectedInquiryMessagePurpose } from "./message-purpose";
+import { inquiryMessageRouteAtUse } from "./inquiry-policy-at-use";
+import { inquiryRecordsEnabled } from "@/platform/infra/inquiry-records";
 import { INQUIRY_WORKSPACE_EXIT_CODE, isInquiryWorkspaceExited } from "./workspace-exit";
 import type { EmailAudience } from "@/platform/infra/email/send";
+import { inquiryBusinessFactsEnabled, inquiryPersonEmail, inquiryWithinBusinessHours, readInquiryBusinessContext } from "./business-context";
 import {
   actorForAction,
   createInquiryDeliveryMessage,
+  prepareInquiryDeliveryMessage,
   deliveryActionLabel,
   getInquiryReplyTrackingAddress,
+  getInquiryDeliveryMessageDigest,
   inquiryBusinessName,
   validEmail,
 } from "./delivery-message";
@@ -187,31 +193,9 @@ function actionTimes(
   return { dueAt: dueAt.toISOString(), expiresAt: expiresAt.toISOString() };
 }
 
-/**
- * Bind an approval to the exact message and capability revision. The provider
- * idempotency key alone is not sufficient because an edited body could reuse
- * the same inquiry/action key under the same policy version.
- */
-export function getInquiryDeliveryMessageDigest(message: InquiryDeliveryMessage): string {
-  const canonical = JSON.stringify({
-    tenantId: message.tenantId,
-    inquiryId: message.inquiryId,
-    action: message.action,
-    capabilityId: message.capabilityId ?? null,
-    capabilityVersion: message.capabilityVersion ?? null,
-    audience: message.audience,
-    to: message.to,
-    replyTo: message.replyTo ?? null,
-    tags: message.tags ?? null,
-    subject: message.subject,
-    options: message.options,
-    idempotencyKey: message.idempotencyKey,
-  });
-  return createHash("sha256").update(canonical).digest("hex");
-}
-
 /** Build the exact message that an approval UI must display and hash. */
-export { createInquiryDeliveryMessage, getInquiryReplyTrackingAddress };
+export { createInquiryDeliveryMessage, prepareInquiryDeliveryMessage, getInquiryReplyTrackingAddress, getInquiryDeliveryMessageDigest };
+export { gateResponsibilityAction, isWithinResponsibilityHours } from "./delivery-responsibility";
 
 export function inquirySubmissionFromLead(tenantId: string, lead: LeadRecord): InquiryDeliverySubmission {
   return {
@@ -245,9 +229,14 @@ export async function resolveInquiryRoute(
   // email address, retain the tenant owner fallback for the legacy notice.
   // Without a configured destination, the one owner-recipient rule decides
   // (src/lib/owner-recipient.ts); it falls back to the tenant's owner_email.
-  const ownerEmail = businessRecordReadsEnabled()
+  // A destination wins only as a current business person when inquiry facts
+  // are on. With record reads on, a bare legacy staff address yields to the
+  // business record's owner.
+  const business = inquiry.staffDestination ? await readInquiryBusinessContext(inquiry.tenantId) : null;
+  const staff = business ? inquiryPersonEmail(business, inquiry.staffDestination) : businessRecordReadsEnabled() ? null : inquiry.staffDestination;
+  const ownerEmail = validEmail(staff) || (businessRecordReadsEnabled()
     ? validEmail(await ownerNoticeEmail({ id: inquiry.tenantId, ownerEmail: tenant?.ownerEmail }))
-    : validEmail(inquiry.staffDestination) || (tenant ? validEmail(await ownerNoticeEmail(tenant)) : null);
+    : tenant ? validEmail(await ownerNoticeEmail(tenant)) : null);
   const context = await readReleasedTenantBusinessContext(inquiry.tenantId);
   return {
     tenantId: inquiry.tenantId,
@@ -257,89 +246,6 @@ export async function resolveInquiryRoute(
     ownerNotification: policy.ownerNotification,
     customerReplyTo: getInquiryReplyTrackingAddress(inquiry) || ownerEmail,
   };
-}
-
-/** Policy gate used by hosts that already evaluate a Responsibility in the engine. */
-export function gateResponsibilityAction(
-  action: InquiryDeliveryAction,
-  policy: ResponsibilityPolicy | null | undefined,
-  evaluation?: ResponsibilityEvaluation | null,
-  now: Date = new Date(),
-): ResponsibilityDeliveryGate {
-  const responsibilityAction: ResponsibilityAction =
-    action === "schedule_follow_up" ? "schedule_follow_up" : action === "owner_notification" ? "send_message" : "reply";
-  if (!policy) {
-    return { allowed: false, action, evaluation: evaluation ?? null, reason: "responsibility_unavailable" };
-  }
-  if (policy.status !== "active") {
-    return { allowed: false, action, evaluation: evaluation ?? null, reason: "responsibility_paused" };
-  }
-  if (!isWithinResponsibilityHours(policy, now)) {
-    return { allowed: false, action, evaluation: evaluation ?? null, reason: "outside_responsibility_hours" };
-  }
-  if (!policy.allowedActions.includes(responsibilityAction)) {
-    return { allowed: false, action, evaluation: evaluation ?? null, reason: "action_not_allowed" };
-  }
-  const forbidden = policy.never.some((clause) => clause.action === responsibilityAction);
-  if (forbidden) {
-    return { allowed: false, action, evaluation: evaluation ?? null, reason: "action_forbidden" };
-  }
-  // A policy's trust level is never authority by itself. Every outbound
-  // action needs an explicit, current engine evaluation that says allow.
-  if (evaluation?.decision !== "allow") {
-    return { allowed: false, action, evaluation: evaluation ?? null, reason: "approval_required" };
-  }
-  const limit = Math.floor(policy.budget.dailyMessages);
-  const timezone = policy.budget.timezone.trim();
-  if (!Number.isFinite(limit) || limit < 1 || !timezone) {
-    return { allowed: false, action, evaluation, reason: "daily_budget_unavailable" };
-  }
-  return {
-    allowed: true,
-    action,
-    evaluation,
-    budget: {
-      limit,
-      timezone,
-      policyVersion: policy.id,
-      now: now.toISOString(),
-    },
-  };
-}
-
-/** Check the policy's stated support hours without relying on the server's zone. */
-export function isWithinResponsibilityHours(policy: ResponsibilityPolicy, now: Date = new Date()): boolean {
-  const { timezone, days, start, end } = policy.hours;
-  if (!timezone || !Array.isArray(days) || days.length === 0) return false;
-  const parseMinutes = (value: string): number | null => {
-    const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
-    if (!match) return null;
-    const hour = Number(match[1]);
-    const minute = Number(match[2]);
-    return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59 ? hour * 60 + minute : null;
-  };
-  const startMinutes = parseMinutes(start);
-  const endMinutes = parseMinutes(end);
-  if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) return false;
-  try {
-    const parts = new Intl.DateTimeFormat("en-US", {
-      timeZone: timezone,
-      weekday: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).formatToParts(now);
-    const weekday = parts.find((part) => part.type === "weekday")?.value;
-    const hour = Number(parts.find((part) => part.type === "hour")?.value);
-    const minute = Number(parts.find((part) => part.type === "minute")?.value);
-    const day = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(weekday || "");
-    if (day < 0 || !days.includes(day) || !Number.isFinite(hour) || !Number.isFinite(minute)) return false;
-    const currentMinutes = hour * 60 + minute;
-    return currentMinutes >= startMinutes && currentMinutes < endMinutes;
-  } catch {
-    // An invalid or unavailable timezone must never authorize a send.
-    return false;
-  }
 }
 
 export function isInquiryApprovalValid(
@@ -561,6 +467,8 @@ export async function deliverInquiryAction(
   options: {
     policy?: PartialInquiryRoutingPolicy | null;
     approval?: InquiryDeliveryApproval | null;
+    /** Exact reviewed copy; the approval digest is checked against these options before sending. */
+    messageOptions?: InquiryDeliveryMessage["options"];
     responsibilityGate?: ResponsibilityDeliveryGate;
     deps?: InquiryDeliveryDependencies;
   } = {},
@@ -599,11 +507,16 @@ export async function deliverInquiryAction(
   if (route.tenantId !== inquiry.tenantId) {
     return { inquiryId: inquiry.id, tenantId: inquiry.tenantId, action, status: "unavailable", reason: "recipient_route_tenant_mismatch", retryable: false };
   }
-  const message = createInquiryDeliveryMessage(inquiry, route, action);
+  if (action === "reply") {
+    const { withInquiryBookingOffer } = await import("./booking-handoff");
+    inquiry = await withInquiryBookingOffer(inquiry);
+  }
+  const message = await prepareInquiryDeliveryMessage(inquiry, route, action);
   if (!message) {
     await appendTimelineSafe(store, timelineFor(inquiry, action, blockedTimelineType(action), "recipient unavailable", "blocked", now.toISOString()));
     return { inquiryId: inquiry.id, tenantId: inquiry.tenantId, action, status: "unavailable", reason: "recipient_unavailable", retryable: false };
   }
+  if (options.messageOptions) message.options = options.messageOptions;
 
   let responsibilityGate: ResponsibilityDeliveryGate | null | undefined = options.responsibilityGate;
   if (deps.getResponsibilityGate) {
@@ -620,6 +533,19 @@ export async function deliverInquiryAction(
     const reason = responsibilityGate.reason || "responsibility_blocked";
     await appendTimelineSafe(store, timelineFor(inquiry, action, blockedTimelineType(action), reason, "blocked", now.toISOString()));
     return { inquiryId: inquiry.id, tenantId: inquiry.tenantId, action, status: blockedResultStatus(reason), reason, retryable: false };
+  }
+
+  if (action !== "owner_notification" && options.approval === undefined
+    && process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && inquiryRecordsEnabled()) {
+    const decisionRoute = responsibilityGate.evaluation
+      ? await (deps.messageRoute ?? inquiryMessageRouteAtUse)(inquiry.tenantId, responsibilityGate.evaluation,
+        `${message.subject}\n${renderInquiryMessage(message).text}`, inquiry.businessId)
+      : "never";
+    if (decisionRoute !== "handle") {
+      const reason = decisionRoute === "never" ? "responsibility_blocked" : "approval_required";
+      await appendTimelineSafe(store, timelineFor(inquiry, action, blockedTimelineType(action), reason, "blocked", now.toISOString()));
+      return { inquiryId: inquiry.id, tenantId: inquiry.tenantId, action, status: decisionRoute === "never" ? "paused" : "awaiting_approval", reason, retryable: false };
+    }
   }
 
   const messageDigest = getInquiryDeliveryMessageDigest(message);
@@ -718,6 +644,12 @@ export async function deliverInquiryAction(
   // Exit blocks a new claim, while the checkpoint branches above remain
   // available to verify or reconcile an already accepted or ambiguous write.
   try {
+    if (action !== "owner_notification" && inquiryBusinessFactsEnabled()) {
+      const business = await readInquiryBusinessContext(inquiry.tenantId);
+      if (business && !inquiryWithinBusinessHours(business, now)) {
+        return { ...evaluated, status: "paused", reason: "outside_business_hours", retryable: false };
+      }
+    }
     const exited = await (deps.isWorkspaceExited ?? ((tenantId: string) => isInquiryWorkspaceExited({ tenantId })))(inquiry.tenantId);
     if (exited) {
       const reason = INQUIRY_WORKSPACE_EXIT_CODE;
@@ -842,8 +774,23 @@ export async function deliverInquiryAction(
     } catch {
       return { ...evaluated, status: "unavailable", reason: "inquiry_workspace_exit_unavailable", attemptId, retryable: false };
     }
+    // The workspace owner and governed engine cannot acquire two first replies,
+    // even while the other's provider write or acceptance checkpoint is pending.
+    let purposeClaimed: boolean;
+    try {
+      purposeClaimed = await claimInquiryMessagePurpose(inquiry.tenantId, inquiry.id, action, attemptId);
+    } catch {
+      return { ...evaluated, status: "reconciliation_required", reason: "shared_reply_claim_unavailable", attemptId, retryable: false };
+    }
+    if (!purposeClaimed) {
+      await store.markFailed({ tenantId: inquiry.tenantId, inquiryId: inquiry.id, action, attemptId, reason: "reply_purpose_already_claimed", retryable: false });
+      return { ...evaluated, status: "paused", reason: "reply_purpose_already_claimed", attemptId, retryable: false };
+    }
     const sent = await transport.send(message);
     if (sent.status === "rejected") {
+      // Explicit rejection proves nothing was accepted. Failure to record the
+      // release stays closed; an accepted/unknown write never reaches this seam.
+      await releaseRejectedInquiryMessagePurpose(inquiry.tenantId, inquiry.id, action, attemptId).catch(() => undefined);
       let failed: InquiryDeliveryCheckpoint;
       try {
         failed = await store.markFailed({ tenantId: inquiry.tenantId, inquiryId: inquiry.id, action, attemptId, reason: sent.reason, retryable: sent.retryable });

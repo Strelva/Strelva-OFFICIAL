@@ -1,6 +1,9 @@
 "use client";
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 
+import { WorkspaceInquirySystem } from "@/experience/places/WorkspaceInquirySystem";
 import Link from "next/link";
+import { ContentWorkspace } from "@/experience/publishing/ContentWorkspace";
 import { useState } from "react";
 import { ArrowLeft, ArrowUpRight, MessageSquareText } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -24,8 +27,9 @@ import {
 } from "./model";
 import { workspaceSiteHref } from "@/platform/workspaces/site-places";
 import { SystemPanel as Panel } from "./SystemPanel";
-import { WebsiteSystemPanels, useWebsiteSystemDetail, type WebsiteDetailState } from "./WebsiteSystemPanels";
+import { WebsiteSystemPanels, WebsiteHistoryPanel, hasWebsiteDetail, useWebsiteSystemDetail, type WebsiteDetailState } from "./WebsiteSystemPanels";
 import { WebsiteChangeAsk } from "./WebsiteChangeAsk";
+import { websiteDomainConnections } from "./website-detail";
 import { SystemVersionImprovements } from "./SystemVersionImprovements";
 import { SystemVersionManagement } from "./SystemVersionManagement";
 import styles from "./systems.module.css";
@@ -41,6 +45,8 @@ export interface SystemPageProps {
   useReadOnly?: boolean;
   rebuildEnabled?: boolean;
   managed?: boolean;
+  /** Managed website tooling is available only to a Strelva operator. */
+  operator?: boolean;
   agency?: boolean;
   readOnlyReason?: string;
   /** Only owners can make a Possibility real. When false, say why. */
@@ -53,6 +59,7 @@ export interface SystemPageProps {
   calendarRecoveryAllowed?: boolean;
   /** Domains, Waiting on you, Requests and History for a website System. Supplied by tests; otherwise read from the server. */
   websiteDetail?: WebsiteDetailState;
+  inquiryInbox?: boolean;
   inquiryAdapter?: { tenantId: string; adapter?: InquirySurfaceAdapter };
   systemHref: (id: string) => string;
   onHome: () => void;
@@ -70,13 +77,13 @@ export function SystemPage(props: SystemPageProps) {
   const [detailVersion, setDetailVersion] = useState(0);
   const fetchedDetail = useWebsiteSystemDetail(props.workspaceId, system?.id ?? "", Boolean(system && system.kind === "website" && !props.websiteDetail), detailVersion);
   const websiteDetail = props.websiteDetail ?? fetchedDetail;
-  const siteHref = system && system.surface.kind === "website" && system.surface.editing ? (tab: "connections" | "google") => workspaceSiteHref({ workspaceId: props.workspaceId, systemId: system.id, tab }, props.appBase || "") : undefined;
+  const siteHref = props.operator && system && system.surface.kind === "website" && system.surface.editing ? (tab: "connections" | "google") => workspaceSiteHref({ workspaceId: props.workspaceId, systemId: system.id, tab }, props.appBase || "") : undefined;
   const back = <button type="button" className={styles.back} onClick={onHome}><ArrowLeft size={16} aria-hidden="true" />Home</button>;
   if (loading && !system) return <div className={styles.page}>{back}<p role="status" className="mt-6 text-sm text-gray-muted">Opening this system…</p></div>;
   if (!system) return <div className={styles.page}>{back}<div className={styles.notFound}><h1 className="font-display">This system isn’t available here.</h1><p>It may belong to another business, or your access may have changed. Nothing about it was changed.</p></div></div>;
   // Website panels and the site's own editor links count as context too.
-  const showAside = hasContext(system) || Boolean(system.kind === "website" && websiteDetail) || Boolean(siteHref);
   const filesRequests = system.kind === "website" && system.surface.kind === "website" && Boolean(system.surface.editing) && !readOnly;
+  const showAside = hasContext(system) || (system.kind === "website" && hasWebsiteDetail(websiteDetail)) || Boolean(siteHref) || (filesRequests && askingChange);
   function askForChange() {
     if (filesRequests) setAskingChange(true);
     else onAsk(`About ${system!.name}: `);
@@ -101,11 +108,12 @@ export function SystemPage(props: SystemPageProps) {
           <HealthSignal health={system.health} detailed />
           {system.operatedBy ? <span>Run by {system.operatedBy}</span> : null}
         </p>
+        {system.health.signals?.length ? <ul aria-label="Website health evidence" className="mt-3 space-y-1 text-sm text-gray-muted">{system.health.signals.map(signal => <li key={signal}>{signal}</li>)}</ul> : null}
         {system.lifecycle === "paused" ? <p className={styles.meta} role="note">{PAUSED_KEEPS[system.kind] ?? "Paused. Its records are kept."}</p> : null}
       </div>
       <div className={styles.actions}>
         {system.surface.kind === "website" && system.surface.liveUrl ? <a className={styles.linkAction} href={system.surface.liveUrl} target="_blank" rel="noreferrer">Visit site<ArrowUpRight size={16} aria-hidden="true" /></a> : null}
-        {system.surface.kind === "website" && system.surface.editing ? <a className={styles.linkAction} data-variant="secondary" href={workspaceSiteHref({ workspaceId: props.workspaceId, systemId: system.id, tab: system.surface.editing === "native" ? "edit" : "request" }, props.appBase || "")}>{system.surface.editing === "native" ? "Edit site" : "Changes to this site"}</a>
+        {system.surface.kind === "website" && system.surface.editing ? <a className={styles.linkAction} data-variant="secondary" href={workspaceSiteHref({ workspaceId: props.workspaceId, systemId: system.id, tab: "request" }, props.appBase || "")}>Changes to this site</a>
           : system.surface.kind === "website" && system.surface.manageHref ? <a className={styles.linkAction} data-variant="secondary" href={system.surface.manageHref}>Website controls</a> : null}
         {readOnly && readOnlyReason ? <span className="self-center text-xs text-gray-muted">{readOnlyReason}</span> : null}
         <Button size="sm" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} icon={<MessageSquareText size={16} />} aria-expanded={filesRequests ? askingChange : undefined} onClick={askForChange}>Ask for a change</Button>
@@ -125,23 +133,25 @@ export function SystemPage(props: SystemPageProps) {
             {mode !== "possibility" || !comparing ? <figure>{comparing && mode === "both" ? <figcaption>Current · {system.surface.domain || system.name}</figcaption> : null}{system.surface.previewSrc ? <iframe title={`${system.name} as visitors see it`} src={system.surface.previewSrc} sandbox={websiteSandbox(system.surface.previewSrc)} loading="lazy" referrerPolicy="no-referrer" tabIndex={-1} /> : <p className="p-4 text-sm text-gray-muted">No address is recorded for this website yet, so there is nothing to show. Website controls still open it.</p>}</figure> : null}
             {comparing && mode !== "current" ? <figure>{mode === "both" ? <figcaption>{POSSIBILITY_STATUS_LABEL[comparing.status]} · {comparing.title}</figcaption> : null}<iframe title={`${comparing.title}, not live`} src={comparing.previewSrc} sandbox="" loading="lazy" referrerPolicy="no-referrer" tabIndex={-1} /></figure> : null}
           </div>
+          {system.publishing && !props.localPreview ? <ContentWorkspace key={system.id} workspaceId={props.workspaceId} systemId={system.id} kind="website" readOnly={readOnly || system.lifecycle === "paused"} /> : null}
         </> : <div className={styles.workSurface}><SystemSurface {...props} system={system} /></div>}
       </section>
 
       {showAside ? <aside className={styles.aside} aria-label={`About ${system.name}`}>
         {filesRequests && askingChange ? <WebsiteChangeAsk workspaceId={props.workspaceId} systemId={system.id} siteName={system.name} onFiled={() => setDetailVersion(version => version + 1)} onClose={() => setAskingChange(false)} /> : null}
-        {system.kind === "website" && websiteDetail ? <WebsiteSystemPanels workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} onAsk={onAsk} onAskChange={filesRequests ? () => setAskingChange(true) : undefined} readOnly={readOnly} /> : null}
+        {system.kind === "website" && websiteDetail ? <WebsiteSystemPanels workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} onAsk={onAsk} onAskChange={filesRequests ? () => setAskingChange(true) : undefined} readOnly={readOnly} includeHistory={false} /> : null}
         {system.activations?.length ? <ActivationsPanel system={system} /> : null}
         {system.possibilities.length || system.storedVersionId ? <PossibilitiesPanel system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={comparing && mode !== "current" ? comparing.id : null} onCompare={system.surface.kind === "website" ? compare : undefined} onAsk={onAsk} /> : null}
-        {system.connections.length || system.offers?.length || siteHref ? <ConnectionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} siteHref={siteHref} /> : null}
+        {system.connections.length || system.offers?.length || siteHref || (websiteDetail?.status === "ready" && websiteDetail.detail.domains.length) ? <ConnectionsPanel system={system.kind === "website" && websiteDetail?.status === "ready" ? { ...system, connections: [...system.connections, ...websiteDomainConnections(websiteDetail.detail)] } : system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} siteHref={siteHref} /> : null}
         <PartsPanel system={system} />
         {system.versions.length ? <VersionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} /> : null}
         {system.storedVersionId ? <Panel id={`${system.id}-version-draft`} title="Version draft" count={1} intro="Local changes, accounts and earlier releases belong to this business."><SystemVersionManagement key={`${props.workspaceId}:${system.id}`} workspaceId={props.workspaceId} systemId={system.id} versionId={system.storedVersionId} readOnly={readOnly} /></Panel> : null}
-        {system.history?.length ? <HistoryPanel system={system} /> : null}
+        {system.kind === "website" && websiteDetail?.status === "ready" ? <WebsiteHistoryPanel workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} systemHistory={system.history} canRestore={!readOnly && (props.operator || (props.canMakeReal ?? true))} appBase={props.appBase} onPrepared={() => setDetailVersion(version => version + 1)} onAskRestore={filesRequests ? () => setAskingChange(true) : undefined} />
+          : system.history?.length ? <HistoryPanel system={system} /> : null}
         {system.audits?.length ? <AuditsPanel system={system} workspaceId={props.workspaceId} appBase={props.appBase || ""} /> : null}
       </aside> : null}
     </div>
-    {hasContext(system) ? null : <p className={styles.askMore}><button type="button" className="underline" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={() => onAsk(`What else could ${system.name} become? `)}>Ask what else {system.name} could become.</button></p>}
+    {showAside ? null : <p className={styles.askMore}><button type="button" className="underline" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={() => onAsk(`What else could ${system.name} become? `)}>Ask what else {system.name} could become.</button></p>}
   </div>;
 }
 
@@ -182,21 +192,23 @@ function HistoryPanel({ system }: { system: SystemView }) {
 export function websiteSandbox(src: string): string {
   try {
     const url = new URL(src);
-    const own = url.hostname === "app.strelva.com" || url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    const own = url.hostname === new URL(CONTROL_PLANE_URL).hostname || url.hostname === "localhost" || url.hostname === "127.0.0.1";
     return (url.protocol === "https:" || url.protocol === "http:") && !own ? "allow-scripts allow-same-origin allow-popups" : "";
   } catch {
     return "";
   }
 }
 
-function SystemSurface({ system, workspaceId, readOnly, useReadOnly = readOnly, rebuildEnabled, managed, agency, sources, localPreview, workspaceStopped, calendarRecoveryAllowed, inquiryAdapter }: SystemPageProps & { system: SystemView }) {
+function SystemSurface({ system, workspaceId, readOnly, useReadOnly = readOnly, rebuildEnabled, managed, agency, sources, localPreview, workspaceStopped, calendarRecoveryAllowed, inquiryAdapter, inquiryInbox }: SystemPageProps & { system: SystemView }) {
   const noop = () => undefined;
   if (system.surface.kind === "inquiries") {
+    if (inquiryInbox) return <WorkspaceInquirySystem key={workspaceId} workspaceId={workspaceId} />;
     const adapter = inquiryAdapter?.tenantId === system.surface.tenantId ? inquiryAdapter.adapter : undefined;
     return <InquiryServerWorkspaceExperience tenantId={system.surface.tenantId} adapter={adapter} initialView="home" basePath="/workspace" routePrefix="inquiry" />;
   }
   if (system.surface.kind === "listing") return <ListingSurface surface={system.surface} />;
-  if (system.surface.kind === "newsletter") return <div className="p-6"><h2 className="text-sm font-semibold">Newsletter</h2><p className="mt-2 text-sm text-gray-muted">{system.surface.audience}</p><p className="mt-2 text-sm text-gray-muted">Strelva drafts each issue. It sends only after the owner approves, from mail.strelva.com, to active subscribers. Each send says how many the mail provider accepted.</p></div>;
+  if (system.surface.kind === "newsletter" && system.publishing && !localPreview) return <ContentWorkspace key={system.id} workspaceId={workspaceId} systemId={system.id} kind="newsletter" readOnly={readOnly || system.lifecycle === "paused"} />;
+  if (system.surface.kind === "newsletter") return <div className="p-6"><h2 className="text-sm font-semibold">Newsletter</h2><p className="mt-2 text-sm text-gray-muted">{system.surface.audience}</p><p className="mt-2 text-sm text-gray-muted">Strelva drafts each issue. Sending is paused. Approval keeps an immutable issue and receipt; no subscriber receives email.</p></div>;
   if (system.surface.kind !== "work") return null;
   const { workId, productId } = system.surface;
   if (productId === "applications" || productId === "scheduling") return <BoundedWorkExperience key={workId} workspaceId={workspaceId} workId={workId} productId={productId} sources={[...sources]} readOnly={useReadOnly} canManage={!readOnly} workspaceStopped={workspaceStopped} calendarRecoveryAllowed={calendarRecoveryAllowed} onSaved={noop} />;
@@ -250,6 +262,7 @@ function ConnectionsPanel({ system, systemHref, onOpenSystem, siteHref }: { syst
   const item = (connection: SystemConnection) => <li key={connection.id}>
     <span>{connection.sentence}</span>
     <small>{(connection.direction === "in" ? INCOMING_CONNECTION_LABEL : CONNECTION_KIND_LABEL)[connection.kind]} <SystemLink id={connection.systemId} label={connection.target} systemHref={systemHref} onOpenSystem={onOpenSystem} />{connection.status === "connected" ? "" : connection.status === "not_connected" ? " · Not connected" : " · Not confirmed"}</small>
+    {connection.contract ? <><small>Source: {connection.contract.sourceOfTruth}</small><small>{connection.contract.authority}</small><small>{connection.contract.freshness}</small><small>{connection.contract.failureBehavior}</small></> : null}
   </li>;
   return <Panel id={`${system.id}-connections`} title="Connections" count={system.connections.length} intro="What it works with.">
     {attention.length ? <ul className={styles.panelList}>{attention.map(item)}</ul> : null}

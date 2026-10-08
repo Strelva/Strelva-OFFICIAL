@@ -1,3 +1,7 @@
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
+import { bookingScopeFor, workspaceBookingScope } from "./booking-scope";
+import { resolveOwnerRecipient } from "@/platform/business-record";
+import { emailSendingEnabled } from "@/platform/infra/email/enabled";
 /**
  * The real ports of the booking lifecycle run (lifecycle.ts): the one store's
  * functions, the tenant config and owner-recipient rule for the business, the
@@ -10,54 +14,46 @@ import { sendEmailWithReceipt } from "@/platform/infra/email/send";
 import { ownerNoticeEmail } from "@/lib/owner-recipient";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantPublicUrl } from "@/lib/tenant-urls";
-import { storeSlotsForDate } from "./availability";
-import { bookingWhen } from "./emails";
-import { bookingManagePageEnabled } from "./flags";
+import { nativeSlots } from "./native";
+import { bookingManagePageEnabled, bookingMessagesEnabled } from "./flags";
 import type { BookingLifecyclePorts } from "./lifecycle";
 import {
   claimBookingMessages,
   expireBookingHolds,
   finishBookingMessage,
   lapseBookingRequests,
-  readBookingContext,
-  readTenantBookings,
+  bookingStoreDb,
   type StoreBooking,
 } from "./store";
 
 export function bookingAppOrigin(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL || "https://app.strelva.com").replace(/\/$/, "");
+  return (process.env.NEXT_PUBLIC_APP_URL || CONTROL_PLANE_URL).replace(/\/$/, "");
 }
 
-function addDays(date: string, days: number): string {
-  const d = new Date(`${date}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-/** The next open times for the same length on the same calendar, up to three, over the next two weeks. */
+/** Up to three currently offered times for the same active service. Removed
+ * services, pause and unavailable storage produce no proposals. Calendar busy
+ * times and current service length use exactly the public slot engine. */
 export async function nextOpenTimes(booking: StoreBooking, now: Date, count = 3): Promise<string[]> {
-  if (!booking.tenantId) return [];
-  const context = await readBookingContext(booking.tenantId);
-  if (!context || context.paused) return [];
-  const minutes = Math.max(5, Math.round((Date.parse(booking.end) - Date.parse(booking.start)) / 60_000));
-  const today = new Intl.DateTimeFormat("en-CA", { timeZone: booking.timeZone }).format(now);
-  const to = addDays(today, 14);
-  const bookings = await readTenantBookings(booking.tenantId, { from: today, to });
-  const labels: string[] = [];
-  for (let i = 0; i <= 14 && labels.length < count; i++) {
-    const date = addDays(today, i);
-    for (const start of storeSlotsForDate(context, date, minutes, bookings)) {
-      const when = bookingWhen({ localDate: date, localStart: start });
-      labels.push(`${when.day} at ${when.time}`);
-      if (labels.length >= count) break;
-    }
-  }
-  return labels;
+  if (!bookingScopeFor(booking) || !booking.serviceRef || count <= 0) return [];
+  try {
+    const offered = await nativeSlots(bookingScopeFor(booking)!, booking.serviceRef, now.toISOString(), new Date(now.getTime() + 14 * 86400000).toISOString());
+    const day = new Intl.DateTimeFormat("en-US", { timeZone: offered.timeZone, weekday: "short", month: "short", day: "numeric" });
+    const time = new Intl.DateTimeFormat("en-US", { timeZone: offered.timeZone, hour: "numeric", minute: "2-digit" });
+    return offered.slots.slice(0, count).map(slot => `${day.format(new Date(slot.start))} at ${time.format(new Date(slot.start))} (${offered.timeZone})`);
+  } catch { return []; }
 }
 
 /** The customer's manage link for an API reservation (its token is stored encrypted for receipts). */
-async function manageUrl(booking: StoreBooking): Promise<string | null> {
-  if (!bookingManagePageEnabled() || !booking.publicReservationId) return null;
+export async function manageUrl(booking: StoreBooking): Promise<string | null> {
+  if (!bookingManagePageEnabled()) return null;
+  if (!booking.publicReservationId) {
+    if (!bookingMessagesEnabled()) return null;
+    const { issueNativeAccess } = await import("./native");
+    const scope = bookingScopeFor(booking);
+    const access = scope ? await issueNativeAccess(scope, booking.id) : null;
+    const token = access && typeof access.manage_ciphertext === "string" ? decryptSecret(access.manage_ciphertext) : null;
+    return token ? `${bookingAppOrigin()}/b/${encodeURIComponent(token)}` : null;
+  }
   type Query = {
     select(columns: string): Query;
     eq(column: string, value: unknown): Query;
@@ -82,12 +78,26 @@ export const bookingLifecyclePorts: BookingLifecyclePorts = {
   claim: (now, limit) => claimBookingMessages(now, limit),
   finish: (messageId, status, providerMessageId, detail) => finishBookingMessage(messageId, status, providerMessageId, detail),
   async business(booking) {
-    if (!booking.tenantId) return null;
+    if (!booking.tenantId) {
+      if (!booking.workspaceId) return null;
+      const db = bookingStoreDb();
+      if (!db) throw new Error("booking_business_facts_unavailable");
+      const details = await db.rpc("read_booking_business_details", { p_tenant_id: workspaceBookingScope(booking.workspaceId) });
+      if (details.error || !details.data) throw new Error("booking_business_facts_unavailable");
+      const facts = details.data as { name?: string; address?: string };
+      const recipient = await resolveOwnerRecipient(booking.workspaceId);
+      return { name: facts.name ?? "", address: facts.address ?? "", tenantId: null,
+        ownerEmail: recipient?.email ?? null, siteUrl: null };
+    }
     const config = await getTenantConfig(booking.tenantId);
     if (!config) return null;
-    const context = await readReleasedTenantBusinessContext(booking.tenantId);
+    const details = await bookingStoreDb()?.rpc("read_booking_business_details", { p_tenant_id: booking.tenantId });
+    if (details?.error) throw new Error("booking_business_facts_unavailable");
+    const facts = details?.data as { name?: string; address?: string } | null;
+    const context = facts?.name ? null : await readReleasedTenantBusinessContext(booking.tenantId);
     return {
-      name: context?.facts.display_name || context?.facts.legal_name || config.siteName || "",
+      name: facts?.name || context?.facts.display_name || context?.facts.legal_name || config.siteName || "",
+      address: facts?.address ?? "",
       tenantId: booking.tenantId,
       ownerEmail: await ownerNoticeEmail(config).catch(() => null),
       siteUrl: getTenantPublicUrl(config),
@@ -95,6 +105,11 @@ export const bookingLifecyclePorts: BookingLifecyclePorts = {
   },
   alternatives: (booking, now) => nextOpenTimes(booking, now),
   manageUrl,
-  send: sendEmailWithReceipt,
+  async send(input) {
+    if (!emailSendingEnabled()) return { status: "suppressed", reason: "email_gates" };
+    const { bookingCustomerEmailAllowed } = await import("./updates");
+    if (!await bookingCustomerEmailAllowed(input.tenantId ?? null, input.tags?.bookingWorkspaceId)) return { status: "suppressed", reason: "email_gates" };
+    return sendEmailWithReceipt(input);
+  },
   appOrigin: bookingAppOrigin(),
 };

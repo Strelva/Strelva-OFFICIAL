@@ -77,7 +77,9 @@ export function calendarOAuthConfiguration(provider: CalendarProvider, appUrl: s
   }
   const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
   if (!clientId) return null;
-  const scopes = ["https://www.googleapis.com/auth/calendar"];
+  const scopes = process.env.STRELVA_BOOKING_CALENDAR_SCOPES === "1"
+    ? ["https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/calendar.events.freebusy", "https://www.googleapis.com/auth/calendar.calendarlist.readonly"]
+    : ["https://www.googleapis.com/auth/calendar"];
   const query = new URLSearchParams({ client_id: clientId, response_type: "code", redirect_uri: callback, access_type: "offline", prompt: "consent", scope: scopes.join(" ") });
   return { clientId, authorizationUrl: `https://accounts.google.com/o/oauth2/v2/auth?${query}`, redirectUri: callback, scopes };
 }
@@ -155,4 +157,16 @@ export async function refreshCalendarOAuthToken(provider: CalendarProvider, refr
 
 export function calendarOAuthRedirectUri(provider: CalendarProvider, appUrl = process.env.APP_URL || "http://localhost:3000"): string {
   return redirectUri(calendarProviderSchema.parse(provider), appUrl);
+}
+
+/** Google supports per-token revocation. Microsoft has no equivalent scoped
+ * refresh-token revocation endpoint for a third-party multitenant app; wiping
+ * locally is immediate, and the owner removes consent in My Apps. Do not use
+ * revokeSignInSessions (all apps, requires a broader permission).
+ * https://developers.google.com/identity/protocols/oauth2/web-server#tokenrevoke */
+export async function revokeCalendarOAuthToken(provider: CalendarProvider, token: string, fetcher: CalendarFetch = fetch): Promise<void> {
+  if (provider !== "google" || !token) return;
+  const response = await fetcher("https://oauth2.googleapis.com/revoke", { method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ token }).toString(), signal: AbortSignal.timeout(10000) });
+  if (!response.ok) throw new CalendarProviderError({ provider, code: "provider", message: "Google could not revoke calendar consent. Try disconnecting again.", status: response.status });
 }

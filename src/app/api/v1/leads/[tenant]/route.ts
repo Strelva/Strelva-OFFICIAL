@@ -8,6 +8,7 @@
  *
  * Part of the public /api/v1/* contract — change only additively or via a v2.
  */
+import { captureInquiryBookingOffer } from "@/platform/bookings/inquiry-offers";
 import { NextResponse } from "next/server";
 import { getTenantConfig } from "@/lib/tenants";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
@@ -17,6 +18,8 @@ import { captureLead } from "@/lib/leads";
 import { scoreLeadSpam } from "@/lib/lead-spam";
 import { recordSpam } from "@/lib/spam-pit";
 import { readLeadAttribution } from "@/lib/lead-attribution";
+import { notifyInquiryOwner } from "@/products/inquiries";
+import { inquiryDefinitionAtUse } from "@/products/inquiries";
 import {
   getInquiryRepository,
   inquiryReleaseEnabledForTenant,
@@ -184,7 +187,7 @@ export async function POST(
       // Use the same validator as the engine so the public route enforces the
       // exact published definition, including required fields, email syntax,
       // unknown fields, and select options.
-      const validationErrors = capability?.live ? validateInquiryFields(capability.live, fields) : ["Inquiry form unavailable."];
+      const validationErrors = capability?.live ? validateInquiryFields(await inquiryDefinitionAtUse(tenant, capability.live), fields) : ["Inquiry form unavailable."];
       if (validationErrors.length > 0) return corsJson({ error: validationErrors[0] }, 400);
 
       const name = str(body.name, 200) || str(fields.name, 200) || str(fields.full_name, 200);
@@ -214,6 +217,12 @@ export async function POST(
         return corsJson({ error: "Inquiry capture is temporarily unavailable." }, 503);
       }
       if (captured.status === "unavailable") return corsJson({ error: "Inquiry capture is temporarily unavailable." }, 503);
+      // A factual notice is independent of customer-handling authority. It
+      // still runs when handling is paused; its own release flag, email gates
+      // and one-purpose claim prevent default sends or a duplicate worker send.
+      if (process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && captured.lead) {
+        await notifyInquiryOwner({ tenantId: tenant, lead: captured.lead }).catch(() => undefined);
+      }
       // Re-read the mapped workspace after Redis capture. A concurrent exit
       // may leave the lead as retained evidence, but it must not proceed into
       // a new durable inquiry receipt or delivery path.
@@ -251,8 +260,14 @@ export async function POST(
         if (evidence.status === "rejected") return corsJson({ error: evidence.reason }, 400);
         if (evidence.status === "unavailable") return corsJson({ error: "Inquiry provenance is temporarily unavailable." }, 503);
       }
-      if (captured.status === "duplicate") return corsJson({ ok: true, duplicate: true }, 200);
-      return corsJson({ ok: true }, 200);
+      // Two off-by-default handoffs share this field: bookings' signed booking page, then inquiries' per-slot links.
+      const offer = durableLead?.email ? await captureInquiryBookingOffer({ tenantId: tenant, inquiryId: durableLead.id, customer: { name: durableLead.name, email: durableLead.email } }) : null;
+      let bookingOffer: unknown = offer ? { serviceName: offer.serviceName, timeZone: offer.timeZone, slots: offer.slots, url: offer.url } : null;
+      if (!bookingOffer && process.env.STRELVA_INQUIRY_BOOKING_HANDOFF === "1" && durableLead) {
+        const { prepareInquiryBookingOffer } = await import("@/products/inquiries");
+        bookingOffer = await prepareInquiryBookingOffer({ tenantId: tenant, inquiryId: durableLead.id }).catch(() => null);
+      }
+      return corsJson({ ok: true, ...(captured.status === "duplicate" ? { duplicate: true } : {}), ...(bookingOffer ? { bookingOffer } : {}) }, 200);
     }
 
     if (!name) return corsJson({ error: "name is required" }, 400);

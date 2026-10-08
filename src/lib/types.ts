@@ -394,6 +394,7 @@ export interface Booking {
   clientEmail: string;
   clientPhone: string;
   notes?: string;
+  intakeAnswers?: Record<string,string>;
   /** `requested`: request mode on the one booking store; the owner approves through Needs you. */
   status: "confirmed" | "cancelled" | "completed" | "requested";
   createdAt: string;
@@ -728,40 +729,7 @@ export interface BusinessHours {
 
 // --- Unified Event Types ---
 
-export interface UnifiedEvent {
-  id: string;
-  tenantId: string;
-  source: 'website' | 'google' | 'yelp' | 'calendly' | 'instagram' | 'vegaro' | 'ai' | 'stripe';
-  type: 'review' | 'booking' | 'message' | 'mention' | 'content_update' | 'suggestion' | 'newsletter_draft' | 'change_request' | 'build_payment' | 'change_verified' | 'change_verify_failed' | 'visibility_snapshot';
-  title: string;
-  body: string;
-  status: 'pending' | 'approved' | 'dismissed' | 'auto_approved';
-  metadata?: Record<string, unknown> & {
-    execution?: {
-      // "external_accepted": the non-idempotent external write (GBP post/hours/
-      // photo, review reply, newsletter) was ACCEPTED by the provider but the
-      // event may not have resolved (lost lock / Redis blip). It is a BLOCKING
-      // state — claimEventAction refuses to re-grant so a retry can't duplicate
-      // the write; an operator reconciles instead.
-      state: "processing" | "external_accepted" | "completed" | "failed";
-      action: "approved" | "dismissed";
-      actor: string;
-      attemptId: string;
-      startedAt: string;
-      finishedAt?: string;
-      reason?: string;
-      // What the provider accepted, kept on the event as a second copy for
-      // reconciliation when the delivery's own marker could not be written.
-      acceptance?: {
-        providerMessageId?: string;
-        acceptedAt?: string;
-        deliveryAttemptId?: string;
-      };
-    };
-  };
-  createdAt: string;
-  resolvedAt?: string;
-}
+export type { UnifiedEvent } from "@/platform/infra/event-contract";
 
 export type CustomChangeRequestStatus =
   | "requested"
@@ -805,6 +773,13 @@ export interface CustomChangeRequestMetadata {
 
 // --- Weekly Brief Types ---
 
+/** Intake cohort and first business reply accepted by the provider. No claim
+ * of delivery, customer response, bookings or revenue follows from this. */
+export type WeeklyInquiryOutcomeProof =
+  | { status: "available"; inquiries: number; answered: number; withinDay: number; unanswered: number;
+      averageReplySeconds: number | null; medianReplySeconds: number | null; evidence: string }
+  | { status: "unavailable"; reason: string };
+
 export interface WeeklyBriefStats {
   pageViews: number;
   bookingClicks: number;
@@ -816,6 +791,8 @@ export interface WeeklyBriefStats {
    *  is a customer action too, so surfaces total booking + phone clicks. */
   phoneClicks?: number;
   phoneClicksDelta?: number;
+  /** Absent with STRELVA_INQUIRY_OUTCOMES off, including historical recaps. */
+  inquiryOutcomeProof?: WeeklyInquiryOutcomeProof;
 }
 
 export interface WeeklyBriefNextAction {

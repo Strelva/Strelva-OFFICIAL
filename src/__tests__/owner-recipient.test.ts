@@ -109,7 +109,7 @@ describe("hosted website report recipient", () => {
   });
 
   async function load() {
-    vi.doMock("@/platform/business-record/service", () => ({ resolveOwnerRecipient: mocks.businessRecipient, resolveTenantOwnerRecipient: vi.fn().mockRejectedValue(new Error("unused")) }));
+    vi.doMock("@/platform/business-record/service", async (original) => ({ ...(await original<typeof import("@/platform/business-record/service")>()), resolveOwnerRecipient: mocks.businessRecipient, resolveTenantOwnerRecipient: vi.fn().mockRejectedValue(new Error("unused")) }));
     vi.doMock("@/lib/tenants", () => ({ getTenantConfig: mocks.tenantConfig }));
     return import("@/products/websites/site-report");
   }

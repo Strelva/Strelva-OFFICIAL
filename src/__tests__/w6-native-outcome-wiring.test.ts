@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ send: vi.fn(), native: vi.fn(), rpc: vi.fn(), gate: vi.fn() }));
 vi.mock("@/products/websites/document-store", () => ({ websiteDocumentStore: { managePublishedTenant: mocks.native } }));
-vi.mock("@/platform/infra/email/send", () => ({ sendEmailWithReceipt: mocks.send }));
+vi.mock("@/platform/infra/email/send", async (original) => ({ ...(await original<typeof import("@/platform/infra/email/send")>()), sendEmailWithReceipt: mocks.send }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mocks.rpc }) }));
 vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: mocks.gate }));
 vi.mock("@/platform/infra/monitoring", () => ({ alert: vi.fn() }));
+vi.mock("@/platform/catalog-reports/receipts", () => ({ recordCatalogReport: vi.fn() }));
 import { sendWebsiteMonthlyReport, type WebsiteMonthlyReport } from "@/products/websites/site-report";
 const workspaceId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const token = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -21,7 +22,7 @@ beforeEach(() => {
   mocks.send.mockResolvedValue({ status: "accepted", providerMessageId: "provider-fixture", acceptedAt: "2026-10-01T00:00:00Z" });
   mocks.rpc.mockImplementation(async (name: string) => ({ data: name === "reserve_business_outcome_report_delivery" ? { token } : name === "list_business_outcome_reports" ? [{ workspaceId, primaryTenantId: "a", tenantIds: ["a", "b"], outcome: {workspaceId,month: "2026-09",sites: 2,visits: {kind:"counted",value:null},inquiries:{kind:"counted",value:9},answered:{kind:"linked",value:null,withinDay:null},bookings:{kind:"counted",value:3,native:1,legacy:2},bookingsFromInquiry:{kind:"linked",value:2,joins:["inquiry_id"]},reviews:{kind:"counted",value:null}} }] : {}, error: null }));
   vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1"); vi.stubEnv("STRELVA_BUSINESS_OUTCOME_REPORTS", "1");
-  vi.stubEnv("EMAIL_SENDING_ENABLED", "true"); vi.stubEnv("CUSTOMER_EMAIL_ENABLED", "true");
+  vi.stubEnv("EMAIL_SENDING_ENABLED", "true"); vi.stubEnv("CUSTOMER_EMAIL_ENABLED", "true"); vi.stubEnv("STRELVA_WEBSITE_REPORT_EMAIL_ENABLED", "1");
 });
 afterEach(() => vi.unstubAllEnvs());
 describe("native outcome report transport", () => {

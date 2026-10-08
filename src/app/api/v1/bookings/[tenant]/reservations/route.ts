@@ -1,7 +1,10 @@
+import { bookingAlternativeRange, nativeBookingAlternatives } from "@/platform/bookings/conflicts";
+import { agentBookingSchema, agentReceipt, requestAgentBooking } from "@/platform/bookings/native";
+import { deliverBookingUpdates } from "@/platform/bookings/updates";
 import { isTenantId } from "@/lib/scaffold-contracts";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { publicBookingVisitorSchema } from "@/products/scheduling/server";
-import { bookingError, bookingJson, bookingOptions, bookingService, bodyObject, stringValue } from "../../_shared";
+import { bookingConflictError, bookingJson, bookingOptions, bookingService, bodyObject, stringValue } from "../../_shared";
 
 function integerValue(value: unknown): number | undefined {
   return Number.isSafeInteger(value) && Number(value) > 0 ? Number(value) : undefined;
@@ -17,11 +20,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
   try {
     if (await isRateLimitedAsync(rateLimitKey(request, `v1-bookings:${tenant}`), 20)) return bookingJson({ error: "Too many booking requests." }, 429);
   } catch {
-    // A limiter outage must not make a truthful booking boundary look like an
-    // availability outage; the durable idempotency key still protects retries.
+    return bookingJson({ error: "Booking requests are temporarily unavailable. Nothing was booked." }, 503);
   }
   const body = await bodyObject(request);
   if (!body) return bookingJson({ error: "Invalid request body." }, 400);
+  if (body.origin === "agent") {
+    const parsed = agentBookingSchema.safeParse(body);
+    if (!parsed.success) return bookingJson({ error: "Enter the service, time, agent and customer details." }, 400);
+    try {
+      const result = await requestAgentBooking(tenant, parsed.data);
+      await deliverBookingUpdates(result.booking.id).catch(() => undefined);
+      return bookingJson(agentReceipt(result), result.created ? 201 : 200);
+    } catch (error) { return bookingConflictError(error, () => nativeBookingAlternatives(tenant, parsed.data.serviceId)); }
+  }
   const capabilityId = stringValue(body.capabilityId, 200);
   const capabilityVersion = integerValue(body.capabilityVersion);
   const slotId = stringValue(body.slotId, 256);
@@ -40,6 +51,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       ...(requestId ? { requestId } : {}),
     }), 201);
   } catch (error) {
-    return bookingError(error);
+    return bookingConflictError(error, () => bookingService().read({ tenantId: tenant, capabilityId, range: bookingAlternativeRange() }));
   }
 }

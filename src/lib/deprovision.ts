@@ -13,6 +13,7 @@
  * server-side (confirmSlug === id in the request body).
  */
 
+import { leadAuthorityIsPostgres } from "./lead-reads";
 import { getSupabase } from "@/platform/infra/db/client";
 import { getRedis } from "@/platform/infra/redis";
 import type { TenantConfig } from "@/lib/types";
@@ -150,7 +151,12 @@ export async function pauseStoredSystems(tenantId: string): Promise<{ ok: true; 
 async function deleteTenantRowsAtomically(tenantId: string): Promise<Record<string, number>> {
   const call = rpc();
   if (!call) return {};
-  const { data, error } = await call(process.env.STRELVA_TENANT_RECEIPT_RETENTION === "1" ? "deprovision_tenant_rows_retained" : "deprovision_tenant_rows", { p_tenant_id: tenantId });
+  // Each switch adds one atomic wrapper; both on uses the combined wrapper.
+  const retained = process.env.STRELVA_TENANT_RECEIPT_RETENTION === "1";
+  const name = leadAuthorityIsPostgres()
+    ? retained ? "deprovision_tenant_rows_retained_after_inquiry_export" : "deprovision_tenant_rows_after_inquiry_export"
+    : retained ? "deprovision_tenant_rows_retained" : "deprovision_tenant_rows";
+  const { data, error } = await call(name, { p_tenant_id: tenantId });
   if (error) throw new Error(`deprovision_tenant_rows: ${error.message}`);
   return Object.fromEntries(Object.entries((data ?? {}) as Record<string, unknown>).map(([table, n]) => [table, Number(n)]));
 }
@@ -315,6 +321,16 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
       pgRowTotal: 0,
       summary,
     };
+  }
+
+  // Check before pausing any System or touching Redis/Vercel. The atomic
+  // teardown repeats this guard under the tenant lock, so a stale export
+  // cannot authorize teardown after a fresh lead arrived.
+  if (executed && leadAuthorityIsPostgres()) {
+    const call = rpc();
+    if (!call) throw new Error("inquiry_export_guard_unavailable");
+    const checked = await call("assert_tenant_inquiry_export", { p_tenant_id: tenantId });
+    if (checked.error) throw new Error(`inquiry_export_guard: ${checked.error.message}`);
   }
 
   // Postgres: count (always), then purge every table and the tenant in one

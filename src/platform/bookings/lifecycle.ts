@@ -15,12 +15,14 @@
  * recorded, never retried: a provider may have accepted it. Every dependency
  * is a port so the whole run is tested without Postgres or Resend.
  */
+import { bookingOwnerNoticeEnabled } from "./flags";
 import type { SendEmailInput, SendEmailResult } from "@/platform/infra/email/send";
 import { customerReminderEmail, ownerRequestReminderEmail, requestLapsedEmail, type ReminderEmail } from "./emails";
 import type { BookingMessageKind, BookingMessageStatus, ClaimedBookingMessage, StoreBooking } from "./store";
 
 export interface BookingBusiness {
   name: string;
+  address?: string;
   tenantId: string | null;
   /** The owner recipient, resolved once through the owner-recipient rule. */
   ownerEmail: string | null;
@@ -86,6 +88,7 @@ async function deliver(
   let to: string;
   let audience: SendEmailInput["audience"];
   if (kind === "request_owner_reminder") {
+    if (!bookingOwnerNoticeEnabled()) return skip("owner_notice_off");
     if (!business.ownerEmail) return skip("no_owner_recipient");
     to = business.ownerEmail;
     audience = "client";
@@ -108,13 +111,13 @@ async function deliver(
   try {
     const result = await ports.send({
       audience,
-      ...(audience === "client" && business.tenantId ? { tenantId: business.tenantId } : {}),
+      ...(business.tenantId ? { tenantId: business.tenantId } : {}),
       ...(audience === "customer" ? { fromName: business.name || "Strelva", fromAddress: CUSTOMER_FROM } : {}),
       to,
       subject: email.subject,
       options: email.options,
       idempotencyKey: `booking-message:${messageId}`,
-      tags: { kind: `booking_${kind}` },
+      tags: { kind: `booking_${kind}`, ...(!booking.tenantId && booking.workspaceId ? { bookingWorkspaceId: booking.workspaceId } : {}) },
     });
     if (result.status === "accepted") {
       summary.sent += 1;

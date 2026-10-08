@@ -131,7 +131,7 @@ describe("manage link route", () => {
     vi.doMock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: async () => false, rateLimitKey: () => "k" }));
     const { POST } = await import("@/app/b/[token]/action/route");
     const request = () => new Request(`https://app.strelva.example/b/${TOKEN}/action`, {
-      method: "POST", body: new URLSearchParams({ action: "cancel" }), headers: { "content-type": "application/x-www-form-urlencoded" },
+      method: "POST", body: new URLSearchParams({ action: "cancel" }), headers: { "content-type": "application/x-www-form-urlencoded", origin: "https://app.strelva.example" },
     });
     vi.stubEnv("STRELVA_BOOKING_MANAGE_PAGE", "");
     expect((await POST(request(), { params: Promise.resolve({ token: TOKEN }) })).status).toBe(404);
@@ -141,6 +141,10 @@ describe("manage link route", () => {
     expect(res.status).toBe(303);
     expect(res.headers.get("location")).toBe(`https://app.strelva.example/b/${TOKEN}?done=cancelled`);
     expect(act).toHaveBeenCalledWith(TOKEN, { action: "cancel", slotId: null }, {});
+    act.mockClear();
+    const crossSite = new Request(`https://app.strelva.example/b/${TOKEN}/action`, { method: "POST", headers: { origin: "https://other.example" }, body: new URLSearchParams({ action: "cancel" }) });
+    expect((await POST(crossSite, { params: Promise.resolve({ token: TOKEN }) })).status).toBe(403);
+    expect(act).not.toHaveBeenCalled();
     vi.unstubAllEnvs();
     vi.doUnmock("@/platform/bookings/manage");
     vi.doUnmock("@/platform/bookings/manage-server");

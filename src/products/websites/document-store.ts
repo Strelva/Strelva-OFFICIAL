@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { observeWebsiteWorkRelease } from "./system-releases";
 import { z } from "zod";
 import { provisionHostedWebsiteTenant } from "@/lib/tenants";
 import type { CrawledPage } from "./rebuild-crawl";
@@ -9,7 +10,7 @@ import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type
 import { siteDocumentHash, siteDocumentSchema, unresolvedSiteFacts, type SiteDocument } from "./site-document";
 import { websiteLaunchReceiptSchema, type WebsiteLaunchReceipt } from "./contracts";
 import { bindToCurrentTenant } from "./hosted-routing";
-import { ROOT_DOMAIN } from "@/platform/infra/brand";
+import { SITES_ROOT_DOMAIN } from "@/platform/infra/brand";
 
 export interface WebsiteDocumentRevision {
   workspaceId: string; workId: string; revision: number; contentHash: string;
@@ -51,6 +52,7 @@ export interface WebsiteDocumentStore {
   approveDomain?(actor: WorkspaceActor, input: WebsiteDocumentKey & { tenantId: string; hostname: string }): Promise<{ hostname: string; expiresAt: string }>;
   authorizeDomain?(actor: WorkspaceActor, input: WebsiteDocumentKey & { tenantId: string; hostname: string; action: "attach" | "refresh" }): Promise<WebsiteDomainAuthority>;
   domainApprovals?(actor: WorkspaceActor, input: WebsiteDocumentKey): Promise<WebsiteDomainApproval[]>;
+  undoLinkedCutover?(actor: WorkspaceActor, input: WebsiteDocumentCandidate & { tenantId: string; commandId: string; domainRestored: boolean; fallbackVerified: boolean }): Promise<Record<string, unknown>>;
 }
 export interface WebsiteDocumentRpc { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message: string } | null }>; }
 const id = z.string().uuid();
@@ -70,14 +72,24 @@ function documentRow(raw: Record<string,unknown>): WebsiteDocumentRevision {
   if (siteDocumentHash(document) !== contentHash) throw new WorkspaceStoreError("The stored website document does not match its immutable hash.");
   return { workspaceId: String(raw.workspace_id), workId: String(raw.website_work_id), revision: revision.parse(Number(raw.revision)), contentHash, document, createdBy: String(raw.created_by), createdAt: String(raw.created_at), ...(typeof raw.tenant_id === "string" ? { tenantId: raw.tenant_id } : {}), ...(raw.receipt ? { receipt: websiteLaunchReceiptSchema.parse(raw.receipt) } : {}) };
 }
-export function createWebsiteDocumentStore(db?: WebsiteDocumentRpc): WebsiteDocumentStore {
+export interface OwnerLinkWebsiteSession { sessionId: string; workspaceId: string; decisionId: string; revisionHash: string; recipient: string; userId: string }
+
+export function createWebsiteDocumentStore(db?: WebsiteDocumentRpc, ownerLink?: OwnerLinkWebsiteSession): WebsiteDocumentStore {
   async function rpc(name: string, args: Record<string,unknown>): Promise<Record<string,unknown>[]> {
     const client = db ?? getSupabase() as unknown as WebsiteDocumentRpc | null;
     if (!client) throw new WorkspaceStoreError("Website document storage is unavailable.");
+    // Only reserve and publish admit an owner-link capability. All reads,
+    // candidate edits and unrelated actions keep their original RPCs.
+    if (ownerLink && ["reserve_website_hosted_tenant", "publish_website_document"].includes(name)) {
+      if (args.p_workspace_id !== ownerLink.workspaceId || args.p_user_id !== ownerLink.userId) throw new WorkspaceAccessError();
+      name = name === "reserve_website_hosted_tenant" ? "reserve_website_by_owner_link" : "publish_website_by_owner_link";
+      args = { ...args, p_session_id: id.parse(ownerLink.sessionId), p_decision_id: id.parse(ownerLink.decisionId), p_revision_hash: hash.parse(ownerLink.revisionHash), p_recipient: z.string().email().parse(ownerLink.recipient) };
+    }
     const result = await client.rpc(name,args);
     if (result.error) {
       if (result.error.message.includes("workspace_access_denied") || result.error.message.includes("website_tenant_access_denied") || result.error.message.includes("website_tenant_not_linked") || result.error.message.includes("agency_managed_website_draft_denied")) throw new WorkspaceAccessError();
       if (result.error.message.includes("website_domain_owner_approval_required")) throw new WorkspaceConflictError("The owner hasn't approved this domain yet. Strelva can prepare the records; the owner decides.");
+      if (/website_fallback_(?:confirmation_required|unavailable)/.test(result.error.message)) throw new WorkspaceConflictError("Undo requires a verified old project within the fallback window and restored DNS. Nothing was changed.");
       if (result.error.message.includes("website_domain_invalid")) throw new WorkspaceConflictError("Enter a valid domain you control.");
       if (/website_.*(?:conflict|unresolved|approval_required)|workspace_exit_future_work_blocked|website_rebuild_in_progress|bounded_revision_conflict/.test(result.error.message)) throw new WorkspaceConflictError(result.error.message.includes("unresolved") ? "Resolve the flagged website facts before approval." : "This website changed or is already rebuilding. Reload before continuing.");
       throw new WorkspaceStoreError("The website document operation could not be confirmed.");
@@ -149,6 +161,7 @@ export function createWebsiteDocumentStore(db?: WebsiteDocumentRpc): WebsiteDocu
       // The authoritative write has completed. Cache failure cannot make this
       // publication retryable; the short cache TTL bounds recovery.
       try { await getRedis()?.set(`reb:website-document:${input.tenantId}`, published.document, { ex: 60 }); } catch { /* Postgres remains authoritative. */ }
+      await observeWebsiteWorkRelease(actor, input.workspaceId, input.workId, db);
       return published;
     },
     async published(tenantId) { const result = await rpc("read_published_website_documents", { p_tenant_id: tenant.parse(tenantId) }); return result[0] ? documentRow(result[0]) : null; },
@@ -170,6 +183,7 @@ export function createWebsiteDocumentStore(db?: WebsiteDocumentRpc): WebsiteDocu
       const published = { ...documentRow(row), tenantId: String(row.tenant_id), receipt: row.receipt ? websiteLaunchReceiptSchema.parse(row.receipt) : receipt,
         priorDeliveryModel: z.enum(["custom_repo","platform_template"]).parse(row.prior_delivery_model), fallbackUntil: String(row.fallback_until) };
       try { await getRedis()?.set(`reb:website-document:${published.tenantId}`, published.document, { ex: 60 }); } catch { /* Postgres remains authoritative. */ }
+      await observeWebsiteWorkRelease(actor, input.workspaceId, input.workId, db);
       return published;
     },
     async currentTenant(actor,input) {
@@ -198,6 +212,13 @@ export function createWebsiteDocumentStore(db?: WebsiteDocumentRpc): WebsiteDocu
     },
     async domainApprovals(actor,input) {
       return (await rpc("read_website_domain_approvals", { ...identity(actor), ...key(input) })).map(row => ({ hostname: String(row.hostname), approvedBy: String(row.approved_by), approvedAt: String(row.approved_at), expiresAt: String(row.expires_at), current: row.current === true }));
+    },
+    async undoLinkedCutover(actor,input) {
+      const result = await rpc("undo_website_linked_cutover", { ...identity(actor), ...candidate(input), p_tenant_id: tenant.parse(input.tenantId), p_command_id: id.parse(input.commandId), p_domain_restored: z.boolean().parse(input.domainRestored), p_fallback_verified: z.boolean().parse(input.fallbackVerified) });
+      if (!result[0]) throw new WorkspaceStoreError("The restored website could not be confirmed.");
+      await invalidatePublishedSiteDocument(input.tenantId);
+      await observeWebsiteWorkRelease(actor, input.workspaceId, input.workId, db);
+      return result[0];
     },
   }; return store;
 }
@@ -230,7 +251,7 @@ export async function publishedCapabilityTenant(tenantId: string, document: Site
   try {
     const row = await websiteDocumentStore.published(tenant.parse(tenantId));
     if (!row || row.contentHash !== siteDocumentHash(document)) return undefined;
-    return bindToCurrentTenant(row.document, tenantId, row.receipt, ROOT_DOMAIN).capabilities?.tenant === tenantId ? tenantId : undefined;
+    return bindToCurrentTenant(row.document, tenantId, row.receipt, SITES_ROOT_DOMAIN).capabilities?.tenant === tenantId ? tenantId : undefined;
   } catch { return undefined; }
 }
 export async function invalidatePublishedSiteDocument(tenantId: string): Promise<void> {

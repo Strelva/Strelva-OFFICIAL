@@ -5,7 +5,7 @@ import { motion } from "motion/react";
 import { ReceiptText, TrendingUp } from "lucide-react";
 import { CountUp, formatDollars, formatInteger } from "@/components/ui/motion/CountUp";
 import { EntranceProvider, Reveal, entranceTransition, useEntranceTrigger } from "@/components/ui/motion/Entrance";
-import { strelvaMotion } from "@/lib/motion";
+import { strelvaMotion } from "@/platform/infra/motion";
 import { loopChips, loopHeadline, loopRibbonGeometry, type LoopStage, type LoopStageKey } from "./loop";
 import { outcomeFont } from "./outcome-font";
 import styles from "./outcomes.module.css";

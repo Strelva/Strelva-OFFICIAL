@@ -1,3 +1,4 @@
+import { bookingAgentVisibilityEnabled } from "@/platform/bookings/flags";
 /**
  * Server reads behind the agency surface. Each one runs under the signed-in
  * actor; Postgres rechecks access on every row.
@@ -14,6 +15,9 @@
  *   here: going live is a separate release through the release gate.
  */
 import { z } from "zod";
+import { inquiryReleaseMayBeOn, inquiryReleaseEnabledForWorkspace, inquiryReleasedForCurrentUser, discoverInquiryPortfolio } from "@/products/inquiries";
+import { readLinkedSites } from "@/platform/owner-entry/linked-sites";
+import { resolveInquiryWorkspace } from "@/products/inquiries/server";
 import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
 import { addAgencyOperatorOverview } from "./agency/operator-overview";
 import { systemsReleasedFor } from "@/platform/systems-release";
@@ -64,7 +68,9 @@ export async function readAgencyClientsPage(
   }, "Clients could not be loaded.");
   const parsed = agencyClientsPageSchema.safeParse(data);
   if (!parsed.success || parsed.data.agencyWorkspaceId !== agencyWorkspaceId) throw new WorkspaceStoreError("Clients could not be loaded. The response was malformed.");
-  return released ? addAgencyOperatorOverview(actor, parsed.data) : parsed.data;
+  const page = { ...parsed.data, clients: parsed.data.clients.map(client => ({ ...client,
+    ...(bookingAgentVisibilityEnabled() && client.systems.some(system => ["booking", "bookings"].includes(system.kind)) ? { agentBookings: true } : {}) })) };
+  return released ? addAgencyOperatorOverview(actor, page) : page;
 }
 
 const sourcesSchema = z.object({
@@ -136,6 +142,19 @@ export async function readAgencyLibrary(actor: WorkspaceActor, agencyWorkspaceId
       revisions: source.revisions.map((revision) => ({ number: revision.number, label: revision.label, summary: revision.summary, publishedAt: revision.publishedAt })),
       versions: rows,
     });
+  }
+  if (inquiryReleaseMayBeOn() && await inquiryReleaseEnabledForWorkspace(agencyWorkspaceId, { userId: actor.userId, operator: false, tester: false })) {
+    try {
+      // Source access is the agency's own current links; target access is the
+      // existing portfolio's freshly checked tenant membership. No definition,
+      // credential, inquiry, approval or connection is copied into lineage.
+      const linked = await readLinkedSites(actor, agencyWorkspaceId);
+      const sourceIds = new Set([agencyWorkspaceId, ...await Promise.all(linked.sites.map(async site =>
+        (await resolveInquiryWorkspace({ tenantId: site.tenantId, tenantStableId: site.tenantStableId, fallbackBusinessId: site.tenantStableId })).businessId))]);
+      const portfolio = await discoverInquiryPortfolio(undefined, inquiryReleasedForCurrentUser);
+      result.inquiryVersions = (portfolio.versions ?? []).filter(item => sourceIds.has(item.sourceBusinessId));
+      if (portfolio.unavailableTenantIds.length) result.inquiryVersionsUnavailable = true;
+    } catch { result.inquiryVersionsUnavailable = true; }
   }
   return result;
 }

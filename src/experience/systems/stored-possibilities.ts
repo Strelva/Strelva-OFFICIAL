@@ -13,12 +13,14 @@
  * failure leaves the per-request projection in place and claims nothing.
  */
 import { randomUUID } from "node:crypto";
+import { possibilityPreviewPath } from "@/platform/possibilities/preview-link";
 import { canonicalJson } from "@/platform/business-record/tenant-import";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import {
   createPossibility,
   possibilityInputSchema,
   markReady,
+  returnToExploring,
   recordRehearsal,
   rehearsePossibility,
   reviseCandidate,
@@ -32,7 +34,9 @@ import { createIsolatedAdapter } from "@/platform/make-real/isolated-adapters";
 import { customerActivationView } from "@/platform/make-real/view";
 import type { BusinessSystems, SystemListing } from "@/platform/systems/from-existing";
 import type { SystemRevision } from "@/platform/systems/contracts";
-import type { WebsiteRebuildCandidate } from "@/products/websites/index";
+import { siteDocumentSchema, unresolvedSiteFacts, type WebsiteRebuildCandidate, type WebsiteRebuildRecord } from "@/products/websites/index";
+import { followUpTryView } from "@/products/inquiries/server";
+import { publicBookingScheduleSchema } from "@/products/scheduling/contracts";
 import type {
   WorkspaceSystemActivation,
   WorkspaceSystemHistoryRow,
@@ -75,7 +79,8 @@ export function rebuildPossibilityInput(target: StoredTarget, revisions: Readonl
     effects: [{
       id: "publish-site", kind: "publish", channel: "hosted_website", system: { systemId: site.system.id },
       description: `Publish the ${agency ? "changed" : "rebuilt"} ${domain}`,
-      request: { workId: candidate.workId, candidateRevision: candidate.candidateRevision, candidateContentHash: candidate.candidateContentHash },
+      request: { workId: candidate.workId, candidateRevision: candidate.candidateRevision, candidateContentHash: candidate.candidateContentHash,
+        ...(site.references.tenantId ? { tenantId: site.references.tenantId } : {}) },
       after: [],
     }],
     checks: [
@@ -150,6 +155,52 @@ export async function syncRebuildPossibilities(deps: {
   return stored;
 }
 
+/** Native Ask drafts keep their exact content/hash pin as the owner reviews copy. */
+export async function syncAskPageSetPossibilities(deps: {
+  repo: SupabasePossibilityRepository; live: LiveSystemsReader; actorId: string; at: string;
+  stored: ListedPossibility[]; canWrite: boolean;
+  read(workId: string): Promise<WebsiteRebuildRecord>;
+}): Promise<ListedPossibility[]> {
+  if (!deps.canWrite) return deps.stored;
+  const rows = [...deps.stored];
+  for (let index = 0; index < rows.length; index++) {
+    const row = rows[index]!;
+    let p = row.possibility;
+    const intro = [...p.introduces, ...p.changes].find(item => ["ask-website-pages", "ask-existing-booking-page", "ask-existing-website-pages"].includes(String(item.candidate.content.kind)));
+    const workId = intro?.candidate.content.rebuildWorkId;
+    if (!intro || typeof workId !== "string" || p.activationId || !["exploring", "ready"].includes(p.status)) continue;
+    try {
+      const record = await deps.read(workId);
+      const candidate = record.rebuild.candidate;
+      if (record.workspaceId !== p.businessId || !candidate || record.rebuild.status === "published") continue;
+      const content: Record<string, unknown> = { ...intro.candidate.content, candidateRevision: candidate.revision, candidateContentHash: candidate.contentHash, document: candidate.document };
+      if (canonicalJson(content) !== canonicalJson(intro.candidate.content)) {
+        const revised = reviseCandidate(p, {
+          introduces: p.introduces.map(item => item.candidate.content.rebuildWorkId === workId ? { ...item, candidate: { ...item.candidate, content } } : item),
+          changes: p.changes.map(item => item.candidate.content.rebuildWorkId === workId ? { ...item, candidate: { ...item.candidate, content } } : item),
+          effects: p.effects.map(effect => effect.channel === "hosted_website" && effect.request.workId === workId ? { ...effect, request: { workId, candidateRevision: candidate.revision, candidateContentHash: candidate.contentHash } } : effect),
+        }, p.revision, deps.actorId, deps.at);
+        await deps.repo.save(revised, p.revision);
+        p = revised;
+      }
+      const checked = siteDocumentSchema.parse(candidate.document);
+      const bookingSchedule = publicBookingScheduleSchema.safeParse(content.bookingSchedule);
+      const bookingMatches = content.kind !== "ask-existing-booking-page" || bookingSchedule.success
+        && checked.capabilities?.booking?.capabilityId === bookingSchedule.data.capabilityId
+        && checked.capabilities.booking.version === bookingSchedule.data.version
+        && record.rebuild.publishedCapabilitySelection?.bookingGrantId === content.grantId
+        && checked.pages.some(page => page.path === content.bookingPath);
+      const reviewed = ["review_ready", "approved"].includes(record.rebuild.status)
+        && bookingMatches
+        && unresolvedSiteFacts(checked).length === 0
+        && Object.values(checked.nodes).every(node => !node.verification?.needsReview);
+      if (p.status === "exploring" && reviewed) p = await prepare(p, true, deps);
+      rows[index] = { ...row, possibility: p };
+    } catch { /* Unreadable or concurrent candidates stay held for review. */ }
+  }
+  return rows;
+}
+
 function lastStale(p: Possibility): string | null {
   const last = [...p.history].reverse().find((h) => h.kind === "stale" || h.kind === "ready" || h.kind === "revise");
   return p.status === "exploring" && last?.kind === "stale" ? last.detail ?? "A System it changes moved since it was built." : null;
@@ -159,16 +210,23 @@ function lastStale(p: Possibility): string | null {
 export function storedPossibilityViews(stored: readonly ListedPossibility[], candidates: readonly WebsiteRebuildCandidate[], summaries: { evidence: (workId: string) => string | null } = { evidence: () => null }): WorkspaceSystemPossibility[] {
   return stored.flatMap(({ possibility: p, sourceRef }) => {
     if (p.status !== "exploring" && p.status !== "ready") return [];
-    const workId = sourceRef?.startsWith(REBUILD_SOURCE_PREFIX) ? sourceRef.slice(REBUILD_SOURCE_PREFIX.length) : null;
+    const askContent = [...p.introduces, ...p.changes].find(item => item.candidate.content.kind === "ask-inquiry-follow-up" || ["ask-website-pages", "ask-existing-booking-page", "ask-existing-website-pages"].includes(String(item.candidate.content.kind)))?.candidate.content;
+    const workId = sourceRef?.startsWith(REBUILD_SOURCE_PREFIX) ? sourceRef.slice(REBUILD_SOURCE_PREFIX.length)
+      : typeof askContent?.rebuildWorkId === "string" ? askContent.rebuildWorkId : null;
     const candidate = workId ? candidates.find((item) => item.workId === workId) : undefined;
+    let tryHref: string | undefined;
+    try {
+      if (askContent) tryHref = possibilityPreviewPath({ workspaceId: p.businessId, possibilityId: p.id, candidateRevision: p.candidateRevision });
+    } catch { /* Keep the native review link when signing is not configured. */ }
     return [{
       id: p.id,
       title: p.title,
-      summary: candidate?.summary ?? p.intent,
+      summary: askContent ? p.intent : candidate?.summary ?? p.intent,
       status: p.status,
-      affects: p.changes.map((c) => c.baseline.systemId),
+      affects: [...new Set([...p.changes.map((c) => c.baseline.systemId), ...(typeof askContent?.contextSystemId === "string" ? [askContent.contextSystemId] : [])])],
       evidence: candidate?.evidence ?? (workId ? summaries.evidence(workId) : null),
       previewHref: candidate?.previewHref ?? null,
+      ...(tryHref ? { tryHref } : {}),
       workId: workId ?? p.id,
       stored: true,
       staleReason: lastStale(p),
@@ -239,6 +297,8 @@ export function revisionHistory(systemId: string, revisions: readonly SystemRevi
         ? `Made live: ${r.summary ?? "a change"}`
         : `${IMPLEMENTATION_SENTENCE[r.implementation.kind] ?? r.summary ?? "Changed"}`,
     at: r.createdAt,
+    releaseRef: r.implementation.ref,
+    implementationKind: r.implementation.kind,
   }));
 }
 
@@ -253,4 +313,31 @@ export function storedTargets(listing: BusinessSystems, candidates: readonly Web
       .filter((item): item is SystemListing => Boolean(item && item.system.kind === "inquiry" && item.provenance === "stored" && item.system.currentRevision));
     return [{ candidate, site: found.site, inquiries, domain: found.domain }];
   });
+}
+
+/** Exact native Inquiry alternatives use their real isolated engine rehearsal, then the existing plan lifecycle. */
+export async function syncAskInquiryFollowUpPossibilities(deps: {
+  repo: SupabasePossibilityRepository; live: LiveSystemsReader; actorId: string; at: string;
+  stored: ListedPossibility[]; canWrite: boolean; current(selection: unknown): Promise<boolean>;
+}): Promise<ListedPossibility[]> {
+  if (!deps.canWrite) return deps.stored;
+  const rows = [...deps.stored];
+  for (let index = 0; index < rows.length; index++) {
+    const row = rows[index]!;
+    const p = row.possibility;
+    const content = p.changes.find(change => change.candidate.content.kind === "ask-inquiry-follow-up")?.candidate.content;
+    if (!content || p.activationId || !["exploring", "ready"].includes(p.status)) continue;
+    try {
+      if (!followUpTryView(content.selection, content.draft, content.rehearsal) || !await deps.current(content.selection)) {
+        if (p.status === "ready") {
+          const stale = returnToExploring(p, "The native Inquiry configuration changed. Review a refreshed alternative.", deps.actorId, deps.at);
+          await deps.repo.save(stale, p.revision);
+          rows[index] = { ...row, possibility: stale };
+        }
+        continue;
+      }
+      if (p.status === "exploring") rows[index] = { ...row, possibility: await prepare(p, true, deps) };
+    } catch { /* Missing authority, moved native rules, or concurrent saves remain held for review. */ }
+  }
+  return rows;
 }

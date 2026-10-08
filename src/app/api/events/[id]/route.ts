@@ -39,6 +39,7 @@ export async function PATCH(
     const result = await decideTenantEvent(decider, { tenantId: tenant, eventId: id, action: status, auditAction: `dashboard.event.${status}` });
     const refused = operatorRefusal(result.reason);
     if (refused) return NextResponse.json({ error: refused.error }, { status: refused.status });
+    if (result.reason === "permission_denied") return NextResponse.json({ error: "Only the current business owner can decide on this change. Nothing changed." }, { status: 403 });
     if (result.reason === "not_found" || result.reason === "wrong_tenant") {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }

@@ -75,13 +75,18 @@ export function AgencyLibraryView({
     <p className="text-[13px] text-warm-black">The library could not be loaded. Nothing was changed.</p>
     <Button variant="secondary" size="sm" icon={<RefreshCw size={14} />} onClick={() => setAttempt((value) => value + 1)}>Retry</Button>
   </div>;
-  if (!state.library.sources.length) return <p className="border-y border-gray-border py-5 text-[13px] leading-relaxed text-gray-muted">No sources yet. When a System is packaged as a source and adapted for a client, it appears here with each client’s Version.</p>;
+  if (!state.library.sources.length && !state.library.inquiryVersions?.length && !state.library.inquiryVersionsUnavailable) return <p className="border-y border-gray-border py-5 text-[13px] leading-relaxed text-gray-muted">No sources yet. When a System is packaged as a source and adapted for a client, it appears here with each client’s Version.</p>;
 
-  return <ul aria-label="Sources" className="space-y-12">
+  return <><ul aria-label="Sources" className="space-y-12">
     {state.library.sources.map((source) => <li key={source.systemId}>
       <LibrarySource source={source} review={reviews[source.systemId]} onReview={() => void review(source)} />
     </li>)}
-  </ul>;
+  </ul><InquiryLibraryVersions library={state.library} /></>;
+}
+
+export function InquiryLibraryVersions({ library }: { library: AgencyLibrary }) {
+  return <>{library.inquiryVersionsUnavailable ? <p role="status" className="mt-6 text-sm text-gray-muted">Some inquiry Versions could not be checked. Their absence does not mean they were removed.</p> : null}
+    {library.inquiryVersions?.length ? <section className="mt-12" aria-label="Inquiry Versions"><h3 className="font-display text-base font-medium">Inquiry Versions</h3><ul className="mt-4">{library.inquiryVersions.map(version => <li key={version.id} className="border-b border-gray-border py-4"><strong className="text-sm font-medium">{version.businessName} · {version.name}</strong><p className="mt-2 text-xs text-gray-muted">Source revision {version.sourceRevision} · this Version’s release {version.currentRelease}</p><p className="mt-2 text-sm text-gray-muted">{version.improvement === "blocked" ? "A source update needs a choice about local changes." : version.improvement === "auto_applicable" ? "A source update is available for review." : "Based on the accepted source revision. Local changes keep their own release."}</p><a className="mt-3 inline-flex min-h-12 items-center text-sm underline underline-offset-2" href={`/business/${encodeURIComponent(version.tenantId)}?view=patterns`}>Open {version.businessName}’s inquiry form</a></li>)}</ul><p className="mt-4 text-xs text-gray-muted">Updates use the existing inquiry review and testing steps. Each business owner approves going live.</p></section> : null}</>;
 }
 
 function LibrarySource({

@@ -14,7 +14,7 @@ import type {
 import { InquiryEngine } from "./inquiry-engine";
 import {
   createEmailInquiryTransport,
-  createInquiryDeliveryMessage,
+  prepareInquiryDeliveryMessage,
   createRedisInquiryDeliveryStore,
   deliverInquiryAction,
   evaluateInquiryDelivery,
@@ -36,20 +36,23 @@ import type {
   ResponsibilityDeliveryGate,
 } from "./delivery";
 import { inquiryEmailReadiness } from "./email-consent";
+import { inquiryMessageRouteAtUse, type InquiryMessageRouteReader } from "./inquiry-policy-at-use";
+import { bindInquiryReviewActor, authorizeSignedInquiryMessageDecision, type InquiryActorAuthorityDependencies } from "./message-review-authority";
 import { stateForReceive } from "./receive";
-import { classifyInquiryMessage } from "./message-outcome";
+import { checkpointAccepted, outcomeError, outcomeFromCheckpoint } from "./message-review-outcome";
 import { type MessageReceiptContext, writeMessageReceipt } from "./message-receipt";
 import {
   DIFFERENT_MESSAGE_SENT,
   MESSAGE_DIGEST_UNKNOWN,
   metadataFromEvent,
+  approvalEventMatches,
+  acceptanceEvidenceFromEvent,
   previewFromEvent,
   sentMessageBinding,
 } from "./message-review-event";
 import { policyFor } from "./message-review-policy";
 import { currentResponsibility, inquiryCurrentness } from "./currentness";
 import type {
-  InquiryMessageAcceptanceEvidence,
   InquiryMessageReviewAction,
   InquiryMessageReviewExecution,
   InquiryMessageReviewReconciliation,
@@ -64,7 +67,6 @@ import {
   InquiryMessageReviewEngineError,
   type InquiryMessageReviewEventMetadata,
   assertOpenInquiry,
-  assertResponsibilitySponsor,
   dependency,
   errorCode,
   errorMessage,
@@ -93,7 +95,7 @@ type ResolveRoute = (
   policy: InquiryRoutingPolicy,
 ) => Promise<InquiryRoute>;
 
-export interface InquiryMessageReviewDependencies {
+export interface InquiryMessageReviewDependencies extends InquiryActorAuthorityDependencies {
   repository?: import("./repository").InquiryRepository;
   store?: InquiryDeliveryStore;
   transport?: InquiryOutboundTransport;
@@ -105,8 +107,11 @@ export interface InquiryMessageReviewDependencies {
   resolveAction?: ResolveApprovalAction;
   emailReady?: (tenantId: string) => Promise<boolean>;
   allowExternalSends?: boolean;
+  /** Ask validates workspace draft authority here; never used by execution. */
+  authorizeDraft?: (actorId: string, businessId: string) => Promise<boolean>;
   /** Test/host seam for the durable workspace exit authority. */
   isWorkspaceExited?: (tenantId: string) => Promise<boolean>;
+  messageRoute?: InquiryMessageRouteReader;
 }
 
 interface ReviewContext {
@@ -123,8 +128,12 @@ interface ReviewContext {
   messageBody: string;
   messageDigest: string;
   evaluation: ResponsibilityEvaluation;
+  decisionRoute: Awaited<ReturnType<InquiryMessageRouteReader>>;
   deliveryEvaluation: InquiryDeliveryResult;
   status: InquiryRecordStatus;
+  ownerDecisionActor?: string;
+  operatorReviewActor?: string;
+  authoredReply?: string;
 }
 
 async function repositoryFor(deps: InquiryMessageReviewDependencies): Promise<import("./repository").InquiryRepository> {
@@ -236,8 +245,12 @@ async function buildContext(input: {
   action: InquiryMessageReviewAction;
   actorId: string;
   responsibilityId?: string;
+  authoredReply?: string;
+  draftActorAllowed?: boolean;
   expectedResponsibilityRevision?: string;
   expectedPolicyVersion?: string;
+  ownerDecisionEvent?: UnifiedEvent;
+  ownerDecisionAction?: "approved" | "dismissed";
   deps: InquiryMessageReviewDependencies;
   now: Date;
 }): Promise<ReviewContext> {
@@ -249,11 +262,18 @@ async function buildContext(input: {
   await readyForEmail(input.tenantId, definition, input.deps);
   const responsibility = responsibilityFor(snapshot.state, capability.id, input.responsibilityId);
   if (responsibility.businessId !== input.businessId) throwCode("permission_denied", "This responsibility belongs to another business.");
-  assertResponsibilitySponsor(responsibility, input.actorId);
+  // An authorized Ask draft (prepare only) skips sponsor binding; every other actor binds current authority.
+  const actorBinding = input.draftActorAllowed ? {} : await bindInquiryReviewActor({ tenantId: input.tenantId, businessId: input.businessId,
+    inquiryId: input.inquiryId, action: input.action, actorId: input.actorId, responsibility,
+    event: input.ownerDecisionEvent, eventAction: input.ownerDecisionAction, deps: input.deps });
   if (input.expectedResponsibilityRevision && responsibility.updatedAt !== input.expectedResponsibilityRevision) {
     throwCode("policy_changed", "The current responsibility policy changed. Prepare a fresh review.");
   }
-  const inquiry = inquiryFromLead(input.tenantId, lead, definition);
+  let inquiry = inquiryFromLead(input.tenantId, lead, definition);
+  if (input.action === "reply") {
+    const { withInquiryBookingOffer } = await import("./booking-handoff");
+    inquiry = await withInquiryBookingOffer(inquiry);
+  }
   const policy = policyFor(definition, responsibility, input.action);
   if (input.expectedPolicyVersion && policy.version !== input.expectedPolicyVersion) {
     throwCode("policy_changed", "The current responsibility policy changed. Prepare a fresh review.");
@@ -265,8 +285,13 @@ async function buildContext(input: {
   } catch (error) {
     throw new InquiryMessageReviewEngineError(errorMessage(error, "The inquiry recipient could not be resolved."), "recipient_route_changed");
   }
-  const message = createInquiryDeliveryMessage(inquiry, route, input.action);
+  const message = await prepareInquiryDeliveryMessage(inquiry, route, input.action);
   if (!message) throwCode("recipient_unavailable", "A permitted inquiry recipient is not configured.");
+  if (input.authoredReply !== undefined) {
+    if (input.action !== "reply") throwCode("message_mismatch", "Authored copy is only available for inquiry replies.");
+    const authoredReply = text(input.authoredReply, "Reply body", 4096);
+    message.options = { heading: "A reply from your business", paragraphs: [authoredReply], footerNote: "Sent by Strelva for the business named above" };
+  }
   const messageBody = renderInquiryMessage(message).text;
   const messageDigest = getInquiryDeliveryMessageDigest(message);
   const record = recordFromLead(snapshot.state, capability, lead, status);
@@ -285,12 +310,17 @@ async function buildContext(input: {
   if (evaluation.decision === "block") {
     throwCode("delivery_unavailable", evaluation.reason || "The current responsibility blocks this message.");
   }
+  const decisionRoute = await (input.deps.messageRoute ?? inquiryMessageRouteAtUse)(input.tenantId, evaluation, `${message.subject}\n${messageBody}`, input.businessId);
+  if (actorBinding.operatorReviewActor && decisionRoute !== "strelva_reviews") {
+    throwCode("permission_denied", "The current responsibility does not delegate this review to Strelva.");
+  }
   const deliveryEvaluation = evaluateInquiryDelivery(inquiry, input.action, policy, null, input.now, messageDigest);
   if (deliveryEvaluation.status !== "awaiting_approval" && deliveryEvaluation.status !== "ready") {
     throwCode("delivery_unavailable", deliveryEvaluation.reason || "The message is not ready for approval.");
   }
   return {
     snapshot,
+    ...actorBinding,
     lead,
     inquiry,
     capability,
@@ -303,8 +333,10 @@ async function buildContext(input: {
     messageBody,
     messageDigest,
     evaluation,
+    decisionRoute,
     deliveryEvaluation,
     status,
+    ...(input.authoredReply === undefined ? {} : { authoredReply: text(input.authoredReply, "Reply body", 4096) }),
   };
 }
 
@@ -334,7 +366,8 @@ function metadataFor(
     messageDigest: context.messageDigest,
     preparedAt: now.toISOString(),
     expiresAt: context.deliveryEvaluation.expiresAt ?? null,
-    reviewAudience: "owner",
+    reviewAudience: process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && context.decisionRoute === "strelva_reviews" ? "operator" : "owner",
+    ...(context.authoredReply === undefined ? {} : { authoredReply: context.authoredReply }),
   };
 }
 
@@ -359,7 +392,9 @@ export async function prepareInquiryMessageReviewWithDependencies(
   const action = reviewAction(input.action);
   const now = dependency(deps.now, () => new Date())();
   const tenantId = text(input.tenantId, "Tenant id", 80);
-  const context = await buildContext({ tenantId, businessId, inquiryId, action, actorId, deps, now });
+  const draftActorAllowed = input.authoredReply !== undefined && deps.authorizeDraft
+    ? await deps.authorizeDraft(actorId, businessId) : false;
+  const context = await buildContext({ tenantId, businessId, inquiryId, action, actorId, authoredReply: input.authoredReply, draftActorAllowed, deps, now });
   const baseMetadata = metadataFor(context, actorId, now);
   const reviewToken = tokenFor(baseMetadata, actorId);
   const metadata: InquiryMessageReviewEventMetadata = { ...baseMetadata, reviewTokenHash: hash(reviewToken) };
@@ -399,75 +434,12 @@ export async function prepareInquiryMessageReviewWithDependencies(
     status: "pending",
     metadata: metadata as unknown as Record<string, unknown>,
   }, { requirePersistence: true });
-  return previewFromEvent(created, metadata, actorId);
-}
-
-function checkpointAccepted(checkpoint: InquiryDeliveryCheckpoint | null): boolean {
-  return Boolean(checkpoint) && classifyInquiryMessage(checkpoint!).accepted;
-}
-
-function outcomeFromCheckpoint(
-  checkpoint: InquiryDeliveryCheckpoint | null,
-  inquiryId: string,
-  action: InquiryMessageReviewAction,
-  fallback?: { status?: InquiryDeliveryResult["status"]; reason?: string },
-  reviewDigest?: string,
-): InquiryMessageReviewOutcome {
-  if (reviewDigest && checkpointAccepted(checkpoint) && sentMessageBinding(checkpoint, reviewDigest) === "different") {
-    // Another message already went out for this purpose. This review was
-    // never sent and cannot be: report it as blocked, with no provider ids
-    // that belong to the other message.
-    return { inquiryId, action, status: "blocked", reason: DIFFERENT_MESSAGE_SENT, retryable: false };
+  if (process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1") {
+    // Opening the owner decision is immediate; notice failures cannot undo the saved draft.
+    const { notifyPreparedInquiryDecision } = await import("./decision-notice");
+    await notifyPreparedInquiryDecision(tenantId, context.lead).catch(() => "none");
   }
-  const status = checkpoint?.status;
-  const outputStatus: InquiryMessageReviewOutcome["status"] =
-    fallback?.status === "reconciliation_required" ? "reconciliation_required" :
-      status === "verified" ? "verified" :
-      status === "delivered" ? "delivered" :
-        status === "bounced" ? "bounced" :
-          status === "deferred" ? "deferred" :
-            status === "suppressed" ? "suppressed" :
-              status === "failed" ? "failed" :
-                status === "accepted" || status === "accepted_unverified" ? "accepted_unverified" :
-                  status === "sending" || status === "unknown" ? "reconciliation_required" :
-                    fallback?.status === "failed" ? "failed" : "unavailable";
-  // An unsettled attempt stays "possibly accepted" even when the checkpoint
-  // alone would read as a rejection.
-  const classification = outputStatus === "reconciliation_required" && !checkpointAccepted(checkpoint)
-    ? classifyInquiryMessage({ status: outputStatus })
-    : classifyInquiryMessage(checkpoint ?? { status: outputStatus });
-  return {
-    inquiryId,
-    action,
-    status: outputStatus,
-    ...(checkpoint?.failureReason || checkpoint?.verificationReason || fallback?.reason ? { reason: checkpoint?.failureReason || checkpoint?.verificationReason || fallback?.reason } : {}),
-    ...(checkpoint?.acceptedAt ? { acceptedAt: checkpoint.acceptedAt } : {}),
-    ...(checkpoint?.providerMessageId ? { providerMessageId: checkpoint.providerMessageId } : {}),
-    ...(checkpoint?.verificationEvidence ? { verificationEvidence: checkpoint.verificationEvidence } : {}),
-    retryable: outputStatus === "failed" && classification.retryAllowed ? Boolean(checkpoint?.retryable) : false,
-    delivery: classification.delivery,
-    retryAllowed: classification.retryAllowed,
-  };
-}
-
-function approvalEventMatches(
-  event: UnifiedEvent,
-  tenantId: string,
-  input: InquiryMessageReviewApproveInput,
-  actorId: string,
-): InquiryMessageReviewEventMetadata | null {
-  const metadata = metadataFromEvent(event);
-  if (!metadata || event.tenantId !== tenantId || metadata.businessId !== input.businessId || metadata.inquiryId !== input.inquiryId || metadata.action !== input.action) return null;
-  if (metadata.requestedBy !== actorId) return metadata;
-  if (metadata.messageDigest !== input.messageDigest) return metadata;
-  if (hash(input.reviewToken) !== metadata.reviewTokenHash) return metadata;
-  return metadata;
-}
-
-function outcomeError(result: { changed: boolean; reason?: string }): InquiryMessageReviewEngineError {
-  const reason = result.reason || "delivery_approval_failed";
-  const known = new Set(["policy_changed", "inquiry_changed", "recipient_route_changed", "message_mismatch", "approval_required", "permission_denied", "review_expired", "review_revoked"]);
-  return new InquiryMessageReviewEngineError(reason, known.has(reason) ? reason : "delivery_unavailable");
+  return previewFromEvent(created, metadata, actorId);
 }
 
 export async function approveInquiryMessageReviewWithDependencies(
@@ -685,7 +657,9 @@ export async function executeInquiryMessageReview(
       businessId: metadata.businessId,
       inquiryId: metadata.inquiryId,
       action: metadata.action,
+      authoredReply: metadata.authoredReply,
       actorId: input.actorId,
+      ownerDecisionEvent: input.event,
       responsibilityId: metadata.responsibilityId,
       expectedResponsibilityRevision: metadata.responsibilityRevision,
       expectedPolicyVersion: metadata.policyVersion,
@@ -733,7 +707,9 @@ export async function executeInquiryMessageReview(
           businessId: metadata.businessId,
           inquiryId: metadata.inquiryId,
           action: metadata.action,
+          authoredReply: metadata.authoredReply,
           actorId: input.actorId,
+          ownerDecisionEvent: input.event,
           responsibilityId: metadata.responsibilityId,
           expectedResponsibilityRevision: metadata.responsibilityRevision,
           expectedPolicyVersion: metadata.policyVersion,
@@ -755,7 +731,9 @@ export async function executeInquiryMessageReview(
           businessId: metadata.businessId,
           inquiryId: metadata.inquiryId,
           action: metadata.action,
+          authoredReply: metadata.authoredReply,
           actorId: input.actorId,
+          ownerDecisionEvent: input.event,
           responsibilityId: metadata.responsibilityId,
           expectedResponsibilityRevision: metadata.responsibilityRevision,
           expectedPolicyVersion: metadata.policyVersion,
@@ -790,6 +768,7 @@ export async function executeInquiryMessageReview(
     result = await deliverInquiryAction(context.inquiry, metadata.action, {
       policy: context.policy,
       approval,
+      ...(metadata.authoredReply === undefined ? {} : { messageOptions: context.message.options }),
       deps: deliveryDeps,
     });
   } catch (error) {
@@ -848,17 +827,29 @@ export async function authorizeInquiryMessageReviewActor(input: {
   tenantId: string;
   event: UnifiedEvent;
   actorId: string;
+  eventAction?: "approved" | "dismissed";
   deps?: InquiryMessageReviewDependencies;
 }): Promise<{ allowed: boolean; reason?: string }> {
   const metadata = metadataFromEvent(input.event);
   if (!metadata || input.event.tenantId !== input.tenantId) return { allowed: false, reason: "wrong_tenant" };
+  // Not yet closes the exact signed source without sending. A later email
+  // pause or capability edit cannot turn this declined decision into a send,
+  // nor should it prevent the owner from closing the old draft.
+  if (input.eventAction === "dismissed" && input.actorId.startsWith("owner-link:")) {
+    const allowed = await authorizeSignedInquiryMessageDecision({ tenantId: input.tenantId, event: input.event,
+      actorId: input.actorId, eventAction: "dismissed", deps: input.deps });
+    return { allowed, ...(allowed ? {} : { reason: "permission_denied" }) };
+  }
   try {
     const context = await buildContext({
       tenantId: input.tenantId,
       businessId: metadata.businessId,
       inquiryId: metadata.inquiryId,
       action: metadata.action,
+      authoredReply: metadata.authoredReply,
       actorId: input.actorId,
+      ownerDecisionEvent: input.event,
+      ownerDecisionAction: input.eventAction,
       responsibilityId: metadata.responsibilityId,
       expectedResponsibilityRevision: metadata.responsibilityRevision,
       expectedPolicyVersion: metadata.policyVersion,
@@ -870,20 +861,6 @@ export async function authorizeInquiryMessageReviewActor(input: {
   } catch (error) {
     return { allowed: false, reason: errorCode(error) };
   }
-}
-
-function acceptanceEvidenceFromEvent(event: UnifiedEvent): InquiryMessageAcceptanceEvidence | null {
-  const raw = (event.metadata?.execution as { acceptance?: unknown } | undefined)?.acceptance;
-  if (!raw || typeof raw !== "object") return null;
-  const row = raw as Record<string, unknown>;
-  const value = (field: unknown, max: number) => (typeof field === "string" && field.trim() ? field.trim().slice(0, max) : undefined);
-  const acceptedAt = value(row.acceptedAt, 80);
-  if (acceptedAt && !Number.isFinite(Date.parse(acceptedAt))) return null;
-  return {
-    providerMessageId: value(row.providerMessageId, 240),
-    acceptedAt,
-    deliveryAttemptId: value(row.deliveryAttemptId, 240),
-  };
 }
 
 export async function reconcileInquiryMessageReview(input: {
@@ -946,7 +923,9 @@ export async function reconcileInquiryMessageReview(input: {
       businessId: metadata.businessId,
       inquiryId: metadata.inquiryId,
       action: metadata.action,
+      authoredReply: metadata.authoredReply,
       actorId: input.actorId,
+      ownerDecisionEvent: input.event,
       responsibilityId: metadata.responsibilityId,
       deps: { ...deps, emailReady: async () => true },
       now,

@@ -213,7 +213,13 @@ per business.
     and domain → `recovery`, `prospect_lead` → `sales`). The operator can edit
     or skip. Work done outside the queue is still logged by the existing form.
     `/admin/work` shows the monthly median, per business, per kind and per
-    System.
+    System. Every in-scope customer business appears in the effort measure.
+    Coverage means a non-voided log exists for that business and UTC month;
+    it does not certify all work was logged. Explicit 0-minute manual logs
+    confirm no human work; gaps remain "Not logged", including after a first
+    log. Portfolio median and average use all customer businesses (denominator
+    shown), including explicit zeros, and require complete log coverage.
+    Partial sums are labeled logged minutes; incomplete months have no trend.
 14. **Owner reach outside the app.** An owner's-call item records how the
     owner was told (email, approve link, or not yet) and when. If client email
     is paused (`EMAIL_SENDING_ENABLED` unset), the row says "Owner not told:

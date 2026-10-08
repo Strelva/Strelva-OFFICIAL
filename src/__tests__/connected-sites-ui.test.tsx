@@ -70,6 +70,16 @@ describe("bringing the website a business already has", () => {
     expect(node.querySelector("[role=alert]")?.textContent).toContain("verification tag");
     expect(node.textContent).toContain("Add these two lines");
   });
+  it("keeps existing sites available while connecting another, and retains rejected inputs", async () => {
+    const request = vi.fn(async () => new Response(JSON.stringify({ error: "This address could not be verified" }), { status: 409 }));
+    const node = await mount(request as unknown as typeof fetch, { initialSites: [{ ...site, verifiedAt: "2026-10-08T01:00:00Z" }] });
+    await act(async () => { [...node.querySelectorAll("button")].find(item => item.textContent === "Connect another website")!.click(); });
+    const field = node.querySelector("input")!;
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, "second.example"); field.dispatchEvent(new Event("input", { bubbles: true })); });
+    await act(async () => node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    expect(field.value).toBe("second.example"); expect(node.querySelector('[role="alert"]')?.textContent).toContain("could not be verified");
+    expect(node.querySelector('option[value="' + SITE + '"]')?.textContent).toBe("bakery.example");
+  });
   it("tells a member an owner or admin connects the site", async () => {
     const node = await mount(vi.fn() as unknown as typeof fetch, { canManage: false });
     expect(node.textContent).toContain("An owner or admin of this business connects its website.");

@@ -266,6 +266,7 @@ export function updateResponsibility(host: InquiryEngineHost, responsibilityId: 
 export function promoteResponsibility(host: InquiryEngineHost, responsibilityId: string, actorId: string, nowInput?: string): ResponsibilityPolicy {
   const policy = host._responsibility(responsibilityId);
   const sponsor = actor(actorId);
+  if (sponsor !== policy.sponsorId) throw new Error("Only the responsibility sponsor can promote trust.");
   if (policy.trust === "trusted") return clone(policy);
   if (policy.failedReceiptCount > 0) throw new Error("Resolve failed responsibility receipts before promoting trust.");
   if (policy.cleanReceiptCount < policy.requiredCleanReceipts) throw new Error(`This responsibility needs ${policy.requiredCleanReceipts} clean receipt${policy.requiredCleanReceipts === 1 ? "" : "s"} before it can be trusted.`);
@@ -285,7 +286,7 @@ export function promoteResponsibility(host: InquiryEngineHost, responsibilityId:
     why: "The sponsor approved a clean record inside its written boundary.",
     lookedAt: ["clean responsibility receipts", `${policy.cleanReceiptCount} accepted`],
     outcome: "recorded",
-    evidence: ["trust remains limited to pre-authorized actions"],
+    evidence: ["old route: strelva_reviews", "new route: handle for pre-authorized ordinary messages", "commitments remain owner_decides", "trust remains limited to pre-authorized actions"],
     createdAt: now,
   });
   host._emit();

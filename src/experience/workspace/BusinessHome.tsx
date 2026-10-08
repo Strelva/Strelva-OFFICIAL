@@ -154,7 +154,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   // The Systems layout (Systems list and files split) is for a business with Systems released.
   const business = systemsReleased && customer;
   // Connected sites (the business's own site, any builder) open at /workspace/site when on for this business.
-  const connectSiteHref = business && !readOnly && snapshot.releases?.connectedSites === true
+  const connectSiteHref = business && !readOnly && (snapshot.releases?.connectedSites === true || snapshot.releases?.websiteRebuild === true)
     ? `${appBase}/workspace/site?${new URLSearchParams({ workspaceId: snapshot.workspaceId })}` : null;
   const openSystemHref = systemHref || ((id: string) => `${appBase}/workspace?view=system&system=${encodeURIComponent(id)}&workspaceId=${encodeURIComponent(snapshot.workspaceId)}`);
   const live = systems.filter(item => item.lifecycle === "live").length;
@@ -298,7 +298,9 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
     {business || systems.length ? <section className={styles.section} aria-labelledby="home-systems">
       <header className={styles.sectionHeader}><h2 id="home-systems"><LayoutGrid size={18} aria-hidden="true" />{SYSTEMS_LABEL}</h2>{systems.length ? <Button variant="ghost" size="sm" onClick={() => onNavigate("apps")}>{SYSTEMS_LIST_LABEL}<ArrowRight size={16} aria-hidden="true" /></Button> : null}</header>
       {busy || systemsLoading ? <p role="status" className={styles.muted}>Loading your systems…</p> : systemsUnavailable ? <p role="status" className={styles.notice}>Your systems could not be loaded just now. Nothing about them has changed.</p> : systems.length ? <SystemList systems={systems} href={openSystemHref} onOpen={onOpenSystem} label={`${name} ${SYSTEMS_LABEL.toLowerCase()}`} /> : <div className={styles.empty}><LayoutGrid size={24} aria-hidden="true" /><div><h3>{readOnly ? "Nothing has been shared here yet." : "Nothing is running yet."}</h3><p>{readOnly ? "Systems the owner shares will appear here." : "Your website, inquiries, bookings and the tools your team uses will appear here once Strelva builds them. Tell Strelva what you need above."}</p></div></div>}
-      {connectSiteHref && !busy && !systemsLoading ? <p className={styles.muted} data-home-connect-site>{systems.some(item => item.kind === "website")
+      {connectSiteHref && !busy && !systemsLoading ? <p className={styles.muted} data-home-connect-site>{snapshot.releases?.websiteRebuild === true
+        ? <>Your next website: <a className="underline underline-offset-4" href={connectSiteHref}>Open website options</a>.</>
+        : systems.some(item => item.kind === "website")
         ? <>Have another website? <a className="underline underline-offset-4" href={connectSiteHref}>Connect it</a>. It stays where it is.</>
         : <>Already have a website? <a className="underline underline-offset-4" href={connectSiteHref}>Bring it into Strelva</a>. It stays where it is; Strelva takes its inquiries.</>}</p> : null}
     </section> : null}

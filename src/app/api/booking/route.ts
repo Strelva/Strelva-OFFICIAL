@@ -1,10 +1,17 @@
+import { bookingServicePoliciesEnabled } from "@/platform/bookings/service-policy";
+import { z } from "zod";
+import { PublicBookingError } from "@/platform/bookings/errors";
+import { bookingConflictAlternatives, nativeBookingAlternatives } from "@/platform/bookings/conflicts";
 import { NextResponse } from "next/server";
 import { getContent, logActivity } from "@/lib/storage";
 import { createBookingAtomic } from "@/platform/bookings/legacy-store";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
-import { isRateLimitedAsync, isRateLimitedPerInstance, rateLimitKey } from "@/platform/infra/rate-limit";
-import { bookingReadSource } from "@/platform/bookings/flags";
+import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
+import { deliverBookingUpdates, notifyBookingRequestNow } from "@/platform/bookings/updates";
+import { issueNativeAccess } from "@/platform/bookings/native";
+import { readTenantBookings } from "@/platform/bookings/store";
+import { bookingMessagesEnabled, bookingOwnerNoticeEnabled, bookingReadSource } from "@/platform/bookings/flags";
 import { readJsonObject } from "@/lib/request-body";
 import { sendBookingConfirmation } from "@/lib/delivery-email";
 import { notifyOwnerOfBooking } from "@/platform/bookings/notices";
@@ -23,22 +30,10 @@ function cleanText(value: unknown, maxLength: number): string {
 
 const UNAVAILABLE = "We couldn't save your booking just now, so nothing was booked. Please try again in a minute.";
 
-/**
- * The visitor's rate limit. Redis is required for it in production and fails
- * closed. With the one booking store serving (its exclusion constraint guards
- * every slot), a Redis outage falls back to a per-instance limit so a
- * client's customer can still book; otherwise the visitor is told honestly
- * that nothing was booked.
- */
+/** Booking writes require the shared limiter; a limiter outage denies before effects. */
 async function bookingRateLimit(request: Request): Promise<"ok" | "limited" | "unavailable"> {
-  const key = rateLimitKey(request, "booking");
-  try {
-    return (await isRateLimitedAsync(key, 10)) ? "limited" : "ok";
-  } catch (error) {
-    if ((await bookingReadSource()) !== "postgres") return "unavailable";
-    console.warn("[booking] rate limit store unavailable; using the per-instance limit while the one booking store serves:", error instanceof Error ? error.message : error);
-    return isRateLimitedPerInstance(key, 10) ? "limited" : "ok";
-  }
+  try { return await isRateLimitedAsync(rateLimitKey(request, "booking"), 10) ? "limited" : "ok"; }
+  catch { return "unavailable"; }
 }
 
 /** After the booking is stored, nothing that follows may turn it into a failure for the visitor. */
@@ -68,6 +63,8 @@ export async function POST(request: Request) {
     const clientEmail = cleanText(body.clientEmail, 320).toLowerCase();
     const clientPhone = cleanText(body.clientPhone, 80);
     const notes = cleanText(body.notes, 1000);
+    const intake = bookingServicePoliciesEnabled() ? z.record(z.string().max(80),z.string().max(2000)).safeParse(body.intakeAnswers ?? {}) : null;
+    if (intake && !intake.success) return NextResponse.json({error:"Check your intake answers."},{status:400});
 
     if (!serviceId || !date || !startTime || !clientName || !clientEmail) {
       return NextResponse.json(
@@ -113,6 +110,7 @@ export async function POST(request: Request) {
         clientEmail,
         clientPhone,
         notes: notes || undefined,
+        ...(intake?.success ? {intakeAnswers:intake.data} : {}),
       },
       tenant
     );
@@ -120,10 +118,12 @@ export async function POST(request: Request) {
     if (!result.success) {
       // Only the one booking store (reads flipped) returns a code: a paused
       // bookings System, or a service the business record no longer offers.
+      if (result.code === "invalid_intake") return NextResponse.json({error:result.error},{status:400});
       if (result.code === "invalid_service") return NextResponse.json({ error: "Invalid service" }, { status: 400 });
       // Nothing could be stored or guarded (store and Redis both unavailable): say so, never claim success.
       if (result.code === "unavailable") return NextResponse.json({ error: result.error }, { status: 503 });
-      return NextResponse.json({ error: result.error, ...(result.code === "paused" ? { paused: true } : {}) }, { status: 409 });
+      const alternatives = result.code === "paused" ? {} : await bookingConflictAlternatives(new PublicBookingError("conflict", result.error), () => nativeBookingAlternatives(tenant, serviceId));
+      return NextResponse.json({ error: result.error, ...alternatives, ...(result.code === "paused" ? { paused: true } : {}) }, { status: 409 });
     }
     const requested = result.requested === true;
     // With reads on the one store, the name comes from the business record.
@@ -137,6 +137,24 @@ export async function POST(request: Request) {
       },
       tenant
     ));
+    if (requested && bookingOwnerNoticeEnabled() && !bookingMessagesEnabled() && await bookingReadSource() === "postgres") {
+      const saved = (await readTenantBookings(tenant).catch(() => [])).find(b => b.legacyId === result.booking.id);
+      if (saved) await afterStored("request owner", () => notifyBookingRequestNow(saved));
+    }
+    if (bookingMessagesEnabled() && await bookingReadSource() === "postgres") {
+      const saved = (await readTenantBookings(tenant).catch(() => [])).find(b => b.legacyId === result.booking.id);
+      let confirmationSent = false;
+      if (saved) {
+        await afterStored("request owner", () => notifyBookingRequestNow(saved));
+        await afterStored("manage link", () => issueNativeAccess(tenant, saved.id));
+        await afterStored("booking messages", async () => {
+          const messages = await deliverBookingUpdates(saved.id);
+          confirmationSent = !requested && messages.customerSent > 0;
+        });
+      }
+      if (!saved) await afterStored("owner notice", () => notifyOwnerOfBooking(tenant, result.booking));
+      return NextResponse.json({ success: true, booking: result.booking, confirmationSent, ...(requested ? { requested: true } : {}) });
+    }
     // "New booking" to the owner recipient (off unless STRELVA_BOOKING_OWNER_NOTICE=1).
     // A request reaches the owner as a Needs you item instead.
     await afterStored("owner notice", () => notifyOwnerOfBooking(tenant, result.booking));

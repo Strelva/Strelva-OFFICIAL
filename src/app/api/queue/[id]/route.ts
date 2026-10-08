@@ -74,6 +74,7 @@ export async function PATCH(
   }
   const refused = operatorRefusal(result.reason);
   if (refused) return NextResponse.json({ error: refused.error }, { status: refused.status });
+  if (result.reason === "permission_denied") return NextResponse.json({ error: "Only the current business owner can decide on this change. Nothing changed." }, { status: 403 });
   if (result.reason === "not_found") {
     return NextResponse.json({ error: "Event not found" }, { status: 404 });
   }

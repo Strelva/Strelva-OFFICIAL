@@ -76,6 +76,8 @@ export const hostedWebsiteRequestSchema = z.object({
   workId: z.string().uuid(),
   candidateRevision: z.number().int().positive(),
   candidateContentHash: z.string().regex(/^[0-9a-f]{64}$/),
+  /** Existing managed site: publish onto its linked tenant, keeping identity. */
+  tenantId: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/).optional(),
 }).strict();
 
 type RebuildSelection = { expectedRevision: number; candidateRevision: number; candidateContentHash: string };
@@ -89,6 +91,7 @@ export interface HostedWebsitePorts {
   /** The owner's approval of this exact preview, recorded on the rebuild (the plan approval is that decision). */
   approve(actor: WorkspaceActor, workId: string, selection: RebuildSelection): Promise<unknown>;
   launch(actor: WorkspaceActor, workId: string, selection: RebuildSelection): Promise<{ rebuild: { launch: LaunchView } }>;
+  publishLinked?(actor: WorkspaceActor, workId: string, selection: RebuildSelection & { tenantId: string }): Promise<{ rebuild: { launch: LaunchView }; cutover?: unknown }>;
 }
 
 export function createHostedWebsiteAdapter(ports: HostedWebsitePorts, ctx: LiveChannelContext): EffectAdapter {
@@ -115,10 +118,14 @@ export function createHostedWebsiteAdapter(ports: HostedWebsitePorts, ctx: LiveC
       } else if (!replay && current.rebuild.status !== "approved") {
         return rejected("The rebuilt site is not ready to publish. Nothing was published.");
       }
-      const launched = await ports.launch(ctx.actor, req.workId, { expectedRevision: current.rebuild.revision, candidateRevision: req.candidateRevision, candidateContentHash: req.candidateContentHash });
+      if (req.tenantId && !ports.publishLinked) return rejected("Publishing onto this existing site is not connected yet.");
+      const selection = { expectedRevision: current.rebuild.revision, candidateRevision: req.candidateRevision, candidateContentHash: req.candidateContentHash };
+      const launched = req.tenantId
+        ? await ports.publishLinked!(ctx.actor, req.workId, { ...selection, tenantId: req.tenantId })
+        : await ports.launch(ctx.actor, req.workId, selection);
       const receipt = launched.rebuild.launch.receipt;
       if (!receipt || receipt.candidateRevision !== req.candidateRevision) return rejected("The launch returned no receipt for this version.");
-      return { status: "accepted", providerRef: ref(req.workId, receipt.receiptId), result: { receiptId: receipt.receiptId, providerUrl: receipt.providerUrl, candidateRevision: receipt.candidateRevision, tenantId: current.rebuild.tenantId } };
+      return { status: "accepted", providerRef: ref(req.workId, receipt.receiptId), result: { receiptId: receipt.receiptId, providerUrl: receipt.providerUrl, candidateRevision: receipt.candidateRevision, tenantId: req.tenantId ?? current.rebuild.tenantId, ...("cutover" in launched ? { cutover: launched.cutover } : {}) } };
     },
     async find({ effect }) {
       const req = parseRequest(hostedWebsiteRequestSchema, effect);
@@ -156,6 +163,8 @@ export interface TenantContentPorts {
   /** Newest first. */
   versions(section: string, tenantId: string): Promise<Array<{ id: string; requestId?: string; data?: unknown }>>;
   content(section: string, tenantId: string): Promise<unknown>;
+  /** Verify the visitor's page, separately from the accepted content write. */
+  publicReadBack?(tenantId: string, section: string, expected: Record<string, unknown>): Promise<{ ok: boolean; detail: string }>;
   restore(section: string, versionId: string, tenantId: string): Promise<{ id: string } | null>;
 }
 
@@ -194,7 +203,9 @@ export function createTenantContentAdapter(ports: TenantContentPorts, ctx: LiveC
       const live = await ports.content(section, tenantId);
       const expected = ours.data;
       if (expected && typeof expected === "object" && !contains(live, expected as Record<string, unknown>)) return { ok: false, detail: "The live section differs from what was published." };
-      return { ok: true, detail: `The ${section} section reads back as published.` };
+      if (!expected || typeof expected !== "object" || !ports.publicReadBack) return { ok: false, detail: "The content was saved; the visitor's page has not been verified." };
+      try { return await ports.publicReadBack(tenantId, section, expected as Record<string, unknown>); }
+      catch { return { ok: false, detail: "The content was saved; the visitor's page could not be checked." }; }
     },
     async compensate({ providerRef }) {
       const { tenantId, section, versionId } = split(providerRef);
@@ -212,6 +223,7 @@ export function createTenantContentAdapter(ports: TenantContentPorts, ctx: LiveC
 // Inquiry form -------------------------------------------------------------------
 
 export const inquiryFormRequestSchema = z.object({
+  followUpAlternative: z.record(z.string(), z.unknown()).optional(),
   tenantId: z.string().min(1).max(120),
   businessId: z.string().min(1).max(160),
   requestId: z.string().min(1).max(200),
@@ -223,6 +235,7 @@ export const inquiryFormRequestSchema = z.object({
 type InquiryClaim = { id: string; status: string; tenantId: string; businessId: string; requestId: string; capabilityId: string; changeId: string; version: number };
 
 export interface InquiryFormPorts {
+  prepareFollowUp?(actor: WorkspaceActor, selection: Record<string, unknown>): Promise<void>;
   queue(input: z.infer<typeof inquiryFormRequestSchema> & { action: "make_live" | "undo"; idempotencyKey: string; actorId: string }): Promise<{ claim: InquiryClaim; acquired: boolean; reason?: string; eventId: string | null }>;
   execute(input: { tenantId: string; eventId: string; claimId: string }): Promise<{ accepted: boolean; verified: boolean; reason?: string }>;
   claim(tenantId: string, claimId: string): Promise<InquiryClaim | null>;
@@ -234,7 +247,9 @@ export function createInquiryFormAdapter(ports: InquiryFormPorts, ctx: LiveChann
   const ref = (tenantId: string, claimId: string) => `${tenantId}|${claimId}`;
   const split = (providerRef: string) => { const [tenantId = "", claimId = ""] = providerRef.split("|"); return { tenantId, claimId }; };
   async function publish(req: z.infer<typeof inquiryFormRequestSchema>, action: "make_live" | "undo", key: string) {
-    const queued = await ports.queue({ ...req, action, idempotencyKey: key, actorId: ctx.actor.userId });
+    const { followUpAlternative: _selection, ...native } = req;
+    void _selection;
+    const queued = await ports.queue({ ...native, action, idempotencyKey: key, actorId: ctx.actor.userId });
     if (ACCEPTED_CLAIM.has(queued.claim.status)) return { accepted: true, claim: queued.claim };
     if (queued.claim.status === "failed") return { accepted: false, claim: queued.claim, reason: "An earlier attempt with this key was refused." };
     if (!queued.eventId) return { accepted: false, claim: queued.claim, reason: queued.reason ?? "The publication could not be queued." };
@@ -246,6 +261,10 @@ export function createInquiryFormAdapter(ports: InquiryFormPorts, ctx: LiveChann
     async perform({ effect, idempotencyKey }) {
       const req = parseRequest(inquiryFormRequestSchema, effect);
       if (!req) return rejected("This effect does not name the inquiry form change it publishes.");
+      if (req.followUpAlternative) {
+        if (!ports.prepareFollowUp) return rejected("The native follow-up approval path is unavailable.");
+        await ports.prepareFollowUp(ctx.actor, req.followUpAlternative);
+      }
       const result = await publish(req, "make_live", idempotencyKey);
       if (!result.accepted) return rejected(result.reason ?? "The inquiry form was not published.");
       return { status: "accepted", providerRef: ref(req.tenantId, result.claim.id), result: { claimId: result.claim.id } };
@@ -255,7 +274,9 @@ export function createInquiryFormAdapter(ports: InquiryFormPorts, ctx: LiveChann
       if (!req) return null;
       // The claim is keyed by the step's idempotency key; asking again creates
       // at most the claim row, never a publication.
-      const queued = await ports.queue({ ...req, action: "make_live", idempotencyKey, actorId: ctx.actor.userId });
+      const { followUpAlternative: _selection, ...native } = req;
+      void _selection;
+      const queued = await ports.queue({ ...native, action: "make_live", idempotencyKey, actorId: ctx.actor.userId });
       return ACCEPTED_CLAIM.has(queued.claim.status) ? { found: true, providerRef: ref(req.tenantId, queued.claim.id) } : { found: false };
     },
     async readBack({ providerRef }) {

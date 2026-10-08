@@ -246,6 +246,7 @@ export async function runDueInquiryFollowUps(
       const followUp = definition.followUp;
       const inquiry = {
         ...inquirySubmissionFromLead(tenant.id, lead),
+        businessId: inquiryBusinessId,
         businessName: tenant.siteName,
         staffDestination: definition.routing?.destination || null,
         followUpMessageTemplate: followUp?.messageTemplate ?? null,

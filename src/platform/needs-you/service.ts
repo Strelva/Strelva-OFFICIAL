@@ -3,6 +3,7 @@
  * own resolver, chase them by email, and lapse them. Every dependency is a
  * port so the whole flow runs in tests without Redis, Postgres or Resend.
  */
+import { bookingRemindersEnabled, bookingOwnerNoticeEnabled } from "@/platform/bookings/flags";
 import type { SendEmailInput, SendEmailResult } from "@/platform/infra/email/send";
 import type { EmailDecision, EmailOptions } from "@/platform/infra/email/layout";
 import { buildWorkspaceApproveUrl, type WorkspaceApproveLinkClaims } from "@/lib/approve-link";
@@ -19,6 +20,19 @@ export interface NeedsYouDeps {
   /** Origin that serves /api/approve and /workspace. */
   appOrigin: string;
   now(): number;
+  /** New sources may impose additional opt-in gates without changing existing email delivery. */
+  emailAllowed?(row: DeliveryRow): Promise<boolean>;
+  /** Optional channel-specific release/send policy; false leaves the item
+   * waiting without consuming its delivery state. */
+  canDeliver?(row: DeliveryRow): Promise<boolean>;
+  /** Booking calendar health is an owner action, separate from decisions. */
+  bookingWorkspaces?(): Promise<string[]>;
+  /** Overflow stays undelivered and joins the existing morning digest. */
+  bookingUrgentAllowed?(workspaceId: string): Promise<boolean>;
+  bookingCalendarHealth?(workspaceId: string, input: { now: number; appOrigin: string; sendEmail: NeedsYouDeps["sendEmail"] }): Promise<{ digests: number; ownerNotTold: number; failed: number; complete: boolean }>;
+  /** New immediate inquiry delivery stays off unless the host supplies the
+   * release switches and strict global/customer/per-tenant email gates. */
+  urgentInquiryAllowed?(tenantId: string | null): Promise<boolean>;
 }
 
 export type DecideStatus =
@@ -157,16 +171,21 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
         memberActor = await deps.store.ownerActor(input.workspaceId, input.by.recipient).catch(() => null);
         // An owner with no account (owner-entry decision 6): Strelva (system)
         // reads and runs this one item, bound to it and to the owner recipient.
-        if (!memberActor && adapter.ownerLinkWithoutAccount && deps.store.linkSession) {
+        if (!memberActor && adapter.ownerLinkWithoutAccount && (deps.store.linkSession || deps.store.ownerLinkSession)) {
           let session: ServiceSession | null = null;
           try {
-            session = await deps.store.linkSession(input.workspaceId, item.id, input.by.recipient);
+            session = item.sourceLifecycle === "make_real"
+              ? await deps.store.linkSession?.(input.workspaceId, item.id, input.by.recipient) ?? null
+              : await deps.store.ownerLinkSession?.(input.workspaceId, item.id, input.revision, input.by.recipient) ?? null;
           } catch (error) {
             // A link for anyone but the owner on record is refused like any other link.
             if (error instanceof ServiceSessionRefusedError && error.code === "owner_decision_recipient_not_owner") return { status: "not_owner", item };
             session = null;
           }
-          if (session && session.workspaceId === input.workspaceId && session.purpose === "make_real_link") {
+          const bound = session?.purpose === "owner_decision_link" && session.decisionId === item.id
+            && session.revisionHash === input.revision && session.recipient === input.by.recipient.trim().toLowerCase()
+            && Boolean(deps.store.authorizeOwnerLinkRun);
+          if (session && session.workspaceId === input.workspaceId && (item.sourceLifecycle === "make_real" ? session.purpose === "make_real_link" : bound)) {
             linkService = session;
             memberActor = session.actor;
           }
@@ -200,6 +219,12 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     }
     if (claimed.status !== "claimed") return { status: claimed.status, item: claimed.item };
 
+    if (linkService?.purpose === "owner_decision_link") {
+      try { await deps.store.authorizeOwnerLinkRun!(linkService); } catch {
+        const finished = await deps.store.finish(input.workspaceId, item.id, "failed", "link_authority_changed", null);
+        return { status: "failed", item: finished };
+      }
+    }
     const by: ResolveBy = input.by.kind === "owner_link"
       ? { kind: "owner_link", recipient: input.by.recipient, actor: memberActor, ...(linkService ? { service: linkService } : {}) }
       : { kind: "session", actor: input.by.actor };
@@ -237,7 +262,19 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     };
   }
 
-  async function deliver(kind: "urgent" | "digest" | "reminder_1" | "reminder_2", rows: DeliveryRow[], summary: ChaseSummary) {
+  async function deliver(kind: "urgent" | "digest" | "reminder_1" | "reminder_2", rows: DeliveryRow[], summary: ChaseSummary, inquiryNotice?: { name: string; message: string | null }) {
+    if (deps.emailAllowed) {
+      const allowed: DeliveryRow[] = [];
+      for (const row of rows) {
+        if (await deps.emailAllowed(row).catch(() => false)) allowed.push(row);
+        else {
+          await deps.store.recordDelivery(row.workspaceId, row.id, kind, "suppressed", null, null, "source_email_disabled");
+          summary.ownerNotTold += 1;
+        }
+      }
+      rows = allowed;
+      if (!rows.length) return;
+    }
     const first = rows[0]!;
     const recipient = first.recipient?.email?.trim().toLowerCase() ?? null;
     if (!recipient) {
@@ -245,24 +282,83 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
       summary.ownerNotTold += rows.length;
       return;
     }
+    const inquiryUrgent = rows.some(row => row.sourceLifecycle === "tenant_event" && (row.kind === "customer.message" || row.kind === "customer.commitment"));
+    const inquiryRows = (await Promise.all(rows.map(async row => ({ row, inquiry: row.sourceLifecycle === "inquiry_fact"
+      || (row.sourceLifecycle === "tenant_event" && (row.kind === "customer.message" || row.kind === "customer.commitment"))
+      || (row.sourceLifecycle === "tenant_event" && (row.kind === "system.go_live" || row.kind === "system.change_live")
+        && await (adapterFor(row.sourceLifecycle)?.inquiryEmailSource?.({ workspaceId: row.workspaceId }, row.sourceId).catch(() => true) ?? true)),
+    })))).filter(item => item.inquiry).map(item => item.row);
+    const sourceTenant = (row: DeliveryRow) => row.sourceLifecycle === "tenant_event"
+      ? row.sourceId.indexOf(":") > 0 ? row.sourceId.slice(0, row.sourceId.indexOf(":")) : null
+      : row.recipient?.tenantId ?? null;
+    const inquiryTenants = [...new Set(inquiryRows.map(sourceTenant))];
+    const mailTenant = inquiryRows.length && first.sourceLifecycle === "tenant_event" ? sourceTenant(first)
+      : first.recipient?.tenantId ?? inquiryTenants.find(tenantId => tenantId !== null) ?? null;
+    // A configured business owner has tenantId:null. It must not erase the
+    // originating tenant's mail override, including in a multi-site digest.
+    if (first.recipient?.tenantId && !inquiryTenants.includes(first.recipient.tenantId)) inquiryTenants.push(first.recipient.tenantId);
+    if (mailTenant && !inquiryTenants.includes(mailTenant)) inquiryTenants.push(mailTenant);
+    if (inquiryRows.length && (!deps.urgentInquiryAllowed
+      || inquiryRows.some(row => row.sourceLifecycle === "tenant_event" && !sourceTenant(row))
+      || !(await Promise.all(inquiryTenants.map(tenantId => deps.urgentInquiryAllowed!(tenantId)))).every(Boolean))) {
+      for (const row of rows) await deps.store.recordDelivery(row.workspaceId, row.id, kind, "suppressed", recipient, null, "inquiry_email_gates_off");
+      summary.ownerNotTold += rows.length;
+      return "suppressed";
+    }
     const options = email(kind === "urgent" ? "urgent" : kind === "digest" ? "digest" : "reminder", first.businessName, rows, recipient);
+    const subject = kind === "urgent" ? `${first.businessName}: a customer is waiting on you` : options.heading;
+    const durableUrgent = inquiryUrgent && kind === "urgent";
+    if (durableUrgent) {
+      // Immediate delivery and the hourly chase share this SQL claim. A stale
+      // not_sent projection cannot send after a timeout or failed checkpoint.
+      if (rows.length !== 1 || !deps.store.claimInquiryNotice || !deps.store.finishInquiryNotice) {
+        await deps.store.recordDelivery(first.workspaceId, first.id, kind, "suppressed", recipient, null, "inquiry_send_claim_unavailable");
+        return "suppressed";
+      }
+      try {
+        const claim = await deps.store.claimInquiryNotice(first, recipient, subject);
+        if (!claim.acquired) {
+          if (["accepted", "delivered", "deferred"].includes(claim.status)) return "sent";
+          if (claim.status === "suppressed") return "suppressed";
+          return "failed";
+        }
+      } catch {
+        return "failed";
+      }
+    }
+    if (inquiryNotice) options.paragraphs = [
+      `New inquiry from ${inquiryNotice.name.slice(0, 160)}.`,
+      ...(inquiryNotice.message ? [inquiryNotice.message.slice(0, 2000)] : []),
+      ...(options.paragraphs ?? []),
+    ];
     let result: SendEmailResult | null = null;
     let reason: string | null = null;
     try {
       result = await deps.sendEmail({
         audience: "client",
         // Client email is tenant-aware; without a linked tenant the global switch decides.
-        ...(first.recipient?.tenantId ? { tenantId: first.recipient.tenantId } : {}),
+        ...(mailTenant ? { tenantId: mailTenant } : {}),
         to: recipient,
-        subject: kind === "urgent" ? `${first.businessName}: a customer is waiting on you` : options.heading,
+        subject,
         options,
         idempotencyKey: `needs-you:${kind}:${rows.map(row => row.id).sort().join(",")}`.slice(0, 256),
-        tags: { stream: "needs_you", kind },
+        tags: { stream: "needs_you", kind, ...(rows.every(row => row.sourceLifecycle === "booking_request") ? { lifecycle: "booking_request", bookingWorkspaceId: first.workspaceId } : {}), ...(durableUrgent ? { strelva_inquiry_decision_id: first.id, strelva_workspace_id: first.workspaceId } : {}) },
       });
     } catch (error) {
       reason = error instanceof Error ? error.message.slice(0, 200) : "send_failed";
     }
     const status = result?.status === "accepted" ? "sent" : result?.status === "suppressed" ? "suppressed" : "failed";
+    if (durableUrgent) {
+      // Provider acceptance is the result even if checkpoint persistence
+      // fails. The earlier durable sending claim still excludes another send.
+      await deps.store.finishInquiryNotice!(first, status === "sent" ? "accepted" : status === "suppressed" ? "suppressed" : "unknown",
+        result?.status === "accepted" ? result.providerMessageId : null,
+        result?.status === "accepted" ? result.acceptedAt : null,
+        result?.status === "suppressed" ? result.reason : reason).catch(() => undefined);
+      if (status === "suppressed") summary.ownerNotTold += 1;
+      if (status === "failed") summary.failed += 1;
+      return status;
+    }
     for (const row of rows) {
       await deps.store.recordDelivery(row.workspaceId, row.id, kind, status, recipient,
         result?.status === "accepted" ? result.providerMessageId : null,
@@ -270,6 +366,33 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     }
     if (status === "suppressed") summary.ownerNotTold += rows.length;
     if (status === "failed") summary.failed += rows.length;
+    return status;
+  }
+
+  /** One just-created inquiry decision, without waiting for the hourly chase
+   * or contacting any other business. Source revision is re-read before send. */
+  async function deliverUrgentSource(workspaceId: string, sourceLifecycle: string, sourceId: string, inquiryNotice?: { name: string; message: string | null }): Promise<"sent" | "suppressed" | "failed" | "none"> {
+    if (!deps.urgentInquiryAllowed) return "none";
+    const adapter = adapterFor(sourceLifecycle);
+    if (!adapter || adapter.needsMemberActor) return "none";
+    const ctx = { workspaceId };
+    const proposal = await adapter.propose(ctx);
+    if (!proposal.complete) return "none";
+    const proposed = proposal.items.find(item => item.sourceId === sourceId && item.sourceLifecycle === sourceLifecycle);
+    if (!proposed || !proposed.urgent || proposed.route !== "owner_decides") return "none";
+    await deps.store.open(workspaceId, proposed);
+    const row = deps.store.deliveryForSource
+      ? await deps.store.deliveryForSource(workspaceId, sourceLifecycle, sourceId)
+      : (await deps.store.dueForDelivery(500)).find(item => item.workspaceId === workspaceId && item.sourceLifecycle === sourceLifecycle && item.sourceId === sourceId) ?? null;
+    if (!row || row.state !== "open" || !row.urgent || row.route !== "owner_decides") return "none";
+    if (await reconcile(ctx, row) !== "current") return "none";
+    if (row.deliveryState !== "not_sent") return row.deliveryState === "suppressed" ? "suppressed" : row.deliveryState === "bounced" ? "failed" : "sent";
+    if (!(await deps.urgentInquiryAllowed(row.recipient?.tenantId ?? null))) {
+      await deps.store.recordDelivery(workspaceId, row.id, "urgent", "suppressed", row.recipient?.email ?? null, null, "inquiry_email_gates_off");
+      return "suppressed";
+    }
+    const summary: ChaseSummary = { lapsed: 0, reminded: 0, digests: 0, urgent: 0, ownerNotTold: 0, failed: 0 };
+    return (await deliver("urgent", [row], summary, inquiryNotice)) ?? "suppressed";
   }
 
   /** The hourly chase: lapse at day 14, urgent at once, morning email and reminders at 07:00 local. */
@@ -280,8 +403,13 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     // signs in: workspace sources are read as Strelva (system).
     const sessions = new Map<string, AdapterContext>();
     const linked = await deps.store.linkedTenants(null).catch(() => []);
-    for (const workspaceId of new Set(linked.map(link => link.workspaceId))) {
+    const native = await deps.bookingWorkspaces?.().catch(() => { summary.failed += 1; return []; }) ?? [];
+    for (const workspaceId of new Set([...linked.map(link => link.workspaceId), ...native])) {
       await sync(await cronContext(workspaceId, sessions)).catch(() => { summary.failed += 1; });
+      if (deps.bookingCalendarHealth) {
+        const health = await deps.bookingCalendarHealth(workspaceId, { now, appOrigin: deps.appOrigin, sendEmail: deps.sendEmail }).catch(() => ({ digests: 0, ownerNotTold: 0, failed: 1, complete: false }));
+        summary.digests += health.digests; summary.ownerNotTold += health.ownerNotTold; summary.failed += health.failed;
+      }
     }
     const rows = await deps.store.dueForDelivery(500);
     const byBusiness = new Map<string, DeliveryRow[]>();
@@ -293,7 +421,9 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
       const remind1: DeliveryRow[] = [];
       const remind2: DeliveryRow[] = [];
       for (const row of items) {
-        const step = nextChaseStep(row, now);
+        // Bookings own the 24 h / 72 h clock; the generic day 3/7/14
+        // clock must never send another chase or expire an existing booking.
+        const step = row.sourceLifecycle === "booking_request" && bookingRemindersEnabled() ? "none" : nextChaseStep(row, now);
         if (step === "lapse") {
           try {
             const expired = await deps.store.expire(workspaceId, row.id);
@@ -315,7 +445,10 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
           const fresh = await reconcile(readCtx, row);
           if (fresh === "gone" || fresh === "changed") continue;
         }
-        if (row.urgent && row.deliveryState === "not_sent") {
+        if (row.sourceLifecycle === "booking_request" && !bookingOwnerNoticeEnabled()) continue;
+        if (deps.canDeliver && !(await deps.canDeliver(row))) { summary.ownerNotTold += 1; continue; }
+        if (row.urgent && row.deliveryState === "not_sent"
+          && (row.sourceLifecycle !== "booking_request" || !deps.bookingUrgentAllowed || await deps.bookingUrgentAllowed(workspaceId))) {
           await deliver("urgent", [row], summary);
           summary.urgent += 1;
           continue;
@@ -332,7 +465,18 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     return summary;
   }
 
-  return { sync, list, decide, chase };
+  /** One newly captured booking reaches its owner now, without chasing other work. */
+  async function notifyBookingRequest(workspaceId: string, itemId: string): Promise<ChaseSummary> {
+    const summary: ChaseSummary = { lapsed: 0, reminded: 0, digests: 0, urgent: 0, ownerNotTold: 0, failed: 0 };
+    if (!bookingOwnerNoticeEnabled()) return summary;
+    const row = (await deps.store.dueForDelivery(500)).find(item => item.workspaceId === workspaceId && item.id === itemId && item.sourceLifecycle === "booking_request" && item.state === "open" && item.urgent && item.deliveryState === "not_sent");
+    if (!row || await reconcile({ workspaceId }, row) !== "current") return summary;
+    if (deps.bookingUrgentAllowed && !await deps.bookingUrgentAllowed(workspaceId)) return summary;
+    await deliver("urgent", [row], summary); summary.urgent = 1;
+    return summary;
+  }
+
+  return { sync, list, decide, chase, notifyBookingRequest, deliverUrgentSource };
 }
 
 export type NeedsYouService = ReturnType<typeof createNeedsYouService>;

@@ -5,7 +5,7 @@ import { animate, motion, useMotionValue, useTransform } from "motion/react";
 import { ArrowRight, CalendarClock, Eye, Package, ShieldCheck, Undo2, type LucideIcon } from "lucide-react";
 import { CountUp, formatInteger } from "@/components/ui/motion/CountUp";
 import { EntranceProvider, Reveal, entranceTransition, useEntranceTrigger } from "@/components/ui/motion/Entrance";
-import { strelvaMotion } from "@/lib/motion";
+import { strelvaMotion } from "@/platform/infra/motion";
 import { confirmLabel, slideCommits, slideProgress } from "./price-sheet";
 import { outcomeFont } from "./outcome-font";
 import styles from "./outcomes.module.css";

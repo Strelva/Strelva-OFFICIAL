@@ -6,9 +6,10 @@ import { withAskPreview } from "@/experience/workspace/preview/ask-fixture";
 import { ContentWorkspace } from "@/components/dashboard/ContentWorkspace";
 import type { SectionData } from "@/components/dashboard/ContentBrowser";
 import { AskStrelva } from "@/experience/ask/AskStrelva";
-import { NATIVE_TABS, REQUEST_TABS, type SiteTab } from "@/platform/workspaces/site-places";
+import { type SiteTab } from "@/platform/workspaces/site-places";
 import type { SiteChangeRequest } from "@/products/websites/client";
 import { WebsiteChangeRequests } from "./WebsiteChangeRequests";
+import { managedSiteNavigation } from "./site-navigation";
 import { WorkspaceSiteFrame, WorkspaceSiteMessage } from "./WorkspaceSiteFrame";
 
 const WS = "11111111-1111-4111-8111-111111111111";
@@ -51,21 +52,20 @@ function siteChangesFixture(mode: "ready" | "empty" | "error"): typeof fetch {
 
 /** Local preview of the workspace website: fictional site, real frame and panels, no live actions. */
 export function WorkspaceSitePreview({ kind, tab, role, state }: { kind: "native" | "request"; tab: SiteTab | null; role: "owner" | "admin" | "member" | "operator"; state: "ready" | "empty" | "error" | "permission" | "not_found" }) {
-  const request = useMemo(() => withAskPreview(siteChangesFixture(state === "error" ? "error" : state === "empty" ? "empty" : "ready"), "on"), [state]);
+  const request = useMemo(() => withAskPreview(siteChangesFixture(state === "error" ? "error" : state === "empty" ? "empty" : "ready"), "on", role === "operator"), [state, role]);
   if (state === "permission") return <WorkspaceSiteMessage title="This business is unavailable to your account." body="It may belong to another account, or your access may have changed. Nothing about the site was changed." href="/preview/strelva" action="Open your workspace" />;
   if (state === "not_found") return <WorkspaceSiteMessage title="This website isn't connected to this business." body="It may belong to another business, or its link was removed. Nothing about the site was changed." href="/preview/strelva" action="Back to Home" />;
-  const tabs = kind === "native" ? NATIVE_TABS : REQUEST_TABS;
-  const current: SiteTab = tab && (tabs.includes(tab) || tab === "request") ? tab : tabs[0]!;
+  const { tab: current, tabs } = managedSiteNavigation(kind, role === "operator", tab);
   const readOnly = role === "member";
   const siteLabel = kind === "native" ? "greatlakesdriedfruit.com" : "mclearsbuffalo.com";
   return <WorkspaceRequestContext.Provider value={request}>
     <WorkspaceSiteFrame workspaceId={WS} systemId={SYSTEM} workspaceName={kind === "native" ? "Great Lakes Dried Fruit" : "McClear's Pub"} siteLabel={siteLabel} tab={current}
-      tabs={kind === "native" && current === "request" ? [...tabs, "request"] : tabs} tenantRoot={FIXTURE_API} tenantId="preview-business" workspaceBase="/preview/strelva" askReleased readOnly={readOnly}
+      tabs={tabs} tenantRoot={FIXTURE_API} tenantId="preview-business" workspaceBase="/preview/strelva" askReleased readOnly={readOnly || role !== "operator"}
       liveUrl="https://example.com" site={{ siteUrl: "", previewUrl: `${FIXTURE_API}/dashboard/site`, liveSyncEnabled: false, siteModel: "food-brand", autoPublish: false }}
       notice={readOnly ? "You can see this site. Only an owner or admin of this business can change it." : undefined}>
       {current === "edit" && readOnly ? <p className="p-8 text-sm text-gray-muted">Only an owner or admin can edit this site. The page links to History instead.</p>
         : current === "edit" ? <ContentWorkspace siteName="Great Lakes Dried Fruit" ownerName="Ruth" sectionData={SECTIONS} timestamps={{}}
-        assistant={<AskStrelva compact request={request} workspaceId={WS} businessName="Great Lakes Dried Fruit" systemId={SYSTEM} systemName={siteLabel} readOnly={readOnly} />} />
+        assistant={<AskStrelva compact canAskOnBehalf={role === "operator"} request={request} workspaceId={WS} businessName="Great Lakes Dried Fruit" systemId={SYSTEM} systemName={siteLabel} readOnly={readOnly} />} />
         : current === "request" ? <WebsiteChangeRequests request={request} workspaceId={WS} systemId={SYSTEM} siteLabel={siteLabel} editing={kind} canAsk={!readOnly} canDecide={role === "owner"} operator={role === "operator"} />
         : <p className="p-8 text-sm text-gray-muted">This tab reuses the dashboard&apos;s own panel against the tenant&apos;s API. The local fixture serves the editor and requests only.</p>}
     </WorkspaceSiteFrame>

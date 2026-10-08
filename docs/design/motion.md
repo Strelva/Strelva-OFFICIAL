@@ -4,7 +4,7 @@ Jacob requested gooey motion for the card system. The intended behavior is a sof
 
 ## Sources of truth
 
-- [motion.ts](../../src/lib/motion.ts): typed Motion presets for React.
+- [motion.ts](../../src/platform/infra/motion.ts): typed Motion presets for React.
 - [motion.css](../../src/app/styles/motion.css): named CSS timings and an elastic easing curve, imported by globals.
 - [GooeyDisclosure](../../src/components/ui/motion/GooeyDisclosure.tsx): reusable implementation and reduced-motion boundary.
 - [Entrance](../../src/components/ui/motion/Entrance.tsx) and [CountUp](../../src/components/ui/motion/CountUp.tsx): entry choreography for data surfaces (reveal, draw, count).

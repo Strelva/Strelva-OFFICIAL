@@ -114,7 +114,8 @@ export interface WorkspaceDelegation {
 }
 
 /** A business this agency operates (provider of record). A label, not access:
- * the server lists only businesses the actor already belongs to. */
+ * the server lists only businesses the actor can already open, as a member or
+ * through the agency's provider seat with the actor staffed on it. */
 export interface WorkspaceProvidedClient {
   customerWorkspaceId: string;
   name: string;
@@ -146,8 +147,9 @@ export interface WorkspaceSnapshot {
   managedWorkUnavailable?: boolean;
   handoffs: WorkspaceHandoff[];
   delegations: WorkspaceDelegation[];
-  /** Businesses the selected agency operates that the actor can open as a
-   * member (workspace_providers intersected with membership). Absent when
+  /** Businesses the selected agency operates that the actor can open
+   * (workspace_providers intersected with membership or a staffed provider
+   * seat). Absent when
    * not an agency, or when the provider list could not be read. Additive. */
   providedClients?: WorkspaceProvidedClient[];
   products: WorkspaceProduct[];
@@ -162,6 +164,8 @@ export interface WorkspaceSnapshot {
 }
 
 export interface WorkspaceReleases {
+  /** Agency-owned public check leads, off unless explicitly released. */
+  agencyProspecting?: boolean;
   systems: boolean;
   /** STRELVA_NEEDS_YOU_RELEASE: Home reads Needs you and Strelva handled from the policy model. */
   needsYou?: boolean;
@@ -169,10 +173,14 @@ export interface WorkspaceReleases {
   ask?: boolean;
   /** STRELVA_INQUIRIES_RELEASE for this workspace (per-workspace row under `workspace`). */
   inquiries?: boolean;
+  /** Durable customer inbox instead of the internal inquiry builder. */
+  inquiryInbox?: boolean;
   /** STRELVA_WEBSITE_REBUILD_RELEASE for this workspace. Absent: the page's env value decides. */
   websiteRebuild?: boolean;
   /** Connected sites on for this business (its `connected_sites` row, and Systems): Home links to /workspace/site. */
   connectedSites?: boolean;
+  /** STRELVA_AGENCY_SIGNUP_RELEASE: agency Home links to the setup checklist at /workspace/agency/start. */
+  agencySetup?: boolean;
 }
 
 /**
@@ -227,6 +235,8 @@ export interface WorkspaceSystemHistoryRow {
   /** "Strelva published the rebuilt site". Never called a Version. */
   sentence: string;
   at: string;
+  releaseRef?: string;
+  implementationKind?: string;
 }
 
 export interface WorkspaceSystemReceipt {
@@ -283,11 +293,13 @@ export interface WorkspaceSystemEntry {
   savedWorkId: string | null;
   tenantId: string | null;
   /** What the evidence shows. Never derived from lifecycle. */
-  health: { status: HealthStatus; summary: string; lastVerifiedAt: string | null };
+  health: { status: HealthStatus; summary: string; lastVerifiedAt: string | null; signals?: string[] };
   /** A Bookings System's day and week views on the managed site (wellness schedule, roster). */
   views?: Array<"schedule" | "roster">;
   /** A managed website: Strelva edits its content (`native`) or every change is a repo Request (`request`). */
   editing?: "native" | "request";
+  /** Confirmed from this tenant's issued document and enabled business-facts runtime. */
+  businessFactsConnected?: boolean;
   /** A website the business runs elsewhere, connected by script. Additive. */
   connectedSite?: { siteUrl: string; siteHost: string; verified: boolean; lastEventAt: string | null };
 }
@@ -314,6 +326,8 @@ export interface WorkspaceSystemPossibility {
   evidence: string | null;
   /** Same-origin rendering of the candidate. */
   previewHref: string | null;
+  /** Signed isolated Try for a prepared native candidate. */
+  tryHref?: string;
   /** The saved work the candidate came from. */
   workId: string;
   /** Stored in Postgres: it survives deploys and restarts. Additive. */

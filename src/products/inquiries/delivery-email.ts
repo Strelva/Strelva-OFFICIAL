@@ -8,6 +8,11 @@
 
 import { getEmailReadback, sendEmailWithReceipt } from "@/platform/infra/email/send";
 
+import { customerEmailEnabled, emailSendingEnabled } from "@/platform/infra/email/enabled";
+import { getClientEmailOverride } from "@/platform/infra/email/client-override";
+import { inquiryRecordsEnabled } from "@/platform/infra/inquiry-records";
+import { CLIENT_MAIL_DOMAIN } from "@/platform/infra/email/send";
+
 import type { InquiryOutboundTransport } from "./delivery-types";
 
 /** Real email transport. In tests it is blocked unless explicitly overridden. */
@@ -18,10 +23,21 @@ export function createEmailInquiryTransport(options: { allowExternalSends?: bool
         return { status: "rejected", reason: "external_sends_disabled_in_test", retryable: false };
       }
       try {
+        // The rollout never arms a send through one audience gate alone.
+        if ((inquiryRecordsEnabled() || process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1")
+          && (!emailSendingEnabled() || !customerEmailEnabled() || await getClientEmailOverride(message.tenantId) === "off")) {
+          return { status: "rejected", reason: "inquiry_email_gates_off", retryable: false, outcome: "suppressed" };
+        }
+        if (message.tags?.strelva_booking_offer === "1") {
+          const { bookingCustomerEmailAllowed } = await import("@/platform/bookings/updates");
+          if (!await bookingCustomerEmailAllowed(message.tenantId)) return { status: "rejected", reason: "email_gates", retryable: false, outcome: "suppressed" };
+        }
         const sent = await sendEmailWithReceipt({
           audience: message.audience,
+          ...(inquiryRecordsEnabled() && message.audience === "customer" ? { fromAddress: `hello@${CLIENT_MAIL_DOMAIN}` } : {}),
           tenantId: message.audience === "client" ? message.tenantId : undefined,
           to: message.to,
+          ...(message.tags?.strelva_booking_offer === "1" ? { fromAddress: "bookings@mail.strelva.com", fromName: message.fromName || "Strelva" } : {}),
           ...(message.replyTo ? { replyTo: message.replyTo } : {}),
           subject: message.subject,
           options: message.options,

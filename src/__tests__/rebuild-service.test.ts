@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { createWebsiteRebuildService } from "@/products/websites/rebuild-service";
+import type { resolvePublishedWebsiteCapabilities } from "@/products/websites/published-capabilities";
 import { runWebsiteRebuild, writeSourceContent, type RebuildOptions } from "@/products/websites/rebuild-pipeline";
 import { siteDocumentHash, siteDocumentSchema, unresolvedSiteFacts, } from "@/products/websites/site-document";
 import { renderSiteDocumentHtml, buildSiteDocumentExport } from "@/products/websites/site-export";
@@ -19,7 +20,7 @@ function selection(record: WebsiteRebuildRecord) { return { expectedRevision: re
 
 /** Independent memory persistence port: production SQL verifies these same
  * transactional guarantees separately against the full historical schema. */
-function harness(options: { pipelineOptions?: RebuildOptions; checkLiveFailure?: boolean } = {}) {
+function harness(options: { pipelineOptions?: RebuildOptions; checkLiveFailure?: boolean; resolveCapabilities?: typeof resolvePublishedWebsiteCapabilities } = {}) {
   const works = new Map<string,SavedWork>(); const revisions = new Map<string,WebsiteDocumentRevision[]>();
   const approvals = new Map<string,{ revision: number; contentHash: string }>(); const publications = new Map<string,WebsiteDocumentRevision>(); const reservations = new Map<string,string>();
   const state = { member: true, manager: true, failWorkKind: null as string | null, failCandidateCas: false };
@@ -70,7 +71,7 @@ function harness(options: { pipelineOptions?: RebuildOptions; checkLiveFailure?:
   const pipeline = vi.fn(runWebsiteRebuild); const rateLimited = vi.fn(async () => false);
   const checkLive = vi.fn(async () => { if (options.checkLiveFailure) throw new Error("Read-back unavailable"); return { status: "verified" as const, checkedAt: fixedTime, message: "Verified local fixture" }; });
   const domainChange = vi.fn(async () => ({ domain: null, domains: [] }));
-  const service = createWebsiteRebuildService(store,{ documents, pipeline, pipelineOptions: { now: () => fixedTime, ...options.pipelineOptions }, list: async user => { authorize(user); return clone([...works.values()]); }, now: () => fixedTime, rateLimited, checkLive, revalidate: async () => {}, domainChange });
+  const service = createWebsiteRebuildService(store,{ documents, pipeline, pipelineOptions: { now: () => fixedTime, ...options.pipelineOptions }, list: async user => { authorize(user); return clone([...works.values()]); }, now: () => fixedTime, rateLimited, checkLive, revalidate: async () => {}, domainChange, resolveCapabilities: options.resolveCapabilities });
   const create = (input = brief) => service.create(actor,workspaceId,input);
   const launch = async (record: WebsiteRebuildRecord) => { const approved = await service.approve(actor,record.workId,selection(record)); return service.launch(actor,record.workId,selection(approved)); };
   return { service, documents, store, works, revisions, publications, state, pipeline, rateLimited, checkLive, domainChange, create, launch };
@@ -299,6 +300,30 @@ describe("website System: publish onto a linked site, routing after a rename, op
     expect(result.cutover.find(item => item.id === "read_back")!.status).toBe("failed");
     expect(result.rebuild.status).toBe("published");
     expect(h.documents.publishToLinkedTenant).toHaveBeenCalledOnce();
+  });
+  it.each([undefined, { baseUrl: "https://app.example.test", tenant: "linked-client", inquiry: { capabilityId: "changed-form", version: 2 } }])("refuses a revoked or changed visitor connection before linked publishing", async projection => {
+    const resolveCapabilities = vi.fn(async () => projection);
+    const h = withLinkedSite(harness({ resolveCapabilities }));
+    const reviewed = await h.create();
+    const approved = await h.service.approve(actor,reviewed.workId,selection(reviewed));
+    const work = h.works.get(approved.workId)!;
+    h.works.set(work.id,{ ...work, payload: { ...approved.rebuild, publishedCapabilitySelection: { tenantId: "linked-client", inquiryCapabilityId: "original-form" } } });
+    await expect(h.service.publishOntoLinkedTenant(actor,approved.workId,{ ...selection(approved), tenantId: "linked-client" })).rejects.toThrow("connection changed");
+    expect(resolveCapabilities).toHaveBeenCalledExactlyOnceWith(actor,workspaceId,approved.workId,{ tenantId: "linked-client", inquiryCapabilityId: "original-form" });
+    expect(h.documents.publishToLinkedTenant).not.toHaveBeenCalled();expect(h.publications.size).toBe(0);
+  });
+  it("reconciles an accepted linked publication after a visitor grant is revoked without another write", async () => {
+    const resolveCapabilities = vi.fn(async () => undefined);
+    const h = withLinkedSite(harness({ resolveCapabilities }));
+    const reviewed = await h.create();
+    const approved = await h.service.approve(actor,reviewed.workId,selection(reviewed));
+    const published = await h.service.publishOntoLinkedTenant(actor,approved.workId,{ ...selection(approved), tenantId: "linked-client" });
+    const work = h.works.get(published.workId)!;
+    h.works.set(work.id,{ ...work, payload: { ...published.rebuild, publishedCapabilitySelection: { tenantId: "linked-client", inquiryCapabilityId: "original-form" } } });
+    h.documents.linkedPublications = vi.fn(async () => [{ tenantId: "linked-client", tenantSlugAtPublication: "linked-client", publishedBy: actor.userId, revision: published.rebuild.candidate!.revision, contentHash: published.rebuild.candidate!.contentHash, priorDeliveryModel: "custom_repo" as const, fallbackUntil: published.fallbackUntil, publishedAt: fixedTime }]);
+    const reconciled = await h.service.publishOntoLinkedTenant(actor,published.workId,{ ...selection(published), tenantId: "linked-client" });
+    expect(reconciled.rebuild.launch.receipt).toEqual(published.rebuild.launch.receipt);
+    expect(resolveCapabilities).not.toHaveBeenCalled();expect(h.documents.publishToLinkedTenant).toHaveBeenCalledOnce();expect(h.checkLive).toHaveBeenCalledOnce();
   });
   it("routes reads and domain work to the current slug after a rename without rewriting the receipt", async () => {
     const h = harness(); const record = await h.launch(await h.create());

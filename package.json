@@ -34,14 +34,19 @@
     "check:scrubbed-copy": "SCRUBBED_COPY_E2E=1 vitest run src/__tests__/scrubbed-copy-e2e.test.ts",
     "check:inquiry-lua": "bash scripts/check-inquiry-lua.sh",
     "check:workspace-target": "node scripts/check-workspace-target.mjs",
+    "test:migration-helpers": "node --test scripts/tests/migration-helpers.node-test.mjs",
     "test:workspace-target": "node --test scripts/tests/workspace-target.node-test.mjs",
     "check:release-one": "bash scripts/check-release-one.sh",
+    "check:journeys": "bash scripts/check-journeys.sh",
+    "check:readonly-rpcs": "node scripts/check-readonly-rpcs.mjs",
     "smoke:workspace": "STRELVA_WORKSPACE_RELEASE=1 playwright test tests/workspace-release.spec.ts",
     "audit:full": "npx tsx --env-file-if-exists=.env.local scripts/full-audit.ts",
     "check:prod": "tsx scripts/production-checklist.ts",
     "typecheck": "next typegen && tsc --noEmit",
     "reborn:progress": "node scripts/reborn-progress.mjs",
-    "version:check": "node scripts/check-version-sync.mjs"
+    "version:check": "node scripts/check-version-sync.mjs",
+    "check:release-safety": "vitest run src/__tests__/release-safety-tools.test.ts src/__tests__/release-restore.test.ts src/__tests__/production-readiness-snapshot.test.ts && tsx scripts/check-release-safety.ts",
+    "check:release-safety:batch8": "tsx scripts/check-release-safety-batch8.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.78",

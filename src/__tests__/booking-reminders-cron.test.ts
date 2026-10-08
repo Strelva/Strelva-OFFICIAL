@@ -1,16 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  updates: vi.fn(async () => ({ sent: 0, suppressed: 0, failed: 0 })),
+  mirrors: vi.fn(async () => ({ processed: 0, failed: 0 })),
   run: vi.fn(),
   heartbeat: vi.fn(),
   alertOnce: vi.fn(),
   denied: vi.fn(),
   enabled: vi.fn(),
 }));
+vi.mock("@/platform/bookings/updates", () => ({ deliverBookingUpdates: mocks.updates }));
+vi.mock("@/platform/bookings/calendar-mirror", () => ({ runBookingCalendarMirrors: mocks.mirrors, bookingCalendarMirrorPorts: () => ({ marker: "mirror-ports" }) }));
 vi.mock("@/platform/bookings/lifecycle", () => ({ runBookingLifecycle: mocks.run }));
 vi.mock("@/platform/bookings/lifecycle-ports", () => ({ bookingLifecyclePorts: { marker: "real-ports" } }));
 vi.mock("@/platform/bookings/flags", () => ({ bookingRemindersEnabled: mocks.enabled }));
-vi.mock("@/platform/infra/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));
+vi.mock("@/platform/infra/heartbeat", async (original) => ({ ...(await original<typeof import("@/platform/infra/heartbeat")>()), recordHeartbeat: mocks.heartbeat }));
 vi.mock("@/platform/infra/monitoring", () => ({ alertOnce: mocks.alertOnce }));
 vi.mock("@/lib/cron-auth", () => ({ requireCronRequest: mocks.denied }));
 

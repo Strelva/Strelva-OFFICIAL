@@ -12,9 +12,9 @@ export function previewWebsiteDetailMode(value: string | null): PreviewWebsiteDe
   return value && MODES.has(value as PreviewWebsiteDetailMode) ? value as PreviewWebsiteDetailMode : "full";
 }
 
-export function previewWebsiteDetail(systemId: string, mode: PreviewWebsiteDetailMode, now = Date.parse("2026-10-07T15:00:00.000Z")): WebsiteSystemDetail {
+export function previewWebsiteDetail(systemId: string, mode: PreviewWebsiteDetailMode, now = Date.parse("2026-10-07T15:00:00.000Z"), workspaceId = "11111111-1111-4111-8111-111111111111"): WebsiteSystemDetail {
   const day = (offset: number) => new Date(now - offset * 86_400_000).toISOString();
-  const empty = { systemId, actorId: "preview", domains: [], decisions: [], draftSections: [], siteReview: null, changeRequests: [], serviceRequests: [], contentVersions: [], snapshots: [], documentRevisions: [], linkedPublications: [], unavailable: [] };
+  const empty = { systemId, actorId: "preview", workspaceId, workId: "f1000000-0000-4000-8000-000000000002", domains: [], decisions: [], draftSections: [], siteReview: null, changeRequests: [], serviceRequests: [], contentVersions: [], snapshots: [], documentRevisions: [], linkedPublications: [], unavailable: [] };
   if (mode === "empty") return buildWebsiteSystemDetail(empty);
   if (mode === "connected") return buildWebsiteSystemDetail({
     ...empty,
@@ -42,6 +42,7 @@ export function previewWebsiteDetail(systemId: string, mode: PreviewWebsiteDetai
       { id: "v_preview_2", section: "contact", author: "user", timestamp: day(5), status: "rolled-back" },
     ],
     snapshots: [{ id: "snap_preview", label: "Daily copy", reason: "daily", author: "system", createdAt: day(1), status: "available" }],
+    documentRevisions: [1, 2].map(revision => ({ revision, contentHash: String(revision).repeat(64), createdAt: day(10 - revision), createdBy: "preview", published: true })),
     unavailable: partial ? ["Domains", "Content history"] : [],
   });
 }

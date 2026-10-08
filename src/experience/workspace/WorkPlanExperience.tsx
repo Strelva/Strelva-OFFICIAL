@@ -12,7 +12,7 @@ import type { WorkspaceWork } from "./contracts";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
 import { WorkPlanOutputPreview } from "./WorkPlanOutputPreview";
 
-type PlanningEconomicsInput = { jobId: string; executionKey: string; maximumCents: number };
+type PlanningEconomicsInput = { fundingWorkspaceId?: string; jobId: string; executionKey: string; maximumCents: number };
 type PlanningEconomicsReceipt = BudgetExecution;
 type PlanningBudgetResponse = {
   ledger: JobEconomicsRecord | null;
@@ -89,6 +89,8 @@ export type WorkPlanExperienceProps = {
   workspaceId: string;
   workId?: string;
   initialRequest?: string;
+  systemsRelease?: boolean;
+  onRequest?: (request: string) => void;
   /** Supplied only after a payer has accepted the planning budget. */
   planningEconomics?: PlanningEconomicsInput;
   sources: readonly WorkspaceWork[];
@@ -105,7 +107,7 @@ export function WorkPlanExperience(props: WorkPlanExperienceProps) {
   return <PlanSession key={`${props.workspaceId}:${props.workId ?? "new"}`} {...props} onSaved={onSaved} initialRequest={props.initialRequest || (!props.workId ? intentRequestFor(intent, "plan") : undefined)} />;
 }
 
-function PlanSession({ presentation, prepareUrl = "/api/work-plans", outputUrl, workspaceId, workId, initialRequest = "", planningEconomics: providedPlanningEconomics, sources, readOnly, localPreview, onSaved, onOpenWork }: WorkPlanExperienceProps) {
+function PlanSession({ presentation, prepareUrl = "/api/work-plans", outputUrl, workspaceId, systemsRelease, onRequest, workId, initialRequest = "", planningEconomics: providedPlanningEconomics, sources, readOnly, localPreview, onSaved, onOpenWork }: WorkPlanExperienceProps) {
   const transport = useWorkspaceRequest();
   const [request, setRequest] = useState(initialRequest);
   const [sourceIds, setSourceIds] = useState<string[]>([]);
@@ -116,6 +118,9 @@ function PlanSession({ presentation, prepareUrl = "/api/work-plans", outputUrl, 
   const [budget, setBudget] = useState<PlanningBudgetResponse | null>(null);
   const [budgetLoading, setBudgetLoading] = useState(!localPreview);
   const [budgetError, setBudgetError] = useState("");
+  const [fundingWorkspaceId, setFundingWorkspaceId] = useState(workspaceId);
+  const [requestRequired, setRequestRequired] = useState(false);
+  const [fallbackRequestId, setFallbackRequestId] = useState<string | null>(null);
   const [budgetBusy, setBudgetBusy] = useState(false);
   const [budgetRetry, setBudgetRetry] = useState<PlanningBudgetCommand | null>(null);
   const [executionJobId, setExecutionJobId] = useState(providedPlanningEconomics?.jobId ?? null);
@@ -172,8 +177,20 @@ function PlanSession({ presentation, prepareUrl = "/api/work-plans", outputUrl, 
     setBudgetLoading(true);
     setBudgetError("");
     try {
+      let funding = workspaceId;
+      if (systemsRelease) {
+        const authority = await fetch(`/api/work-plans/funding?workspaceId=${encodeURIComponent(workspaceId)}`, { credentials: "same-origin", cache: "no-store" });
+        const body = await authority.json().catch(() => null) as { fundingWorkspaceId?: string; code?: string } | null;
+        if (!authority.ok) {
+          if (body?.code === "make_systems_required") setRequestRequired(true);
+          throw new Error(responseError(body, "Planning authority could not be checked."));
+        }
+        if (!body?.fundingWorkspaceId) throw new Error("The planning budget target could not be confirmed.");
+        funding = body.fundingWorkspaceId;
+        setFundingWorkspaceId(funding);
+      }
       const query = new URLSearchParams({
-        workspaceId,
+        workspaceId: funding,
         productId: PLANNING_PRODUCT_ID,
         resourceKind: PLANNING_RESOURCE_KIND,
       });
@@ -186,7 +203,7 @@ function PlanSession({ presentation, prepareUrl = "/api/work-plans", outputUrl, 
     } finally {
       setBudgetLoading(false);
     }
-  }, [applyBudget, localPreview, transport, workspaceId]);
+  }, [applyBudget, localPreview, transport, workspaceId, systemsRelease]);
 
   useEffect(() => { void loadPlanningBudget(); }, [loadPlanningBudget]);
 
@@ -274,6 +291,7 @@ function PlanSession({ presentation, prepareUrl = "/api/work-plans", outputUrl, 
           sourceWorkIds: sourceIds,
           planningEconomics: {
             jobId: accepted.jobId,
+            ...(systemsRelease ? { fundingWorkspaceId } : {}),
             executionKey: nextExecutionKey,
             maximumCents: accepted.maximumCents,
           },
@@ -285,6 +303,11 @@ function PlanSession({ presentation, prepareUrl = "/api/work-plans", outputUrl, 
         if (code === "planning_receipt_requires_reconciliation") {
           await loadPlanningBudget();
           throw new Error("A previous planning call has a durable receipt. Its maximum remains held until the cost is reconciled.");
+        }
+        if (systemsRelease && code === "make_systems_required") setRequestRequired(true);
+        if (code === "planning_request_filed") {
+          const id = (body as { requestId?: unknown }).requestId;
+          if (typeof id === "string") setFallbackRequestId(id);
         }
         throw new Error(responseError(body, "The plan could not be prepared."));
       }
@@ -302,17 +325,22 @@ function PlanSession({ presentation, prepareUrl = "/api/work-plans", outputUrl, 
   const latestExecution = budget?.executions[budget.executions.length - 1];
   const executionBlocksNewCall = Boolean(result?.planningEconomics || (latestExecution && !(latestExecution.status === "finished" && latestExecution.effect === "none" && latestExecution.amountCents === 0)));
   const accepted = Boolean(providedJobId || (job && (job.status === "accepted" || job.status === "reserved")));
-  const canPrepare = !budgetLoading && !budgetError && accepted && !executionBlocksNewCall;
+  const canPrepare = !requestRequired && !budgetLoading && !budgetError && accepted && !executionBlocksNewCall;
   const plan = result?.plan;
   const Heading = presentation === "document" ? "h2" : "h1";
   return <section className="mx-auto max-w-3xl space-y-6 p-4 sm:p-8" aria-label="Work plan" aria-busy={busy}>
     <header><p className="text-sm text-gray-muted">{presentation === "document" ? "Draft with Strelva" : "Proposed work"}</p><Heading className="font-display text-2xl">{plan ? "Review what Strelva prepared" : presentation === "document" ? "What should this document cover?" : "What would you like to accomplish?"}</Heading><p className="mt-2 text-sm text-gray-muted">Describe the result you want. Strelva prepares a proposal using the work you choose to share.</p></header>
     {localPreview ? <p role="status" className="text-sm">AI planning is available in a configured, signed-in workspace. This preview does not call a model or save a plan.</p> : null}
-    {!localPreview ? <PlanningBudgetPanel workspaceId={workspaceId} budget={budget} loading={budgetLoading} error={budgetError} busy={budgetBusy} retry={budgetRetry} execution={latestExecution} canPropose={!workId || refining} readOnly={Boolean(readOnly)} onCommand={command} onRetry={() => void loadPlanningBudget()} /> : null}
+    {!localPreview && !requestRequired ? <PlanningBudgetPanel workspaceId={fundingWorkspaceId} budget={budget} loading={budgetLoading} error={budgetError} busy={budgetBusy} retry={budgetRetry} execution={latestExecution} canPropose={!workId || refining} readOnly={Boolean(readOnly)} onCommand={command} onRetry={() => void loadPlanningBudget()} /> : null}
     {error ? <p role="alert" className="text-sm text-critical">{error}</p> : null}
+    {systemsRelease && fundingWorkspaceId !== workspaceId ? <p className="text-sm text-gray-muted">Your agency funds this planning call. The draft and its records stay in this client’s workspace.</p> : null}
+    {fallbackRequestId ? <p role="status" className="text-sm">Your Request is in this business’s Requests for Strelva to review.</p> : null}
+    {requestRequired ? <p role="status" className="text-sm">Strelva or your authorized agency builds Systems. Send the result you want as a Request for review.</p> : null}
+    {systemsRelease && onRequest && !fallbackRequestId && (requestRequired || error || budgetError) ? <Button type="button" variant="secondary" disabled={busy || !request.trim()} onClick={() => onRequest(request.trim())}>Ask Strelva to build this</Button> : null}
     {result?.planningEconomics ? <p role="status" className="text-sm text-gray-muted">Planning admission recorded. The provider cost is unverified, so up to the accepted maximum remains held until reconciliation.</p> : null}
     {workId && !plan && !error && !localPreview ? <p role="status">Loading your plan…</p> : null}
-    {(!workId || refining) && !readOnly ? <form className="space-y-4" onSubmit={event => { event.preventDefault(); void prepare(); }}>
+    {requestRequired && !readOnly ? <TextArea label="The result you want" rows={5} value={request} maxLength={3000} onChange={event => setRequest(event.target.value)} /> : null}
+    {(!workId || refining) && !readOnly && !requestRequired ? <form className="space-y-4" onSubmit={event => { event.preventDefault(); void prepare(); }}>
       <TextArea label="The result you want" rows={5} value={request} maxLength={3000} required disabled={busy} onChange={event => setRequest(event.target.value)} placeholder="Help my team handle new customer requests without anything slipping through." />
       {availableSources.length ? <details><summary className="cursor-pointer py-2 text-sm">Include saved work{sourceIds.length ? ` (${sourceIds.length} selected)` : " (optional)"}</summary><fieldset className="space-y-2"><legend className="mb-2 text-sm font-medium">Include saved work, optional</legend><p className="mb-3 text-sm text-gray-muted">Choose up to six documents, trackers, or assessments. Strelva reads a limited excerpt of each selected item when preparing this plan.</p>{availableSources.map(source => <label key={source.id} className="flex items-center gap-3 py-2 text-sm"><input type="checkbox" checked={sourceIds.includes(source.id)} disabled={busy || (!sourceIds.includes(source.id) && sourceIds.length >= 6)} onChange={event => setSourceIds(current => event.target.checked ? [...current, source.id] : current.filter(id => id !== source.id))} />{source.title}</label>)}</fieldset></details> : null}
       <p className="text-sm text-gray-muted">Preparing a plan uses the configured AI provider after the accepted maximum is recorded. It does not publish, send messages, or start the proposed work.</p>

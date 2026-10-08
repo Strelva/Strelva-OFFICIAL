@@ -1,4 +1,4 @@
-import type { AiVisibilityScorecard } from "@/lib/ai-visibility-scorecard";
+import type { AiVisibilityScorecard } from "@/platform/infra/ai-visibility-scorecard";
 
 /**
  * What AI says when people ask for a business like this one.

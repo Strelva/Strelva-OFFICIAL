@@ -13,7 +13,7 @@
  * Pure. Navigation hints only; every page and API authorizes on its own.
  */
 
-export const SITE_TABS = ["edit", "photos", "look", "collections", "history", "connections", "google", "source", "request"] as const;
+export const SITE_TABS = ["edit", "photos", "look", "collections", "history", "connections", "google", "source", "request", "store", "members"] as const;
 export type SiteTab = (typeof SITE_TABS)[number];
 
 export const SITE_TAB_LABEL: Record<SiteTab, string> = {
@@ -26,6 +26,8 @@ export const SITE_TAB_LABEL: Record<SiteTab, string> = {
   google: "Google Business",
   source: "Connection",
   request: "Ask for a change",
+  store: "Store",
+  members: "Members",
 };
 
 /** Tabs a site that Strelva edits natively shows, in order. `source` opens from Connections. */
@@ -65,14 +67,21 @@ export function workspaceSiteTarget(value: string): string | null {
   if (url.pathname !== "/workspace/site" || url.hash) return null;
   const params = url.searchParams;
   for (const key of params.keys()) {
-    if (params.getAll(key).length !== 1 || !["workspaceId", "system", "tab", "source", "request"].includes(key)) return null;
+    if (params.getAll(key).length !== 1 || !["workspaceId", "system", "tab", "source", "request", "entry", "workId"].includes(key)) return null;
   }
   const workspaceId = params.get("workspaceId");
   const systemId = params.get("system");
   const tab = params.get("tab");
   const source = params.get("source");
   const request = params.get("request");
-  if (!workspaceId || !UUID.test(workspaceId) || !systemId || !UUID.test(systemId)) return null;
+  if (!workspaceId || !UUID.test(workspaceId)) return null;
+  const entry = params.get("entry");
+  const workId = params.get("workId");
+  if (systemId === null) {
+    if (tab !== null || source !== null || request !== null || (entry !== null && entry !== "connect" && entry !== "rebuild") || (workId !== null && (entry !== "rebuild" || !UUID.test(workId)))) return null;
+    return `${url.pathname}?${params}`;
+  }
+  if (!UUID.test(systemId) || entry !== null || workId !== null) return null;
   if (tab !== null && !isSiteTab(tab)) return null;
   if (source !== null && (tab !== "source" || !SOURCE_ID.test(source))) return null;
   if (tab === "source" && source === null) return null;
@@ -85,6 +94,8 @@ export function sitePlaceForDashboardPath(path: string): { tab: SiteTab; source?
   const url = new URL(path, "https://dashboard.invalid");
   const route = url.pathname.replace(/\/+$/, "");
   if (route === "/dashboard/site" || route === "/dashboard/content") return { tab: "edit" };
+  if (route === "/dashboard/store") return { tab: "store" };
+  if (route === "/dashboard/members") return { tab: "members" };
   if (route === "/dashboard/assets") return { tab: "photos" };
   if (route === "/dashboard/brand-kit") return { tab: "look" };
   if (route === "/dashboard/collections") return { tab: "collections" };

@@ -250,7 +250,6 @@
       "src/lib/types"
     ],
     "src/products/inquiries/linked-leads.ts": [
-      "src/lib/inquiry-records",
       "src/lib/leads"
     ],
     "src/products/inquiries/message-receipt.ts": [
@@ -280,9 +279,6 @@
       "src/lib/events",
       "src/lib/leads",
       "src/lib/types"
-    ],
-    "src/products/inquiries/workspace-records.ts": [
-      "src/lib/inquiry-records"
     ],
     "src/products/investigations/public-website-source.ts": [
       "src/lib/audit/checks",
@@ -398,7 +394,6 @@
     "src/app/api/cron/connected-sites-purge/route.ts -> @/products/connected-sites/store :: Import a product through its index, contracts, server, or client entry point.",
     "src/app/api/cron/website-health/route.ts -> @/products/websites/hosted-routing :: Import a product through its index, contracts, server, or client entry point.",
     "src/app/api/workspace/connected-sites/route.ts -> @/products/connected-sites/store :: Import a product through its index, contracts, server, or client entry point.",
-    "src/app/workspace/inquiries/page.tsx -> @/products/inquiries/linked-leads :: Import a product through its index, contracts, server, or client entry point.",
     "src/app/workspace/results/page.tsx -> @/products/websites/linked-results :: Import a product through its index, contracts, server, or client entry point.",
     "src/app/workspace/reviews/page.tsx -> @/products/google-listing/linked-reviews :: Import a product through its index, contracts, server, or client entry point.",
     "src/experience/places/WorkspaceInquiries.tsx -> @/products/inquiries/linked-leads :: Import a product through its index, contracts, server, or client entry point.",
@@ -409,8 +404,6 @@
     "src/experience/systems/server.ts -> @/products/investigations/system-health :: Import a product through its index, contracts, server, or client entry point.",
     "src/experience/systems/server.ts -> @/products/publishing/projection :: Import a product through its index, contracts, server, or client entry point.",
     "src/experience/systems/website-detail-server.ts -> @/products/websites/document-store :: Import a product through its index, contracts, server, or client entry point.",
-    "src/experience/systems/website-detail-server.ts -> @/products/websites/rebuild-release :: Import a product through its index, contracts, server, or client entry point.",
-    "src/experience/systems/website-detail-server.ts -> @/products/websites/rebuild-service :: Import a product through its index, contracts, server, or client entry point.",
     "src/experience/workspace/preview/publishing-fixture.ts -> @/products/publishing/projection :: Import a product through its index, contracts, server, or client entry point.",
     "src/experience/workspace/preview/systems-projection.ts -> @/products/publishing/projection :: Import a product through its index, contracts, server, or client entry point.",
     "src/platform/bookings/calendar-busy.ts -> @/products/scheduling/server :: Platform modules cannot depend on routes, products, or the experience layer.",

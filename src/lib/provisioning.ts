@@ -1,3 +1,4 @@
+import { tenantSiteOrigin, tenantSiteHost } from "@/platform/infra/brand";
 /**
  * Operator onboarding orchestrator. Automates everything AROUND a site Jacob
  * hand-builds: the tenant record (with a generated revalidation secret and
@@ -106,7 +107,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     input.adminDomain?.trim() || (productionDomain ? `admin.${productionDomain}` : undefined);
   const siteUrl = productionDomain
     ? `https://${productionDomain}`
-    : `https://${subdomain}.strelva.com`;
+    : tenantSiteOrigin(subdomain);
   const revalidateUrl = `${siteUrl}/api/v1/revalidate`;
   let tenantId = subdomain;
   let tenantWasCreated = false;
@@ -418,7 +419,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     // Phase: deploy — DNS + repo connect
     productionDomain
       ? `DEPLOY:dns|Point ${productionDomain} at Vercel|A 76.76.21.21 (root) or CNAME cname.vercel-dns.com (www). Verify in the Vercel dashboard.`
-      : `DEPLOY:dns|Subdomain routes automatically|${subdomain}.strelva.com is live once the control plane is up — no DNS step needed.`,
+      : `DEPLOY:dns|Subdomain routes automatically|${tenantSiteHost(subdomain)} is live once the control plane is up — no DNS step needed.`,
     `DEPLOY:repo|Connect the repo to Vercel|Link the hand-built ${tenantId} repo to the "${tenantId}-site" project (git integration), then trigger a deploy.`,
     // Phase: tracking & analytics — beacon (load-bearing) + GSC/GA4 grants
     // The whole "proof it's working" value prop (dashboard stats + weekly report

@@ -1,6 +1,6 @@
 import { readReleasedTenantBusinessContext } from "@/platform/business-record/public-reader";
 import { addEvent, resolveEvent } from "@/lib/events";
-import { getLeads, type LeadRecord } from "@/lib/leads";
+import { getLeads, leadReadSource, leadReadStoreReady, type LeadRecord } from "@/lib/leads";
 import { getRedis } from "@/platform/infra/redis";
 import { getConnections } from "@/lib/connections";
 import { getTenantRole, roleHasPermission, type ClientRole, type TenantPermission } from "@/platform/infra/auth";
@@ -44,8 +44,12 @@ import { explainWhyWithDelivery, projectInquiryDeliveryTimeline, withoutInquiryD
 import { placeholderInquiryRecords, projectedInquiryRecords } from "./record-projection";
 import { assertInquiryWorkspaceOpen } from "./workspace-exit";
 import { currentResponsibility } from "./currentness";
+import { stageInquiryScanFacts, correctInquiryBusinessFact, inquiryRecordOnboarding } from "./business-facts";
+import { readInquiryBusinessContext } from "./business-context";
 
 export { recordedInquiryAssignee, recordedInquiryStatus } from "./record-projection";
+export { prepareInquiryMessageReviewWithDependencies } from "./delivery-approval-service";
+export { readAskInquirySummary } from "./ask-read";
 export { decideHeldInquiry, parseWorkspaceLead, readInquiryEvents, readWorkspaceInquiryLeads } from "./workspace-records";
 export type { HeldDecision, InquiryEventView, IntakeState, WorkspaceInquiryLead } from "./workspace-records";
 
@@ -56,7 +60,7 @@ export {
   InquiryWorkspaceExitUnavailableError,
   resolveInquiryWorkspace,
 } from "./workspace-exit";
-export { executeInquiryPublication } from "./publication";
+export { executeInquiryPublication, authorizeInquiryPublicationActor } from "./publication";
 export { getInquiryRepository } from "./repository";
 export { publicationClaimToken } from "./repository";
 export { InquiryPersistenceError, InquiryValidationError } from "./repository";
@@ -66,7 +70,7 @@ export { recordInquiryEvidence } from "./receive";
 export { evaluateInquiryResponsibility, evaluateInquiryFollowUpResponsibility } from "./receive";
 export type { RecordInquiryEvidenceInput, RecordInquiryEvidenceResult } from "./receive";
 
-/** Customer records are a live Redis projection, never a Postgres fallback. */
+/** Customer records follow the gated shared lead read source. */
 export interface InquiryWorkspaceRead {
   tenantId: string;
   businessId: string;
@@ -84,20 +88,23 @@ export interface ReadInquiryWorkspaceInput {
 }
 
 /**
- * Read the durable capability state and Redis-authoritative inquiry records.
- * Missing Redis is explicit, so an outage can never render as an empty CRM.
+ * Read the durable capability state and the selected inquiry record store.
+ * Missing stores are explicit, so an outage can never render as an empty inbox.
  */
 export async function readInquiryWorkspace(input: ReadInquiryWorkspaceInput): Promise<InquiryWorkspaceRead> {
   const businessId = input.businessId ?? input.tenantId;
   const repository = input.repository ?? getInquiryRepository();
   const snapshot = await repository.getSnapshot(input.tenantId, businessId);
   const recordOverlays = await repository.getRecordOverlays(input.tenantId, businessId);
-  const redis = getRedis();
-  if (!redis) {
+  if (!(await leadReadStoreReady())) {
     return { tenantId: input.tenantId, businessId, snapshot, records: null, recordsAvailable: false, recordOverlays };
   }
-  const records = await getLeads(input.tenantId, Math.max(1, Math.min(input.leadLimit ?? 50, 500)));
-  return { tenantId: input.tenantId, businessId, snapshot, records, recordsAvailable: true, recordOverlays };
+  try {
+    const records = await getLeads(input.tenantId, Math.max(1, Math.min(input.leadLimit ?? 50, 500)));
+    return { tenantId: input.tenantId, businessId, snapshot, records, recordsAvailable: true, recordOverlays };
+  } catch {
+    return { tenantId: input.tenantId, businessId, snapshot, records: null, recordsAvailable: false, recordOverlays };
+  }
 }
 
 /** Save the engine snapshot with an explicit optimistic-concurrency revision. */
@@ -162,14 +169,29 @@ export async function queueInquiryPublication(input: QueueInquiryPublicationInpu
   const kind = input.action === "undo" ? INQUIRY_UNDO_EVENT_KIND : INQUIRY_PUBLISH_EVENT_KIND;
   let createdEventId: string | null = null;
   try {
+    const snapshot = await repository.getSnapshot(input.tenantId, input.businessId);
+    const work = snapshot?.state.requests.find(item => item.id === input.requestId && item.capabilityId === input.capabilityId);
+    const current = snapshot?.state.capabilities.find(item => item.id === input.capabilityId);
+    const target = input.action === "undo" ? current?.previousLive : work?.draft;
+    if (!work || !current || (input.action === "make_live" && (target?.version !== input.version || work.activeChangeId !== input.changeId))
+      || (input.action === "undo" && ((current.live?.version ?? 0) + 1 !== input.version || work.lastLiveChangeId !== input.changeId))) {
+      throw new InquiryValidationError("This changed since we emailed you. Prepare a fresh live change.");
+    }
+    const confirmation = [
+      `${input.action === "undo" ? "Undo" : "Make live"} release ${input.version} for ${input.tenantId}.`,
+      `Appears in: ${input.tenantId}'s website inquiry form.`,
+      target ? `Form: ${target.form.title}.` : "The published inquiry form is removed; received inquiries stay kept.",
+      target?.routing ? `Routing: ${target.routing.sentence} Destination: ${target.routing.destination}. Within ${target.routing.withinMinutes} minutes.` : "Routing: no inquiry routing rule.",
+      target?.followUp ? `Follow-up: ${target.followUp.sentence} After ${target.followUp.afterMinutes} minutes; at most ${target.followUp.maxAttempts} attempts.` : "Follow-up: none.",
+      "Sender: Strelva via mail.strelva.com, subject to the current sending permissions.",
+      "Business recipients and hours are checked again before a message sends.",
+    ].join("\n");
     const event = await addEvent({
       tenantId: input.tenantId,
       source: "website",
       type: "change_request",
-      title: input.action === "undo" ? "Undo inquiry capability change" : "Make inquiry capability live",
-      body: input.summary?.trim().slice(0, 500) || (input.action === "undo"
-        ? "Review the requested inquiry capability undo before it changes the live form."
-        : "Review the requested inquiry capability before it changes the live form."),
+      title: input.action === "undo" ? "Undo the live inquiry form change" : "Make the inquiry form live",
+      body: confirmation,
       status: "pending",
       metadata: {
         kind,
@@ -637,6 +659,7 @@ async function surfaceSnapshot(input: SurfaceContext, workspace: InquiryWorkspac
   const businessName = businessContext?.facts.display_name || businessContext?.facts.legal_name || config.siteName;
   const description = businessContext?.facts.description || (config.industry ? `${config.industry} inquiry workspace.` : "Inquiry workspace for this business.");
   const website = config.siteUrl ?? config.productionDomain ?? null;
+  const businessFacts = await readInquiryBusinessContext(input.tenantId);
   const projectedConnections = projectInquiryConnections(input.tenantId, connections, "/account?connections=1");
   const patternInstallations = listPatternInstallations(new InquiryEngine({ businessId: input.businessId, state: baseState })).map(({ id, capabilityId, sourceBusinessId, sourceCapabilityId, sourceVersion, targetVersion, status, lastProposalId, updatedAt }) => ({ id, capabilityId, sourceBusinessId, sourceCapabilityId, sourceVersion, targetVersion, status, lastProposalId, updatedAt }));
   try {
@@ -656,7 +679,7 @@ async function surfaceSnapshot(input: SurfaceContext, workspace: InquiryWorkspac
     state: visibleState,
     capabilities: visibleState.capabilities,
     connections: projectedConnections,
-    onboarding: projectOnboardingCorrections(recordedOnboarding(baseState.actionReceipts) ?? {
+    onboarding: businessFacts ? inquiryRecordOnboarding(businessFacts) : projectOnboardingCorrections(recordedOnboarding(baseState.actionReceipts) ?? {
       website,
       statements: [
         { id: "website", label: "Website", value: website, provenance: website ? "Tenant settings" : null, editable: true, confirmed: Boolean(website) },
@@ -828,6 +851,10 @@ export async function executeInquirySurface(input: {
     }
     case "scan-onboarding": {
       const facts = await readOnboardingWebsite(action.website);
+      if (!facts.checks.some(check => check.status === "failed")) {
+        const business = await readInquiryBusinessContext(context.tenantId);
+        if (business) await stageInquiryScanFacts(business.workspaceId, actorId, facts);
+      }
       engine._addActionReceipt({ businessId: context.businessId, requestId: null, capabilityId: null, inquiryId: null, responsibilityId: null,
         actor: { kind: "person", id: actorId }, action: "onboarding_scan", what: "Read public website metadata to propose business facts.",
         why: "The user requested website-based setup.", lookedAt: [facts.website ?? action.website],
@@ -837,6 +864,11 @@ export async function executeInquirySurface(input: {
     }
     case "correct-onboarding": {
       const value = action.value.trim();
+      const business = await readInquiryBusinessContext(context.tenantId);
+      if (business && await correctInquiryBusinessFact(business.workspaceId, actorId, action.statementId, value)) {
+        message = "Your confirmed detail was saved in Business details. Inquiries reads it from there.";
+        break;
+      }
       if (action.statementId === "website") {
         let website: URL;
         try { website = new URL(value); } catch { throw new InquiryValidationError("Enter a complete website address."); }
@@ -933,3 +965,12 @@ export async function executeInquirySurface(input: {
 }
 
 export { inquiryEconomicsAuthority } from "./economics";
+
+export { replyFromWorkspace, workspaceInquiryRepliesEnabled, workspaceReplyInput } from "./workspace-replies";
+
+/** Shared tenant read switch at the existing legacy adapter boundary. */
+export async function inquiryLeadReadSource() { return leadReadSource(); }
+export { composeAskInquiryFollowUp, approveAskInquiryFollowUp, followUpTryView, askInquiryFollowUpSelectionSchema } from "./ask-follow-up";
+export type { InquiryRepository } from "./repository";
+
+export { askInquiryFollowUpStillCurrent, approveAskInquiryFollowUpPublication } from "./ask-follow-up-server";

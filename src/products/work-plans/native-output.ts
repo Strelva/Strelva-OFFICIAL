@@ -73,6 +73,7 @@ export function selectedOperation(
 
 export function buildNativeOutput(input: {
   actor: WorkspaceActor;
+  linkFieldsReleased?: boolean;
   planWorkId: string;
   outputId: string;
   capability: QualifiedExecutableCapability;
@@ -85,7 +86,7 @@ export function buildNativeOutput(input: {
     const parsed = workPlanApplicationDraftSchema.safeParse({ ...values, kind: "application" });
     if (!parsed.success) throw new WorkPlanInvalidOutputError("Review the application's fields and approved views before accepting it.");
     const { kind: _kind, ...spec } = parsed.data;
-    const application = createApplicationDraft({ ...spec, maintenanceOwner: input.actor.userId }, input.actor);
+    const application = createApplicationDraft({ ...spec, maintenanceOwner: input.actor.userId }, input.actor, input.linkFieldsReleased);
     return { nativeProductId: "applications", nativeResourceKind: "application", nativeTitle: application.title, nativePayload: application, nativeInput: spec };
   }
   if (input.capability.definition.adapterKey === "documents.create") {

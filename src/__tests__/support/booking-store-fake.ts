@@ -41,6 +41,7 @@ export function fakeBookingStore() {
   const tenants = new Map<string, FakeTenant>();
   const settings = new Map<string, Record<string, unknown> & { revision: number }>();
   const rows: Row[] = [];
+  const publicReceipts = new Set<string>();
   const history: Array<{ bookingId: string; actor: string; from: string | null; to: string; reason: string | null }> = [];
   const parity: Array<Record<string, unknown>> = [];
   const state = { down: false, streakDays: 0 };
@@ -80,6 +81,14 @@ export function fakeBookingStore() {
             settings.set(tenant.stableId, next);
             return { data: { status: prior ? "updated" : "recorded", revision: next.revision }, error: null };
           }
+          case "release_public_record_booking_claim": {
+            const row = rows.find(r => r.calendarKey === tenant?.stableId && r.publicReservationId === args.p_reservation_id);
+            if (row?.status === "held" && row.serviceRef && !publicReceipts.has(String(row.publicReservationId))) {
+              row.status = "cancelled";
+              return { data: { released: true }, error: null };
+            }
+            return { data: { released: false }, error: null };
+          }
           case "record_tenant_booking": {
             if (!tenant) return fail("booking_unknown_tenant");
             const b = args.p_booking as Record<string, unknown>;
@@ -93,6 +102,7 @@ export function fakeBookingStore() {
               && rows.some((r) => r !== self && r.calendarKey === key && holds(r) && overlaps(r, candidate));
             const actor = args.p_via === "backfill" ? "migration" : args.p_via === "import" ? "import" : "visitor";
             if (existing) {
+              if (b.requestFingerprint && existing.requestFingerprint !== b.requestFingerprint) return fail("booking_request_conflict");
               if (existing.status === b.status && existing.start === candidate.start && existing.end === candidate.end) return { data: { status: "unchanged", booking: json(existing) }, error: null };
               if (clash(existing)) return { data: { status: "conflict", booking: null }, error: null };
               const from = existing.status;
@@ -108,7 +118,7 @@ export function fakeBookingStore() {
               status: String(b.status), origin: String(b.origin), serviceRef: b.serviceRef ?? null, businessServiceId: null,
               serviceName: b.serviceName, start: candidate.start, end: candidate.end, bufferMinutes: candidate.bufferMinutes,
               timeZone: String(b.timeZone), customer: { ...customer, ...(customer.email ? { email: customer.email.toLowerCase() } : {}) },
-              contactId: null, intakeAnswers: b.intakeAnswers ?? {}, inquiryId: b.inquiryId ?? null, legacyId: (b.legacyId as string) ?? null,
+              requestFingerprint: b.requestFingerprint ?? null, contactId: null, intakeAnswers: b.intakeAnswers ?? {}, inquiryId: b.inquiryId ?? null, legacyId: (b.legacyId as string) ?? null,
               publicReservationId: (b.publicReservationId as string) ?? null, externalSource: (b.externalSource as string) ?? null,
               externalRef: (b.externalRef as string) ?? null, recordedVia: args.p_via, createdAt: b.createdAt ?? new Date().toISOString(),
               cancelledAt: b.cancelledAt ?? null,
@@ -130,6 +140,15 @@ export function fakeBookingStore() {
             if (row.status === "cancelled") row.cancelledAt = row.cancelledAt ?? new Date().toISOString();
             return { data: { status: "updated", booking: json(row) }, error: null };
           }
+          case "read_workspace_booking_evidence": {
+            if (!tenant) return fail("workspace_access_denied");
+            const list = rows.filter((r) => r.calendarKey === tenant.stableId).map(json)
+              .filter((r) => r.localDate >= String(args.p_from) && r.localDate <= String(args.p_to))
+              .sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
+            return { data: { calendarHealth: "not_connected", truncated: list.length > 500,
+              bookings: list.slice(0, 500).map((booking) => ({ booking, calendar: null, historyTruncated: false,
+                history: history.filter((entry) => entry.bookingId === booking.id).map((entry) => ({ ...entry, kind: "change", at: new Date().toISOString() })) })) }, error: null };
+          }
           case "read_tenant_bookings": {
             if (!tenant) return { data: [], error: null };
             const list = rows.filter((r) => r.calendarKey === tenant.stableId).map(json)
@@ -148,6 +167,7 @@ export function fakeBookingStore() {
             row.status = to;
             return { data: { status: "decided", booking: json(row) }, error: null };
           }
+          case "booking_parity_streak":
           case "client_record_parity_streak":
             return { data: { store: args.p_store, days: state.streakDays }, error: null };
           case "record_client_record_parity":
@@ -160,12 +180,12 @@ export function fakeBookingStore() {
       return run();
     },
   };
-  return { db, tenants, settings, rows, history, parity, state };
+  return { db, tenants, settings, rows, history, parity, state, publicReceipts };
 }
 
 const TYPES: Record<string, string> = {
   p_tenant_id: "text", p_booking: "jsonb", p_via: "text", p_ref: "text", p_status: "text", p_actor: "text", p_reason: "text",
-  p_from: "date", p_to: "date", p_settings: "jsonb", p_workspace_id: "uuid", p_booking_id: "uuid", p_decision: "text",
+  p_user_id: "uuid", p_verified_email: "text", p_from: "date", p_to: "date", p_settings: "jsonb", p_workspace_id: "uuid", p_booking_id: "uuid", p_reservation_id: "uuid", p_decision: "text",
   p_store: "text", p_redis_count: "integer", p_postgres_count: "integer", p_missing: "integer", p_mismatched: "integer",
 };
 

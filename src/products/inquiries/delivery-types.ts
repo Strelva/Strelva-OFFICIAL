@@ -35,6 +35,8 @@ export type InquiryDeliveryStatus =
 export interface InquiryDeliverySubmission {
   id: string;
   tenantId: string;
+  /** Trusted engine workspace identity, never sourced from visitor fields. */
+  businessId?: string;
   name: string;
   email: string;
   message?: string | null;
@@ -49,6 +51,7 @@ export interface InquiryDeliverySubmission {
   capabilityVersion?: number | null;
   /** Optional host revision used to bind approvals and follow-up rechecks. */
   inquiryVersion?: string | number | null;
+  bookingOffer?: import("./booking-handoff").InquiryBookingOffer;
   receivedAt: string;
 }
 
@@ -110,6 +113,7 @@ export interface InquiryDeliveryMessage {
   audience: EmailAudience;
   to: string;
   replyTo?: string;
+  fromName?: string;
   subject: string;
   options: EmailOptions;
   /** Non-sensitive provider metadata used to correlate signed delivery events. */
@@ -322,6 +326,7 @@ export interface InquiryFollowUpRecheck {
 }
 
 export interface InquiryDeliveryDependencies {
+  messageRoute?: import("./inquiry-policy-at-use").InquiryMessageRouteReader;
   store?: InquiryDeliveryStore;
   transport?: InquiryOutboundTransport;
   now?: () => Date;

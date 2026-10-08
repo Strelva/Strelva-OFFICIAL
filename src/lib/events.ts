@@ -109,7 +109,7 @@ export async function claimEventAction(
   // accepted but the event didn't resolve) survive the lock and force operator
   // reconciliation instead of risking a duplicate external write.
   const execState = existing.metadata?.execution?.state;
-  if (execState === "processing" || execState === "external_accepted") {
+  if (execState === "processing" || execState === "external_accepted" || execState === "external_unconfirmed") {
     return { acquired: false, reason: "action_reconciliation_required" };
   }
 
@@ -173,6 +173,16 @@ export async function markExecutionExternalAccepted(
   }).catch(() => {});
 }
 
+/** A publishing transport failed after dispatch; the provider may hold it.
+ * Preserve uncertainty separately from acceptance and refuse any new write. */
+export async function markExecutionExternalUnconfirmed(id: string): Promise<void> {
+  await updateEvent(id, event => {
+    const execution = event.metadata?.execution;
+    if (!execution || execution.state !== "processing") return event;
+    return { ...event, metadata: { ...event.metadata, execution: { ...execution, state: "external_unconfirmed", reason: "Google write needs reconciliation before retry." } } };
+  });
+}
+
 export async function finishEventAction(
   id: string,
   attemptId: string,
@@ -187,7 +197,7 @@ export async function finishEventAction(
       // Never downgrade an "external_accepted" marker to "failed": the provider
       // write already went through, so unblocking the claim would let a retry
       // duplicate it. Keep it blocking so an operator reconciles instead.
-      if (execution.state === "external_accepted" && outcome.state === "failed") {
+      if ((execution.state === "external_accepted" || execution.state === "external_unconfirmed") && outcome.state === "failed") {
         return event;
       }
       return {

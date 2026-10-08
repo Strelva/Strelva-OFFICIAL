@@ -30,6 +30,7 @@ export interface SystemHealth {
   /** One plain sentence from the evidence. Never claims a check that did not happen. */
   summary: string;
   lastVerifiedAt?: string | null;
+  signals?: string[];
 }
 
 export type SystemConnectionKind = "read" | "act" | "appear" | "share" | "depend" | "trigger";
@@ -46,6 +47,8 @@ export interface SystemConnection {
   status: "connected" | "not_connected" | "unknown";
   /** `in`: another System points at this one (the form that appears on this site). */
   direction?: "out" | "in";
+  /** The actual read/write boundary, distinct from the connection's status. */
+  contract?: { sourceOfTruth: string; authority: string; freshness: string; failureBehavior: string };
 }
 
 export type PossibilityStatus = "exploring" | "ready";
@@ -85,6 +88,8 @@ export interface SystemHistoryRow {
   id: string;
   sentence: string;
   at: string;
+  releaseRef?: string;
+  implementationKind?: string;
 }
 
 export interface SystemVersion {
@@ -123,6 +128,8 @@ export interface SystemView {
   surface: SystemSurface;
   /** Who builds and runs it, when recorded. Managed customers never have to. */
   operatedBy?: string;
+  /** Set only by the released publishing projection for a linked tenant. */
+  publishing?: boolean;
   connections: SystemConnection[];
   possibilities: SystemPossibility[];
   versions: SystemVersion[];

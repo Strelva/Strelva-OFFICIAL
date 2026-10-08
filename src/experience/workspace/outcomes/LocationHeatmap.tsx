@@ -3,7 +3,7 @@
 import { useId, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { EntranceProvider, Reveal, entranceTransition, useEntranceTrigger } from "@/components/ui/motion/Entrance";
-import { strelvaMotion } from "@/lib/motion";
+import { strelvaMotion } from "@/platform/infra/motion";
 import { WEEK_DAYS, formatReplyTime } from "./reply-pattern";
 import { HEAT_EMPTY, HEAT_SCALE, formatTileMinutes, heatStep, heatmapVerdict, type HeatmapRow } from "./location-heatmap";
 import { outcomeFont } from "./outcome-font";

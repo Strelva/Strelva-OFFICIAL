@@ -146,6 +146,7 @@ export interface TenantBusinessContext {
 }
 
 export interface BusinessRecordPort {
+  ownerNoticeWorkspaceUrl?(tenant: { id: string; stableId?: string }, path: string, legacyUrl: string): Promise<string>;
   /** The owner-recipient rule for one tenant. Server-only; sends nothing. */
   resolveTenantOwnerRecipient(tenantId: string): Promise<TenantOwnerRecipientRow | null>;
   readTenantBusinessContext(tenantId: string): Promise<TenantBusinessContext | null>;
@@ -212,15 +213,19 @@ export interface InquiryReviewOutcome {
 }
 
 export interface InquiriesPort {
+  inquiryOutcomeProofEnabled(): boolean;
+  readTenantInquiryOutcomeProof(tenantId: string, from: string, to: string): Promise<import("./types").WeeklyInquiryOutcomeProof>;
+  notifyInquiryOwner(input: { tenantId: string; lead: import("./leads").LeadRecord }): Promise<unknown>;
   isInquiryMessageReviewEvent(event: UnifiedEvent): boolean;
-  authorizeInquiryMessageReviewActor(input: { tenantId: string; event: UnifiedEvent; actorId: string }): Promise<{ allowed: boolean; reason?: string }>;
+  authorizeInquiryMessageReviewActor(input: { tenantId: string; event: UnifiedEvent; actorId: string; eventAction?: "approved" | "dismissed" }): Promise<{ allowed: boolean; reason?: string }>;
   executeInquiryMessageReview(input: { tenantId: string; eventId: string; event: UnifiedEvent; actorId: string }): Promise<InquiryReviewOutcome & {
     acceptedAt?: string;
     providerMessageId?: string;
     deliveryAttemptId?: string;
   }>;
   reconcileInquiryMessageReview(input: { tenantId: string; event: UnifiedEvent; actorId: string }): Promise<InquiryReviewOutcome>;
-  executeInquiryPublication(input: { tenantId: string; eventId: string; claimId: string }): Promise<{ accepted: boolean; verified: boolean; reason?: string }>;
+  authorizeInquiryPublicationActor(input: { tenantId: string; eventId: string; claimId: string; event: UnifiedEvent; actorId: string; action: "approved" | "dismissed" }): Promise<{ allowed: boolean; reason?: string }>;
+  executeInquiryPublication(input: { tenantId: string; eventId: string; claimId: string; event: UnifiedEvent; actorId: string }): Promise<{ accepted: boolean; verified: boolean; reason?: string }>;
 }
 
 // ── Google listing replies for a tenant (src/products/google-listing) ──────────
@@ -235,6 +240,7 @@ export type TenantReplyAuthority =
 
 export interface TenantReviewRepliesPort {
   defaultTenantReplyDeps(): Promise<TenantReplyDepsHandle>;
+  listingDraftingAllowed(tenantId: string, locationId?: string): Promise<boolean>;
   routeTenantReviewReply(tenantId: string, deps: TenantReplyDepsHandle): Promise<{ kind: "legacy"; reason: string } | { kind: "listing"; workspaceId: string }>;
   postTenantReviewReply(input: {
     tenantId: string; workspaceId: string; eventId: string; attemptId: string; reviewId: string; text: string;
@@ -263,9 +269,25 @@ export interface WebsitesPort {
   patchWebsiteRebuild(actor: VerifiedActor, workId: string, patch: Record<string, unknown> & { forceReview: true }): Promise<unknown>;
 }
 
+/** Observation only: the tenant write and revalidation have already started. */
+export interface WebsitePublicationReadbackPort {
+  observeAcceptedNativePublish(input: {
+    tenantId: string; section: string; expected: unknown; actorId: string;
+    publicationRef?: string; revalidation: Promise<unknown>;
+  }): Promise<void>;
+}
+
+export interface PublishingContentPort {
+  authorizePublishingEvent(input: { tenantId: string; event: UnifiedEvent; actorId: string }): Promise<{ allowed: boolean; reason?: string }>;
+  prepareTenantCollectionDraft(input: { tenantId: string; actor: VerifiedActor | null; draft: unknown }): Promise<{ eventId: string; slug: string } | null>;
+
+  executePublishingEvent(input: { tenantId: string; event: UnifiedEvent; actorId: string; attemptId: string }): Promise<null | { accepted: boolean; reason?: string; receiptId?: string; verified?: boolean }>;
+}
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 export interface WorkspacePorts {
+  bookingProof(): Promise<{ readAgentRequestProof(tenantId: string, from: string, to: string): Promise<string | null> }>;
   clientRecords(): Promise<ClientRecordsPort>;
   tenantPolicy(): Promise<TenantPolicyPort>;
   outsideWriteReceipts(): Promise<OutsideWriteReceiptsPort>;
@@ -275,6 +297,8 @@ export interface WorkspacePorts {
   inquiries(): Promise<InquiriesPort>;
   tenantReviewReplies(): Promise<TenantReviewRepliesPort>;
   websites(): Promise<WebsitesPort>;
+  websitePublicationReadback(): Promise<WebsitePublicationReadbackPort>;
+  publishingContent(): Promise<PublishingContentPort>;
 }
 
 const SLOT = Symbol.for("strelva.workspace-ports");

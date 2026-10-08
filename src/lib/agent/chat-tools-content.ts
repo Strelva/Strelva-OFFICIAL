@@ -391,7 +391,7 @@ export function contentChatTools(deps: ChatToolDeps): ChatToolEntries {
 
 /** CMS collection entries (blog, video, product). Always drafts. */
 export function collectionChatTools(deps: ChatToolDeps): ChatToolEntries {
-  const { tenant } = deps;
+  const { tenant, ctx } = deps;
   return {
     list_entries: {
       capability: "list_entries",
@@ -432,6 +432,12 @@ export function collectionChatTools(deps: ChatToolDeps): ChatToolEntries {
         }),
         execute: async ({ type, data, slug }) => {
           try {
+            if (["1", "workspace"].includes(process.env.STRELVA_PUBLISHING_RELEASE ?? "")) {
+              const { workspacePorts } = await import("@/lib/workspace-ports");
+              const publishing = await workspacePorts().publishingContent();
+              const proposal = await publishing.prepareTenantCollectionDraft({ tenantId: tenant, actor: ctx.actor, draft: { kind: "collection", type, data, ...(slug ? { slug } : {}) } });
+              if (proposal) return { success: true, slug: proposal.slug, status: "draft", eventId: proposal.eventId, message: "Saved for the owner's approval in Needs you. The published entry stays live until approval." };
+            }
             const { saveEntry } = await import("@/lib/cms/collections-service");
             // Governance: the agent drafts; a human publishes from the editor.
             const result = await saveEntry({

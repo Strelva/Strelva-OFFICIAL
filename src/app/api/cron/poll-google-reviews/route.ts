@@ -1,3 +1,4 @@
+import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 /**
  * Google Reviews Polling Cron
  *
@@ -25,6 +26,7 @@ import { alert } from "@/platform/infra/monitoring";
 import { addEvent } from "@/lib/events";
 import { addReview } from "@/lib/reviews";
 import { getRedis } from "@/platform/infra/redis";
+import { listingDraftingAllowed, noteTenantListingRead } from "@/products/google-listing/server";
 import { draftReviewReply, storeRecentReply } from "@/lib/review-replies";
 import { getReplyVoice, defaultReplyVoice } from "@/lib/reviews/reply-voice";
 import { AUTO_POST_DELAY_MS, autoReplyAllowed } from "@/lib/reviews/auto-reply";
@@ -68,7 +70,8 @@ function lastReviewsKey(tenantId: string): string {
 async function fetchGoogleReviews(
   accessToken: string,
   accountId: string,
-  locationId: string
+  locationId: string,
+  tenantId: string,
 ): Promise<GoogleReview[]> {
   // google-meta stores "accounts/123"; a bare id gets the prefix. The old
   // `accounts/${accountId}` doubled it to accounts/accounts/123.
@@ -86,13 +89,17 @@ async function fetchGoogleReviews(
     });
 
     if (!res.ok) {
-      throw new Error(`Google API error: ${res.status} ${await res.text()}`);
+      const detail = await res.text();
+      await noteTenantListingRead(tenantId, locationId, { status: res.status, detail }).catch(() => {});
+      throw new Error(`Google API error: ${res.status} ${detail}`);
     }
 
     const data = (await res.json()) as GoogleReviewsResponse;
     allReviews.push(...(data.reviews ?? []));
     pageToken = data.nextPageToken;
   } while (pageToken);
+
+  await noteTenantListingRead(tenantId, locationId, { status: 200 }).catch(() => {});
 
   return allReviews;
 }
@@ -137,7 +144,7 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
   }
 
   // Fetch reviews
-  const reviews = await fetchGoogleReviews(accessToken, accountId, locationId);
+  const reviews = await fetchGoogleReviews(accessToken, accountId, locationId, tenantId);
   await noteGoogleReadSucceeded(grant);
 
   // Get last known review IDs
@@ -200,7 +207,7 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
     let draftedReply: string | undefined;
     let draftEventId: string | undefined;
     const replyMode = (await getReplyVoice(tenantId).catch(() => defaultReplyVoice())).mode;
-    if (replyMode !== "off") {
+    if (replyMode !== "off" && await listingDraftingAllowed(tenantId, locationId)) {
       try {
         draftedReply = await draftReviewReply(
           {
@@ -261,7 +268,7 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
         tenant,
         reviewId: review.reviewId,
         review: { author: review.reviewer.displayName, rating, text: review.comment },
-        reviewsUrl: getTenantDashboardUrl(tenant, "/dashboard/reviews"),
+        reviewsUrl: await ownerNoticeUrl(tenant, "/dashboard/reviews", getTenantDashboardUrl(tenant, "/dashboard/reviews")),
         draftedReply,
         approveUrl,
         notYetUrl,

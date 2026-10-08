@@ -216,16 +216,26 @@ export const providedClientSchema = z.object({
   customerWorkspaceId: uuid,
   name: z.string(),
   role: z.enum(["owner", "admin", "member"]),
-  source: z.enum(["tenant_conversion", "operator"]),
+  /** How the actor opens it: a direct membership, or the agency's provider seat with the actor staffed on it. */
+  access: z.enum(["membership", "provider_seat"]).optional(),
+  source: z.enum(["tenant_conversion", "operator", "business_choice"]),
   startedAt: z.string(),
 });
 export type ProvidedClient = z.infer<typeof providedClientSchema>;
 
-/** Businesses this agency operates that the actor can already open. Grants nothing. */
+/** Businesses this agency operates that the actor can open (membership or staffed provider seat). Grants nothing. */
 export async function listProvidedClients(actor: WorkspaceActor, agencyWorkspaceId: string): Promise<ProvidedClient[]> {
   return call("list_provided_clients", {
     p_user_id: uuid.parse(actor.userId),
     p_verified_email: email.parse(actor.verifiedEmail),
     p_agency_workspace_id: uuid.parse(agencyWorkspaceId),
   }, z.array(providedClientSchema), "Operated businesses could not be loaded.");
+}
+
+/** Claim only an existing operator-issued invitation for this verified identity and trusted tenant. */
+export async function claimPendingBusinessOwner(actor: WorkspaceActor, tenantId: string): Promise<string | null> {
+  return call("claim_pending_business_owner", {
+    p_actor_id: uuid.parse(actor.userId), p_verified_email: email.parse(actor.verifiedEmail),
+    p_tenant_id: z.string().regex(/^[a-z0-9-]+$/).parse(tenantId),
+  }, uuid.nullable(), "The pending owner invitation could not be claimed.");
 }

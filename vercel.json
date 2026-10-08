@@ -73,6 +73,10 @@
       "schedule": "*/15 * * * *"
     },
     {
+      "path": "/api/cron/booking-parity",
+      "schedule": "45 5 * * *"
+    },
+    {
       "path": "/api/cron/client-records-parity",
       "schedule": "40 5 * * *"
     },
@@ -131,6 +135,10 @@
     {
       "path": "/api/cron/connected-sites-purge",
       "schedule": "50 5 * * *"
+    },
+    {
+      "path": "/api/cron/newsletter-sender",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

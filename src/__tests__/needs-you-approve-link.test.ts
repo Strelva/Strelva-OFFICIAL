@@ -79,6 +79,22 @@ describe("workspace approve tokens", () => {
 });
 
 describe("GET with a workspace link (scanner-safe)", () => {
+  it("offers a signed full website preview before confirming, while its release is on", async () => {
+    for (const name of ["STRELVA_WORKSPACE_RELEASE", "STRELVA_OWNER_ENTRY", "STRELVA_NEEDS_YOU_RELEASE", "STRELVA_OWNER_DECISION_LINKS_RELEASE", "STRELVA_WEBSITE_REBUILD_RELEASE"]) vi.stubEnv(name, "1");
+    try {
+      const { signWorkspaceApproveToken } = await import("@/lib/approve-link");
+      mockRead.mockResolvedValue(item({ sourceLifecycle: "website_document", title: "Review exact website copy" }));
+      const token = signWorkspaceApproveToken(claims);
+      const html = await (await get(token)).text();
+      expect(html).toContain("Review the complete website preview before deciding");
+      expect(html).toContain(`/api/owner-website-preview?token=${encodeURIComponent(token)}`);
+      expect(mockDecide).not.toHaveBeenCalled();
+      expect(mockResolveEventAction).not.toHaveBeenCalled();
+      vi.stubEnv("STRELVA_OWNER_DECISION_LINKS_RELEASE", "0");
+      expect(await (await get(token)).text()).not.toContain("/api/owner-website-preview");
+    } finally { vi.unstubAllEnvs(); }
+  });
+
   it("confirms without deciding", async () => {
     const { signWorkspaceApproveToken } = await import("@/lib/approve-link");
     const token = signWorkspaceApproveToken(claims);
@@ -91,6 +107,18 @@ describe("GET with a workspace link (scanner-safe)", () => {
     expect(mockDecide).not.toHaveBeenCalled();
     expect(mockResolveEventAction).not.toHaveBeenCalled();
     expect(mockRead).toHaveBeenCalledWith(WS, ITEM);
+  });
+
+  it("shows agent attribution in a booking decision and resolves without a login", async () => {
+    const { signWorkspaceApproveToken } = await import("@/lib/approve-link");
+    const bookingItem = item({ title: "Booking request: Booked through Claude · Dana, Fri Nov 6 2:00 PM", approveEffect: "The booking is confirmed for this time. Booked through Claude.", sourceLifecycle: "booking_request" });
+    mockRead.mockResolvedValue(bookingItem);
+    mockDecide.mockResolvedValue({ status: "done", item: { ...bookingItem, state: "approved" } });
+    const token = signWorkspaceApproveToken(claims);
+    expect(await (await get(token)).text()).toContain("Booked through Claude");
+    expect(mockDecide).not.toHaveBeenCalled();
+    expect((await post(token)).status).toBe(200);
+    expect(mockDecide).toHaveBeenCalledWith(expect.objectContaining({ by: { kind: "owner_link", recipient: "owner@example.test" } }));
   });
 
   it("says the item changed when the revision moved or it was superseded", async () => {
@@ -151,11 +179,14 @@ describe("POST with a workspace link", () => {
     expect(await res.text()).toContain(text.replace("'", "&#39;"));
   });
 
-  it("a throw does nothing and says so", async () => {
+  it("a failure after an accepted effect reports uncertainty without inviting a retry", async () => {
     const { signWorkspaceApproveToken } = await import("@/lib/approve-link");
     mockDecide.mockRejectedValueOnce(new Error("db down"));
     const html = await (await post(signWorkspaceApproveToken(claims))).text();
-    expect(html).toContain("Nothing was done");
+    expect(html).toContain("Strelva is checking the outcome");
+    expect(html).toContain("The change may have gone through");
+    expect(html).not.toContain("Nothing was done");
+    expect(html).not.toContain('method="POST"');
   });
 
   it("leaves today's tenant review links on resolveEventAction", async () => {

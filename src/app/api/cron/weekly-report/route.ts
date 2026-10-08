@@ -1,3 +1,4 @@
+import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { mapPool } from "@/lib/concurrency";
@@ -14,6 +15,8 @@ import type { EmailRow } from "@/platform/infra/email/layout";
 import { isReportDue, markReportSent } from "@/lib/report-cadence";
 import { requireCronRequest } from "@/lib/cron-auth";
 import { sendEmail } from "@/platform/infra/email/send";
+import { catalogReportsMayBeOn, recordCatalogReport } from "@/platform/catalog-reports/receipts";
+import { getAllTenants } from "@/lib/tenants";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
 // would otherwise die mid-batch at scale on a lower default.
@@ -64,11 +67,20 @@ export async function GET(request: Request) {
   // tenants) the report's only purpose — the email — can't go out, so skip the
   // whole run rather than build reports nothing sends.
   if (emailSendingPaused()) {
+    if (catalogReportsMayBeOn()) {
+      await mapPool((await getAllTenants()).filter(tenant => tenant.active !== false && tenant.subscriptionStatus !== "cancelled"), 8, tenant =>
+        recordCatalogReport({ tenantId: tenant.id, kind: "weekly", period: new Date().toISOString().slice(0, 10), status: "suppressed", recipient: null, reason: "email_paused" }));
+    }
     console.warn("[weekly-report] skipped — email sending paused (EMAIL_SENDING_ENABLED != true)");
     return NextResponse.json({ status: "skipped", reason: "email_sending_paused" });
   }
 
   const { reports: allReports, skipped: generationSkips } = await generateAllReports();
+  const receipt = (tenantId: string, status: "accepted" | "suppressed" | "failed", recipient: string | null, reason: string | null = null) =>
+    recordCatalogReport({ tenantId, kind: "weekly", period: new Date().toISOString().slice(0, 10), status, recipient, reason });
+  for (const skip of generationSkips) {
+    if (skip.reason !== "inactive") await receipt(skip.tenantId, skip.reason === "generation_failed" ? "failed" : "suppressed", null, skip.reason);
+  }
 
   // Track skipped tenants with a reason so "why did X never get a receipt?" is
   // answerable from this response. Seed with tenants skipped during generation
@@ -118,6 +130,7 @@ await mapPool(reports, 8, async (report) => {
       const email = report.ownerRecipient ?? report.tenant.ownerEmail;
       if (!email) {
         skippedReasons.push({ tenantId: report.tenant.id, reason: "missing_owner_email" });
+        await receipt(report.tenant.id, "suppressed", null, "missing_owner_email");
         return;
       }
 
@@ -130,13 +143,13 @@ await mapPool(reports, 8, async (report) => {
         heading,
         report.summary,
         report.tenant.siteName,
-        getTenantDashboardUrl(report.tenant, "/dashboard/reports"),
+        await ownerNoticeUrl(report.tenant, "/dashboard/reports", getTenantDashboardUrl(report.tenant, "/dashboard/reports")),
         report.analyticsRows,
       );
       const text = reportToText(
         heading,
         report.summary,
-        getTenantDashboardUrl(report.tenant, "/dashboard/reports"),
+        await ownerNoticeUrl(report.tenant, "/dashboard/reports", getTenantDashboardUrl(report.tenant, "/dashboard/reports")),
         report.analyticsRows,
       );
       await generateWeeklyBrief(report.tenant.id);
@@ -165,20 +178,24 @@ await mapPool(reports, 8, async (report) => {
           console.error(`[weekly-report] send failed for tenant ${report.tenant.id}:`, err);
           errors.push(`${report.tenant.id}: ${reason}`);
           await recordMailSend(report.tenant.id, "weekly_report", { ok: false, error: reason, to: email });
+          await receipt(report.tenant.id, "failed", email, reason.slice(0, 500));
           return;
         }
         if (!ok) {
           errors.push(`${report.tenant.id}: send suppressed or unconfigured`);
           await recordMailSend(report.tenant.id, "weekly_report", { ok: false, error: "suppressed_or_unconfigured", to: email });
+          await receipt(report.tenant.id, "suppressed", email, "suppressed_or_unconfigured");
           return;
         }
         sent.push(report.tenant.id);
         await recordMailSend(report.tenant.id, "weekly_report", { ok: true, to: email });
+        await receipt(report.tenant.id, "accepted", email);
       } else {
         console.log(`[Weekly report dev] "${subject}" -> ${email}`);
         console.log(report.summary);
         sent.push(report.tenant.id);
         await recordMailSend(report.tenant.id, "weekly_report", { ok: true, to: email });
+        await receipt(report.tenant.id, "suppressed", email, "email_provider_unconfigured");
       }
 
       // Persist last-sent so the cadence gate can throttle the next run. Only
@@ -201,6 +218,7 @@ await mapPool(reports, 8, async (report) => {
       const msg = `${report.tenant.id}: ${err instanceof Error ? err.message : "Unknown error"}`;
       console.error(`[weekly-report] Failed for tenant ${report.tenant.id}:`, err);
       errors.push(msg);
+      await receipt(report.tenant.id, "failed", report.ownerRecipient ?? report.tenant.ownerEmail ?? null, "report_generation_or_delivery_failed");
     }
   });
 

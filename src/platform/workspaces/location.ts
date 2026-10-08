@@ -29,7 +29,7 @@ export function workspaceReturnTarget(value: string | null): string | null {
     const params = target.searchParams;
     const workspaceId = params.get("workspaceId");
     const allowed = place[1] === "results" ? ["workspaceId", "range", "from", "to"] : ["workspaceId"];
-    if (target.hash || [...params.keys()].some((key) => !allowed.includes(key) || params.getAll(key).length !== 1)
+    if ((target.hash && !((place[1] === "results" && target.hash === "#site-health") || (place[1] === "business-details" && target.hash === "#ownership"))) || [...params.keys()].some((key) => !allowed.includes(key) || params.getAll(key).length !== 1)
       || !workspaceId || !UUID.test(workspaceId)) return null;
     const range = params.get("range");
     if (range !== null && !["live", "week", "month", "custom"].includes(range)) return null;
@@ -37,7 +37,7 @@ export function workspaceReturnTarget(value: string | null): string | null {
       const date = params.get(key);
       if (date !== null && (range !== "custom" || !/^\d{4}-\d{2}-\d{2}$/.test(date))) return null;
     }
-    return `${target.pathname}?${params}`;
+    return `${target.pathname}?${params}${target.hash}`;
   }
   // A managed website's own pages (editor, photos, look, history, connections).
   if (value?.startsWith("/workspace/site?")) return workspaceSiteTarget(value);
@@ -47,9 +47,10 @@ export function workspaceReturnTarget(value: string | null): string | null {
     const workspaceId = target.searchParams.get("workspaceId");
     const view = target.searchParams.get("view");
     const date = target.searchParams.get("date");
-    const allowed = [...target.searchParams.keys()].every((key) => key === "workspaceId" || key === "view" || key === "date");
+    const allowed = [...target.searchParams.keys()].every((key) => key === "workspaceId" || key === "view" || key === "date" || key === "source");
     if (target.hash || target.pathname !== "/workspace/bookings" || !allowed || target.searchParams.getAll("workspaceId").length !== 1
       || !workspaceId || !UUID.test(workspaceId) || target.searchParams.getAll("view").length > 1 || (view !== null && view !== "day" && view !== "week")
+      || target.searchParams.getAll("source").length > 1 || (target.searchParams.has("source") && !["all", "agent"].includes(target.searchParams.get("source")!))
       || target.searchParams.getAll("date").length > 1 || (date !== null && !/^\d{4}-\d{2}-\d{2}$/.test(date))) return null;
     return `${target.pathname}?${target.searchParams}`;
   }
@@ -64,6 +65,14 @@ export function workspaceReturnTarget(value: string | null): string | null {
     return null;
   }
 
+  // The agency setup checklist (#258), optionally for one agency.
+  if (value === "/workspace/agency/start") return value;
+  if (value?.startsWith("/workspace/agency/start?")) {
+    const target = new URL(value, "https://workspace.invalid");
+    const workspaceId = target.searchParams.get("workspaceId");
+    if (target.hash || target.pathname !== "/workspace/agency/start" || target.searchParams.size !== 1 || !workspaceId || !UUID.test(workspaceId)) return null;
+    return `${target.pathname}?${target.searchParams}`;
+  }
   if (!value || (value !== "/workspace" && !value.startsWith("/workspace?"))) return null;
   const url = new URL(value, "https://workspace.invalid");
   if (url.hash || url.pathname !== "/workspace") return null;

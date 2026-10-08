@@ -4,7 +4,7 @@ import { useId, useMemo, useRef } from "react";
 import { motion } from "motion/react";
 import { TrendingDown, TrendingUp, MoveRight } from "lucide-react";
 import { EntranceProvider, Reveal, entranceTransition, useEntranceTrigger } from "@/components/ui/motion/Entrance";
-import { strelvaMotion } from "@/lib/motion";
+import { strelvaMotion } from "@/platform/infra/motion";
 import { ratingChartGeometry, ratingTrendWord, type RatingPoint } from "./rating-trend";
 import { outcomeFont } from "./outcome-font";
 import styles from "./outcomes.module.css";

@@ -1,3 +1,6 @@
+import { bookingCalendarMirrorPorts, runBookingCalendarMirrors } from "@/platform/bookings/calendar-mirror";
+import { calendarSchedulingService } from "@/products/scheduling/server";
+import { deliverBookingUpdates } from "@/platform/bookings/updates";
 import { NextResponse } from "next/server";
 import { requireCronRequest } from "@/lib/cron-auth";
 import { recordHeartbeat } from "@/platform/infra/heartbeat";
@@ -28,6 +31,10 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   const started = Date.now();
   const summary = await runBookingLifecycle(bookingLifecyclePorts, { now: new Date(), limit: 200 });
+  const updates = await deliverBookingUpdates().catch(() => ({ sent: 0, suppressed: 0, failed: 1 }));
+  const calendar = await runBookingCalendarMirrors(bookingCalendarMirrorPorts(calendarSchedulingService)).catch(() => ({ processed: 0, failed: 1 }));
+  summary.failed += calendar.failed;
+  summary.sent += updates.sent; summary.suppressed += updates.suppressed; summary.failed += updates.failed;
   if (summary.errors.length > 0) {
     await alertOnce("booking_reminders_failed", "high", { errors: summary.errors.length }, 3600).catch(() => undefined);
   }

@@ -1,7 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InquiryCapabilityState } from "@/products/inquiries/contracts";
 
 const mocks = vi.hoisted(() => ({
+  offer: vi.fn(),
   capture: vi.fn(),
   legacy: vi.fn(),
   limited: vi.fn(),
@@ -10,9 +11,16 @@ const mocks = vi.hoisted(() => ({
   tenant: vi.fn(),
   evidence: vi.fn(),
   workspace: vi.fn(),
+  notice: vi.fn(),
+  bookingOffer: vi.fn(),
 }));
 
-vi.mock("@/lib/leads", () => ({ captureLead: mocks.capture, recordLead: mocks.legacy }));
+vi.mock("@/platform/bookings/inquiry-offers", () => ({ captureInquiryBookingOffer: mocks.offer }));
+vi.mock("@/products/inquiries", async (original) => ({ ...(await original<typeof import("@/products/inquiries")>()), prepareInquiryBookingOffer: mocks.bookingOffer, notifyInquiryOwner: mocks.notice }));
+
+vi.mock("@/products/inquiries/owner-notice", () => ({ notifyInquiryOwner: mocks.notice }));
+
+vi.mock("@/lib/leads", () => ({ captureLead: mocks.capture, recordLead: mocks.legacy, getLeadById: async () => null }));
 vi.mock("@/platform/infra/rate-limit", () => ({
   isRateLimitedAsync: mocks.limited,
   rateLimitKey: () => "inquiry-submit-test",
@@ -96,8 +104,22 @@ function capabilityBody(overrides: Record<string, unknown> = {}) {
 }
 
 describe("public inquiry capability submission", () => {
+  it("adds bookable times only when the handoff switch is on; offer failure never loses capture", async () => {
+    const offer = { chooseUrl: "/inquiry-booking/fixture", slots: [{ label: "Friday 9 AM" }] };
+    mocks.bookingOffer.mockResolvedValue(offer);
+    const unchanged = await request(capabilityBody());
+    expect(await unchanged.json()).toEqual({ ok: true });
+    expect(mocks.bookingOffer).not.toHaveBeenCalled();
+    vi.stubEnv("STRELVA_INQUIRY_BOOKING_HANDOFF", "1");
+    expect(await (await request(capabilityBody())).json()).toEqual({ ok: true, bookingOffer: offer });
+    expect(mocks.bookingOffer).toHaveBeenCalledWith({ tenantId: "acme", inquiryId: "lead-1" });
+    mocks.bookingOffer.mockRejectedValue(new Error("booking unavailable"));
+    expect(await (await request(capabilityBody())).json()).toEqual({ ok: true });
+  });
+  afterEach(() => vi.unstubAllEnvs());
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.offer.mockResolvedValue(null);
     mocks.capture.mockResolvedValue({ status: "captured", lead: { id: "lead-1", createdAt: time } });
     mocks.limited.mockResolvedValue(false);
     mocks.release.mockReturnValue(true);
@@ -105,6 +127,43 @@ describe("public inquiry capability submission", () => {
     mocks.tenant.mockResolvedValue({ active: true, stableId: "stable-business" });
     mocks.workspace.mockResolvedValue({ businessId: "stable-business", workspaceIds: [], exitCompleted: false });
     mocks.evidence.mockResolvedValue({ status: "recorded", receiptId: "receipt-1", timelineEventIds: ["event-1", "event-2"] });
+    mocks.notice.mockResolvedValue({ status: "accepted" });
+    vi.stubEnv("STRELVA_INQUIRY_RECORDS", "");
+    vi.stubEnv("STRELVA_INQUIRY_OWNER_NOTICES", "");
+    vi.stubEnv("STRELVA_INQUIRY_BOOKING_HANDOFF", "");
+  });
+
+  it("keeps paused intake closed with the rollout off, and retains the exact published form with it on", async () => {
+    mocks.snapshot.mockResolvedValue({ state: { capabilities: [{ ...capability, status: "paused" }] } });
+    expect((await request(capabilityBody())).status).toBe(404);
+    expect(mocks.capture).not.toHaveBeenCalled();
+    vi.stubEnv("STRELVA_INQUIRY_RECORDS", "1");
+    vi.stubEnv("DUAL_WRITE_PG", "1");
+    expect((await request(capabilityBody())).status).toBe(200);
+    expect(mocks.capture).toHaveBeenCalledTimes(1);
+    expect(mocks.notice).not.toHaveBeenCalled();
+    expect(mocks.evidence).toHaveBeenCalledWith(expect.objectContaining({ expectedCapabilityVersion: 4 }));
+    expect((await request(capabilityBody({ capabilityVersion: 3 }))).status).toBe(409);
+  });
+
+  it("notifies the owner immediately for paused intake only under the notice flag; notice failure never loses the lead", async () => {
+    vi.stubEnv("STRELVA_INQUIRY_RECORDS", "1");
+    vi.stubEnv("DUAL_WRITE_PG", "1");
+    vi.stubEnv("STRELVA_INQUIRY_OWNER_NOTICES", "1");
+    mocks.snapshot.mockResolvedValue({ state: { capabilities: [{ ...capability, status: "paused" }] } });
+    mocks.notice.mockRejectedValue(new Error("notice unavailable"));
+    expect((await request(capabilityBody())).status).toBe(200);
+    expect(mocks.notice).toHaveBeenCalledWith({ tenantId: "acme", lead: { id: "lead-1", createdAt: time } });
+    expect(mocks.capture).toHaveBeenCalledWith("acme", expect.any(Object), { notifyOwner: false });
+  });
+
+  it("adds offered times only to a durable inquiry receipt and keeps customer identity server-owned", async () => {
+    mocks.capture.mockResolvedValue({ status:"captured", lead:{ id:"lead-1", createdAt:time, name:"Ada Rivera", email:"ada@example.test" } });
+    const offer = { serviceName:"Consultation", timeZone:"America/New_York", slots:[{ start:"2026-11-03T15:00:00Z", end:"2026-11-03T15:30:00Z" }], url:"https://app.strelva.test/book-inquiry/signed", token:"private-token", id:"private-id" };
+    mocks.offer.mockResolvedValue(offer);
+    const response = await request(capabilityBody());
+    expect(await response.json()).toEqual({ ok:true, bookingOffer:{ serviceName:offer.serviceName, timeZone:offer.timeZone, slots:offer.slots, url:offer.url } });
+    expect(mocks.offer).toHaveBeenCalledWith({ tenantId:"acme", inquiryId:"lead-1", customer:{name:"Ada Rivera",email:"ada@example.test"} });
   });
 
   it("rejects new intake after the mapped customer workspace exits", async () => {

@@ -51,6 +51,7 @@ export const agencyClientRowSchema = z.object({
   openRequests: z.number().int().min(0),
   improvementsWaiting: z.number().int().min(0),
   lastReceiptAt: iso.nullable(),
+  agentBookings: z.boolean().optional(),
 }).strict();
 
 export const agencyQueueItemSchema = z.object({
@@ -131,6 +132,12 @@ export const agencyLibrarySourceSchema = z.object({
 export const agencyLibrarySchema = z.object({
   agencyWorkspaceId: uuid,
   sources: z.array(agencyLibrarySourceSchema).max(500),
+  inquiryVersions: z.array(z.object({
+    id: z.string(), tenantId: z.string(), businessName: z.string(), name: z.string(),
+    sourceBusinessId: z.string(), sourceSystemId: z.string(), sourceRevision: z.number().int().positive(),
+    currentRelease: z.number().int().positive(), improvement: z.enum(["none", "auto_applicable", "blocked"]),
+  }).strict()).optional(),
+  inquiryVersionsUnavailable: z.boolean().optional(),
 }).strict();
 
 export type AgencyLibraryVersion = z.infer<typeof agencyLibraryVersionSchema>;

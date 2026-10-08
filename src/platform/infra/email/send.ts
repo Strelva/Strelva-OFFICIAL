@@ -40,6 +40,7 @@ export type SendEmailInput = RenderedEmail & {
   tags?: Record<string, string>;
   /** Provider idempotency key for sends that must be safe across retries. */
   idempotencyKey?: string;
+  attachments?: Array<{ filename: string; content: string }>;
 };
 
 export type SendEmailResult =
@@ -60,7 +61,7 @@ export type EmailReceivedReadbackResult =
     }
   | { status: "unavailable"; reason: string };
 
-async function audienceEnabled(input: SendEmailInput): Promise<boolean> {
+async function audienceEnabled(input: SendEmailInput, strictClientGate = false): Promise<boolean> {
   const { audience } = input;
   if (audience === "operator") return operatorEmailsEnabled();
   if (audience === "prospect") return prospectEmailsEnabled();
@@ -70,7 +71,7 @@ async function audienceEnabled(input: SendEmailInput): Promise<boolean> {
   // verified client ("on") or block one client ("off") independent of the
   // global switch. No tenantId / "inherit" ⇒ follow the global switch (unchanged).
   if (input.tenantId) {
-    const override = await getClientEmailOverride(input.tenantId);
+    const override = await (strictClientGate ? getClientEmailOverride(input.tenantId, { failClosed: true }) : getClientEmailOverride(input.tenantId));
     if (override === "on") return true;
     if (override === "off") return false;
   }
@@ -114,6 +115,7 @@ export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendE
     subject: input.subject,
     html,
     text,
+    ...(input.attachments ? { attachments: input.attachments } : {}),
     ...(input.tags
       ? {
           tags: Object.entries(input.tags)
@@ -145,6 +147,8 @@ export interface BatchMessage {
 }
 
 export interface SendBatchInput {
+  /** Client-branded newsletters also obey the tenant-aware client pause. */
+  requireClientGate?: boolean;
   audience: EmailAudience;
   tenantId?: string;
   fromName: string;
@@ -163,6 +167,15 @@ export type SendBatchResult =
 
 const ALLOWED_FROM_DOMAINS = ["updates.strelva.com", CLIENT_MAIL_DOMAIN];
 
+/** Check before rendering unsubscribe links; the transport checks again at send. */
+export async function batchEmailSuppression(input: Pick<SendBatchInput, "audience" | "tenantId" | "requireClientGate">): Promise<string | null> {
+  const rendered = { subject: "", to: [], html: "", text: "" };
+  if (input.requireClientGate && !(await audienceEnabled({ ...rendered, audience: "client", tenantId: input.tenantId }, true))) return "not sent: gated";
+  if (!(await audienceEnabled({ ...rendered, audience: input.audience, tenantId: input.tenantId }))) return "not sent: gated";
+  if (!process.env.RESEND_API_KEY) return "not sent: unconfigured";
+  return null;
+}
+
 /**
  * A batch through the same transport boundary and audience gate as
  * sendEmailWithReceipt. Used for newsletters (audience `customer`). Throws on
@@ -173,12 +186,9 @@ export async function sendBatchWithReceipt(input: SendBatchInput): Promise<SendB
   if (input.messages.length > 100) throw new Error("A batch holds at most 100 messages.");
   const domain = input.fromAddress.split("@")[1]?.toLowerCase();
   if (!domain || !ALLOWED_FROM_DOMAINS.includes(domain)) throw new Error(`Refusing to send from ${domain ?? "an invalid address"}.`);
-  if (!(await audienceEnabled({ audience: input.audience, tenantId: input.tenantId, subject: "", to: [], html: "", text: "" }))) {
-    console.warn(`[email] ${input.audience} email disabled — skipped batch`);
-    return { status: "suppressed", reason: "email_suppressed_or_unconfigured" };
-  }
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return { status: "suppressed", reason: "email_suppressed_or_unconfigured" };
+  const suppression = await batchEmailSuppression(input);
+  if (suppression) return { status: "suppressed", reason: suppression };
+  const apiKey = process.env.RESEND_API_KEY!;
 
   const { Resend } = await import("resend");
   const resend = new Resend(apiKey);
@@ -197,6 +207,7 @@ export async function sendBatchWithReceipt(input: SendBatchInput): Promise<SendB
     : await resend.batch.send(payload);
   if (result.error) throw new Error(result.error.message || "Resend rejected the batch.");
   const ids = (result.data?.data ?? []).map((item) => item.id).filter((id): id is string => typeof id === "string");
+  if (ids.length !== input.messages.length) throw new Error("Batch acceptance is unconfirmed; reconcile before retrying.");
   return { status: "accepted", count: input.messages.length, providerMessageIds: ids, acceptedAt: new Date().toISOString() };
 }
 

@@ -30,6 +30,10 @@ export const JOURNEY_SERVER_FLAGS = [
   "STRELVA_NEEDS_YOU_RELEASE",
   "STRELVA_OWNER_ENTRY",
   "STRELVA_BOOKING_STORE_WRITE",
+  // Make real approved by email link for an owner with no account (20261009140000).
+  "STRELVA_MAKE_REAL_OWNER_LINK_RELEASE",
+  // Every lead kept in Postgres, spam review and the workspace read (20261009113000).
+  "STRELVA_INQUIRY_RECORDS",
 ] as const;
 
 export function journeyEnvironment() {
@@ -54,6 +58,61 @@ export function adminHost(tenantId: string): string {
 }
 
 /**
+ * Serve client admin hosts the way Vercel does. On Vercel, Next trusts the Host
+ * header, so request.url names the host the browser asked for. A self-hosted
+ * `next dev` builds request.url from its own bound hostname instead
+ * (NextNodeServer.attachRequestMeta), so on admin.<tenant>.localhost every
+ * same-origin write guard (`origin === new URL(request.url).origin`) refuses
+ * and every redirect built from request.url points at the app host. This
+ * route maps both back for admin hosts only: a same-origin Origin header is
+ * presented as the bound origin, and a Location on the bound origin returns to
+ * the admin host. Cross-origin requests pass through untouched, so the guards
+ * still refuse them. Product code is unchanged.
+ *
+ * Two runner limits shape it. The runner's DNS does not resolve *.localhost
+ * (Chromium does), so requests go to the bound origin with the admin host in
+ * the Host header, as a proxy would. And Chromium follows a fulfilled
+ * redirect without routing the next hop, so a GET redirect chain that stays
+ * on the admin host is followed here and handed to the browser as one
+ * redirect to where it ends, which is what Vercel's absolute redirects give.
+ */
+export async function serveAdminHostsAsOnVercel(context: BrowserContext) {
+  // Host routing also belongs to the flags-off regression; it does not need
+  // any 1.0 release enabled.
+  const bound = new URL(localEnvironment().app).origin;
+  await context.route((url) => /^admin\.[a-z0-9-]+\.localhost$/.test(url.hostname), async (route) => {
+    const request = route.request();
+    let current = new URL(request.url());
+    const asked = current.origin;
+    const headers: Record<string, string> = { ...request.headers(), host: current.host };
+    if (headers.origin === asked) headers.origin = bound;
+    const onAdmin = (location: string) => {
+      const target = new URL(location, current);
+      return target.origin === bound || target.origin === asked ? new URL(`${asked}${target.pathname}${target.search}${target.hash}`) : target;
+    };
+    const send = (url: URL) => route.fetch({ url: `${bound}${url.pathname}${url.search}`, headers, maxRedirects: 0 });
+    let response = await send(current);
+    let followed = false;
+    for (let hop = 0; hop < 5 && request.method() === "GET" && response.status() >= 300 && response.status() < 400; hop += 1) {
+      const location = response.headers().location;
+      const next = location ? onAdmin(location) : null;
+      // Off the admin host, or a hop that sets cookies: the browser takes it from here.
+      if (!next || next.origin !== asked || response.headersArray().some((header) => header.name.toLowerCase() === "set-cookie")) break;
+      current = next;
+      followed = true;
+      response = await send(current);
+    }
+    const responseHeaders = response.headers();
+    if (responseHeaders.location) responseHeaders.location = onAdmin(responseHeaders.location).toString();
+    if (followed && !responseHeaders.location) {
+      await route.fulfill({ status: 307, headers: { location: current.toString(), "cache-control": "private, no-store" } });
+      return;
+    }
+    await route.fulfill({ response, headers: responseHeaders });
+  });
+}
+
+/**
  * A verified local identity signed in on each origin given. Session cookies
  * are host-only in Strelva, so a person signed in on the app host and on a
  * client admin host holds one cookie set per host, exactly as in production.
@@ -74,6 +133,7 @@ export async function person(browser: Browser, admin: Admin, label: string, opti
   if (signedIn.error) throw new Error(`The local Auth service rejected ${label}.`);
   const hosts = [env.app, ...(options.origins ?? [])].map((origin) => new URL(origin).hostname);
   await context.addCookies(hosts.flatMap((domain) => collected.map((cookie) => ({ ...cookie, domain, secure: false, sameSite: "Lax" as const }))));
+  if (hosts.some((host) => /^admin\.[a-z0-9-]+\.localhost$/.test(host))) await serveAdminHostsAsOnVercel(context);
   return { context, userId: created.data.user.id, email };
 }
 
@@ -87,7 +147,35 @@ export async function fixtureTenant(admin: Admin, input: { siteName: string; own
   const row = await admin.from("tenants").insert({ id: tenantId, site_name: input.siteName, active: true, owner_email: input.ownerEmail, owner_name: input.ownerName ?? null })
     .select("stable_id").single();
   expect(row.error).toBeNull();
+  await forgetTenantCache();
   return { tenantId, stableId: String(row.data!.stable_id) };
+}
+
+/**
+ * Read or write the disposable database directly, for tables the app reaches
+ * only through RPCs (no table grant to service_role): tenant_leads,
+ * inquiry_events, systems. Loopback only. `:'v1'`, `:'v2'`… are the values.
+ */
+export function localSql<T>(sql: string, ...values: string[]): T {
+  const url = process.env.STRELVA_LOCAL_DB_URL || "";
+  if (!url || new URL(url).hostname !== "127.0.0.1") throw new Error("Set STRELVA_LOCAL_DB_URL to the disposable database (loopback only).");
+  const vars = values.flatMap((value, index) => ["-v", `v${index + 1}=${value}`]);
+  const out = execFileSync("psql", [url, "-X", "-A", "-t", "-q", "-v", "ON_ERROR_STOP=1", ...vars], { input: sql, encoding: "utf8" }).trim();
+  return (out ? JSON.parse(out) : null) as T;
+}
+
+/**
+ * The tenant list is cached in Redis (`reb:tenants:all`); the app's own tenant
+ * writes drop that key (src/lib/tenants.ts invalidateCache). A fixture written
+ * straight to Postgres does the same, so the app sees it at once. Only the
+ * loopback Redis of pnpm check:journeys is ever touched.
+ */
+export async function forgetTenantCache() {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  if (!url) return;
+  if (new URL(url).hostname !== "127.0.0.1") throw new Error("UPSTASH_REDIS_REST_URL is not the loopback journeys Redis.");
+  const response = await fetch(url, { method: "POST", headers: { authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}` }, body: JSON.stringify(["DEL", "reb:tenants:all"]) });
+  expect(response.status).toBe(200);
 }
 
 /** Run one operator script against the loopback database and parse its --json outcome. */

@@ -9,13 +9,16 @@
  * and flags only.
  *
  * Read-only by construction: the dependencies below expose reads only
- * (Postgres head counts and column selects, Redis SCAN, TYPE and cardinality).
- * Nothing here can insert, update, delete, call an RPC, GET a Redis value or
+ * (Postgres head counts and column selects, Redis SCAN, TYPE, cardinality and
+ * one fixed-key client-email enum read per active tenant).
+ * Nothing here can insert, update, delete, call an RPC, read an arbitrary Redis value or
  * set a key. The report holds no secret values and no customer data: env
  * secrets are reported as present/absent, tenant slugs and sending domains are
  * business identifiers, and assertNoSensitiveOutput() refuses to print anything
  * that looks like an email address or a token.
  */
+
+import { silentRolloutEnvStops } from "./silent-rollout";
 
 export const JACOBS_YES = "--i-have-jacobs-yes";
 
@@ -58,8 +61,9 @@ export interface ReadOnlyDb {
   ): Promise<DbRows<T>>;
 }
 
-/** Redis, read side only: SCAN, TYPE and a cardinality read per type. Never GET. */
+/** Redis reads only. The fixed-key email policy read returns an enum, never a raw value. */
 export interface ReadOnlyRedis {
+  clientEmailOverride(tenantId: string): Promise<"on" | "off" | "absent" | "unknown">;
   scan(cursor: string, options: { match: string; count: number }): Promise<[string, string[]]>;
   type(key: string): Promise<string>;
   /** ZCARD / LLEN / SCARD / HLEN by type; a number, never a value. */
@@ -102,6 +106,13 @@ export const SEPT30_EXTRA_APPLIED = ["20260930120000"];
  * `accounts`. "missing" there is a stop.
  */
 export const MIGRATION_SENTINELS: Record<string, string> = {
+  "20261011102000": "workspace_collection_entries",
+  "20261011101000": "business_booking_email_settings",
+  "20261011120000": "business_policies",
+  "20261011150000": "public_booking_requests",
+  "20261010140000": "google_listing_controls",
+  "20261010142000": "workspace_newsletter_issues",
+  "20261010143000": "publishing_google_outages",
   "20260729180000": "accounts",
   "20260928130000": "business_effort_entries",
   "20261001120000": "website_documents",
@@ -134,6 +145,33 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261009100000": "strelva_service_actions",
   "20261009110000": "business_booking_messages",
   "20261009113000": "inquiry_events",
+  "20261009151000": "provider_seats",
+  "20261009152000": "agency_verifications",
+  "20261010102000": "owner_decision_link_sessions",
+  "20261010103000": "ask_business_record_drafts",
+  "20261010110000": "website_cutover_undos",
+  "20261010113000": "website_rebuild_origins",
+  "20261010114000": "website_domain_requests",
+  "20261010115000": "website_model_allowances",
+  "20261010115700": "website_native_fact_reviews",
+  "20261010120000": "inquiry_workspace_messages",
+  "20261010125600": "inquiry_engine_reply_claims",
+  "20261010125800": "connected_inquiry_owner_notices",
+  "20261010125910": "inquiry_decision_notice_claims",
+  "20261010125915": "inquiry_decision_notice_events",
+  "20261010125930": "inquiry_business_fact_proposals",
+  "20261010125940": "inquiry_booking_offers",
+  "20261010125950": "connected_inquiry_owner_notice_repairs",
+  "20261010131000": "business_booking_access",
+  "20261010132000": "business_booking_update_epoch",
+  "20261010133000": "business_booking_calendar_mirrors",
+  "20261010134000": "booking_inquiry_offers",
+  "20261010135000": "booking_instant_policies",
+  "20261010135920": "booking_service_policies",
+  "20261010135950": "booking_calendar_health_actions",
+  "20261010150300": "internal_tool_contact_conflicts",
+  "20261010152000": "catalog_report_receipts",
+  "20261010153000": "newsletter_contact_sync",
   "20261010160000": "agency_package_commands",
   "20261010161000": "operator_google_write_attempts",
   "20261010161100": "operator_queue_effort_context",
@@ -142,6 +180,9 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261010165500": "business_outcome_report_deliveries",
   "20261010165600": "workspace_exit_handoff_receipts",
   "20261010165700": "workspace_export_recovery",
+  "20261011100000": "workspace_newsletter_batches",
+  "20261011170000": "prospects",
+  "20261012110000": "business_pages",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */
@@ -181,6 +222,11 @@ export const FLAG_ENV = [
   "STRELVA_WEBSITE_REBUILD_RELEASE",
   "STRELVA_OWNER_ENTRY",
   "STRELVA_SYSTEMS_RELEASE",
+  "STRELVA_AGENCY_SIGNUP_RELEASE",
+  "STRELVA_INTERNAL_TOOL_NOTICES_RELEASE",
+  "STRELVA_CATALOG_REPORTS_RELEASE",
+  "STRELVA_NEWSLETTER_CONTACTS_RELEASE",
+  "STRELVA_DOCUMENT_HISTORY_RELEASE",
   "STRELVA_ASK_RELEASE",
   "STRELVA_NEEDS_YOU_RELEASE",
   "STRELVA_PUBLISHING_RELEASE",
@@ -201,14 +247,33 @@ export const FLAG_ENV = [
   "STRELVA_LEADS_READ",
   "STRELVA_LEADS_AUTHORITY",
   "STRELVA_INQUIRY_RECORDS",
+  "STRELVA_INQUIRY_REPLIES",
+  "STRELVA_INQUIRY_OWNER_NOTICES",
+  "STRELVA_INQUIRY_BUSINESS_FACTS",
+  "STRELVA_INQUIRY_OUTCOMES",
+  "STRELVA_INQUIRY_BOOKING_HANDOFF",
   "STRELVA_BOOKING_STORE_WRITE",
   "STRELVA_BOOKING_STORE_READ",
   "STRELVA_BOOKING_OWNER_NOTICE",
   "STRELVA_BOOKING_REMINDERS",
   "STRELVA_BOOKING_MANAGE_PAGE",
   "STRELVA_BOOKING_CALENDAR_BUSY",
+  "STRELVA_BOOKING_AGENTS",
+  "STRELVA_BOOKING_MESSAGES",
+  "STRELVA_BOOKING_INQUIRY_OFFERS",
+  "STRELVA_BOOKING_SETTINGS",
+  "STRELVA_BOOKING_CALENDAR_MIRROR",
+  "STRELVA_BOOKING_CALENDAR_SCOPES",
+  "STRELVA_BOOKING_CALENDAR_REVOKE",
+  "STRELVA_BOOKING_RECORD_FALLBACK",
+  "STRELVA_BOOKING_MANUAL",
   "STRELVA_MAKE_REAL_LIVE",
   "STRELVA_CONNECTED_SITES_RELEASE",
+  "STRELVA_BUSINESS_PAGES",
+  "STRELVA_WEBSITE_DOMAIN_EMAIL_ENABLED",
+  "STRELVA_WEBSITE_MODEL_CALLS_ENABLED",
+  "STRELVA_WEBSITE_BUSINESS_FACTS_ENABLED",
+  "STRELVA_WEBSITE_NATIVE_FACTS_ENABLED",
   "STRELVA_MAKE_REAL_OWNER_LINK_RELEASE",
   "REB_DEV_UNGATED_ACCESS",
 ] as const;
@@ -279,7 +344,9 @@ export interface SnapshotReport {
     activeTenantsWithAnalyticsConfig: string[];
     activeTenantsWithGoogleConnection: string[];
     activeTenantsWithClientEmailOverride: string[];
+    clientEmailOverrides: Record<string, "on" | "off" | "absent" | "unknown">;
   } | null;
+  silentRollout: { safe: boolean; stopConditions: string[] };
   notes: string[];
 }
 
@@ -401,6 +468,7 @@ export async function runReadinessSnapshot(options: { jacobsYes: boolean }, deps
     }
   }
 
+  let activeTenantReadComplete = false;
   /* postgres */
   const pg: SnapshotReport["postgres"] = {
     tenants: { total: null, active: null },
@@ -430,6 +498,7 @@ export async function runReadinessSnapshot(options: { jacobsYes: boolean }, deps
     });
     const gscIds = new Set(gsc.ok ? gsc.rows.map((r) => r.id) : []);
     if (active.ok) {
+      activeTenantReadComplete = pg.tenants.active !== null && active.rows.length === pg.tenants.active;
       pg.activeTenants = active.rows.map((row) => ({
         id: row.id,
         features: Array.isArray(row.features) ? [...row.features].sort() : [],
@@ -480,8 +549,14 @@ export async function runReadinessSnapshot(options: { jacobsYes: boolean }, deps
       const present = new Set(Object.keys(family?.byTenant ?? {}));
       return activeIds.length ? activeIds.filter((id) => present.has(id)) : [...present].sort();
     };
+    const clientEmailOverrides: NonNullable<SnapshotReport["redis"]>["clientEmailOverrides"] = {};
+    for (const id of activeIds) {
+      try { clientEmailOverrides[id] = await redis.clientEmailOverride(id); }
+      catch { clientEmailOverrides[id] = "unknown"; }
+    }
     redisReport = {
       families,
+      clientEmailOverrides,
       activeTenantsWithAnalyticsConfig: tenantsIn("analytics config"),
       activeTenantsWithGoogleConnection: tenantsIn("google connections"),
       activeTenantsWithClientEmailOverride: tenantsIn("client email overrides"),
@@ -491,7 +566,16 @@ export async function runReadinessSnapshot(options: { jacobsYes: boolean }, deps
 
   notes.push("Out of scope: gldf's own Supabase project (paused on Sept 30), Stripe, Vercel logs, Google.");
 
+  const stopConditions = silentRolloutEnvStops(deps.env);
+  if (!activeTenantReadComplete) stopConditions.push("Active tenant inventory is incomplete; silent rollout cannot be verified.");
+  if (!redisReport) stopConditions.push("Redis email overrides are unavailable; silent rollout cannot be verified.");
+  for (const [id, state] of Object.entries(redisReport?.clientEmailOverrides ?? {})) {
+    if (state === "on") stopConditions.push(`Active tenant ${id} has reb:client-email override on.`);
+    if (state === "unknown") stopConditions.push(`Active tenant ${id} email override is unknown; silent rollout cannot be verified.`);
+  }
+
   const report: SnapshotReport = {
+    silentRollout: { safe: stopConditions.length === 0, stopConditions },
     version: 1,
     observedAt: iso(now),
     sources: { postgres: Boolean(db), redis: Boolean(redis), auth: Boolean(auth), schemaMigrations: Boolean(applied) },
@@ -519,6 +603,9 @@ export function formatReport(report: SnapshotReport): string[] {
   lines.push(`Strelva production readiness snapshot, ${report.observedAt} (read-only)`);
   lines.push(`Sources: postgres=${report.sources.postgres} redis=${report.sources.redis} auth=${report.sources.auth} schema_migrations=${report.sources.schemaMigrations}`);
   lines.push("");
+  lines.push(`Silent rollout: ${report.silentRollout.safe ? "safe" : "STOP"}`);
+  for (const stop of report.silentRollout.stopConditions) lines.push(`  STOP: ${stop}`);
+  lines.push("");
   lines.push("Env (names only; secrets as present/absent):");
   for (const [name, state] of Object.entries(report.env.secrets)) lines.push(`  ${name}: ${state}`);
   for (const [name, state] of Object.entries(report.env.flags)) lines.push(`  ${name}: ${state}`);
@@ -544,7 +631,7 @@ export function formatReport(report: SnapshotReport): string[] {
   if (report.auth) lines.push(`Auth users: ${report.auth.total}, ${report.auth.emailConfirmed} email-confirmed, ${report.auth.signedInLast30Days} signed in within 30 days`);
   lines.push("");
   if (report.redis) {
-    lines.push("Redis (SCAN/TYPE/cardinality only):");
+    lines.push("Redis (SCAN/TYPE/cardinality and fixed-key email policy enums only):");
     for (const f of report.redis.families) {
       const tenants = Object.entries(f.byTenant).sort(([a], [b]) => a.localeCompare(b)).map(([t, c]) => `${t} ${c}${f.entriesByTenant?.[t] !== undefined ? `/${f.entriesByTenant[t]} entries` : ""}`);
       lines.push(`  ${f.match}: ${f.keys} keys${f.truncated ? " (truncated)" : ""}${tenants.length ? `; ${tenants.join(", ")}` : ""}`);

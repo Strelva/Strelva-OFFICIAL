@@ -203,6 +203,7 @@ disagree, the checklist's stop conditions win.
 | [4](https://github.com/Strelva/Strelva-OFFICIAL/issues/347) | Lead backfill · done Oct 7 | data | 3 · S1 |
 | [5](https://github.com/Strelva/Strelva-OFFICIAL/issues/348) | Preview environment (optional, recommended before batch 2) | new env | 5 |
 | [6](https://github.com/Strelva/Strelva-OFFICIAL/issues/349) | Batches 1 to 7 (unchanged, after release-safety's rehearsal) | migration ×7 | 1 |
+| 6b | Batch 8 (proposed; companions run, catalog not restored): readers fix and w6 migrations, after 7A | migration | 1 |
 | [6a](https://github.com/Strelva/Strelva-OFFICIAL/issues/350) | Batch 7A: agency-neutral amendments, dated before w6 migrations | migration | 1 |
 | [7](https://github.com/Strelva/Strelva-OFFICIAL/issues/351) | Deploy the 1.0 candidate with every new flag unset | deploy | 2 |
 | [8](https://github.com/Strelva/Strelva-OFFICIAL/issues/352) | Copy report and analytics state; client-records dual-write, backfill, parity | data | 3 · S2–S3 |
@@ -344,7 +345,8 @@ before each push and stop on any difference. Wave 4's journey gaps add two
 more (`20261009130000`, `20261009131000`) as batch 7, on top: 50 in all.
 Wave 5 adds `20261009140000` (the owner-link flag key) to batch 7: 51.
 Batch 0 is done, leaving 50 files in batches 1–7 from this inventory.
-Batch 7A and w6 files are additional; pin their final manifest separately.
+Batch 7A and w6 files are additional. The readers fix and w6 are listed as
+proposed batch 8 (not rehearsed) with digests; 7A still needs its own manifest.
 
 ### Before batch 0: a backup you have restored
 
@@ -412,6 +414,7 @@ After each batch:
 | 5 | `20261008110000`, `20261008111000`, `20261008123000`, `20261008124000`, `20261008130000`, `20261008131000`, `20261008140000` | No Sept 30 objects. Triggers on batch 1–2 tables (`systems`, `tenant_workspace_links`), wraps `tenant_unlink_plan`, replaces `workspace_release_flag_names` | Ask history, website change receipts, listing read-back queue, Needs you policy imports, Possibilities, Make real live, lead reads |
 | 6 | `20261008141000`, `20261008150000`, `20261008150100`, `20261008151000`, `20261009100000`, `20261009110000`, `20261009113000` | Yes: `btree_gist` extension, a column + FK and an index on live `public_website_bookings`; checks, columns and indexes on `tenant_leads` (written since `0.2.1`); a column + trigger on `owner_decisions`; replaces batch 1–5 functions | Booking store and lifecycle, linked-tenant publishing, domain approvals, connected sites, the Strelva service actor, inquiry records |
 | 7 | `20261009130000`, `20261009131000`, `20261009140000` | Yes, small: replaces two batch 3/6 functions (`read_strelva_handled`, `record_strelva_service_action`) with the same signatures, swaps the `purpose` check on `strelva_service_actions` (batch 6, append-only), and replaces `workspace_release_flag_names()` (batch 6) with one more key | Strelva handled lists decided Needs you items; Make real by signed link for an owner with no account, behind its own `make_real_owner_link` flag |
+| 8 (proposed; rehearsal fails catalog restore) | `20261009150000` and 83 w6 files (`20261010100000`–`20261010170000`); see "Batch 8 · proposed" | Not classified yet: live-object and lock impact unreviewed | Nothing until rehearsed; listed for review only |
 
 Batches 5 and 6 are in filename order; batch 6 depends on batch 5
 (`20261009100000` keeps every flag name `20261008131000` adds;
@@ -430,6 +433,139 @@ filename order, not in batches. Audit H cites release-safety's restored-copy
 batch rehearsal for Gate 2 step 4; integrate its exact results rather than
 treating this older filename-order check as equivalent. Preview (section 5)
 is the place to qualify the batches against the old app on hosted Postgres 17.
+
+<!-- proposed-batch-8:start -->
+### Batch 8 · proposed, rehearsal fails catalog restore: readers fix and w6
+
+Status: **proposed; forward and every companion run, catalog not restored.** Integrated on `a1/integrate-w6-r2`
+(#455): the readers fix (#252) and every w6 stream (release-safety, website,
+publishing, catalog, bookings, journeys, inquiries, owner-ask,
+agency-operator), plus one integration wrapper (`20261010170000`). 84
+files. They are listed in `scripts/release-safety/batches.json` under
+`proposed`, which `check:release-safety` does not read. Nothing here is
+staged, pushed or approved.
+
+- Proven locally: forward replay of every migration in filename order on a
+  fresh cluster, `check:workspace-sql` (per-stream forward and rollback
+  fixtures) and `check:workspace-upgrade`. Not proven: release-safety's
+  forward, reverse, forward with catalog/ACL comparison, the restored Oct 7
+  copy, hosted Postgres 17.
+- Every companion is now `rollback-<forward-file>` (release-safety's and
+  #527's contract); the shared owner-link companion is split per file.
+- Applies after batch 7A. Round 3 made two w6 files 7A-aware: owner decision
+  link sessions (`20261010102000`) are served and rechecked through the
+  verified agency of record like every other service session, and
+  `system_actor_scope` (`20261010163100`) keeps 7A's provider-seat read.
+  Their companions restore 7A's bodies byte-for-byte so 7A's own rollback
+  guards still match.
+- Release flag names (#253): every w6 file now appends or removes only its own
+  keys in `workspace_release_flag_names()`, so apply order cannot drop a
+  stream's flag. `tests/release-flag-names-final-schema.sql` pins the final
+  union (19 keys).
+- **Ordering.** 7A applies before this batch (packet order); two files now
+  depend on 7A objects. `20261009150000` (readers fix) is dated inside 7A's
+  window but has no 7A dependency.
+- Rehearsal, Oct 7 local (`pnpm check:release-safety:batch8`, opt-in): after
+  baseline, batches 0–7 and 7A, all 84 files apply and all 84 companions run
+  in reverse (one defect fixed: `rollback-20261010135955_booking_exit_admission.sql`
+  restored `booking_tenant` with three columns for a four-column type). The
+  catalog is **not** restored: 20 tables, 168 columns, 6 indexes, 6 triggers,
+  60 functions and 111 constraints remain, because the w6 companions keep
+  evidence tables and entry points in place instead of archiving them the way
+  batches 0–7 do. Batch 8 cannot join `batches` until each companion either
+  archives and drops (release-safety's contract) or the rehearsal accepts a
+  named retained-object list.
+- Who says yes: Jacob, per file set, after release-safety supplies rehearsal
+  evidence. This entry authorizes nothing.
+
+| Forward file | SHA-256 (12) | Rollback companion |
+| --- | --- | --- |
+| `20261009150000_reader_rpc_volatility` | `e0bb71275ff5` | `rollback-20261009150000_reader_rpc_volatility.sql` |
+| `20261010100000_owner_invitation_claim` | `f9f5d643cc0d` | `rollback-20261010100000_owner_invitation_claim.sql` |
+| `20261010102000_owner_decision_links` | `5b6a58caea0e` | `rollback-20261010102000_owner_decision_links.sql` |
+| `20261010102100_website_owner_link_launch` | `f6b16719de69` | `rollback-20261010102100_website_owner_link_launch.sql` |
+| `20261010103000_ask_business_fact_drafts` | `f50ff99f752a` | `rollback-20261010103000_ask_business_fact_drafts.sql` |
+| `20261010104000_owner_decision_website_preview` | `4836bf12d65c` | `rollback-20261010104000_owner_decision_website_preview.sql` |
+| `20261010110000_website_cutover_undo` | `2eed390b2abe` | `rollback-20261010110000_website_cutover_undo.sql` |
+| `20261010113000_website_system_releases` | `ce3aaa959b1a` | `rollback-20261010113000_website_system_releases.sql` |
+| `20261010114000_website_domain_requests` | `ce75612d024e` | `rollback-20261010114000_website_domain_requests.sql` |
+| `20261010115000_website_model_admission` | `148126b01ce2` | `rollback-20261010115000_website_model_admission.sql` |
+| `20261010115500_website_business_facts` | `65e60c5b1aff` | `rollback-20261010115500_website_business_facts.sql` |
+| `20261010115700_website_native_fact_reviews` | `39c0e5f10e4b` | `rollback-20261010115700_website_native_fact_reviews.sql` |
+| `20261010120000_inquiry_workspace_replies` | `0e8449ac0d69` | `rollback-20261010120000_inquiry_workspace_replies.sql` |
+| `20261010121000_inquiry_outcome_proof` | `f37be23868c6` | `rollback-20261010121000_inquiry_outcome_proof.sql` |
+| `20261010122000_inquiry_weekly_outcomes` | `d5313e628fe9` | `rollback-20261010122000_inquiry_weekly_outcomes.sql` |
+| `20261010123000_inquiry_context_notices` | `49b20de70665` | `rollback-20261010123000_inquiry_context_notices.sql` |
+| `20261010124000_connected_inquiry_records` | `25030cff72a2` | `rollback-20261010124000_connected_inquiry_records.sql` |
+| `20261010125000_inquiry_urgent_decisions` | `a0f1d7fe3007` | `rollback-20261010125000_inquiry_urgent_decisions.sql` |
+| `20261010125500_inquiry_inbox` | `eb9e8b5aa5e4` | `rollback-20261010125500_inquiry_inbox.sql` |
+| `20261010125600_inquiry_reply_purpose` | `b19132d4aac4` | `rollback-20261010125600_inquiry_reply_purpose.sql` |
+| `20261010125700_inquiry_cache_presence` | `a53475a1e250` | `rollback-20261010125700_inquiry_cache_presence.sql` |
+| `20261010125800_connected_inquiry_owner_notices` | `95cd063a1774` | `rollback-20261010125800_connected_inquiry_owner_notices.sql` |
+| `20261010125900_inquiry_export_before_teardown` | `b85199f551f9` | `rollback-20261010125900_inquiry_export_before_teardown.sql` |
+| `20261010125910_inquiry_decision_notice_claims` | `b6191189be01` | `rollback-20261010125910_inquiry_decision_notice_claims.sql` |
+| `20261010125915_inquiry_decision_notice_events` | `2cda63da9816` | `rollback-20261010125915_inquiry_decision_notice_events.sql` |
+| `20261010125920_tenant_lead_parity_completeness` | `593249eed7ff` | `rollback-20261010125920_tenant_lead_parity_completeness.sql` |
+| `20261010125925_inquiry_member_replies` | `31a4c93da1d2` | `rollback-20261010125925_inquiry_member_replies.sql` |
+| `20261010125930_inquiry_business_facts` | `853eb686c467` | `rollback-20261010125930_inquiry_business_facts.sql` |
+| `20261010125935_inquiry_operator_authority` | `b6f229cd3b57` | `rollback-20261010125935_inquiry_operator_authority.sql` |
+| `20261010125940_inquiry_booking_handoff` | `020a462a3978` | `rollback-20261010125940_inquiry_booking_handoff.sql` |
+| `20261010125950_inquiry_operator_review` | `d5b7c466cb42` | `rollback-20261010125950_inquiry_operator_review.sql` |
+| `20261010125955_inquiry_operator_revocation` | `8971490463a2` | `rollback-20261010125955_inquiry_operator_revocation.sql` |
+| `20261010130000_booking_parity` | `cb9400eeded0` | `rollback-20261010130000_booking_parity.sql` |
+| `20261010131000_booking_access` | `71ef42374f28` | `rollback-20261010131000_booking_access.sql` |
+| `20261010132000_booking_updates` | `2054f7b5fc9f` | `rollback-20261010132000_booking_updates.sql` |
+| `20261010133000_booking_calendar_mirror` | `bb78a005b074` | `rollback-20261010133000_booking_calendar_mirror.sql` |
+| `20261010134000_booking_inquiry_offers` | `90cc6a1262a9` | `rollback-20261010134000_booking_inquiry_offers.sql` |
+| `20261010135000_booking_setup` | `fbcd556ca5db` | `rollback-20261010135000_booking_setup.sql` |
+| `20261010135500_booking_receipt_history` | `6d56df538a38` | `rollback-20261010135500_booking_receipt_history.sql` |
+| `20261010135900_booking_receipt_lifecycle` | `2e55ddbe80e6` | `rollback-20261010135900_booking_receipt_lifecycle.sql` |
+| `20261010135910_booking_owner_evidence` | `938e6aff021e` | `rollback-20261010135910_booking_owner_evidence.sql` |
+| `20261010135920_booking_service_policies` | `7091ca705254` | `rollback-20261010135920_booking_service_policies.sql` |
+| `20261010135940_booking_manual` | `6c24b3ca00d7` | `rollback-20261010135940_booking_manual.sql` |
+| `20261010135945_booking_cancellation_cutoff` | `0268b1d85954` | `rollback-20261010135945_booking_cancellation_cutoff.sql` |
+| `20261010135950_booking_calendar_health` | `98538318b1e4` | `rollback-20261010135950_booking_calendar_health.sql` |
+| `20261010135955_booking_exit_admission` | `93a5c4e699d2` | `rollback-20261010135955_booking_exit_admission.sql` |
+| `20261010135956_booking_native_workspace` | `d0fdaf3d4d09` | `rollback-20261010135956_booking_native_workspace.sql` |
+| `20261010140000_google_listing_controls` | `bd73bdd48b95` | `rollback-20261010140000_google_listing_controls.sql` |
+| `20261010141000_publishing_release_flags` | `282390f4bba5` | `rollback-20261010141000_publishing_release_flags.sql` |
+| `20261010142000_workspace_publishing_content` | `a18b7644362e` | `rollback-20261010142000_workspace_publishing_content.sql` |
+| `20261010143000_publishing_reconnect` | `d8173afa1b76` | `rollback-20261010143000_publishing_reconnect.sql` |
+| `20261010150000_internal_tool_submit_notices` | `110c2d595560` | `rollback-20261010150000_internal_tool_submit_notices.sql` |
+| `20261010150100_internal_tool_use_links` | `cacee35a11ef` | `rollback-20261010150100_internal_tool_use_links.sql` |
+| `20261010150200_internal_tool_notice_delivery` | `d654c2e51b0d` | `rollback-20261010150200_internal_tool_notice_delivery.sql` |
+| `20261010150300_catalog_tool_evidence` | `d427152e9159` | `rollback-20261010150300_catalog_tool_evidence.sql` |
+| `20261010150400_internal_tool_use_edits` | `174d7aa326b4` | `rollback-20261010150400_internal_tool_use_edits.sql` |
+| `20261010152000_catalog_report_receipts` | `cf902ae50664` | `rollback-20261010152000_catalog_report_receipts.sql` |
+| `20261010153000_newsletter_contacts` | `73a4bab72d88` | `rollback-20261010153000_newsletter_contacts.sql` |
+| `20261010154000_system_work_plan_authority` | `cccc95d2332f` | `rollback-20261010154000_system_work_plan_authority.sql` |
+| `20261010155000_failed_system_plan_request` | `6743c34c637f` | `rollback-20261010155000_failed_system_plan_request.sql` |
+| `20261010155100_internal_tool_member_submit` | `06f32d312b7f` | `rollback-20261010155100_internal_tool_member_submit.sql` |
+| `20261010155200_internal_tool_use_link_labels` | `431012d2a7d8` | `rollback-20261010155200_internal_tool_use_link_labels.sql` |
+| `20261010160000_agency_authoring` | `3030d1e2c9c8` | `rollback-20261010160000_agency_authoring.sql` |
+| `20261010161000_operator_google_attempts` | `eb66a4a96832` | `rollback-20261010161000_operator_google_attempts.sql` |
+| `20261010161100_operator_effort_context` | `5b0778835065` | `rollback-20261010161100_operator_effort_context.sql` |
+| `20261010161200_operator_content_receipts` | `f13556ba7a61` | `rollback-20261010161200_operator_content_receipts.sql` |
+| `20261010161300_review_reply_reservations` | `fc52897ad419` | `rollback-20261010161300_review_reply_reservations.sql` |
+| `20261010161400_operator_complete_sources` | `cb1ce79c853b` | `rollback-20261010161400_operator_complete_sources.sql` |
+| `20261010162000_complete_client_record_stores` | `6cb73a159863` | `rollback-20261010162000_complete_client_record_stores.sql` |
+| `20261010162100_tenant_receipt_retention` | `6293e96d9a05` | `rollback-20261010162100_tenant_receipt_retention.sql` |
+| `20261010162200_inquiry_delivery_records` | `69215a26babb` | `rollback-20261010162200_inquiry_delivery_records.sql` |
+| `20261010163000_agency_operator_overview` | `682461fc3873` | `rollback-20261010163000_agency_operator_overview.sql` |
+| `20261010163100_version_management` | `dfc621fe3532` | `rollback-20261010163100_version_management.sql` |
+| `20261010163200_version_owner_grants` | `eb4ec7db41ac` | `rollback-20261010163200_version_owner_grants.sql` |
+| `20261010163300_version_native_applications` | `69bdaf48f912` | `rollback-20261010163300_version_native_applications.sql` |
+| `20261010163400_version_sibling_changes` | `512198a07d3b` | `rollback-20261010163400_version_sibling_changes.sql` |
+| `20261010164000_finite_job_adapters` | `f2c7780c61b6` | `rollback-20261010164000_finite_job_adapters.sql` |
+| `20261010165000_tenant_business_context` | `8f98460acd6b` | `rollback-20261010165000_tenant_business_context.sql` |
+| `20261010165500_business_portability` | `fdb1db1a4ae9` | `rollback-20261010165500_business_portability.sql` |
+| `20261010165600_exit_handoff_evidence` | `e28fd6bf9ef9` | `rollback-20261010165600_exit_handoff_evidence.sql` |
+| `20261010165700_export_recovery` | `7f0e03212cba` | `rollback-20261010165700_export_recovery.sql` |
+| `20261010165800_unbounded_export_archive` | `8bb45a0d6921` | `rollback-20261010165800_unbounded_export_archive.sql` |
+| `20261010165900_export_build_access` | `e2dd7c05fc27` | `rollback-20261010165900_export_build_access.sql` |
+| `20261010170000_deprovision_retained_after_inquiry_export` | `172e31fd9858` | `rollback-20261010170000_deprovision_retained_after_inquiry_export.sql` |
+
+<!-- proposed-batch-8:end -->
 
 ### Step 6a · Batch 7A, before w6
 

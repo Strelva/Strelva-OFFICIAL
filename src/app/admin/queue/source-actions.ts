@@ -54,14 +54,13 @@ export async function runQueueSourceAction(input: { key: string; action: QueueSo
       message = "Lead kept in Postgres. No notification sent.";
     } else if (input.action === "check_health" && item.kind === "site_health" && item.sourceRef.startsWith("document:") && item.business.kind === "workspace") {
       const { websiteDocumentStore, checkWebsiteHealth, currentHostedUrl } = await import("@/products/websites/index");
-      const { ROOT_DOMAIN } = await import("@/platform/infra/brand");
       // Publication data and provider URL are read server-side. A workspace
       // health item need not have a tenant_workspace_links row to be checked.
       const target = (await websiteDocumentStore.listPublished()).find(row => row.workspaceId === (item.business.kind === "workspace" ? item.business.workspaceId : null)
         && item.sourceRef === `document:${row.workId}:${row.revision}`);
       if (!target?.tenantId) throw new Error("The published site changed. Refresh before checking it.");
       const receipt = await checkWebsiteHealth({ workspaceId: target.workspaceId, workId: target.workId, tenantId: target.tenantId,
-        revision: target.revision, contentHash: target.contentHash, url: currentHostedUrl({ tenantId: target.tenantId, receipt: target.receipt }, ROOT_DOMAIN) });
+        revision: target.revision, contentHash: target.contentHash, url: currentHostedUrl({ tenantId: target.tenantId, receipt: target.receipt }) });
       await websiteDocumentStore.recordHealth(receipt);
       message = receipt.status === "healthy" ? "Published revision read back and matched." : `Health check saved: ${receipt.status.replaceAll("_", " ")}. The site still needs attention.`;
     } else if (input.action === "check_health" && item.kind === "site_health" && tenantId) {
