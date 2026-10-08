@@ -57,6 +57,19 @@ function text(value: string, field: string, max = 200): string {
   return result;
 }
 
+/** Locks belong to an immutable source revision, never to local bindings/data. */
+export function validateLockedPaths(definition: JsonObject, paths: readonly string[]): string[] {
+  if (paths.length > 100) throw new VersionValidationError("A revision supports at most 100 pushed standards.");
+  const result = [...new Set(paths.map(validPath))].sort();
+  if (result.some(path => path === "*" || path.split(".").some(part => ["__proto__", "prototype", "constructor"].includes(part)) || readPath(definition, path) === undefined)) throw new VersionValidationError("Lock an existing definition field, not local data or an entire System.");
+  return result;
+}
+export function assertLockedDefinition(revision: SourceRevision, definition: JsonObject): void {
+  for (const path of revision.lockedPaths ?? []) {
+    if (!jsonEqual(readPath(revision.definition, path), readPath(definition, path))) throw new VersionValidationError("This change would alter a pushed standard. Take the source value before releasing.");
+  }
+}
+
 /** Baseline plus local overrides, shallowest first. */
 export function applyOverrides(baseline: JsonObject, overrides: readonly VersionOverride[]): JsonObject {
   const result = cloneJson(baseline);
@@ -101,6 +114,9 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
   }
 
   async function save(actor: VersionActor, lineage: VersionLineage, expectedRowRevision: number): Promise<VersionLineage> {
+    const baseline = await store.getRevision(actor, lineage.source, lineage.baseline.revision);
+    if (!baseline) throw new VersionAccessError();
+    assertLockedDefinition(componentRevision(lineage, baseline), working(lineage));
     const next = { ...lineage, updatedAt: now() };
     const saved = await store.updateLineage(actor, next, expectedRowRevision);
     return saved ?? (await store.getLineage(actor, lineage.id))!;
@@ -115,7 +131,7 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
     const definition=revision.definition.systems;
     const part=Array.isArray(definition)?definition.find(item=>item&&typeof item==="object"&&!Array.isArray(item)&&item.key===lineage.sourceComponentKey):undefined;
     if(!part||typeof part!=="object"||Array.isArray(part)||!part.definition||typeof part.definition!=="object"||Array.isArray(part.definition))throw new VersionValidationError("This bundle component was removed from the source. Keep the current draft and review the source.");
-    return {...revision,definition:part.definition};
+    return {...revision,definition:part.definition, lockedPaths: revision.lockedPaths?.includes("systems") ? ["*"] : []};
   }
   function compareWith(lineage: VersionLineage, revision: SourceRevision): ImprovementComparison & { upstreamPaths: string[] } {
     revision=componentRevision(lineage,revision);
@@ -143,6 +159,13 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
       local,
       localEditPaths: lineage.overrides.map((override) => override.path),
     });
+    for (const locked of revision.lockedPaths ?? []) {
+      if (jsonEqual(readPath(local, locked), readPath(revision.definition, locked))) continue;
+      for (const override of lineage.overrides.filter(item => overlaps(item.path, locked))) {
+        if (result.conflicts.some(conflict => overlaps(conflict.path, override.path))) continue;
+        result.conflicts.push({ path: override.path, reason: "overlapping_edit", base: readPath(lineage.baseline.definition, override.path), upstream: readPath(revision.definition, override.path), local: readPath(local, override.path) });
+      }
+    }
     const bound = new Set(lineage.bindings.map((binding) => binding.kind));
     const missingBindings = revision.requires.bindingKinds.filter((kind) => !bound.has(kind));
     return {
@@ -151,6 +174,7 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
       sourceRevision: revision.source.number,
       summary: revision.summary,
       status: result.conflicts.length > 0 || missingBindings.length > 0 ? "blocked" : "auto_applicable",
+      lockedPaths: revision.lockedPaths ?? [],
       changes: result.changes,
       conflicts: result.conflicts,
       missingBindings,
@@ -171,7 +195,7 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
     /** Author side: publish an immutable shareable revision of a source System. */
     async publishSourceRevision(
       actor: VersionActor,
-      input: { source: SystemRef; definition: JsonObject; requires?: { bindingKinds: string[] }; summary: string; label?: string; declaration?: PackageDeclaration },
+      input: { source: SystemRef; definition: JsonObject; requires?: { bindingKinds: string[] }; summary: string; label?: string; declaration?: PackageDeclaration; lockedPaths?: string[] },
     ): Promise<SourceRevision> {
       requireManage(actor, input.source.businessId);
       assertShareableDefinition(input.definition);
@@ -187,6 +211,7 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
         ...(input.label ? { label: input.label } : {}),
         summary: text(input.summary, "summary", 500),
         definition: cloneJson(input.definition),
+        ...(input.lockedPaths ? { lockedPaths: validateLockedPaths(input.definition, input.lockedPaths) } : {}),
         requires: { bindingKinds: [...new Set(input.requires?.bindingKinds ?? [])].sort() },
         publishedBy: actor.userId,
         publishedAt: now(),
@@ -262,6 +287,9 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
       const lineage = await loadOwned(actor, versionId, true);
       if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
       const path = validPath(input.path);
+      const baseline = await store.getRevision(actor, lineage.source, lineage.baseline.revision);
+      if (!baseline) throw new VersionAccessError();
+      if (input.value !== undefined && baseline.lockedPaths?.some(locked => overlaps(locked, path))) throw new VersionValidationError("This field is a pushed standard. Change it at the source.");
       const at = now();
       const restored = lineage.overrides.find(override => override.path === "*");
       if (path === "*" || restored) {
@@ -384,6 +412,7 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
       for (const resolution of resolutions) {
         if (!expected.has(resolution.path) || seen.has(resolution.path)) throw new VersionValidationError("Each conflict must be resolved exactly once.");
         if (resolution.choice !== "keep_local" && resolution.choice !== "take_upstream") throw new VersionValidationError("Choose keep local or take upstream.");
+        if (resolution.choice === "keep_local" && revision.lockedPaths?.some(locked => overlaps(locked, resolution.path))) throw new VersionValidationError("A pushed standard must take the upstream value.");
         seen.add(resolution.path);
       }
       if (seen.size !== expected.size) throw new VersionConflictError(comparison.conflicts);
@@ -448,6 +477,9 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
         if (!isRevisionQualified(baseline)) throw new VersionValidationError("This exact revision needs qualification and human review before release.");
         assertPackageDeclaration(definition, baseline.declaration, baseline.requires.bindingKinds);
       }
+      const baselineForLocks = await store.getRevision(actor, lineage.source, lineage.baseline.revision);
+      if (!baselineForLocks) throw new VersionAccessError();
+      assertLockedDefinition(componentRevision(lineage, baselineForLocks), definition);
       const latest = lineage.releases.at(-1);
       if (latest && jsonEqual(latest.definition, definition)) throw new VersionValidationError("Nothing changed since the current release.");
       const number = (latest?.number ?? 0) + 1;

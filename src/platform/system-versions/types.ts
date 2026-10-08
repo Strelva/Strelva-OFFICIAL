@@ -52,6 +52,8 @@ export interface SourceRevision {
   summary: string;
   definition: JsonObject;
   requires: { bindingKinds: string[] };
+  /** Immutable source policy. Local accounts/data never become standards. */
+  lockedPaths?: string[];
   publishedBy: string;
   publishedAt: string;
   creatorWorkspaceId?: string;
@@ -140,6 +142,7 @@ export interface ImprovementComparison {
   sourceRevision: number;
   summary: string;
   status: ImprovementStatus;
+  lockedPaths?: string[];
   changes: ThreeWayChange[];
   conflicts: ThreeWayConflict[];
   /** Required binding kinds this Version has not bound locally. */

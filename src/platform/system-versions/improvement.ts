@@ -47,7 +47,7 @@ export interface ImprovementPossibility {
   status: "exploring" | "ready";
   changes: Array<{ path: string; before: JsonValue | undefined; after: JsonValue | undefined }>;
   /** Each conflict waits for keep local or take upstream, with both values shown. */
-  conflicts: Array<{ path: string; local: JsonValue | undefined; upstream: JsonValue | undefined; reason: string }>;
+  conflicts: Array<{ path: string; local: JsonValue | undefined; upstream: JsonValue | undefined; reason: string; locked?: boolean }>;
   missingAccounts: string[];
   preview: JsonObject;
   /** Make real = this Version's next release. */
@@ -65,7 +65,7 @@ export function improvementPossibility(lineage: Pick<VersionLineage, "id" | "ver
     // Ready only when nothing waits on a choice or an account.
     status: offer.status === "auto_applicable" ? "ready" : "exploring",
     changes: offer.changes.map((change) => ({ path: change.path, before: change.base, after: change.upstream })),
-    conflicts: offer.conflicts.map((conflict) => ({ path: conflict.path, local: conflict.local, upstream: conflict.upstream, reason: conflict.reason })),
+    conflicts: offer.conflicts.map((conflict) => ({ path: conflict.path, local: conflict.local, upstream: conflict.upstream, reason: conflict.reason, locked: offer.lockedPaths?.some(path => path === "*" || path === conflict.path || path.startsWith(`${conflict.path}.`) || conflict.path.startsWith(`${path}.`)) ?? false })),
     missingAccounts: [...offer.missingBindings],
     preview: offer.preview,
     makeReal: { kind: "version_release", versionId: lineage.id },

@@ -17,6 +17,8 @@ import { APP_ROOT_DOMAIN, CONTROL_PLANE_URL, MARKETING_URL, OPERATOR_URL, isPlat
 import { websiteRebuildReleaseMayBeOn } from "./products/websites/index";
 import { hostedRedirectTarget } from "./products/websites/index";
 import { strelvaHostedPreviewEnabled } from "./experience/workspace/preview/enabled";
+import { customersReleaseEnabled } from "./platform/customers/release";
+import { workspaceReleaseEnabled } from "./platform/workspace-release";
 import { OWNER_ENTRY_PATH, ownerEntryPossible } from "./platform/owner-entry/env";
 
 export { isMarketingHost } from "./lib/marketing-hosts";
@@ -133,9 +135,13 @@ const PUBLIC_PREFIXES = [
 // negative lookahead — literal prefix, so `/apixyz`/`/administrator` are protected too).
 const PROTECTED_AREA = /^\/(?:api|dashboard|admin|studio)/;
 
+export function isHomeFinderPublicPath(path: string): boolean {
+  return /^\/api\/home-finder\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(path);
+}
 export function isPublicRoute(req: NextRequest): boolean {
   const path = normalizePathForMatch(req.nextUrl.pathname);
   if (path === null) return false;
+  if (isHomeFinderPublicPath(path)) return true;
   if (PUBLIC_EXACT.has(path)) return true;
   if (PUBLIC_PREFIXES.some((prefix) => path.startsWith(prefix))) return true;
   // Marketing/public catch-all: anything not under a control-plane area.
@@ -283,7 +289,7 @@ function isTenantAppPath(path: string): boolean {
 function isSitesAppPath(path: string): boolean {
   if (isTenantAppPath(path)) return true;
   if (PROTECTED_AREA.test(path)) return !/^\/api\/v1\//.test(path);
-  return /^\/(?:auth|workspace|account|client|admin|studio|onboard|access-request|preview|demo|apps|custom-applications|agency-websites|ai-visibility|audit|embed)(?:\/|$)/.test(path);
+  return /^\/(?:auth|workspace|account|client|admin|studio|onboard|access-request|preview|demo|apps|custom-applications|agency-websites|ai-visibility|audit|embed|home-finder)(?:\/|$)/.test(path);
 }
 
 function sitesAppRedirect(req: NextRequest, tenant: string, path: string): URL {
@@ -578,6 +584,22 @@ export default async function proxy(req: NextRequest) {
     if (isSitesAppPath(path)) {
       return applySecurityHeaders(NextResponse.redirect(sitesAppRedirect(req, tenant, path)), req);
     }
+  }
+  // The native IDX page frames only at its exact licensed brokerage origin.
+  // No query parameter, signed-in role or dev bypass broadens this policy.
+  const finderEntry = /^\/home-finder\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(pathname);
+  if (finderEntry) {
+    if (!workspaceReleaseEnabled() || !customersReleaseEnabled()) return applySecurityHeaders(new NextResponse("Home Finder unavailable", { status: 404 }), req);
+    const { homeFinderFrameAncestors } = await import("./products/home-finder/entry");
+    const ancestors = await homeFinderFrameAncestors(finderEntry[1]!);
+    const forwarded = new Headers(req.headers);
+    for (const header of ["x-tenant", "x-preview-mode", "x-client-fallback-root", DASHBOARD_PATH_HEADER]) forwarded.delete(header);
+    const response = applySecurityHeaders(NextResponse.next({ request: { headers: forwarded } }), req);
+    response.headers.set("Content-Security-Policy", response.headers.get("Content-Security-Policy")!.replace(/frame-ancestors [^;]+/, ancestors));
+    if (ancestors !== "frame-ancestors 'none'") response.headers.delete("X-Frame-Options");
+    response.headers.set("Cache-Control", "private, no-store");
+    response.headers.set("Referrer-Policy", "no-referrer");
+    return response;
   }
   // Embeds admit only the enabled agency's configured HTTPS contact origin.
   // Every other surface retains DENY. Query params cannot alter frame authority.

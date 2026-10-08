@@ -59,6 +59,7 @@ export function mapVersionsError(error: DbError, fallback: string): never {
   if (detail.includes("system_version_binding_taken")) {
     throw new VersionValidationError("That account is already connected to another Version. Connect a separate account for this one.");
   }
+  if (detail.includes("system_version_standard_locked")) throw new VersionValidationError("This field is a pushed standard. Take its source value.");
   if (detail.includes("workspace_exit_future_work_blocked")) throw new VersionValidationError("New work is stopped for this business.");
   if (detail.includes("system_revision_not_qualified")) throw new VersionValidationError("This exact source revision needs passing checks and human review before installation, update or release.");
   if (detail.includes("system_revision_reviewer_policy_required")) throw new VersionValidationError("A human reviewer and review standard have to be configured before qualification can be approved.");
@@ -90,6 +91,7 @@ const revisionSchema = z.object({
   label: z.string().max(40).optional(),
   summary: z.string(),
   definition: jsonObject,
+  lockedPaths: z.array(z.string().regex(/^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$/)).max(100).optional(),
   requires: z.object({ bindingKinds: z.array(z.string()) }).strict(),
   publishedBy: uuid,
   publishedAt: iso,

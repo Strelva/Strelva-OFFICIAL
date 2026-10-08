@@ -14,7 +14,7 @@ const systemRef = z.object({ businessId: uuid, systemId: uuid });
 const possibilitySchema = z.object({ id: z.string(), system: systemRef, title: z.string(), summary: z.string(), sourceRevision: z.number().int().positive(),
   status: z.enum(["exploring", "ready"]), preview: z.record(z.string(), z.unknown()),
   changes: z.array(z.object({ path: z.string(), before: z.unknown(), after: z.unknown() })),
-  conflicts: z.array(z.object({ path: z.string(), local: z.unknown(), upstream: z.unknown() })), missingAccounts: z.array(z.string()),
+  conflicts: z.array(z.object({ path: z.string(), local: z.unknown(), upstream: z.unknown(), locked: z.boolean().optional() })), missingAccounts: z.array(z.string()),
   makeReal: z.object({ kind: z.literal("version_release"), versionId: uuid }),
 });
 const pendingReleaseSchema = z.object({ id: z.string(), system: systemRef, title: z.string(), status: z.literal("ready"), rowRevision: z.number().int().positive(),
@@ -154,7 +154,7 @@ function ScopedSystemVersionImprovements({ workspaceId, systemId, versionId, rea
       <details><summary>Compare with the current draft</summary><ul className="my-3 space-y-2">{offer.changes.map(change => <li key={change.path} className="break-words">{change.path}: {valueLabel(change.before)} → {valueLabel(change.after)}</li>)}</ul><VersionAlternative definition={offer.preview} label="Alternative definition" /></details>
       {offer.missingAccounts.length ? <p role="status">Connect {offer.missingAccounts.join(", ")} in this business before preparing the improvement.</p> : null}
       {offer.conflicts.map(conflict => <div key={conflict.path} className="space-y-2 min-w-0"><p className="break-words">{conflict.path}</p><p className="break-words text-gray-muted">Here: {valueLabel(conflict.local)}</p><p className="break-words text-gray-muted">Source: {valueLabel(conflict.upstream)}</p>
-        {!readOnly && view?.canManage ? <SelectInput label={`Choice for ${conflict.path}`} disabled={locked} value={choices[conflict.path] ?? ""} onChange={event => setChoices(previous => ({ ...previous, [conflict.path]: event.target.value as "keep_local" | "take_upstream" }))} options={[{ value: "", label: "Choose what to keep" }, { value: "keep_local", label: "Keep our value" }, { value: "take_upstream", label: "Take the source value" }]} /> : null}
+        {!readOnly && view?.canManage ? <SelectInput label={`Choice for ${conflict.path}`} disabled={locked} value={choices[conflict.path] ?? ""} onChange={event => setChoices(previous => ({ ...previous, [conflict.path]: event.target.value as "keep_local" | "take_upstream" }))} options={[{ value: "", label: "Choose what to keep" }, ...(!conflict.locked ? [{ value: "keep_local", label: "Keep our value" }] : []), { value: "take_upstream", label: "Take the source value" }]} /> : null}
       </div>)}
       {!readOnly && view?.canManage && !success ? pending.current ? <Button size="lg" disabled={busy} loading={busy} onClick={() => void prepare(pending.current!.action)}>Retry the same choice</Button> : <>
         <Button size="lg" disabled={busy || Boolean(offer.missingAccounts.length) || offer.conflicts.some(conflict => !choices[conflict.path])} onClick={() => void prepare("adopt")}>Prepare for review</Button>

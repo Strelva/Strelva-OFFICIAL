@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/Button";
-import { SelectInput, TextArea } from "@/components/ui/TextInput";
+import { SelectInput, TextArea, TextInput } from "@/components/ui/TextInput";
 import { WorkPlanExperience } from "../WorkPlanExperience";
 import type { AgencyClientRow } from "../agency-clients";
 import type { WorkspaceSnapshot } from "../contracts";
@@ -38,6 +38,7 @@ function AgencyPackage({ request, workspaceId, url }: { request: typeof fetch; w
   const [error, setError] = useState("");
   const [systemId, setSystemId] = useState("");
   const [summary, setSummary] = useState("");
+  const [locks, setLocks] = useState("");
   const [busy, setBusy] = useState(false);
   const [receipt, setReceipt] = useState<z.infer<typeof packageReceiptSchema> | null>(null);
   const pending = useRef<string | null>(null);
@@ -57,7 +58,7 @@ function AgencyPackage({ request, workspaceId, url }: { request: typeof fetch; w
   async function publish() {
     if (!selected || inFlight.current || receipt || !summary.trim()) return;
     inFlight.current = true; setBusy(true); setError("");
-    pending.current ??= JSON.stringify({ workspaceId, systemId: selected.systemId, fingerprint: selected.fingerprint, expectedRevision: selected.revision, summary, commandId: crypto.randomUUID() });
+    pending.current ??= JSON.stringify({ workspaceId, systemId: selected.systemId, fingerprint: selected.fingerprint, expectedRevision: selected.revision, summary, ...(locks.trim() ? { lockedPaths: locks.split(",").map(path => path.trim()).filter(Boolean) } : {}), commandId: crypto.randomUUID() });
     try {
       const response = await request(`${url}&action=package`, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: pending.current });
       const value: unknown = await response.json().catch(() => null);
@@ -73,7 +74,7 @@ function AgencyPackage({ request, workspaceId, url }: { request: typeof fetch; w
     {!state && !error ? <p role="status">Loading reusable Systems…</p> : null}
     {error ? <div><p role="alert" className="text-sm text-critical">{error}</p>{!state ? <Button variant="secondary" onClick={() => setAttempt(value => value + 1)}>Retry</Button> : null}</div> : null}
     {state?.choices.length ? <SelectInput label="System owned by this agency" value={systemId} disabled={busy || Boolean(pending.current)} onChange={event => setSystemId(event.target.value)} options={[{ value: "", label: "Choose a System" }, ...state.choices.map(choice => ({ value: choice.systemId, label: `${choice.name} · revision ${choice.revision + 1}` }))]} /> : state ? <p className="text-sm text-gray-muted">No reusable Systems yet. Make an internal tool in this agency, or adapt a source into this agency first.</p> : null}
-    {selected ? <><p className="text-sm text-gray-muted">{selected.name} becomes source revision {selected.revision + 1}. Each client Version chooses whether to take it.</p><TextArea label="What changed" value={summary} maxLength={500} required rows={3} disabled={busy || Boolean(pending.current)} onChange={event => setSummary(event.target.value)} /><Button disabled={busy || !summary.trim() || Boolean(receipt)} loading={busy} onClick={() => void publish()}>{pending.current && !receipt ? "Retry this package" : "Publish source revision"}</Button></> : null}
+    {selected ? <><p className="text-sm text-gray-muted">{selected.name} becomes source revision {selected.revision + 1}. Each client Version chooses whether to take it.</p><TextArea label="What changed" value={summary} maxLength={500} required rows={3} disabled={busy || Boolean(pending.current)} onChange={event => setSummary(event.target.value)} /><TextInput label="Pushed standards (optional field paths, separated by commas)" value={locks} disabled={busy || Boolean(pending.current)} onChange={event => setLocks(event.target.value)} placeholder="branding.name, policy.cancellation" /><p className="text-xs text-gray-muted">Locked fields must exist in this definition. Client Versions take the source value; their own accounts, data and local fields remain independent. Each new revision needs its own qualification.</p><Button disabled={busy || !summary.trim() || Boolean(receipt)} loading={busy} onClick={() => void publish()}>{pending.current && !receipt ? "Retry this package" : "Publish source revision"}</Button></> : null}
     {receipt ? <p role="status" className="text-sm text-warm-black">Source revision {receipt.revision} is published. Open Library to prepare it for client review.</p> : null}
     {state?.unavailable.length ? <details><summary className="cursor-pointer text-sm text-gray-muted">{state.unavailable.length} Systems cannot be packaged yet</summary><ul className="mt-2 text-sm text-gray-muted">{state.unavailable.map(item => <li key={item.systemId}>{item.name} — no reusable definition could be read.</li>)}</ul></details> : null}
   </section>;

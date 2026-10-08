@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 const uuid = z.string().uuid();
 const packageBody = z.object({ workspaceId: uuid, systemId: uuid, commandId: uuid, fingerprint: z.string().min(1).max(150),
+  lockedPaths: z.array(z.string().regex(/^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$/).max(300)).max(100).optional(),
   expectedRevision: z.number().int().min(0), summary: z.string().trim().min(1).max(500) }).strict();
 function failure(error: unknown) {
   if (error instanceof VersionAccessError) return workspaceJson({ error: "This client or agency is unavailable to your account." }, 403);

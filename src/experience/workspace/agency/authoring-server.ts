@@ -1,3 +1,4 @@
+import { canonicalJson, sha256 } from "@/platform/business-record/tenant-import";
 /** Agency authoring uses the existing funded planner, native output and Version
  * stores. No provider write, message, client grant or owner decision is implied. */
 import { z } from "zod";
@@ -91,16 +92,18 @@ export async function readPackageChoices(actor: WorkspaceActor, agencyWorkspaceI
   return { workspaceId: agencyWorkspaceId, choices, unavailable };
 }
 
-export async function packageAgencySystem(actor: WorkspaceActor, input: { workspaceId: string; systemId: string; commandId: string; fingerprint: string; expectedRevision: number; summary: string }, db: VersionsDb = versionsDb()) {
+export async function packageAgencySystem(actor: WorkspaceActor, input: { workspaceId: string; systemId: string; commandId: string; fingerprint: string; expectedRevision: number; summary: string; lockedPaths?: string[] }, db: VersionsDb = versionsDb()) {
   await requireAgencyAuthoring(actor, input.workspaceId, input.workspaceId, db);
   const packageReceipt = (value: unknown) => {
     const parsed = z.object({ source: z.object({ businessId: z.string().uuid(), systemId: z.string().uuid(), revisionId: z.string().uuid(), number: z.number().int().positive() }).strict() }).passthrough().safeParse(value);
     if (!parsed.success || parsed.data.source.businessId !== input.workspaceId || parsed.data.source.systemId !== input.systemId || parsed.data.source.number !== input.expectedRevision + 1) throw new WorkspaceStoreError("The package receipt could not be confirmed.");
     return parsed.data.source;
   };
+  const lockPaths = [...new Set(input.lockedPaths ?? [])].sort();
+  const commandFingerprint = lockPaths.length ? sha256(canonicalJson({ fingerprint: input.fingerprint, lockedPaths: lockPaths })) : input.fingerprint;
   const replay = await db.rpc("read_agency_package_command", {
     p_workspace_id: input.workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail,
-    p_command_id: input.commandId, p_system_id: input.systemId, p_fingerprint: input.fingerprint,
+    p_command_id: input.commandId, p_system_id: input.systemId, p_fingerprint: commandFingerprint,
     p_expected_revision: input.expectedRevision, p_summary: input.summary,
   });
   if (replay.error) mapVersionsError(replay.error, "The package could not be confirmed. Retry the same request.");
@@ -114,7 +117,7 @@ export async function packageAgencySystem(actor: WorkspaceActor, input: { worksp
   const base = createSupabaseVersionStore(db);
   // Reuse all the source store's checks. Only insertion has a command receipt.
   const store: VersionStore = { ...base, async insertRevision(_actor, revision) {
-    const publication = { ...revision, source: { ...revision.source, number: input.expectedRevision + 1 }, packageFingerprint: input.fingerprint };
+    const publication = { ...revision, source: { ...revision.source, number: input.expectedRevision + 1 }, packageFingerprint: commandFingerprint };
     const { data, error } = await db.rpc("publish_agency_package", {
       p_workspace_id: input.workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail,
       p_command_id: input.commandId, p_expected_revision: input.expectedRevision, p_revision: publication,
@@ -131,7 +134,7 @@ export async function packageAgencySystem(actor: WorkspaceActor, input: { worksp
     name: row.system.name, kind: row.system.kind, origin: row.system.origin,
   }, input.systemId);
   const revision = await createSystemVersions({ store, connections: createSupabaseConnectionOwnership(db), rehearsePackage: revision => rehearseApplicationPackage(revision.source.revisionId, revision.definition) }).publishSourceRevision(actorForVersions, {
-    source: { businessId: input.workspaceId, systemId: input.systemId }, definition: choice.definition, requires: choice.requires, summary: input.summary,
+    source: { businessId: input.workspaceId, systemId: input.systemId }, definition: choice.definition, requires: choice.requires, summary: input.summary, ...(lockPaths.length ? { lockedPaths: lockPaths } : {}),
   });
   return { workspaceId: input.workspaceId, systemId: input.systemId, revision: revision.source.number, revisionId: revision.source.revisionId };
 }
