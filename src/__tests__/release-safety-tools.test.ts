@@ -40,6 +40,14 @@ describe("silent rollout preflight", () => {
 });
 
 describe("offline batch staging", () => {
+  it("names both files when a migration version is reused, even before packet classification", () => {
+    const repo = temp();
+    const migrations = join(repo, "supabase/migrations");
+    mkdirSync(migrations, { recursive: true });
+    writeFileSync(join(migrations, "20261013220000_provider_seat_tenant_conversion.sql"), "select 1;");
+    writeFileSync(join(migrations, "20261013220000_inquiry_lead_retention.sql"), "select 1;");
+    expect(() => verifyReleaseInventory(repo)).toThrow(/20261013220000_inquiry_lead_retention.sql, 20261013220000_provider_seat_tenant_conversion.sql/);
+  });
   it("requires every integrated migration to have one pinned packet entry", () => {
     expect(() => verifyReleaseInventory(process.cwd())).not.toThrow();
   });

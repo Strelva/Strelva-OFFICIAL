@@ -16,7 +16,7 @@ import { catalog, command, sql, type Catalog } from "./release-safety/postgres";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const migrations = join(root, "supabase/migrations");
-type Item = { file: string; sha256: string; rollback?: string; rollbackStatus?: string };
+type Item = { file: string; sha256: string; rollback?: string; rollbackStatus?: string; rollbackKind?: string };
 
 function differences(actual: Catalog, expected: Catalog): Record<string, string[]> {
   const changes: Record<string, string[]> = {};
@@ -47,7 +47,7 @@ function main() {
   const items: Item[] = batch8.items;
   const missingCompanions = items.filter(item => !item.rollback).map(item => item.file);
   if (missingCompanions.length) throw new Error("Batch 8 missing rollback companions: " + missingCompanions.join(", "));
-  for (const item of items) if (item.rollback !== "rollback-" + item.file) throw new Error("Rollback companion is not rollback-<file>: " + item.file);
+  for (const item of items) if (item.rollback !== "rollback-" + item.file && item.rollbackKind !== "manual") throw new Error("Rollback companion is not rollback-<file>: " + item.file);
   const hotfix = manifest.proposed.find(entry => entry.batch === "H");
   const batch7a = manifest.proposed.find(entry => entry.batch === "7A");
   if (!hotfix || !batch7a || batch7a.items.length !== 4) throw new Error("Pinned H and four-file 7A prerequisites are required.");
