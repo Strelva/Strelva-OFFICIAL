@@ -404,3 +404,5 @@ diff -u "$cluster_root/catalog-before-agency-team.txt" "$cluster_root/catalog-af
 printf 'Agency Team upgrade rollback restored the public catalog exactly.\n'
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011160000_agency_team.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-team-schema.sql"
+
+psql "${psql_args[@]}" --file="$repo_root/tests/ask-confirmed-facts-schema.sql"

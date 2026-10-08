@@ -1,4 +1,5 @@
 import type { BusinessFactDraft, BusinessFactDraftStore } from "@/platform/ask/workspace-drafts";
+import type { BusinessFactsPorts } from "./business-facts";
 import type { SourceAdapter } from "../adapters";
 import type { ProposedItem } from "../contracts";
 import { memberActor, proposeAsMember, revisionOf } from "./shared";
@@ -20,7 +21,7 @@ export function businessFactDraftItem(draft: BusinessFactDraft): ProposedItem | 
   };
 }
 
-export function businessRecordDraftAdapter(store: BusinessFactDraftStore, enabled: () => boolean = () => true): SourceAdapter {
+export function businessRecordDraftAdapter(store: BusinessFactDraftStore, enabled: () => boolean = () => true, confirmed?: BusinessFactsPorts["confirmed"]): SourceAdapter {
   return {
     lifecycle: "business_record_draft", needsMemberActor: true, ownerLinkWithoutAccount: true,
     propose: ctx => enabled() ? proposeAsMember(ctx, async actor => (await store.list(actor, ctx.workspaceId))
@@ -48,6 +49,10 @@ export function businessRecordDraftAdapter(store: BusinessFactDraftStore, enable
           : await store.resolve(actor, ctx.workspaceId, draft.id, decision);
         if (decision === "not_yet") return saved.status === "declined" ? { outcome: "done", reason: "Not yet" } : { outcome: "failed", reason: "draft_not_declined" };
         if (saved.status !== "approved" || !saved.receipt) return { outcome: "failed", reason: "draft_not_applied" };
+        const after = await confirmed?.({ decisionId: item.id, workspaceId: ctx.workspaceId, recordRevision: saved.receipt.revision,
+          changeCount: Object.keys(saved.patch.facts ?? {}).length, factKeys: Object.keys(saved.patch.facts ?? {}), replayed: false }, by)
+          .catch(() => ({ websitePending: true }));
+        if (after?.websitePending) return { outcome: "done_unverified", reason: "website_review_pending", receiptRef: `business_record:${ctx.workspaceId}:${saved.receipt.sequence}` };
         return { outcome: "done", receiptRef: `business_record:${ctx.workspaceId}:${saved.receipt.sequence}` };
       } catch { return { outcome: "failed", reason: "business_record_changed_or_unavailable" }; }
     },

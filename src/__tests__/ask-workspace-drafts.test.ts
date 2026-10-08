@@ -84,6 +84,15 @@ describe("business draft Needs you resolution", () => {
     expect(persistence.list).not.toHaveBeenCalled();
     expect(persistence.resolve).not.toHaveBeenCalled();
   });
+  it("carries confirmed Ask contact changes to native review and reports an unfinished website", async () => {
+    const persistence = store(); const confirmed = vi.fn(async () => ({ websitePending: true }));
+    const adapter = businessRecordDraftAdapter(persistence, () => true, confirmed);
+    expect(await adapter.resolve({ workspaceId: WS, actor }, item, "approve", { kind: "session", actor }))
+      .toEqual({ outcome: "done_unverified", reason: "website_review_pending", receiptRef: `business_record:${WS}:4` });
+    expect(confirmed).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: WS, decisionId: item.id, recordRevision: 4, factKeys: ["phone"] }), { kind: "session", actor });
+    confirmed.mockRejectedValueOnce(Error("website review unavailable"));
+    expect(await adapter.resolve({ workspaceId: WS, actor }, item, "approve", { kind: "session", actor })).toMatchObject({ outcome: "done_unverified" });
+  });
   it("links a durable source and applies only through its resolver", async () => {
     const persistence = store(); const adapter = businessRecordDraftAdapter(persistence);
     expect((await adapter.propose({ workspaceId: WS, actor })).items).toEqual([businessFactDraftItem(saved)]);
