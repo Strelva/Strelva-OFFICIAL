@@ -139,12 +139,11 @@ describe("operator commands", () => {
     expect(setWorkspaceReleaseFlag).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: WS, flag: "systems", state: "on", reason: "ready", approvalId: APPROVAL }));
   });
 
-  it("refuses owner entry on while a page the client uses hasn't moved, but allows operators", async () => {
+  it("allows owner entry while intentionally retaining Settings", async () => {
     readTenantWorkspaceLink.mockResolvedValue({ tenantId: "gldf", link: { workspaceId: WS } });
-    await expect(applyTenantReleaseCommand("op@example.test", "gldf", plain, { kind: "flag", flag: "owner_entry", state: "on", reason: "go", expectedRevision: 0, approvalId: APPROVAL }))
-      .rejects.toThrow(/\/dashboard\/settings/);
+    await applyTenantReleaseCommand("op@example.test", "gldf", plain, { kind: "flag", flag: "owner_entry", state: "on", reason: "go", expectedRevision: 0, approvalId: APPROVAL });
     await applyTenantReleaseCommand("op@example.test", "gldf", plain, { kind: "flag", flag: "owner_entry", state: "operators", reason: "walk pages", expectedRevision: 0 });
-    expect(setWorkspaceReleaseFlag).toHaveBeenCalledTimes(1);
+    expect(setWorkspaceReleaseFlag).toHaveBeenCalledTimes(2);
     expect(setWorkspaceReleaseFlag).toHaveBeenCalledWith(expect.objectContaining({ state: "operators", reason: "walk pages" }));
   });
 

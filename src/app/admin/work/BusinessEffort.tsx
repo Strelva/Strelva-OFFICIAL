@@ -9,6 +9,8 @@ import type { BusinessEffortMeasure, EffortDirection, PortfolioMonth } from "@/p
 import type { BusinessEffortLoad } from "./effort-data";
 import { EffortLogForm } from "./EffortLogForm";
 import { EffortEntries } from "./EffortEntries";
+import { measureQueueEffort } from "@/platform/business-effort/measure";
+import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
 
 const DIRECTION: Record<EffortDirection, { label: string; tone: "good" | "warn" | "neutral" }> = {
   falling: { label: "Falling", tone: "good" },
@@ -98,6 +100,7 @@ export function BusinessEffortPortfolio({ load }: { load: BusinessEffortLoad }) 
     label: b.tenantIds.length > 0 ? `${b.name} (${b.tenantIds.join(", ")})` : b.name,
   }));
   const portfolioDirection = DIRECTION[measure.portfolio.direction];
+  const queueMinutes = operatorQueueReleaseEnabled() ? measureQueueEffort(overview.entries, measure.currentMonth) : [];
 
   return (
     <Panel
@@ -140,6 +143,14 @@ export function BusinessEffortPortfolio({ load }: { load: BusinessEffortLoad }) 
       </section>
 
       <section aria-labelledby="effort-log">
+        {operatorQueueReleaseEnabled() && <div className="mb-5">
+          <h3 className="text-[12.5px] font-semibold text-warm-white">This month by queue kind and System</h3>
+          {queueMinutes.length ? <ul className="mt-2 divide-y divide-glass-border">
+            {queueMinutes.map((row) => <li key={JSON.stringify([row.businessId, row.kind, row.systemId, row.systemLabel])} className="flex flex-wrap justify-between gap-2 py-2 text-[12px] text-gray-muted">
+              <span>{names[row.businessId] ?? "Business"} · {row.systemLabel ?? "Not attached"} · {row.kind.replaceAll("_", " ")}</span><span className="tabular-nums">{row.minutes} min</span>
+            </li>)}
+          </ul> : <p className="mt-2 text-[12px] text-gray-muted">No attributed queue minutes this month. Manual minutes stay in the business totals.</p>}
+        </div>}
         <h3 id="effort-log" className="mb-3 text-[12.5px] font-semibold text-warm-white">Record human minutes</h3>
         {options.length > 0 ? (
           <EffortLogForm businesses={options} today={today} />

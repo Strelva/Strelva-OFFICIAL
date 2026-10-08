@@ -6,7 +6,7 @@ import { QueueBoard } from "./QueueBoard";
  * The queue page body: header, board, and the per-source counts the two-week
  * parity check compares. Shared by /admin/queue and its local fixture preview.
  */
-export function QueueView({ queue, me }: { queue: OperatorQueue; me: string }) {
+export function QueueView({ queue, me, actionsEnabled = false }: { queue: OperatorQueue; me: string; actionsEnabled?: boolean }) {
   const open = queue.items.length;
   const late = queue.items.filter((item) => item.late).length;
   return (
@@ -21,7 +21,24 @@ export function QueueView({ queue, me }: { queue: OperatorQueue; me: string }) {
         <span className="text-[11px] font-mono text-gray-faint">Read {new Date(queue.generatedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
       </header>
 
-      <QueueBoard queue={queue} me={me} />
+      <QueueBoard queue={queue} me={me} actionsEnabled={actionsEnabled} />
+
+      {queue.businessLeads && <Panel title="Client leads · last 7 days">
+        <ul className="divide-y divide-glass-border border-t border-glass-border text-[13px]">
+          {queue.businessLeads.map(summary => {
+            const entries = [...queue.items, ...queue.parked].filter(item => summary.businessKey === (item.business.kind === "workspace" ? `w:${item.business.workspaceId}` : item.business.kind === "tenant" ? `t:${item.business.tenantId}` : "strelva"));
+            const business = entries[0]?.business;
+            const label = business && business.kind !== "strelva" ? business.name : summary.businessName;
+            const unkept = entries.filter(item => item.kind === "lead_unkept").length;
+            const pendingUnknown = queue.gaps.some(gap => gap.kind === "lead_unkept" && gap.source !== "Client lead counts");
+            return <li key={summary.businessKey} className="flex flex-wrap justify-between gap-2 px-[18px] py-3">
+              <span className="text-warm-white">{label}</span>
+              <span className="text-gray-muted">{summary.lastSevenDays === null ? "Lead count unavailable" : `${summary.lastSevenDays} leads`}{pendingUnknown ? " · pending copies unavailable" : unkept ? ` · ${unkept} not kept` : ""}</span>
+            </li>;
+          })}
+          {!queue.businessLeads.length && <li className="px-[18px] py-3 text-gray-muted">No client sites are linked yet.</li>}
+        </ul>
+      </Panel>}
 
       <Panel title="Per-source counts" trailing={<PanelCount>{queue.complete ? "all sources read" : `${queue.gaps.length} not read`}</PanelCount>}>
         <div className="overflow-x-auto">
@@ -38,7 +55,7 @@ export function QueueView({ queue, me }: { queue: OperatorQueue; me: string }) {
             </thead>
             <tbody className="divide-y divide-glass-border text-gray-muted tabular-nums">
               {queue.counts.map((count) => {
-                const gap = queue.gaps.find((item) => item.kind === count.kind);
+                const gap = queue.gaps.find((item) => item.kind === count.kind && item.source !== "Client lead counts");
                 return (
                   <tr key={count.kind}>
                     <th scope="row" className="px-[18px] py-1.5 font-normal text-warm-white">{QUEUE_KIND_LABELS[count.kind]}</th>

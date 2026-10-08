@@ -480,6 +480,24 @@ export async function upsertContentData(
   if (error) throw error;
 }
 
+/** Release-only: content and its accepted/pending receipt share a transaction. */
+export async function upsertContentDataWithReceipt(
+  tenant: string,
+  section: string,
+  data: Record<string, unknown>,
+): Promise<string | null> {
+  const db = requiredDb(`upsertContentDataWithReceipt ${tenant}/${section}`);
+  // Additive RPC is deliberately outside generated types until migration
+  // integration regenerates them. No second content write is performed here.
+  const rpc = db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> };
+  const result = await rpc.rpc("write_operator_content", { p_tenant_id: tenant, p_section: section, p_data: data });
+  if (result.error) throw result.error;
+  const receipt = result.data as { id?: unknown } | null;
+  // A successful RPC already committed content and receipt. A malformed
+  // response cannot turn that acceptance into a caller retry.
+  return receipt && typeof receipt.id === "string" ? receipt.id : null;
+}
+
 // ---------------------------------------------------------------------------
 // collection_entries (Collections CMS — typed repeating entries)
 // See src/lib/cms/collection-types.ts + docs/capabilities/publishing/collections-cms.md.

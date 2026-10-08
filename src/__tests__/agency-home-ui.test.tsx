@@ -80,6 +80,19 @@ function router(handlers: { clients?: () => Response | Promise<Response>; librar
 }
 
 describe("agency home on the batched read", () => {
+  it("shows health independently of lifecycle and names incomplete Queue sources", async () => {
+    const request = router({ clients: () => Response.json(page([row(1, { systems: [{ id: uuid("51000000", 1), name: "Client website", kind: "website", lifecycle: "live", versionContext: null,
+      health: { status: "blocked", summary: "Domain is down", lastVerifiedAt: "2026-10-07T12:00:00.000Z" } }] })], {
+      queueComplete: false, queueGaps: ["Owner approvals: unavailable"], queue: [{ id: "decision:1", kind: "owner_email", workspaceId: uuid("c0000000", 1), clientName: "Client 1",
+        title: "Owner email bounced: new booking flow", systemId: uuid("51000000", 1), workId: null, since: "2026-10-07T12:00:00.000Z" }],
+    })) });
+    const { node } = await render(request);
+    expect(node.textContent).toContain("Client website · Live · Blocked");
+    await act(async () => button(node, "Queue").click());
+    expect(node.textContent).toContain("Owner email bounced: new booking flow");
+    expect(node.querySelector('[role="alert"]')?.textContent).toContain("This Queue is incomplete");
+    expect(node.querySelector('[role="alert"]')?.textContent).toContain("Owner approvals: unavailable");
+  });
   it("opens Team independently of failed client overview reads and loads it only on demand", async () => {
     const request = router({ clients: () => Response.json({ error: "Unavailable" }, { status: 503 }) });
     const { node } = await render(request);
@@ -159,6 +172,8 @@ describe("agency home on the batched read", () => {
     expect(node.textContent).toContain("“We'll call you within one business day”");
     expect(node.textContent).toContain("“Someone will reply by the end of the next business day.”");
     expect(node.textContent).toContain("Needs Google Calendar connected first");
+    const conflictLink = [...node.querySelectorAll("a")].find(link => link.textContent === "Open The Mooney Firm’s System")!;
+    expect(conflictLink.getAttribute("href")).toBe(`/workspace?view=system&system=${uuid("52000000", 2)}&workspaceId=${uuid("c0000000", 2)}`);
     await act(async () => { button(node, "Review all").click(); });
     await settle();
     expect(bodies).toEqual([{ action: "review_all", workspaceId: AGENCY, sourceSystemId: library.sources[0]!.systemId, revision: 4, versionIds: ["ready-1"] }]);
@@ -168,6 +183,18 @@ describe("agency home on the batched read", () => {
     expect(results).toContain("Elmwood PTSkipped. Needs Google Calendar connected first.");
   });
 
+  it("shows existing inquiry Versions through the current agency Library tab", async () => {
+    const request = router({ clients: () => Response.json(page([])), library: () => Response.json({ agencyWorkspaceId: AGENCY, sources: [],
+      inquiryVersions: [{ id: "legacy-inquiry", tenantId: "lake-bakery", businessName: "Lake Bakery", name: "Ask us",
+        sourceBusinessId: AGENCY, sourceSystemId: "inquiry:source", sourceRevision: 2, currentRelease: 7, improvement: "blocked" }] }) });
+    const { node } = await render(request);
+    await act(async () => { button(node, "Library").click(); }); await settle();
+    expect(node.textContent).toContain("Inquiry Versions");
+    expect(node.textContent).toContain("Source revision 2 · this Version’s release 7");
+    expect(node.textContent).toContain("choice about local changes");
+    expect(node.querySelector('a[href="/business/lake-bakery?view=patterns"]')?.textContent).toContain("Lake Bakery");
+    expect(node.textContent).not.toContain("No sources yet");
+  });
   it("keeps Library and Team out when the Systems release is off, with clients still from one read", async () => {
     const request = router({ clients: () => Response.json(page([row(1), row(2)])) });
     const { node } = await render(request, false);

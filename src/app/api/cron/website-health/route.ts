@@ -15,13 +15,14 @@ import { getScanSummaries } from "@/lib/scan-store";
 import { collectDomainEvidence, deriveSiteCoverage } from "@/platform/operator-queue/site-coverage";
 import { saveSiteHealth } from "@/platform/operator-queue/site-health-store";
 import { currentHostedUrl } from "@/products/websites/hosted-routing";
+import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
 export const maxDuration=300;
 
 /**
  * Two checks, both read-only toward client sites:
  *
  * 1. Every active site gets a health result (custom repos and hosted sites),
- *    whether or not the website rebuild release is on. Evidence comes from
+ *    when the operator queue release is on, independent of the rebuild flag. Evidence comes from
  *    the domain monitor, the scanner, cron heartbeats and the custom repo's
  *    revalidation mark; a site the domain monitor missed is probed with a GET.
  *    Report-only: the result is saved for the operator queue, nobody is emailed.
@@ -32,6 +33,8 @@ export const maxDuration=300;
 export async function GET(request:Request){
  const denied=requireCronRequest(request);if(denied)return denied;const started=Date.now();let ok=false;let processed=0;let failed=0;
  try{
+  const coverageEnabled=operatorQueueReleaseEnabled();
+  if(!coverageEnabled&&!websiteRebuildReleaseMayBeOn()){ok=true;return NextResponse.json({skipped:true,reason:"website_rebuild_release_disabled"});}
   let hosted:Record<string,unknown>={skipped:true,reason:"website_rebuild_release_disabled"};let receipts:WebsiteHealthReceipt[]=[];
   if(websiteRebuildReleaseMayBeOn()){
    let retention:{status:"pruned";removed:number}|{status:"failed"};
@@ -39,10 +42,10 @@ export async function GET(request:Request){
    const result=await scanWebsiteHealth({list:async()=>{const listed=await websiteDocumentStore.listPublished();const released=await Promise.all(listed.map(row=>websiteRebuildReleaseEnabledForWorkspace(row.workspaceId,OPERATOR_VIEWER).catch(()=>false)));const rows=listed.filter((_row,index)=>released[index]);return Promise.all(rows.filter(row=>row.tenantId).map(async row=>{return{workspaceId:row.workspaceId,workId:row.workId,tenantId:row.tenantId!,revision:row.revision,contentHash:row.contentHash,url:currentHostedUrl({tenantId:row.tenantId!,receipt:row.receipt},SITES_ROOT_DOMAIN)};}));},save:receipt=>websiteDocumentStore.recordHealth(receipt),alert:async receipts=>{await sendEmailWithReceipt({audience:"operator",to:resolveLeadNotifyRecipients(),fromAddress:"health@updates.strelva.com",subject:`Strelva: ${receipts.length} hosted website checks need attention`,idempotencyKey:`website-health:${new Date().toISOString().slice(0,10)}`,options:{heading:"Hosted website checks need attention",paragraphs:["The published revision could not be verified. Each result is saved as a health receipt; no content was republished."],rows:receipts.map(value=>({label:value.tenantId,value:`${value.status}: ${value.url}`})),button:{label:"Open operator workspace",url:OPERATOR_URL}}});}});
    processed+=result.processed;failed+=result.failed;receipts=result.results;hosted={processed:result.processed,failed:result.failed,crawlRetention:retention};
   }
-  const coverage=await coverEverySite(receipts);processed+=coverage.sites;failed+=coverage.failed;
+  const coverage=coverageEnabled?await coverEverySite(receipts):null;if(coverage){processed+=coverage.sites;failed+=coverage.failed;}
   ok=failed===0;
   // The pre-existing hosted response fields stay at the top level for callers.
-  return NextResponse.json({processed,failed,...(hosted.crawlRetention?{crawlRetention:hosted.crawlRetention}:{}),hosted,coverage},{status:failed?207:200});
+  return NextResponse.json({processed,failed,...(hosted.crawlRetention?{crawlRetention:hosted.crawlRetention}:{}),...(coverageEnabled?{hosted,coverage}:{})},{status:failed?207:200});
  }catch{failed=Math.max(1,failed);return NextResponse.json({error:"Website health checks could not be confirmed."},{status:503});}finally{await recordHeartbeat("website-health",{ok,processed,failed,durationMs:Date.now()-started});}
 }
 

@@ -20,6 +20,7 @@ export {
 export * from "./rebuild-contracts";
 export * from "./rebuild-audit-contracts";
 export * from "./site-document-schema";
+export { SiteDocumentTry } from "./SiteDocumentTry";
 export type { WebsiteMonthlyReport } from "./site-report";
 export type {
   ApproveWebsiteInput,

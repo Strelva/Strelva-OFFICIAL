@@ -15,6 +15,7 @@ import { getClientEmailOverride } from "@/platform/infra/email/client-override";
 import { getTenantConfig } from "@/lib/tenants";
 import { OPERATOR_URL, SITES_ROOT_DOMAIN } from "@/platform/infra/brand";
 import { bindToCurrentTenant } from "./hosted-routing";
+import { businessOutcomeReportsEnabled, deliverBusinessOutcomeReport, readBusinessOutcomeReports, type BusinessOutcomeReport } from "@/platform/business-outcomes/reports";
 export const websiteReportInputSchema=z.object({month:z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/)}).strict();
 export interface WebsiteMonthlyReport {
  workId:string;workspaceId:string;tenantId:string|null;siteName:string;month:string;generatedAt:string;
@@ -23,6 +24,7 @@ export interface WebsiteMonthlyReport {
  visibility:{status:"available"|"unavailable";checkedAt?:string;mentioned?:boolean;recommended?:boolean;note:string};
  readiness:{status:"available"|"unavailable";checkedAt?:string;passedChecks:number|null;totalChecks:number|null};
  changes:Array<{revision:number;contentHash:string;createdAt:string;createdBy:string;published:boolean}>;
+ businessOutcome?:BusinessOutcomeReport;
 }
 export async function readWebsiteMonthlyReport(actor:WorkspaceActor,workId:string,raw:unknown):Promise<WebsiteMonthlyReport>{
  const {month}=websiteReportInputSchema.parse(raw);const record=await readWebsiteRebuild(actor,workId);await assertWorkspaceMember(actor,record.workspaceId);
@@ -56,7 +58,8 @@ export async function readWebsiteMonthlyReport(actor:WorkspaceActor,workId:strin
  // The assessment score may blend readiness and citation. Report the actual
  // website checks separately instead of relabeling that blended score.
  const readiness:WebsiteMonthlyReport["readiness"]=checked?{status:"available",checkedAt:checked.checkedAt,passedChecks:checked.result.signals.filter(signal=>signal.pass).length,totalChecks:checked.result.signals.length}:{status:"unavailable",passedChecks:null,totalChecks:null};
- return{workId,workspaceId:record.workspaceId,tenantId,siteName:published?.document.siteName??record.rebuild.title,month,generatedAt:new Date().toISOString(),inquiries,bookings,visibility,readiness,changes:documents.filter(row=>during(row.createdAt)).map(row=>({revision:row.revision,contentHash:row.contentHash,createdAt:row.createdAt,createdBy:row.createdBy,published:publishedRevisions.has(`${row.revision}:${row.contentHash}`)}))};
+ const businessOutcome=tenantId?(await readBusinessOutcomeReports([tenantId],month))?.find(row=>row.workspaceId===record.workspaceId):undefined;
+ return{workId,workspaceId:record.workspaceId,tenantId,siteName:published?.document.siteName??record.rebuild.title,month,generatedAt:new Date().toISOString(),inquiries,bookings,visibility,readiness,...(businessOutcome?{businessOutcome}:{}),changes:documents.filter(row=>during(row.createdAt)).map(row=>({revision:row.revision,contentHash:row.contentHash,createdAt:row.createdAt,createdBy:row.createdBy,published:publishedRevisions.has(`${row.revision}:${row.contentHash}`)}))};
 }
 /** Shared transport enforces the existing tenant email gate. No recipient is inferred. */
 export async function sendWebsiteMonthlyReport(report:WebsiteMonthlyReport,recipient:string,actor:WorkspaceActor){
@@ -69,7 +72,14 @@ export async function sendWebsiteMonthlyReport(report:WebsiteMonthlyReport,recip
 /** Transport only. Callers have already checked who may send and resolved the recipient server-side. */
 async function deliverWebsiteMonthlyReport(report:WebsiteMonthlyReport&{tenantId:string},to:string){
  if(process.env.STRELVA_WEBSITE_REPORT_EMAIL_ENABLED!=="1"||emailSendingPaused()||customerEmailPaused()||await getClientEmailOverride(report.tenantId)==="off"){const suppressed={status:"suppressed" as const,reason:"website_report_email_disabled"};await recordCatalogReport({tenantId:report.tenantId,kind:"hosted_monthly",period:report.month,status:"suppressed",recipient:to,reason:suppressed.reason});return suppressed;}
- return sendEmailWithReceipt({audience:"client",tenantId:report.tenantId,to,fromAddress:"report@updates.strelva.com",subject:`${report.siteName}: ${report.month} website report`,idempotencyKey:`website-report:${report.workId}:${report.month}`,options:{heading:`Your ${report.month} website report`,paragraphs:["Counts come from your native inquiry and booking records. Unavailable measurements are shown below.","Assistant citation results reflect one saved answer. Website readiness checks do not measure whether an assistant names your business."],rows:[{label:"Inquiries (recent retained records)",value:report.inquiries.count===null?"Unavailable":String(report.inquiries.count)},{label:"Bookings scheduled in this period",value:report.bookings.scheduledInPeriod===null?"Unavailable":String(report.bookings.scheduledInPeriod)},{label:"Verified calendar writes",value:report.bookings.providerVerified===null?"Unavailable":String(report.bookings.providerVerified)},{label:"Saved assistant citation check",value:report.visibility.status==="available"?`${report.visibility.mentioned?"Named":"Not named"}; ${report.visibility.recommended?"recommended":"not recommended"} in this check`:"Not measured"},{label:"Website readiness checks",value:report.readiness.status==="available"?`${report.readiness.passedChecks} of ${report.readiness.totalChecks} passed`:"Not measured"},{label:"Website revisions",value:String(report.changes.length)}],button:{label:"Open website report",url:new URL(`/workspace?${new URLSearchParams({workspaceId:report.workspaceId,view:"websites",work:report.workId})}`,OPERATOR_URL).toString()}}}).then(async delivery=>{await recordCatalogReport({tenantId:report.tenantId,kind:"hosted_monthly",period:report.month,status:delivery.status,recipient:to,reason:delivery.status==="suppressed"?delivery.reason:null,providerMessageId:delivery.status==="accepted"?delivery.providerMessageId:null});return delivery;}).catch(async error=>{await recordCatalogReport({tenantId:report.tenantId,kind:"hosted_monthly",period:report.month,status:"failed",recipient:to,reason:"native_report_delivery_failed"});throw error;});
+ if(businessOutcomeReportsEnabled()){
+  const grouped=await readBusinessOutcomeReports([report.tenantId],report.month);
+  if(grouped===null){const held={status:"suppressed" as const,reason:"business_outcome_grouping_unavailable"};await recordCatalogReport({tenantId:report.tenantId,kind:"hosted_monthly",period:report.month,status:"suppressed",recipient:to,reason:held.reason});return held;}
+  const current=grouped.find(row=>row.workspaceId===report.workspaceId);
+  report={...report,businessOutcome:current};
+ }
+ const send=()=>sendEmailWithReceipt({audience:"client",tenantId:report.tenantId,to,fromAddress:"report@updates.strelva.com",subject:`${report.siteName}: ${report.month} website report`,idempotencyKey:`website-report:${report.workId}:${report.month}`,options:{heading:`Your ${report.month} website report`,paragraphs:["Counts come from your native inquiry and booking records. Unavailable measurements are shown below.","Assistant citation results reflect one saved answer. Website readiness checks do not measure whether an assistant names your business.",...(report.businessOutcome?[`Across your business: ${report.businessOutcome.line.text}`]:[])],rows:[{label:"Inquiries (recent retained records)",value:report.inquiries.count===null?"Unavailable":String(report.inquiries.count)},{label:"Bookings scheduled in this period",value:report.bookings.scheduledInPeriod===null?"Unavailable":String(report.bookings.scheduledInPeriod)},{label:"Verified calendar writes",value:report.bookings.providerVerified===null?"Unavailable":String(report.bookings.providerVerified)},{label:"Saved assistant citation check",value:report.visibility.status==="available"?`${report.visibility.mentioned?"Named":"Not named"}; ${report.visibility.recommended?"recommended":"not recommended"} in this check`:"Not measured"},{label:"Website readiness checks",value:report.readiness.status==="available"?`${report.readiness.passedChecks} of ${report.readiness.totalChecks} passed`:"Not measured"},{label:"Website revisions",value:String(report.changes.length)},...(report.businessOutcome?.line.figures.map(figure=>({label:`Business ${figure.label} (${figure.kind})`,value:String(figure.value)}))??[])],button:{label:"Open website report",url:new URL(`/workspace?${new URLSearchParams({workspaceId:report.workspaceId,view:"websites",work:report.workId})}`,OPERATOR_URL).toString()}}}).then(async delivery=>{await recordCatalogReport({tenantId:report.tenantId,kind:"hosted_monthly",period:report.month,status:delivery.status,recipient:to,reason:delivery.status==="suppressed"?delivery.reason:null,providerMessageId:delivery.status==="accepted"?delivery.providerMessageId:null});return delivery;}).catch(async error=>{await recordCatalogReport({tenantId:report.tenantId,kind:"hosted_monthly",period:report.month,status:"failed",recipient:to,reason:"native_report_delivery_failed"});throw error;});
+ return report.businessOutcome?deliverBusinessOutcomeReport(report.businessOutcome,report.month,send):send();
 }
 
 export async function sendOwnerWebsiteMonthlyReport(actor:WorkspaceActor,workId:string,raw:unknown){
@@ -119,8 +129,12 @@ export async function runWebsiteMonthlyReports(month:string){
  // Owners get the report only where the rebuild is on for their business (per row under `workspace`).
  const listed=await websiteDocumentStore.listPublished();
  const released=await Promise.all(listed.map(row=>websiteRebuildReleaseEnabledForWorkspace(row.workspaceId).catch(()=>false)));
- const published=listed.filter((_row,index)=>released[index]);const result={tenants:published.flatMap(row=>row.tenantId?[row.tenantId]:[]),sent:0,suppressed:0,errors:[] as string[]};
- for(const site of published){
+ const published=listed.filter((_row,index)=>released[index]);
+ const grouped=await readBusinessOutcomeReports(published.flatMap(row=>row.tenantId?[row.tenantId]:[]),month);
+ if(grouped===null)return{tenants:published.flatMap(row=>row.tenantId?[row.tenantId]:[]),sent:0,suppressed:published.length,errors:["Business outcome grouping is unavailable; report delivery suppressed"]};
+ const byBusiness=new Map(grouped.map(row=>[row.workspaceId,row]));
+ const result={tenants:[...new Set([...published.flatMap(row=>row.tenantId?[row.tenantId]:[]),...grouped.flatMap(row=>row.tenantIds)])],sent:0,suppressed:0,errors:[] as string[]};
+ for(const site of published.filter(row=>!byBusiness.has(row.workspaceId)||byBusiness.get(row.workspaceId)!.primaryTenantId===row.tenantId)){
   try{
    const {data,error}=await (db as unknown as WorkspaceDb).from("workspace_memberships").select("user_id").eq("workspace_id",site.workspaceId).eq("role","owner").order("created_at",{ascending:true}).limit(1);
    if(error)throw new WorkspaceStoreError("No current workspace owner could be confirmed.");

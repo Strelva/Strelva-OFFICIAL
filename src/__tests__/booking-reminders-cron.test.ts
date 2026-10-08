@@ -14,7 +14,7 @@ vi.mock("@/platform/bookings/calendar-mirror", () => ({ runBookingCalendarMirror
 vi.mock("@/platform/bookings/lifecycle", () => ({ runBookingLifecycle: mocks.run }));
 vi.mock("@/platform/bookings/lifecycle-ports", () => ({ bookingLifecyclePorts: { marker: "real-ports" } }));
 vi.mock("@/platform/bookings/flags", () => ({ bookingRemindersEnabled: mocks.enabled }));
-vi.mock("@/platform/infra/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));
+vi.mock("@/platform/infra/heartbeat", async (original) => ({ ...(await original<typeof import("@/platform/infra/heartbeat")>()), recordHeartbeat: mocks.heartbeat }));
 vi.mock("@/platform/infra/monitoring", () => ({ alertOnce: mocks.alertOnce }));
 vi.mock("@/lib/cron-auth", () => ({ requireCronRequest: mocks.denied }));
 

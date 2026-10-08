@@ -137,6 +137,17 @@ service-only RPC access. Two simultaneous service-role transactions claim the
 same fictional source domain; exactly one may commit a rebuild. The prepared
 migration remains a local test artifact until separately authorized.
 
+The inquiry portion of `pnpm check:workspace-sql` also runs
+`scripts/check-inquiry-rollbacks.sh` on its local socket. It retains fictional
+contract rows in an isolated clone, checks all 19 wave-6 rollback files separately
+and in reverse order, and compares exact rows for leads, events, send purposes,
+provider receipts, facts/proposals and booking offers. Clones are removed after
+each case, including failures; the outer cluster and logs remain local evidence.
+The receipt-preserving rollback files disable RPC access instead of deleting
+accepted or ambiguous send state. Callers must be switched off first. This is
+rollback execution and retention proof, not authorization to apply production
+migrations or to replay non-idempotent forward files on retained tables.
+
 `pnpm check:workspace-upgrade` is the ordered-history rehearsal. It applies every
 repository migration through the documented pre-workspace baseline
 `20260802120000_report_snapshots.sql`, seeds representative tenant,
