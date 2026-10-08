@@ -122,7 +122,7 @@ export async function ingestConnectEvent(event:Stripe.Event,deps:ConnectDependen
  if(kind==="paid") {
  const bound=await moneyRpc<{provider_id:string}|null>("read_business_payment_provider",{p_payment_id:paymentId,p_account:accountScope},deps.db===undefined?connectDb():deps.db);
  if(bound&&bound.provider_id!==object.id)throw new WorkspaceStoreError("Payment intent identity does not match.");
- if(!bound){const sessions=await (deps.stripe??stripeClient()).checkout.sessions.list({payment_intent:object.id,limit:100},{stripeAccount:accountScope});
+ if(!bound && !await moneyRpc<boolean>("recover_agent_payment_provider",{p_payment_id:paymentId,p_account:accountScope,p_provider:object.id,p_amount:object.amount_received??0,p_currency:object.currency??null},deps.db===undefined?connectDb():deps.db)){const sessions=await (deps.stripe??stripeClient()).checkout.sessions.list({payment_intent:object.id,limit:100},{stripeAccount:accountScope});
  const session=sessions.data.find(s=>s.metadata?.businessPaymentId===paymentId);
  if(!session)throw new WorkspaceStoreError("Payment has no matching issued checkout.");
  await moneyRpc("bind_business_payment_provider",{p_payment_id:paymentId,p_account:accountScope,p_provider:object.id,p_currency:object.currency??null,p_checkout:session.id},deps.db===undefined?connectDb():deps.db);}
