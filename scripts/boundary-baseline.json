@@ -188,7 +188,6 @@
       "src/lib/types"
     ],
     "src/products/ai-visibility/score.ts": [
-      "src/lib/audit/checks",
       "src/lib/pinned-public-text"
     ],
     "src/products/assessment/contracts.ts": [
@@ -389,7 +388,6 @@
     ]
   },
   "boundaries": [
-    "src/app/admin/websites/page.tsx -> @/products/websites/rebuild-release :: Import a product through its index, contracts, server, or client entry point.",
     "src/app/agency-websites/[bindingId]/page.tsx -> @/products/websites/rebuild-release :: Import a product through its index, contracts, server, or client entry point.",
     "src/app/api/cron/connected-sites-purge/route.ts -> @/products/connected-sites/store :: Import a product through its index, contracts, server, or client entry point.",
     "src/app/api/cron/website-health/route.ts -> @/products/websites/hosted-routing :: Import a product through its index, contracts, server, or client entry point.",

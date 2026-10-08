@@ -638,3 +638,6 @@ bookings. If the admin host does not connect, restart step 3 with
 - Whether the isolated Make real reports a status other than `made_real`.
 
 A green run here is local proof only, never a production claim.
+
+
+Isolated worktrees can set `STRELVA_BUILD_CACHE=off` with `pnpm exec next build --webpack` to disable persistent Webpack caching when disk is constrained. The full compilation and checks still run. For version parity outside the normal sibling layout, set `STRELVA_MARKETING_ROOT` to the actual independent marketing checkout; the default remains the sibling repository. Neither setting grants provider, production or cleanup authority.
