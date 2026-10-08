@@ -540,6 +540,8 @@ export function createCustomApplicationService(store: BoundedStore = boundedStor
       const app = loaded.app!;
       if (app.candidate.revision !== input.expectedCandidateRevision) throw new CustomApplicationConflictError("This candidate changed. Reload before building it.");
       if (!app.budget || app.budget.status !== "accepted") throw new CustomApplicationConflictError("Accept a build budget before building this application.");
+      const sandbox = !options.build && process.env.STRELVA_CUSTOM_APPLICATION_BUILD_PROVIDER === "vercel-sandbox"
+        ? (await import("./sandbox-runtime")).configureSandboxApplicationRuntime(actor, app, durableDb(store)!) : null;
       const recheck = async () => {
         const current = await read(actor, id);
         if (current.status === "retired"
@@ -553,11 +555,11 @@ export function createCustomApplicationService(store: BoundedStore = boundedStor
           throw new CustomApplicationConflictError("The build target, budget, or live release changed before execution.");
         }
       };
-      const built = await economics.execute(actor, {
+      const built = await (sandbox?.execute ?? economics.execute)(actor, {
         workspaceId: loaded.work.workspaceId, workId: id, version: app.candidate.version,
         maximumCents: app.budget.maxAuthorizedCents, jobId: app.budget.jobId,
       }, async () => {
-        const artifact = await build({ workspaceId: loaded.work.workspaceId, resourceId: id, applicationVersion: app.candidate.version, files: app.candidate.files });
+        const artifact = await (sandbox?.build ?? build)({ workspaceId: loaded.work.workspaceId, resourceId: id, applicationVersion: app.candidate.version, files: app.candidate.files });
         await rpc(durableDb(store)!, "custom_application_store_artifact", {
           p_work_id: id, p_application_version: artifact.applicationVersion, p_source_digest: artifact.sourceDigest,
           p_artifact_digest: artifact.artifactDigest, p_image: artifact.image, p_html: artifact.html,

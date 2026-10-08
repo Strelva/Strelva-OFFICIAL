@@ -155,7 +155,10 @@ async function startRpcAdapter() {
   return `http://127.0.0.1:${rpcServer.address().port}`;
 }
 async function startNext(adapterUrl) {
-  for (const file of ["tsconfig.json", "next-env.d.ts"]) generatedBefore.set(file, await readFile(join(repo, file), "utf8"));
+  for (const file of ["tsconfig.json", "next-env.d.ts"]) {
+    try { generatedBefore.set(file, await readFile(join(repo, file), "utf8")); }
+    catch (cause) { if (cause.code !== "ENOENT") throw cause; generatedBefore.set(file, null); }
+  }
   const port = await localPort();
   const origin = `http://127.0.0.1:${port}`;
   logStream = createWriteStream(join(artifacts, "next.log"));
@@ -180,17 +183,23 @@ async function startNext(adapterUrl) {
 }
 async function restoreGeneratedTypes() {
   for (const [file, before] of generatedBefore) {
-    const current = await readFile(join(repo, file), "utf8");
+    let current;
+    try { current = await readFile(join(repo, file), "utf8"); }
+    catch (cause) { if (cause.code === "ENOENT") continue; throw cause; }
     if (!current.includes(distDir)) continue;
     if (file === "tsconfig.json") {
       const parsed = JSON.parse(current);
       parsed.include = parsed.include.filter(entry => !entry.startsWith(`${distDir}/`));
-      check(JSON.stringify(parsed) === JSON.stringify(JSON.parse(before)), "TypeScript config changed concurrently; retained it for review.");
+      if (before && JSON.stringify(parsed) === JSON.stringify(JSON.parse(before))) await writeFile(join(repo, file), before);
+      else await writeFile(join(repo, file), `${JSON.stringify(parsed, null, 2)}\n`);
     } else {
       const withoutImports = text => text.split("\n").filter(line => !/^import "\.\/.*\/types\/(?:routes|root-params)\.d\.ts";$/.test(line)).join("\n");
-      check(withoutImports(current) === withoutImports(before), "Next declarations changed concurrently; retained them for review.");
+      if (before && withoutImports(current) === withoutImports(before)) await writeFile(join(repo, file), before);
+      // An absent file was created by this Next instance only when every
+      // generated route import still points at its retained output directory.
+      else if (!before && current.split("\n").filter(line => /^import "\.\/.*\/types\//.test(line)).every(line => line.includes(distDir))) await rm(join(repo, file));
+      else console.error("Next declarations changed concurrently; retained them for review.");
     }
-    await writeFile(join(repo, file), before);
   }
 }
 async function jsonFetch(url, options) {

@@ -5,7 +5,7 @@ returns jsonb language plpgsql security definer set search_path=public,pg_temp a
 declare p public.business_payments%rowtype; provider_id text; started timestamptz;
 begin
  select * into p from public.business_payments where id=p_payment_id for update;
- if p.id is null or p.merchant_account_id<>p_account
+ if p.id is null or p_account is null or p.merchant_account_id<>p_account
   or not exists(select 1 from public.business_payment_channels where payment_id=p.id and channel='agent')
   or not exists(select 1 from public.connected_accounts where workspace_id=p.workspace_id and stripe_account_id=p_account and state='ready' and 'merchant'=any(configurations))
  then raise exception 'agent_payment_attempt_denied';end if;
@@ -27,7 +27,7 @@ declare p public.business_payments%rowtype;
 begin
  select * into p from public.business_payments where id=p_payment_id for update;
  if not exists(select 1 from public.business_payment_channels where payment_id=p_payment_id and channel='agent') then return false;end if;
- if p.id is null or p.merchant_account_id<>p_account or p.amount_cents<>p_amount or p.currency<>p_currency
+ if p.id is null or p_account is null or p.merchant_account_id<>p_account or p.amount_cents<>p_amount or p.currency<>p_currency
   or not exists(select 1 from public.business_payment_attempts where payment_id=p.id)
   or not exists(select 1 from public.agent_payment_reservations where payment_id=p.id and workspace_id=p.workspace_id and amount_cents=p.amount_cents and currency=p.currency)
  then raise exception 'agent_payment_provider_observation_mismatch';end if;

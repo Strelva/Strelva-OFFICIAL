@@ -188,7 +188,7 @@ export interface CustomApplicationArtifact {
   version: 1; workspaceId: string; resourceId: string; applicationVersion: number;
   sourceDigest: string; artifactDigest: string; image: string; html: string;
   builtAt: string; durationMs: number; state: "built";
-  limits: { network: "none"; memoryMb: 256; cpuCount: 1; timeoutSeconds: 30 };
+  limits: { network: "none"; memoryMb: 256 | 2048; cpuCount: 1; timeoutSeconds: 30 };
 }
 
 export type CustomBuildArtifact = CustomApplicationArtifact;

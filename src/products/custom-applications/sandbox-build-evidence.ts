@@ -16,7 +16,7 @@ const billingSchema = z.object({
 /** No SDK import, live provider, rate card, default selection or release permission. */
 export function createSandboxBuildEvidence(
   db: SandboxEvidenceDatabase, actor: WorkspaceActor,
-  target: { workId: string; candidateRevision: number; teamId: string; projectId: string; image: string },
+  target: { workId: string; candidateRevision: number; teamId: string; projectId: string; image: string; policyVersion?: string },
   gates: { enabled: () => boolean; assertListedRuntimeEligibility: () => Promise<void> },
 ) {
   let attempt: z.infer<typeof attemptSchema> | undefined;
@@ -32,16 +32,17 @@ export function createSandboxBuildEvidence(
       // This callback must remain unavailable until a genuine exact-revision
       // custom listed-runtime qualifier exists; bytes alone never qualify it.
       await gates.assertListedRuntimeEligibility();
-      attempt = attemptSchema.parse(await command("prepare_sandbox_build_attempt", {
+      attempt = attemptSchema.parse(await command(target.policyVersion ? "prepare_qualified_sandbox_build_attempt" : "prepare_sandbox_build_attempt", {
         p_work: target.workId, p_version: input.applicationVersion, p_revision: target.candidateRevision,
         p_digest: sourceDigest, p_name: attemptName, p_team: target.teamId, p_project: target.projectId,
         p_image: target.image, p_user: actor.userId, p_email: actor.verifiedEmail,
+        ...(target.policyVersion ? { p_policy: target.policyVersion } : {}),
       }));
       if (attempt.attempt_name !== attemptName) throw new Error("Sandbox build attempt mismatch.");
       await gates.assertListedRuntimeEligibility();
       if (!gates.enabled()) throw new Error("Sandbox build admission is unavailable.");
       // One durable opportunity to create. A second start is never retry permission.
-      await command("begin_sandbox_build_attempt", { p_attempt: attempt.id, p_user: actor.userId, p_email: actor.verifiedEmail });
+      await command(target.policyVersion ? "begin_qualified_sandbox_build_attempt" : "begin_sandbox_build_attempt", { p_attempt: attempt.id, p_user: actor.userId, p_email: actor.verifiedEmail });
     },
     async observe(event) {
       if (!attempt || attempt.attempt_name !== event.attemptName) throw new Error("Sandbox build observation has no exact attempt.");

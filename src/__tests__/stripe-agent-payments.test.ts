@@ -3,6 +3,7 @@ import { createStripeAgentPaymentProvider, SPT_API_VERSION, qualifiedAgentMercha
 import { requestAgentPayment } from "@/platform/connect/agent-payments";
 import { ingestConnectEvent } from "@/platform/connect";
 import type Stripe from "stripe";
+import { readAgentPaymentContext } from "@/platform/connect/agent-payment-context";
 const workspaceId = "00000000-0000-4000-8000-000000000010";
 const paymentId = "00000000-0000-4000-8000-000000000011";
 const identity = { merchantAccountId: "acct_Merchant", paymentId, amountCents: 1000, currency: "usd" };
@@ -19,6 +20,16 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe("documented Stripe direct-account shared payment token protocol", () => {
+  it("discovers the actual merchant profile and immutable amount without accepting or charging", async () => {
+    const database = rpcDb(name => name === "read_public_payment_request" ? { workspaceId, amountCents: 1000, currency: "usd", expiresAt: "2026-10-09T00:00:00Z", status: "unpaid", acceptedTerms: "Accepted source terms" } : merchant);
+    expect(await readAgentPaymentContext({ paymentCapability: "f".repeat(64) }, database)).toMatchObject({ networkId: "profile_Merchant", chargeType: "direct", workspaceId, amountCents: 1000, currency: "usd" });
+    expect(database.rpc.mock.calls.map(call => call[0])).toEqual(["read_public_payment_request", "read_connected_account"]);
+  });
+  it.each(["paid", "cancelled", "expired"])("does not issue seller credential context for a %s intent", async status => {
+    const database = rpcDb(() => ({ workspaceId, amountCents: 1000, currency: "usd", expiresAt: "2026-10-09T00:00:00Z", status, acceptedTerms: "Accepted source terms" }));
+    await expect(readAgentPaymentContext({ paymentCapability: "f".repeat(64) }, database)).rejects.toThrow();
+    expect(database.rpc).toHaveBeenCalledTimes(1);
+  });
   it("retrieves the bounded token then creates an account-scoped preview PaymentIntent", async () => {
     const rawRequest = vi.fn().mockResolvedValueOnce(token).mockResolvedValueOnce(intent);
     const provider = createStripeAgentPaymentProvider({ rawRequest }, () => 1000000);

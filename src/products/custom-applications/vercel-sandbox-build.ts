@@ -24,7 +24,7 @@ export interface VercelSandboxBuildPort {
   }>;
 }
 
-/** Prepared only: the existing Docker/lifecycle artifact still declares 256 MB. */
+/** The Sandbox receipt declares its actual 2048 MB VM footprint. */
 export type VercelSandboxBuildArtifact = Omit<CustomApplicationArtifact, "limits"> & {
   limits: { network: "none"; memoryMb: 2048; cpuCount: 1; timeoutSeconds: 30 };
 };
@@ -94,9 +94,9 @@ const stoppedUsage = z.object({
 });
 
 /**
- * Optional internal builder. Deliberately not selected by the lifecycle: provider
- * spend metering, the 2048 MB contract decision, and listed-app qualification
- * must be approved and integrated first. No dependency or spend is authorized
+ * Optional internal builder. The lifecycle selects it only through explicit
+ * provider policy, 2048 MB contract and exact source-review qualification gates.
+ * No dependency or spend is authorized
  * by constructing this function. No credentials/source URL/ports enter the VM.
  */
 export function createVercelSandboxBuilder(port: VercelSandboxBuildPort, config: VercelSandboxBuildConfiguration) {

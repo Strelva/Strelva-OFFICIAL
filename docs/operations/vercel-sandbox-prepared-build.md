@@ -2,7 +2,11 @@
 
 Prepared October 7, 2026. This is an isolated proposal and local port proof, not
 an installed dependency, provider qualification, spending approval, or release.
-The existing Docker builder, custom-app freeze and iframe CSP remain selected.
+October 8 integration adds a dependency-free HTTP binding and a gated native
+custom-app lifecycle selector. The Docker path remains the fallback selection;
+the Sandbox path requires explicit resource/provider policy and exact source
+qualification. The custom-app freeze and iframe CSP remain enforced. Neither
+path is qualified by this source integration alone.
 
 ## Concrete approval
 

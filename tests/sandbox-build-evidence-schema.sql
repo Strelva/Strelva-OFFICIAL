@@ -151,7 +151,14 @@ do $$declare u uuid='cc334000-0000-4000-8000-000000000001';signer uuid='cc334000
 end;$$;
 rollback;
 -- Actual empty-schema rollback and reapply; the guard above refused retained attempts.
+select (to_regclass('public.custom_sandbox_runtime_qualifications') is not null) as sandbox_runtime_integrated \gset
+\if :sandbox_runtime_integrated
+\i supabase/migrations/rollback-20261021130100_custom_sandbox_runtime_qualification.sql
+\endif
 \i supabase/migrations/rollback-20261020090015_sandbox_build_evidence.sql
 do $$begin if to_regclass('public.sandbox_build_attempts') is not null then raise exception 'Sandbox rollback left tables';end if;if exists(select 1 from sandbox_shared_function_hashes b where to_regprocedure(b.signature) is null or md5(pg_get_functiondef(to_regprocedure(b.signature)))<>b.hash) then raise exception 'Sandbox rollback changed shared economics';end if;end;$$;
 \i supabase/migrations/20261020090015_sandbox_build_evidence.sql
+\if :sandbox_runtime_integrated
+\i supabase/migrations/20261021130100_custom_sandbox_runtime_qualification.sql
+\endif
 select has_function_privilege('service_role','public.prepare_sandbox_build_attempt(uuid,integer,integer,text,text,text,text,text,uuid,text)','EXECUTE') as reapplied_internal_admission;
