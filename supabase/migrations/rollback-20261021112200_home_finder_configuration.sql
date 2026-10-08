@@ -1,0 +1,12 @@
+begin;
+set local lock_timeout='5s';
+do $$ begin if exists(select 1 from public.home_finder_configuration_commands) or exists(select 1 from public.home_finder_binding_audit where action='configured') then raise exception 'home_finder_configuration_rollback_retained_history'; end if; end; $$;
+drop trigger home_finder_configuration_history on public.home_finder_configuration_commands;
+drop trigger home_finder_audit_history on public.home_finder_binding_audit;
+drop trigger enterprise_unit_audit_history on public.enterprise_unit_audit;
+drop function public.configure_home_finder(uuid,text,jsonb,text);
+drop table public.home_finder_configuration_commands;
+alter table public.home_finder_binding_audit drop constraint home_finder_binding_audit_action_check;
+alter table public.home_finder_binding_audit add constraint home_finder_binding_audit_action_check check(action in('installed','observed','revoked'));
+notify pgrst,'reload schema';
+commit;

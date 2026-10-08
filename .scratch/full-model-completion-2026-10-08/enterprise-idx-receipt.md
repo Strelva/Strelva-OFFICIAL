@@ -11,3 +11,32 @@ Unproven: three new forward/inverse migrations have not run against native Postg
 Integration seams: readHomeFinderSystemObservations(actor, workspaceId) exported from src/products/home-finder/runtime-server.ts for health owner. Actual management routes /workspace/units and /workspace/home-finder need shared directory entry links. New binding/receipt/Unit export and exit coverage is subsequent owned work, must compose runtime investigation export wrapper. License renewal/configuration update currently remains coding work; installation/check/publish/pause/revoke are implemented.
 
 Next exact action: compose commit into coordinator source; run scheduled native migrations and inverse/upgrade checks. Lane continues business-owned export/exit/revocation coverage without editing runtime investigation ownership. Coordinator owns canonical model/state; these are proposed implementation deltas, no adoption/commercial proof.
+
+
+## Owned follow-through
+
+Added 211121 portability wrapper after investigation history, preserving preceding
+categories and read authority; six enterprise/Home Finder categories are explicitly
+business scoped and allowlisted. Unit parents in another business are masked.
+Exit handoff schema/UI now shows native accepted/unresolved outcomes and explicitly
+requires the separately held licensed-provider content export. Current completed
+exit already denies public Home Finder probe/admission; accepted receipts remain
+readable. This does not stop an outside provider or prove its export.
+
+Added 211122 configuration renewal with current business and agency authority,
+Version/System CAS, exact command replay, fixed business/agency/provider identity,
+new immutable native System revision and append-only audit/command history. A live
+System is paused, qualification cleared and generation incremented before the
+change is returned; current provider requalification and explicit publication are
+required again. Revoked installation grants cannot be renewed.
+
+Followup evidence: five focused files / 39 tests pass, covering renewal receipt
+scope/generation/current actor, unsupported identity edits, exact provider protocol,
+capability tamper/future/expiry, existing export paging/secret detection and exit
+completion/UI contracts. Scoped lint passes; diffcheck passes. Prior TypeScript
+proof predates these followup edits; coordinator owns the composed typecheck.
+Native fixture tests/enterprise-home-finder-schema.sql is authored but unexecuted.
+It rolls back by default; keep_fixture=true retains fictional274 data and runs
+readers in BEGIN READ ONLY. This fixture is no licensed-provider proof. Forward,
+unused inverse/catalog equivalence, retained-history rollback refusal and actual
+native race proof remain pending coordinator qualification.

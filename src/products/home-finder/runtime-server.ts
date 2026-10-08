@@ -9,7 +9,7 @@ import { getConfiguredHomeFinderAdapter } from "./server";
 import { configuredHomeFinderRuntimeAdapter, type HomeFinderRuntimeAdapter } from "./runtime-adapter";
 import { HomeFinderAdapterError } from "./types";
 import { HOME_FINDER_MANAGEMENT_OPERATIONS, type HomeFinderManagementReader } from "@/platform/customers/home-finder-port";
-import { homeFinderBindingSchema, homeFinderInstallSchema, homeFinderInquirySchema, homeFinderSearchSchema, type HomeFinderBinding, type HomeFinderInstall, type HomeFinderInquiry, type HomeFinderSearch } from "./runtime-contracts";
+import { homeFinderBindingSchema, homeFinderConfigureSchema, homeFinderInstallSchema, homeFinderInquirySchema, homeFinderSearchSchema, type HomeFinderBinding, type HomeFinderConfigure, type HomeFinderInstall, type HomeFinderInquiry, type HomeFinderSearch } from "./runtime-contracts";
 const uuid = z.string().uuid();
 const REQUIRED = ["participating brokerage", "provider/MLS authorization", "approved attribution, display, filter, and freshness rules", "exact HTTPS embedding origin", "verified brokerage inquiry destination", "verified agency receipt destination", "server credentials/configuration", "persistent store/backup/worker readiness", "consented end-to-end delivery proof"];
 export const HOME_FINDER_CATALOG_APP = { id: "home-finder", name: "Home Finder", kind: "home_finder", requirements: REQUIRED, dataOwner: "business", runtime: "licensed-idx", availableToPrepare: true } as const;
@@ -103,4 +103,11 @@ export async function readHomeFinderReceipt(bindingId: string, submissionId: str
 }
 export async function readHomeFinderSystemObservations(actor: WorkspaceActor, workspaceId: string, db = enterpriseDb()): Promise<Observation[]> {
   return (await readHomeFinderBindings(actor, workspaceId, db)).map(b => ({ subjectId: b.systemId, signal: "home-finder.readiness", source: "integration-connection", outcome: b.status === "revoked" || Date.parse(b.licenseExpiresAt) <= Date.now() ? "fail" : b.runtimeAllowed ? "pass" : "unknown", impact: "blocking", observedAt: b.qualifiedAt, maxAgeSeconds: 300, message: b.status === "revoked" ? "The brokerage grant was revoked. Existing receipts remain readable." : b.qualifiedAt ? "Licensed-provider qualification was observed." : "Provider, licensing and delivery qualification is required." }));
+}
+
+export async function configureHomeFinder(actor: WorkspaceActor, raw: HomeFinderConfigure, db = enterpriseDb()) {
+  const input = homeFinderConfigureSchema.parse(raw);
+  const result = homeFinderBindingSchema.parse(await enterpriseCall(db, "configure_home_finder", { ...enterpriseActor(actor), p_input: input, p_digest: sha256(canonicalJson(input)) }));
+  if (result.workspaceId !== input.workspaceId || result.id !== input.bindingId || result.revision !== input.expectedRevision + 1 || result.runtimeAllowed || result.qualifiedAt !== null) throw new WorkspaceStoreError("The configuration receipt could not be confirmed. Reload current state.");
+  return result;
 }

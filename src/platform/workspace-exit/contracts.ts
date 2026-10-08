@@ -44,6 +44,7 @@ export const workspaceExitResourceSchema = z.object({
 }).strict();
 
 export const workspaceExitHandoffSchema = z.object({
+  homeFinder: z.array(z.object({ id: uuid, systemId: uuid, brokerageName: z.string(), approvedOrigin: z.string().url(), licenseExpiresAt: instant, acceptedInquiries: count, newIntakeBlockedOnExit: z.literal(true), retainedReceiptObligation: z.literal(true), buyerContentExport: z.string() }).strict()).optional(),
   businessRecordRetained: z.literal(true),
   dataDeleted: z.literal(false),
   sites: z.array(z.object({

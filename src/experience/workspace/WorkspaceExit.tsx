@@ -111,6 +111,7 @@ function HandoffPlan({ plan }: { plan: NonNullable<WorkspaceExitOptions["handoff
   return <section className="mt-8" aria-label="Business handoff">
     <h2 className="font-medium">Your business goes with you</h2>
     <p className="mt-3 text-sm leading-6 text-gray-muted">The business record and {plan.systems.length} Systems stay available. No data is deleted. Completed steps show the operator’s recorded evidence; pending steps still need attention.</p>
+    {plan.homeFinder?.length ? <section className="mt-4" aria-label="Home Finder handoff"><h3 className="font-medium">Brokerage search and accepted inquiries</h3><ul className="mt-2 space-y-3 text-sm text-gray-muted">{plan.homeFinder.map(binding => <li key={binding.id}><strong className="text-warm-black">{binding.brokerageName}</strong><p>Exit blocks new native intake. {binding.acceptedInquiries} accepted or unresolved inquiry records remain available; delivery and signed receipt obligations continue.</p><p>{binding.buyerContentExport}</p><p>Approved website: {binding.approvedOrigin}</p></li>)}</ul></section> : null}
     <ul className="mt-4 space-y-4">{plan.sites.map(site => <li key={site.tenantStableId} className="border-t border-gray-border pt-4">
       <h3 className="font-medium">{site.siteName}</h3>
       <ul className="mt-2 space-y-2 text-sm text-gray-muted">{site.steps.map(step => <li key={step.kind}>{step.detail} · {step.status === "completed" ? "Completed" : "Pending"}{step.evidence ? <span className="block">{step.evidence}</span> : null}</li>)}</ul>

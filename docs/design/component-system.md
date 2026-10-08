@@ -1075,3 +1075,34 @@ separate. `WebsiteEntry` keeps the owned SelectInput and intake controls, and re
 same-tab actor/business draft text without deleting it. Source/UI contract tests
 are local proof; rendered desktop/mobile, native authority and combined release
 checks remain pending the coordinated verification window.
+
+## Private enterprise and licensed Home Finder preparation
+
+`src/experience/enterprise/Units.tsx` composes the owned Button, SelectInput and
+TextInput for explicit business/location/division/franchise hierarchy, edit,
+archive and business-owned Version assignment. Member views remain read only;
+structure conveys no membership or provider grant. Inaccessible Units show only
+a count. Current owner/admin authority and parent business access are native
+checks. Access review now locates directly accessible explicit Unit businesses
+as well as legacy customer mappings.
+
+`HomeFinder.tsx` provides draft installation, current provider readiness,
+publish, pause, revoke, and license/display configuration renewal. Renewal pauses
+new intake, clears qualification and invalidates old entry generations. Its
+uncertain request preserves the exact command for retry. `HomeFinderBuyer.tsx`
+provides licensed search, attribution, explicit buyer consent, uncertain-intake
+retry and signed delivery receipt lookup. It uses the owned controls and never
+labels queued delivery as delivered. The approved brokerage iframe receives a
+scoped encrypted capability; current binding/lifecycle/license/grants remain
+independent checks. An approved framing origin is contextual evidence, not an
+identity credential.
+
+`WorkspaceExit` shows Home Finder's retained accepted/unresolved obligations and
+the need to obtain provider-held buyer content before the provider retention
+window expires. Native export includes business-owned Units, assignments,
+configuration and content-free receipt/audit outcomes through explicit field
+allowlists; provider receipt capabilities, routing and buyer content are omitted.
+These are implemented private contracts. Scoped tests/lint/typechecking establish
+only their respective behavior; native SQL, rendered desktop/mobile states and
+actual licensed provider journeys require separate proof. No new foundation,
+material or composition direction was adopted.

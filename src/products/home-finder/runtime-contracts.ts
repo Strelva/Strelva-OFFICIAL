@@ -14,3 +14,6 @@ export type HomeFinderBinding = z.infer<typeof homeFinderBindingSchema>;
 export type HomeFinderInstall = z.infer<typeof homeFinderInstallSchema>;
 export type HomeFinderSearch = z.infer<typeof homeFinderSearchSchema>;
 export type HomeFinderInquiry = z.infer<typeof homeFinderInquirySchema>;
+
+export const homeFinderConfigureSchema = homeFinderInstallSchema.pick({ workspaceId: true, commandId: true, brokerageName: true, approvedOrigin: true, licenseReference: true, licenseExpiresAt: true, sourceName: true }).extend({ bindingId: uuid, expectedRevision: z.number().int().positive(), expectedChange: z.number().int().positive() }).strict();
+export type HomeFinderConfigure = z.infer<typeof homeFinderConfigureSchema>;

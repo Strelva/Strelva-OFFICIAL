@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHomeFinderRuntimeAdapter } from "@/products/home-finder/runtime-adapter";
 import { parseHomeFinderEntry, sealHomeFinderEntry } from "@/products/home-finder/entry";
 import { isHomeFinderPublicPath } from "@/proxy";
-import { installHomeFinder, readHomeFinderBindings, readHomeFinderReceipt, submitHomeFinder } from "@/products/home-finder/runtime-server";
+import { configureHomeFinder, installHomeFinder, readHomeFinderBindings, readHomeFinderReceipt, submitHomeFinder } from "@/products/home-finder/runtime-server";
 import type { HomeFinderBinding } from "@/products/home-finder/runtime-contracts";
 import type { EnterpriseDb } from "@/platform/enterprise/server";
 const NOW = "2026-10-08T12:00:00.000Z", id = "27400000-0000-4000-8000-000000000061", workspaceId = "27400000-0000-4000-8000-000000000041", requestId = "27400000-0000-4000-8000-000000000062";
@@ -39,6 +39,7 @@ describe("Home Finder native licensed transport", () => {
   });
   it("entry capabilities reject tampering, another binding, expiry and future issuance", () => {
     const token = sealHomeFinderEntry({ bindingId: id, approvedOrigin: binding.approvedOrigin, revision: 1 });
+    expect(() => parseHomeFinderEntry(sealHomeFinderEntry({ bindingId: id, approvedOrigin: binding.approvedOrigin, revision: 1 }, Date.now() + 60_000), id)).toThrow();
     expect(parseHomeFinderEntry(token, id).approvedOrigin).toBe(binding.approvedOrigin);
     expect(() => parseHomeFinderEntry(token + "x", id)).toThrow(); expect(() => parseHomeFinderEntry(token, requestId)).toThrow();
     vi.advanceTimersByTime(300_000); expect(() => parseHomeFinderEntry(token, id)).toThrow(); expect(parseHomeFinderEntry(token, id, true).bindingId).toBe(id);
@@ -71,5 +72,18 @@ describe("Home Finder native licensed transport", () => {
     const db = { rpc: vi.fn().mockResolvedValue({ error: null, data: { binding: { ...binding, status: "revoked" }, status: "pending", reference } }) };
     expect((await readHomeFinderReceipt(id, requestId, reference, db, adapter, provider)).state).toBe("pending");
     await expect(readHomeFinderReceipt(id, requestId, "another-reference", db, adapter, provider)).rejects.toThrow("unavailable");
+  });
+});
+
+describe("license and display configuration renewal", () => {
+  const update = { workspaceId, bindingId: id, commandId: requestId, expectedRevision: 1, expectedChange: 4, brokerageName: binding.brokerageName, approvedOrigin: binding.approvedOrigin, licenseReference: "renewed-fixture", licenseExpiresAt: "2026-12-01T00:00:00Z", sourceName: binding.sourceName };
+  it("uses current actor and both native revisions, demanding a paused unqualified receipt", async () => {
+    const rpc = vi.fn().mockResolvedValue({ error: null, data: { ...binding, revision: 2, lifecycle: "paused", qualifiedAt: null, readiness: null, runtimeAllowed: false } });
+    expect((await configureHomeFinder(actor, update, { rpc })).revision).toBe(2);
+    expect(rpc).toHaveBeenCalledWith("configure_home_finder", expect.objectContaining({ p_user_id: actor.userId, p_verified_email: actor.verifiedEmail, p_input: update, p_digest: expect.stringMatching(/^[a-f0-9]{64}$/) }));
+  });
+  it("rejects foreign identity, stale generations, claimed qualification and installation identity changes", async () => {
+    for (const result of [{ ...binding, workspaceId: requestId }, { ...binding, revision: 1 }, { ...binding, revision: 2, qualifiedAt: null, runtimeAllowed: true }]) await expect(configureHomeFinder(actor, update, { rpc: vi.fn().mockResolvedValue({ error: null, data: result }) })).rejects.toThrow("receipt");
+    await expect(configureHomeFinder(actor, { ...update, externalInstallationId: "different" } as typeof update, { rpc: vi.fn() })).rejects.toThrow();
   });
 });
