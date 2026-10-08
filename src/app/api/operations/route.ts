@@ -12,7 +12,7 @@ import {
   workspaceResponsibilityCommands,
 } from "@/products/operations/server";
 import { listStandingResponsibilities, readStandingRuns } from "@/platform/work-execution/standing-repository";
-import { createKeepMeFoundBundle, readResponsibilityProof, readResponsibilityBundleState, setProviderResponsibilityCadence, snapshotResponsibilityMeter } from "@/products/operations/server";
+import { createKeepMeFoundBundle, readResponsibilityProof, readResponsibilityBundleState, setProviderResponsibilityCadence, snapshotResponsibilityMeter, readResponsibilityMonthEvidence } from "@/products/operations/server";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 export async function GET(request: Request) {
@@ -20,6 +20,9 @@ export async function GET(request: Request) {
   try {
     const actor = await workspaceHttpActor(); if (!actor) return json({ error: "Sign in to open your work." }, 401);
     const query = new URL(request.url).searchParams;
+    if (query.get("view") === "responsibility_meter") {
+      return json(await readResponsibilityMonthEvidence(actor, z.string().uuid().parse(query.get("workspaceId")), z.string().parse(query.get("month"))));
+    }
     if (query.get("view") === "responsibility_proof") {
       const workspaceId = z.string().uuid().parse(query.get("workspaceId"));
       const from = z.string().datetime().parse(query.get("from")), to = z.string().datetime().parse(query.get("to"));

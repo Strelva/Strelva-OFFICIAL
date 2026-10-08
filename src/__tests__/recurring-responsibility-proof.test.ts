@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { responsibilityProofCard, responsibilityVerdict, addNativeResponsibilityEvidence, keepMeFoundInputSchema } from "@/platform/work-execution/responsibility-proof";
 import { createStandingResponsibility } from "@/platform/work-execution/standing";
-import { createKeepMeFoundBundle, snapshotResponsibilityMeter, setProviderResponsibilityCadence, snapshotDueResponsibilityMeters } from "@/products/operations/server";
+import { createKeepMeFoundBundle, snapshotResponsibilityMeter, setProviderResponsibilityCadence, snapshotDueResponsibilityMeters, readResponsibilityMonthEvidence } from "@/products/operations/server";
 import type { StandingRunsRecord } from "@/platform/work-execution/standing-repository";
 import { createMemoryReceiptStore } from "@/products/google-listing/receipts";
 const owner="00000000-0000-4000-8000-000000000001", business="00000000-0000-4000-8000-000000000002", standing="00000000-0000-4000-8000-000000000003";
@@ -55,4 +55,18 @@ it("bounded background meter preserves isolated authority failures and never ena
  expect(await snapshotDueResponsibilityMeters(20,async(name,args)=>{expect(name).toBe("snapshot_due_responsibility_meters");expect(args).toEqual({p_limit:20});return {data:value,error:null};})).toEqual(value);
  await expect(snapshotDueResponsibilityMeters(101,async()=>({data:value,error:null}))).rejects.toThrow();
  await expect(snapshotDueResponsibilityMeters(20,async()=>({data:null,error:{message:"unavailable"}}))).rejects.toThrow("could not be confirmed");
+});
+
+it("historical monthly commands preserve native evidence and current actor failures",async()=>{
+ const snapshot={stage:"monthly_snapshot",availability:"partial",standingResponsibilities:[{providerWorkspaceId:"original-provider"}],acceptedOfferings:[{sourceRevisionId:"original-source",versionId:"original-version"}],billableQuantity:null,priced:false,stripeExportEnabled:false};
+ const rpc=async(name:string,args:Record<string,unknown>)=>{
+  expect(["snapshot_responsibility_meter","read_responsibility_month_evidence"]).toContain(name);
+  expect(args).toEqual({p_user_id:owner,p_verified_email:actor.verifiedEmail,p_business_id:business,p_month:"2026-08-01"});
+  return {data:snapshot,error:null};
+ };
+ expect(await snapshotResponsibilityMeter(actor,business,"2026-08",rpc)).toEqual(snapshot);
+ expect(await readResponsibilityMonthEvidence(actor,business,"2026-08",rpc)).toEqual(snapshot);
+ await expect(readResponsibilityMonthEvidence(actor,business,"2026-08",async()=>({data:null,error:{message:"responsibility_membership_denied"}}))).rejects.toThrow("access denied");
+ await expect(readResponsibilityMonthEvidence(actor,business,"2026-08",async()=>({data:null,error:{message:"database unavailable"}}))).rejects.toThrow("could not be confirmed");
+ expect(await readResponsibilityMonthEvidence(actor,business,"2026-08",async()=>({data:null,error:null}))).toBeNull();
 });

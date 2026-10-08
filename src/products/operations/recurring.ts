@@ -68,6 +68,10 @@ export async function snapshotResponsibilityMeter(actor: WorkspaceActor, busines
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new WorkspaceConflictError("Choose a valid meter month.");
   return call(actor, "snapshot_responsibility_meter", { p_business_id: z.string().uuid().parse(businessId), p_month: `${month}-01` }, rpc);
 }
+export async function readResponsibilityMonthEvidence(actor: WorkspaceActor, businessId: string, month: string, rpc?: OutcomeRpc) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new WorkspaceConflictError("Choose a valid meter month.");
+  return call(actor, "read_responsibility_month_evidence", { p_business_id: z.string().uuid().parse(businessId), p_month: `${month}-01` }, rpc);
+}
 export async function setProviderResponsibilityCadence(actor: WorkspaceActor, businessId: string, cadence: "weekly" | "monthly", rpc?: OutcomeRpc) {
   return call(actor, "set_provider_responsibility_cadence", { p_business_id: z.string().uuid().parse(businessId), p_cadence: z.enum(["weekly", "monthly"]).parse(cadence) }, rpc);
 }

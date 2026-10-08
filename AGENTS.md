@@ -188,6 +188,12 @@ The isolated creator maintenance identity check is
 royalty eligibility, populated guarded inverse/reapply and controlled current
 verification/membership races. See
 [its private handoff](docs/operations/creator-maintenance-identity-2026-10-08.md).
+Completed-month evidence additionally uses
+`PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH bash scripts/check-recurring-responsibilities.sh`.
+Keep its actual populated rollback refusal, historical identity/coverage checks,
+READ ONLY reader and controlled current-actor races. The
+[private monthly contract](docs/operations/responsibility-month-evidence-2026-10-08.md)
+distinguishes observed history from unavailable period-end state and billing.
 
 ## Done means proven
 

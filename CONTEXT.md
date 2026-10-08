@@ -8,6 +8,15 @@ configuration. [Private handoff](docs/operations/creator-maintenance-identity-20
 records original takeover/taper eligibility, preserved creator/history, isolated
 concurrent loss proof and guarded inverse. Proposed packet 17 stays private;
 combined release reconciliation and all original outside/provider gates remain open.
+## October 8 private completed-month evidence #299
+
+This isolated follow-up starts at frozen private candidate `e28e1a5f`. New
+migration32 adds immutable completed-month responsibility evidence from recorded
+historical captures, with current actor checks, exact source identity and explicit
+partial/unavailable coverage. Current-month previews remain separate. Prices,
+Stripe export, accepted SLA targets and production authority stay off/unselected.
+[Monthly evidence contract and native rehearsal](docs/operations/responsibility-month-evidence-2026-10-08.md)
+own this branch's preparation; no prior public release claim is extended.
 
 ## October 8 private integration #601
 

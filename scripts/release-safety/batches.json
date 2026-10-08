@@ -1433,6 +1433,18 @@
       ]
     },
     {
+      "batch": "14",
+      "status": "private monthly evidence #299; not production-authorized",
+      "items": [
+        {
+          "file": "20261020090032_responsibility_month_evidence.sql",
+          "sha256": "bbdd5f90b5aa1768464d982579a49e83ec5369de4168132e8212881fe5db4c50",
+          "rollback": "rollback-20261020090032_responsibility_month_evidence.sql",
+          "rollbackSha256": "27c603bd225162f1e85d39a0c3e8a11530c632c7bf56b195cf933018ab04f23a"
+        }
+      ]
+    },
+    {
       "batch": "17",
       "status": "private creator maintenance identity #287; not production-authorized",
       "items": [
