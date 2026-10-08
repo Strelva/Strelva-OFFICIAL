@@ -31,6 +31,7 @@ import { getTenantConfig } from "@/lib/tenants";
 import { siteEditingFor, type SiteEditing } from "@/products/websites/server";
 import { getPublishedSiteDocument, readHostedBusinessFacts } from "@/products/websites";
 import { savedCheckObservations } from "@/products/investigations/system-health";
+import { readHomeFinderSystemObservations } from "@/products/home-finder/runtime-server";
 import { createSupabaseSystemStore } from "@/platform/systems/supabase-store";
 import { readBusinessVersions } from "@/platform/system-versions/supabase-store";
 import type { System } from "@/platform/systems/contracts";
@@ -370,12 +371,19 @@ async function liveProjectionInput(deps: LiveSystemsDeps): Promise<SystemsProjec
   const { bookingViews, ...surfaced } = withTenantSurfaces(spine, tenantFacts.facts);
   const published = await publishingEnabledForWorkspace(surfaced.businessId, deps.actor) ? await withPublishing(surfaced, deps.actor, now) : null;
   const listing = published?.listing ?? surfaced;
+  const homeFinderSystems = listing.systems.filter(item => item.system.kind === "home_finder");
+  const homeFinderObservations: Observation[] = homeFinderSystems.length
+    ? await readHomeFinderSystemObservations(deps.actor, deps.businessId).catch(() => homeFinderSystems.map(item => ({
+      subjectId: item.system.id, signal: "home-finder.readiness", source: "integration-connection",
+      outcome: "unknown", impact: "blocking", observedAt: null, maxAgeSeconds: 300,
+      message: "The licensed provider and current grant could not be checked.",
+    }))) : [];
   const noticeRows = await readToolNoticeReceipts(deps.actor, deps.businessId, new Date(now - 7 * 86400_000).toISOString()).catch(() => null);
   return {
     listing,
     siteDomains: deps.siteDomains,
     candidates: deps.savedWork.flatMap((work) => websiteRebuildCandidate(work) ?? []),
-    observations: [...await readSystemsEvidence(listing, now), ...savedCheckEvidence(listing, deps.siteDomains, deps.savedWork), ...(published?.observations ?? []),
+    observations: [...homeFinderObservations, ...await readSystemsEvidence(listing, now), ...savedCheckEvidence(listing, deps.siteDomains, deps.savedWork), ...(published?.observations ?? []),
       ...toolNoticeObservations(noticeRows ?? [], listing.systems.map(item => ({ systemId: item.system.id, workId: item.references.savedWorkId })))],
     actorId: deps.actor.userId,
     now,
