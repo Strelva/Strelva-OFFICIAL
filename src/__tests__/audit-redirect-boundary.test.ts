@@ -14,7 +14,7 @@ function transport() {
     const route = net.routes[url.href] ?? { status: 404, body: "missing" };
     const request = Object.assign(new EventEmitter(), {
       end() { queueMicrotask(() => {
-        const response = Object.assign(new EventEmitter(), { statusCode: route.status, headers: { ...(route.location ? { location: route.location } : {}), "content-type": route.type ?? "text/html" }, resume() {}, destroy() { this.emit("close"); return this; } });
+        const response = Object.assign(new EventEmitter(), { statusCode: route.status, headers: { ...(route.location ? { location: route.location } : {}), "content-type": route.type ?? "text/html" }, resume() {}, destroy: vi.fn() });
         onResponse(response);
         if (!route.location) { if (route.body) response.emit("data", Buffer.from(route.body)); response.emit("end"); }
         request.emit("close");
