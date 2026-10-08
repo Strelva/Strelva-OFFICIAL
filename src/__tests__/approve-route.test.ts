@@ -145,4 +145,36 @@ describe("POST /api/approve (the real resolve)", () => {
     const res = await postReq(signApproveToken(claims));
     expect(res.status).toBe(403);
   });
+
+  it("refuses a tenant link once the site has a business: nothing resolves (#524)", async () => {
+    const recipients = await import("@/lib/owner-recipient");
+    recipients.setOwnerRecipientResolver(async () => ({ email: "trusted@gldf.example", name: null, from: "record", workspaceId: "w1", tenantId: "gldf" }));
+    const { signApproveToken } = await import("@/lib/approve-link");
+    const token = signApproveToken(claims);
+    const res = await postReq(token);
+    expect(res.status).toBe(403);
+    expect(await res.text()).toContain("Decide this in Strelva");
+    expect(mockResolveEventAction).not.toHaveBeenCalled();
+    const confirm = await getReq(token);
+    expect(confirm.status).toBe(403);
+    expect(await confirm.text()).not.toContain('method="POST"');
+  });
+
+  it("refuses a tenant link when the site's business can't be read (fail closed)", async () => {
+    const recipients = await import("@/lib/owner-recipient");
+    recipients.setOwnerRecipientResolver(async () => { throw new Error("db down"); });
+    const { signApproveToken } = await import("@/lib/approve-link");
+    const res = await postReq(signApproveToken(claims));
+    expect(res.status).toBe(403);
+    expect(mockResolveEventAction).not.toHaveBeenCalled();
+  });
+
+  it("a site with no business keeps its tenant link", async () => {
+    const recipients = await import("@/lib/owner-recipient");
+    recipients.setOwnerRecipientResolver(async () => ({ email: "owner@gldf.example", name: null, from: "tenant", workspaceId: null, tenantId: "gldf" }));
+    const { signApproveToken } = await import("@/lib/approve-link");
+    const res = await postReq(signApproveToken(claims));
+    expect(res.status).toBe(200);
+    expect(mockResolveEventAction).toHaveBeenCalledWith("gldf", "evt_1", "approved");
+  });
 });

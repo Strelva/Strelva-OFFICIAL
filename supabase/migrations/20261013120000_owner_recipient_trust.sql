@@ -32,11 +32,16 @@
 --     you delivery list, domain and Make real link checks, publishing
 --     reconnect, tool notices, exports, the billing payer and the owner
 --     invitation default.
---   resolve_tenant_owner_recipient    tenant-model notices. A linked site
---     with no owner-set address keeps its own owner_email, as before.
+--   resolve_tenant_owner_recipient    tenant-model notices (leads, reports,
+--     Google review alerts and their approve links). A converted site gets
+--     its business's trusted address and nothing else: never its own
+--     owner_email, which an operator can still edit. Only a site with no
+--     business keeps its owner_email.
 --   business_trusted_owner_recipient  confirm_business_facts.
 -- claim_owner_decision accepts an owner link only from the trusted address,
--- and only if that item's link was sent to it while it was trusted. With no
+-- and only if that item's link was sent to it while it was trusted. It reads
+-- the trust row FOR SHARE; every trust change takes it FOR UPDATE first, so a
+-- change in flight finishes before a claim checks the address. With no
 -- trusted address the delivery cron records the item as not sent
 -- (no_trusted_owner_recipient) and sends nothing.
 begin;
@@ -294,8 +299,9 @@ begin
 end;
 $$;
 
--- Same order as 20261007110000, with the record's trusted address in place of
--- whatever owner_recipient the working record holds.
+-- A converted site: its business's trusted address, or nobody. Its own
+-- owner_email stays editable by operators, so it is never read once the site
+-- has a business. A site with no business keeps its owner_email (20261007110000).
 create or replace function public.resolve_tenant_owner_recipient(p_tenant_id text) returns jsonb
 language plpgsql stable security definer set search_path = public, pg_temp as $$
 declare tenant_row record; ws uuid; trusted public.business_owner_recipient_trust;
@@ -305,18 +311,17 @@ begin
   select l.workspace_id into ws from public.tenant_workspace_links l where l.tenant_stable_id = tenant_row.stable_id;
   if ws is not null then
     select * into trusted from public.business_owner_recipient_trust where workspace_id = ws;
-    if trusted.workspace_id is not null and trusted.tenant_stable_id is null then
-      return jsonb_build_object('email', trusted.email, 'name', trusted.name, 'from', 'record',
-        'workspaceId', ws, 'tenantId', tenant_row.id);
-    end if;
+    if not found then return null; end if;
+    return jsonb_build_object('email', trusted.email, 'name', trusted.name,
+      'from', case when trusted.tenant_stable_id is null then 'record'
+        when trusted.tenant_stable_id = tenant_row.stable_id then 'tenant' else 'linked_tenant' end,
+      'workspaceId', ws,
+      'tenantId', case when trusted.tenant_stable_id is null or trusted.tenant_stable_id = tenant_row.stable_id then tenant_row.id
+        else (select t.id from public.tenants t where t.stable_id = trusted.tenant_stable_id) end);
   end if;
   if nullif(btrim(tenant_row.owner_email), '') is not null then
     return jsonb_build_object('email', lower(btrim(tenant_row.owner_email)), 'name', null, 'from', 'tenant',
-      'workspaceId', ws, 'tenantId', tenant_row.id);
-  end if;
-  if trusted.workspace_id is not null then
-    return jsonb_build_object('email', trusted.email, 'name', null, 'from', 'linked_tenant',
-      'workspaceId', ws, 'tenantId', (select t.id from public.tenants t where t.stable_id = trusted.tenant_stable_id));
+      'workspaceId', null, 'tenantId', tenant_row.id);
   end if;
   return null;
 end;
@@ -331,6 +336,7 @@ declare
   item public.owner_decisions%rowtype;
   actor_role text;
   v_decided_by text;
+  v_trusted text;
   by_kind text := p_by_kind;
 begin
   if p_decision not in ('approve','not_yet') then raise exception 'owner_decision_invalid'; end if;
@@ -352,9 +358,11 @@ begin
     if item.route <> 'owner_decides' then raise exception 'owner_decision_permission_denied'; end if;
     if item.sign_in_required then raise exception 'owner_decision_sign_in_required'; end if;
     -- Only the trusted owner address (20261013120000), and only an address
-    -- that was trusted when this item's link was sent to it.
-    if p_recipient is null
-      or public.business_trusted_owner_recipient(p_workspace_id) is distinct from lower(btrim(p_recipient))
+    -- that was trusted when this item's link was sent to it. FOR SHARE waits
+    -- out a trust change in flight (business_owner_recipient_set_trust locks
+    -- this row FOR UPDATE first) and holds off the next until this commits.
+    select t.email into v_trusted from public.business_owner_recipient_trust t where t.workspace_id = p_workspace_id for share;
+    if p_recipient is null or v_trusted is distinct from lower(btrim(p_recipient))
       or not exists (select 1 from public.owner_decision_link_bindings b
         where b.decision_id = item.id and b.recipient = lower(btrim(p_recipient))) then
       raise exception 'owner_decision_recipient_not_owner';
