@@ -38,6 +38,19 @@ begin
     jsonb_build_object('version',2,'revision',0,'title','Owner link fixture','status','building','createdBy',actor,'createdAt','2026-10-08T10:00:00Z','history','[]'::jsonb));
   perform public.append_website_document(ws,work.id,actor,'ol-operator@example.test',0,h,doc);
   perform public.approve_website_document(ws,work.id,actor,'ol-operator@example.test',1,h);
+  -- After 20261014101000 (#534) launching from the link also publishes: the
+  -- agency needs its seat, publish verification and the website mandate
+  -- (recorded at conversion; this business has no owner).
+  if to_regprocedure('public.acting_provider(uuid,uuid,text,text,text)') is not null then
+    insert into public.provider_seats(customer_workspace_id,agency_workspace_id,granted_by_kind,granted_by)
+      values(ws,'b2000000-0000-4000-8000-0000000000a1','conversion',actor);
+    insert into public.agency_verifications(agency_workspace_id,effect,status,evidence,verified_by,verifier_is_agency_member)
+      values('b2000000-0000-4000-8000-0000000000a1','publish','verified','{"note":"fixture"}',actor,false);
+    insert into public.client_resource_mandates(customer_workspace_id,agency_workspace_id,effect,resource_kind,resource_ref,
+        granted_by_kind,granted_by,granter_is_agency_member,grant_note)
+      values(ws,'b2000000-0000-4000-8000-0000000000a1','publish','website',public.system_origin_id(ws,'saved_work',work.id::text)::text,
+        'conversion',actor,false,'Fixture conversion mandate.');
+  end if;
   item:=public.open_owner_decision(ws,jsonb_build_object('kind','system.go_live','route','owner_decides','title','Launch exact site',
     'approveEffect','It goes live.','notYetEffect','Nothing changes.','sourceLifecycle','website_document','sourceId',work.id::text||':launch','revisionHash',revision_hash,'adminMayDecide',false));
   id:=(item->>'id')::uuid;
@@ -55,6 +68,22 @@ begin
   perform pg_temp.ol_expect(format('select public.authorize_owner_decision_link_run(%L,%L,%L,%L,%L)',ws,sid,id,revision_hash,'ol-owner@example.test'),'strelva_service_access_denied');
   perform pg_temp.ol_expect(format('select public.reserve_website_by_owner_link(%L,%L,%L,%L,1,%L,%L,%L,%L,%L,%L)',ws,work.id,actor,'ol-operator@example.test',h,'ol-existing-fixture',sid,id,revision_hash,'ol-owner@example.test'),'website_publication_conflict');
   perform pg_temp.ol_expect(format('select public.reserve_website_by_owner_link(%L,%L,%L,%L,1,%L,%L,%L,%L,%L,%L)',ws,work.id,actor,'ol-operator@example.test',revision_hash,'ol-new-fixture',sid,id,revision_hash,'ol-owner@example.test'),'website_approval_required');
+  if to_regprocedure('public.acting_provider(uuid,uuid,text,text,text)') is not null then
+    -- An agency verified for email but not publish launches nothing (#534).
+    insert into public.agency_verifications(agency_workspace_id,effect,status,reason,verified_by,verifier_is_agency_member)
+      values('b2000000-0000-4000-8000-0000000000a1','publish','unverified','Fixture revocation.',actor,false);
+    perform pg_temp.ol_expect(format('select public.reserve_website_by_owner_link(%L,%L,%L,%L,1,%L,%L,%L,%L,%L,%L)',ws,work.id,actor,'ol-operator@example.test',h,'ol-new-fixture',sid,id,revision_hash,'ol-owner@example.test'),'strelva_service_access_denied');
+    insert into public.agency_verifications(agency_workspace_id,effect,status,evidence,verified_by,verifier_is_agency_member)
+      values('b2000000-0000-4000-8000-0000000000a1','publish','verified','{"note":"fixture"}',actor,false);
+    -- Nor does a verified agency whose website mandate has ended.
+    update public.client_resource_mandates set status='ended',ended_by_kind='owner',ended_by=actor,ended_at=now(),end_reason='Fixture end.'
+      where customer_workspace_id=ws and status='active';
+    perform pg_temp.ol_expect(format('select public.reserve_website_by_owner_link(%L,%L,%L,%L,1,%L,%L,%L,%L,%L,%L)',ws,work.id,actor,'ol-operator@example.test',h,'ol-new-fixture',sid,id,revision_hash,'ol-owner@example.test'),'strelva_service_access_denied');
+    insert into public.client_resource_mandates(customer_workspace_id,agency_workspace_id,effect,resource_kind,resource_ref,
+        granted_by_kind,granted_by,granter_is_agency_member,grant_note)
+      values(ws,'b2000000-0000-4000-8000-0000000000a1','publish','website',public.system_origin_id(ws,'saved_work',work.id::text)::text,
+        'conversion',actor,false,'Fixture conversion mandate.');
+  end if;
   select tenant_id into reserved from public.reserve_website_by_owner_link(ws,work.id,actor,'ol-operator@example.test',1,h,'ol-new-fixture',sid,id,revision_hash,'ol-owner@example.test');
   perform pg_temp.ol_assert(reserved='ol-new-fixture','new hosted tenant reserved');
   perform pg_temp.ol_assert(not exists(select 1 from public.memberships where tenant_id=reserved),'no tenant membership granted');

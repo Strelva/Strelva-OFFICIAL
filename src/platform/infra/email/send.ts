@@ -8,6 +8,7 @@ import {
   prospectEmailsEnabled,
 } from "@/platform/infra/email/enabled";
 import { getClientEmailOverride } from "@/platform/infra/email/client-override";
+import { providerEmailSendAllowed, senderDomain, type EmailProvider } from "@/platform/infra/email/provider-gate";
 import { renderEmailHtml, renderEmailText, type EmailOptions } from "@/platform/infra/email/layout";
 
 /** The four people Strelva can address. These are relationship roles, not
@@ -28,6 +29,11 @@ export type SendEmailInput = RenderedEmail & {
   tenantId?: string;
   /** Business scope for owner presentation; never an authority grant. */
   workspaceId?: string;
+  /** Set when an agency sends this for a business (an owner invitation, a
+   * client's mail). The send then also needs that agency's seat, its email
+   * verification and the business's mandate for the sending domain
+   * (provider-gate.ts). Absent ⇒ behavior is unchanged. */
+  provider?: EmailProvider;
   fromName?: string;
   /** Presentation already rendered into raw reports; envelope is revalidated here. */
   brand?: OwnerBrand;
@@ -68,7 +74,17 @@ export type EmailReceivedReadbackResult =
     }
   | { status: "unavailable"; reason: string };
 
+function fromAddressFor(input: Pick<SendEmailInput, "fromAddress">): string {
+  return input.fromAddress || `hello@${process.env.RESEND_DOMAIN || "updates.strelva.com"}`;
+}
+
 async function audienceEnabled(input: SendEmailInput, strictClientGate = false): Promise<boolean> {
+  if (!(await audiencePolicyEnabled(input, strictClientGate))) return false;
+  // The audience allows it; an agency's send also needs its own effect gate.
+  return !input.provider || providerEmailSendAllowed(input.provider, senderDomain(fromAddressFor(input)));
+}
+
+async function audiencePolicyEnabled(input: SendEmailInput, strictClientGate: boolean): Promise<boolean> {
   const { audience } = input;
   if (audience === "operator") return operatorEmailsEnabled();
   if (audience === "prospect") return prospectEmailsEnabled();
@@ -126,6 +142,12 @@ export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendE
   const defaultReplyTo = process.env.REPLY_TO_EMAIL || "hello@strelva.com";
   const replyTo = agencyId ? identity?.replyTo || defaultReplyTo : input.replyTo || defaultReplyTo;
 
+
+  // Resolve branding first, then authorize the actual envelope domain.
+  if (input.provider && !(await providerEmailSendAllowed(input.provider, senderDomain(fromAddress)))) {
+    return { status: "suppressed", reason: "email_suppressed_or_unconfigured" };
+  }
+
   const payload = {
     from: formatEmailFrom(fromName, fromAddress),
     replyTo,
@@ -171,6 +193,8 @@ export interface SendBatchInput {
   tenantId?: string;
   /** Business scope for owner presentation; never an authority grant. */
   workspaceId?: string;
+  /** As SendEmailInput.provider; checked against fromAddress's domain. */
+  provider?: EmailProvider;
   fromName: string;
   /** Must be on updates.strelva.com or mail.strelva.com. */
   fromAddress: string;
@@ -188,10 +212,11 @@ export type SendBatchResult =
 const ALLOWED_FROM_DOMAINS = ["updates.strelva.com", CLIENT_MAIL_DOMAIN];
 
 /** Check before rendering unsubscribe links; the transport checks again at send. */
-export async function batchEmailSuppression(input: Pick<SendBatchInput, "audience" | "tenantId" | "requireClientGate">): Promise<string | null> {
+export async function batchEmailSuppression(input: Pick<SendBatchInput, "audience" | "tenantId" | "requireClientGate"> & Partial<Pick<SendBatchInput, "provider" | "fromAddress">>): Promise<string | null> {
   const rendered = { subject: "", to: [], html: "", text: "" };
   if (input.requireClientGate && !(await audienceEnabled({ ...rendered, audience: "client", tenantId: input.tenantId }, true))) return "not sent: gated";
   if (!(await audienceEnabled({ ...rendered, audience: input.audience, tenantId: input.tenantId }))) return "not sent: gated";
+  if (input.provider && !(await providerEmailSendAllowed(input.provider, senderDomain(fromAddressFor(input))))) return "not sent: provider not cleared";
   if (!process.env.RESEND_API_KEY) return "not sent: unconfigured";
   return null;
 }

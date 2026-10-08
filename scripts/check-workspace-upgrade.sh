@@ -387,6 +387,13 @@ psql "${psql_args[@]}" --file="$repo_root/tests/business-pages-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-confirmed-facts-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/owner-recipient-trust-schema.sql"
 printf 'Booking-reader, public-facts and #509 rollbacks restored the exact catalog in reverse order.\n'
+# 20261014100000-20261014101000 (#255/#534) replace every client-serving
+# super_admins gate with the acting provider and make owner-link website
+# launches need publish; the effect matrix and the owner-link contracts hold
+# after the full ordered upgrade, and the replaced contracts above ran against it.
+psql "${psql_args[@]}" --file="$repo_root/tests/acting-provider-gates-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-links-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-website-preview-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 

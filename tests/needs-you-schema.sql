@@ -63,6 +63,20 @@ insert into public.workspace_memberships(workspace_id, user_id, role, created_by
   ('ae000000-0000-4000-8000-000000000010', 'ae000000-0000-4000-8000-000000000003', 'member', 'ae000000-0000-4000-8000-000000000001'),
   ('ae000000-0000-4000-8000-000000000011', 'ae000000-0000-4000-8000-000000000004', 'owner', 'ae000000-0000-4000-8000-000000000004'),
   ('ae000000-0000-4000-8000-000000000012', 'ae000000-0000-4000-8000-000000000001', 'owner', 'ae000000-0000-4000-8000-000000000001');
+-- After 20261014101000 the provider layer belongs to the business's acting
+-- provider, not super_admins: the operator works for this business through an
+-- agency's seat and staff row, the way any agency does.
+do $$ begin
+  if to_regprocedure('public.acting_provider(uuid,uuid,text,text,text)') is null then return; end if;
+  insert into public.workspaces(id, kind, name, created_by)
+    values ('ae000000-0000-4000-8000-000000000020', 'agency', 'Fixture Provider Agency', 'ae000000-0000-4000-8000-000000000005');
+  insert into public.workspace_memberships(workspace_id, user_id, role, created_by)
+    values ('ae000000-0000-4000-8000-000000000020', 'ae000000-0000-4000-8000-000000000005', 'owner', 'ae000000-0000-4000-8000-000000000005');
+  insert into public.provider_seats(customer_workspace_id, agency_workspace_id, granted_by_kind, granted_by)
+    values ('ae000000-0000-4000-8000-000000000010', 'ae000000-0000-4000-8000-000000000020', 'owner', 'ae000000-0000-4000-8000-000000000001');
+  insert into public.agency_client_staff(agency_workspace_id, customer_workspace_id, user_id, assigned_by)
+    values ('ae000000-0000-4000-8000-000000000020', 'ae000000-0000-4000-8000-000000000010', 'ae000000-0000-4000-8000-000000000005', 'ae000000-0000-4000-8000-000000000005');
+end $$;
 -- The owner recipient falls back to the linked tenant's owner email.
 insert into public.tenants(id, stable_id, site_name, active, owner_email) values
   ('ny-fixture-site', 'ae000000-0000-4000-8000-0000000000a1', 'Mooney Fixture Site', true, 'NY-Owner@example.test');
