@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # Shared lifecycle for disposable SQL checks. Source before allocating anything.
 # PostgreSQL 18 on macOS needs a valid process locale even with initdb --locale=C.
-export LC_ALL=C
+# Preserve an explicit caller locale (the SQL rehearsal uses en_US.UTF-8); only
+# replace the unavailable macOS C.UTF-8 alias with the portable C locale.
+if [[ -z "${LC_ALL:-}" || "$LC_ALL" == "C.UTF-8" || "$LC_ALL" == "C.utf8" ]]; then
+  export LC_ALL=C
+fi
 cluster_root=''
 cluster_data=''
 cluster_socket=''

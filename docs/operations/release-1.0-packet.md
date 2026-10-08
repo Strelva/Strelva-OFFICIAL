@@ -1410,17 +1410,25 @@ logged and time-boxed, separate from agency delivery.
 ### Step 12 · HOLD until batch 7A and the pending decision
 
 [Step issue #358](https://github.com/Strelva/Strelva-OFFICIAL/issues/358);
-conversion implementation [#316](https://github.com/Strelva/Strelva-OFFICIAL/issues/316).
+conversion implementation [#316](https://github.com/Strelva/Strelva-OFFICIAL/issues/316),
+provider-seat conversion [#246](https://github.com/Strelva/Strelva-OFFICIAL/issues/246),
+and removed-agency access [#535](https://github.com/Strelva/Strelva-OFFICIAL/issues/535).
 
 - What: convert each tenant with an explicit chosen agency. For the 9
-  existing managed clients, record `workspace_providers.source=existing_contract`
+  existing managed clients, record `agencySelectionBasis=existing_contract`
   only after Jacob confirms each client's existing agreement names Strelva's
-  agency. A test or new business needs its own recorded choice; never infer
-  a contract from being in the active-tenant list.
-- Command/approach: use the commands below with `--agency=<workspace-id>`
-  after the amended script and RPC land. This checkout's old script does not
-  support that option; do not run it or silently omit the agency. The dry run
-  must show the provider, source and absence of an operator-admin grant.
+  agency. The provider attribution source is `tenant_conversion`. A test or
+  new business needs its own recorded owner choice; never infer a contract
+  from being in the active-tenant list.
+- Command/approach: pass `--agency=<workspace-id>`,
+  `--agency-staff=<verified-member-email[,email...]>` and
+  `--agency-basis=existing_contract|owner_choice` to both the preview and
+  apply commands below. No Strelva agency is selected by default. The named
+  people must already be verified agency members. The preview must show the
+  provider, basis, staff and absence of a personal operator-admin grant.
+  Conversion creates no owner invitation and sends no email. The existing
+  owner-invite command remains available through the conversion link, without
+  granting the operator customer-workspace membership.
 - Verify: chosen provider and `existing_contract` receipt per existing
   client; ordinary agency queue access; no standing platform-operator admin;
   owner data and exit intact; billing payer remains `business`; storefront
@@ -1462,10 +1470,15 @@ npx tsx scripts/storefront-parity.ts capture --base=https://app.strelva.com \
   --tenants=$SLUG --out=$D/before.json --i-have-jacobs-yes
 
 # b. Dry run (reads production, writes nothing)
-npx tsx --env-file=<prod env> scripts/convert-tenant-to-workspace.ts $SLUG --agency=$AGENCY --operator-email=$OP
+STAFF=<verified agency-member emails, comma-separated>
+BASIS=existing_contract # use owner_choice only when the owner made that choice
+npx tsx --env-file=<prod env> scripts/convert-tenant-to-workspace.ts $SLUG \
+  --agency=$AGENCY --agency-staff=$STAFF --agency-basis=$BASIS --operator-email=$OP
 
 # c. On the yes for this tenant
-npx tsx --env-file=<prod env> scripts/convert-tenant-to-workspace.ts $SLUG --agency=$AGENCY --apply --operator-email=$OP --i-have-jacobs-yes
+npx tsx --env-file=<prod env> scripts/convert-tenant-to-workspace.ts $SLUG \
+  --agency=$AGENCY --agency-staff=$STAFF --agency-basis=$BASIS \
+  --apply --operator-email=$OP --i-have-jacobs-yes
 
 # d. Prove nothing a site reads changed
 npx tsx scripts/storefront-parity.ts capture --base=https://app.strelva.com \
@@ -1688,13 +1701,30 @@ bypass for an ordinary agency action.
 [Step issue #359](https://github.com/Strelva/Strelva-OFFICIAL/issues/359).
 
 - What: move any earlier conversion onto an explicit provider seat and
-  remove the standing operator-admin path. Expected count: zero; verify it.
-- Command/approach: after 7A and before client flags or invites, inventory
-  `tenant_workspace_links`, providers and operator memberships against the
-  new conversion contract. Record a zero-result receipt if none need repair.
-  Otherwise use the rehearsed RL-08 re-path tool from #316, dry run then
-  guarded apply on each business's own yes, with recorded agency choice or
-  confirmed `existing_contract`. Its exact command waits for the tool to land.
+  remove the standing operator-admin path created by conversion. Expected
+  count: zero; verify it.
+- Command/approach: after batch 7A and migration
+  `20261013220000_provider_seat_tenant_conversion.sql`, and before client
+  flags or invites, inventory `tenant_workspace_links`, providers and
+  conversion-created operator memberships. Record a zero-result receipt if
+  none need repair. Otherwise preview each legacy conversion:
+
+  ```sh
+  AGENCY=<workspace-id>
+  STAFF=<verified-agency-member-emails>
+  BASIS=existing_contract # only with confirmed agreement evidence
+  npx tsx --env-file=<prod env> scripts/repath-provider.ts <slug> \
+    --agency=$AGENCY --agency-staff=$STAFF --agency-basis=$BASIS \
+    --operator-email=<super-admin>
+  ```
+
+  After the route and old-membership count are reviewed, apply on the client's
+  own yes with the same arguments plus `--apply --i-have-jacobs-yes`. The RPC
+  adds the seat and named staff, records the route, and ends a legacy
+  `tenant_conversion` provider attribution and its seat/staff rows when it
+  points at a different agency. It removes only an operator admin membership
+  whose original receipt proves conversion created it. An admin membership
+  that predated a joined conversion is preserved.
 - Verify: same business/System ids, data, billing payer and storefront reads;
   explicit provider/source; ordinary agency access; no standing operator
   admin; owner replacement and exit still work. Compare before/after receipts.

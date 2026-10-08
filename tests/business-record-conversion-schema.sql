@@ -19,13 +19,20 @@ end; $$;
 
 create temporary table cv_fixture(value jsonb);
 insert into cv_fixture values (:'tenant_import'::jsonb);
+create function pg_temp.cv_route(payload jsonb) returns jsonb language sql as $$
+  select payload || case when to_regprocedure('public.repath_converted_tenant_provider(text,text,uuid,jsonb,text,boolean)') is null then '{}'::jsonb
+    else jsonb_build_object('agencyWorkspaceId', 'cf000000-0000-4000-8000-000000000011',
+      'agencyStaffEmails', jsonb_build_array('provider-staff@agency.example.test'), 'agencySelectionBasis', 'existing_contract') end
+$$;
+update cv_fixture set value = jsonb_set(value, '{payload}', pg_temp.cv_route(value->'payload'));
 create temporary table cv_result(label text primary key, value jsonb);
 
 insert into public.users(id, email, verified_at) values
   ('cf000000-0000-4000-8000-000000000001', 'operator@strelva.example.test', now()),
   ('cf000000-0000-4000-8000-000000000002', 'not-an-operator@example.test', now()),
   ('cf000000-0000-4000-8000-000000000003', 'revoked-operator@strelva.example.test', now()),
-  ('cf000000-0000-4000-8000-000000000004', 'other-business-owner@example.test', now());
+  ('cf000000-0000-4000-8000-000000000004', 'other-business-owner@example.test', now()),
+  ('cf000000-0000-4000-8000-000000000007', 'provider-staff@agency.example.test', now());
 insert into public.super_admins(user_id, email) values
   ('cf000000-0000-4000-8000-000000000001', 'operator@strelva.example.test');
 insert into public.super_admins(user_id, email, revoked_at) values
@@ -38,6 +45,10 @@ insert into public.workspaces(id, kind, name, created_by) values
   ('cf000000-0000-4000-8000-000000000010', 'customer', 'Unrelated Business', 'cf000000-0000-4000-8000-000000000004');
 insert into public.workspace_memberships(workspace_id, user_id, role, created_by) values
   ('cf000000-0000-4000-8000-000000000010', 'cf000000-0000-4000-8000-000000000004', 'owner', 'cf000000-0000-4000-8000-000000000004');
+insert into public.workspaces(id, kind, name, created_by) values
+  ('cf000000-0000-4000-8000-000000000011', 'agency', 'Fictional Agency', 'cf000000-0000-4000-8000-000000000001');
+insert into public.workspace_memberships(workspace_id, user_id, role, created_by) values
+  ('cf000000-0000-4000-8000-000000000011', 'cf000000-0000-4000-8000-000000000007', 'member', 'cf000000-0000-4000-8000-000000000001');
 create temporary table cv_tenant_before as select to_jsonb(t) as row from public.tenants t where id = 'gldf';
 create temporary table cv_counts_before as select
   (select count(*) from public.workspaces) as workspaces,
@@ -68,13 +79,16 @@ select pg_temp.cv_assert((select count(*) from public.workspaces) = (select work
 insert into cv_result select 'first', public.convert_tenant_to_business('operator@strelva.example.test', 'gldf',
   (select value->'payload' from cv_fixture), (select (value->>'commandId')::uuid from cv_fixture), (select value->>'digest' from cv_fixture));
 create temporary table cv_ws as select (value->>'workspaceId')::uuid as id from cv_result where label = 'first';
-select pg_temp.cv_assert((select value->>'replayed' = 'false' and value->>'alreadyConverted' = 'false' and value->>'operatorRole' = 'admin'
+select pg_temp.cv_assert((select value->>'replayed' = 'false' and value->>'alreadyConverted' = 'false'
+  and value->>'operatorRole' = case when value ? 'operatorMembershipCreated' then 'none' else 'admin' end
   and value#>>'{billing,billingType}' = 'tier' and value#>>'{billing,grandfathered}' = 'true' and value->'account' = 'null'::jsonb
   from cv_result where label = 'first'), 'receipt records the operator role and billing as observed');
 select pg_temp.cv_assert((select kind = 'customer' and name = 'Great Lakes Dried Fruit' and created_by = 'cf000000-0000-4000-8000-000000000001'
   from public.workspaces where id = (select id from cv_ws)), 'customer business created by the operator');
-select pg_temp.cv_assert((select count(*) = 1 and bool_and(user_id = 'cf000000-0000-4000-8000-000000000001' and role = 'admin')
-  from public.workspace_memberships where workspace_id = (select id from cv_ws)), 'the operator is the only member, as admin; no client user, no owner');
+select pg_temp.cv_assert((select case when to_regprocedure('public.repath_converted_tenant_provider(text,text,uuid,jsonb,text,boolean)') is null
+  then count(*) = 1 and bool_and(user_id = 'cf000000-0000-4000-8000-000000000001' and role = 'admin')
+  else count(*) = 0 end from public.workspace_memberships where workspace_id = (select id from cv_ws)),
+  'conversion creates no direct admin membership');
 select pg_temp.cv_assert((select count(*) from public.memberships) = (select tenant_memberships from cv_counts_before), 'no tenant membership created');
 -- `account_id` is excluded: once the business billing migration
 -- (20261007180000) is applied, its link trigger points the tenant at the
@@ -129,14 +143,14 @@ select pg_temp.cv_expect($$update public.tenant_workspace_links set receipt = '{
 
 -- A second site of the same account joins the same business; existing facts are kept.
 insert into cv_result select 'second', public.convert_tenant_to_business('operator@strelva.example.test', 'gldf-second-site',
-  jsonb_build_object('tenantId', 'gldf-second-site', 'tenantStableId', 'c0ffee00-0000-4000-8000-0000000000a2',
+  pg_temp.cv_route(jsonb_build_object('tenantId', 'gldf-second-site', 'tenantStableId', 'c0ffee00-0000-4000-8000-0000000000a2',
     'workspaceName', 'Great Lakes Dried Fruit Wholesale', 'targetWorkspaceId', (select id from cv_ws),
     'billing', null, 'account', jsonb_build_object('id', 'acct-fixture', 'name', 'Great Lakes', 'tenantIds', jsonb_build_array('gldf', 'gldf-second-site'), 'multiSite', true),
     'patch', jsonb_build_object('facts', jsonb_build_object(
       'display_name', jsonb_build_object('value', 'Great Lakes Dried Fruit Wholesale', 'verified', false),
       'legal_name', jsonb_build_object('value', 'Great Lakes Dried Fruit LLC', 'verified', false)),
       'services', jsonb_build_array(jsonb_build_object('op', 'upsert', 'name', 'Pallet orders'))),
-    'contacts', jsonb_build_array(jsonb_build_object('email', 'buyer@example.net', 'source', 'inquiry'))),
+    'contacts', jsonb_build_array(jsonb_build_object('email', 'buyer@example.net', 'source', 'inquiry')))),
   'cf000000-0000-4000-8000-0000000000c3', repeat('7', 64));
 select pg_temp.cv_assert((select value->>'joinedExistingWorkspace' = 'true' and value->>'workspaceId' = (select id::text from cv_ws) and value#>>'{account,multiSite}' = 'true'
   from cv_result where label = 'second'), 'second site joined the account business');
@@ -146,11 +160,12 @@ select pg_temp.cv_assert((select value #>> '{}' from public.business_record_fact
   and (select count(*) from public.business_services where workspace_id = (select id from cv_ws)) = 2
   and (select count(*) from public.business_contacts where workspace_id = (select id from cv_ws)) = 4, 'joining fills only missing facts and merges contacts');
 select pg_temp.cv_assert((select count(*) from public.workspace_memberships where workspace_id = (select id from cv_ws)) = 1, 'joining granted nobody anything');
-select pg_temp.cv_expect($$select public.convert_tenant_to_business('operator@strelva.example.test','quiet-site','{"tenantId":"quiet-site","tenantStableId":"c0ffee00-0000-4000-8000-0000000000a3","workspaceName":"Quiet Site","targetWorkspaceId":"cf000000-0000-4000-8000-000000000010","billing":null,"account":null,"patch":{},"contacts":[]}','cf000000-0000-4000-8000-0000000000c4',repeat('6',64))$$, 'tenant_conversion_target_invalid');
+select pg_temp.cv_expect(format($$select public.convert_tenant_to_business('operator@strelva.example.test','quiet-site',%L::jsonb,'cf000000-0000-4000-8000-0000000000c4',repeat('6',64))$$,
+  pg_temp.cv_route('{"tenantId":"quiet-site","tenantStableId":"c0ffee00-0000-4000-8000-0000000000a3","workspaceName":"Quiet Site","targetWorkspaceId":"cf000000-0000-4000-8000-000000000010","billing":null,"account":null,"patch":{},"contacts":[]}'::jsonb)), 'tenant_conversion_target_invalid');
 
 -- A tenant with no owner_recipient fact falls back to tenants.owner_email through the link.
 insert into cv_result select 'quiet', public.convert_tenant_to_business('operator@strelva.example.test', 'quiet-site',
-  '{"tenantId":"quiet-site","tenantStableId":"c0ffee00-0000-4000-8000-0000000000a3","workspaceName":"Quiet Site","billing":null,"account":null,"patch":{},"contacts":[]}',
+  pg_temp.cv_route('{"tenantId":"quiet-site","tenantStableId":"c0ffee00-0000-4000-8000-0000000000a3","workspaceName":"Quiet Site","billing":null,"account":null,"patch":{},"contacts":[]}'::jsonb),
   'cf000000-0000-4000-8000-0000000000c5', repeat('5', 64));
 select pg_temp.cv_assert((select public.resolve_business_owner_recipient((value->>'workspaceId')::uuid) - 'trusted' from cv_result where label = 'quiet')
   = '{"email":"quiet-owner@example.com","name":null,"from":"tenant_fallback","source":null,"verified":false,"tenantId":"quiet-site"}'::jsonb, 'owner recipient falls back to the linked tenant');
@@ -358,14 +373,14 @@ select pg_temp.cv_assert(not exists (select 1 from public.business_record_facts 
   and (select count(*) from public.business_contacts where workspace_id = (select id from cv_ws)) = 3
   and (select count(*) from public.tenant_workspace_links where workspace_id = (select id from cv_ws)) = 1, 'pre-existing record intact; the other site stays linked');
 insert into cv_result select 'rejoin', public.convert_tenant_to_business('operator@strelva.example.test', 'gldf-second-site',
-  jsonb_build_object('tenantId', 'gldf-second-site', 'tenantStableId', 'c0ffee00-0000-4000-8000-0000000000a2',
+  pg_temp.cv_route(jsonb_build_object('tenantId', 'gldf-second-site', 'tenantStableId', 'c0ffee00-0000-4000-8000-0000000000a2',
     'workspaceName', 'Great Lakes Dried Fruit Wholesale', 'targetWorkspaceId', (select id from cv_ws),
     'billing', null, 'account', jsonb_build_object('id', 'acct-fixture', 'name', 'Great Lakes', 'tenantIds', jsonb_build_array('gldf', 'gldf-second-site'), 'multiSite', true),
     'patch', jsonb_build_object('facts', jsonb_build_object(
       'display_name', jsonb_build_object('value', 'Great Lakes Dried Fruit Wholesale', 'verified', false),
       'legal_name', jsonb_build_object('value', 'Great Lakes Dried Fruit LLC', 'verified', false)),
       'services', jsonb_build_array(jsonb_build_object('op', 'upsert', 'name', 'Pallet orders'))),
-    'contacts', jsonb_build_array(jsonb_build_object('email', 'buyer@example.net', 'source', 'inquiry'))),
+    'contacts', jsonb_build_array(jsonb_build_object('email', 'buyer@example.net', 'source', 'inquiry')))),
   'cf000000-0000-4000-8000-0000000000c3', repeat('7', 64));
 select pg_temp.cv_assert((select value->>'alreadyConverted' = 'false' and value->>'joinedExistingWorkspace' = 'true' from cv_result where label = 'rejoin')
   and (select count(*) from public.tenant_workspace_links where workspace_id = (select id from cv_ws)) = 2
@@ -374,7 +389,7 @@ select pg_temp.cv_assert((select value->>'alreadyConverted' = 'false' and value-
 -- An import already undone through history still unlinks, and the business it
 -- created still goes: its only history is the import and that undo.
 insert into cv_result select 'undo-convert', public.convert_tenant_to_business('operator@strelva.example.test', 'undo-site',
-  '{"tenantId":"undo-site","tenantStableId":"c0ffee00-0000-4000-8000-0000000000d2","workspaceName":"Undo Site","billing":null,"account":null,"patch":{"facts":{"display_name":{"value":"Undo Site"}}},"contacts":[{"email":"undo-lead@example.test","source":"inquiry"}]}',
+  pg_temp.cv_route('{"tenantId":"undo-site","tenantStableId":"c0ffee00-0000-4000-8000-0000000000d2","workspaceName":"Undo Site","billing":null,"account":null,"patch":{"facts":{"display_name":{"value":"Undo Site"}}},"contacts":[{"email":"undo-lead@example.test","source":"inquiry"}]}'::jsonb),
   'cf000000-0000-4000-8000-0000000000e7', repeat('5', 64));
 select public.undo_business_record_revision((value->>'workspaceId')::uuid, 'cf000000-0000-4000-8000-000000000001', 'operator@strelva.example.test', 'operator', 1,
   'cf000000-0000-4000-8000-0000000000e8', repeat('6', 64)) from cv_result where label = 'undo-convert';
