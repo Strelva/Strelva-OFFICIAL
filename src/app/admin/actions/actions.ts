@@ -8,7 +8,7 @@
  * results so the UI can report honest partial failures.
  */
 import { isSuperAdmin } from "@/platform/infra/auth";
-import { auditOperatorDecision, verifiedOperator } from "../operator-audit";
+import { auditOperatorDecision, verifiedOperator } from "@/lib/operator-decisions";
 import { getAllTenants } from "@/lib/tenants";
 import { escalateEventToOwner } from "@/lib/event-actions";
 import {

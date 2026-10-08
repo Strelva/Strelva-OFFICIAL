@@ -1010,6 +1010,21 @@ button.row:hover {
   line-height: 22px;
 }
 
+/* Every value an owner approves (business facts), never shortened. */
+.reviewLines {
+  margin: 4px 0 0;
+  padding: 0 0 0 18px;
+  color: var(--gray-fg);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.reviewLines li + li {
+  margin-top: 4px;
+}
+
 .effects {
   display: block;
   margin-top: 4px;

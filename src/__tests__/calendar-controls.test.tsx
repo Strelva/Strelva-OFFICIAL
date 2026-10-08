@@ -3,6 +3,7 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScheduleCalendarControls } from "@/experience/scheduling/ScheduleCalendarControls";
+import { CalendarConnectionPanel } from "@/experience/scheduling/CalendarConnectionPanel";
 import { WorkspaceRequestContext } from "@/experience/workspace/WorkspaceRequest";
 import type { CalendarConnection } from "@/products/scheduling/contracts";
 import { outlookCalendarConsentAction } from "@/products/scheduling/contracts";
@@ -81,7 +82,31 @@ async function mount(
   return onChanged;
 }
 
+async function mountConnectionPanel(initialConnections: CalendarConnection[]) {
+  await act(async () => root.render(createElement(
+    WorkspaceRequestContext.Provider,
+    { value: transport as typeof fetch },
+    createElement(CalendarConnectionPanel, { workspaceId: connection.workspaceId }),
+  )));
+  expect(pending[0]?.url).toContain("/api/workspace/calendar-connections?");
+  await act(async () => pending.shift()!.resolve(response({ connections: initialConnections })));
+}
+
 describe("calendar sync controls", () => {
+  it("explains that a failed Google revoke still removed local credentials", async () => {
+    const googleConnection: CalendarConnection = { ...connection, provider: "google" };
+    await mountConnectionPanel([googleConnection]);
+    const disconnect = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(button => button.textContent === "Disconnect");
+    expect(disconnect).toBeTruthy();
+    await act(async () => disconnect!.click());
+    expect(pending[0]?.init?.method).toBe("POST");
+    await act(async () => pending.shift()!.resolve(response({ disconnected: true, revocationOutcome: "failed", revocationErrorCode: "http_503" })));
+    expect(pending[0]?.url).toContain("/api/workspace/calendar-connections?");
+    await act(async () => pending.shift()!.resolve(response({ connections: [{ ...googleConnection, status: "revoked" }] })));
+    expect(container.querySelector('[role="status"]')?.textContent).toContain("The calendar is disconnected here and its stored credentials were removed.");
+    expect(container.textContent).toContain("Disconnected");
+  });
+
   it("announces local Outlook disconnection and the remaining Microsoft consent step", async () => {
     const onChanged = await mount([]);
     await act(async () => Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find(button => button.textContent === "Disconnect")!.click());

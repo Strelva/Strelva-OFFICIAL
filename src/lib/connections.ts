@@ -110,10 +110,9 @@ export async function updateLastSynced(
 export async function deleteConnection(
   tenantId: string,
   provider: IntegrationProvider
-): Promise<void> {
+): Promise<boolean> {
   const redis = getRedis();
-  if (!redis) return;
-
-  await redis.del(connectionKey(tenantId, provider));
+  if (redis) await redis.del(connectionKey(tenantId, provider));
   await removeRecord("provider_connections", tenantId, provider);
+  return true;
 }

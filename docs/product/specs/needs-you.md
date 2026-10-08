@@ -168,6 +168,34 @@ nothing that wasn't theirs did.
    each. A fact Strelva inferred or extracted routes to `owner_decides` until
    the owner confirms it. This moves the "high-risk facts" review from every
    copy of a fact to the one place it lives.
+   *Built for client sites (#509, ADR 0012):* a fact or service written by
+   anyone but a verified owner (a Strelva operator, any agency including
+   Strelva's, an admin, an import or a model) stays out of the confirmed copy
+   (`business_record_confirmed`) that hosted and connected sites read. An owner-approved Ask
+   business-record draft confirms only the entities written by that draft's
+   exact receipt, under the same owner session or signed-link decision. It does
+   not reopen a second facts approval or confirm unrelated pending edits. Plain
+   admin approval still carries no owner confirmation. Native custom-repo
+   contact changes enter the existing forced review; unavailable or held review
+   is reported as pending, with no automatic provider write. All of
+   a business's pending changes form one `business_facts` item
+   (`fact.inferred`, `owner_decides`, admins never decide).
+   `confirm_business_facts` applies it only for the owner's session or a
+   signed link to the trusted owner address (rule 8). A recipient a provider
+   wrote is itself pending and never approves. Delivery and the link claim
+   resolve that same trusted owner (`resolve_business_owner_recipient`), and the item
+   is never emailed to an address only a provider wrote. The owner approves
+   only where every value is shown in full (the signed-link confirm page and
+   the Needs you card, from `SourceAdapter.review` bound to the item's
+   revision); the 1,000-character item detail is whole lines plus a count,
+   never a cut value, and a pending recipient change leads it. The hourly
+   chase also finds businesses with pending facts and no tenant or bookings.
+   The migration rebuilds the confirmed copy
+   from the owner's own history, so an earlier provider overwrite or deletion
+   stays pending. Confirmed contact facts reach a native website as after the
+   owner's own save: signed in, the owner's contact review is prepared at once;
+   by link, Strelva's review queue gets it and the decision reads
+   done_unverified until then.
 6. **Needs you items are one shape.** Each item has the business, System,
    change kind, a plain title, what happens on Approve, what happens on Not
    yet, its source lifecycle and source id, a revision hash, when it opened,
@@ -179,8 +207,21 @@ nothing that wasn't theirs did.
    on). Needs you records the decision and its outcome. It doesn't make a
    second write path.
 8. **Email reaches the owner without sign-in.** Every `owner_decides` item
-   reaches the business's owner recipient (`resolve_business_owner_recipient`:
-   the `owner_recipient` fact, falling back to `tenants.owner_email`) by email.
+   reaches the business's **trusted owner address**
+   (`resolve_business_owner_recipient`) by email.
+   *Built (#524, ADR 0012):* an address is trusted only when it was imported
+   at conversion (the site's imported `owner_recipient`, else its
+   `owner_email`) into a business with none yet, or the owner set it: their
+   own write, or their Approve on the business details item, which goes to
+   the previously trusted address or their session. An address an operator,
+   any agency (Strelva's included) or an admin writes is pending and receives
+   nothing. Editing `tenants.owner_email` after conversion moves nothing.
+   Every change is logged with its actor (`business_owner_recipient_events`).
+   A link decides only if it was sent to that item while its address was
+   trusted, and the address is still trusted
+   (`owner_decision_link_bindings`, checked in `claim_owner_decision`). With
+   no trusted address nothing is sent; the item is recorded as not sent
+   (`no_trusted_owner_recipient`) and the operator queue shows it.
    - **Urgent kinds** go at once, one email per item. Urgent means a customer
      is waiting: an inquiry reply, a review reply in `approve` mode.
    - **Everything else** goes in one morning email per business that has
@@ -494,7 +535,8 @@ yes to email.
 | Failure | What the person sees | Recovery |
 | --- | --- | --- |
 | Email gate off or override off | Owner: nothing. Operator: "Owner not told" on the item | Operator decides whether to call; item still expires on day 14 |
-| Email bounces | Operator: "Email bounced" | Fix `owner_recipient` in the business record; resend |
+| Email bounces | Operator: "Email bounced" | The owner sets a new address (signed in), or approves one an operator proposes from the last trusted address |
+| No trusted owner address | Operator: "Not sent: no trusted owner address" | An address an operator adds waits; the owner signs in to set it |
 | Link expired or item changed | "This changed since we emailed you" / "This link expired", with Open | Owner opens the latest in the workspace or the next morning email |
 | Owner no longer owner | "This link isn't for this account" | Nothing acts |
 | Resolve fails at the provider | "Strelva couldn't finish this. We're on it." | Item stays pending (source rule); operator queue P1/P2 |

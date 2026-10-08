@@ -27,14 +27,14 @@ import { POST as scan } from "@/app/api/audit/scan/route";
 import { POST as exportAudit } from "@/app/api/audit/report/route";
 import { GET as prospects } from "@/app/api/workspace/prospects/route";
 
-const agency: AgencyAttribution = { workspaceId: "b2770000-0000-4000-8000-000000000010", slug: "northside", name: "Northside Web", contactUrl: "https://north.example/contact", brand: { logoUrl: null, accentColor: null } };
+const agency: AgencyAttribution = { workspaceId: "b2770000-0000-4000-8000-000000000010", slug: "northside", name: "Northside Web", contactUrl: "https://north.example/contact", brand: { logoUrl: null, accentColor: "#447a4f" } };
 const result: AiVisibilityResult = { business: "Acme", url: "https://acme.example", score: 40, grade: "F", verdict: "Needs work", signals: [], topFix: "Ask Strelva to add schema.", citation: { probed: false, mentioned: false, recommended: false, note: "Not probed" } };
 const categories = [{ name: "SEO", slug: "seo", score: 40, weight: 1, checks: [{ name: "Schema", status: "fail", score: 0, message: "Missing schema", details: "Ask Strelva to add it.", impact: "Optional: ask Strelva to review.", priority: "high" }] }];
 const request = (path: string, body: unknown) => new NextRequest(`https://app.strelva.com${path}`, { method: "POST", body: JSON.stringify(body), headers: { "content-type": "application/json", "x-forwarded-for": "127.0.0.1" } });
 
 beforeEach(() => {
   vi.clearAllMocks(); vi.stubEnv("STRELVA_AGENCY_PROSPECTING_RELEASE", "1");
-  mocks.rpc.mockImplementation(async (name: string) => ({ data: name === "agency_prospecting_profile" ? [{ workspace_id: agency.workspaceId, slug: agency.slug, name: agency.name, contact_url: agency.contactUrl, contact_email: "north@agency.test" }] : null, error: null }));
+  mocks.rpc.mockImplementation(async (name: string) => ({ data: name === "agency_prospecting_profile" ? [{ workspace_id: agency.workspaceId, slug: agency.slug, name: agency.name, contact_url: agency.contactUrl, contact_email: "north@agency.test" }] : name === "resolve_owner_brand" ? { agencyId: agency.workspaceId, name: agency.name, brand: null, emailAllowed: true, replyTo: "north@agency.test" } : null, error: null }));
   mocks.score.mockResolvedValue(result); mocks.saveResult.mockImplementation(async (value: AiVisibilityResult) => ({ id: "scan_abc123", result: value, input: {} }));
   mocks.getResult.mockResolvedValue({ id: "scan_abc123", result: { ...result, agency }, input: {} });
   mocks.rate.mockResolvedValue(false); mocks.redisGet.mockResolvedValue(null); mocks.audit.mockResolvedValue(categories);
@@ -49,8 +49,8 @@ describe("agency public check attribution", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ agency, topFix: "Ask your web provider to add schema.", shareUrl: "https://app.strelva.com/ai-visibility/scan_abc123" });
     expect(mocks.rpc.mock.calls[0]).toEqual(["agency_prospecting_profile", { p_slug: "northside" }]);
-    expect(mocks.rpc.mock.calls[1]?.[0]).toBe("agency_prospect_admit");
-    expect((mocks.rpc.mock.invocationCallOrder[1] ?? Infinity)).toBeLessThan(mocks.score.mock.invocationCallOrder[0] ?? -Infinity);
+    expect(mocks.rpc.mock.calls[2]?.[0]).toBe("agency_prospect_admit");
+    expect((mocks.rpc.mock.invocationCallOrder[2] ?? Infinity)).toBeLessThan(mocks.score.mock.invocationCallOrder[0] ?? -Infinity);
     expect(mocks.saveResult.mock.calls[0]?.[0]?.agency?.workspaceId).toBe(agency.workspaceId);
   });
   it("keeps flag-off public behavior and copy unchanged", async () => {
@@ -103,7 +103,7 @@ describe("agency lead routing", () => {
     expect(response.status).toBe(200); expect(mocks.slack).not.toHaveBeenCalled();
     expect(mocks.saveReport.mock.calls[0]?.[0]).toMatchObject({ agency, categories: [{ checks: [{ details: "Ask your web provider to add it.", impact: "Optional: ask your web provider to review." }] }] });
     expect(mocks.rpc).toHaveBeenCalledWith("agency_prospect_capture", expect.objectContaining({ p_workspace_id: agency.workspaceId, p_source: "audit" }));
-    expect(mocks.email).toHaveBeenCalledWith(expect.objectContaining({ replyTo: "north@agency.test", reportUrl: `https://app.strelva.com/audit/report/${"a".repeat(32)}`, result: expect.objectContaining({ agency }) }));
+    expect(mocks.email).toHaveBeenCalledWith(expect.objectContaining({ replyTo: "north@agency.test", reportUrl: `https://app.strelva.com/audit/report/${"a".repeat(32)}`, result: expect.objectContaining({ agency: expect.objectContaining(agency) }) }));
   });
   it("does not email or notify Strelva when prospect persistence fails", async () => {
     mocks.rpc.mockImplementation(async (name: string) => name === "agency_prospect_capture" ? { data: null, error: { message: "database unavailable" } } : { data: [{ workspace_id: agency.workspaceId, slug: agency.slug, name: agency.name, contact_url: agency.contactUrl }], error: null });

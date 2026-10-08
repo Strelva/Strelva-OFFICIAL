@@ -429,7 +429,7 @@ Neither is used by any journey today.
 - [ ] Per-workspace flags layered over the env flags, so each client's
       landing, inquiries and rebuild turn on and roll back on their own. The
       same flags split Preview per tester. *Built locally on
-      `build/owner-entry`, with migration `20261013130000`: switching on
+      `build/owner-entry`, with migration `20261016110000`: switching on
       records and audits the authenticated operator's approval; controls are
       on `/admin/clients/[id]`.*
 

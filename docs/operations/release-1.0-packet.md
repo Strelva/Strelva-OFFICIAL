@@ -417,7 +417,7 @@ After each batch:
 | 5 | `20261008110000`, `20261008111000`, `20261008123000`, `20261008124000`, `20261008130000`, `20261008131000`, `20261008140000` | No Sept 30 objects. Triggers on batch 1–2 tables (`systems`, `tenant_workspace_links`), wraps `tenant_unlink_plan`, replaces `workspace_release_flag_names` | Ask history, website change receipts, listing read-back queue, Needs you policy imports, Possibilities, Make real live, lead reads |
 | 6 | `20261008141000`, `20261008150000`, `20261008150100`, `20261008151000`, `20261009100000`, `20261009110000`, `20261009113000` | Yes: `btree_gist` extension, a column + FK and an index on live `public_website_bookings`; checks, columns and indexes on `tenant_leads` (written since `0.2.1`); a column + trigger on `owner_decisions`; replaces batch 1–5 functions | Booking store and lifecycle, linked-tenant publishing, domain approvals, connected sites, the Strelva service actor, inquiry records |
 | 7 | `20261009130000`, `20261009131000`, `20261009140000` | Yes, small: replaces two batch 3/6 functions (`read_strelva_handled`, `record_strelva_service_action`) with the same signatures, swaps the `purpose` check on `strelva_service_actions` (batch 6, append-only), and replaces `workspace_release_flag_names()` (batch 6) with one more key | Strelva handled lists decided Needs you items; Make real by signed link for an owner with no account, behind its own `make_real_owner_link` flag |
-| 8 (proposed; rehearsal fails catalog restore) | `20261009150000` and 83 w6 files (`20261010100000`–`20261010170000`); see "Batch 8 · proposed" | Not classified yet: live-object and lock impact unreviewed | Nothing until rehearsed; listed for review only |
+| 8 (proposed; rehearsal fails catalog restore) | `20261009150000`, 83 w6 files (`20261010100000`–`20261010170000`) and `20261011153000` (#530); see "Batch 8 · proposed" | Not classified yet: live-object and lock impact unreviewed | Nothing until rehearsed; listed for review only |
 
 Batches 5 and 6 are in filename order; batch 6 depends on batch 5
 (`20261009100000` keeps every flag name `20261008131000` adds;
@@ -478,6 +478,16 @@ staged, pushed or approved.
   batches 0–7 do. Batch 8 cannot join `batches` until each companion either
   archives and drops (release-safety's contract) or the rehearsal accepts a
   named retained-object list.
+- **Added after the rehearsal (#530, PR #549, not rehearsed):**
+  `20261011153000_operator_owner_decisions` replaces batch 3's
+  `claim_owner_decision` (same signature and grants) so a super admin or a
+  member of the business's provider agency holding an admin seat is refused
+  an owner item, and adds two service-role lookups (`business_agency_seat`,
+  `tenant_agency_seat`). No tables, no data changes. Depends on batch 1
+  (`tenant_workspace_links`), batch 3 (`needs_you`) and 7A (`provider_seats`).
+  Its companion restores batch 3's body and drops the lookups. Proven locally
+  in `check:workspace-sql` (forward, rollback, forward); not in the batch 8
+  rehearsal.
 - Who says yes: Jacob, per file set, after release-safety supplies rehearsal
   evidence. This entry authorizes nothing.
 
@@ -567,8 +577,95 @@ staged, pushed or approved.
 | `20261010165800_unbounded_export_archive` | `8bb45a0d6921` | `rollback-20261010165800_unbounded_export_archive.sql` |
 | `20261010165900_export_build_access` | `e2dd7c05fc27` | `rollback-20261010165900_export_build_access.sql` |
 | `20261010170000_deprovision_retained_after_inquiry_export` | `172e31fd9858` | `rollback-20261010170000_deprovision_retained_after_inquiry_export.sql` |
+| `20261011153000_operator_owner_decisions` | `1859f9b74b7c` | `rollback-20261011153000_operator_owner_decisions.sql` |
 
 <!-- proposed-batch-8:end -->
+
+<!-- proposed-batch-9:start -->
+### Batch 9 · proposed: audited super-admin grants
+
+Status: **proposed, not released or rehearsed against the restored production
+copy.** This migration follows batch 8 and contains the audited grant/revoke
+RPCs, the access-review view, the zero-active break-glass bootstrap, and the
+retirement of the unused bootstrap email table. The manifest entry is in
+`scripts/release-safety/batches.json` under `proposed`; it is not an approved
+production batch.
+
+| Forward file | SHA-256 | Rollback companion |
+| --- | --- | --- |
+| `20261015110000_super_admin_grants.sql` | `2804c89c47c905d12bb8a2b598207c31e16c1081a5983393257ca11966b94349` | `rollback-20261015110000_super_admin_grants.sql` |
+
+The migration is **one-way after the first successful grant, revoke, or
+bootstrap**. Every one of those appends an audit event; rollback refuses to
+discard even one event. Before any event, rollback restores the prior table
+grants, auth trigger and original bootstrap seed set. The forward migration
+stops if `super_admin_bootstrap` contains rows beyond its original Jacob and
+Noah seeds. It then drops the table because no runtime code reads it. The old
+email list is not an active grant and does not carry Noah's access forward.
+
+### Jacob's super-admin migration checks
+
+1. **Before migrating**, run:
+
+   ```sql
+   select user_id, email, revoked_at from public.super_admins;
+   ```
+
+   Confirm Jacob's exact current account row is present and `revoked_at` is
+   `null`. Also confirm his mirrored identity is verified:
+
+   ```sql
+   select id, email, verified_at
+   from public.users
+   where lower(email) = lower('<Jacob account email>');
+   ```
+
+   Stop if either check is missing, unverified, or revoked; do not rely on the
+   legacy bootstrap list as evidence of active access.
+
+2. **After migrating**, run:
+
+   ```sql
+   select * from public.super_admin_access_review;
+   ```
+
+   Confirm Jacob appears. The view intentionally includes only verified active
+   operators. The CLI also requires a non-null `public.users.verified_at`; this
+   is intentional because every grant and actor check has the same verified
+   identity gate. If it is null, complete Supabase Auth email verification and
+   confirm the auth-provisioning trigger has populated `users.verified_at`
+   before using the CLI. Do not update that column directly.
+
+3. **Confirm Noah retains access**, using:
+
+   ```sql
+   select user_id, email, revoked_at
+   from public.super_admins
+   where lower(email) = lower('noahowsh@gmail.com');
+   ```
+
+   Confirm one active row. If Noah was only present in the pre-migration
+   `super_admin_bootstrap` list, grant him after migration through the audited
+   CLI while Jacob is an active verified operator:
+
+   Replace the email placeholder with Jacob's exact verified account email.
+
+   ```sh
+   JACOB_VERIFIED_EMAIL='<Jacob verified account email>'
+   pnpm exec tsx scripts/manage-super-admin.ts grant noahowsh@gmail.com \
+     --actor "$JACOB_VERIFIED_EMAIL" \
+     --reason "Retain Noah's active operator access" --apply
+   ```
+
+For a fresh local, preview, or disaster-recovery database with **zero active
+super-admins**, follow [the first-operator runbook](./super-admin-access.md).
+Bootstrap uses the service-role key, accepts only a verified target, succeeds
+only while the active roster is empty, and appends `break_glass = true`.
+Ordinary grants and revokes remain separately attributed as service-role-key
+or signed-in-session actions. No production grant, revocation, migration, or
+deployment is authorized by this packet.
+
+<!-- proposed-batch-9:end -->
 
 ### Step 6a · Batch 7A, before w6
 
@@ -1419,17 +1516,25 @@ logged and time-boxed, separate from agency delivery.
 ### Step 12 · HOLD until batch 7A and the pending decision
 
 [Step issue #358](https://github.com/Strelva/Strelva-OFFICIAL/issues/358);
-conversion implementation [#316](https://github.com/Strelva/Strelva-OFFICIAL/issues/316).
+conversion implementation [#316](https://github.com/Strelva/Strelva-OFFICIAL/issues/316),
+provider-seat conversion [#246](https://github.com/Strelva/Strelva-OFFICIAL/issues/246),
+and removed-agency access [#535](https://github.com/Strelva/Strelva-OFFICIAL/issues/535).
 
 - What: convert each tenant with an explicit chosen agency. For the 9
-  existing managed clients, record `workspace_providers.source=existing_contract`
+  existing managed clients, record `agencySelectionBasis=existing_contract`
   only after Jacob confirms each client's existing agreement names Strelva's
-  agency. A test or new business needs its own recorded choice; never infer
-  a contract from being in the active-tenant list.
-- Command/approach: use the commands below with `--agency=<workspace-id>`
-  after the amended script and RPC land. This checkout's old script does not
-  support that option; do not run it or silently omit the agency. The dry run
-  must show the provider, source and absence of an operator-admin grant.
+  agency. The provider attribution source is `tenant_conversion`. A test or
+  new business needs its own recorded owner choice; never infer a contract
+  from being in the active-tenant list.
+- Command/approach: pass `--agency=<workspace-id>`,
+  `--agency-staff=<verified-member-email[,email...]>` and
+  `--agency-basis=existing_contract|owner_choice` to both the preview and
+  apply commands below. No Strelva agency is selected by default. The named
+  people must already be verified agency members. The preview must show the
+  provider, basis, staff and absence of a personal operator-admin grant.
+  Conversion creates no owner invitation and sends no email. The existing
+  owner-invite command remains available through the conversion link, without
+  granting the operator customer-workspace membership.
 - Verify: chosen provider and `existing_contract` receipt per existing
   client; ordinary agency queue access; no standing platform-operator admin;
   owner data and exit intact; billing payer remains `business`; storefront
@@ -1471,10 +1576,15 @@ npx tsx scripts/storefront-parity.ts capture --base=https://app.strelva.com \
   --tenants=$SLUG --out=$D/before.json --i-have-jacobs-yes
 
 # b. Dry run (reads production, writes nothing)
-npx tsx --env-file=<prod env> scripts/convert-tenant-to-workspace.ts $SLUG --agency=$AGENCY --operator-email=$OP
+STAFF=<verified agency-member emails, comma-separated>
+BASIS=existing_contract # use owner_choice only when the owner made that choice
+npx tsx --env-file=<prod env> scripts/convert-tenant-to-workspace.ts $SLUG \
+  --agency=$AGENCY --agency-staff=$STAFF --agency-basis=$BASIS --operator-email=$OP
 
 # c. On the yes for this tenant
-npx tsx --env-file=<prod env> scripts/convert-tenant-to-workspace.ts $SLUG --agency=$AGENCY --apply --operator-email=$OP --i-have-jacobs-yes
+npx tsx --env-file=<prod env> scripts/convert-tenant-to-workspace.ts $SLUG \
+  --agency=$AGENCY --agency-staff=$STAFF --agency-basis=$BASIS \
+  --apply --operator-email=$OP --i-have-jacobs-yes
 
 # d. Prove nothing a site reads changed
 npx tsx scripts/storefront-parity.ts capture --base=https://app.strelva.com \
@@ -1697,13 +1807,30 @@ bypass for an ordinary agency action.
 [Step issue #359](https://github.com/Strelva/Strelva-OFFICIAL/issues/359).
 
 - What: move any earlier conversion onto an explicit provider seat and
-  remove the standing operator-admin path. Expected count: zero; verify it.
-- Command/approach: after 7A and before client flags or invites, inventory
-  `tenant_workspace_links`, providers and operator memberships against the
-  new conversion contract. Record a zero-result receipt if none need repair.
-  Otherwise use the rehearsed RL-08 re-path tool from #316, dry run then
-  guarded apply on each business's own yes, with recorded agency choice or
-  confirmed `existing_contract`. Its exact command waits for the tool to land.
+  remove the standing operator-admin path created by conversion. Expected
+  count: zero; verify it.
+- Command/approach: after batch 7A and migration
+  `20261013220000_provider_seat_tenant_conversion.sql`, and before client
+  flags or invites, inventory `tenant_workspace_links`, providers and
+  conversion-created operator memberships. Record a zero-result receipt if
+  none need repair. Otherwise preview each legacy conversion:
+
+  ```sh
+  AGENCY=<workspace-id>
+  STAFF=<verified-agency-member-emails>
+  BASIS=existing_contract # only with confirmed agreement evidence
+  npx tsx --env-file=<prod env> scripts/repath-provider.ts <slug> \
+    --agency=$AGENCY --agency-staff=$STAFF --agency-basis=$BASIS \
+    --operator-email=<super-admin>
+  ```
+
+  After the route and old-membership count are reviewed, apply on the client's
+  own yes with the same arguments plus `--apply --i-have-jacobs-yes`. The RPC
+  adds the seat and named staff, records the route, and ends a legacy
+  `tenant_conversion` provider attribution and its seat/staff rows when it
+  points at a different agency. It removes only an operator admin membership
+  whose original receipt proves conversion created it. An admin membership
+  that predated a joined conversion is preserved.
 - Verify: same business/System ids, data, billing payer and storefront reads;
   explicit provider/source; ordinary agency access; no standing operator
   admin; owner replacement and exit still work. Compare before/after receipts.

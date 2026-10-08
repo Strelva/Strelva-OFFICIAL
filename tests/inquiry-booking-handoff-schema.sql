@@ -8,6 +8,9 @@ insert into public.tenants(id,stable_id,site_name,active) values('handoff-site',
 create temporary table handoff_ws as select (public.convert_tenant_to_business('handoff-owner@example.test','handoff-site',
  '{"tenantId":"handoff-site","tenantStableId":"e0000000-0000-4000-8000-000000000010","workspaceName":"Mooney Fixture","billing":null,"account":null,"patch":{"facts":{"hours":{"value":{"timezone":"UTC","weekly":[{"day":5,"opens":"09:00","closes":"17:00"}]},"verified":false}},"services":[{"op":"upsert","name":"Consultation","durationMinutes":30,"active":true,"position":0,"externalRef":"consult"}]},"contacts":[]}',
  'e0000000-0000-4000-8000-000000000020',repeat('a',64))->>'workspaceId')::uuid id;
+-- The owner has confirmed the imported details (#509).
+\ir support/confirm-working-record.sql
+select pg_temp.confirm_working_record(id) from handoff_ws;
 insert into public.workspace_memberships(workspace_id,user_id,role,created_by) select id,'e0000000-0000-4000-8000-000000000001','owner','e0000000-0000-4000-8000-000000000001' from handoff_ws on conflict(workspace_id,user_id) do update set role='owner';
 insert into public.workspace_memberships(workspace_id,user_id,role,created_by) select id,'e0000000-0000-4000-8000-000000000002','member','e0000000-0000-4000-8000-000000000001' from handoff_ws;
 insert into public.memberships(user_id,tenant_id,tenant_stable_id,role) values('e0000000-0000-4000-8000-000000000001','handoff-site','e0000000-0000-4000-8000-000000000010','owner');
@@ -82,6 +85,7 @@ begin
     values(ws,'hours','{"timezone":"UTC","weekly":[{"day":5,"opens":"09:00","closes":"17:00"}]}','owner',true,own);
   insert into public.business_services(workspace_id,name,duration_minutes,source,verified,created_by,updated_by)
     values(ws,'Consultation',30,'owner',true,own,own) returning id into svc;
+  perform pg_temp.confirm_working_record(ws);
   insert into public.systems(business_workspace_id,name,kind,command_id,command_digest,created_by,updated_by)
     values(ws,'Native appointments','booking',gen_random_uuid(),repeat('a',64),own,own) returning id into sys;
   insert into public.system_revisions(system_id,business_workspace_id,number,implementation,command_id,command_digest,created_by)
@@ -94,7 +98,13 @@ begin
   perform pg_temp.ibh_assert(public.resolve_workspace_inquiry_booking_lead(ws,lead,own,'handoff-owner@example.test')->>'tenantId' is null,'no website purchase required');
   w:=public.read_inquiry_booking_handoff(null,lead::text,ws,lead,own,'handoff-owner@example.test');
   slots:=jsonb_build_array(jsonb_build_object('start',now()+interval '3 days','end',now()+interval '3 days 30 minutes'));
+  -- #509: a pending rename and new length never reach the customer's offer.
+  if to_regprocedure('public.business_confirmed_services(uuid)') is not null then
+    update public.business_services set name='Operator rename',duration_minutes=120 where id=svc;
+  end if;
   o:=public.prepare_inquiry_booking_offer(null,lead::text,w->'witness',svc,slots,own,'handoff-owner@example.test');
+  perform pg_temp.ibh_assert(o->>'serviceName'='Consultation' and o->'services'->0->>'name'='Consultation' and o->'services'->0->>'durationMinutes'='30','offer names the confirmed service');
+  update public.business_services set name='Consultation',duration_minutes=30 where id=svc;
   perform pg_temp.ibh_assert(public.read_inquiry_booking_offer((o->>'id')::uuid)->>'workspaceId'=ws::text,'native public choice bound to business');
   b:=public.choose_inquiry_booking_slot((o->>'id')::uuid,0);
   perform pg_temp.ibh_assert(b->>'status'=case when to_regclass('public.public_booking_requests') is null then 'requested' else 'held' end and b->>'tenantStableId' is null and b->>'calendarKey'=ws::text and b->>'inquiryId'=lead::text,'one native booking store request');

@@ -35,9 +35,12 @@ export async function POST(request: Request) {
     if (input.action === "configure") {
       return workspaceJson({ connection: await configureWorkspaceCalendarConnection(actor, input.workspaceId, input.connection) });
     }
-    await revokeWorkspaceCalendarConnection(actor, input.workspaceId, input.provider);
+    const result = await revokeWorkspaceCalendarConnection(actor, input.workspaceId, input.provider);
     return workspaceJson({ disconnected: true,
-      ...(input.provider === "outlook" && process.env.STRELVA_BOOKING_CALENDAR_REVOKE === "1" ? { providerConsentAction: outlookCalendarConsentAction } : {}),
+      revocationOutcome: result.revocationOutcome,
+      revocationErrorCode: result.revocationErrorCode,
+      receiptId: result.receiptId,
+      ...(result.revocationOutcome === "consent_remains" ? { providerConsentAction: outlookCalendarConsentAction } : {}),
     });
   } catch (error) {
     return workspaceHttpFailure(error);

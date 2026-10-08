@@ -19,7 +19,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
-import { OPERATOR_URL } from "@/platform/infra/brand";
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import type { EmailOptions } from "@/platform/infra/email/layout";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "./types";
 import { recordOperatorActionApproval, type OperatorAuditContext } from "./operator-approvals";
@@ -131,7 +131,7 @@ export interface OwnerInvitationResult {
 }
 
 export function ownerInvitationAcceptUrl(token: string): string {
-  return new URL(`/workspace/invitations/accept/${token}`, OPERATOR_URL).toString();
+  return new URL(`/workspace/invitations/accept/${token}`, CONTROL_PLANE_URL).toString();
 }
 
 /** The invitation email. Strelva is the only name that acts; no tooling words. */
