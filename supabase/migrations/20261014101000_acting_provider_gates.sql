@@ -20,8 +20,10 @@
 --   make Systems                       the seat ('provider'), or a delegation
 --   Needs you provider layer           the seat (deciding is not the effect;
 --                                      each effect is gated where it happens)
---   owner-ask launch checks (#534)     strelva_runs_business now means
---                                      "served for publish", not email
+--   owner-link website launch (#534)   the serving provider verified for publish
+--                                      with the website mandate, on top of the
+--                                      email-served owner link; the owner's
+--                                      preview needs the publish-served provider
 --
 -- A provider seat also opens the website document and change-request reads
 -- and writes, as 7A's business_record_assert_actor does: the seat resolves
@@ -289,16 +291,40 @@ begin
 end;
 $$;
 
--- ---- owner-ask launch checks (#534, M6) ----
+-- ---- owner-ask website launch (#534, M6) ----
 
--- Kept for owner-ask's three website-launch checks (w6/owner-ask
--- 20261010102000, 20261010104000), which gate publishing. It now means "the
--- platform serves this business for publish". Nothing else calls it; new
--- code calls platform_serves_business or platform_provider_for_resource.
-create or replace function public.strelva_runs_business(p_workspace_id uuid) returns boolean
-language sql stable security definer set search_path = public, pg_temp as $$
-  select public.platform_serves_business(p_workspace_id, 'publish')
-$$;
+-- An owner-decision link is served for email: its session and
+-- assert_owner_decision_link (20261010102000) check the provider verified for
+-- email, which is right for the email itself. Launching a website from one
+-- also publishes, so the website checks add publish: the preview the owner
+-- opens, and the launch choke point (reserve and publish both call it),
+-- which also needs the session's provider to hold the website mandate,
+-- rechecked at each step. strelva_runs_business keeps meaning email.
+do $patch$
+declare
+  target text := 'public.assert_website_owner_link(uuid,uuid,uuid,text,integer,text,uuid,uuid,text,text)';
+  definition text;
+  patched text;
+begin
+  definition := pg_get_functiondef(target::regprocedure);
+  patched := replace(definition,
+    '  perform public.website_document_assert_actor(p_workspace_id,p_work_id,p_user_id,p_verified_email,true,true);',
+    '  if public.platform_provider_for_resource(p_workspace_id,session_row.provider_workspace_id,''publish'',''website'',
+    public.system_origin_id(p_workspace_id,''saved_work'',p_work_id::text)::text) is null then
+    raise exception ''strelva_service_access_denied'';
+  end if;
+  perform public.website_document_assert_actor(p_workspace_id,p_work_id,p_user_id,p_verified_email,true,true);');
+  if patched = definition then raise exception 'acting_provider_patch_drift: %', target; end if;
+  execute patched;
+
+  target := 'public.read_owner_decision_website_preview(uuid,uuid,text,text)';
+  definition := pg_get_functiondef(target::regprocedure);
+  patched := replace(definition, 'or not public.strelva_runs_business(p_workspace_id) then',
+    'or not public.platform_serves_business(p_workspace_id,''publish'') then');
+  if patched = definition then raise exception 'acting_provider_patch_drift: %', target; end if;
+  execute patched;
+end;
+$patch$;
 
 -- ---- Needs you, per business ----
 

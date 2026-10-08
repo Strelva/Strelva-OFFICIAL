@@ -117,12 +117,7 @@ select pg_temp.pa_assert((select body->>'userId' = '6c000000-0000-4000-8000-0000
 select pg_temp.pa_assert((select body is null from pa_sessions where name = 'unverified'), 'unverified agency: no session');
 select pg_temp.pa_assert((select body is null from pa_sessions where name = 'none'), 'no provider of record: no session');
 select pg_temp.pa_assert((select body is null from pa_sessions where name = 'north-resume'), 'verified for email is not publish');
--- 20261014101000 (#534): the old name, kept for owner-ask's launch checks,
--- means "served for publish" from then on.
-select pg_temp.pa_assert(case when to_regprocedure('public.acting_provider(uuid,uuid,text,text,text)') is null
-    then public.strelva_runs_business('6c000000-0000-4000-8000-000000000011')
-    else public.strelva_runs_business('6c000000-0000-4000-8000-000000000011')
-      = public.platform_serves_business('6c000000-0000-4000-8000-000000000011', 'publish') end
+select pg_temp.pa_assert(public.strelva_runs_business('6c000000-0000-4000-8000-000000000011')
   and not public.strelva_runs_business('6c000000-0000-4000-8000-000000000012'), 'the old name answers the neutral rule');
 select pg_temp.pa_assert((select provider_workspace_id from public.strelva_service_actions
   where id = (select (body->>'sessionId')::uuid from pa_sessions where name = 'north')) = '6c000000-0000-4000-8000-000000000030',

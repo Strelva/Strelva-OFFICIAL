@@ -1,5 +1,5 @@
 -- Rollback for 20261014101000_acting_provider_gates.sql
--- Forward SHA-256: 304090f8ead2ce8e363f2c217b901607865c14d10c01cb42b1f9af10c300aad9
+-- Forward SHA-256: c819d83818d53a92887397c00108a881ac79ee672e79feb727625c7e6fcbf919
 -- Agency 1.0 #255 / #534. Undo this file before 20261014100000; undo every later file first.
 -- Prepared SQL only. Production execution requires a separately reviewed approval.
 -- Restores every replaced body exactly as it stood before; no rows are removed.
@@ -17,7 +17,8 @@ begin
   if (select md5(pg_get_functiondef(to_regprocedure('public.record_website_change_receipt(uuid,uuid,text,uuid,text,jsonb)')))) is distinct from '05230feeff1007977192b8dc0f2feb02' then raise exception 'rollback_wrong_order_or_function_drift: record_website_change_receipt'; end if;
   if (select md5(pg_get_functiondef(to_regprocedure('public.workspace_make_systems_authority(uuid,uuid)')))) is distinct from 'f2681da34962f5a55291894067bb0099' then raise exception 'rollback_wrong_order_or_function_drift: workspace_make_systems_authority'; end if;
   if (select md5(pg_get_functiondef(to_regprocedure('public.workspace_require_make_systems(uuid,uuid)')))) is distinct from 'ac7913eb1620c424bbfefea98e0d1b28' then raise exception 'rollback_wrong_order_or_function_drift: workspace_require_make_systems'; end if;
-  if (select md5(pg_get_functiondef(to_regprocedure('public.strelva_runs_business(uuid)')))) is distinct from '62dc98239575fd472d3f1c00a9acf1e6' then raise exception 'rollback_wrong_order_or_function_drift: strelva_runs_business'; end if;
+  if (select md5(pg_get_functiondef(to_regprocedure('public.assert_website_owner_link(uuid,uuid,uuid,text,integer,text,uuid,uuid,text,text)')))) is distinct from 'b07857b77bdb3bf6db5c0fa755160d59' then raise exception 'rollback_wrong_order_or_function_drift: assert_website_owner_link'; end if;
+  if (select md5(pg_get_functiondef(to_regprocedure('public.read_owner_decision_website_preview(uuid,uuid,text,text)')))) is distinct from '8133de7910018c69affb5c3030cfa32b' then raise exception 'rollback_wrong_order_or_function_drift: read_owner_decision_website_preview'; end if;
   if (select md5(pg_get_functiondef(to_regprocedure('public.set_decision_policy(uuid,uuid,text,text,uuid,text,text,text,bigint)')))) is distinct from '87e1020fdb5f6970cb9da73da068b595' then raise exception 'rollback_wrong_order_or_function_drift: set_decision_policy'; end if;
   if (select md5(pg_get_functiondef(to_regprocedure('public.read_decision_policies(uuid,uuid,text)')))) is distinct from '72aeb3a567a302f34d8dbe5c20f539c9' then raise exception 'rollback_wrong_order_or_function_drift: read_decision_policies'; end if;
   if (select md5(pg_get_functiondef(to_regprocedure('public.claim_owner_decision(uuid,uuid,text,text,text,uuid,text,text)')))) is distinct from '36a5d0173fc75332c1453e9368d01dc5' then raise exception 'rollback_wrong_order_or_function_drift: claim_owner_decision'; end if;
@@ -258,14 +259,63 @@ end;
 $function$
 
 ;
-CREATE OR REPLACE FUNCTION public.strelva_runs_business(p_workspace_id uuid)
- RETURNS boolean
- LANGUAGE sql
+CREATE OR REPLACE FUNCTION public.assert_website_owner_link(p_workspace_id uuid, p_work_id uuid, p_user_id uuid, p_verified_email text, p_revision integer, p_content_hash text, p_session_id uuid, p_decision_id uuid, p_revision_hash text, p_recipient text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare item public.owner_decisions; session_row public.strelva_service_actions; link public.owner_decision_link_sessions; head public.website_document_heads;
+begin
+  item:=public.assert_owner_decision_link(p_workspace_id,p_session_id,p_decision_id,p_revision_hash,p_recipient);
+  session_row:=public.strelva_service_session(p_workspace_id,p_session_id,'owner_decision_link');
+  if session_row.on_behalf_user_id is distinct from p_user_id or item.state<>'approved' or item.source_lifecycle<>'website_document'
+    or item.source_id is distinct from p_work_id::text||':launch'
+    or not exists(select 1 from public.strelva_service_actions where session_id=p_session_id and action='run') then
+    raise exception 'strelva_service_access_denied';
+  end if;
+  perform public.website_document_assert_actor(p_workspace_id,p_work_id,p_user_id,p_verified_email,true,true);
+  select * into link from public.owner_decision_link_sessions where session_id=p_session_id;
+  select * into head from public.website_document_heads where website_work_id=p_work_id and workspace_id=p_workspace_id for update;
+  if not found or head.revision is distinct from p_revision or head.approved_revision is distinct from p_revision
+    or head.approved_hash is distinct from p_content_hash or link.website_revision is distinct from p_revision
+    or link.website_hash is distinct from p_content_hash then raise exception 'website_approval_required'; end if;
+end $function$
+
+;
+CREATE OR REPLACE FUNCTION public.read_owner_decision_website_preview(p_workspace_id uuid, p_decision_id uuid, p_revision_hash text, p_recipient text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
  STABLE SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $function$
-  select public.platform_serves_business(p_workspace_id, 'email')
-$function$
+declare item public.owner_decisions; recipient jsonb; work public.saved_product_work;
+  head public.website_document_heads; document public.website_documents;
+begin
+  select * into item from public.owner_decisions where workspace_id=p_workspace_id and id=p_decision_id;
+  if not found or item.state<>'open' or item.expires_at<=clock_timestamp() or item.route<>'owner_decides'
+    or item.sign_in_required or item.change_kind in ('access.grant','money','exit')
+    or item.source_lifecycle<>'website_document' or item.revision_hash is distinct from p_revision_hash then
+    raise exception 'owner_preview_unavailable';
+  end if;
+  recipient:=public.resolve_business_owner_recipient(p_workspace_id);
+  if recipient is null or nullif(lower(btrim(p_recipient)),'') is null
+    or lower(btrim(recipient->>'email')) is distinct from lower(btrim(p_recipient))
+    or not public.strelva_runs_business(p_workspace_id) then raise exception 'owner_preview_unavailable'; end if;
+  select * into work from public.saved_product_work where workspace_id=p_workspace_id and id::text=split_part(item.source_id,':',1)
+    and product_id='websites' and payload->>'version'='2';
+  if not found then raise exception 'owner_preview_unavailable'; end if;
+  select * into head from public.website_document_heads where workspace_id=p_workspace_id and website_work_id=work.id;
+  if not found then raise exception 'owner_preview_unavailable'; end if;
+  select * into document from public.website_documents where workspace_id=p_workspace_id and website_work_id=work.id and revision=head.revision;
+  if not found or work.payload->'candidate'->>'revision' is distinct from head.revision::text
+    or work.payload->'candidate'->>'contentHash' is distinct from document.content_hash
+    or work.payload->'candidate'->'document' is distinct from document.document then raise exception 'owner_preview_unavailable'; end if;
+  -- The HTTP reader additionally hashes the current lifecycle stage and work
+  -- revision against the signed item, and refuses any changed source before rendering.
+  return jsonb_build_object('item',public.owner_decision_json(item),
+    'record',jsonb_build_object('workId',work.id,'workspaceId',p_workspace_id,'rebuild',work.payload));
+end $function$
 
 ;
 CREATE OR REPLACE FUNCTION public.set_decision_policy(p_workspace_id uuid, p_user_id uuid, p_verified_email text, p_layer text, p_system_id uuid, p_kind text, p_route text, p_reason text, p_expected_version bigint)

@@ -1139,6 +1139,8 @@ check_acting_provider() {
   psql "${psql_args[@]}" --file="$repo_root/tests/acting-provider-gates-schema.sql"
   psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
   psql "${psql_args[@]}" --file="$repo_root/tests/platform-service-actor-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-links-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-website-preview-schema.sql"
 }
 catalog_fingerprint >"$cluster_root/catalog-before-acting-provider.txt"
 for name in "${acting_provider[@]}"; do

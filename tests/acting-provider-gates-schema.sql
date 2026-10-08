@@ -405,12 +405,17 @@ begin
   perform pg_temp.verify(agency_a, 'email', 'verified');
   perform pg_temp.ap_assert(not public.provider_email_send_allowed('ac7e0000-0000-4000-8000-000000000011', agency_a, 'mail.agency-a.example.test'), 'never for another agency''s client');
 
-  -- #534: owner-ask's launch checks mean "served for publish", not email.
-  perform pg_temp.ap_assert(public.strelva_runs_business(ws), 'served for publish');
+  -- #534: the owner-link shim keeps meaning email; the website launch and
+  -- preview checks need publish (owner-decision-links and
+  -- owner-decision-website-preview schema tests prove those paths).
   perform pg_temp.verify(agency_a, 'publish', 'unverified');
-  perform pg_temp.ap_assert(public.platform_serves_business(ws, 'email') and not public.strelva_runs_business(ws),
-    'an agency verified only for email does not pass the launch checks');
+  perform pg_temp.ap_assert(public.strelva_runs_business(ws) = public.platform_serves_business(ws, 'email')
+    and public.strelva_runs_business(ws) and not public.platform_serves_business(ws, 'publish'), 'the shim means email');
   perform pg_temp.verify(agency_a, 'publish', 'verified');
+  perform pg_temp.ap_assert(public.platform_provider_for_resource(ws, null, 'publish', 'website', site) = agency_a,
+    'the platform serves the provider of record for its granted website');
+  perform pg_temp.ap_assert(public.platform_provider_for_resource(ws, null, 'publish', 'domain', 'never-granted.example.test') is null,
+    'not for a resource the business never granted');
 
   -- The agency's Google read-back list covers only clients it is staffed on.
   perform pg_temp.ap_assert(jsonb_typeof(public.read_agency_google_listing_readback_failures(a_staff, 'ap-a-staff@agency-a.example.test', agency_a, 10)) = 'array', 'agency read-back list');
