@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { comparePlatformSchema, platformSchemaFromHtml, platformSchemaHintSchema, platformSchemaReportSchema } from "@/products/connected-sites/schema-facts";
+import { comparePlatformSchema, platformSchemaFromHtml, platformSchemaReportSchema } from "@/products/connected-sites/schema-facts";
+import { platformSchemaHintSchema } from "@/products/connected-sites/schema-hint";
 import { recordPlatformSchema } from "@/products/connected-sites/schema-conflicts";
 import { connectedSiteSchemaAdapter } from "@/platform/needs-you/sources/connected-site-schema";
 import type { ConnectedSitesStore } from "@/products/connected-sites/store";

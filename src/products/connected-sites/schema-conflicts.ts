@@ -5,7 +5,8 @@ import type { ProposedItem } from "@/platform/needs-you/contracts";
 import { schemaConflictReleaseEnabled } from "@/platform/needs-you/release";
 import { connectedSitesStore, type ConnectedSitesStore } from "./store";
 import { publicFactsFromRecord, type ResolvedConnectedSite } from "./contracts";
-import { comparePlatformSchema, platformSchemaFromHtml, platformSchemaHintSchema, schemaConflictSignature } from "./schema-facts";
+import { platformSchemaHintSchema } from "./schema-hint";
+import { comparePlatformSchema, platformSchemaFromHtml, schemaConflictSignature } from "./schema-facts";
 
 export async function recordPlatformSchema(publicKey: string, site: ResolvedConnectedSite, origin: string | null, raw: unknown, store: ConnectedSitesStore = connectedSitesStore(), deps: { fetchPage?: (url: string) => Promise<string | null> } = {}): Promise<void> {
   if (!schemaConflictReleaseEnabled() || !site.injectSchema) return;

@@ -12,7 +12,7 @@ import { z } from "zod";
 import type { BusinessRecord } from "@/platform/business-record/contracts";
 import { selectPublishedBusinessPolicies, type PublishedPolicies } from "@/platform/business-record/policies";
 import { publishedPolicyRows, PAYMENT_LABELS } from "./published-policies";
-import { platformSchemaHintSchema } from "./schema-facts";
+import { platformSchemaHintSchema } from "./schema-hint";
 
 export const SITE_KEY_PATTERN = /^sk_pub_[a-z0-9]{24}$/;
 export const VERIFICATION_TOKEN_PATTERN = /^[a-z0-9]{32}$/;

@@ -14,8 +14,6 @@ export const platformSchemaReportSchema = z.object({
   })).max(8),
 });
 export type PlatformSchemaReport = z.infer<typeof platformSchemaReportSchema>;
-/** The browser can only say that a business schema exists; all compared data is fetched server-side. */
-export const platformSchemaHintSchema = z.object({ present: z.literal(true) }).strict();
 
 const BUSINESS_TYPE = /(?:LocalBusiness|Organization|Corporation|Business|Store|Service|Restaurant|Establishment|Attorney|Dentist|Physician|Clinic|Salon|Contractor|Plumber|Electrician)$/i;
 /** Extract a bounded, public JSON-LD report from HTML fetched from the verified site's stored URL. */
