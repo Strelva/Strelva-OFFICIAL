@@ -12,6 +12,7 @@ import {
   contactBatchSchema,
   conversionReceiptSchema,
   ownerRecipientSchema,
+  providerRepathResultSchema,
   tenantOwnerRecipientSchema,
   patchVerificationAllowed,
   tenantImportPayloadSchema,
@@ -24,6 +25,7 @@ import {
   type BusinessRecordWriteResult,
   type ConversionReceipt,
   type OwnerRecipient,
+  type ProviderRepathResult,
   type TenantOwnerRecipient,
   type TenantImportPayload,
   type TenantLinkState,
@@ -144,6 +146,9 @@ export async function convertTenantToBusiness(
   operatorEmail: string, payload: TenantImportPayload, plan: { commandId: string; digest: string },
 ): Promise<ConversionReceipt> {
   const parsed = tenantImportPayloadSchema.parse(payload);
+  if (!parsed.agencyWorkspaceId || !parsed.agencyStaffEmails?.length || !parsed.agencySelectionBasis) {
+    throw new BusinessRecordValidationError("tenant_conversion_invalid", "Choose an agency, named agency staff, and a selection basis before converting.");
+  }
   if (sha256(canonicalJson(parsed)) !== plan.digest) {
     throw new BusinessRecordValidationError("tenant_conversion_invalid", "The plan digest does not match its payload.");
   }
@@ -154,6 +159,24 @@ export async function convertTenantToBusiness(
     p_command_id: commandId.parse(plan.commandId),
     p_command_digest: plan.digest,
   }, conversionReceiptSchema, "The tenant conversion failed.");
+}
+
+/** Preview or atomically repair access for a tenant converted before agency
+ * seats replaced the conversion-created operator admin membership. */
+export async function repathConvertedTenantProvider(
+  operatorEmail: string,
+  tenantId: string,
+  route: { agencyWorkspaceId: string; agencyStaffEmails: string[]; agencySelectionBasis: "existing_contract" | "owner_choice" },
+  apply: boolean,
+): Promise<ProviderRepathResult> {
+  return callBusinessRecord("repath_converted_tenant_provider", {
+    p_operator_email: z.string().email().parse(operatorEmail.trim().toLowerCase()),
+    p_tenant_id: z.string().min(1).max(120).parse(tenantId),
+    p_agency_workspace_id: workspaceId.parse(route.agencyWorkspaceId),
+    p_staff_emails: z.array(z.string().email()).min(1).max(100).parse(route.agencyStaffEmails.map((email) => email.trim().toLowerCase())),
+    p_selection_basis: z.enum(["existing_contract", "owner_choice"]).parse(route.agencySelectionBasis),
+    p_apply: z.boolean().parse(apply),
+  }, providerRepathResultSchema, "The converted tenant provider route could not be reconciled.");
 }
 
 /** Operator preview of unlinking a converted tenant. Writes nothing. */

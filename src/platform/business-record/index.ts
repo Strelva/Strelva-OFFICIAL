@@ -8,6 +8,7 @@ export {
   readBusinessPolicies,
   readBusinessRecordHistory,
   readTenantWorkspaceLink,
+  repathConvertedTenantProvider,
   resolveOwnerRecipient,
   resolveTenantOwnerRecipient,
   undoBusinessRecordRevision,

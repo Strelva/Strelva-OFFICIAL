@@ -78,6 +78,12 @@ for migration in $(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -na
     fi
     tail_started=1
   fi
+  if [[ "$migration_name" == "20261013220000_provider_seat_tenant_conversion.sql" ]]; then
+    # This is the current last migration. Apply it after the historical
+    # conversion fixtures below so they continue to prove their original RPC;
+    # its new route behavior has a dedicated contract immediately afterward.
+    continue
+  fi
   if [[ "$migration_name" == "$early_lead_migration" ]]; then
     printf 'Skipping %s: applied ahead of the October 1 migrations above.\n' "$migration_name"
     continue
@@ -293,6 +299,9 @@ fi
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012010000_tenant_track_signing_keys.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012120000_track_signing_key_rotation.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-track-signing-keys-schema.sql"
+
+
+
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 
@@ -324,3 +333,8 @@ diff -u "$cluster_root/catalog-before-agency-team.txt" "$cluster_root/catalog-af
 printf 'Agency Team upgrade rollback restored the public catalog exactly.\n'
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011160000_agency_team.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-team-schema.sql"
+
+# Apply the new conversion contract after historical callers have been proven.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013220000_provider_seat_tenant_conversion.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/provider-seat-tenant-conversion-schema.sql"
+printf 'Provider-seat tenant conversion upgrade contract passed.\n'
