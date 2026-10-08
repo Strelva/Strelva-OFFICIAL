@@ -180,7 +180,8 @@ async function WebsiteEntryPage({ workspaceId, entry, workId }: { workspaceId: s
   const workspace = workspaces.find(item => item.id === workspaceId && item.kind === "customer" && item.access === "member")
     ?? await providerSeatBusiness(actor, workspaceId).catch(() => null);
   if (!workspace) return <Unavailable message="This business isn't available to your account." />;
-  const operator = await isSuperAdmin().catch(() => false);
+  // Serving uses ordinary business/agency authority; platform support is separate.
+  const operator = false;
   // Rebuild has its own release; the connected-sites resolver retains its
   // Systems prerequisite. Neither release grants workspace or website access.
   const [connectedEnabled, rebuildEnabled] = await Promise.all([
@@ -199,7 +200,7 @@ async function WebsiteEntryPage({ workspaceId, entry, workId }: { workspaceId: s
       path === "connect" ? Promise.resolve().then(() => readBusinessVisibility(actor, workspaceId)).catch(() => null) : null,
     ]);
     body = <>
-      <WebsiteEntry workspaceId={workspaceId} connectedEnabled={connectedEnabled} rebuildEnabled={rebuildEnabled} path={path} canManage={canManage} operator={operator}
+      <WebsiteEntry actorEmail={actor.verifiedEmail} agency={workspace.access === "provider_seat"} workspaceId={workspaceId} connectedEnabled={connectedEnabled} rebuildEnabled={rebuildEnabled} path={path} canManage={canManage} operator={operator}
         initialWorkId={workId ?? undefined} rebuilds={records.map(parseRebuildView)} sites={overview?.sites.map(site => ({ id: site.id, siteHost: site.siteHost, siteUrl: site.siteUrl, status: site.status, verifiedAt: site.verifiedAt, systemId: site.systemId, snippet: site.snippet }))} />
       {visibility ? <ServerVisibility workspaceId={workspaceId} canManage={canManage} suggestedHandle={suggestBusinessHandle(workspace.name)}
         initial={{ pagesEnabled: visibility.pagesEnabled, page: visibility.page, blocks: visibility.blocks?.map(item => ({ id: item.id, label: item.label, url: item.url, checkable: item.checkable, block: { hash: item.block.hash, html: item.block.html } })) ?? null }} /> : null}

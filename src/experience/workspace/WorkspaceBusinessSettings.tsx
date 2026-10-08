@@ -81,7 +81,7 @@ export function WorkspaceBusinessSettings({
       <p className="text-sm font-medium text-accent-text">{workspace?.name || "Current workspace"}</p>
       <h1 className="mt-4 font-display text-4xl font-normal text-warm-black">Business details</h1>
       <p className="mt-4 max-w-2xl text-sm leading-relaxed text-gray-muted">What Strelva knows about this business and the websites it runs. Your sign-in identity stays in your personal account.</p>
-      <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-muted">Hours, services and prices are still edited on each website. Changing them once here and having every place update is not built yet.</p>
+      <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-muted">Business details hold shared facts such as hours and services. Each System declares which facts it reads; connected sites and independently edited content need their own update.</p>
     </header>
 
     <section className="border-b border-gray-border py-8" aria-labelledby="business-settings-heading">

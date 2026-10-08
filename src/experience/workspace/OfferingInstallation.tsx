@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { workspaceWorkLabel } from "./work-label";
 import type { WorkspaceWork } from "./contracts";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
+import { useServiceRequestProviders } from "./useServiceRequestProviders";
 import { sameAppHref } from "./workspace-discovery";
 import { offeringRetryFromConflict, preserveOfferingDraftOnConflict } from "./offering-recovery";
 import styles from "./workspace-offerings.module.css";
@@ -166,7 +167,7 @@ export function OfferingInstallationView({
         : `${installation.responsibility.providerName} has been requested as the provider. This record does not confirm they accepted the work.`}</p>
     </section>
 
-    {installation.responsibility.kind === "provider_requested" && installation.responsibility.providerKind === "strelva"
+    {installation.responsibility.kind === "provider_requested" && ["strelva", "agency"].includes(installation.responsibility.providerKind)
       ? <ProviderDeliveryPanel collection={collection} installation={installation} work={work} /> : null}
 
     {installation.status === "draft" ? <section className={styles.section} aria-labelledby={`offering-activation-${installation.id}`}>
@@ -270,14 +271,15 @@ function ProviderDeliveryPanel({ collection, installation, work }: {
   const current = deliveries?.[0];
   return <section className={styles.section} aria-labelledby={`provider-delivery-${installation.id}`}>
     <h3 id={`provider-delivery-${installation.id}`}>Provider delivery</h3>
+    {installation.responsibility.kind === "provider_requested" && installation.responsibility.providerKind === "strelva" ? <p className={styles.note}>Historical provider request. Its receipts are retained; new provider work uses an ordinary agency identity.</p> : null}
     {!current ? <>
-      <p>No provider has accepted this request. First approve exact zero-cost work and offer it to a verified Strelva assignee in Ongoing.</p>
+      <p>No provider has accepted this request. First approve exact zero-cost work and offer it to the chosen agency’s assigned staff member in Ongoing.</p>
       {collection.permissions.canManage ? <form onSubmit={requestDelivery} className={styles.retireForm}>
         <label><span>Approved assigned work</span><select required value={selectedWorkId} onChange={(event) => setSelectedWorkId(event.target.value)}><option value="">Choose work</option>{responsibilities.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
-        <button className={styles.primary} type="submit" disabled={saving || !selectedWorkId}>{saving ? "Requesting…" : "Request Strelva delivery"}</button>
+        <button className={styles.primary} type="submit" disabled={saving || !selectedWorkId || (installation.responsibility.kind === "provider_requested" && installation.responsibility.providerKind !== "agency")}>{saving ? "Requesting…" : "Request agency delivery"}</button>
       </form> : <p className={styles.note}>A business owner manages provider requests.</p>}
     </> : <>
-      <p>{current.status === "requested" ? "Requested. Strelva has not accepted this work." : current.status === "accepted" ? "Accepted by the exact assigned Strelva operator." : "Revoked. No new assigned action is permitted."}</p>
+      <p>{current.status === "requested" ? "Requested. The assigned agency has not accepted this work." : current.status === "accepted" ? "Accepted by the exact assigned agency staff member." : "Revoked. No new assigned action is permitted."}</p>
       <p className={styles.note}>Customer review: {current.customerDecision === "pending" ? "Pending" : current.customerDecision === "confirmed" ? "Confirmed" : "Changes requested"}</p>
       <a href={`/workspace?workspaceId=${encodeURIComponent(current.businessId)}&view=operations&assignmentId=${encodeURIComponent(current.assignmentId)}`}>Open assigned work</a>
       {current.canAccept ? <button className={styles.primary} type="button" disabled={saving} onClick={() => void command({ action: "accept", deliveryId: current.id })}>{saving ? "Accepting…" : "Accept assigned delivery"}</button> : null}
@@ -318,7 +320,9 @@ export function OfferingInstallView({
   const [resourceId, setResourceId] = useState(resources[0]?.id ?? "");
   const [configuration, setConfiguration] = useState(() => configurationFrom(definition));
   const [operator, setOperator] = useState<"customer_operated" | "provider_requested">("customer_operated");
-  const [providerKind, setProviderKind] = useState<"strelva" | "named_third_party">("strelva");
+  const agencyChoices = useServiceRequestProviders(collection.businessId);
+  const [agencyWorkspaceId, setAgencyWorkspaceId] = useState("");
+  const agency = agencyChoices.providers.find(item => item.agencyWorkspaceId === agencyWorkspaceId);
   const [providerName, setProviderName] = useState(businessName);
   const [requestNote, setRequestNote] = useState("");
   const pendingCommand = useRef<Extract<OfferingCommand, { action: "install" }> | null>(null);
@@ -328,13 +332,14 @@ export function OfferingInstallView({
   async function install(event: FormEvent) {
     event.preventDefault();
     const resource = resourceMode === "existing" ? resources.find((item) => item.id === resourceId) : undefined;
-    if ((resourceMode === "existing" && !resource) || !canInstall || !providerName.trim()) return;
+    if ((resourceMode === "existing" && !resource) || !canInstall || !providerName.trim() || (operator === "provider_requested" && !agency)) return;
     const responsibility: OfferingResponsibility = operator === "customer_operated"
       ? { kind: "customer_operated", providerName: providerName.trim() }
       : {
           kind: "provider_requested",
-          providerKind,
-          providerName: providerKind === "strelva" ? "Strelva" : providerName.trim(),
+          providerKind: "agency",
+          agencyWorkspaceId: agency!.agencyWorkspaceId,
+          providerName: agency!.name,
           ...(requestNote.trim() ? { requestNote: requestNote.trim() } : {}),
         };
     const command = pendingCommand.current ?? {
@@ -378,12 +383,12 @@ export function OfferingInstallView({
     <fieldset className={styles.fields} disabled={!collection.permissions.canManage || saving || attempted}>
       <legend>Operating responsibility</legend>
       <label className={styles.radioField}><input type="radio" name="responsibility" checked={operator === "customer_operated"} onChange={() => { setOperator("customer_operated"); setProviderName(businessName); }} /><span>Your business operates it</span></label>
-      <label className={styles.radioField}><input type="radio" name="responsibility" checked={operator === "provider_requested"} onChange={() => { setOperator("provider_requested"); setProviderName("Strelva"); }} /><span>Request a provider</span></label>
+      <label className={styles.radioField}><input type="radio" name="responsibility" checked={operator === "provider_requested"} onChange={() => { setOperator("provider_requested"); setProviderName(""); }} /><span>Request a provider</span></label>
       {operator === "provider_requested" ? <div className={styles.nestedFields}>
-        <label><span>Requested provider</span><select value={providerKind} onChange={(event) => { const next = event.target.value as typeof providerKind; setProviderKind(next); setProviderName(next === "strelva" ? "Strelva" : ""); }}><option value="strelva">Strelva</option><option value="named_third_party">Named third party</option></select></label>
-        {providerKind === "named_third_party" ? <label><span>Provider name</span><input required maxLength={120} value={providerName} onChange={(event) => setProviderName(event.target.value)} /></label> : null}
-        <label><span>Request note</span><textarea maxLength={500} value={requestNote} onChange={(event) => setRequestNote(event.target.value)} /></label>
-        <p className={styles.blocked}>This records your request. It does not confirm Strelva or a third party accepted the work.</p>
+        <label><span>Requested agency</span><select required value={agencyWorkspaceId} onChange={event => { setAgencyWorkspaceId(event.target.value); setProviderName(agencyChoices.providers.find(item => item.agencyWorkspaceId === event.target.value)?.name ?? ""); }}><option value="">Choose an agency</option>{agencyChoices.providers.map(item => <option key={item.agencyWorkspaceId} value={item.agencyWorkspaceId}>{item.name}</option>)}</select></label>
+        {agencyChoices.loading ? <p role="status">Loading agency choices…</p> : agencyChoices.error ? <p role="alert">{agencyChoices.error}</p> : !agencyChoices.providers.length ? <p>Choose an agency in business access before requesting work.</p> : null}
+        <label><span>Request note (optional)</span><textarea maxLength={500} value={requestNote} onChange={event => setRequestNote(event.target.value)} /></label>
+        <p className={styles.blocked}>This records your request. It does not confirm the agency accepted the work.</p>
       </div> : null}
     </fieldset>
 
@@ -394,6 +399,6 @@ export function OfferingInstallView({
 
     {!collection.permissions.canManage ? <p className={styles.blocked}>You can review this, but only a business owner or admin can set it up.</p> : definition.installability !== "available" ? <p className={styles.blocked}>{definition.installationNote}</p> : null}
     {attempted && !saving ? <p className={styles.blocked}>The first request did not return confirmation. The setup is locked so retry sends the exact same command. Reload before changing it.</p> : null}
-    <button className={styles.primary} type="submit" disabled={saving || !canInstall || (resourceMode === "existing" && !resourceId) || !providerName.trim()}>{saving ? "Preparing…" : attempted ? "Retry exact setup" : resourceMode === "default" ? "Prepare setup" : "Set up"} <ArrowRight size={16} aria-hidden="true" /></button>
+    <button className={styles.primary} type="submit" disabled={saving || !canInstall || (resourceMode === "existing" && !resourceId) || !providerName.trim() || (operator === "provider_requested" && !agency)}>{saving ? "Preparing…" : attempted ? "Retry exact setup" : resourceMode === "default" ? "Prepare setup" : "Set up"} <ArrowRight size={16} aria-hidden="true" /></button>
   </form>;
 }

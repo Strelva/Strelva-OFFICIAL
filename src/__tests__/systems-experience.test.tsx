@@ -50,10 +50,18 @@ describe("Systems read adapter with STRELVA_SYSTEMS_RELEASE off", () => {
   });
 });
 
+it("uses recorded agency identity equally and never claims a requested provider operates the site", () => {
+  for (const name of ["Strelva", "Another agency"]) {
+    const projected = { ...mooney, providerOfRecord: { agencyWorkspaceId: "20000000-0000-4000-8000-000000000001", name } };
+    expect(readBusinessSystems({ snapshot: snapshot([], projected), sites: [mooneySite] }).systems[0]?.operatedBy).toBe(name);
+  }
+  expect(readBusinessSystems({ snapshot: snapshot([], mooney), sites: [mooneySite] }).systems[0]?.operatedBy).toBeUndefined();
+});
+
 describe("Systems read adapter over the spine projection", () => {
   it("shows the business facts boundary for repo-only, native content, and hosted websites", () => {
     for (const scenario of [
-      { editing: "request" as const, savedWorkId: null, status: "not_connected", sentence: "Strelva updates this site by hand" },
+      { editing: "request" as const, savedWorkId: null, status: "not_connected", sentence: "Changes to this site go through its repository" },
       { editing: "native" as const, savedWorkId: null, status: "not_connected", sentence: "native website content" },
       { editing: "native" as const, savedWorkId: "document", status: "not_connected", sentence: "not connected", businessFactsConnected: false },
       { editing: "native" as const, savedWorkId: "document", status: "connected", sentence: "when it renders", businessFactsConnected: true },
@@ -83,7 +91,7 @@ describe("Systems read adapter over the spine projection", () => {
       [INBOX, "inquiries", "The Mooney Firm inquiries", "live", "unknown"],
       [INTAKE_SYSTEM, "app", "Mediation intake", "live", "unknown"],
     ]);
-    expect(systems[0]!).toMatchObject({ detail: "The Mooney Firm", surface: { kind: "website", liveUrl: "https://www.attymooney.com", previewSrc: "https://www.attymooney.com", manageHref: "/dashboard" }, operatedBy: "Strelva" });
+    expect(systems[0]!).toMatchObject({ detail: "The Mooney Firm", surface: { kind: "website", liveUrl: "https://www.attymooney.com", previewSrc: "https://www.attymooney.com", manageHref: "/dashboard" }, operatedBy: undefined });
     // The inquiry inbox opens for the tenant of the site its form appears on.
     expect(systems[1]!.surface).toEqual({ kind: "inquiries", tenantId: "mooney-firm" });
     expect(systems[1]!.connections[0]!).toMatchObject({ kind: "appear", systemId: SITE, sentence: "Inquiry form on the site", status: "connected" });

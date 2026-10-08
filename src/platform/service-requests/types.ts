@@ -2,6 +2,7 @@ import { z } from "zod";
 import { deliveryCommitmentSchema } from "./delivery-commitment";
 
 export interface ServiceRequestActor { userId: string; verifiedEmail: string; }
+/** Storage/read compatibility includes historical special-provider records. New commands accept agencies only. */
 export const serviceRequestProviderSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("strelva") }).strict(),
   z.object({ kind: z.literal("agency"), agencyWorkspaceId: z.string().uuid() }).strict(),

@@ -66,10 +66,6 @@ function hostname(value: unknown): string | undefined {
 
 const bare = (host: string | undefined) => host?.replace(/^www\./, "");
 
-function provider(installation: OfferingInstallation | undefined): string | undefined {
-  if (!installation) return undefined;
-  return installation.responsibility.kind === "provider_requested" ? installation.responsibility.providerName : undefined;
-}
 
 const CONNECTION_STATUS = { connected: "connected", disconnected: "not_connected", stale: "unknown" } as const;
 
@@ -180,7 +176,7 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
       health: { state: entry.health.status, summary: work?.unavailableReason || entry.health.summary, lastVerifiedAt: entry.health.lastVerifiedAt, ...(entry.health.signals ? { signals: entry.health.signals } : {}) },
       ...(publishing && (kind === "website" || kind === "newsletter") ? { publishing: true } : {}),
       surface: surface ?? { kind: "work", workId: entry.savedWorkId ?? entry.ref.systemId, productId: "unknown" },
-      operatedBy: kind === "website" && site ? site.relationship === "enterprise" ? "Your enterprise team" : "Strelva" : provider(installation),
+      operatedBy: projection?.providerOfRecord?.name,
       ...(kind === "bookings" && entry.views?.length ? { views: bookingViews(entry.views, entry.tenantId ? siteById.get(entry.tenantId) : undefined) } : {}),
       ...(kind === "website" && domain ? auditsFor(domain, snapshot.work) : {}),
       connections: [], possibilities: [], versions,
@@ -224,7 +220,7 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
         : connectedOnly ? "Confirmed business facts are filled into the connected site after ownership is proven."
           : entry.savedWorkId ? "This website uses its approved content. Business fact reads are not connected."
           : native ? "Strelva prepares business fact changes as native website content for review and publishing."
-            : "Strelva updates this site by hand; it does not read the business record.",
+            : "Changes to this site go through its repository; it does not read the business record.",
       contract: { sourceOfTruth: "The business record's confirmed facts", authority: "Only confirmed public business facts; no contacts, requests or owner-only details.",
         freshness: automatic ? "Read when the website renders or the connected page loads." : "Changes reach the live site only after Strelva publishes them.",
         failureBehavior: automatic ? "If facts cannot be read, the last approved website content stays available." : "A business record change does not automatically change this website." },

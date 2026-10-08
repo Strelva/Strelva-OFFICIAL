@@ -196,6 +196,8 @@ export interface WorkspaceReleases {
  * SystemRef; nothing here is a second model.
  */
 export interface WorkspaceSystems {
+  /** Recorded agency identity; grants nothing. Absent means the read was unavailable. */
+  providerOfRecord?: { agencyWorkspaceId: string; name: string } | null;
   /** `unavailable`: the spine read failed. Nothing about any System is claimed. */
   status: "ready" | "unavailable";
   systems: WorkspaceSystemEntry[];

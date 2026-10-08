@@ -4,15 +4,16 @@ import { groupByBusiness } from "./project";
 /**
  * The agency surface's Queue (spec §9.1, option c): the same projection,
  * filtered to the customer businesses an agency has an active delegation for.
- * View model only; partner agencies are out of 1.0.0 (assumption 2), so no
- * route renders it yet.
+ * Retained projection compatibility only; the released agency Queue uses the
+ * agency-clients projection in AgencyHome. It grants no provider authority.
  *
- * Never shown to an agency: Strelva's own sales leads, items with no
- * business, and kinds that expose Strelva-internal state (receipts' read-back
- * ledger, the lead copy). Provider-visible receipt checks and owner delivery
- * use the separate current-seat/staff scoped provider-client-queue read.
+ * Never shown to an agency: platform sales leads, items with no
+ * business, and kinds that expose platform-internal state (receipts' read-back
+ * ledger, the lead copy).
+ * Provider-visible receipt checks and owner delivery use the separate
+ * current-seat/staff scoped provider-client-queue read.
  */
-const STRELVA_ONLY: ReadonlySet<QueueKind> = new Set(["prospect_lead", "readback_failed", "lead_unkept", "ops_alert"]);
+const PLATFORM_INTERNAL: ReadonlySet<QueueKind> = new Set(["prospect_lead", "readback_failed", "lead_unkept", "ops_alert"]);
 
 export interface AgencyQueueView {
   agencyWorkspaceId: string;
@@ -39,7 +40,7 @@ export interface AgencyQueueRow {
 export function buildAgencyQueue(queue: OperatorQueue, delegations: QueueDelegation[], agencyWorkspaceId: string): AgencyQueueView {
   const customers = new Set(delegations.filter((d) => d.agencyWorkspaceId === agencyWorkspaceId).map((d) => d.customerWorkspaceId));
   const visible = queue.items.filter((item) =>
-    item.business.kind === "workspace" && customers.has(item.business.workspaceId) && !STRELVA_ONLY.has(item.kind));
+    item.business.kind === "workspace" && customers.has(item.business.workspaceId) && !PLATFORM_INTERNAL.has(item.kind));
   const groups = groupByBusiness(visible).map((group) => ({
     workspaceId: group.business.kind === "workspace" ? group.business.workspaceId : "",
     name: group.business.kind === "workspace" ? group.business.name : "",
@@ -51,7 +52,7 @@ export function buildAgencyQueue(queue: OperatorQueue, delegations: QueueDelegat
   return {
     agencyWorkspaceId,
     complete: queue.complete,
-    gaps: queue.gaps.filter((gap) => !STRELVA_ONLY.has(gap.kind)).map((gap) => `Couldn't read ${gap.source.toLowerCase()} (${gap.reason})`),
+    gaps: queue.gaps.filter((gap) => !PLATFORM_INTERNAL.has(gap.kind)).map((gap) => `Couldn't read ${gap.source.toLowerCase()} (${gap.reason})`),
     groups,
     total: visible.length,
   };

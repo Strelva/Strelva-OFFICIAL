@@ -1057,3 +1057,21 @@ change only fictional preview state. Native SQL and HTTP checks are separate fro
 this rendered proof. Historical last use is available for agent reads/proposals;
 other access types show “Not recorded”. This is private local preparation, not
 a production or customer-adoption claim.
+
+
+## October 8 private canonical directory and neutral request preparation
+
+`WorkspaceLayout` released All Systems uses the canonical spine identities, with
+separate supporting Files. Directory search covers System name/detail/kind and
+file title/evidence; pinned navigation remains independent. Empty and unavailable
+registry states do not claim that no Systems exist. Website assignment handoff,
+stopped reads and delegated/provider-seat views are retained. Existing work-row
+composition is reused, with semantic sections and actual System links.
+
+`WorkspaceHelpForm` and `OfferingInstallView` require an explicit agency choice
+from the selected business's active seats. No platform designation orders or
+selects a provider. Historical requests remain inspectable; platform support is
+separate. `WebsiteEntry` keeps the owned SelectInput and intake controls, and reads
+same-tab actor/business draft text without deleting it. Source/UI contract tests
+are local proof; rendered desktop/mobile, native authority and combined release
+checks remain pending the coordinated verification window.

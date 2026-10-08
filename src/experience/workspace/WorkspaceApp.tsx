@@ -1,5 +1,6 @@
 "use client";
 
+import { requestDraftKey, writeRequestDraft } from "./request-draft";
 import { prepareWebsiteRequestDraft } from "@/lib/website-request-draft";
 import { WebsiteAuditPage } from "@/products/website-audit";
 import { replaceWorkspaceLocation, workspaceReturnTarget } from "@/platform/workspaces/location";
@@ -11,6 +12,7 @@ import {
   LockKeyhole,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { AiVisibilityAssessmentForm, AiVisibilityAssessmentResult } from "@/products/ai-visibility";
@@ -72,6 +74,7 @@ export function WorkspaceApp({ request = fetch, appBase = "", signOut, inquiry, 
 }
 
 function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEnabled }: { rebuildEnabled: boolean; appBase: string; signOut?: React.ReactNode; inquiry?: WorkspaceInquiryConfig }) {
+  const router = useRouter();
   const request = useWorkspaceRequest();
   const postAction = usePostAction();
   const [snapshot, setSnapshot] = useState<WorkspaceSnapshot | null>(null);
@@ -361,6 +364,15 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
 
   function startHorizontal(productId: HorizontalView, context?: WorkspaceStartContinuation) {
     if (workspaceExitBlocks) return;
+    if (productId === "websites" && snapshot?.releases?.systems === true && snapshot.releases.websiteRebuild === true && currentWorkspace?.kind === "customer") {
+      const key = requestDraftKey({ actorEmail: snapshot.actor.email, workspaceId: snapshot.workspaceId });
+      if (context?.request && !writeRequestDraft(window.sessionStorage, key, context.request)) {
+        setNotice({ kind: "error", message: "Your website request could not be carried forward. Copy it before reopening website creation." });
+        return;
+      }
+      router.push(`${appBase || ""}/workspace/site?${new URLSearchParams({ workspaceId: snapshot.workspaceId, entry: "rebuild" })}`);
+      return;
+    }
     if (productId === "applications" && context?.request) { startPlan(context.request); return; }
     leaveCurrentWork({ start: context?.request ? { view: productId, request: context.request } : null });
     setSelectedWorkId(null); setHome(false); setView(productId); setNotice(null);

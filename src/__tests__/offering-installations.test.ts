@@ -306,7 +306,7 @@ describe("offering installation interface", () => {
     const store = new MemoryOfferingStore();
     const service = new OfferingService(store);
     const created = await service.execute(owner, installCommand({
-      responsibility: { kind: "provider_requested", providerKind: "strelva", providerName: "Strelva", requestNote: "Please review service options." },
+      responsibility: { kind: "provider_requested", providerKind: "agency", agencyWorkspaceId: "20000000-0000-4000-8000-000000000001", providerName: "Ordinary agency", requestNote: "Please review service options." },
     }));
     const retired = await service.execute(owner, {
       action: "retire",

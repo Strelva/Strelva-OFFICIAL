@@ -154,3 +154,30 @@ it("keeps shared read-only System use disabled", async () => {
   expect(button("Reserve in workspace").disabled).toBe(true);
   expect(request.mock.calls.every(([, init]) => !init?.method)).toBe(true);
 });
+
+it.each([undefined, "delegated_read" as const, "provider_seat" as const])("lists registry-only Systems by identity and separates searchable files (%s)", async access => {
+  const state = await snapshot({ id: "file", workspaceId: "workspace-a", title: "File", productId: "ai_visibility", resourceKind: "assessment", payload: null, input: {}, createdAt: "2026-10-08T00:00:00Z" });
+  state.work = [{ ...state.work[0]!, id: "supporting-file", title: "Campaign evidence", productId: "ai_visibility", resourceKind: "assessment" }];
+  state.workspaces[0]!.access = access;
+  state.systems!.systems = ["inquiry", "listing", "newsletter"].map((kind, index) => ({ ref: { businessId: state.workspaceId, systemId: `registry-${index}` }, name: `Registry ${kind}`, kind, lifecycle: "live", basis: null, savedWorkId: null, tenantId: null, health: { status: "unknown", summary: "No evidence", lastVerifiedAt: null } }));
+  window.history.replaceState(null, "", "/workspace?view=work");
+  const onChoose = vi.fn();
+  const request = vi.fn(async () => new Response(JSON.stringify({ error: "Unavailable" }), { status: 503 }));
+  await mount(createElement(WorkspaceRequestContext.Provider, { value: request }, createElement(WorkspaceLayout, { snapshot: state, home: true, agency: false, busy: false, selectedWork: null, onHome: noop, onNew: noop, onOngoing: noop, onAgency: noop, onChoose, onWorkspace: noop, onOpenClientWork: noop, notice: null })));
+  for (const [index, kind] of ["inquiry", "listing", "newsletter"].entries()) {
+    const link = [...container.querySelectorAll("a")].find(item => item.textContent?.includes(`Registry ${kind}`));
+    expect(link?.getAttribute("href")).toContain(`system=registry-${index}`);
+  }
+  expect(container.textContent).toContain("Files");
+  const file = container.querySelector<HTMLButtonElement>('[aria-label="Open file Campaign evidence"]')!;
+  await act(async () => file.click());
+  expect(onChoose).toHaveBeenCalledWith("supporting-file");
+  const search = container.querySelector<HTMLInputElement>('#workspace-search')!;
+  await fill(search, "newsletter");
+  expect(container.textContent).toContain("Registry newsletter");
+  expect(container.querySelector('[aria-labelledby="systems-directory-title"]')?.textContent).not.toContain("Registry listing");
+  expect(container.querySelector('[aria-label="Open file Campaign evidence"]')).toBeNull();
+  await fill(search, "campaign");
+  expect(container.textContent).toContain("Campaign evidence");
+  expect(container.querySelector('[aria-labelledby="systems-directory-title"]')?.textContent).not.toContain("Registry newsletter");
+});

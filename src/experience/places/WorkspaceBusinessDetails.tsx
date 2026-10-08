@@ -150,7 +150,7 @@ export function WorkspaceBusinessDetails({ workspaceId, state, result, googleRes
               {data.sites.length ? (
                 <ul className="grid gap-1 text-sm leading-6">{data.sites.map((site) => <li key={site.tenantId}>{site.siteName}</li>)}</ul>
               ) : <p className="text-sm text-gray-muted">No website is connected to this business yet.</p>}
-              <p className="mt-2 text-sm leading-6 text-gray-muted">Your site&apos;s look, menu, domain and connected services are run by Strelva. Ask for a change from Home and Strelva handles it.</p>
+              <p className="mt-2 text-sm leading-6 text-gray-muted">Open the website System to see its operating mode, connections and provider details. Changes to a connected site require its own publishing access.</p>
               <a className="mt-2 inline-block text-sm font-medium underline-offset-4 hover:underline" href={`/workspace/results?workspaceId=${encodeURIComponent(workspaceId)}`}>Results and site health</a>
             </Card>
           </Section>

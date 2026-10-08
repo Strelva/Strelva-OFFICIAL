@@ -251,10 +251,11 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
     });
     if ((scenario === "business" || scenario === "agency") && url.pathname === "/api/service-requests") {
       if ((init?.method || "GET") === "GET") {
+        if (url.searchParams.get("providersBusinessId")) return response({ providers: [{ agencyWorkspaceId: "22222222-2222-4222-8222-222222222222", name: "North Agency", providerOfRecord: true }] });
         const requestId = url.searchParams.get("requestId");
         const businessId = url.searchParams.get("businessId");
         const providerKind = url.searchParams.get("providerKind");
-        if (providerKind === "strelva") return response({ requests: serviceRequests.filter((item) => item.status === "requested" && item.provider.kind === "strelva" && item.providerAcceptance.status === "pending").map(serviceRequestResponse) });
+        if (providerKind === "strelva") return response({ error: "The privileged provider inbox is retired." }, 403);
         const providerWorkspaceId = url.searchParams.get("providerWorkspaceId");
         if (providerWorkspaceId) return response({ requests: serviceRequests.filter((item) => item.status === "requested" && item.provider.kind === "agency" && item.provider.agencyWorkspaceId === providerWorkspaceId && item.providerAcceptance.status === "pending").map(serviceRequestResponse) });
         if (requestId) {
@@ -273,6 +274,7 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
           let provider: ServiceRequest["provider"];
           try { provider = serviceRequestProvider(command.provider); }
           catch (error) { return response({ error: error instanceof Error ? error.message : "The provider is unavailable in the local preview." }, 422); }
+          if (provider.kind !== "agency") return response({ error: "Choose an ordinary agency." }, 400);
           const digest = serviceRequestDigest(command);
           const prior = serviceRequestKeys.get(`${CUSTOMER}:${command.idempotencyKey}`);
           if (prior) {
@@ -297,8 +299,7 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
         }
         if (command.action === "respond" && typeof command.requestId === "string") {
           const existing = serviceRequests.find((candidate) => candidate.id === command.requestId);
-          const providerMatches = existing?.provider.kind === "strelva"
-            || (existing?.provider.kind === "agency" && existing.provider.agencyWorkspaceId === AGENCY);
+          const providerMatches = existing?.provider.kind === "agency" && existing.provider.agencyWorkspaceId === AGENCY;
           if (!existing || !providerMatches) return response({ error: "The local service request was not found." }, 404);
           if (typeof command.idempotencyKey !== "string") return response({ error: "The local service request is invalid." }, 400);
           const digest = serviceRequestDigest(command);

@@ -9,6 +9,7 @@ import { WorkspaceSitePreview } from "@/experience/websites/WorkspaceSitePreview
 import { WebsiteCutoverUndo, WebsiteDomainRequest } from "@/experience/websites/WebsiteRecoveryControls";
 import { fixtureRebuild } from "@/experience/websites/rebuild-fixture";
 import type { RebuildTransport } from "@/experience/websites/rebuild-transport";
+import { requestDraftKey, writeRequestDraft, readRequestDraft } from "@/experience/workspace/request-draft";
 import { workspaceReturnTarget } from "@/platform/workspaces/location";
 
 const WS = "11111111-1111-4111-8111-111111111111";
@@ -108,4 +109,17 @@ describe("domain and cutover recovery decisions", () => {
     await act(async () => button("Restore previous website").click());
     expect(node.textContent).toContain("undo receipt is saved in history");
   });
+});
+
+it("carries the same-tab business request into canonical website intake without deleting it or touching another actor's draft", async () => {
+  const actorEmail = "draft-owner@example.test";
+  const key = requestDraftKey({ actorEmail, workspaceId: WS });
+  writeRequestDraft(window.sessionStorage, key, "Make a website for our second office.");
+  const foreign = requestDraftKey({ actorEmail: "other@example.test", workspaceId: WS });
+  writeRequestDraft(window.sessionStorage, foreign, "Another actor's private request.");
+  await mount(createElement(WebsiteEntry, { workspaceId: WS, actorEmail, connectedEnabled: false, rebuildEnabled: true, path: "rebuild", canManage: true }));
+  expect([...node.querySelectorAll("textarea")].map(field => field.value)).toContain("Make a website for our second office.");
+  expect(node.textContent).not.toContain("Another actor's private request.");
+  expect(readRequestDraft(window.sessionStorage, key)).toBe("Make a website for our second office.");
+  window.sessionStorage.removeItem(key); window.sessionStorage.removeItem(foreign);
 });
