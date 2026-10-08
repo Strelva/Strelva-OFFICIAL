@@ -144,12 +144,24 @@ select pg_temp.ps_assert(jsonb_array_length(public.read_agency_provider_seats('5
 select pg_temp.ps_expect($$select public.read_agency_provider_seats('5e000000-0000-4000-8000-000000000005',
   'ps-b-owner@agency-b.example.test', '5e000000-0000-4000-8000-000000000020')$$, 'provider_seat_access_denied');
 
+-- The exposed TypeScript authority resolver is executable only by service_role.
+-- A verified staffed provider gets a seat claim, never an invented membership.
+select pg_temp.ps_assert(has_function_privilege('service_role', 'public.read_version_actor(uuid,text)', 'execute')
+  and not has_function_privilege('authenticated', 'public.read_version_actor(uuid,text)', 'execute'), 'version resolver service-only');
+select pg_temp.ps_assert(not exists(select 1 from public.workspace_memberships
+  where workspace_id = '5e000000-0000-4000-8000-000000000010' and user_id = '5e000000-0000-4000-8000-000000000003'), 'staff has no direct client membership');
+select pg_temp.ps_assert(public.read_version_actor('5e000000-0000-4000-8000-000000000003', 'wrong@example.test')->'memberships' = '[]'::jsonb, 'resolver rejects wrong verified email');
+select pg_temp.ps_assert(public.read_version_actor('5e000000-0000-4000-8000-000000000007', 'ps-a-unverified@agency-a.example.test')->'memberships' = '[]'::jsonb, 'resolver rejects unverified staff');
+select pg_temp.ps_assert(not (public.read_version_actor('5e000000-0000-4000-8000-000000000005', 'ps-b-owner@agency-b.example.test')->'memberships'
+  @> '[{"businessId":"5e000000-0000-4000-8000-000000000010","via":"provider_seat"}]'::jsonb), 'resolver rejects cross-agency staff');
+
 -- Leaving the agency ends the person's staff row; being added back restores
 -- nothing until an owner/admin staffs them again.
 delete from public.workspace_memberships
   where workspace_id = '5e000000-0000-4000-8000-000000000020' and user_id = '5e000000-0000-4000-8000-000000000003';
 select pg_temp.ps_assert(pg_temp.ps_role('5e000000-0000-4000-8000-000000000003', 'ps-a-staff@agency-a.example.test', false)
   = 'business_record_access_denied', 'removed from the agency: no access');
+select pg_temp.ps_assert(public.read_version_actor('5e000000-0000-4000-8000-000000000003', 'ps-a-staff@agency-a.example.test')->'memberships' = '[]'::jsonb, 'resolver sees membership removal immediately');
 select pg_temp.ps_assert((select status = 'ended' and ended_by is null and ended_at is not null from public.agency_client_staff
   where agency_workspace_id = '5e000000-0000-4000-8000-000000000020' and user_id = '5e000000-0000-4000-8000-000000000003'),
   'leaving the agency ends the staff row');
@@ -197,6 +209,8 @@ select pg_temp.ps_assert(pg_temp.ps_role('5e000000-0000-4000-8000-000000000005',
   = 'business_record_access_denied', 'no seat after stepping back');
 select pg_temp.ps_assert(exists (select 1 from public.workspace_providers where provider_workspace_id = '5e000000-0000-4000-8000-000000000030'
   and status = 'active'), 'attribution kept');
+select pg_temp.ps_assert(not (public.read_version_actor('5e000000-0000-4000-8000-000000000005', 'ps-b-owner@agency-b.example.test')->'memberships'
+  @> '[{"businessId":"5e000000-0000-4000-8000-000000000010","via":"provider_seat"}]'::jsonb), 'resolver sees ended seat immediately');
 -- Choosing B again restores a seat; staff must be put back explicitly.
 select pg_temp.ps_assert((public.choose_business_provider('5e000000-0000-4000-8000-000000000001', 'ps-owner@example.test',
   '5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000030')->>'replayed') = 'false', 'seat restored');

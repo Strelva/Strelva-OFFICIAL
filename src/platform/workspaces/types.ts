@@ -19,7 +19,7 @@ export interface Workspace {
   createdAt: string;
   updatedAt: string;
   role?: WorkspaceRole;
-  access: "member" | "delegated_read";
+  access: "member" | "delegated_read" | "provider_seat";
 }
 
 export interface SavedWork {

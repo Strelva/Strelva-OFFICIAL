@@ -449,3 +449,13 @@ psql "${psql_args[@]}" --file="$repo_root/tests/ask-confirmed-facts-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013220000_provider_seat_tenant_conversion.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/provider-seat-tenant-conversion-schema.sql"
 printf 'Provider-seat tenant conversion upgrade contract passed.\n'
+
+# #245: provider website saved checkpoint authority, with exact rollback/reapply.
+psql "${psql_args[@]}" -Atc "select md5(pg_get_functiondef('public.update_bounded_product_work(uuid,uuid,uuid,text,text,integer,jsonb)'::regprocedure))" >"$cluster_root/provider-website-forward.txt"
+psql "${psql_args[@]}" --set=rollback_expected=false --file="$repo_root/tests/provider-seat-websites-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261018110000_provider_seat_website_access.sql"
+psql "${psql_args[@]}" --set=rollback_expected=true --file="$repo_root/tests/provider-seat-websites-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261018110000_provider_seat_website_access.sql"
+psql "${psql_args[@]}" --set=rollback_expected=false --file="$repo_root/tests/provider-seat-websites-schema.sql"
+diff -u "$cluster_root/provider-website-forward.txt" <(psql "${psql_args[@]}" -Atc "select md5(pg_get_functiondef('public.update_bounded_product_work(uuid,uuid,uuid,text,text,integer,jsonb)'::regprocedure))")
+printf 'Provider website saved checkpoints: forward/rollback/reapply passed.\n'

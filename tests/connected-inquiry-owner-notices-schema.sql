@@ -17,10 +17,13 @@ begin
   insert into public.business_records(workspace_id,created_by,updated_by) values(ws,owner_id,owner_id);
   insert into public.business_record_facts(workspace_id,fact_key,value,source,verified,updated_by)
     values(ws,'owner_recipient','{"email":"cno-owner@example.test","name":"Owner"}','owner',true,owner_id);
-  -- The working fact alone is not trusted after #553. Seed the same audited
-  -- owner-write trust state a confirmed owner recipient produces.
-  perform public.business_owner_recipient_set_trust(
-    ws,'cno-owner@example.test','Owner','owner',true,'owner_write',null,null,null,'owner',owner_id::text);
+  -- check:workspace-sql runs this legacy fixture before #553, when the
+  -- working fact is its recipient contract. Ordered upgrade runs it after
+  -- #553, when that same fact needs an audited trust row.
+  if to_regprocedure('public.business_owner_recipient_set_trust(uuid,text,text,text,boolean,text,uuid,uuid,bigint,text,text)') is not null then
+    execute 'select public.business_owner_recipient_set_trust($1,$2,$3,$4,$5,$6,$7::uuid,$8::uuid,$9::bigint,$10,$11)'
+      using ws,'cno-owner@example.test','Owner','owner',true,'owner_write',null,null,null,'owner',owner_id::text;
+  end if;
   site_id := (public.create_connected_site(ws,owner_id,'cno-owner@example.test',jsonb_build_object('publicKey',key,'verificationToken',repeat('n',32),
     'label','Fixture','siteUrl',origin||'/','siteHost','owner-notice-fixture.example','allowedOrigins',jsonb_build_array(origin),'platform','custom'))->>'id')::uuid;
   perform public.confirm_connected_site_verification(ws,owner_id,'cno-owner@example.test',site_id,array[repeat('n',32)]);
