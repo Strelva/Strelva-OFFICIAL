@@ -10,7 +10,7 @@ const input = { workspaceId, systemId, section: "hero", versionId: "saved-hero" 
 const ports = {
   released: vi.fn(), workspaces: vi.fn(), systems: vi.fn(), operator: vi.fn(), tenant: vi.fn(),
   template: vi.fn(), capabilities: vi.fn(), canWrite: vi.fn(), subscribed: vi.fn(), versions: vi.fn(), apply: vi.fn(),
-  snapshots: vi.fn(), rebuildReleased: vi.fn(), document: vi.fn(), rebuild: vi.fn(), undo: vi.fn(), request: vi.fn(),
+  snapshots: vi.fn(), rebuildReleased: vi.fn(), document: vi.fn(), rebuild: vi.fn(), undo: vi.fn(), request: vi.fn(), audit: vi.fn(),
 };
 const restore = createWebsiteContentRestoreService(ports);
 beforeEach(() => {
@@ -19,6 +19,7 @@ beforeEach(() => {
   ports.workspaces.mockResolvedValue([{ id: workspaceId, kind: "customer", access: "member", role: "owner" }]);
   ports.systems.mockResolvedValue({ systems: [{ system: { id: systemId, kind: "website" }, references: { tenantId: "gldf", tenantStableId: workspaceId, savedWorkId: workId } }] });
   ports.operator.mockResolvedValue(false); ports.canWrite.mockResolvedValue(true); ports.subscribed.mockResolvedValue(true);
+  ports.audit.mockReset().mockResolvedValue({});
   ports.tenant.mockResolvedValue({ id: "gldf", active: true, deliveryModel: "custom_repo" });
   ports.template.mockResolvedValue({ contentSections: ["hero"] }); ports.capabilities.mockResolvedValue({ fixture: "manifest" });
   ports.versions.mockResolvedValue([{ id: input.versionId, data: { headline: "Earlier reviewed headline" } }]);
@@ -94,6 +95,22 @@ describe("site document restore from System History", () => {
 });
 
 describe("website History restore authority and review", () => {
+  it("records the preparer and selected restore without treating it as owner approval", async () => {
+    ports.workspaces.mockResolvedValue([{ id: workspaceId, kind: "customer", access: "member", role: "admin" }]);ports.operator.mockResolvedValue(true);
+    await restore(actor, input);
+    expect(ports.apply).toHaveBeenCalledWith(expect.objectContaining({ forceReview: true, preparer: { userId: actor.userId, email: actor.verifiedEmail, kind: "operator" } }));
+    expect(ports.audit).toHaveBeenNthCalledWith(1, expect.objectContaining({ tenant: "gldf", action: "website.section.restore.prepare", targetId: input.versionId,
+      actor: expect.objectContaining({ userId: actor.userId, type: "super_admin" }), metadata: { workspaceId, systemId, section: "hero", phase: "attempt" } }));
+    expect(ports.audit.mock.invocationCallOrder[0]).toBeLessThan(ports.apply.mock.invocationCallOrder[0]!);
+    expect(ports.audit).toHaveBeenLastCalledWith(expect.objectContaining({ metadata: expect.objectContaining({ phase: "result", status: "queued", eventId: "review-event" }) }));
+  });
+  it("does not queue a restore when its audit attempt fails", async () => {
+    ports.audit.mockRejectedValueOnce(new Error("Audit unavailable"));await expect(restore(actor, input)).rejects.toThrow("Audit unavailable");expect(ports.apply).not.toHaveBeenCalled();
+  });
+  it("does not repeat or report a queued restore as failed when the result audit is lost", async () => {
+    ports.audit.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error("Result unavailable"));
+    expect(await restore(actor, input)).toMatchObject({ status: "queued" });expect(ports.apply).toHaveBeenCalledOnce();
+  });
   it("flags off reads no content and queues no change", async () => {
     ports.released.mockResolvedValue(false);
     await expect(restore(actor, input)).rejects.toThrow("not enabled");

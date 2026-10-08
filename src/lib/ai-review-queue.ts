@@ -11,6 +11,8 @@ export type QueueAiContentReviewInput = {
   diffs: PreviewDiff[];
   risk?: RiskAssessment;
   governance: AiGovernanceDecision;
+  /** Provenance for a human-prepared draft; never an approval or decision. */
+  preparer?: { userId: string; email: string; kind: "owner" | "operator" };
 };
 
 export async function queueAiContentReview(
@@ -37,6 +39,7 @@ export async function queueAiContentReview(
         diffs: input.diffs,
         proposedData: input.proposedData,
         currentData: input.currentData,
+        ...(input.preparer ? { preparedBy: input.preparer } : {}),
       },
     },
     { requirePersistence: process.env.NODE_ENV === "production" }
