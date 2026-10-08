@@ -22,6 +22,12 @@ select pg_temp.expect_failure('update public.business_payments set amount_cents=
 select pg_temp.expect_failure($q$select public.read_business_money('a2830000-0000-4000-8000-000000000010','a2830000-0000-4000-8000-000000000003','money-stranger@example.test')$q$,'connect_denied');
 select public.choose_business_provider('a2830000-0000-4000-8000-000000000001','money-owner@example.test','a2830000-0000-4000-8000-000000000010','a2830000-0000-4000-8000-000000000020');
 insert into public.money_agreements(beneficiary_workspace_id,kind,version,rate_reference,rate_bps,effective_from,approved_by,approved_at) values('a2830000-0000-4000-8000-000000000020','agency','test-agreement','test-rate',1000,'2020-01-01','a2830000-0000-4000-8000-000000000001',now());
+-- New agency accrual uses explicit fictional owner-confirmed acquisition and
+-- frozen invoice provenance, never the operator projection. This fixture insert
+-- exercises ledger math; it is not runtime source verification or a backfill.
+select public.record_business_attribution('a2830000-0000-4000-8000-000000000010','a2830000-0000-4000-8000-000000000001','money-owner@example.test','a2830000-0000-4000-8000-000000000020','referral','{"kind":"owner_statement","reference":"Fictional money ledger bringer"}','a2830000-0000-4000-8000-000000000040',(select id from public.workspace_providers where customer_workspace_id='a2830000-0000-4000-8000-000000000010' and status='active'));
+insert into public.invoice_split_sources(source_account_id,invoice_line_id,charge_id,business_workspace_id,payer_workspace_id,payer_kind,customer_id,basis_cents,currency,period_start,period_end)
+values('platform','il_test','ch_Money','a2830000-0000-4000-8000-000000000010','a2830000-0000-4000-8000-000000000010','business','cus_MoneyFixture',1000,'cad',now()+interval '1 minute',now()+interval '1 month');
 -- Period starts after attribution. Paid-line identity and currency are immutable.
 select public.accrue_invoice_splits('a2830000-0000-4000-8000-000000000010','il_test',now()+interval '1 minute',now()+interval '1 month','platform','ch_Money',1000,'cad');
 select pg_temp.assert_true((select amount_cents=100 and currency='cad' from public.revenue_splits where beneficiary_kind='agency'),'explicit approved rate and source currency');

@@ -213,6 +213,8 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261020090028": "responsibility_bundles",
   "20261020090031": "provider_change_cancellations",
   "20261020090032": "responsibility_meter_months",
+  "20261020090034": "invoice_split_attributions",
+  "20261020090035": "creator_maintenance_identity_snapshot",
   "20261020090013": "split_recovery_payouts",
   "20261020090014": "invoice_money_evidence",
   "20261020090015": "sandbox_build_attempts",
