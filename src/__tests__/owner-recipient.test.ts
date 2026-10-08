@@ -30,13 +30,13 @@ describe("resolveOwnerNoticeRecipient", () => {
     expect(resolve).not.toHaveBeenCalled();
   });
 
-  it("releases added notices through the same resolver and bounded fallback", async () => {
+  it("releases added notices through the same resolver and suppresses unavailable trust", async () => {
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
     vi.stubEnv("STRELVA_BUSINESS_RECORD_READS", "1");
     setOwnerRecipientResolver(async () => ({ email: "Record@Example.test ", name: null, from: "record", workspaceId: "w1" }));
     await expect(releasedOwnerNoticeEmail(tenant)).resolves.toBe("record@example.test");
     setOwnerRecipientResolver(async () => { throw new Error("resolver unavailable"); });
-    await expect(releasedOwnerNoticeEmail(tenant)).resolves.toBe("owner@gldf.example");
+    await expect(releasedOwnerNoticeEmail(tenant)).resolves.toBeNull();
   });
 
   it("uses the business record's owner contact when the rule names one", async () => {
