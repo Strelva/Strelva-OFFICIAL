@@ -265,6 +265,23 @@ fixture route to `/api/workspace/agency-clients` caused the October 8 failure:
 the strict page parser correctly refused it. Final desktop/mobile browser proof
 and the complete CI run belong to root integration after this fixture repair.
 
+The third October 8 CI attempt reached the correct100→102 UI but the request
+count assertion counted an aborted development startup request as a completed
+page. All six retained traces (both viewports and retries) show two initial
+workspace200 reads, an initial client-page request without a response, one
+replacement client-page200 and one UUID-cursor200. `AgencyHome` cleanup aborts
+the first read; `WorkspaceApp` guards startup response generations. This matches
+[Next.js App Router's default Strict Mode](https://nextjs.org/docs/app/api-reference/config/next-config-js/reactStrictMode)
+and [React's extra development effect setup/cleanup](https://react.dev/reference/react/StrictMode#fixing-bugs-found-by-re-running-effects-in-development).
+The fixture now requires exactly one completed initial client page, allows only
+one additional initial attempt proven `net::ERR_ABORTED`, and keeps completed
+Show more/retry cursors exact. Initial workspace reads are bounded to one or two
+for the same agency; pagination/retry add none, and only explicit queue opening
+adds the exact client read. No product behavior changed. The third red traces
+remain in `output/release-safety/backlog-ci-third-20261008`; fresh zero-retry
+focused browser proof remains root's next step. Captures include the current
+last-client viewport at390px as well as the full-page evidence.
+
 ### The CI-faithful local sim (use this before trusting a green local run)
 
 Local exports or `.env` may provide Postgres **and** Upstash, which silently masks CI-only
