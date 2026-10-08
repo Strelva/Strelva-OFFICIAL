@@ -61,23 +61,44 @@ Allowed fact fields can still contain pasted confidential text; review values.
 Initial feature branch: `build/mcp-complete-20261008` at `6a7ac01e`, worktree
 `/private/tmp/strelva-mcp-complete-20261008`, based on `9b49d9fa`.
 
-Preferred prepared integration: `prepare/mcp-launch-integration-20261008`, worktree
-`/private/tmp/strelva-mcp-launch-20261008`, based on selected private launch
-candidate `e28e1a5f`. It cherry-picks the five MCP commits without replacing the
-launch candidate's client-safe imports, provider-seat controls or add-client gate.
+Reborn integration (Jacob authorized October 8): `integrate/mcp-reborn-20261008`
+at `/private/tmp/strelva-mcp-reborn-20261008`, based on remote
+`integrate/reborn-1.0` at `f3097dd6`. It selects the four original MCP foundation
+commits and the eight owner-assistant commits, plus integration-only migration
+ordering and handoff. It does not bring the 137-commit private launch ancestry
+into Reborn. Existing remote SQL files retain their exact bytes, and workspace
+provider-seat/Add Client controls are preserved. Direct connected-sites imports
+match this Reborn base; native website locks/documents already exist here.
+
+Earlier private preparation remains `prepare/mcp-launch-integration-20261008`
+at `2782587b`, based on `e28e1a5f`; its evidence is dated history, not a claim that
+its other money/apps/hosting features are in this Reborn integration.
+
 The full webpack check exposed an existing application-draft import that pulled
 server-only `node:crypto` into the browser. Existing schemas now live in a
 client-safe contract module, with server exports preserved. Generated route checks
 also exposed two optional page arguments and an unsupported Resend route constant
-export; their contract-only fixes preserve account/auth/webhook behavior. Earlier
-failures are retained in the proof record.
+export; their contract-only fixes preserve account/auth/webhook behavior. The
+scoped Reborn build additionally needs the existing email sanitizer/jsdom packages
+externalized so their package-relative CSS can load. No dependency was added or
+upgraded. Earlier failures are retained in the proof record.
 
-This release is not just two new migrations. The prepared source has a large
-unreleased ancestry relative to local `origin/main`. Choose the actual deploy
-head and observed schema, reconcile their complete delta, and pass the owning
-release checklist before production. Do not run these files as standalone SQL.
+Jacob explicitly chose to skip staging and push this work to Reborn. This
+instruction authorizes Git integration and push, not production deployment,
+configuration, live database changes or customer access. Actual native-client
+qualification follows an approved Reborn deployment. Do not infer production
+readiness from the Git push; reconcile the selected release against actual
+deployed source/schema and the existing release checklist first.
 
-New forward migrations, after their existing agent/schema prerequisites:
+MCP prerequisite migrations (after the existing Reborn/native schema):
+
+1. `20261020090016_agent_inquiries.sql`
+2. `20261020090017_agent_profile.sql`
+3. `20261020090018_agent_oauth.sql`
+4. `20261020090019_agent_channel_policy.sql`
+5. `20261020090020_agent_confirmed_provenance.sql`
+
+New owner-assistant forward migrations, after those prerequisites:
 
 1. `20261020090031_agent_oauth_connection_context.sql`
 2. `20261020090032_agent_oauth_renewable.sql`
@@ -111,7 +132,7 @@ The HTTP proof starts a clean-env local Next process, a strict loopback RPC
 adapter, and disposable real PostgreSQL. It exercises actual HTTP handlers,
 Supabase SDK calls and service-role SQL. Code consent is issued through a SQL
 fixture: this does **not** prove Supabase browser login, actual Claude/Codex
-callbacks, client refresh behavior or HTTPS staging. It refuses repository env
+callbacks, client refresh behavior or the selected public HTTPS deployment. It refuses repository env
 files and never accepts production credentials. All data is fictional.
 
 The browser suite is `tests/agent-connections-ui.spec.ts`. Start a local webpack
@@ -122,7 +143,23 @@ failure and recovery, consent and native owner fact review. Consent transport is
 mocked in that one UI case. Browser fixtures do not establish authenticated owner
 session or publication.
 
-## Local evidence
+## Scoped Reborn push proof
+
+Remote base `f3097dd6` plus this MCP-only slice passes **448 tests across 35
+files**: 280 MCP/owner contracts, 145 public-site/workspace regressions and
+23 email/sanitizer checks. The full optimized webpack build passed, including
+generated route types and all 248 page entries. Ordered schema/rollback/reapply
+and composed real SQL/HTTP checks passed on this scoped source. Independent
+review found no functional blocker and confirmed all 434 existing remote SQL
+files remain byte-identical; eight forward additions and three rollbacks have
+unique versions. No dependencies, `/api/v1` or Vercel configuration changed.
+
+The first scoped build failure (disk capacity and package-relative sanitizer
+CSS) is retained alongside the passing retry. Stored console logs normalize
+line endings, tabs and trailing whitespace only; test results/errors are intact.
+Original stdout logs remain in `/private/tmp/strelva-mcp-reborn-*.log`.
+
+## Earlier private-source local evidence
 
 - Integrated MCP/related contracts: **232 tests passed across 12 files**.
 - Independent integrated authority/source review: **75 tests across seven files**.
@@ -144,8 +181,9 @@ Evidence logs (including failures) are preserved under
 
 ## Native client rehearsal: exact remaining proof
 
-Use an authorized HTTPS staging deployment and a fictional direct-owned business
-with one saved native website. Confirm the host's Supabase callback allowlist,
+Jacob has chosen no staging. After an explicitly approved Reborn deployment,
+use an explicitly authorized non-confidential direct-owned test business with
+one saved native website. Confirm the host's Supabase callback allowlist,
 release/schema and public access from the assistant before inviting any customer.
 
 For Codex 0.161.0:
@@ -180,14 +218,15 @@ For each client, retain evidence of:
 
 ## Resume and stop point
 
-The authorized local first-job implementation is prepared. Pending proof is real HTTPS client sign-in/renewal and the first
+The authorized local first-job implementation is prepared. Pending proof is real HTTPS client sign-in/renewal after an approved Reborn deployment and the first
 real business/site binding. No customer acceptance, recurring use, price, support
 cost or distribution outcome is established. Directory submission is unnecessary
 for an initial custom-connector rehearsal and remains a separate future.
 
-Next action: select and authorize an HTTPS staging target and its fictional
-Supabase business, reconcile full release/schema, then execute the native-client
-matrix above. Production deployment, flags, migrations and customer onboarding
+Next action: push the verified scoped source to `integrate/reborn-1.0`, then
+qualify the actual Reborn release/source/schema and obtain separate production
+deployment/configuration/migration authority. Run the native-client matrix only
+after that approved deployment and explicit test-business authority. Production deployment, flags, migrations and customer onboarding
 need separate authority. The source owner is [AGENTS.md](../../AGENTS.md).
 
 Primary client contracts checked October 8:

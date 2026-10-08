@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   // Instruction files are user-owned; next dev must not rewrite them.
   agentRules: false,
   distDir: process.env.PLAYWRIGHT_DIST_DIR || ".next",
+  // Preserve jsdom package-relative CSS reads used by the email sanitizer.
+  serverExternalPackages: ["isomorphic-dompurify", "jsdom"],
   // The generated website export copies this dependency into each client
   // repository and the private preview route reads it while building a
   // candidate. Keep it in standalone server output tracing as well as the

@@ -437,7 +437,7 @@ INSERT 0 3
 INSERT 0 1
 INSERT 0 1
 INSERT 0 1
-                                                                                        patch_business_record                                                                                        
+                                                                                        patch_business_record
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  {"undoOf": null, "contacts": {"merged": 0, "created": 0, "unchanged": 0}, "replayed": false, "revision": 1, "sequence": 1, "changeCount": 1, "workspaceId": "ac161100-0000-4000-8000-000000000010"}
 (1 row)
@@ -446,321 +446,321 @@ INSERT 0 1
 CREATE TABLE
 CREATE FUNCTION
 INSERT 0 1
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
- ac_expect 
+ ac_expect
 -----------
- 
+
 (1 row)
 
- ac_expect 
+ ac_expect
 -----------
- 
+
 (1 row)
 
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
- ac_assert 
+ ac_assert
 -----------
- 
-(1 row)
 
-INSERT 0 1
- ac_assert 
------------
- 
-(1 row)
-
- ac_expect 
------------
- 
 (1 row)
 
 INSERT 0 1
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
- ac_expect 
+ ac_expect
 -----------
- 
+
 (1 row)
 
-                                                                       receive_agent_inquiry                                                                       
+INSERT 0 1
+ ac_assert
+-----------
+
+(1 row)
+
+ ac_expect
+-----------
+
+(1 row)
+
+                                                                       receive_agent_inquiry
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------
  {"replyBy": null, "expiresAt": "2026-11-07T13:43:53.212007-05:00", "inquiryId": "bac37859-23b7-48c6-9b8a-8dab6d4f0ac9", "statusCiphertext": "encrypted-status-3"}
 (1 row)
 
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
- issue_agent_oauth_code 
+ issue_agent_oauth_code
 ------------------------
  {"issued": true}
 (1 row)
 
- ac_expect 
+ ac_expect
 -----------
- 
+
 (1 row)
 
- ac_expect 
+ ac_expect
 -----------
- 
+
 (1 row)
 
- ac_expect 
+ ac_expect
 -----------
- 
+
 (1 row)
 
- ac_expect 
+ ac_expect
 -----------
- 
+
 (1 row)
 
- ac_expect 
+ ac_expect
 -----------
- 
+
 (1 row)
 
-                                              exchange_agent_oauth_code                                              
+                                              exchange_agent_oauth_code
 ---------------------------------------------------------------------------------------------------------------------
  {"scope": "business:read quotes:approve", "expiresIn": 3600, "workspaceId": "ac161100-0000-4000-8000-000000000010"}
 (1 row)
 
- ac_expect 
+ ac_expect
 -----------
- 
+
 (1 row)
 
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
-                                                                                                                                                                                                                                                                                                                                                                                                                               call_agent_protected_tool                                                                                                                                                                                                                                                                                                                                                                                                                               
+                                                                                                                                                                                                                                                                                                                                                                                                                               call_agent_protected_tool
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  {"facts": {"phone": {"value": "716-555-0100", "source": "agent", "verified": false, "updatedAt": "2026-10-08T13:43:53.196179-04:00", "updatedBy": "ac161100-0000-4000-8000-000000000001"}, "response_time": {"value": {"maximumHours": 24}, "source": "owner", "verified": true, "updatedAt": "2026-10-08T13:43:53.194739-04:00", "updatedBy": "ac161100-0000-4000-8000-000000000001"}}, "access": "owner", "people": [], "revision": 1, "services": [{"id": "ac161100-0000-4000-8000-000000000040", "name": "Consulting", "active": true, "source": "owner", "position": 0, "verified": true, "priceText": null, "updatedAt": "2026-10-08T13:43:53.191977-04:00", "description": null, "externalRef": null, "durationMinutes": null}], "updatedAt": "2026-10-08T13:43:53.196021-04:00", "workspaceId": "ac161100-0000-4000-8000-000000000010", "contactCount": 0, "lastSequence": 1}
 (1 row)
 
- revoke_agent_oauth_client_token 
+ revoke_agent_oauth_client_token
 ---------------------------------
  t
 (1 row)
 
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
- revoke_agent_oauth_client_token 
+ revoke_agent_oauth_client_token
 ---------------------------------
  t
 (1 row)
 
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
- issue_agent_oauth_code 
+ issue_agent_oauth_code
 ------------------------
  {"issued": true}
 (1 row)
 
 UPDATE 1
- ac_expect 
+ ac_expect
 -----------
- 
+
 (1 row)
 
- issue_agent_oauth_code 
+ issue_agent_oauth_code
 ------------------------
  {"issued": true}
 (1 row)
 
-                                      exchange_agent_oauth_code                                       
+                                      exchange_agent_oauth_code
 ------------------------------------------------------------------------------------------------------
  {"scope": "business:read", "expiresIn": 3600, "workspaceId": "ac161100-0000-4000-8000-000000000010"}
 (1 row)
 
 UPDATE 1
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
- ac_expect 
+ ac_expect
 -----------
- 
+
 (1 row)
 
-                                                                                                                                            choose_business_provider                                                                                                                                            
+                                                                                                                                            choose_business_provider
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  {"seatId": "6df24615-73fb-4fd9-8b48-cf1319ca4f9d", "source": "business_choice", "replayed": false, "providerId": "bed3f740-341d-4035-8a35-b9df1f854c71", "grantedByKind": "owner", "agencyWorkspaceId": "ac161100-0000-4000-8000-000000000020", "customerWorkspaceId": "ac161100-0000-4000-8000-000000000010"}
 (1 row)
 
-                                                                                             set_agency_client_staff                                                                                             
+                                                                                             set_agency_client_staff
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  {"active": true, "userId": "ac161100-0000-4000-8000-000000000003", "changed": true, "agencyWorkspaceId": "ac161100-0000-4000-8000-000000000020", "customerWorkspaceId": "ac161100-0000-4000-8000-000000000010"}
 (1 row)
 
- ac_expect 
+ ac_expect
 -----------
- 
+
 (1 row)
 
- issue_agent_oauth_code 
+ issue_agent_oauth_code
 ------------------------
  {"issued": true}
 (1 row)
 
-                                      exchange_agent_oauth_code                                       
+                                      exchange_agent_oauth_code
 ------------------------------------------------------------------------------------------------------
  {"scope": "business:read", "expiresIn": 3600, "workspaceId": "ac161100-0000-4000-8000-000000000010"}
 (1 row)
 
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
-                                                                                             set_agency_client_staff                                                                                              
+                                                                                             set_agency_client_staff
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  {"active": false, "userId": "ac161100-0000-4000-8000-000000000003", "changed": true, "agencyWorkspaceId": "ac161100-0000-4000-8000-000000000020", "customerWorkspaceId": "ac161100-0000-4000-8000-000000000010"}
 (1 row)
 
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
-                                                                                             set_agency_client_staff                                                                                             
+                                                                                             set_agency_client_staff
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  {"active": true, "userId": "ac161100-0000-4000-8000-000000000003", "changed": true, "agencyWorkspaceId": "ac161100-0000-4000-8000-000000000020", "customerWorkspaceId": "ac161100-0000-4000-8000-000000000010"}
 (1 row)
 
-                                                                          end_provider_seat                                                                          
+                                                                          end_provider_seat
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
  {"ended": true, "endedByKind": "owner", "agencyWorkspaceId": "ac161100-0000-4000-8000-000000000020", "customerWorkspaceId": "ac161100-0000-4000-8000-000000000010"}
 (1 row)
 
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
-                                                                                                                                            choose_business_provider                                                                                                                                            
+                                                                                                                                            choose_business_provider
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  {"seatId": "a546190d-18dc-4647-9128-d9384b845ce8", "source": "business_choice", "replayed": false, "providerId": "bed3f740-341d-4035-8a35-b9df1f854c71", "grantedByKind": "owner", "agencyWorkspaceId": "ac161100-0000-4000-8000-000000000020", "customerWorkspaceId": "ac161100-0000-4000-8000-000000000010"}
 (1 row)
 
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
- set_agent_channel_consent 
+ set_agent_channel_consent
 ---------------------------
  t
 (1 row)
 
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
 INSERT 0 1
- ac_expect 
+ ac_expect
 -----------
- 
+
 (1 row)
 
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
 UPDATE 1
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
- ac_expect 
+ ac_expect
 -----------
- 
+
 (1 row)
 
- ac_expect 
+ ac_expect
 -----------
- 
+
 (1 row)
 
- ac_expect 
+ ac_expect
 -----------
- 
+
 (1 row)
 
 DELETE 1
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
- ac_assert 
+ ac_assert
 -----------
- 
+
 (1 row)
 
 ROLLBACK
@@ -781,23 +781,23 @@ INSERT 0 1
 INSERT 0 1
 CREATE FUNCTION
 CREATE FUNCTION
- aa_probe 
+ aa_probe
 ----------
- 
+
 (1 row)
 
- aa_probe 
+ aa_probe
 ----------
- 
+
 (1 row)
 
- aa_probe 
+ aa_probe
 ----------
- 
+
 (1 row)
 
 DO
-          result           
+          result
 ---------------------------
  agent abuse checks passed
 (1 row)
@@ -820,33 +820,33 @@ INSERT 0 1
 INSERT 0 1
 CREATE FUNCTION
 CREATE FUNCTION
- aa_probe 
+ aa_probe
 ----------
- 
+
 (1 row)
 
- aa_probe 
+ aa_probe
 ----------
- 
+
 (1 row)
 
- aa_probe 
+ aa_probe
 ----------
- 
+
 (1 row)
 
- aa_probe 
+ aa_probe
 ----------
- 
+
 (1 row)
 
- aa_probe 
+ aa_probe
 ----------
- 
+
 (1 row)
 
 DO
-                result                 
+                result
 ---------------------------------------
  agent booking admission checks passed
 (1 row)
@@ -858,59 +858,59 @@ CREATE FUNCTION
 INSERT 0 1
 INSERT 0 1
 INSERT 0 1
- issue_agent_oauth_code 
+ issue_agent_oauth_code
 ------------------------
  {"issued": true}
 (1 row)
 
-                                      exchange_agent_oauth_code                                       
+                                      exchange_agent_oauth_code
 ------------------------------------------------------------------------------------------------------
  {"scope": "business:read", "expiresIn": 3600, "workspaceId": "ac171200-0000-4000-8000-000000000010"}
 (1 row)
 
- connection_assert 
+ connection_assert
 -------------------
- 
+
 (1 row)
 
- connection_assert 
+ connection_assert
 -------------------
- 
+
 (1 row)
 
- connection_assert 
+ connection_assert
 -------------------
- 
-(1 row)
 
-UPDATE 1
- connection_assert 
--------------------
- 
 (1 row)
 
 UPDATE 1
- connection_assert 
+ connection_assert
 -------------------
- 
+
 (1 row)
 
 UPDATE 1
- connection_assert 
+ connection_assert
 -------------------
- 
+
+(1 row)
+
+UPDATE 1
+ connection_assert
+-------------------
+
 (1 row)
 
 UPDATE 1
 DELETE 1
- connection_assert 
+ connection_assert
 -------------------
- 
+
 (1 row)
 
- connection_assert 
+ connection_assert
 -------------------
- 
+
 (1 row)
 
 ROLLBACK
@@ -934,222 +934,222 @@ CREATE FUNCTION
 CREATE FUNCTION
 CREATE TABLE
 INSERT 0 1
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
- renew_expect 
+ renew_expect
 --------------
- 
+
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
- renew_expect 
+ renew_expect
 --------------
- 
+
 (1 row)
 
 INSERT 0 1
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
- renew_expect 
+ renew_expect
 --------------
- 
+
 (1 row)
 
- renew_expect 
+ renew_expect
 --------------
- 
+
 (1 row)
 
- disconnect_agent_oauth_connection 
+ disconnect_agent_oauth_connection
 -----------------------------------
  t
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
 INSERT 0 1
 UPDATE 1
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
 INSERT 0 1
 DELETE 1
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
 INSERT 0 1
 INSERT 0 1
- revoke_agent_oauth_client_token 
+ revoke_agent_oauth_client_token
 ---------------------------------
  t
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
- revoke_agent_oauth_client_token 
+ revoke_agent_oauth_client_token
 ---------------------------------
  t
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
-                                                                                                                                            choose_business_provider                                                                                                                                            
+                                                                                                                                            choose_business_provider
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  {"seatId": "cd817be7-0cc8-44a8-b2d7-94a38ea277c7", "source": "business_choice", "replayed": false, "providerId": "d42210e9-91a8-4b77-ab5b-ae2d1fe8116e", "grantedByKind": "owner", "agencyWorkspaceId": "ac181200-0000-4000-8000-000000000020", "customerWorkspaceId": "ac181200-0000-4000-8000-000000000010"}
 (1 row)
 
-                                                                                             set_agency_client_staff                                                                                             
+                                                                                             set_agency_client_staff
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  {"active": true, "userId": "ac181200-0000-4000-8000-000000000002", "changed": true, "agencyWorkspaceId": "ac181200-0000-4000-8000-000000000020", "customerWorkspaceId": "ac181200-0000-4000-8000-000000000010"}
 (1 row)
 
 INSERT 0 1
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
-                                                                                             set_agency_client_staff                                                                                              
+                                                                                             set_agency_client_staff
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  {"active": false, "userId": "ac181200-0000-4000-8000-000000000002", "changed": true, "agencyWorkspaceId": "ac181200-0000-4000-8000-000000000020", "customerWorkspaceId": "ac181200-0000-4000-8000-000000000010"}
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
-                                                                                             set_agency_client_staff                                                                                             
+                                                                                             set_agency_client_staff
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  {"active": true, "userId": "ac181200-0000-4000-8000-000000000002", "changed": true, "agencyWorkspaceId": "ac181200-0000-4000-8000-000000000020", "customerWorkspaceId": "ac181200-0000-4000-8000-000000000010"}
 (1 row)
 
-                                                                          end_provider_seat                                                                          
+                                                                          end_provider_seat
 ---------------------------------------------------------------------------------------------------------------------------------------------------------------------
  {"ended": true, "endedByKind": "owner", "agencyWorkspaceId": "ac181200-0000-4000-8000-000000000020", "customerWorkspaceId": "ac181200-0000-4000-8000-000000000010"}
 (1 row)
 
-                                                                                                                                            choose_business_provider                                                                                                                                            
+                                                                                                                                            choose_business_provider
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  {"seatId": "1104bf2c-81e7-4491-b975-b0225aa1a19c", "source": "business_choice", "replayed": false, "providerId": "d42210e9-91a8-4b77-ab5b-ae2d1fe8116e", "grantedByKind": "owner", "agencyWorkspaceId": "ac181200-0000-4000-8000-000000000020", "customerWorkspaceId": "ac181200-0000-4000-8000-000000000010"}
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
- renew_assert 
+ renew_assert
 --------------
- 
+
 (1 row)
 
- renew_expect 
+ renew_expect
 --------------
- 
+
 (1 row)
 
 ROLLBACK
@@ -1266,9 +1266,9 @@ BEGIN
 CREATE FUNCTION
 CREATE FUNCTION
 DO
- website_assert 
+ website_assert
 ----------------
- 
+
 (1 row)
 
 ROLLBACK

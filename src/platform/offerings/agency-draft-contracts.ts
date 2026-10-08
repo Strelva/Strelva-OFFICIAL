@@ -34,4 +34,3 @@ export const agencyApplicationDraftWorkSchema = z.object({
   draftGrantExpiresAt: dateTime.nullable(),
 }).strict();
 export type AgencyApplicationDraftWork = z.infer<typeof agencyApplicationDraftWorkSchema>;
-

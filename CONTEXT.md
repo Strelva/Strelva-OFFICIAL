@@ -458,9 +458,11 @@ adoption. Extensions and richer agency profiles/branding remain unfinished.
 ## Owner assistant MCP (October 8, local preparation)
 
 Jacob selected business context and website work, with Claude and Croki/Codex
-as the first clients. The isolated `prepare/mcp-launch-integration-20261008`
-branch extends the selected private launch candidate with renewable scoped
-connections, owner disconnect and native website reading/proposals. Proposals
+as the first clients. Jacob then chose to skip staging and push these changes to Reborn. The scoped
+`integrate/mcp-reborn-20261008` branch starts from remote Reborn `f3097dd6` and
+adds only the MCP/auth prerequisites, renewable connections, owner disconnect
+and native website reads/proposals. Other private money/apps/hosting work is
+outside this Git integration. Proposals
 reuse saved website revisions and owner fact review; the connector cannot approve
 or publish. [The operating record](./docs/operations/owner-assistant-mcp-2026-10-08.md)
 owns exact sources, local proof and the native-client rehearsal. Actual HTTPS

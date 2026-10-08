@@ -24,7 +24,7 @@ Running 14 tests using 1 worker
   ✘  14 [desktop] › tests/agent-connections-ui.spec.ts:72:5 › native website review requires owner fact decisions before approval (10.8s)
 
 
-  1) [desktop] › tests/agent-connections-ui.spec.ts:72:5 › native website review requires owner fact decisions before approval 
+  1) [desktop] › tests/agent-connections-ui.spec.ts:72:5 › native website review requires owner fact decisions before approval
 
     Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
 
@@ -58,5 +58,5 @@ Running 14 tests using 1 worker
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
   1 failed
-    [desktop] › tests/agent-connections-ui.spec.ts:72:5 › native website review requires owner fact decisions before approval 
+    [desktop] › tests/agent-connections-ui.spec.ts:72:5 › native website review requires owner fact decisions before approval
   13 passed (38.0s)
