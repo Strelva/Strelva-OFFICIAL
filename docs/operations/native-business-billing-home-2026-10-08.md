@@ -14,7 +14,8 @@ completed customer creation path. Existing missing customer homes are backfilled
 existing accounts are never rewritten by the provisioner.
 
 The private helper holds the same workspace advisory boundary (7415) as payer
-acceptance. Existing `accounts_payer_party_stamp` derives the current accepted
+acceptance, before taking the workspace row lock, matching ordinary business
+writes. Existing `accounts_payer_party_stamp` derives the current accepted
 party; existing account triggers create the current agency's unpriced client line.
 The new helper grants no browser/service RPC execution. The billing reader stays
 read-only. No commercial plan, monthly price, Stripe customer, payment intent or
@@ -52,6 +53,12 @@ complete existing account/subscription and accepted transition JSON equality.
 Both actual read RPCs run under a service-role read-only transaction. Each graph
 passes the read-only function traversal. Two concurrent sessions are explicitly
 observed waiting at 7415, exercising provision-first and acceptance-first. A
+separate disposable database runs the exact `b40827cd` provisioner body as a
+negative control: actual payer acceptance holds 7415, provisioning is observed
+waiting, and an actual `patch_business_record` call exposes SQLSTATE `40P01`.
+The repaired helper commits the same business write and unpriced home in both
+orders, with the second session observed waiting at 7415. No synthetic lock
+function or weakened authority replaces the native RPCs. A
 future function successor rejects the inverse; rollback/reapply preserve complete
 account/line JSON equality. The script stops only its own cluster.
 
@@ -67,6 +74,15 @@ Its source-specific packet must pin the final
 commit and actual results before promotion.
 
 ## Preserved failures and limits
+
+The first lock-order qualification reproduced the original deadlock and passed
+both corrected interleavings, then failed its later inverse snapshot assertion:
+an intentionally aborted negative-control transaction left a missing fixture
+home for reapply to backfill. The regression now runs in a disposable clone,
+keeping fault fixtures apart from the inverse's retained-account set. The failed
+log remains `lockorder-native-attempt-1.log` in the private packet. UI bytes are
+unchanged by this repair; the `b40827cd` real Auth/UI proof stays bound to those
+bytes, without claiming a fresh full journey at the repaired source.
 
 The first native run stopped in the unchanged legacy test at its stale assertion
 that super-admin operator status grants billing read. Current e28 accepts a

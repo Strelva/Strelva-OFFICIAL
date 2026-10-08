@@ -37,6 +37,10 @@ for database in home_fresh home_upgrade;do
  node "$repo_root/scripts/check-readonly-rpcs.mjs" "postgresql:///$database?host=$cluster_socket&port=$cluster_port"
  echo "PASS $database: both native creation RPCs, unpriced party/line, conversion and read-only graph."
 done
+# Negative-control transactions may abort before provisioning. Keep those
+# deliberate failure fixtures apart from the inverse's retained-account set.
+psql "${psql_args[@]}" --dbname=postgres -c 'create database home_lockproof template home_upgrade' >/dev/null
+python3 "$repo_root/scripts/check-native-business-billing-home-locks.py" "$repo_root" "${psql_args[@]}" --dbname=home_lockproof
 # Two real concurrent sessions exercise both lock orderings against a missing
 # legacy home. All fixtures are disposable; no runtime grants are relaxed.
 for first in ensure accept;do
