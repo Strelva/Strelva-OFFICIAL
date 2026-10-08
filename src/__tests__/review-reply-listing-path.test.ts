@@ -191,7 +191,8 @@ describe("review reply approve on the listing System", () => {
 
   it("an operator's reply is an operator instruction naming the operator, never the owner's approval", async () => {
     const operator = operatorActorId("10000000-0000-4000-8000-0000000000aa");
-    const { google, receipts } = setup();
+    const authorizeProvider = vi.fn(async () => undefined);
+    const { google, receipts } = setup({ authorizeProvider });
     const result = await resolveEventAction("tenant-a", "evt_rr", "approved", operator);
     expect(result).toEqual({ changed: true });
     expect(google.writes).toEqual(["Thank you!"]);
@@ -202,6 +203,20 @@ describe("review reply approve on the listing System", () => {
     expect(receipts.all()[0]).not.toMatchObject({ authority: { kind: "owner_approval" } });
     expect(mockClaimEventAction).toHaveBeenCalledWith("evt_rr", "approved", operator);
     expect(mockResolveEvent).toHaveBeenCalledWith("evt_rr", "approved", { actor: operator });
+    // The operator acts for the business as its acting provider (#255), checked before the receipt and the write.
+    expect(authorizeProvider).toHaveBeenCalledWith(WORKSPACE, "10000000-0000-4000-8000-0000000000aa", expect.any(String));
+    expect(authorizeProvider).toHaveBeenCalledTimes(2);
+  });
+
+  it("an operator who is not the business's acting provider sends nothing (#255)", async () => {
+    const operator = operatorActorId("10000000-0000-4000-8000-0000000000aa");
+    const { google, receipts } = setup({ authorizeProvider: async () => { throw new Error("acting_provider_no_mandate"); } });
+    expect(await resolveEventAction("tenant-a", "evt_rr", "approved", operator)).not.toEqual({ changed: true });
+    expect(google.writes).toEqual([]);
+    expect(receipts.all()).toHaveLength(0);
+    const unwired = setup();
+    expect(await resolveEventAction("tenant-a", "evt_rr", "approved", operator)).not.toEqual({ changed: true });
+    expect(unwired.google.writes).toEqual([]);
   });
 
   it("an operator's reply on the legacy publisher names the operator in its receipt", async () => {
