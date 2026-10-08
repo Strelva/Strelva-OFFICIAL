@@ -4,6 +4,8 @@
 -- helpers are intentionally callable by signed-in users: policies use them.
 -- Newsletter backfill is a session-bound operator RPC: it derives auth.uid()
 -- and checks current verified, unrevoked operator authority in its transaction.
+-- Super-admin grant/revoke are also session-bound operator RPCs: authenticated
+-- calls derive the actor from auth.uid() and require a verified active operator.
 do $$
 declare
   exposed text;
@@ -18,10 +20,34 @@ begin
     and p.proname not in ('app_is_super_admin', 'app_tenant_ids', 'app_tenant_stable_ids')
     and p.oid is distinct from to_regprocedure('public.agency_prospect_member(uuid)')
     and p.oid is distinct from to_regprocedure('public.backfill_newsletter_contacts(text,uuid,boolean,text,integer)')
+    and p.oid is distinct from to_regprocedure('public.grant_super_admin(uuid,text,uuid)')
+    and p.oid is distinct from to_regprocedure('public.revoke_super_admin(uuid,text,uuid)')
     and (has_function_privilege('anon', p.oid, 'execute')
       or has_function_privilege('authenticated', p.oid, 'execute'));
   if exposed is not null then
     raise exception 'security-definer functions callable with a public key: %', exposed;
+  end if;
+end $$;
+
+-- Access RPCs are available only to a signed-in active operator or the
+-- service-role CLI; the anonymous key cannot execute them.
+do $$
+declare
+  grant_rpc regprocedure := to_regprocedure('public.grant_super_admin(uuid,text,uuid)');
+  revoke_rpc regprocedure := to_regprocedure('public.revoke_super_admin(uuid,text,uuid)');
+begin
+  if (grant_rpc is null) <> (revoke_rpc is null) then
+    raise exception 'only one super-admin access RPC is present';
+  end if;
+  if grant_rpc is not null then
+    if not has_function_privilege('authenticated', grant_rpc, 'execute')
+      or has_function_privilege('anon', grant_rpc, 'execute')
+      or not has_function_privilege('service_role', grant_rpc, 'execute')
+      or not has_function_privilege('authenticated', revoke_rpc, 'execute')
+      or has_function_privilege('anon', revoke_rpc, 'execute')
+      or not has_function_privilege('service_role', revoke_rpc, 'execute') then
+      raise exception 'super-admin access RPC execute boundary is incorrect';
+    end if;
   end if;
 end $$;
 

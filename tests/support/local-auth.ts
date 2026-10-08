@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import type { Browser, BrowserContext } from "@playwright/test";
@@ -13,6 +14,26 @@ export function localEnvironment() {
   const service = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
   if (!anon || !service) throw new Error("The isolated local keys are required.");
   return { url, app, anon, service };
+}
+
+function localSql(sql: string): string {
+  const dbUrl = process.env.STRELVA_LOCAL_DB_URL || "";
+  if (!dbUrl || !["localhost", "127.0.0.1"].includes(new URL(dbUrl).hostname)) {
+    throw new Error("Set STRELVA_LOCAL_DB_URL to the disposable loopback database for operator fixtures.");
+  }
+  return execFileSync("psql", [dbUrl, "--no-psqlrc", "-At", "--set=ON_ERROR_STOP=1"], { input: sql, encoding: "utf8" }).trim();
+}
+
+const sqlLiteral = (value: string) => `'${value.replace(/'/g, "''")}'`;
+
+/** Seed authority only in an explicitly configured, loopback test database. */
+export function seedLocalSuperAdmin(userId: string, email: string): void {
+  localSql(`insert into public.super_admins(user_id, email) values (${sqlLiteral(userId)}::uuid, ${sqlLiteral(email)}) on conflict (user_id) do nothing;`);
+}
+
+/** Remove a test fixture row from the disposable database during teardown. */
+export function removeLocalSuperAdmin(userId: string): void {
+  localSql(`delete from public.super_admins where user_id = ${sqlLiteral(userId)}::uuid;`);
 }
 
 export async function signedInContext(browser: Browser, admin: Pick<SupabaseClient, "auth">, role: string) {

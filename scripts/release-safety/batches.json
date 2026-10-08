@@ -995,6 +995,18 @@
           "rollback": "rollback-20261011153000_operator_owner_decisions.sql"
         }
       ]
+    },
+    {
+      "batch": "9",
+      "status": "proposed, not rehearsed",
+      "note": "Audited super-admin grant/revoke, zero-active break-glass bootstrap and legacy bootstrap-table retirement. Applies after batch 8; rollback refuses after the first successful grant, revoke or bootstrap event.",
+      "items": [
+        {
+          "file": "20261015110000_super_admin_grants.sql",
+          "sha256": "2804c89c47c905d12bb8a2b598207c31e16c1081a5983393257ca11966b94349",
+          "rollback": "rollback-20261015110000_super_admin_grants.sql"
+        }
+      ]
     }
   ]
 }
