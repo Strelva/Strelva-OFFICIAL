@@ -91,15 +91,39 @@ artifact and returns a safe operator lookup name; ambiguous creation also
 requires operator verification. The 30-second provider timeout is the fallback,
 not evidence that cleanup actually occurred. There are no snapshots or drives.
 
+`sandbox-build-evidence.ts` and migration `20261016100900` prepare durable
+admission against the existing native custom-app work and accepted payer budget.
+Current verified manager and payer authority, exact candidate revision/source,
+budget snapshot and provider scope/image are checked before a full-cap shared
+ledger reservation. One atomic start admits one creation opportunity. Changed
+or missing source state, canceled funding, identity loss and an unresolved
+attempt cannot authorize another VM. Attempts and observations are append-only;
+rollback refuses to remove retained evidence. The supplied exact-revision
+eligibility callback remains unavailable until the actual custom listed runtime
+exists; no build receipt replaces qualification or human approval.
+
+Actual SDK stop counters are stored separately from financial receipts. They
+leave the accepted cap held: CPU milliseconds and transfer bytes establish no
+dollar amount. A trusted independent resolver may supply an exact session-bound
+USD decimal and provider reference. Raw evidence persists first; a separate
+command reconciles it through the existing decimal provider-receipt ledger.
+Replay does not debit twice. Revoked execution authority or an over-cap bill
+retains evidence and the reservation for operator resolution. No automatic
+cleanup recovery, budget increase, estimated charge or zero-cost closure is
+included. A real Vercel per-session dollar retrieval path remains unsupported.
+
 ## Exact integration remaining
 
 1. Approve and install the dependency; compile the real SDK binding. Approve or
    provision the digest-pinned image and verify its helpers, mount permissions,
    sudo policy, nonroot identity and filesystem behavior in the chosen project.
-2. Persist build attempts, ambiguous creation/cleanup receipts and actual
-   provider usage against the existing accepted budget. The current lifecycle
-   economics path records `amountCents: 0`; do not wire a paid provider into it
-   without metering/reservation/reconciliation.
+2. Bind the prepared evidence adapter to the approved server-owned provider
+   scope, actual eligible runtime and trustworthy exact session billing source.
+   The current selected lifecycle records `amountCents: 0`; replace that closure
+   deliberately with actual evidence reconciliation when integrating. SDK stop
+   counters cannot be converted into a fabricated bill or used to release the
+   reservation. Ambiguous attempts require actual operator/provider resolution;
+   this preparation grants no automatic second creation opportunity.
 3. Resolve the 2048 MB artifact contract deliberately. This prepared return type
    is intentionally incompatible with the current literal-256 MB lifecycle
    type; do not cast it or claim the old bound. Then inject the approved builder
@@ -119,11 +143,17 @@ not evidence that cleanup actually occurred. There are no snapshots or drives.
 ## Local evidence
 
 `src/__tests__/vercel-sandbox-build.test.ts` uses an injected SDK-shaped fake;
-it makes no provider calls. Together with the retained custom build/CSP suite,
-21 tests cover resource/digest binding, exact request shape, stable attempts,
+it makes no provider calls. Together with the evidence adapter and retained
+custom build/CSP suite, 34 tests cover resource/digest binding, exact request shape, stable attempts,
 disabled/denied admission, immutable input, command failures, missing/oversized
 or invalid output, provider-image mismatch, logs, cancellation and cleanup.
 Type checking, focused lint and trusted wrapper shell syntax checks pass.
+`bash scripts/check-creator-apps-sql.sh tests/sandbox-build-evidence-schema.sql`
+applies all ordered migrations in disposable PostgreSQL and proves current
+authority, immutable replay, source/funding changes, unresolved attempt denial,
+actual counters, exact decimal closure, overage retention and guarded rollback
+with baseline routine hashes unchanged. All prices and provider identities in
+these fixtures are explicitly fictional test evidence.
 
 These tests prove adapter decisions and failure handling. They do not establish
 real VM isolation, blocked egress, mount availability, package installation,

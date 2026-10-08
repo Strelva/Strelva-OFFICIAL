@@ -9,7 +9,7 @@ const input = { workspaceId: "11111111-1111-4111-8111-111111111111", resourceId:
 // Fictional operator image digest, never selected as an actual provider image.
 const image = `fixture-team/qualification-node@sha256:${"a".repeat(64)}`;
 function fixture(options: { failPhase?: number; logs?: number; bytes?: Buffer | null; createFailure?: boolean; stopFailure?: boolean; mismatch?: boolean; cancel?: AbortController } = {}) {
-  const stop = vi.fn(async (cleanup: { signal: AbortSignal }) => { expect(cleanup.signal.aborted).toBe(false); if (options.stopFailure) throw new Error("Provider-private failure"); });
+  const stop = vi.fn(async (cleanup: { signal: AbortSignal }) => { expect(cleanup.signal.aborted).toBe(false); if (options.stopFailure) throw new Error("Provider-private failure"); return { activeCpuDurationMs: 142, networkTransfer: { ingress: 500, egress: 200 } }; });
   const writeFiles = vi.fn(async (files: { path: string; content: Buffer; mode: number }[]) => { expect(files.length).toBeGreaterThan(0); });
   let phase = 0;
   const runCommand = vi.fn(async (command: Parameters<Awaited<ReturnType<VercelSandboxBuildPort["create"]>>["runCommand"]>[0]) => {
@@ -21,7 +21,7 @@ function fixture(options: { failPhase?: number; logs?: number; bytes?: Buffer | 
   const readFileToBuffer = vi.fn(async () => options.bytes === undefined ? Buffer.from("<main>Local</main>") : options.bytes);
   const create = vi.fn(async (request: Parameters<VercelSandboxBuildPort["create"]>[0]) => {
     if (options.createFailure) throw new Error("Ambiguous provider create response");
-    return { name: request.name, image: options.mismatch ? "unexpected-image" : request.image, persistent: false, vcpus: 1, memory: 2048, writeFiles, runCommand, readFileToBuffer, stop };
+    return { name: request.name, image: options.mismatch ? "unexpected-image" : request.image, persistent: false, vcpus: 1, memory: 2048, currentSession: () => ({ sessionId: "sbx_fixture_session" }), writeFiles, runCommand, readFileToBuffer, stop };
   });
   const port: VercelSandboxBuildPort = { create };
   const admit = vi.fn(async () => undefined);
@@ -104,5 +104,17 @@ describe("prepared Vercel Sandbox build port (no provider operations)", () => {
     const f = fixture({ createFailure: true });
     await expect(f.builder(input)).rejects.toMatchObject({ cleanupRequired: true, sandboxName: expect.stringMatching(/^strelva-build-/) });
     expect(f.stop).not.toHaveBeenCalled();
+  });
+  it.each([{ createFailure: true }, { stopFailure: true }, {}])("retains safe unresolved lookup and cleanup when observation persistence fails", async options => {
+    const f = fixture(options);
+    const observe = vi.fn(async () => { throw new Error("Private database failure"); });
+    await expect(createVercelSandboxBuilder(f.port, { image, enabled: () => true, admit: f.admit, observe })(input)).rejects.toMatchObject({ cleanupRequired: true, sandboxName: expect.stringMatching(/^strelva-build-/) });
+    expect(f.stop).toHaveBeenCalledTimes(options.createFailure ? 0 : 1);
+  });
+  it("observes actual SDK stop counts without deriving a price or fabricating zero cost", async () => {
+    const f = fixture(); const observe = vi.fn(async () => undefined);
+    await createVercelSandboxBuilder(f.port, { image, enabled: () => true, admit: f.admit, observe })(input);
+    expect(observe.mock.calls).toHaveLength(2);
+    expect(observe).toHaveBeenLastCalledWith({ attemptName: expect.stringMatching(/^strelva-build-/), kind: "stopped", sessionId: "sbx_fixture_session", payload: { activeCpuDurationMs: 142, ingressBytes: 500, egressBytes: 200 } });
   });
 });

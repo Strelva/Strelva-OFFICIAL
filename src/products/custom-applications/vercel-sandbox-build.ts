@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { Writable } from "node:stream";
+import { z } from "zod";
 import { customArtifactDigest, validateCustomBuild, type CustomBuildInput } from "./build";
 import type { CustomApplicationArtifact } from "./contracts";
 
@@ -12,6 +13,7 @@ export interface VercelSandboxBuildPort {
   }): Promise<{
     name: string; image: string | undefined; persistent: boolean;
     vcpus: number | undefined; memory: number | undefined;
+    currentSession(): { sessionId: string };
     writeFiles(files: { path: string; content: Buffer; mode: number }[], options: { signal: AbortSignal }): Promise<unknown>;
     runCommand(options: {
       cmd: string; args: string[]; sudo: true; cwd: string;
@@ -79,7 +81,17 @@ export interface VercelSandboxBuildConfiguration {
   image: string;
   /** Recheck exact resource/revision, creator eligibility and accepted spend before create. */
   admit: (input: Readonly<CustomBuildInput>, sourceDigest: string, attemptName: string) => Promise<void>;
+  /** Persist SDK observations. Counts do not establish a billable dollar amount. */
+  observe?: (event: SandboxBuildObservation) => Promise<void>;
 }
+export type SandboxBuildObservation = {
+  attemptName: string; kind: "created" | "stopped" | "creation_unknown" | "cleanup_failed" | "build_failed";
+  sessionId: string | null; payload: { activeCpuDurationMs: number; ingressBytes: number; egressBytes: number } | Record<string, never>;
+};
+const stoppedUsage = z.object({
+  activeCpuDurationMs: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  networkTransfer: z.object({ ingress: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), egress: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER) }),
+});
 
 /**
  * Optional internal builder. Deliberately not selected by the lifecycle: provider
@@ -107,6 +119,7 @@ export function createVercelSandboxBuilder(port: VercelSandboxBuildPort, config:
     const started = Date.now();
     let sandbox: Awaited<ReturnType<VercelSandboxBuildPort["create"]>> | undefined;
     let creationAttempted = false;
+    let sessionId: string | null = null;
     let logBytes = 0;
     const logs = new Writable({ write(chunk, _encoding, done) {
       logBytes += Buffer.byteLength(chunk);
@@ -121,7 +134,10 @@ export function createVercelSandboxBuilder(port: VercelSandboxBuildPort, config:
         resources: { vcpus: 1 }, timeout: 30_000, persistent: false,
         networkPolicy: "deny-all", ports: [], env: {}, signal,
       });
-      if (sandbox.image !== image || sandbox.persistent || sandbox.vcpus !== 1 || sandbox.memory !== 2048) throw new Error("Provider configuration mismatch");
+      if (sandbox.name !== sandboxName || sandbox.image !== image || sandbox.persistent || sandbox.vcpus !== 1 || sandbox.memory !== 2048) throw new Error("Provider configuration mismatch");
+      sessionId = sandbox.currentSession().sessionId;
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(sessionId)) throw new Error("Invalid provider session");
+      await config.observe?.({ attemptName: sandboxName, kind: "created", sessionId, payload: {} });
       await sandbox.writeFiles(Object.entries(input.files).map(([path, content]) => ({ path: `${SOURCE}/${path}`, content: Buffer.from(content), mode: 0o444 })), { signal });
       const run = async (cmd: string, args: string[], cwd: string) => {
         signal.throwIfAborted();
@@ -144,12 +160,23 @@ export function createVercelSandboxBuilder(port: VercelSandboxBuildPort, config:
         state: "built", limits: { network: "none", memoryMb: 2048, cpuCount: 1, timeoutSeconds: 30 },
       };
     } catch {
+      // A failed evidence write must not conceal the safe operator lookup or
+      // skip cleanup. The started attempt remains held and cannot restart.
+      try { await config.observe?.({ attemptName: sandboxName, kind: sandbox ? "build_failed" : "creation_unknown", sessionId, payload: {} }); } catch { /* Durable start remains unresolved. */ }
       throw new VercelSandboxBuildError(creationAttempted && !sandbox, sandboxName);
     } finally {
       logs.destroy();
       if (sandbox) {
-        try { await sandbox.stop({ signal: AbortSignal.timeout(5_000) }); }
-        catch { throw new VercelSandboxBuildError(true, sandbox.name); }
+        try {
+          const result = await sandbox.stop({ signal: AbortSignal.timeout(5_000) });
+          if (config.observe) {
+            const usage = stoppedUsage.parse(result);
+            await config.observe({ attemptName: sandboxName, kind: "stopped", sessionId, payload: { activeCpuDurationMs: usage.activeCpuDurationMs, ingressBytes: usage.networkTransfer.ingress, egressBytes: usage.networkTransfer.egress } });
+          }
+        } catch {
+          try { await config.observe?.({ attemptName: sandboxName, kind: "cleanup_failed", sessionId, payload: {} }); } catch { /* Durable start remains unresolved. */ }
+          throw new VercelSandboxBuildError(true, sandbox.name);
+        }
       }
     }
   };
