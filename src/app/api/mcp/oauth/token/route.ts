@@ -9,6 +9,7 @@ export async function POST(request: Request) { const json = (b: unknown, status 
     const text = (await readBoundedBody(request, 8192)).toString('utf8');
     return json(await exchangeAgentCode(new URLSearchParams(text)));
 }
-catch {
-    return json({ error: 'invalid_grant' }, 400);
+catch (error) {
+    const code = error instanceof Error && ['invalid_request', 'invalid_grant', 'invalid_scope', 'unsupported_grant_type', 'temporarily_unavailable'].includes(error.message) ? error.message : 'invalid_grant';
+    return json({ error: code }, code === 'temporarily_unavailable' ? 503 : 400);
 } }
