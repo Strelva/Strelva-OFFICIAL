@@ -1428,7 +1428,7 @@
           "file": "20261020090036_bundle_maintenance.sql",
           "sha256": "99700e78f8e30ff611c7925ddb8973996cc4fd04e36137aa44b975a9cc03dff3",
           "rollback": "rollback-20261020090036_bundle_maintenance.sql",
-          "rollbackSha256": "e7d8ff575dd26a6e677244da2ca91ef877a091860bcaade3daf6262fd852639f"
+          "rollbackSha256": "fa3ae1ff71eb3cf45d29ccb70445c07d02ee8e6cbe66e5cf56bbf35fafc49abc"
         }
       ]
     }

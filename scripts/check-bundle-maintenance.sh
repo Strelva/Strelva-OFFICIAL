@@ -14,13 +14,29 @@ for migration in "$repo_root"/supabase/migrations/20*.sql; do
   if [[ "$migration_name" == "20261001120000_website_documents.sql" ]]; then
     psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261005090000_tenant_leads.sql" >/dev/null
   fi
+  if [[ "$migration_name" == "20261020090036_bundle_maintenance.sql" ]]; then
+    psql "${psql_args[@]}" -At --file="$repo_root/scripts/release-safety/catalog.sql" > "$cluster_root/catalog-before36.json"
+  fi
   psql "${psql_args[@]}" --file="$migration" >/dev/null
  done
+psql "${psql_args[@]}" -At --file="$repo_root/scripts/release-safety/catalog.sql" > "$cluster_root/catalog-with36.json"
 sed '/-- A revoked accepted mandate/,$d' "$repo_root/tests/recurring-responsibilities-schema.sql" > "$cluster_data/maintenance-fixture.sql"
 cat "$repo_root/tests/bundle-maintenance-schema.sql" >> "$cluster_data/maintenance-fixture.sql"
 psql "${psql_args[@]}" --file="$cluster_data/maintenance-fixture.sql"
+python3 "$repo_root/scripts/check-bundle-maintenance-rollback-races.py" "$cluster_socket" "$cluster_port" "$(id -un)" "$repo_root" "$cluster_root"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261020090036_bundle_maintenance.sql" >/dev/null
+psql "${psql_args[@]}" -At --file="$repo_root/scripts/release-safety/catalog.sql" > "$cluster_root/catalog-inverse36.json"
+cmp "$cluster_root/catalog-before36.json" "$cluster_root/catalog-inverse36.json"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261020090036_bundle_maintenance.sql" >/dev/null
+psql "${psql_args[@]}" -At --file="$repo_root/scripts/release-safety/catalog.sql" > "$cluster_root/catalog-reapply36.json"
+cmp "$cluster_root/catalog-with36.json" "$cluster_root/catalog-reapply36.json"
+printf 'Empty inverse and reapply restore the exact public catalog and ACL.\n'
+python3 - "$cluster_root" <<'PY'
+import hashlib,pathlib,sys
+for name in ['catalog-before36.json','catalog-inverse36.json','catalog-with36.json','catalog-reapply36.json']:
+    data=(pathlib.Path(sys.argv[1])/name).read_bytes()
+    print('Catalog proof:',name,len(data),hashlib.sha256(data).hexdigest())
+PY
 sed '$d' "$cluster_data/maintenance-fixture.sql" > "$cluster_data/maintenance-committed.sql"
 cat >> "$cluster_data/maintenance-committed.sql" <<'SQL'
 update public.service_requests set provider_acceptance='accepted',accepted_by='99100000-0000-4000-8000-000000000002',accepted_at=now() where id='99100000-0000-4000-8000-000000000021';

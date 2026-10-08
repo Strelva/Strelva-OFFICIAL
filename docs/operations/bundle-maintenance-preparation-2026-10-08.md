@@ -58,6 +58,15 @@ Migration `20261020090036_bundle_maintenance.sql` and its guarded rollback are
 proposed batch 18 only. The rollback refuses when any attachment, preparation or
 event link exists, preserving receipts rather than deleting admitted evidence.
 An empty rollback and forward reapply are rehearsed by the native check.
+The inverse first takes ACCESS EXCLUSIVE locks on all three evidence tables
+with a 3-second lock timeout, then observes emptiness. Writer-first admission
+therefore makes it refuse and preserve the committed receipt; an inverse-first
+drop excludes delayed admission. It also checks every new function's exact
+body/signature, language/return shape, security, configuration and normalized
+ACL before retirement. Changed wrappers or permissions require their own
+qualified inverse; this packet refuses them. The inverse must run as the same
+function/table owner that installed this private packet. Empty inverse/reapply
+compares the full public catalog, including ACL, to the recorded baseline.
 
 ## Proof commands
 
