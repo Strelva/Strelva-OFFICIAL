@@ -4,6 +4,7 @@ import {moneyRpc,type RpcDb} from "./index";
  * funds too. Known ledger transfers are already counted by SQL reservations. */
 export async function readPlatformSettlement(stripe:Stripe,db:RpcDb|null,chargeId:string){
  const charge=await stripe.charges.retrieve(chargeId,{expand:["balance_transaction"]});const balance=charge.balance_transaction;
+ if(charge.id!==chargeId)throw Error("Settlement charge identity mismatch");
  if(!balance||typeof balance==="string")throw Error("Settlement receipt missing");
  const known=await moneyRpc<string[]>("read_source_transfer_ids",{p_charge:chargeId},db);let external=0;
  for await(const transfer of stripe.transfers.list({limit:100}))if(transfer.source_transaction===chargeId&&!known.includes(transfer.id)){if(transfer.currency!==balance.currency)throw Error("Transfer currency mismatch");external+=transfer.amount-transfer.amount_reversed;}

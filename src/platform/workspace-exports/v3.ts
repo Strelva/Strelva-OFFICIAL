@@ -22,7 +22,7 @@ export const V3_PAGE_SIZE = 1000;
 
 export const V3_CATEGORIES = [
   "business_record", "systems", "linked_sites", "leads", "spam_held", "inquiry_timelines", "inquiry_first_replies",
-  "business_payments", "payment_events", "revenue_splits", "split_payouts", "connected_merchant", "payment_requests", "payment_actions", "refund_requests", "transfer_receipts", "transfer_reversals", "platform_collections", "platform_collection_terms",
+  "business_payments", "payment_events", "revenue_splits", "split_payouts", "connected_merchant", "payment_requests", "payment_actions", "refund_requests", "transfer_receipts", "transfer_reversals", "platform_collections", "platform_collection_terms", "recovery_payouts",
   "booking_config", "bookings", "reviews", "content", "billing", "orders", "reward_members", "reward_transactions",
   "threads", "tenant_settings", "provider_metadata", "system_history", "system_connections", "system_outputs", "versions",
   "saved_system_work", "native_records", "website_documents", "business_bookings", "booking_settings", "inquiry_events", "inquiry_delivery",

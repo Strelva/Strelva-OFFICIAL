@@ -184,6 +184,7 @@ done
 # Focused money contracts use the exact complete upgrade path before historical tests.
 if [[ "${STRELVA_CONNECT_SQL_ONLY:-0}" == "1" ]]; then
   psql "${psql_args[@]}" --file="$repo_root/tests/connect-money-schema.sql"
+  source "$repo_root/scripts/connect-money-concurrency.sh"
   printf 'Connect money contracts passed against the complete historical upgrade.\n'
   exit 0
 fi

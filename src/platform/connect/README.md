@@ -8,7 +8,7 @@ Business customer money uses connected-merchant direct charges. Platform-priced 
 
 `STRELVA_REVENUE_SPLITS`, `STRELVA_PLATFORM_COLLECTION`, `STRELVA_SPLIT_PAYOUTS_DRY_RUN`, `STRELVA_AGENT_PAYMENTS`, `STRELVA_PROVIDER_CHANGE`, and the per-tenant `STRELVA_CONNECT_CHECKOUT_TENANTS` allowlist are off by default. There are no seeded rates, collection terms, agent limits, response windows or payout authorizations. Fees on merchant charges remain zero. Production tenant activation needs a merchant/KYC/provider and existing store audit. Recurring tenant store sales fail closed pending their recurring-sale policy; agency recurring billing uses its separately accepted intent.
 
-The cron runner only plans and reserves dry runs. `transfers.ts` prepares a genuine platform-source transfer/reversal adapter, but a live execution flag alone cannot pass the SQL requirement for a current operator's exact payout/profile approval. Unknown provider attempts older than 23 hours require reconciliation rather than reusing expired provider idempotency keys. Reversals subtract loss already deducted before the original payout. Dispute wins restore immutable accrued shares. A restored share after an already executed-and-reversed payout still needs a separately reviewed recovery payment; the current split journal will not silently pay it twice.
+The cron runner only plans and reserves dry runs. `transfers.ts` prepares a genuine platform-source transfer/reversal adapter, but a live execution flag alone cannot pass the SQL requirement for a current operator's exact payout/profile approval. Unknown provider attempts older than 23 hours require reconciliation rather than reusing expired provider idempotency keys. Reversals subtract loss already deducted before the original payout. Dispute wins restore immutable accrued shares. A restored share after an executed-and-reversed payout requires a new operator-authorized recovery generation. Recovery reservations are bounded by positive restoration rows, current net entitlement and shared source capacity; they have independent stable transfer keys and mapped reversals. The original payout is never resent.
 
 Owner-issued quotes and deposits retain immutable source records and terms. Agent quotes copy the canonical `agent_quote_receipts` exactly. Deposit confirmation requires an exact paid source/currency, expiry releases held capacity, cancellation/late success creates a refund obligation, and the owner can request the original-method refund from Payments. Refund commands retain conservative pending reservations on ambiguous provider failure. Needs you shows unpaid customer follow-up/refund review and closes it through the original lifecycle; it does not impersonate a customer or charge on owner acknowledgement. Outcomes link paid quotes and deposits to real confirmed/completed bookings.
 
@@ -16,13 +16,15 @@ Creator attribution reads `offering_installations.source_revision_id` and `creat
 
 Private seller Shared Payment Tokens remain unavailable without real provider preview access, an approved account-scoped protocol and an injected approved adapter. Tokens are never persisted or returned. Current installed SDK has no direct Stripe Shared Payment Token payment method; the documented custom third-party resolve flow introduces different processing responsibilities and is not invented here.
 
+Unmatched signed provider cases remain in an immutable operator review queue. `STRELVA_MONEY_RECONCILIATION` gates `/workspace/money-reconciliation`; current verified operators record append-only no-effect review conclusions or prove an existing financial effect with the exact account/object-bound ledger receipt. Review never creates a financial effect or retries a provider operation. Invoice payer/customer/subscription/item and period are frozen and included in split exports.
+
 Provider changes use existing `workspace_providers`/seats/staff and their cleanup triggers. The response clock starts when the exact outgoing agency acknowledges its durable notice. A linked payer transition must be the latest accepted transition with both parties still authorized. The response policy is intentionally empty. Agency export initiation delivers to the owner only; agency handoff contains the agency's own source definitions and immutable receipt. Owner exports retain payments, terms, splits, transfer/reversal and merchant identifiers while omitting public payment capabilities and credentials.
 
 Proof commands:
 
 ```
 STRELVA_CONNECT_SQL_ONLY=1 ./scripts/check-workspace-upgrade.sh
-pnpm exec vitest run src/__tests__/connect-money.test.ts src/__tests__/connect-thin-webhook.test.ts src/__tests__/billing-webhook-mode-guard.test.ts src/__tests__/business-billing.test.ts
+pnpm exec vitest run src/__tests__/connect-money.test.ts src/__tests__/connect-thin-webhook.test.ts src/__tests__/connect-revenue-source.test.ts src/__tests__/connect-recovery.test.ts src/__tests__/billing-webhook-mode-guard.test.ts src/__tests__/business-billing.test.ts
 pnpm typecheck
 ```
 
