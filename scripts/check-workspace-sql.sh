@@ -1579,3 +1579,19 @@ fi
 grep -q 'owner_decision_runtime_rollback_requires_data_preservation' "$cluster_root/owner-effects-rollback.log"
 psql "${psql_args[@]}" -Atc "select exists(select 1 from information_schema.columns where table_schema='public' and table_name='owner_decision_link_sessions' and column_name='intended_decision') and exists(select 1 from public.owner_decision_link_sessions) and to_regprocedure('public.owner_decision_provider_holds(uuid,uuid,text[])') is not null" | grep -qx t
 printf 'Owner effect rollback retained sessions and authority gates.\n'
+
+# #457: explicit stable-tenant native mappings and section-scoped review claims.
+psql "${psql_args[@]}" -Atc "select md5(pg_get_functiondef('public.business_fact_confirmation_json(public.business_record_fact_confirmations)'::regprocedure))" >"$cluster_root/native-mapping-before.hash"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261019113000_native_website_fact_mappings.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/native-website-fact-mappings-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261019113000_native_website_fact_mappings.sql"
+diff -u "$cluster_root/native-mapping-before.hash" <(psql "${psql_args[@]}" -Atc "select md5(pg_get_functiondef('public.business_fact_confirmation_json(public.business_record_fact_confirmations)'::regprocedure))")
+psql "${psql_args[@]}" --file="$repo_root/tests/website-native-fact-reviews-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261019113000_native_website_fact_mappings.sql"
+psql "${psql_args[@]}" --set=keep_fixture=true --file="$repo_root/tests/native-website-fact-mappings-schema.sql"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261019113000_native_website_fact_mappings.sql" >"$cluster_root/native-mapping-rollback.log" 2>&1; then
+  printf 'Native mapping rollback discarded retained mappings or review claims.\n' >&2; exit 1
+fi
+grep -q 'native_website_mapping_rollback_requires_data_preservation' "$cluster_root/native-mapping-rollback.log"
+psql "${psql_args[@]}" -Atc "select exists(select 1 from public.website_native_fact_mappings) and exists(select 1 from public.website_native_fact_reviews where section='settings' and status='unconfirmed')" | grep -qx t
+printf 'Native website mappings: authority, isolation, exact rollback/reapply and retained-data refusal passed.\n'

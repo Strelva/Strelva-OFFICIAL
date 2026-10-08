@@ -23,13 +23,14 @@ const makePorts = () => {
   const ports = {
     enabled: vi.fn(() => true), released: vi.fn(async () => true), record: vi.fn(async () => record()),
     confirmed: vi.fn(async () => confirmed()),
+    mapping: vi.fn(async () => ({ mapping: { revision: 0, fields: ["phone", "email", "address", "hours"], services: [] }, recordRevision: 3, services: [] })),
     sites: vi.fn(async () => ({ systems: [{ system: { id: ws, kind: "website", lifecycle: "live" }, references: { tenantId: "gldf" } }] })),
     tenant: vi.fn(async () => ({ id: "gldf", active: true, deliveryModel: "custom_repo" })),
     allowed: vi.fn(async () => true), template: vi.fn(async () => ({ contentSections: ["contact"] })),
     manifest: vi.fn(async () => ({ sections: { contact: { allowedActions: ["read", "draft", "publish"] } } })),
-    current: vi.fn(async () => current), draft: vi.fn(async () => null), queueAvailable: vi.fn(() => true),
-    apply: vi.fn(async () => ({ status: "queued", eventId: "evt_fact_fixture" })),
-    reviews: { claim: vi.fn(async (_actor: WorkspaceActor, workspace: string, tenant: string, revision: number) => { const key = `${workspace}:${tenant}:${revision}`; if (claimed.has(key)) return false; claimed.add(key); return true; }), record: vi.fn(async () => undefined) },
+    current: vi.fn(async (_tenantId?: string, _section?: string) => current), draft: vi.fn(async () => null), queueAvailable: vi.fn(() => true),
+    apply: vi.fn(async (_input: { section: string }) => ({ status: "queued", eventId: "evt_fact_fixture" })),
+    reviews: { claim: vi.fn(async (_actor: WorkspaceActor, workspace: string, tenant: string, revision: number, _token?: string, _section?: string, _mappingRevision?: number) => { const key = `${workspace}:${tenant}:${revision}`; if (claimed.has(key)) return false; claimed.add(key); return true; }), record: vi.fn(async () => undefined) },
     report: vi.fn(async () => undefined),
   };
   return { ports, service: createNativeWebsiteFactService(ports as unknown as NativeWebsiteFactPorts) };
@@ -190,7 +191,58 @@ describe("accepted business patch app edge", () => {
   it("uses only server RPC authority and fails closed on invalid claim results", async () => {
     const rpc = vi.fn(async () => ({ data: true, error: null }));
     expect(await createNativeFactReviewStore({ rpc }).claim(actor, ws, "gldf", 3, ws)).toBe(true);
-    expect(rpc).toHaveBeenCalledWith("claim_native_website_fact_review", expect.objectContaining({ p_user_id: actor.userId, p_tenant_id: "gldf", p_record_revision: 3 }));
+    expect(rpc).toHaveBeenCalledWith("claim_native_website_mapped_fact_review", expect.objectContaining({ p_user_id: actor.userId, p_tenant_id: "gldf", p_record_revision: 3 }));
     rpc.mockResolvedValueOnce({ data: "true" as never, error: null });await expect(createNativeFactReviewStore({ rpc }).claim(actor, ws, "gldf", 3, ws)).rejects.toThrow();
   });
+});
+
+describe("mapped native sections (#457)", () => {
+  it("queues contact, name and service reviews independently once for one accepted record revision", async () => {
+    const { ports, service } = makePorts();
+    const serviceId = "7e000000-0000-4000-8000-000000000040";
+    ports.template.mockResolvedValue({ contentSections: ["contact", "settings", "services"] });
+    ports.manifest.mockResolvedValue({ sections: { contact: { allowedActions: ["draft"] }, settings: { allowedActions: ["draft"] }, services: { allowedActions: ["draft"] } } } as never);
+    ports.mapping.mockResolvedValue({ mapping: { revision: 1, fields: ["display_name", "phone"], services: [{ serviceId, nativeServiceId: "consult", fields: ["name"] }] }, recordRevision: 3, services: [{ id: serviceId, name: "New consult", description: null, priceText: null, durationMinutes: null, active: true }] } as never);
+    ports.confirmed.mockResolvedValue({ ...confirmed(), facts: { ...confirmed().facts, display_name: "The Mooney Firm" } });
+    ports.current.mockImplementation(async (_tenant?: string, section?: string) => section === "settings" ? { siteName: "Old firm", siteTagline: "Preserved" } as never : section === "services" ? { services: [{ id: "consult", name: "Old consult", booking_link: "https://example.test/book", image_url: "/preserve.jpg" }] } as never : current);
+    const claims = new Set<string>();
+    ports.reviews.claim.mockImplementation(async (...args: unknown[]) => { const key = `${args[3]}:${args[5]}`;if (claims.has(key)) return false;claims.add(key);return true; });
+    await service(actor, ws, 3, ["phone", "display_name", `service:${serviceId}`]);
+    await service(actor, ws, 3, ["phone", "display_name", `service:${serviceId}`]);
+    expect(ports.apply).toHaveBeenCalledTimes(3);
+    expect(ports.apply.mock.calls.map(call => (call[0] as { section: string }).section)).toEqual(["contact", "settings", "services"]);
+    expect(ports.apply).toHaveBeenCalledWith(expect.objectContaining({ section: "services", forceReview: true, data: { services: [{ id: "consult", name: "New consult", booking_link: "https://example.test/book", image_url: "/preserve.jpg" }] } }));
+  });
+  it.each(["mapping", "removed_site", "member", "flag", "confirmed_revision", "late_draft"])("holds changed %s after the durable claim", async reason => {
+    const { ports, service } = makePorts();
+    if (reason === "mapping") ports.mapping.mockResolvedValueOnce({ mapping: { revision: 0, fields: ["phone"], services: [] }, recordRevision: 3, services: [] }).mockResolvedValueOnce({ mapping: { revision: 1, fields: [], services: [] }, recordRevision: 3, services: [] });
+    if (reason === "removed_site") ports.sites.mockResolvedValueOnce({ systems: [{ system: { id: ws, kind: "website", lifecycle: "live" }, references: { tenantId: "gldf" } }] }).mockResolvedValueOnce({ systems: [] });
+    if (reason === "member") ports.record.mockResolvedValueOnce(record()).mockResolvedValueOnce({ ...record(), access: "member" });
+    if (reason === "flag") ports.enabled.mockReturnValueOnce(true).mockReturnValueOnce(false);
+    if (reason === "confirmed_revision") ports.confirmed.mockResolvedValueOnce(confirmed()).mockResolvedValueOnce({ ...confirmed(), revision: 4 });
+    if (reason === "late_draft") ports.draft.mockResolvedValueOnce(null).mockResolvedValueOnce(current as never);
+    const result = await service(actor, ws, 3, ["phone"]);
+    expect(ports.apply).not.toHaveBeenCalled();expect(result.needsReview[0]?.reason).toBe("changed_before_dispatch");
+  });
+  it("holds confirmed deletions rather than claiming old website content is current", async () => {
+    const { ports, service } = makePorts();const data = confirmed();delete data.facts.phone;ports.confirmed.mockResolvedValue(data);
+    expect((await service(actor, ws, 3, ["phone"])).needsReview[0]?.reason).toBe("facts_unconfirmed");expect(ports.apply).not.toHaveBeenCalled();
+  });
+  it("includes service-only record saves and owner confirmations", async () => {
+    const prepare = vi.fn(async () => ({ ready: [], needsReview: [] }));
+    const accepted = { workspaceId: ws, revision: 3, sequence: 3, changeCount: 1, undoOf: null, contacts: { created: 0, merged: 0, unchanged: 0 }, replayed: false };
+    await nativeWebsiteFactsPatch(vi.fn(async () => accepted), prepare)(actor, ws, 2, { services: [{ op: "upsert", id: ws, name: "Consult" }] }, { source: "owner" });
+    expect(prepare).toHaveBeenCalledWith(actor, ws, 3, [`service:${ws}`]);
+    const effect = createConfirmedNativeFactsEffect(prepare, { enabled: () => true, nativeTenants: async () => [], report: vi.fn() });
+    await effect({ workspaceId: ws, decisionId: ws, recordRevision: 3, changeCount: 1, factKeys: [], servicesChanged: true, serviceIds: [ws], replayed: false }, { kind: "session", actor });
+    expect(prepare).toHaveBeenCalledTimes(2);
+  });
+});
+
+it("holds a service confirmation without exact service IDs for operator review", async () => {
+  const prepare = vi.fn(async () => ({ ready: [], needsReview: [] }));
+  const report = vi.fn(async () => undefined);
+  const effect = createConfirmedNativeFactsEffect(prepare, { enabled: () => true, nativeTenants: async () => ["gldf"], report });
+  const result = await effect({ workspaceId: ws, decisionId: ws, recordRevision: 3, changeCount: 1, factKeys: [], servicesChanged: true, replayed: false }, { kind: "session", actor });
+  expect(result).toEqual({ websitePending: true });expect(prepare).not.toHaveBeenCalled();expect(report).toHaveBeenCalledExactlyOnceWith("gldf",3);
 });

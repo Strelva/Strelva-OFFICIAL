@@ -1263,6 +1263,18 @@
           "rollback": "rollback-20261019100000_actor_rpc_service_boundary.sql"
         }
       ]
+    },
+    {
+      "batch": "15",
+      "description": "Explicit native website fact mappings and reviewed section propagation (#457), proposed only",
+      "items": [
+        {
+          "file": "20261019113000_native_website_fact_mappings.sql",
+          "sha256": "4ba7a4a3c7b96765020c8569da536cc29d2765ca451b32999aecdfe796e4a156",
+          "rollback": "rollback-20261019113000_native_website_fact_mappings.sql",
+          "rollbackStatus": "guarded; refuses retained mappings or non-contact/explicit-mapping review claims"
+        }
+      ]
     }
   ]
 }

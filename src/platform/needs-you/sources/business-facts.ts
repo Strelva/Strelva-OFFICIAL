@@ -32,7 +32,7 @@ export type BusinessFactChange = z.infer<typeof changeSchema>;
 
 const receiptSchema = z.object({
   decisionId: z.string().uuid(), workspaceId: z.string().uuid(), recordRevision: z.number().int().min(0),
-  changeCount: z.number().int().min(0), factKeys: z.array(z.string()), replayed: z.boolean(),
+  changeCount: z.number().int().min(0), factKeys: z.array(z.string()), servicesChanged: z.boolean().optional(), serviceIds: z.array(z.string().uuid()).optional(), replayed: z.boolean(),
 }).passthrough();
 
 /** The record moved on after the owner saw it; nothing was confirmed. */
