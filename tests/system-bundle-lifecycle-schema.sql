@@ -121,29 +121,40 @@ select pg_temp.b_fail($q$select public.system_bundle_assert_native_publication('
 update public.system_revision_reviewers set active=true where user_id='bb000000-0000-4000-8000-000000000003';
 select pg_temp.b_assert((select d.document->'assets'='{}'::jsonb and not (d.document->'facts' ? 'target_service') and (select count(*) from jsonb_object_keys(d.document->'nodes'))=2 from public.website_documents d where website_work_id='bb000000-0000-4000-8000-000000000104'),'named grant FAQ draft carries no private target facts assets or nodes');
 select pg_temp.b_assert((select d.document->'assets'=value->'document'->'assets' and d.document->'facts'->'target_service'=value->'document'->'facts'->'target_service' and d.document->'nodes' ? 'root' from public.website_documents d cross join bundle_native_input where website_work_id='bb000000-0000-4000-8000-000000000100' and revision=5),'owner-private native target merge retains actual original facts assets and home');
-create temp table b_inquiry_local as select public.read_system_version('bb000000-0000-4000-8000-000000000002','owner@example.test',version_id) lineage from b_inquiry_version;
+create temp table b_inquiry_local as select public.read_system_version('bb000000-0000-4000-8000-000000000002','bundle-lifecycle-owner@example.test',version_id) lineage from b_inquiry_version;
 update b_inquiry_local set lineage=jsonb_set(lineage,'{overrides}',jsonb_build_array(jsonb_build_object('path','title','value','Local Version title preserves received record','setBy','bb000000-0000-4000-8000-000000000002','setAt',now())))||jsonb_build_object('rowRevision',3,'updatedAt',now());
-select public.save_system_version('bb000000-0000-4000-8000-000000000002','owner@example.test',(select version_id from b_inquiry_version),2,lineage) from b_inquiry_local;
+select public.save_system_version('bb000000-0000-4000-8000-000000000002','bundle-lifecycle-owner@example.test',(select version_id from b_inquiry_version),2,lineage) from b_inquiry_local;
+select :'bundle_native_input'||'-'||gen_random_uuid()::text as bundle_durable_prefix \gset
+\set bundle_durable_snapshot :bundle_durable_prefix '-snapshot.json'
+\set bundle_durable_artifact :bundle_durable_prefix '-artifact.sql'
+\set bundle_durable_committed :bundle_durable_prefix '-committed.json'
+\set bundle_durable_unused :bundle_durable_prefix '-unused.sql'
+\set bundle_durable_publication :bundle_durable_prefix '-publication.sql'
+\setenv STRELVA_BUNDLE_DURABLE_SNAPSHOT :bundle_durable_snapshot
+\setenv STRELVA_BUNDLE_DURABLE_ARTIFACT :bundle_durable_artifact
+\setenv STRELVA_BUNDLE_DURABLE_COMMITTED :bundle_durable_committed
+\setenv STRELVA_BUNDLE_DURABLE_UNUSED :bundle_durable_unused
+\setenv STRELVA_BUNDLE_DURABLE_PUBLICATION :bundle_durable_publication
 \pset format unaligned
 \pset tuples_only on
-\o /tmp/bundle-durable-snapshot.json
-select jsonb_build_object('snapshot',public.read_bundle_native_preparation('bb000000-0000-4000-8000-000000000011','bb000000-0000-4000-8000-000000000002','owner@example.test',version_id,3),'definition',public.system_bundle_working_definition(v)) from b_inquiry_version bv join public.system_versions v on v.id=bv.version_id;
+\o :bundle_durable_snapshot
+select jsonb_build_object('snapshot',public.read_bundle_native_preparation('bb000000-0000-4000-8000-000000000011','bb000000-0000-4000-8000-000000000002','bundle-lifecycle-owner@example.test',version_id,3),'definition',public.system_bundle_working_definition(v)) from b_inquiry_version bv join public.system_versions v on v.id=bv.version_id;
 \o
 \pset tuples_only off
 \pset format aligned
-\! node_modules/.bin/tsx scripts/system-bundle-durable-fixture.ts /tmp/bundle-durable-snapshot.json /tmp/bundle-durable-artifact.sql
-\i /tmp/bundle-durable-artifact.sql
-select public.commit_bundle_native_preparation('bb000000-0000-4000-8000-000000000011','bb000000-0000-4000-8000-000000000002','owner@example.test',(select version_id from b_inquiry_version),3,(select revision::integer from public.inquiry_workspaces where business_id='bb000000-0000-4000-8000-000000000011'),0,value) from bundle_durable_artifact;
+\! node_modules/.bin/tsx scripts/system-bundle-durable-fixture.ts "$STRELVA_BUNDLE_DURABLE_SNAPSHOT" "$STRELVA_BUNDLE_DURABLE_ARTIFACT"
+\i :bundle_durable_artifact
+select public.commit_bundle_native_preparation('bb000000-0000-4000-8000-000000000011','bb000000-0000-4000-8000-000000000002','bundle-lifecycle-owner@example.test',(select version_id from b_inquiry_version),3,(select revision::integer from public.inquiry_workspaces where business_id='bb000000-0000-4000-8000-000000000011'),0,value) from bundle_durable_artifact;
 select pg_temp.b_assert((select state->'inquiries'='[]'::jsonb and jsonb_array_length(state->'timeline')>0 and state->'timeline'=value->'publishedState'->'timeline' from public.inquiry_workspaces cross join bundle_native_input where business_id='bb000000-0000-4000-8000-000000000011'),'SQL read through native builder and commit preserves canonical received-record timeline');
 \pset format unaligned
 \pset tuples_only on
-\o /tmp/bundle-durable-committed.json
+\o :bundle_durable_committed
 select jsonb_build_object('snapshot',jsonb_build_object('state',w.state,'capabilityId',c.capability_id),'definition',public.system_bundle_working_definition(v)) from public.inquiry_workspaces w cross join b_inquiry_version bv join public.system_versions v on v.id=bv.version_id join public.system_bundle_components c on c.version_id=v.id where w.business_id='bb000000-0000-4000-8000-000000000011';
 \o
 \pset tuples_only off
 \pset format aligned
-\! node_modules/.bin/tsx scripts/system-bundle-durable-fixture.ts /tmp/bundle-durable-committed.json /tmp/bundle-durable-unused.sql /tmp/bundle-durable-publication.sql
-\i /tmp/bundle-durable-publication.sql
+\! node_modules/.bin/tsx scripts/system-bundle-durable-fixture.ts "$STRELVA_BUNDLE_DURABLE_COMMITTED" "$STRELVA_BUNDLE_DURABLE_UNUSED" "$STRELVA_BUNDLE_DURABLE_PUBLICATION"
+\i :bundle_durable_publication
 update public.inquiry_workspaces set state=value->'state',revision=revision+1 from bundle_durable_publication where business_id='bb000000-0000-4000-8000-000000000011';
 insert into public.inquiry_publication_claims(tenant_id,tenant_stable_id,business_id,request_id,capability_id,change_id,action,version,idempotency_key,command_digest,claim_token_hash,status,acceptance_id,actor_id,accepted_at) select t.id,t.stable_id,'bb000000-0000-4000-8000-000000000011',value->'work'->>'id',value->'work'->>'capabilityId',value->'work'->>'lastLiveChangeId','make_live',(value->'work'->'publishApproval'->>'version')::integer,'fictional-durable-native-claim',repeat('e',64),repeat('f',64),'accepted','fictional-durable-native-acceptance','bb000000-0000-4000-8000-000000000002',(value->'work'->'publishApproval'->>'approvedAt')::timestamptz from public.tenants t cross join bundle_durable_publication where t.id='bundle-target';
 select pg_temp.b_assert(public.reconcile_bundle_inquiry_releases('bb000000-0000-4000-8000-000000000011',(select value->'work'->>'capabilityId' from bundle_durable_publication))=1,'actual committed durable draft rehearses owner-approves and fake-publishes one independently verified local Version release');
