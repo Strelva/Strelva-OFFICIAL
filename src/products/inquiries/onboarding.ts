@@ -1,6 +1,6 @@
 import { load } from "cheerio";
 import { z } from "zod";
-import { fetchPinnedPublicText } from "@/lib/pinned-public-text";
+import { fetchPinnedPublicText } from "@/platform/infra/pinned-public-text";
 import type { ActionReceipt } from "./contracts";
 import type { InquirySurfaceSnapshot } from "./surface-contracts";
 
