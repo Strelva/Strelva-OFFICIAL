@@ -1419,6 +1419,19 @@
           "rollbackSha256": "d2af49d0cb7008e5b70512c44e3d68b5e06d6efe2667be4325ab5f787b1a4dc1"
         }
       ]
+    },
+    {
+      "batch": "15",
+      "status": "private #284 preparation; unmerged; not production-authorized",
+      "note": "Append-only owner-confirmed original bringer attribution, independent operating provider and financial eligibility; MO18-only endings. Batches 13/14 (pending migrations31/32) reserved to separate lanes. No rates, policy, written agreement or legacy backfill selected. Empty-only guarded rollback preserves accepted receipts.",
+      "items": [
+        {
+          "file": "20261020090033_business_attributions.sql",
+          "sha256": "b4c1fde530336d3dd56a2a29580fd55e0a0b63c189639391afb14576f554c615",
+          "rollback": "rollback-20261020090033_business_attributions.sql",
+          "rollbackSha256": "a50e7bce64d47f2d193e9d29c7ada027178d97cff7d8c5fe8ed0b2ba86cf147d"
+        }
+      ]
     }
   ]
 }
