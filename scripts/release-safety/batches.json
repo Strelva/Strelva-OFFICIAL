@@ -1178,6 +1178,11 @@
           "rollback": "rollback-20261017110000_inquiry_lead_retention.sql"
         },
         {
+          "file": "20261017120000_owner_decision_operator_refusal.sql",
+          "sha256": "616c861132f58c6f8aa10c69974a0548cbaf213444202b49db213394f134a80f",
+          "rollback": "rollback-20261017120000_owner_decision_operator_refusal.sql"
+        },
+        {
           "file": "20261018110000_provider_seat_website_access.sql",
           "sha256": "b108d67d2d968bf4dfa8ae7551997b07d653eac8cefcc97f8e123b579cc9c6d4",
           "rollback": "rollback-20261018110000_provider_seat_website_access.sql"

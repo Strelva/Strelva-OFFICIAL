@@ -368,6 +368,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/owner-recipient-trust-schema.sql
 catalog_fingerprint >"$cluster_root/catalog-full.txt"
 # The newest gate patches the owner-trust claimant. Undo it first and reapply
 # after those reader/trust rehearsals, preserving #560's actual effect gate.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261017120000_owner_decision_operator_refusal.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261014112000_acting_provider_gates.sql"
 # Newest first; the public-facts reader is last.
 public_facts_rollbacks=(20261013120000_owner_recipient_trust 20261013115000_booking_reads_confirmed_facts 20261013110000_public_facts_read_confirmed)
@@ -400,6 +401,7 @@ for (( index=${#public_facts_rollbacks[@]}-1; index>=0; index-- )); do
   psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/${public_facts_rollbacks[$index]}.sql"
 done
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261014112000_acting_provider_gates.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261017120000_owner_decision_operator_refusal.sql"
 catalog_fingerprint >"$cluster_root/catalog-full-reapplied.txt"
 if ! diff -u "$cluster_root/catalog-full.txt" "$cluster_root/catalog-full-reapplied.txt"; then
   printf 'Reapplying #509, the public-facts and booking readers did not restore the full catalog.\n' >&2
