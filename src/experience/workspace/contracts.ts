@@ -1,3 +1,4 @@
+import type { OwnerBrand } from "@/platform/infra/agency-brand";
 import type { ConnectionKind, ConnectionState, SystemLifecycle, SystemRef } from "@/platform/systems/contracts";
 import type { HealthStatus } from "@/platform/system-health/contracts";
 import type { AiVisibilityResult } from "@/products/ai-visibility/contracts";
@@ -132,6 +133,7 @@ export interface WorkspaceProduct {
 }
 
 export interface WorkspaceSnapshot {
+  ownerBrand?: OwnerBrand;
   actor: { email: string; localPreview: boolean };
   workspaces: WorkspaceSummary[];
   workspaceId: string;

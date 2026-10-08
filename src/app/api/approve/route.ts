@@ -1,3 +1,5 @@
+import { resolveOwnerBrand, resolveTenantBrand } from "@/platform/agency-brand/server";
+import { brandColors, BRAND_CREDIT, STRELVA_BRAND, type OwnerBrand } from "@/platform/infra/agency-brand";
 import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 /**
  * One-click approve-from-email (with a confirm step).
@@ -225,7 +227,7 @@ async function workspaceResolve(claims: WorkspaceApproveLinkClaims): Promise<Nex
 }
 
 /** GET only shows the confirm step — it must never mutate (scanners auto-fetch it). */
-export async function GET(request: Request): Promise<NextResponse> {
+async function getPage(request: Request): Promise<NextResponse> {
   if (await isRateLimitedAsync(rateLimitKey(request, "approve"), 20)) {
     return noticePage({ status: 429, heading: "Too many requests", body: "Please try again in a moment." });
   }
@@ -235,7 +237,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   const verified = verifyAnyApproveToken(token);
   if (!verified) return noticePage({ status: 400, ...INVALID.bad });
-  if (verified.kind === "workspace") return workspaceConfirm(token, verified.claims);
+  if (verified.kind === "workspace") return brandPage(await workspaceConfirm(token, verified.claims), await resolveOwnerBrand(verified.claims.workspaceId).catch(() => STRELVA_BRAND));
   const claims = verified.claims;
 
   const tenant = await getTenantConfig(claims.tenantId).catch(() => null);
@@ -259,7 +261,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
 /** POST is the real resolve — only reachable from the confirm button, so an email
  *  scanner (which GETs, never POSTs) can't trigger the external write. */
-export async function POST(request: Request): Promise<NextResponse> {
+async function postPage(request: Request): Promise<NextResponse> {
   if (await isRateLimitedAsync(rateLimitKey(request, "approve"), 20)) {
     return noticePage({ status: 429, heading: "Too many requests", body: "Please try again in a moment." });
   }
@@ -271,7 +273,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const verified = verifyAnyApproveToken(token);
   if (!verified) return noticePage({ status: 400, ...INVALID.bad });
-  if (verified.kind === "workspace") return workspaceResolve(verified.claims);
+  if (verified.kind === "workspace") return brandPage(await workspaceResolve(verified.claims), await resolveOwnerBrand(verified.claims.workspaceId).catch(() => STRELVA_BRAND));
   const claims: ApproveLinkClaims = verified.claims;
 
   const tenant = await getTenantConfig(claims.tenantId).catch(() => null);
@@ -352,4 +354,26 @@ export async function POST(request: Request): Promise<NextResponse> {
     dashboardUrl,
     buttonLabel: "Open your dashboard",
   });
+}
+
+async function brandPage(response: NextResponse, brand: OwnerBrand): Promise<NextResponse> {
+  if (!brand.agencyId) return response;
+  const colors = brandColors(brand.accentColor);
+  const image = brand.logoUrl ? `<img src="${escapeHtml(brand.logoUrl)}" alt="" width="132" style="max-height:64px;object-fit:contain;">` : "";
+  const identity = `<div style="margin-bottom:24px;">${image}<p style="color:${INK};font-weight:600;overflow-wrap:anywhere;">${escapeHtml(brand.name)}</p><small style="color:${MUTED};">${BRAND_CREDIT}</small>${brand.replyTo ? `<p><a href="mailto:${escapeHtml(brand.replyTo)}" style="color:${MUTED};">Contact ${escapeHtml(brand.name)}</a></p>` : ""}</div>`;
+  const html = (await response.text()).replace('padding:40px 36px;text-align:center;">', `padding:40px 36px;text-align:center;">${identity}`).replaceAll(`background:${ACCENT};color:#fff`, `background:${colors.accent};color:${colors.onAccent}`);
+  return new NextResponse(html, { status: response.status, headers: response.headers });
+}
+export async function GET(request: Request): Promise<NextResponse> {
+  const response = await getPage(request);
+  const token = new URL(request.url).searchParams.get("token");
+  const verified = token ? verifyAnyApproveToken(token) : null;
+  return verified?.kind === "tenant" ? brandPage(response, await resolveTenantBrand(verified.claims.tenantId).catch(() => STRELVA_BRAND)) : response;
+}
+export async function POST(request: Request): Promise<NextResponse> {
+  const copy = request.clone();
+  const response = await postPage(request);
+  const token = (await copy.formData().catch(() => null))?.get("token");
+  const verified = typeof token === "string" ? verifyAnyApproveToken(token) : null;
+  return verified?.kind === "tenant" ? brandPage(response, await resolveTenantBrand(verified.claims.tenantId).catch(() => STRELVA_BRAND)) : response;
 }

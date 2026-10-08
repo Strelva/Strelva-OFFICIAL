@@ -365,6 +365,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     try {
       result = await deps.sendEmail({
         audience: "client",
+        workspaceId: first.workspaceId,
         // Client email is tenant-aware; without a linked tenant the global switch decides.
         ...(mailTenant ? { tenantId: mailTenant } : {}),
         to: recipient,

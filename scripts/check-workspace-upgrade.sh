@@ -287,6 +287,20 @@ psql "${psql_args[@]}" --file="$repo_root/tests/business-booking-email-schema.sq
 # #528: no client privilege on legacy tenant tables; every member role and anon refused.
 psql "${psql_args[@]}" --file="$repo_root/tests/legacy-tenant-client-access-schema.sql"
 
+# #264 agency brand: full-schema behavior, actual rollback/reapply, configured-data refusal.
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-brand-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012180000_agency_brand.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012180000_agency_brand.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-brand-schema.sql"
+psql "${psql_args[@]}" -c "insert into public.users(id,email,verified_at) values ('b2640000-0000-4000-8000-000000000099','rollback-brand@example.test',now()); insert into public.workspaces(id,kind,name,created_by) values ('b2640000-0000-4000-8000-000000000099','agency','Rollback brand','b2640000-0000-4000-8000-000000000099')"
+psql "${psql_args[@]}" -c "update public.workspaces set agency_brand=jsonb_build_object('displayName',name,'accentColor','#447a4f','replyTo',null,'logo',null,'credit','runs_on_strelva') where id='b2640000-0000-4000-8000-000000000099'"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012180000_agency_brand.sql" >"$cluster_root/brand-rollback-refusal.log" 2>&1; then
+  printf 'Agency brand rollback discarded configured brands.\n' >&2; exit 1
+fi
+grep -q 'agency_brand_rollback_requires_data_preservation' "$cluster_root/brand-rollback-refusal.log"
+psql "${psql_args[@]}" -c "update public.workspaces set agency_brand=null where agency_brand is not null"
+printf 'Agency brand SQL passed: resolution, revocation, exposure, rollback/reapply and preservation.\n'
+
 # Tracking signing keys have no browser grants and refuse rollback while a
 # site's verification identity remains configured.
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-track-signing-keys-schema.sql"
@@ -404,3 +418,5 @@ diff -u "$cluster_root/catalog-before-agency-team.txt" "$cluster_root/catalog-af
 printf 'Agency Team upgrade rollback restored the public catalog exactly.\n'
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011160000_agency_team.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-team-schema.sql"
+
+psql "${psql_args[@]}" --file="$repo_root/tests/ask-confirmed-facts-schema.sql"

@@ -1092,6 +1092,9 @@ psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-native-rollforward.sq
 # Integration: Postgres lead authority plus receipt retention share one teardown wrapper.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010170000_deprovision_retained_after_inquiry_export.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/deprovision-retained-after-inquiry-export-schema.sql"
+# Expired inquiry leads now remove their visitor data and reply payloads atomically.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013220000_inquiry_lead_retention.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-lead-retention.sql"
 # Every stream's release flag key survives every redefinition, in any apply order (#253).
 psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 # Policy facts: confirmation/provenance/history/undo on the existing record RPC.
@@ -1252,6 +1255,12 @@ psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-schema.sql"
 printf 'Owner recipient trust rollback is exact (%s schema objects compared) and reapplies.\n' \
   "$(wc -l <"$cluster_root/owner-trust-before.txt" | tr -d ' ')"
 
+# #525: owner-approved Ask changes confirm the same touched facts.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013130000_ask_confirms_owner_facts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/ask-confirmed-facts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013130000_ask_confirms_owner_facts.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013130000_ask_confirms_owner_facts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/ask-confirmed-facts-schema.sql"
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 
@@ -1277,3 +1286,19 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011160000_age
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-team-schema.sql"
 # Agency-sourced public checks: real RLS, quota races and rollback stop points.
 bash "$repo_root/scripts/check-agency-prospects-sql.sh"
+
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012180000_agency_brand.sql"
+
+# #264 agency brand: full-schema behavior, actual rollback/reapply, configured-data refusal.
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-brand-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012180000_agency_brand.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012180000_agency_brand.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-brand-schema.sql"
+psql "${psql_args[@]}" -c "insert into public.users(id,email,verified_at) values ('b2640000-0000-4000-8000-000000000099','rollback-brand@example.test',now()); insert into public.workspaces(id,kind,name,created_by) values ('b2640000-0000-4000-8000-000000000099','agency','Rollback brand','b2640000-0000-4000-8000-000000000099')"
+psql "${psql_args[@]}" -c "update public.workspaces set agency_brand=jsonb_build_object('displayName',name,'accentColor','#447a4f','replyTo',null,'logo',null,'credit','runs_on_strelva') where id='b2640000-0000-4000-8000-000000000099'"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012180000_agency_brand.sql" >"$cluster_root/brand-rollback-refusal.log" 2>&1; then
+  printf 'Agency brand rollback discarded configured brands.\n' >&2; exit 1
+fi
+grep -q 'agency_brand_rollback_requires_data_preservation' "$cluster_root/brand-rollback-refusal.log"
+psql "${psql_args[@]}" -c "update public.workspaces set agency_brand=null where agency_brand is not null"
+printf 'Agency brand SQL passed: resolution, revocation, exposure, rollback/reapply and preservation.\n'

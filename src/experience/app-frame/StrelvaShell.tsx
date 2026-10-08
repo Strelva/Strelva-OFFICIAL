@@ -1,4 +1,5 @@
 "use client";
+import type { OwnerBrand } from "@/platform/infra/agency-brand";
 
 import { useEffect, useRef, useState, type RefObject, type ReactNode } from "react";
 import { Menu } from "lucide-react";
@@ -12,6 +13,8 @@ import styles from "./strelva-shell.module.css";
 export { isRetiredView, pinnedApps, pinnedSystems, pinnedWebsites, placeForSection, sectionFromView, sectionTitle, workspaceSectionHref, type StrelvaPinnedItem, type StrelvaSection } from "./workspace-places";
 
 interface Props {
+  ownerBrand?: OwnerBrand;
+  tenantId?: string;
   children: ReactNode;
   active?: StrelvaSection;
   title?: string;
@@ -57,7 +60,18 @@ interface Props {
 }
 
 /** Shared presentation only. Each resource retains its server authorization. */
-export function StrelvaShell({ children, active, title = "Strelva", context, businessContext, workspaceId, navigation, recentWork, pinned, searchItems, searchScopeName = "Your work", actions, notice, accountName = "Your account", accountDetail, signedIn = true, signInHref, signOut, appBase = "", onNavigate, onAccess, onSearch, onStart, startDisabled = false, contentId = "strelva-main", rightRail, rightRailOpen, onCloseRightRail, rightRailTriggerRef, systemsReleased = false, needsYou, theme = "linen" }: Props) {
+export function StrelvaShell({ tenantId, ownerBrand, children, active, title = "Strelva", context, businessContext, workspaceId, navigation, recentWork, pinned, searchItems, searchScopeName = "Your work", actions, notice, accountName = "Your account", accountDetail, signedIn = true, signInHref, signOut, appBase = "", onNavigate, onAccess, onSearch, onStart, startDisabled = false, contentId = "strelva-main", rightRail, rightRailOpen, onCloseRightRail, rightRailTriggerRef, systemsReleased = false, needsYou, theme = "linen" }: Props) {
+  const brandScope = workspaceId ? `workspaceId=${encodeURIComponent(workspaceId)}` : tenantId ? `tenantId=${encodeURIComponent(tenantId)}` : null;
+  const [loadedBrand, setLoadedBrand] = useState<{ scope: string; brand: OwnerBrand } | null>(null);
+  useEffect(() => {
+    if (ownerBrand || !signedIn || !brandScope) return;
+    const controller = new AbortController();
+    fetch(`${appBase}/api/workspace/owner-brand?${brandScope}`, { signal: controller.signal, cache: "no-store" })
+      .then(async response => { if (!response.ok) return; const body = await response.json(); if (!controller.signal.aborted && body.brand) setLoadedBrand({ scope: brandScope, brand: body.brand }); })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [ownerBrand, signedIn, brandScope, appBase]);
+  const presentationBrand = ownerBrand ?? (loadedBrand?.scope === brandScope ? loadedBrand.brand : undefined);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const menuRef = useRef<HTMLButtonElement>(null);
@@ -88,7 +102,7 @@ export function StrelvaShell({ children, active, title = "Strelva", context, bus
   return <div data-dashboard data-workspace-theme={theme === "linen" ? "linen" : undefined} className={styles.root}>
     <a className={styles.skip} href={`#${contentId}`}>Skip to work</a>
     <AppFrame className={styles.shell} navigationLabel="Strelva workspace navigation" navigationStorageKey="strelva:app-frame-navigation-collapsed" navigationOpen={mobileOpen} onCloseNavigation={() => setMobileOpen(false)} navigationTriggerRef={menuRef} contentId={contentId}
-      navigation={<StrelvaSidebar systemsReleased={systemsReleased} needsYou={needsYou} active={active} appBase={appBase} workspaceId={workspaceId} accountName={accountName} accountDetail={accountDetail} businessContext={businessContext} contextualNavigation={navigation} recentWork={recentWork} pinned={pinned} mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} onNavigate={onNavigate ? section => section === "access" && onAccess ? onAccess() : onNavigate(section) : undefined} onSearch={canSearch ? openSearch : undefined} onStart={onStart} startDisabled={startDisabled} signedIn={signedIn} signInHref={signInHref} signOut={signOut} />}
+      navigation={<StrelvaSidebar ownerBrand={presentationBrand} systemsReleased={systemsReleased} needsYou={needsYou} active={active} appBase={appBase} workspaceId={workspaceId} accountName={accountName} accountDetail={accountDetail} businessContext={businessContext} contextualNavigation={navigation} recentWork={recentWork} pinned={pinned} mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} onNavigate={onNavigate ? section => section === "access" && onAccess ? onAccess() : onNavigate(section) : undefined} onSearch={canSearch ? openSearch : undefined} onStart={onStart} startDisabled={startDisabled} signedIn={signedIn} signInHref={signInHref} signOut={signOut} />}
       header={<div className={styles.header}><button ref={menuRef} className={styles.mobileMenu} disabled={!ready} onClick={() => setMobileOpen(true)} type="button" aria-label="Open navigation" aria-expanded={mobileOpen}><Menu size={20} /></button><span className={styles.title}>{title}</span>{context ? <div className={styles.context}>{context}</div> : null}{actions ? <div className={styles.actions}>{actions}</div> : null}</div>}
       notice={notice} rightRail={rightRail} rightRailId="managed-discussion" rightRailTitle="Ask Strelva" rightRailOpen={rightRailOpen} onCloseRightRail={onCloseRightRail} rightRailTriggerRef={rightRailTriggerRef}
     >{children}</AppFrame>
