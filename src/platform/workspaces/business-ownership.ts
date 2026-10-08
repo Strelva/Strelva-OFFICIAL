@@ -15,8 +15,11 @@
  * (scripts/business-ownership.ts), and each production invitation is Jacob's
  * yes. The invitation email goes through src/lib/email/send.ts with audience
  * `client` and the business's first tenant, so the per-tenant email switch
- * applies; a suppressed or failed send leaves the invitation pending and
- * returns the accept link for the operator to share by hand.
+ * applies. It is sent for the business by its provider of record, so it also
+ * needs that agency's seat, email verification and the business's mandate for
+ * the sending domain (#255; conversion records it while there is no owner).
+ * A suppressed or failed send leaves the invitation pending and returns the
+ * accept link for the operator to share by hand.
  */
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
@@ -179,6 +182,7 @@ export async function inviteBusinessOwner(operator: string, workspaceId: string,
     const result = await send({
       audience: "client",
       ...(primaryTenant ? { tenantId: primaryTenant } : {}),
+      provider: { businessWorkspaceId: state.workspaceId },
       to: invitation.recipientEmail,
       subject: `Strelva set up ${invitation.workspaceName} for you`,
       idempotencyKey: `owner-invitation:${invitation.invitationId}`,

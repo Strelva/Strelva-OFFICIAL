@@ -13,6 +13,7 @@ import { readLinkedSite } from "@/platform/owner-entry/linked-sites";
 import { readBusinessRecord } from "@/platform/business-record/service";
 import { factValueSchemas } from "@/platform/business-record/contracts";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
+import { assertActingProvider } from "@/platform/workspaces/acting-provider";
 import { publishingEnabledForWorkspace } from "@/products/publishing/server";
 import { readPublishingSnapshot } from "@/products/publishing/server";
 import { defaultTenantReplyDeps } from "./tenant-replies";
@@ -79,6 +80,16 @@ export async function prepareGoogleListingDraft(actor: WorkspaceActor, raw: z.in
 }
 
 export function isGoogleListingEvent(event: UnifiedEvent): boolean { return event.metadata?.kind === "workspace_google_listing_draft"; }
+
+/**
+ * The context for an agency writing for the business (operator_instruction or
+ * operator_undo): every such write rechecks that this person is the acting
+ * provider for Google on this location (#255), before its receipt and again
+ * just before the call.
+ */
+export function asActingProvider(ctx: ListingContext, actor: WorkspaceActor): ListingContext {
+  return { ...ctx, authorizeProvider: async () => { await assertActingProvider(actor, ctx.workspaceId, { effect: "google", kind: "google_location", ref: ctx.location.locationId }); } };
+}
 
 export async function tenantListingContext(tenantId: string, workspaceId: string, locationId: string): Promise<ListingContext> {
   const deps = await defaultTenantReplyDeps();

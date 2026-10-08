@@ -22,9 +22,10 @@ type Row = Record<string, unknown>;
 function databaseBoundary() {
   const tables: Record<string, Row[]> & { workspace_memberships: Row[]; saved_product_work: Row[]; workspace_delegations: Row[] } = {
     workspace_memberships: [{ workspace_id: workspaceId, user_id: owner.id, role: "owner" }],
-    // The fixture's owner is Strelva staff, so it may make internal tools
-    // (make_systems). The plain-owner refusal has its own test below.
-    super_admins: [{ user_id: owner.id, revoked_at: null }],
+    // The fixture's owner is also staffed on its agency's provider seat, so it
+    // may make internal tools (make_systems). The plain-owner refusal has its
+    // own test below.
+    acting_provider_staff: [{ user_id: owner.id, revoked_at: null }],
     saved_product_work: [], workspace_delegations: [], operational_assignments: [], offering_provider_deliveries: [], offering_installations: [], standing_responsibility_jobs: [], standing_responsibility_runs: [], application_states: [], application_releases: [], application_records: [], job_economics: [], job_economics_usage: [], job_economics_reservations: [], job_economics_executions: [],
   };
   let rpcError: string | null = null;
@@ -97,7 +98,7 @@ function databaseBoundary() {
       // Mirrors public.workspace_make_systems_authority.
       const makeAuthority = () => {
         const member = tables.workspace_memberships.some((row) => row.workspace_id === args.p_workspace_id && row.user_id === args.p_user_id);
-        if (member && (tables.super_admins ?? []).some((row) => row.user_id === args.p_user_id && !row.revoked_at)) return "operator";
+        if (member && (tables.acting_provider_staff ?? []).some((row) => row.user_id === args.p_user_id && !row.revoked_at)) return "provider";
         if (tables.workspace_delegations.some((row) => row.customer_workspace_id === args.p_workspace_id && row.status === "active"
           && tables.workspace_memberships.some((m) => m.workspace_id === row.agency_workspace_id && m.user_id === args.p_user_id))) return "agency";
         return member ? "member" : null;
@@ -110,7 +111,7 @@ function databaseBoundary() {
         const authority = makeAuthority();
         if (name === "save_workspace_work" && !member) return { data: null, error: { message: "workspace_membership_required" } };
         if ((name === "save_system_work" || ["applications", "custom-applications"].includes(String(args.p_product_id)))
-          && authority !== "operator" && authority !== "agency") {
+          && authority !== "provider" && authority !== "agency") {
           return { data: null, error: { message: authority ? "workspace_make_systems_required" : "workspace_membership_required" } };
         }
         const saved = await from("saved_product_work").insert({ workspace_id: args.p_workspace_id, product_id: args.p_product_id, resource_kind: args.p_resource_kind, title: args.p_title, payload: args.p_payload, input: args.p_input, source_work_id: args.p_source_work_id, created_by: args.p_user_id }).select().single();
@@ -288,16 +289,16 @@ describe("horizontal work HTTP authority and execution", () => {
     expect((await postBounded(post("bounded-work", { action: "create", productId: "applications", workspaceId, input: { ...applicationInput, script: "fetch('https://other.test')" } }))).status).toBe(400);
   });
 
-  it("tells an owner who is not Strelva staff to ask Strelva, and creates nothing", async () => {
-    database.tables.super_admins = [];
+  it("tells an owner who is not the acting provider to ask their agency, and creates nothing", async () => {
+    database.tables.acting_provider_staff = [];
     const response = await postBounded(post("bounded-work", { action: "create", productId: "applications", workspaceId, input: applicationInput }));
     expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ error: "Ask Strelva to build this.", code: "make_systems_required" });
+    expect(await response.json()).toEqual({ error: "Ask your agency, or find one.", code: "make_systems_required" });
     expect(database.tables.saved_product_work).toHaveLength(0);
   });
 
   it("lets a delegated agency make a tool in its client's business without a direct membership", async () => {
-    database.tables.super_admins = [];
+    database.tables.acting_provider_staff = [];
     database.tables.workspace_memberships.push({ workspace_id: agencyWorkspaceId, user_id: agency.id, role: "member" });
     database.tables.workspace_delegations.push({ id: randomUUID(), customer_workspace_id: workspaceId, agency_workspace_id: agencyWorkspaceId, status: "active" });
     boundary.session.mockResolvedValue(agency);

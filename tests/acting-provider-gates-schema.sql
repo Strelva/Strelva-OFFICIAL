@@ -74,61 +74,61 @@ select pg_temp.ap_assert(
 
 -- ---- fixture ----
 insert into public.users(id, email, verified_at) values
-  ('a9000000-0000-4000-8000-000000000001', 'ap-owner@example.test', now()),
-  ('a9000000-0000-4000-8000-000000000002', 'ap-a-admin@agency-a.example.test', now()),
-  ('a9000000-0000-4000-8000-000000000003', 'ap-a-staff@agency-a.example.test', now()),
-  ('a9000000-0000-4000-8000-000000000004', 'ap-a-unstaffed@agency-a.example.test', now()),
-  ('a9000000-0000-4000-8000-000000000005', 'ap-b-staff@agency-b.example.test', now()),
-  ('a9000000-0000-4000-8000-000000000006', 'ap-stranger@example.test', now()),
-  ('a9000000-0000-4000-8000-000000000007', 'ap-operator@strelva.example.test', now()),
-  ('a9000000-0000-4000-8000-000000000008', 'ap-s-staff@strelva.example.test', now()),
-  ('a9000000-0000-4000-8000-000000000009', 'ap-other-owner@example.test', now()),
-  ('a9000000-0000-4000-8000-00000000000a', 'ap-a-leaver@agency-a.example.test', now());
+  ('ac7e0000-0000-4000-8000-000000000001', 'ap-owner@example.test', now()),
+  ('ac7e0000-0000-4000-8000-000000000002', 'ap-a-admin@agency-a.example.test', now()),
+  ('ac7e0000-0000-4000-8000-000000000003', 'ap-a-staff@agency-a.example.test', now()),
+  ('ac7e0000-0000-4000-8000-000000000004', 'ap-a-unstaffed@agency-a.example.test', now()),
+  ('ac7e0000-0000-4000-8000-000000000005', 'ap-b-staff@agency-b.example.test', now()),
+  ('ac7e0000-0000-4000-8000-000000000006', 'ap-stranger@example.test', now()),
+  ('ac7e0000-0000-4000-8000-000000000007', 'ap-operator@strelva.example.test', now()),
+  ('ac7e0000-0000-4000-8000-000000000008', 'ap-s-staff@strelva.example.test', now()),
+  ('ac7e0000-0000-4000-8000-000000000009', 'ap-other-owner@example.test', now()),
+  ('ac7e0000-0000-4000-8000-00000000000a', 'ap-a-leaver@agency-a.example.test', now());
 -- The operator is a platform operator AND a direct admin of the client, the
 -- shape conversion left behind. Strelva's staff member is an operator too.
 insert into public.super_admins(user_id, email) values
-  ('a9000000-0000-4000-8000-000000000007', 'ap-operator@strelva.example.test'),
-  ('a9000000-0000-4000-8000-000000000008', 'ap-s-staff@strelva.example.test');
+  ('ac7e0000-0000-4000-8000-000000000007', 'ap-operator@strelva.example.test'),
+  ('ac7e0000-0000-4000-8000-000000000008', 'ap-s-staff@strelva.example.test');
 insert into public.workspaces(id, kind, name, created_by) values
-  ('a9000000-0000-4000-8000-000000000010', 'customer', 'Acting Client', 'a9000000-0000-4000-8000-000000000001'),
-  ('a9000000-0000-4000-8000-000000000011', 'customer', 'Other Client', 'a9000000-0000-4000-8000-000000000009'),
-  ('a9000000-0000-4000-8000-000000000012', 'customer', 'Converted Client', 'a9000000-0000-4000-8000-000000000007'),
-  ('a9000000-0000-4000-8000-000000000020', 'agency', 'Agency A', 'a9000000-0000-4000-8000-000000000002'),
-  ('a9000000-0000-4000-8000-000000000030', 'agency', 'Agency B', 'a9000000-0000-4000-8000-000000000005'),
-  ('a9000000-0000-4000-8000-000000000040', 'agency', 'Strelva Agency', 'a9000000-0000-4000-8000-000000000008');
+  ('ac7e0000-0000-4000-8000-000000000010', 'customer', 'Acting Client', 'ac7e0000-0000-4000-8000-000000000001'),
+  ('ac7e0000-0000-4000-8000-000000000011', 'customer', 'Other Client', 'ac7e0000-0000-4000-8000-000000000009'),
+  ('ac7e0000-0000-4000-8000-000000000012', 'customer', 'Converted Client', 'ac7e0000-0000-4000-8000-000000000007'),
+  ('ac7e0000-0000-4000-8000-000000000020', 'agency', 'Agency A', 'ac7e0000-0000-4000-8000-000000000002'),
+  ('ac7e0000-0000-4000-8000-000000000030', 'agency', 'Agency B', 'ac7e0000-0000-4000-8000-000000000005'),
+  ('ac7e0000-0000-4000-8000-000000000040', 'agency', 'Strelva Agency', 'ac7e0000-0000-4000-8000-000000000008');
 insert into public.workspace_memberships(workspace_id, user_id, role, created_by) values
-  ('a9000000-0000-4000-8000-000000000010', 'a9000000-0000-4000-8000-000000000001', 'owner', 'a9000000-0000-4000-8000-000000000001'),
-  ('a9000000-0000-4000-8000-000000000010', 'a9000000-0000-4000-8000-000000000007', 'admin', 'a9000000-0000-4000-8000-000000000001'),
-  ('a9000000-0000-4000-8000-000000000011', 'a9000000-0000-4000-8000-000000000009', 'owner', 'a9000000-0000-4000-8000-000000000009'),
-  ('a9000000-0000-4000-8000-000000000012', 'a9000000-0000-4000-8000-000000000007', 'admin', 'a9000000-0000-4000-8000-000000000007'),
-  ('a9000000-0000-4000-8000-000000000020', 'a9000000-0000-4000-8000-000000000002', 'owner', 'a9000000-0000-4000-8000-000000000002'),
-  ('a9000000-0000-4000-8000-000000000020', 'a9000000-0000-4000-8000-000000000003', 'member', 'a9000000-0000-4000-8000-000000000002'),
-  ('a9000000-0000-4000-8000-000000000020', 'a9000000-0000-4000-8000-000000000004', 'member', 'a9000000-0000-4000-8000-000000000002'),
-  ('a9000000-0000-4000-8000-000000000020', 'a9000000-0000-4000-8000-00000000000a', 'member', 'a9000000-0000-4000-8000-000000000002'),
-  ('a9000000-0000-4000-8000-000000000030', 'a9000000-0000-4000-8000-000000000005', 'owner', 'a9000000-0000-4000-8000-000000000005'),
-  ('a9000000-0000-4000-8000-000000000040', 'a9000000-0000-4000-8000-000000000008', 'owner', 'a9000000-0000-4000-8000-000000000008');
+  ('ac7e0000-0000-4000-8000-000000000010', 'ac7e0000-0000-4000-8000-000000000001', 'owner', 'ac7e0000-0000-4000-8000-000000000001'),
+  ('ac7e0000-0000-4000-8000-000000000010', 'ac7e0000-0000-4000-8000-000000000007', 'admin', 'ac7e0000-0000-4000-8000-000000000001'),
+  ('ac7e0000-0000-4000-8000-000000000011', 'ac7e0000-0000-4000-8000-000000000009', 'owner', 'ac7e0000-0000-4000-8000-000000000009'),
+  ('ac7e0000-0000-4000-8000-000000000012', 'ac7e0000-0000-4000-8000-000000000007', 'admin', 'ac7e0000-0000-4000-8000-000000000007'),
+  ('ac7e0000-0000-4000-8000-000000000020', 'ac7e0000-0000-4000-8000-000000000002', 'owner', 'ac7e0000-0000-4000-8000-000000000002'),
+  ('ac7e0000-0000-4000-8000-000000000020', 'ac7e0000-0000-4000-8000-000000000003', 'member', 'ac7e0000-0000-4000-8000-000000000002'),
+  ('ac7e0000-0000-4000-8000-000000000020', 'ac7e0000-0000-4000-8000-000000000004', 'member', 'ac7e0000-0000-4000-8000-000000000002'),
+  ('ac7e0000-0000-4000-8000-000000000020', 'ac7e0000-0000-4000-8000-00000000000a', 'member', 'ac7e0000-0000-4000-8000-000000000002'),
+  ('ac7e0000-0000-4000-8000-000000000030', 'ac7e0000-0000-4000-8000-000000000005', 'owner', 'ac7e0000-0000-4000-8000-000000000005'),
+  ('ac7e0000-0000-4000-8000-000000000040', 'ac7e0000-0000-4000-8000-000000000008', 'owner', 'ac7e0000-0000-4000-8000-000000000008');
 insert into public.strelva_agency_workspace(workspace_id, designated_by)
-  select 'a9000000-0000-4000-8000-000000000040', 'a9000000-0000-4000-8000-000000000007'
+  select 'ac7e0000-0000-4000-8000-000000000040', 'ac7e0000-0000-4000-8000-000000000007'
   where not exists (select 1 from public.strelva_agency_workspace);
 
 do $$
 declare
-  owner_id uuid := 'a9000000-0000-4000-8000-000000000001';
-  a_admin uuid := 'a9000000-0000-4000-8000-000000000002';
-  a_staff uuid := 'a9000000-0000-4000-8000-000000000003';
-  a_unstaffed uuid := 'a9000000-0000-4000-8000-000000000004';
-  b_staff uuid := 'a9000000-0000-4000-8000-000000000005';
-  stranger uuid := 'a9000000-0000-4000-8000-000000000006';
-  operator_id uuid := 'a9000000-0000-4000-8000-000000000007';
-  s_staff uuid := 'a9000000-0000-4000-8000-000000000008';
-  other_owner uuid := 'a9000000-0000-4000-8000-000000000009';
-  leaver uuid := 'a9000000-0000-4000-8000-00000000000a';
-  ws uuid := 'a9000000-0000-4000-8000-000000000010';
-  other_ws uuid := 'a9000000-0000-4000-8000-000000000011';
-  converted uuid := 'a9000000-0000-4000-8000-000000000012';
-  agency_a uuid := 'a9000000-0000-4000-8000-000000000020';
-  agency_b uuid := 'a9000000-0000-4000-8000-000000000030';
-  agency_s uuid := 'a9000000-0000-4000-8000-000000000040';
+  owner_id uuid := 'ac7e0000-0000-4000-8000-000000000001';
+  a_admin uuid := 'ac7e0000-0000-4000-8000-000000000002';
+  a_staff uuid := 'ac7e0000-0000-4000-8000-000000000003';
+  a_unstaffed uuid := 'ac7e0000-0000-4000-8000-000000000004';
+  b_staff uuid := 'ac7e0000-0000-4000-8000-000000000005';
+  stranger uuid := 'ac7e0000-0000-4000-8000-000000000006';
+  operator_id uuid := 'ac7e0000-0000-4000-8000-000000000007';
+  s_staff uuid := 'ac7e0000-0000-4000-8000-000000000008';
+  other_owner uuid := 'ac7e0000-0000-4000-8000-000000000009';
+  leaver uuid := 'ac7e0000-0000-4000-8000-00000000000a';
+  ws uuid := 'ac7e0000-0000-4000-8000-000000000010';
+  other_ws uuid := 'ac7e0000-0000-4000-8000-000000000011';
+  converted uuid := 'ac7e0000-0000-4000-8000-000000000012';
+  agency_a uuid := 'ac7e0000-0000-4000-8000-000000000020';
+  agency_b uuid := 'ac7e0000-0000-4000-8000-000000000030';
+  agency_s uuid := 'ac7e0000-0000-4000-8000-000000000040';
   work public.saved_product_work;
   site text;
   effect record;
@@ -282,16 +282,16 @@ end $$;
 -- ---- the gates ----
 do $$
 declare
-  owner_id uuid := 'a9000000-0000-4000-8000-000000000001';
-  a_admin uuid := 'a9000000-0000-4000-8000-000000000002';
-  a_staff uuid := 'a9000000-0000-4000-8000-000000000003';
-  a_unstaffed uuid := 'a9000000-0000-4000-8000-000000000004';
-  stranger uuid := 'a9000000-0000-4000-8000-000000000006';
-  operator_id uuid := 'a9000000-0000-4000-8000-000000000007';
-  s_staff uuid := 'a9000000-0000-4000-8000-000000000008';
-  ws uuid := 'a9000000-0000-4000-8000-000000000010';
-  agency_a uuid := 'a9000000-0000-4000-8000-000000000020';
-  agency_s uuid := 'a9000000-0000-4000-8000-000000000040';
+  owner_id uuid := 'ac7e0000-0000-4000-8000-000000000001';
+  a_admin uuid := 'ac7e0000-0000-4000-8000-000000000002';
+  a_staff uuid := 'ac7e0000-0000-4000-8000-000000000003';
+  a_unstaffed uuid := 'ac7e0000-0000-4000-8000-000000000004';
+  stranger uuid := 'ac7e0000-0000-4000-8000-000000000006';
+  operator_id uuid := 'ac7e0000-0000-4000-8000-000000000007';
+  s_staff uuid := 'ac7e0000-0000-4000-8000-000000000008';
+  ws uuid := 'ac7e0000-0000-4000-8000-000000000010';
+  agency_a uuid := 'ac7e0000-0000-4000-8000-000000000020';
+  agency_s uuid := 'ac7e0000-0000-4000-8000-000000000040';
   work public.saved_product_work;
   site text;
   doc jsonb := '{"version":2,"siteName":"Acting Client","nodes":{},"pages":[],"facts":{}}';
@@ -351,17 +351,17 @@ begin
 
   -- Repo-change receipts: a preview needs the seat, a deploy the publish mandate.
   insert into public.service_requests(id, business_workspace_id, status, request_text, outcome, context, scope, provider_kind, created_by) values
-    ('a9000000-0000-4000-8000-0000000000c1', ws, 'requested', 'Add a menu page', 'A menu page',
+    ('ac7e0000-0000-4000-8000-0000000000c1', ws, 'requested', 'Add a menu page', 'A menu page',
       jsonb_build_object('source', 'website_change', 'systemId', site, 'implementation', 'custom_repo'), array['website.repo_change'], 'strelva', owner_id);
-  perform pg_temp.ap_expect(format($q$select public.record_website_change_receipt(%L, %L, %L, 'a9000000-0000-4000-8000-0000000000c1', 'preview', '{"previewUrl":"https://preview.example.test"}')$q$, ws, operator_id, 'ap-operator@strelva.example.test'), 'website_change_operator_required');
-  perform pg_temp.ap_expect(format($q$select public.record_website_change_receipt(%L, %L, %L, 'a9000000-0000-4000-8000-0000000000c1', 'preview', '{"previewUrl":"https://preview.example.test"}')$q$, ws, stranger, 'ap-stranger@example.test'), 'website_change_access_denied');
-  perform public.record_website_change_receipt(ws, a_staff, 'ap-a-staff@agency-a.example.test', 'a9000000-0000-4000-8000-0000000000c1', 'preview', '{"previewUrl":"https://preview.example.test"}');
-  perform pg_temp.ap_expect(format($q$select public.record_website_change_receipt(%L, %L, %L, 'a9000000-0000-4000-8000-0000000000c1', 'approved', '{}')$q$, ws, a_staff, 'ap-a-staff@agency-a.example.test'), 'website_change_owner_required');
-  perform public.record_website_change_receipt(ws, owner_id, 'ap-owner@example.test', 'a9000000-0000-4000-8000-0000000000c1', 'approved', '{}');
+  perform pg_temp.ap_expect(format($q$select public.record_website_change_receipt(%L, %L, %L, 'ac7e0000-0000-4000-8000-0000000000c1', 'preview', '{"previewUrl":"https://preview.example.test"}')$q$, ws, operator_id, 'ap-operator@strelva.example.test'), 'website_change_operator_required');
+  perform pg_temp.ap_expect(format($q$select public.record_website_change_receipt(%L, %L, %L, 'ac7e0000-0000-4000-8000-0000000000c1', 'preview', '{"previewUrl":"https://preview.example.test"}')$q$, ws, stranger, 'ap-stranger@example.test'), 'website_change_access_denied');
+  perform public.record_website_change_receipt(ws, a_staff, 'ap-a-staff@agency-a.example.test', 'ac7e0000-0000-4000-8000-0000000000c1', 'preview', '{"previewUrl":"https://preview.example.test"}');
+  perform pg_temp.ap_expect(format($q$select public.record_website_change_receipt(%L, %L, %L, 'ac7e0000-0000-4000-8000-0000000000c1', 'approved', '{}')$q$, ws, a_staff, 'ap-a-staff@agency-a.example.test'), 'website_change_owner_required');
+  perform public.record_website_change_receipt(ws, owner_id, 'ap-owner@example.test', 'ac7e0000-0000-4000-8000-0000000000c1', 'approved', '{}');
   perform pg_temp.verify(agency_a, 'publish', 'unverified');
-  perform pg_temp.ap_expect(format($q$select public.record_website_change_receipt(%L, %L, %L, 'a9000000-0000-4000-8000-0000000000c1', 'deployed', '{"commitSha":"abc1234","deploymentUrl":"https://x.vercel.app","readBack":"confirmed"}')$q$, ws, a_staff, 'ap-a-staff@agency-a.example.test'), 'acting_provider_unverified');
+  perform pg_temp.ap_expect(format($q$select public.record_website_change_receipt(%L, %L, %L, 'ac7e0000-0000-4000-8000-0000000000c1', 'deployed', '{"commitSha":"abc1234","deploymentUrl":"https://x.vercel.app","readBack":"confirmed"}')$q$, ws, a_staff, 'ap-a-staff@agency-a.example.test'), 'acting_provider_unverified');
   perform pg_temp.verify(agency_a, 'publish', 'verified');
-  perform public.record_website_change_receipt(ws, a_staff, 'ap-a-staff@agency-a.example.test', 'a9000000-0000-4000-8000-0000000000c1', 'deployed', '{"commitSha":"abc1234","deploymentUrl":"https://x.vercel.app","readBack":"confirmed"}');
+  perform public.record_website_change_receipt(ws, a_staff, 'ap-a-staff@agency-a.example.test', 'ac7e0000-0000-4000-8000-0000000000c1', 'deployed', '{"commitSha":"abc1234","deploymentUrl":"https://x.vercel.app","readBack":"confirmed"}');
   perform pg_temp.ap_assert(jsonb_array_length(public.list_website_change_requests(ws, a_staff, 'ap-a-staff@agency-a.example.test', site::uuid)) = 1,
     'the provider reads the request through its seat');
 
@@ -403,7 +403,7 @@ begin
   perform pg_temp.verify(agency_a, 'email', 'unverified');
   perform pg_temp.ap_assert(not public.provider_email_send_allowed(ws, null, 'mail.agency-a.example.test'), 'email verification revoked');
   perform pg_temp.verify(agency_a, 'email', 'verified');
-  perform pg_temp.ap_assert(not public.provider_email_send_allowed('a9000000-0000-4000-8000-000000000011', agency_a, 'mail.agency-a.example.test'), 'never for another agency''s client');
+  perform pg_temp.ap_assert(not public.provider_email_send_allowed('ac7e0000-0000-4000-8000-000000000011', agency_a, 'mail.agency-a.example.test'), 'never for another agency''s client');
 
   -- #534: owner-ask's launch checks mean "served for publish", not email.
   perform pg_temp.ap_assert(public.strelva_runs_business(ws), 'served for publish');
