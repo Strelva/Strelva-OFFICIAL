@@ -1,8 +1,10 @@
 # Audit service-role mutation restriction — October 8, 2026
 
-Prepared locally for #528. Not merged, migrated or deployed. Base `e9ac136f`
-records the earlier bounded security/agency release; it grants no new rollout
-authority. Existing dirty main, customer and release checkouts were preserved.
+Initial local preparation for #528 used base `e9ac136f`, the earlier bounded
+security/agency release. The prepared successor is present in release source
+`3f3eac4f`; its role-path correction below remains isolated and unmerged. No new
+migration application or deployment is proven. Existing dirty main, customer
+and release checkouts were preserved. No new rollout authority follows.
 
 ## Finding and repair
 
@@ -38,7 +40,7 @@ The existing client/user deletion authority and the Redis audit compatibility
 store are outside this ACL repair. An immutable retention or deletion-policy
 change needs a separate explicit decision; do not infer it from this migration.
 
-## Local proof
+## Initial local proof (`b4c382e3` / `aa2bf230`)
 
 - `PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH bash scripts/check-audit-append-only-sql.sh`
   applies the full 267-migration schema with real Supabase-style server table
@@ -70,16 +72,52 @@ Local logs are retained under `output/issue-528-audit-2026-10-08/`; the
 `proof.json` manifest pins SHA256 values and the tested source files.
 No hosted CI, target ACL/role graph, production read/write, adoption or deployment
 proof is established by this work.
-In particular, hosted superuser attributes and noninherited SET ROLE paths are
-not qualified; this follow-up does not expand the independently reviewed ACL
-repair. `runtime-recovery-receipt.json` beside the proof manifest retains the
+This initial proof did not qualify noninherited SET ROLE paths or role-management
+authority; the independent review below found and corrected that gap locally.
+Hosted role attributes and memberships remain unknown. `runtime-recovery-receipt.json` beside the proof manifest retains the
 complete current-tail file hashes and original scope from the local run.
+
+## Independent role-path review and repair
+
+A native PostgreSQL 18 probe reproduced a bypass against the unchanged migration:
+`service_role` membership in an UPDATE-capable role with `INHERIT FALSE, SET TRUE`
+passed the migration, then `SET SESSION AUTHORIZATION service_role; SET ROLE`
+and an actual audit UPDATE changed the stored payload. Effective ACL checks do
+not see permissions hidden by NOINHERIT. An ADMIN-option membership can also
+activate inheritance by granting the role to itself, even with SET disabled and
+without CREATEROLE.
+
+The isolated correction is based on release `3f3eac4f`. It examines all MEMBER
+roles for service and browser principals, including transitive NOINHERIT paths,
+and refuses audit mutation/access authority, superuser attributes and CREATEROLE.
+MEMBER is deliberately conservative: even a presently disabled membership is
+refused rather than modifying another role's permissions. The existing explicit
+owner-membership refusal remains. No role graph, lifecycle exception, RPC body,
+foreign key or rollback behavior changes. Only the proposed successor's current
+packet hash is repinned; every other inventory entry remains unchanged.
+
+Local proof uses the current 276 forwards. The expanded disposable SQL runner
+passes direct read/append and mutation denial, actual SET ROLE and ADMIN
+authority activation, transitive NOINHERIT and browser paths, CREATEROLE,
+superuser and NOINHERIT owner refusals, and table-plus-column ACL preservation
+on refusal. Tenant teardown, tenant rename/delete and actor deletion still pass.
+Typecheck and all 32 release-inventory unit tests pass. Complete current-tail
+recovery includes 50 corrective tails; both rounds disable 187 active original
+service RPCs, preserve all public rows and restore the exact secured catalog.
+
+The first expanded runner failed while cleaning up an ADMIN fixture's dependent
+self-grant. The fixture now revokes that self-grant as its grantor before removing
+the original administrator membership; the final runner passes. Before-bypass,
+failed-fixture and final logs, exact source hashes and the new recovery receipt
+are retained under `output/issue-528-role-path-2026-10-08/`. This proves local
+refusal behavior only. Exact hosted role graph/attributes, hosted CI, migration
+application and production behavior still require separate qualification.
 
 ## Continuation
 
 Objective: finish the remaining bounded #528 server-table audit requirement.
-Next: independently review the draft successor against
-`release/security-runtime-20261007`, refresh its exact hosted target ACL/ownership
+Next: independently review the role-path correction on `3f3eac4f`, then
+refresh its exact hosted target ACL/ownership
 only with the required authority, and prepare a separately approved one-migration
 rollout. Keep #528 open until the selected acceptance boundary and applied state
 are proven. Supersede #545's duplicate migration scope in tracker disposition
