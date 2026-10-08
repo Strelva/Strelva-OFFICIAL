@@ -506,12 +506,16 @@ export async function upsertContentDataWithReceipt(
   tenant: string,
   section: string,
   data: Record<string, unknown>,
+  actor?: { userId: string | null; email: string | null },
 ): Promise<string | null> {
   const db = requiredDb(`upsertContentDataWithReceipt ${tenant}/${section}`);
   // Additive RPC is deliberately outside generated types until migration
   // integration regenerates them. No second content write is performed here.
   const rpc = db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> };
-  const result = await rpc.rpc("write_operator_content", { p_tenant_id: tenant, p_section: section, p_data: data });
+  const result = await rpc.rpc(actor ? "write_content_as_actor" : "write_operator_content", {
+    p_tenant_id: tenant, p_section: section, p_data: data,
+    ...(actor ? { p_user_id: actor.userId, p_verified_email: actor.email } : {}),
+  });
   if (result.error) throw result.error;
   const receipt = result.data as { id?: unknown } | null;
   // A successful RPC already committed content and receipt. A malformed

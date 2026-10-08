@@ -369,6 +369,17 @@ function versionPorts(w: Awaited<ReturnType<typeof versionsWorld>>, mem: ReturnT
 }
 
 describe("the version_release source and the release gate", () => {
+  it("keeps native Live approval with the owner even when policy requests provider review", async () => {
+    const w = await versionsWorld();
+    const mem = needsYouMemoryStore({ clock: { now: Date.parse(at) }, roles: { [owner.userId]: "owner" } });
+    const { ports, release } = versionPorts(w, mem, { policies: async () => [
+      { layer: "strelva", systemId: null, kind: "system.change_live", route: "strelva_reviews" },
+    ] });
+    const ny = service(mem.store, [versionReleaseAdapter(ports)]);
+    const [item] = (await ny.list(owner, VBIZ)).items;
+    expect(item).toMatchObject({ route: "owner_decides", adminMayDecide: false });
+    expect(release).not.toHaveBeenCalled();
+  });
   it("Approve releases through the gate, which finds the approval in Needs you", async () => {
     const w = await versionsWorld();
     const mem = needsYouMemoryStore({ clock: { now: Date.parse(at) }, roles: { [owner.userId]: "owner" } });

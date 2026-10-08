@@ -197,13 +197,14 @@ export async function getStoredContent<K extends ContentSection>(
 export async function setContent<K extends ContentSection>(
   section: K,
   data: ContentMap[K],
-  tenant: string = DEFAULT_TENANT
+  tenant: string = DEFAULT_TENANT,
+  actor?: { userId: string | null; email: string | null },
 ): Promise<void> {
   addSentryBreadcrumb("content", `setContent: ${section}`, { tenant, section });
   if (process.env.STRELVA_OPERATOR_QUEUE_RELEASE === "1" && contentSourceIsPostgres()) {
     let receiptId: string | null;
     try {
-      receiptId = await upsertContentDataWithReceipt(tenant, SECTION_TO_TYPE[section], data as unknown as Record<string, unknown>);
+      receiptId = await upsertContentDataWithReceipt(tenant, SECTION_TO_TYPE[section], data as unknown as Record<string, unknown>, ...(actor ? [actor] : []));
     } catch (error) {
       await invalidateCachedContent(section, tenant);
       throw error;

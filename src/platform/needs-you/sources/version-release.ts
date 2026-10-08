@@ -7,8 +7,7 @@
  * revision hash of the row revision the decision was made on.
  *
  * A Version whose working definition differs from its current release opens
- * one item (`system.change_live`, routed by the policy; floor
- * `strelva_reviews`). Approving claims the item, then resolves through the
+ * one owner item (`system.change_live`, routed to `owner_decides`). Approving claims the item, then resolves through the
  * gate, which re-reads the item before releasing. Not yet and a lapse change
  * nothing: the working definition waits, unreleased.
  */
@@ -51,10 +50,11 @@ export function versionReleaseRevision(versionId: string, rowRevision: number): 
 export function versionReleaseItem(release: PendingVersionRelease, workspaceId: string, policies: readonly PolicySetting[]): ProposedItem | null {
   const evaluation = evaluateRoute({ kind: "system.change_live", origin: "strelva", systemId: release.systemId, policies });
   if (evaluation.route !== "owner_decides" && evaluation.route !== "strelva_reviews") return null;
+  // Agencies prepare; the owner decides and executes native app Live.
   const changed = release.changedPaths.slice(0, 8).join(", ");
   return {
     kind: "system.change_live",
-    route: evaluation.route,
+    route: "owner_decides",
     systemId: release.systemId,
     title: `Put the updated ${release.label} live`.slice(0, 200).trim(),
     detail: (changed ? `This becomes release ${release.nextRelease}. What changed: ${changed}.` : `This becomes release ${release.nextRelease}.`).slice(0, 600),
@@ -118,6 +118,7 @@ export function versionReleaseAdapter(ports: VersionReleaseSourcePorts): SourceA
       // Existing service sessions also refuse: the ordinary member mutation
       // cannot atomically recheck the owner-link agency assignment/effect.
       if (by.kind === "owner_link") return { outcome: "failed", reason: "sign_in_required" };
+      if (by.kind !== "session") return { outcome: "failed", reason: "owner_required" };
       const actor = by.actor;
       if (!actor) return { outcome: "failed", reason: "owner_not_member" };
       const row = (await pending(actor, ctx.workspaceId).catch(() => null))?.find((entry) => entry.versionId === item.sourceId);

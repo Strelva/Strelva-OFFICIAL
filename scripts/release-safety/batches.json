@@ -1263,6 +1263,23 @@
           "rollback": "rollback-20261019100000_actor_rpc_service_boundary.sql"
         }
       ]
+    },
+    {
+      "batch": "12",
+      "description": "October 8 prepared backlog successors; unapplied; qualification required",
+      "status": "proposed, not rehearsed",
+      "items": [
+        {
+          "file": "20261020110000_content_publication_authority.sql",
+          "sha256": "7ede6209f1c40f785a5a4934fb6ffedc9643676f5c7795f19fc12925222a4078",
+          "rollback": "rollback-20261020110000_content_publication_authority.sql"
+        },
+        {
+          "file": "20261020112000_version_live_owner_authority.sql",
+          "sha256": "303cb0a83284e92128ddecf5feab53614bb69c229cf1894876f1da1f206b2077",
+          "rollback": "rollback-20261020112000_version_live_owner_authority.sql"
+        }
+      ]
     }
   ]
 }
