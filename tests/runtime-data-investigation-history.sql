@@ -34,5 +34,9 @@ begin
   perform public.read_investigation_runs(item.id,item.created_by,'agency@example.com',null,null,50);
   raise exception 'revoked_history_visible';
  exception when others then if SQLERRM<>'workspace_access_denied' then raise; end if; end;
+ -- The only deletion allowance is the existing parent-work lifecycle: no
+ -- freestanding history wipe or selected-retention policy is invented here.
+ delete from public.saved_product_work where id=item.id;
+ if exists(select 1 from public.investigation_history_events where work_id=item.id) then raise exception 'parent_cleanup_blocked_by_history'; end if;
 end $$;
 rollback;

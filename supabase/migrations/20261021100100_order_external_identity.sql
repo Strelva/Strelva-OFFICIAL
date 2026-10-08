@@ -1,3 +1,6 @@
+begin;
+set local lock_timeout='3s';
+
 -- Durable order identity survives legacy random IDs, clock skew and cache TTLs.
 -- Extend the latest RPC without removing its tombstone/encryption/rename guards.
 do $$ declare body text; anchor text; addition text; begin
@@ -31,3 +34,5 @@ $b$;
  if position(anchor in body)=0 then raise exception 'connection_revocation_function_drift'; end if;
  execute replace(body,anchor,anchor||addition);
 end $$;
+
+commit;

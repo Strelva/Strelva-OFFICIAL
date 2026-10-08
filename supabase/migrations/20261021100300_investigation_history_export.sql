@@ -1,3 +1,6 @@
+begin;
+set local lock_timeout='3s';
+
 -- Complete immutable check history participates in paged portability.
 alter function public.export_workspace_v3_category(uuid,uuid,text,text,integer,integer) rename to export_workspace_v3_category_before_investigation_history;
 revoke all on function public.export_workspace_v3_category_before_investigation_history(uuid,uuid,text,text,integer,integer) from public,anon,authenticated,service_role;
@@ -16,3 +19,5 @@ begin
 end $$;
 revoke all on function public.export_workspace_v3_category(uuid,uuid,text,text,integer,integer) from public,anon,authenticated;
 grant execute on function public.export_workspace_v3_category(uuid,uuid,text,text,integer,integer) to service_role;
+
+commit;

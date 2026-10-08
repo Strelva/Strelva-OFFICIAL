@@ -1,3 +1,6 @@
+begin;
+set local lock_timeout='3s';
+
 -- Preserve full standing-check evidence while current payloads stay bounded.
 create table public.investigation_history_events (
  ordinal bigint generated always as identity unique,
@@ -101,3 +104,5 @@ begin
 end $$;
 revoke all on function public.read_investigation_runs(uuid,uuid,text,text,integer,integer) from public,anon,authenticated;
 grant execute on function public.read_investigation_runs(uuid,uuid,text,text,integer,integer) to service_role;
+
+commit;
