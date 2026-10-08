@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
+import { declareApplicationPackage } from "@/platform/system-versions/declarations";
 import { createSystemVersions, type JsonObject } from "@/platform/system-versions";
 import { createSupabaseConnectionOwnership, createSupabaseVersionStore, readVersionActor, type VersionsDb } from "@/platform/system-versions/supabase-store";
 import { adminClient, cleanup, convertedBusinessWithOwner, decisions, designateAgency, journeyEnvironment, localSql, noHorizontalOverflow } from "./support/journeys";
@@ -46,7 +47,7 @@ test("an agency's improvement reaches a client's Version only when the owner app
     const agencyActor = await readVersionActor({ userId: operator.userId, verifiedEmail: operator.email }, db);
     const sourceName = `Inquiry intake ${randomUUID().slice(0, 6)}`;
     const source = { businessId: agencyId, systemId: system(agencyId, sourceName, operator.userId) };
-    const first = await versions.publishSourceRevision(agencyActor, { source, definition: intake, summary: "Intake" });
+    const first = await versions.publishSourceRevision(agencyActor, { source, definition: declareApplicationPackage(intake), summary: "Intake" });
     await versions.shareSource(agencyActor, source, businessId);
     const env = journeyEnvironment();
     const created = await operator.context.request.post("/api/workspace/versions/manage", {
@@ -83,7 +84,7 @@ test("an agency's improvement reaches a client's Version only when the owner app
     expect(nativeRelease(version.id)).toEqual({ number: 1, title: "Team requests" });
 
     // 2. The agency publishes an improvement. Nothing changes for the client yet.
-    await versions.publishSourceRevision(agencyActor, { source, definition: { ...intake, title: "Team requests, improved" }, summary: "Clearer request title" });
+    await versions.publishSourceRevision(agencyActor, { source, definition: declareApplicationPackage({ ...intake, title: "Team requests, improved" }), summary: "Clearer request title" });
     await home.reload();
     await expect(home.getByRole("region", { name: /^Needs you/ }).getByText(ask)).toHaveCount(0);
 

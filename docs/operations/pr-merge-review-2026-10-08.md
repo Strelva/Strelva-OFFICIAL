@@ -58,6 +58,12 @@ ambiguous alert selector, historic catalog recovery overwritten serializer, and
 missing declaration in the ordered read-only fixture. Each repair has passing
 focused or complete rerun evidence. Local paths are `/tmp/strelva-pr-merge-*-20261008.log`.
 
+The first combined signed-in run passed 13/14 flags-on journeys and all 8
+flags-off journeys. The remaining Version fixture published without the now-required
+package declaration. Its setup now uses the real authoring declaration helper;
+no product release check was weakened. The flags-on rerun is the remaining merge
+gate and must pass before #603 merges.
+
 ## Limits and next action
 
 #496's billing copy and navigation are implemented and locally qualified. #310's
