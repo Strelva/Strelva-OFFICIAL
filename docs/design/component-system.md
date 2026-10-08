@@ -967,6 +967,6 @@ to remove platform identity. See [#264 evidence and limits](../product/streams/a
 
 `BusinessBillingView` owns the business billing page presentation using the owned
 `Card`, scoped navigation and semantic billing states. The authorized route retains
-its workspace and actor gates; the fictional dev-only preview passes synthetic
+its workspace and actor gates; the gated fictional preview passes synthetic
 values to the same view for desktop/mobile checks. No payer identity, pricing or
 payment authority changes are implied by this extraction.
