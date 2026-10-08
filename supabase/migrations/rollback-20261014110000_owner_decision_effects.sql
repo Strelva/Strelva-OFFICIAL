@@ -2,6 +2,7 @@
 begin;
 set local lock_timeout = '3s';
 set local statement_timeout = '120s';
+alter function public.strelva_service_session(uuid,uuid,text) stable;
 -- Pre-adoption only: serialize concurrent admission before inspecting sessions.
 lock table public.owner_decision_link_sessions in access exclusive mode;
 do $$ begin

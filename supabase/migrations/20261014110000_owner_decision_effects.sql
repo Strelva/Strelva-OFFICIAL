@@ -2,6 +2,11 @@
 -- Local preparation only; activation and production migration need approval.
 begin;
 set local lock_timeout = '3s';
+set local statement_timeout = '120s';
+
+-- This write-authority entry point now takes revocation locks through its
+-- session predicate. It must use the caller's read/write transaction snapshot.
+alter function public.strelva_service_session(uuid,uuid,text) volatile;
 
 -- Existing sessions have no assignment binding and fail closed; never infer
 -- new authority for an old link after an agency relationship changes.
