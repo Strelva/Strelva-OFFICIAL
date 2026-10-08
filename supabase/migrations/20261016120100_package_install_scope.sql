@@ -58,6 +58,7 @@ begin
  exception when others then if sqlerrm not in ('business_record_access_denied','workspace_membership_required') or cardinality(granted)=0 then raise; end if; access:='agency'; work_ids:='{}'::uuid[]; end;
  if access='agency' then work_ids:=array(select distinct unnest(coalesce(work_ids,'{}'::uuid[])||granted)); end if;
 end $$;
+revoke all on function public.system_actor_scope(uuid,uuid,text,boolean) from public,anon,authenticated,service_role;
 alter function public.read_version_actor(uuid,text) rename to read_version_actor_package_core;
 revoke all on function public.read_version_actor_package_core(uuid,text) from public,anon,authenticated,service_role;
 create function public.read_version_actor(p_user_id uuid,p_verified_email text) returns jsonb
