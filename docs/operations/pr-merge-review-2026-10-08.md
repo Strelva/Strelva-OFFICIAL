@@ -41,7 +41,8 @@ Source `004b7e5b` plus documentation-only correction:
 - Typecheck, lint, boundaries and ontology passed. Boundary baseline is now
   **194 workspace-to-lib imports in 88 files**, with 43 older imports retained.
 - Production build passed with empty provider configuration; high-level dependency
-  audit passed with no known vulnerabilities.
+  audit passed under the existing exception for `GHSA-vfj7-8cjw-p6xm`;
+  one high-severity advisory remains ignored by the existing repository policy.
 - Complete ordered upgrade passed, including final declaration owner/actor
   authority and two-actor payer accept/reject races.
 - Workspace SQL aggregate passed; qualification writer quarantine/rollback/reapply
