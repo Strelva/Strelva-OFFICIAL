@@ -4,6 +4,7 @@ import type { ConnectedSitesStore } from "@/products/connected-sites/store";
 const deps = vi.hoisted(() => ({ limited: vi.fn(), spam: vi.fn(), notify: vi.fn(), flag: vi.fn() }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: deps.limited, rateLimitKey: (_req: Request, prefix: string) => prefix }));
 vi.mock("@/lib/lead-spam", () => ({ scoreLeadSpam: deps.spam }));
+vi.mock("@/lib/pinned-public-text", () => ({ fetchPinnedPublicText: async () => '<script type="application/ld+json">{"@type":"LocalBusiness","url":"https://www.fictional-bakery.example/","name":"Old Bakery"}</script>' }));
 vi.mock("@/products/connected-sites/notify", () => ({ notifyConnectedSiteInquiry: deps.notify }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
 vi.mock("@/platform/release-flags/store", () => ({ workspaceReleaseFlagEnabled: deps.flag }));
@@ -31,6 +32,7 @@ describe("public connect routes", () => {
     store = {
       resolve: vi.fn(async () => site), context: vi.fn(async () => ({ revision: 1, facts: { display_name: "Fictional Bakery" }, services: [], site: { captureForms: true, injectSchema: true } })),
       recordEvents: vi.fn(async () => 1), recordInquiry: vi.fn(async () => ({ status: "recorded" as const, id: "78000000-0000-4000-8000-0000000000aa", workspaceId: site.workspaceId })),
+      recordSchemaConflict: vi.fn(async () => ({})),
       recordSpam: vi.fn(async () => ({ status: "recorded" as const })),
     } as unknown as ConnectedSitesStore;
     setConnectedSitesStoreForTests(store);
@@ -101,6 +103,23 @@ describe("public connect routes", () => {
     expect((await inquiry()).status).toBe(429);
     const events = await postEvents(new Request("https://app.strelva.test/x", { method: "POST", headers: { origin: ORIGIN }, body: JSON.stringify({ events: [{ id: "evt12345678", kind: "visit" }] }) }), params());
     expect(events.status).toBe(202); expect(await events.json()).toEqual({ accepted: 1 });
+  });
+  it("accepts additive schema-only reports with the same host gates, default off and no notification", async () => {
+    const body = { events: [], platformSchema: { present: true } };
+    const request = (origin = ORIGIN) => new Request(`https://app.strelva.test/api/v1/connect/${KEY}/events`, { method: "POST", headers: { origin }, body: JSON.stringify(body) });
+    vi.stubEnv("STRELVA_CONNECTED_SITE_SCHEMA_CONFLICTS_RELEASE", "0");
+    expect(await (await postEvents(request(), params())).json()).toEqual({ accepted: 0 });
+    expect(store.context).not.toHaveBeenCalled();
+    expect(store.recordSchemaConflict).not.toHaveBeenCalled();
+    vi.stubEnv("STRELVA_CONNECTED_SITE_SCHEMA_CONFLICTS_RELEASE", "1");
+    expect((await postEvents(request(), params())).status).toBe(202);
+    expect(store.recordSchemaConflict).toHaveBeenCalledWith(KEY, ORIGIN, expect.objectContaining({ sourceId: site.id, route: "owner_decides", sourceLifecycle: "connected_site_schema" }));
+    expect(deps.notify).not.toHaveBeenCalled();
+    expect(store.recordEvents).not.toHaveBeenCalled();
+    expect((await postEvents(request("https://evil.example"), params())).status).toBe(403);
+    vi.mocked(store.resolve).mockResolvedValueOnce({ ...site, verified: false });
+    expect((await postEvents(request(), params())).status).toBe(403);
+    expect(store.recordSchemaConflict).toHaveBeenCalledTimes(1);
   });
   it("serves the context to anyone, cached for a minute", async () => {
     const response = await getContext(new Request(`https://app.strelva.test/api/v1/connect/${KEY}/context`), params());

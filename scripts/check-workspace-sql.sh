@@ -1541,3 +1541,19 @@ psql "${psql_args[@]}" --set=rollback_expected=false --file="$repo_root/tests/pr
 diff -u "$cluster_root/provider-website-forward.txt" <(psql "${psql_args[@]}" -Atc "select md5(pg_get_functiondef('public.update_bounded_product_work(uuid,uuid,uuid,text,text,integer,jsonb)'::regprocedure))")
 printf 'Provider website saved checkpoints: forward/rollback/reapply passed.\n'
 
+# Schema-conflict reports add service-only functions. Rollback restores the
+# pre-report catalog before any records exist and refuses after an owner ask
+# would depend on the adapter for resolution.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261018120000_connected_site_schema_conflicts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-site-schema-conflicts.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261018120000_connected_site_schema_conflicts.sql"
+psql "${psql_args[@]}" -Atc "select to_regprocedure('public.record_connected_site_schema_conflict(text,text,jsonb)') is null and to_regprocedure('public.read_connected_site_schema_conflict(uuid,uuid)') is null" | grep -qx t
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261018120000_connected_site_schema_conflicts.sql"
+psql "${psql_args[@]}" --set=keep_fixture=true --file="$repo_root/tests/connected-site-schema-conflicts.sql"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261018120000_connected_site_schema_conflicts.sql" >"$cluster_root/schema-conflicts-rollback-refusal.log" 2>&1; then
+  printf 'Schema-conflict rollback discarded owner decisions needed by the source adapter.\n' >&2
+  exit 1
+fi
+grep -q 'connected_site_schema_conflicts_rollback_requires_data_preservation' "$cluster_root/schema-conflicts-rollback-refusal.log"
+psql "${psql_args[@]}" -Atc "select to_regprocedure('public.record_connected_site_schema_conflict(text,text,jsonb)') is not null and to_regprocedure('public.read_connected_site_schema_conflict(uuid,uuid)') is not null" | grep -qx t
+printf 'Schema-conflict rollback removes unused functions and refuses after source decisions exist.\n'

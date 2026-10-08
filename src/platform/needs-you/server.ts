@@ -8,6 +8,7 @@ import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { chaseBookingCalendarHealth } from "@/platform/bookings/calendar-health";
 import { bookingSettingsAdapter } from "@/platform/bookings/setup";
 import { deliverBookingUpdates } from "@/platform/bookings/updates";
+import { connectedSiteSchemaAdapter } from "./sources/connected-site-schema";
 import { getEventRaw, getEvents, getEventsRaw } from "@/lib/events";
 import { readCatalogReportHandled } from "@/platform/catalog-reports/receipts";
 import { readToolNoticeHandled } from "@/platform/catalog-reports/tool-notices";
@@ -80,6 +81,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, ef
     urgentInquiryAllowed: async (tenantId) => process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && needsYouReleaseEnabled()
       && emailSendingEnabled() && customerEmailEnabled() && (!tenantId || await getClientEmailOverride(tenantId) !== "off"),
     adapters: [
+      connectedSiteSchemaAdapter(),
       tenantEventAdapter({
         linkedTenants: async (workspaceId) => (await store.linkedTenants(workspaceId)).map(link => link.tenantId),
         pendingEvents: (tenantId) => getEvents(tenantId, { status: "pending", limit: 100 }),

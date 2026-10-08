@@ -142,3 +142,38 @@ bytes and a 16-hex SHA-256 hash).
 
 - Installation on a real Wix or Squarespace site. Never run end to end on a
   builder.
+
+## Published schema disagreements (#503, local preparation)
+
+When connect.js steps aside for the site's own business JSON-LD, it reports only
+that business schema is present as an optional `platformSchema` hint on the
+existing events endpoint. `events: []` is accepted only alongside that hint;
+old event bodies and responses are unchanged. The server fetches the connected
+site's stored, verified URL through the pinned-public-address reader and parses
+bounded JSON-LD there. Client values and a forged Origin cannot supply the
+compared facts. The comparator selects a unique entity whose URL or `@id`
+matches the connected page, uses a sole entity as a fallback, and declines
+ambiguous multi-entity graphs. The script leaves platform schema intact.
+
+`STRELVA_CONNECTED_SITE_SCHEMA_CONFLICTS_RELEASE=1` enables comparison (default
+off, alongside the existing connected-site business/host gates). Only the
+confirmed context RPC feeds comparison: owner/operator-stated or verified facts.
+One Needs you item per site records differing shared fields; repeated identical
+conflicts reuse the same revision, including after acknowledgement. The existing
+store supersedes older open revisions. This is an observation of published facts,
+not proof the site is wrong, and a partial report does not prove other pages agree.
+Matching reports do not automatically dismiss an older item: another page could
+still disagree. Acknowledgement, source revocation, or superseding evidence closes it.
+
+The item can be acknowledged through the existing owner link without an account;
+acknowledgement leaves website and business facts unchanged and calls for follow-up
+in the website platform. Recording never sends email. Existing Needs you delivery
+remains subject to `STRELVA_NEEDS_YOU_RELEASE` and the client-email rollout gate.
+
+New migration: `20261018120000_connected_site_schema_conflicts.sql` (not applied
+to production), with a rollback that removes functions only before source decisions
+exist and refuses once such records depend on the adapter. Tests:
+`connect-js.test.ts`, `connected-site-schema-conflicts.test.ts` and
+`tests/connected-site-schema-conflicts.sql`. Real Wix/Squarespace installation
+and production delivery remain unproven. No `/b/{handle}`, llms.txt or serializer
+files are part of this change.
