@@ -53,5 +53,5 @@ begin
 end $$;
 select pg_temp.website_assert(not has_table_privilege('service_role','public.assistant_website_proposals','select') and not has_function_privilege('anon','public.list_agent_websites(text,text,uuid)','execute') and has_function_privilege('service_role','public.list_agent_websites(text,text,uuid)','execute'),'receipts protected by internal token-scoped RPCs');
 rollback;
-\ir ../supabase/migrations/rollback-20261020090033_agent_website_tools.sql
-\ir ../supabase/migrations/20261020090033_agent_website_tools.sql
+\ir ../supabase/migrations/rollback-20261021131200_agent_website_tools.sql
+\ir ../supabase/migrations/20261021131200_agent_website_tools.sql

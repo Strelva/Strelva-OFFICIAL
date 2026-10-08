@@ -35,11 +35,11 @@ select pg_temp.connection_assert(
  'resolver is service-role only');
 rollback;
 -- No-data additive migration: verify actual rollback and reapply, not just syntax.
-\ir ../supabase/migrations/rollback-20261020090031_agent_oauth_connection_context.sql
+\ir ../supabase/migrations/rollback-20261021131000_agent_oauth_connection_context.sql
 do $$ begin
  if to_regprocedure('public.read_agent_oauth_connection(text,text)') is not null then raise exception 'resolver rollback failed'; end if;
 end $$;
-\ir ../supabase/migrations/20261020090031_agent_oauth_connection_context.sql
+\ir ../supabase/migrations/20261021131000_agent_oauth_connection_context.sql
 do $$ begin
  if not has_function_privilege('service_role','public.read_agent_oauth_connection(text,text)','execute')
  or has_function_privilege('anon','public.read_agent_oauth_connection(text,text)','execute')
