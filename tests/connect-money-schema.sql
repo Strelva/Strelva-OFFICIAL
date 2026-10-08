@@ -81,6 +81,10 @@ select pg_temp.expect_failure($q$select public.reserve_platform_collection('a283
 select public.reconcile_split_loss('platform','ch_PlatformFixture','refund-before-paid',500,1000);
 select public.record_platform_collection_settlement((select (body->>'id')::uuid from platform_collection),'pi_PlatformFixture','ch_PlatformFixture',1000,'cad','cus_MoneyPayer','evt_PlatformFixture');
 select pg_temp.assert_true((select sum(amount_cents)=50 from public.revenue_splits where invoice_line_id='il_platform_fixture' and beneficiary_kind='agency'),'pre-invoice refund retained and applied to accrual');
+select pg_temp.assert_true((select payer_workspace_id='a2830000-0000-4000-8000-000000000010'::uuid and customer_id='cus_MoneyPayer' from public.invoice_split_sources where invoice_line_id='il_platform_fixture'),'exact historical payer retained');
+select pg_temp.assert_true(exists(select 1 from jsonb_array_elements(public.export_workspace_v3_category('a2830000-0000-4000-8000-000000000010','a2830000-0000-4000-8000-000000000001','money-owner@example.test','revenue_splits',0,1000)->'items') r where r->>'invoice_line_id'='il_platform_fixture' and r->>'payer_customer_id'='cus_MoneyPayer'),'split export carries exact frozen payer');
+select pg_temp.expect_failure('update public.invoice_split_sources set customer_id=''cus_Foreign''','money_immutable');
+select pg_temp.expect_failure($q$select public.record_invoice_split_source('platform','il_denied','ch_Foreign','a2830000-0000-4000-8000-000000000010','a2830000-0000-4000-8000-000000000010','cus_Foreign',null,null,1000,'cad',now(),now()+interval '1 month')$q$,'invoice_payer_source_denied');
 select pg_temp.expect_failure(format('select public.prepare_approved_split_transfer(%L)',(select id from public.split_payouts)),'payout_operator_authorization_required');
 insert into public.super_admins(user_id,email) values('a2830000-0000-4000-8000-000000000001','money-owner@example.test') on conflict do nothing;
 insert into public.split_payout_authorizations(payout_id,approved_by,approved_at,profile_version) select id,'a2830000-0000-4000-8000-000000000001',now(),'approved-test-profile' from public.split_payouts;
