@@ -1,0 +1,10 @@
+
+ RUN  v4.1.11 /private/tmp/strelva-issue-528-role-path-20261008
+
+(node:45819) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+ Test Files  2 passed (2)
+      Tests  32 passed (32)
+   Start at  18:06:56
+   Duration  1.44s (transform 150ms, setup 72ms, import 109ms, tests 1.28s, environment 0ms)

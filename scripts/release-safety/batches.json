@@ -1283,7 +1283,7 @@
         },
         {
           "file": "20261020111000_audit_service_role_append_only.sql",
-          "sha256": "47adc8d510850fff3637a4ae74dc9f685336e72134ed59d8e94ae34bc7bd7b4b",
+          "sha256": "eae9458d3cac3bf13feb5a0dfbf195665c7f579f0db679068443db6a86e5a277",
           "rollback": "rollback-20261020111000_audit_service_role_append_only.sql",
           "rollbackSha256": "e19e85259bd73ba910dd42f6d3926d17646e5625b5a95cd0749d42264c920a08",
           "rollbackStatus": "refused; forward-only security repair retains append/read and established lifecycle cleanup"

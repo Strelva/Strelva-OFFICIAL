@@ -20,9 +20,16 @@ begin
   loop
     execute format('revoke update (%I) on public.audit_logs from service_role', column_name);
   end loop;
-  -- Never broaden this repair to unrelated roles. Inherited/PUBLIC/owner grants
-  -- require reviewing the actual role graph, so refuse the entire transaction.
-  if exists(select 1 from pg_roles where rolname='service_role' and rolsuper)
+  -- Never broaden this repair to unrelated roles. MEMBER deliberately includes
+  -- NOINHERIT memberships: SET ROLE or an ADMIN-option self-grant can activate
+  -- their permissions later. Refuse role management too; this ACL cannot bound it.
+  if exists(
+      select 1 from pg_roles reachable
+      where pg_has_role('service_role', reachable.oid, 'MEMBER')
+        and (reachable.rolsuper or reachable.rolcreaterole
+          or has_table_privilege(reachable.oid, 'public.audit_logs', 'UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+          or has_any_column_privilege(reachable.oid, 'public.audit_logs', 'UPDATE,REFERENCES'))
+    )
     or (select pg_has_role('service_role', relowner, 'MEMBER')
         from pg_class where oid='public.audit_logs'::regclass)
     or has_table_privilege('service_role', 'public.audit_logs', 'UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
@@ -31,8 +38,15 @@ begin
   end if;
   if exists (
     select 1 from (values ('anon'), ('authenticated')) client(role_name)
-    where has_table_privilege(client.role_name, 'public.audit_logs', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-      or has_any_column_privilege(client.role_name, 'public.audit_logs', 'SELECT,INSERT,UPDATE,REFERENCES')
+    where (select pg_has_role(client.role_name, relowner, 'MEMBER')
+           from pg_class where oid='public.audit_logs'::regclass)
+      or exists(
+        select 1 from pg_roles reachable
+        where pg_has_role(client.role_name, reachable.oid, 'MEMBER')
+          and (reachable.rolsuper or reachable.rolcreaterole
+            or has_table_privilege(reachable.oid, 'public.audit_logs', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+            or has_any_column_privilege(reachable.oid, 'public.audit_logs', 'SELECT,INSERT,UPDATE,REFERENCES'))
+      )
   ) then
     raise exception 'audit_browser_privilege_drift' using errcode='42501';
   end if;
