@@ -962,3 +962,11 @@ to remove platform identity. See [#264 evidence and limits](../product/streams/a
 ### Public business verification (#308, local)
 
 [`BusinessVerification`](../../src/experience/business-record/BusinessVerification.tsx) is the server-rendered evidence section on `/biz/{handle}`. It uses that public page's `surface-base`, `warm-black`, `gray-muted` and `gray-border` roles, semantic headings and definition rows; it adds no interactive primitive or business-wide badge. Missing, stale and revoked evidence are explicit. The gated fictional `/preview/strelva/business-verification?state=fresh|stale|unknown|revoked` exercises the same component with long domains and agency names. Local desktop and 390px mobile inspection confirms wrapping without horizontal overflow; this is not production/provider proof.
+
+### Business billing presentation (#496, local)
+
+`BusinessBillingView` owns the business billing page presentation using the owned
+`Card`, scoped navigation and semantic billing states. The authorized route retains
+its workspace and actor gates; the fictional dev-only preview passes synthetic
+values to the same view for desktop/mobile checks. No payer identity, pricing or
+payment authority changes are implied by this extraction.

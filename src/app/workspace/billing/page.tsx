@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Card } from "@/components/ui/Card";
+import { BusinessBillingView } from "@/experience/workspace/BusinessBillingView";
 import { businessBillingEnabled, readBusinessBilling } from "@/platform/business-billing";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
@@ -15,27 +14,6 @@ export default async function BusinessBillingPage({ searchParams }: { searchPara
   const workspaceId = (await searchParams).workspaceId ?? "";
   let billing;
   try { billing = await readBusinessBilling(actor, workspaceId); }
-  catch { return <main className="mx-auto max-w-3xl px-6 py-12"><h1 className="font-display text-3xl">Business billing</h1><p role="alert" className="mt-6 text-gray-muted">Billing could not be loaded. Confirm your access and try again.</p><Link className="mt-6 inline-flex min-h-12 items-center underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}>Back to the business</Link></main>; }
-  return <main className="mx-auto max-w-3xl px-6 py-12 text-warm-black">
-    <Link className="inline-flex min-h-12 items-center text-gray-muted underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}>Back to the business</Link>
-    <h1 className="mt-6 font-display text-3xl font-medium">Business billing</h1>
-    {billing ? <Card className="mt-8" padding="lg">
-      <p className="text-lg font-medium">{billing.state === "grandfathered" ? "Existing terms are kept" : billing.state === "comped" ? "Comped" : billing.state === "none" ? "Billing needs to be recorded" : billing.state === "custom" ? "Custom agreement" : "Subscription"}</p>
-      <h2 className="mt-6 font-medium">Who pays</h2>
-      {billing.payerParty ? <>
-        <p className="mt-3 text-sm">{billing.payerParty.kind === "agency" ? "Agency" : "Business"}{billing.payerParty.name?.trim() ? `: ${billing.payerParty.name}` : ""}</p>
-        <p className="mt-3 text-sm text-gray-muted">{billing.payerParty.kind === "agency" ? "The agency is recorded as the payer. Any separate bill from the agency follows the agreement with that agency." : "This business is recorded as the payer."}</p>
-      </> : <p className="mt-3 text-sm text-gray-muted">The payer is not recorded in this billing view. Confirm the existing billing arrangement before changing payment details.</p>}
-      <h2 className="mt-6 font-medium">Recorded Strelva amount</h2>
-      <p className="mt-3 text-2xl font-medium tabular-nums">${(billing.monthlyCents / 100).toFixed(2)} / month</p>
-      <p className="mt-3 text-sm text-gray-muted">Payment: {billing.paymentStatus.replaceAll("_", " ")}{billing.paidThrough ? ` · Paid through ${billing.paidThrough.slice(0, 10)}` : ""}</p>
-      {billing.paymentStatus === "past_due" ? <p role="status" className="mt-6">Payment needs attention. Sites and inquiry capture keep working.</p> : null}
-      {billing.grandfatheredTerms ? <p className="mt-6 text-sm text-gray-muted">{billing.grandfatheredTerms}</p> : null}
-      <h2 className="mt-8 font-medium">Sites covered</h2>
-      {billing.sites.length ? <ul className="mt-3 space-y-3 text-sm">{billing.sites.map(site => <li key={site.tenantId}>{site.siteName} · ${(site.amountCents / 100).toFixed(2)} / month</li>)}</ul> : <p className="mt-3 text-sm text-gray-muted">No sites are listed on this billing record.</p>}
-      <p className="mt-6 text-sm text-gray-muted">Moving into the business workspace does not change the recorded amount, plan or payment cycle.</p>
-      {billing.payerParty?.kind === "business" ? <p className="mt-3 text-sm text-gray-muted">Payment changes use this business’s existing billing arrangement.</p> : null}
-      {billing.payerParty?.kind === "agency" ? <p className="mt-3 text-sm text-gray-muted">Payment changes use the agency’s existing billing arrangement.</p> : null}
-    </Card> : <p className="mt-8 text-gray-muted">No billing record is attached to this business yet. The existing agreement and payer need to be recorded.</p>}
-  </main>;
+  catch { return <BusinessBillingView workspaceId={workspaceId} billing={null} unavailable />; }
+  return <BusinessBillingView workspaceId={workspaceId} billing={billing} />;
 }

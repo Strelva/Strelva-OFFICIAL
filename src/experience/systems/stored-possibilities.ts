@@ -47,6 +47,9 @@ import type {
 
 export const REBUILD_SOURCE_PREFIX = "website-rebuild:";
 
+/** Read-time uncertainty only; never persisted as a candidate change or approval. */
+type StoredPossibilityRead = ListedPossibility & { currentnessUnavailable?: string };
+
 export function rebuildSourceRef(workId: string): string {
   return `${REBUILD_SOURCE_PREFIX}${workId}`;
 }
@@ -210,8 +213,8 @@ function lastStale(p: Possibility): string | null {
 }
 
 /** Open stored Possibilities as the browser reads them. Made real and withdrawn move to History. */
-export function storedPossibilityViews(stored: readonly ListedPossibility[], candidates: readonly WebsiteRebuildCandidate[], summaries: { evidence: (workId: string) => string | null } = { evidence: () => null }, currentRevisions?: ReadonlyMap<string, { revisionId: string; number: number }>): WorkspaceSystemPossibility[] {
-  return stored.flatMap(({ possibility: p, sourceRef }) => {
+export function storedPossibilityViews(stored: readonly StoredPossibilityRead[], candidates: readonly WebsiteRebuildCandidate[], summaries: { evidence: (workId: string) => string | null } = { evidence: () => null }, currentRevisions?: ReadonlyMap<string, { revisionId: string; number: number }>): WorkspaceSystemPossibility[] {
+  return stored.flatMap(({ possibility: p, sourceRef, currentnessUnavailable }) => {
     if (p.status !== "exploring" && p.status !== "ready") return [];
     const baselineMoved = currentRevisions !== undefined && p.changes.some(change => currentRevisions.get(change.baseline.systemId)?.revisionId !== change.baseline.revisionId);
     const askContent = [...p.introduces, ...p.changes].find(item => item.candidate.content.kind === "ask-new-service-setup" || item.candidate.content.kind === "ask-inquiry-follow-up" || ["ask-website-pages", "ask-existing-booking-page", "ask-existing-website-pages"].includes(String(item.candidate.content.kind)))?.candidate.content;
@@ -226,14 +229,14 @@ export function storedPossibilityViews(stored: readonly ListedPossibility[], can
       id: p.id,
       title: p.title,
       summary: askContent ? p.intent : candidate?.summary ?? p.intent,
-      status: baselineMoved ? "exploring" : p.status,
+      status: baselineMoved || currentnessUnavailable ? "exploring" : p.status,
       affects: [...new Set([...p.changes.map((c) => c.baseline.systemId), ...(typeof askContent?.contextSystemId === "string" ? [askContent.contextSystemId] : [])])],
       evidence: candidate?.evidence ?? (workId ? summaries.evidence(workId) : null),
       previewHref: candidate?.previewHref ?? null,
       ...(tryHref ? { tryHref } : {}),
       workId: workId ?? p.id,
       stored: true,
-      staleReason: baselineMoved ? "A System this changes moved. Review a refreshed alternative before making it real." : lastStale(p),
+      staleReason: currentnessUnavailable ?? (baselineMoved ? "A System this changes moved. Review a refreshed alternative before making it real." : lastStale(p)),
     }];
   });
 }
@@ -350,9 +353,9 @@ export async function syncAskInquiryFollowUpPossibilities(deps: {
 export async function syncAskServiceSetupPossibilities(deps: {
   repo: SupabasePossibilityRepository; live: LiveSystemsReader; actorId: string; at: string;
   stored: ListedPossibility[]; canWrite: boolean; current(selection: unknown): Promise<boolean>;
-}): Promise<ListedPossibility[]> {
+}): Promise<StoredPossibilityRead[]> {
   if (!deps.canWrite) return deps.stored;
-  const rows = [...deps.stored];
+  const rows: StoredPossibilityRead[] = deps.stored.map(row => ({ ...row }));
   for (let index = 0; index < rows.length; index++) {
     const row = rows[index]!; const p = row.possibility;
     const content = p.introduces.find(item => item.candidate.content.kind === "ask-new-service-setup")?.candidate.content;
@@ -367,7 +370,11 @@ export async function syncAskServiceSetupPossibilities(deps: {
         continue;
       }
       if (p.status === "exploring") rows[index] = {...row, possibility:await prepare(p,true,deps)};
-    } catch { /* Unreadable authority and pins remain held; no live effect runs. */ }
+    } catch {
+      // Keep exact saved pins/history, but never advertise Ready when current
+      // authority could not be confirmed or its stale transition could not save.
+      rows[index] = { ...row, currentnessUnavailable: "Current service authority and settings could not be confirmed. Retry before making this alternative real." };
+    }
   }
   return rows;
 }

@@ -1605,7 +1605,8 @@ psql "${psql_args[@]}" --file="$repo_root/tests/system-version-declarations.sql"
 printf 'Package declarations: source publication, native release and authority checks passed.\n'
 
 # The current store service depends on native runtime and declaration authority.
-# Run it once against the complete schema, not the historical intermediate RPCs.
+# Run it against this historical declaration checkpoint. The complete ordered
+# upgrade separately qualifies the later owner-authority successor.
 if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
   STRELVA_VERSIONS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
     pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/system-versions-store-contract.test.ts src/__tests__/agency-versions-server.test.ts
