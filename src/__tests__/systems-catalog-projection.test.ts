@@ -230,6 +230,16 @@ describe("systems catalog: agency drafts are website Possibilities", () => {
     expect(candidate.tenantId).toBe("mooney-firm");
   });
 
+  it("labels the latest agent draft without changing prior agency history", () => {
+    const work = rebuild(["rebuild_published", "agency_document_draft", "agent_document_proposal"]);
+    const candidate = websiteRebuildCandidate(work)!;
+    expect(candidate.origin).toBe("agent_draft");
+    expect(candidate.summary).toContain("your connected agent");
+    expect(work.payload.history[1]!.kind).toBe("agency_document_draft");
+    expect(websiteRebuildCandidate(rebuild(["agent_document_proposal", "publish_reconciled"]))!.origin).toBe("rebuild");
+    expect(websiteRebuildCandidate(rebuild(["agent_document_proposal", "agency_document_draft"]))!.origin).toBe("agency_draft");
+  });
+
   it("keeps a plain rebuild, or a draft already published, a rebuild", () => {
     expect(websiteRebuildCandidate(rebuild(["created"]))!.origin).toBe("rebuild");
     expect(websiteRebuildCandidate(rebuild(["agency_document_draft", "publish_reconciled", "candidate"]))!.origin).toBe("rebuild");

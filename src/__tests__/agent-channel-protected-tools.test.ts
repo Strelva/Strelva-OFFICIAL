@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const ports = vi.hoisted(() => ({ validate: vi.fn(), rpc: vi.fn(), scope: vi.fn(), context: vi.fn() }));
+const ports = vi.hoisted(() => ({ validate: vi.fn(), inspect: vi.fn(), rpc: vi.fn(), scope: vi.fn(), context: vi.fn() }));
 vi.mock("@/platform/agent-channel/oauth", async original => ({
   ...await original<typeof import("@/platform/agent-channel/oauth")>(),
-  validateAgentToken: ports.validate, oauthRpc: ports.rpc,
+  validateAgentToken: ports.validate, inspectAgentToken: ports.inspect, oauthRpc: ports.rpc,
 }));
 vi.mock("@/platform/bookings/store", () => ({ readBookingContext: ports.context }));
 import { withProtectedTools } from "@/platform/agent-channel/protected-tools";
@@ -42,6 +42,7 @@ function request(name: string, args: Record<string, unknown> = {}, authenticated
 beforeEach(() => {
   vi.clearAllMocks();
   ports.validate.mockResolvedValue({ userId, verifiedEmail: "owner@example.test", workspaceId, agencyId: null });
+  ports.inspect.mockResolvedValue(null);
   ports.rpc.mockResolvedValue(record);
   ports.scope.mockResolvedValue("fixture");
   ports.context.mockResolvedValue({ workspaceId });
@@ -76,6 +77,37 @@ describe("assistant business context", () => {
     expect(response.headers.get("www-authenticate")).toContain('scope="business:read"');
     expect(response.headers.get("www-authenticate")).toContain("/.well-known/oauth-protected-resource/api/mcp/public");
     expect(ports.rpc).not.toHaveBeenCalled();
+  });
+  it("returns insufficient_scope for a live connection without the requested authority", async () => {
+    ports.validate.mockResolvedValue(null);
+    ports.inspect.mockResolvedValue({ userId, verifiedEmail: "owner@example.test", workspaceId, agencyId: null });
+    const response = await serveMcp(request("list_websites"), server());
+    expect(response.status).toBe(403);
+    expect(response.headers.get("www-authenticate")).toContain('error="insufficient_scope"');
+    expect(response.headers.get("www-authenticate")).toContain('scope="website:read"');
+    expect(ports.rpc).not.toHaveBeenCalled();
+  });
+  it("reads selected-business native websites with no public directory lookup", async () => {
+    ports.rpc.mockResolvedValue([]);
+    const response = await serveMcp(request("list_websites"), server());
+    const result = (await response.json()).result;
+    expect(result.isError).toBe(false);
+    expect(result.structuredContent).toMatchObject({ workspaceId, websites: [] });
+    expect(ports.validate).toHaveBeenCalledWith(expect.any(Request), "website:read", undefined);
+    expect(ports.scope).not.toHaveBeenCalled();
+    expect(ports.rpc).toHaveBeenCalledWith("list_agent_websites", expect.objectContaining({ p_workspace_id: workspaceId }));
+  });
+  it("gates proposals separately and refuses an agency seat without native owner authority", async () => {
+    ports.validate.mockResolvedValue({ userId, verifiedEmail: "owner@example.test", workspaceId, agencyId: otherId });
+    const response = await serveMcp(request("propose_website_change", {}), server());
+    expect((await response.json()).result.isError).toBe(true);
+    expect(ports.validate).toHaveBeenCalledWith(expect.any(Request), "website:propose", undefined);
+    expect(ports.rpc).not.toHaveBeenCalled();
+  });
+  it("advertises proposals as a reviewed write and exposes no publishing tool", () => {
+    const tools = server().tools;
+    expect(tools.find(t => t.name === "propose_website_change")!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false, idempotentHint: true });
+    expect(tools.filter(t => /approve.*website|publish.*website|deploy.*website/.test(t.name))).toEqual([]);
   });
   it("does not substitute the connected business for an explicit unauthorized selector", async () => {
     ports.validate.mockResolvedValue(null);
