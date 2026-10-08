@@ -159,6 +159,8 @@ under conflicting locks, concurrent index creation does not queue out client
 writes, a valid index can be retried, and an incompatible index is rejected.
 It never connects to a hosted or production database.
 
+`pnpm check:public-business-verification` applies the complete ordered migration history to an owned throwaway cluster, then proves published consent, owner-confirmed fact counts, tenant/connected-domain proof, privacy, revocation, actual READ ONLY execution and exact additive rollback/reapply for #308. `check:agency-workflow` also runs the projection contract on its final ordered schema. No hosted connection or provider call is made.
+
 Both commands require PostgreSQL server binaries. The SQL check scripts and
 release-safety rehearsal set `LC_ALL=C` internally, including for `initdb` and
 `pg_ctl`; callers do not need to export a locale on macOS/PostgreSQL 18.

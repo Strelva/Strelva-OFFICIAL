@@ -6,6 +6,7 @@
  * is the booking manage link, whose tokens a handle could equal, so the page
  * lives under `/biz/`.
  */
+import type { PublicBusinessVerification } from "@/platform/business-record/verification";
 import type { PublicFacts } from "./contracts";
 import { publishedPolicyRows } from "./published-policies";
 
@@ -33,6 +34,7 @@ export interface PublishedBusinessPage {
   handle: string;
   facts: PublicFacts;
   confirmedAt: string | null;
+  verification?: PublicBusinessVerification;
 }
 
 type Day = NonNullable<PublicFacts["hours"]>[number]["day"];

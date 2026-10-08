@@ -9,6 +9,7 @@
  * Contracts and pure helpers only. Storage is store.ts; behavior is server.ts.
  */
 import { z } from "zod";
+import { verifiedProfileUrls, type PublicBusinessVerification } from "@/platform/business-record/verification";
 import type { BusinessRecord } from "@/platform/business-record/contracts";
 import { selectPublishedBusinessPolicies, type PublishedPolicies } from "@/platform/business-record/policies";
 import { publishedPolicyRows, PAYMENT_LABELS } from "./published-policies";
@@ -179,7 +180,7 @@ export function publicFactsFromConfirmedRecord(workspaceId: string, raw: {
  * paste block all use it. Services become Offers of a Service; free-text
  * prices stay out (a price must be a number in schema.org, and none is guessed).
  */
-export function businessJsonLd(facts: PublicFacts, siteUrl?: string | null): Record<string, unknown> | null {
+export function businessJsonLd(facts: PublicFacts, siteUrl?: string | null, verification?: PublicBusinessVerification): Record<string, unknown> | null {
   if (!facts.name) return null;
   const ld: Record<string, unknown> = { "@context": "https://schema.org", "@type": "LocalBusiness", name: facts.name, ...(siteUrl ? { url: siteUrl } : {}) };
   if (facts.description) ld.description = facts.description;
@@ -194,7 +195,8 @@ export function businessJsonLd(facts: PublicFacts, siteUrl?: string | null): Rec
     const names: Record<string, string> = { mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thursday", fri: "Friday", sat: "Saturday", sun: "Sunday" };
     ld.openingHoursSpecification = open.map(row => ({ "@type": "OpeningHoursSpecification", dayOfWeek: names[row.day], opens: row.opens, closes: row.closes }));
   }
-  if (facts.social_links?.length) ld.sameAs = facts.social_links;
+  const sameAs = [...new Set([...(facts.social_links ?? []), ...(verification ? verifiedProfileUrls(verification) : [])])];
+  if (sameAs.length) ld.sameAs = sameAs;
   if (facts.service_area?.length) ld.areaServed = facts.service_area;
   if (facts.services?.length) {
     ld.makesOffer = facts.services.map(service => ({ "@type": "Offer", itemOffered: { "@type": "Service", name: service.name, ...(service.description ? { description: service.description } : {}) } }));

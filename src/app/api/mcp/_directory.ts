@@ -10,7 +10,7 @@ import { getActiveTenants } from "@/lib/tenants";
 import { getTenantPublicUrl } from "@/lib/tenant-urls";
 import { isTenantId } from "@/lib/scaffold-contracts";
 import { workspaceBookingScope } from "@/platform/bookings/booking-scope";
-import { appOrigin, businessPageUrl, listPublishedBusinessPages, loadPublishedBusinessPage } from "@/products/connected-sites/server";
+import { appOrigin, businessPageUrl, listPublishedBusinessPages, loadPublishedBusinessPage, readPublicBusinessVerification } from "@/products/connected-sites/server";
 
 const NATIVE = "biz:";
 
@@ -25,6 +25,9 @@ export const tenantDirectory: BusinessDirectory = {
         business: `${NATIVE}${page.handle}`, name: page.facts.name!, industry: null, website: businessPageUrl(appOrigin(), page.handle),
       })),
     ];
+  },
+  async verification(business) {
+    return readPublicBusinessVerification(business.startsWith(NATIVE) ? { handle: business.slice(NATIVE.length) } : { tenantId: business });
   },
   async scope(business) {
     if (!business.startsWith(NATIVE)) return isTenantId(business) ? business : null;

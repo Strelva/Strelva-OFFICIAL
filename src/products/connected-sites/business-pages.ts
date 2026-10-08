@@ -14,6 +14,7 @@
  * Both use businessJsonLd and schemaBlock, so they never disagree.
  */
 import { z } from "zod";
+import { readPublicBusinessVerification } from "./public-verification";
 import { WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { BUSINESS_HANDLE_PATTERN, businessPageUrl, type PublishedBusinessPage } from "./business-page";
 import { businessPagesStore, type BusinessPageSettings, type BusinessPagesStore } from "./business-pages-store";
@@ -37,7 +38,7 @@ export async function loadPublishedBusinessPage(handle: string, deps: { store?: 
   if (!(await (deps.publicFor ?? connectedSitesPublicFor)(row.workspaceId).catch(() => false))) return null;
   const facts = publicFactsFromConfirmedRecord(row.workspaceId, row);
   if (!facts.name) return null;
-  return { workspaceId: row.workspaceId, handle: row.handle, facts, confirmedAt: row.confirmedAt };
+  return { workspaceId: row.workspaceId, handle: row.handle, facts, confirmedAt: row.confirmedAt, verification: await readPublicBusinessVerification({ handle: row.handle }) };
 }
 
 /** Every page loadPublishedBusinessPage would serve, under the same gates. */

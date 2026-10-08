@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const ports = vi.hoisted(() => ({ tenants: vi.fn(), list: vi.fn(), load: vi.fn() }));
+const ports = vi.hoisted(() => ({ tenants: vi.fn(), list: vi.fn(), load: vi.fn(), verification: vi.fn() }));
 vi.mock("@/lib/tenants", () => ({ getActiveTenants: ports.tenants }));
 vi.mock("@/lib/tenant-urls", () => ({ getTenantPublicUrl: (t: { id: string }) => `https://${t.id}.example` }));
 vi.mock("@/products/connected-sites/server", () => ({
   appOrigin: () => "https://app.strelva.test",
   businessPageUrl: (origin: string, handle: string) => `${origin}/biz/${handle}`,
-  listPublishedBusinessPages: ports.list, loadPublishedBusinessPage: ports.load,
+  listPublishedBusinessPages: ports.list, loadPublishedBusinessPage: ports.load, readPublicBusinessVerification: ports.verification,
 }));
 
 import { tenantDirectory } from "@/app/api/mcp/_directory";
@@ -27,6 +27,15 @@ describe("platform MCP directory (#547 review: tenantless businesses)", () => {
       { business: "fixture", name: "Fixture Barbers", industry: "barber", website: "https://fixture.example" },
       { business: "biz:native-cuts", name: "Native Cuts", industry: null, website: "https://app.strelva.test/biz/native-cuts" },
     ]);
+  });
+
+  it("resolves verification by public business handle or active tenant, never raw workspace input", async () => {
+    const evidence = { ownerConfirmedFactCount: 3 };
+    ports.verification.mockResolvedValue(evidence);
+    expect(await tenantDirectory.verification?.("biz:native-cuts")).toEqual(evidence);
+    expect(ports.verification).toHaveBeenLastCalledWith({ handle: "native-cuts" });
+    await tenantDirectory.verification?.("fixture");
+    expect(ports.verification).toHaveBeenLastCalledWith({ tenantId: "fixture" });
   });
 
   it("keeps listing tenants when the business page read fails", async () => {
