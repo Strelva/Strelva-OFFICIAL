@@ -117,4 +117,59 @@ select public.record_money_reconciliation_issue('acct_SeamMerchant','evt_SeamFor
 select pg_temp.mcq_denied(format('select public.resolve_money_reconciliation(%L,%L,''acct_SeamMerchant'',''evt_SeamForeignObject'',''fixture_foreign_object'',''effect_confirmed'',''Foreign provider object receipt cannot prove this payment.'',''business_payment'',%L)','cd161600-0000-4000-8000-000000000003','mcq-operator@example.test',(select id from public.business_payment_events where kind='paid' and provider_object_id='pi_SeamQuote')),'money_reconciliation_effect_unproven');
 select pg_temp.mcq_assert(exists(select 1 from jsonb_array_elements(public.export_workspace_v3_category('cd161600-0000-4000-8000-000000000010','cd161600-0000-4000-8000-000000000001','mcq-owner@example.test','payment_requests',0,1000)->'items') e where e->>'agent_quote_receipt_id'=(select body->>'receiptId' from mcq_quote_price) and e->>'accepted_terms'=(select body->>'terms' from mcq_quote_price) and not(e ? 'token_hash')),'canonical quote terms exported without public capability');
 select pg_temp.mcq_assert(not exists(select 1 from public.money_reconciliation_resolutions where (account_id,event_id) in (('acct_SeamMerchant','evt_SeamCheckoutReview'),('platform','evt_SeamForeignAccount'),('acct_SeamMerchant','evt_SeamForeignObject'))),'denied review evidence changes no financial or review state');
+-- #287: maintenance terms are fictional local approvals, not commercial rates.
+-- Execute the existing command and future period accrual before any source fix.
+create temporary table mcq_maintenance_before as select
+ (select jsonb_agg(to_jsonb(r) order by r.id) from public.revenue_splits r) splits,
+ (select to_jsonb(l) from public.creator_listings l where l.source_revision_id=(select revision_id from mcq_installed)) listing,
+ (select to_jsonb(i) from public.offering_installations i where i.id=(select id from mcq_installed)) installation;
+create function pg_temp.mcq_maintenance(state text,agreement text,rate text,effective timestamptz) returns jsonb language sql as $$
+ select public.record_creator_royalty_maintenance((select id from public.creator_listings where source_revision_id=(select revision_id from mcq_installed)),
+ 'cd161600-0000-4000-8000-000000000003','mcq-operator@example.test',state,agreement,rate,effective)
+$$;
+select pg_temp.mcq_denied($q$select pg_temp.mcq_maintenance('takeover',null,null,now()-interval '1 day')$q$,'creator_maintenance_terms_invalid');
+select pg_temp.mcq_denied($q$select pg_temp.mcq_maintenance('takeover','fictional-seam-royalty','fictional-seam-rate-reference',now()+interval '1 day')$q$,'creator_maintenance_terms_invalid');
+select pg_temp.mcq_denied($q$select pg_temp.mcq_maintenance('tapered','unapproved-taper','unapproved-rate',now()+interval '3 days')$q$,'approved_creator_maintenance_agreement_required');
+select pg_temp.mcq_denied($q$select public.record_creator_royalty_maintenance((select id from public.creator_listings where source_revision_id=(select revision_id from mcq_installed)),'cd161600-0000-4000-8000-000000000004','mcq-stranger@example.test','takeover',null,null,now()+interval '1 day')$q$,'connect_denied');
+-- Being a platform operator supplies no creator workspace role.
+savepoint maintenance_role_loss;
+update public.workspace_memberships set role='member' where workspace_id='cd161600-0000-4000-8000-000000000020' and user_id='cd161600-0000-4000-8000-000000000003';
+select pg_temp.mcq_denied($q$select pg_temp.mcq_maintenance('takeover',null,null,now()+interval '1 day')$q$,'connect_denied');
+rollback to maintenance_role_loss;
+savepoint maintenance_identity_loss;
+update public.users set verified_at=null where id='cd161600-0000-4000-8000-000000000003';
+select pg_temp.mcq_denied($q$select pg_temp.mcq_maintenance('takeover',null,null,now()+interval '1 day')$q$,'connect_denied');
+rollback to maintenance_identity_loss;
+create temporary table mcq_takeover as select pg_temp.mcq_maintenance('takeover',null,null,now()+interval '1 day') body;
+select pg_temp.mcq_assert(pg_temp.mcq_maintenance('takeover',null,null,now()+interval '1 day')=(select body from mcq_takeover),'exact future takeover replay returns original immutable receipt');
+select pg_temp.mcq_denied($q$select pg_temp.mcq_maintenance('creator','fictional-seam-royalty','fictional-seam-rate-reference',now()+interval '1 day')$q$,'creator_maintenance_conflict');
+-- Approved bounded taper uses an explicit fixture-only agreement and rate.
+insert into public.money_agreements(beneficiary_workspace_id,kind,version,rate_reference,rate_bps,effective_from,effective_until,approved_by,approved_at)
+ values('cd161600-0000-4000-8000-000000000020','creator','fictional-maintenance-taper','fictional-maintenance-rate',113,now()+interval '3 days',now()+interval '20 days','cd161600-0000-4000-8000-000000000003',now());
+create temporary table mcq_taper as select pg_temp.mcq_maintenance('tapered','fictional-maintenance-taper','fictional-maintenance-rate',now()+interval '3 days') body;
+select pg_temp.mcq_assert(pg_temp.mcq_maintenance('tapered','fictional-maintenance-taper','fictional-maintenance-rate',now()+interval '3 days')=(select body from mcq_taper),'approved future taper replay returns original immutable receipt');
+select pg_temp.mcq_denied($q$update public.creator_royalty_terms set maintainer_state='creator'$q$,'money_immutable');
+-- Each receipt freezes exact payer, source and period. All fixture invoice lines
+-- are hypothetical future collections, never a provider call or real invoice.
+create function pg_temp.mcq_maintenance_accrue(line text,starts timestamptz,ends timestamptz) returns jsonb language plpgsql as $$
+begin
+ perform public.record_invoice_split_source('platform',line,'ch_Maintenance'||replace(line,'_',''),
+ 'cd161600-0000-4000-8000-000000000010','cd161600-0000-4000-8000-000000000010','cus_SeamPayer','sub_SeamPayer','si_SeamItem',10000,'cad',starts,ends);
+ return public.accrue_invoice_splits('cd161600-0000-4000-8000-000000000010',line,starts,ends,'platform','ch_Maintenance'||replace(line,'_',''),10000,'cad',(select id from mcq_installed));
+end $$;
+select pg_temp.mcq_maintenance_accrue('maintenance_before',now()+interval '1 hour',now()+interval '2 hours');
+select pg_temp.mcq_maintenance_accrue('maintenance_takeover',now()+interval '2 days',now()+interval '3 days');
+select pg_temp.mcq_maintenance_accrue('maintenance_taper',now()+interval '4 days',now()+interval '5 days');
+select pg_temp.mcq_maintenance_accrue('maintenance_taper',now()+interval '4 days',now()+interval '5 days');
+select pg_temp.mcq_maintenance_accrue('maintenance_expired',now()+interval '21 days',now()+interval '22 days');
+select pg_temp.mcq_maintenance_accrue('maintenance_crosses_end',now()+interval '19 days',now()+interval '21 days');
+select pg_temp.mcq_assert((select amount_cents=201 and maintainer_state='creator' and agreement_version='fictional-seam-royalty' from public.revenue_splits where invoice_line_id='maintenance_before' and beneficiary_kind='creator'),'original creator terms apply strictly before future takeover');
+select pg_temp.mcq_assert((select amount_cents=0 and maintainer_state='takeover' and agreement_version is null and rate_bps is null from public.revenue_splits where invoice_line_id='maintenance_takeover' and beneficiary_kind='creator'),'future takeover suppresses future royalty eligibility without deleting creator provenance');
+select pg_temp.mcq_assert((select count(*)=1 and bool_and(amount_cents=113 and maintainer_state='tapered' and agreement_version='fictional-maintenance-taper' and rate_reference='fictional-maintenance-rate' and rate_bps=113) from public.revenue_splits where invoice_line_id='maintenance_taper' and beneficiary_kind='creator'),'approved tapered agreement bounds one future royalty and replay emits no duplicate');
+select pg_temp.mcq_assert((select count(*)=2 and bool_and(amount_cents=0 and agreement_version is null) from public.revenue_splits where invoice_line_id in('maintenance_expired','maintenance_crosses_end') and beneficiary_kind='creator'),'expiry and partial uncovered period earn no royalty under bounded agreement');
+select pg_temp.mcq_denied($q$select pg_temp.mcq_maintenance_accrue('maintenance_taper',now()+interval '4 days',now()+interval '6 days')$q$,'invoice_payer_source_conflict');
+select pg_temp.mcq_assert((select bool_and(s.source_revision_id=i.revision_id and s.beneficiary_workspace_id=i.creator_id and s.installation_id=i.id and r.payer_workspace_id='cd161600-0000-4000-8000-000000000010') from public.revenue_splits s cross join mcq_installed i join public.invoice_split_sources r on r.invoice_line_id=s.invoice_line_id where s.beneficiary_kind='creator' and s.invoice_line_id like 'maintenance_%'),'takeover and taper keep original creator/source/install and exact payer on every period');
+select pg_temp.mcq_assert((select to_jsonb(l)=b.listing and to_jsonb(i)=b.installation from public.creator_listings l join mcq_installed frozen on l.source_revision_id=frozen.revision_id join public.offering_installations i on i.id=frozen.id cross join mcq_maintenance_before b),'maintenance receipts never reattribute original creator, source revision or Version');
+select pg_temp.mcq_assert((select jsonb_agg(to_jsonb(r) order by r.id) from public.revenue_splits r where r.invoice_line_id not like 'maintenance_%')=(select splits from mcq_maintenance_before),'all original periods and loss/recovery receipts remain byte-identical');
+select pg_temp.mcq_assert(not has_function_privilege('authenticated','public.record_creator_royalty_maintenance(uuid,uuid,text,text,text,text,timestamptz)','EXECUTE') and not has_table_privilege('service_role','public.creator_royalty_terms','INSERT'),'maintenance terms are service-only supplied-actor commands, not table writes');
 rollback;
