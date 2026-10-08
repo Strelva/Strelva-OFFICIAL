@@ -31,8 +31,8 @@ import { getTenantConfig } from "@/lib/tenants";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { isTenantId } from "@/lib/scaffold-contracts";
 import { getRedis } from "@/platform/infra/redis";
-import { getTenantPublicUrl } from "@/lib/tenant-urls";
-import { getTenantTrackPublicKey } from "@/lib/tracking-signing-keys";
+import { getTenantPublicOrigins } from "@/lib/tenant-urls";
+import { getTenantTrackPublicKeys, TRACK_SIGNING_KEY_OVERLAP_MS } from "@/lib/tracking-signing-keys";
 import { TRACK_SIGNATURE_HEADERS, verifyTrackSignature } from "@/lib/track-signature";
 
 // The minimal public event vocabulary. Kept intentionally small: this is a
@@ -86,7 +86,7 @@ const SERVICE_ID_RE = /^[a-z0-9][a-z0-9_-]{0,79}$/i;
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": `Content-Type, ${TRACK_SIGNATURE_HEADERS.timestamp}, ${TRACK_SIGNATURE_HEADERS.signature}`,
+  "Access-Control-Allow-Headers": `Content-Type, ${TRACK_SIGNATURE_HEADERS.timestamp}, ${TRACK_SIGNATURE_HEADERS.signature}, ${TRACK_SIGNATURE_HEADERS.origin}`,
   "Access-Control-Max-Age": "86400",
 };
 
@@ -109,20 +109,6 @@ export async function POST(
   }
 
   try {
-    // Independently cap a site's aggregate writes and a caller IP's writes.
-    // Neither counter is optional: a Redis failure denies this write.
-    let siteLimited: boolean;
-    let ipLimited: boolean;
-    try {
-      siteLimited = await isRateLimitedAsync(`v1-track:site:${tenant}`, TRACK_SITE_PER_MINUTE);
-      ipLimited = await isRateLimitedAsync(rateLimitKey(req, "v1-track:ip"), TRACK_IP_PER_MINUTE);
-    } catch {
-      return corsJson({ error: "Tracking temporarily unavailable" }, 503);
-    }
-    if (siteLimited || ipLimited) {
-      return corsJson({ error: "Too many requests" }, 429);
-    }
-
     // Read once so the signed server-to-server order event is checked against
     // the exact bytes that were parsed. text/plain sendBeacon stays supported.
     const rawBody = await req.text();
@@ -143,6 +129,25 @@ export async function POST(
     const { event, serviceId } = body;
     if (typeof event !== "string" || !ALLOWED_EVENTS.has(event)) {
       return corsJson({ error: "Invalid event" }, 400);
+    }
+
+    // Check the caller first so a single IP that is already over its cap does
+    // not consume the site's aggregate allowance. Non-order analytics are
+    // lossy and preserve the legacy fail-open behavior during Redis outages;
+    // signed orders fail closed because they affect Store outcomes.
+    try {
+      const ipLimited = await isRateLimitedAsync(rateLimitKey(req, "v1-track:ip"), TRACK_IP_PER_MINUTE);
+      if (ipLimited) {
+        return corsJson({ error: "Too many requests" }, 429);
+      }
+      const siteLimited = await isRateLimitedAsync(`v1-track:site:${tenant}`, TRACK_SITE_PER_MINUTE);
+      if (siteLimited) {
+        return corsJson({ error: "Too many requests" }, 429);
+      }
+    } catch {
+      if (event === "order") {
+        return corsJson({ error: "Tracking temporarily unavailable" }, 503);
+      }
     }
 
     let serviceKey: string | null = null;
@@ -172,8 +177,12 @@ export async function POST(
         return corsJson({ error: parsed.error }, 400);
       }
 
-      const publicKey = await getTenantTrackPublicKey(tenant);
-      const originHeader = req.headers.get("origin");
+      const signedOriginHeader = req.headers.get(TRACK_SIGNATURE_HEADERS.origin);
+      const browserOriginHeader = req.headers.get("origin");
+      const originHeader = signedOriginHeader ?? browserOriginHeader;
+      const conflictingOrigins = Boolean(
+        signedOriginHeader && browserOriginHeader && signedOriginHeader !== browserOriginHeader,
+      );
       let origin: string | null = null;
       try {
         const parsedOrigin = originHeader ? new URL(originHeader) : null;
@@ -183,26 +192,36 @@ export async function POST(
       } catch {
         // No or malformed Origin is unverified.
       }
-      let configuredOrigin: string | null = null;
-      try {
-        configuredOrigin = new URL(getTenantPublicUrl(config, "production")).origin;
-      } catch {
-        // A missing or invalid configured public URL cannot verify a site.
+      const configuredOrigins = new Set(getTenantPublicOrigins(config, "production"));
+      const timestamp = req.headers.get(TRACK_SIGNATURE_HEADERS.timestamp);
+      const signature = req.headers.get(TRACK_SIGNATURE_HEADERS.signature);
+      let verified = false;
+      if (timestamp && signature) {
+        const keys = await getTenantTrackPublicKeys(tenant);
+        const boundToConfiguredOrigin = Boolean(
+          origin && !conflictingOrigins && configuredOrigins.has(origin),
+        );
+        if (keys && boundToConfiguredOrigin && origin) {
+          const signatureInput = { tenant, origin, timestamp, signature, rawBody };
+          const currentKeyVerified = verifyTrackSignature({
+            ...signatureInput,
+            publicKey: keys.currentPublicKey,
+          });
+          const previousValidUntil = keys.previousValidUntil ? Date.parse(keys.previousValidUntil) : Number.NaN;
+          const now = Date.now();
+          const previousKeyIsInWindow = Boolean(
+            keys.previousPublicKey &&
+            Number.isFinite(previousValidUntil) &&
+            now < previousValidUntil &&
+            previousValidUntil <= now + TRACK_SIGNING_KEY_OVERLAP_MS,
+          );
+          const previousKeyVerified = previousKeyIsInWindow && verifyTrackSignature({
+            ...signatureInput,
+            publicKey: keys.previousPublicKey!,
+          });
+          verified = currentKeyVerified || previousKeyVerified;
+        }
       }
-
-      const verified = Boolean(
-        publicKey &&
-        origin &&
-        origin === configuredOrigin &&
-        verifyTrackSignature({
-          publicKey,
-          tenant,
-          origin,
-          timestamp: req.headers.get(TRACK_SIGNATURE_HEADERS.timestamp),
-          signature: req.headers.get(TRACK_SIGNATURE_HEADERS.signature),
-          rawBody,
-        }),
-      );
       if (!verified) {
         return corsJson({ ok: true, verified: false, recorded: false }, 200);
       }
@@ -216,7 +235,8 @@ export async function POST(
 
     // Best-effort dedup: collapse identical rapid-fire events (double-fires,
     // sendBeacon retries) from the same client within a short window. Redis is
-    // also required by the write rate limits, so a dedup outage denies writes.
+    // also backs the rate limits, but click analytics retain their legacy
+    // fail-open behavior when Redis is unavailable.
     const redis = getRedis();
     if (redis) {
       // Extract the IP directly from x-forwarded-for to avoid splitting on ':'
@@ -231,7 +251,8 @@ export async function POST(
           return corsJson({ ok: true, deduped: true }, 200);
         }
       } catch {
-        return corsJson({ error: "Tracking temporarily unavailable" }, 503);
+        // A duplicate or dropped click is less harmful than losing all page
+        // views during a Redis outage. This path never handles order events.
       }
     }
 

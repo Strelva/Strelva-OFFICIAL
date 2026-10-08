@@ -2,6 +2,7 @@ import { createPrivateKey, sign } from "node:crypto";
 
 const TIMESTAMP_HEADER = "x-reb-track-timestamp";
 const SIGNATURE_HEADER = "x-reb-track-signature";
+const ORIGIN_HEADER = "x-reb-track-origin";
 
 /** Sign the exact JSON body, tenant path, site origin, and current timestamp. Server-only. */
 export function createTrackSignatureHeaders(input: {
@@ -28,6 +29,7 @@ export function createTrackSignatureHeaders(input: {
     return {
       [TIMESTAMP_HEADER]: timestamp,
       [SIGNATURE_HEADER]: signature,
+      [ORIGIN_HEADER]: input.origin,
     };
   } catch {
     return null;

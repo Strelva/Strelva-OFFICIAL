@@ -9199,16 +9199,22 @@ export type Database = {
         Row: {
           created_at: string
           public_key: string
+          previous_public_key: string | null
+          previous_valid_until: string | null
           tenant_id: string
         }
         Insert: {
           created_at?: string
           public_key: string
+          previous_public_key?: string | null
+          previous_valid_until?: string | null
           tenant_id: string
         }
         Update: {
           created_at?: string
           public_key?: string
+          previous_public_key?: string | null
+          previous_valid_until?: string | null
           tenant_id?: string
         }
         Relationships: [
@@ -11870,6 +11876,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      rotate_tenant_track_signing_key: {
+        Args: {
+          p_public_key: string | null
+          p_tenant_id: string
+        }
+        Returns: undefined
+      }
       business_policy_integer_valid: {
         Args: {
           hi: number

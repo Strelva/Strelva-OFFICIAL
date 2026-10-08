@@ -3,6 +3,7 @@ import { createPublicKey, verify as verifySignature } from "node:crypto";
 export const TRACK_SIGNATURE_HEADERS = {
   timestamp: "x-reb-track-timestamp",
   signature: "x-reb-track-signature",
+  origin: "x-reb-track-origin",
 } as const;
 
 export const TRACK_SIGNATURE_TOLERANCE_MS = 5 * 60 * 1000;

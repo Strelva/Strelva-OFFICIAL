@@ -321,9 +321,12 @@ below to report completed orders.
 #### Verify server-side orders
 
 The track endpoint verifies optional Ed25519 signatures bound to the tenant,
-the exact request body, a five-minute timestamp, and the site's configured
-production origin. Unsigned legacy requests still receive HTTP 200, but do not
-create an order. Verified orders are deduplicated by their provider order id.
+the exact request body, a five-minute timestamp, and one of the site's
+configured public origins. The starter adds the signed origin as
+`x-reb-track-origin`; server-side `fetch` does not supply a browser `Origin`
+header. Browser beacons can continue to use their normal `Origin` header.
+Unsigned legacy requests still receive HTTP 200, but do not create an order.
+Verified orders are deduplicated by their provider order id.
 
 Create one Ed25519 key pair per site outside the repo:
 
@@ -343,11 +346,15 @@ Never use a `NEXT_PUBLIC_` variable or commit the private key.
 
 Copy `track-signature.ts` into the client repo beside the webhook template. The
 starter's Stripe webhook signs the verified checkout event automatically when
-`REB_TRACKING_PRIVATE_KEY` is set. Its `Origin` must match the site's public
-origin in the tenant's `siteUrl` / production domain settings. Keep the private
-key only in the server environment. Clearing `trackingPublicKey` with an empty
-string returns the site to compatibility mode, where new order beacons are
-unverified.
+`REB_TRACKING_PRIVATE_KEY` is set. Its request URL origin must match a configured
+site origin from `siteUrl`, `productionDomain`, `customDomains`, or the hosted
+tenant URL. Keep the private key only in the server environment.
+
+When a new public key is configured, Strelva keeps the previous key valid for
+24 hours so in-flight webhook deliveries can finish during rotation. Only the
+immediately previous key is retained; another rotation replaces that overlap
+key. Clearing `trackingPublicKey` with an empty string removes both keys and
+returns the site to compatibility mode, where new order beacons are unverified.
 
 See `docs/operations/tracking-rollout.md` in the Scaffold Web repo for the exact steps to
 roll this into the live GLDF and Rohlax repos plus how to verify the report
