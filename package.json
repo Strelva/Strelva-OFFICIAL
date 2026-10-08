@@ -38,7 +38,7 @@
     "test:workspace-target": "node --test scripts/tests/workspace-target.node-test.mjs",
     "check:release-one": "bash scripts/check-release-one.sh",
     "check:journeys": "bash scripts/check-journeys.sh",
-    "check:readonly-rpcs": "node scripts/check-readonly-rpcs.mjs",
+    "check:readonly-rpcs": "node --import tsx scripts/check-readonly-rpcs.mjs",
     "check:make-real-compensation-sql": "bash scripts/check-make-real-compensation-sql.sh",
     "smoke:workspace": "STRELVA_WORKSPACE_RELEASE=1 playwright test tests/workspace-release.spec.ts",
     "audit:full": "npx tsx --env-file-if-exists=.env.local scripts/full-audit.ts",
