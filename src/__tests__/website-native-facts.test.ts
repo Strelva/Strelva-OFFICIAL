@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { createNativeWebsiteFactService, nativeContactFacts, nativeWebsiteFactsPatch, createNativeFactReviewStore, type NativeWebsiteFactPorts } from "@/app/workspace/business-details/native-website-facts";
-import type { BusinessRecord } from "@/platform/business-record/contracts";
+import type { BusinessRecord, ConfirmedBusinessFacts } from "@/platform/business-record/contracts";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 
 const actor = { userId: "7e000000-0000-4000-8000-000000000001", verifiedEmail: "owner@example.test" };
@@ -14,10 +14,14 @@ const record = (): BusinessRecord => ({ workspaceId: ws, access: "owner", revisi
   hours: { value: { timezone: "America/New_York", weekly: [{ day: 1, opens: "09:00", closes: "17:00" }], overrides: [{ date: "2026-12-25", closed: true, label: "Holiday" }] }, source: "owner", verified: true, updatedAt: at, updatedBy: actor.userId },
   owner_recipient: { value: { email: "private-owner@example.test" }, source: "owner", verified: true, updatedAt: at, updatedBy: actor.userId },
 }, services: [], people: [], contactCount: 0 });
+/** The confirmed copy (read_confirmed_business_facts): never the owner recipient. */
+const confirmed = (): ConfirmedBusinessFacts => ({ revision: 3, services: [],
+  facts: Object.fromEntries(Object.entries(record().facts).filter(([key]) => key !== "owner_recipient").map(([key, fact]) => [key, fact!.value])) });
 const makePorts = () => {
   const claimed = new Set<string>();
   const ports = {
     enabled: vi.fn(() => true), released: vi.fn(async () => true), record: vi.fn(async () => record()),
+    confirmed: vi.fn(async () => confirmed()),
     sites: vi.fn(async () => ({ systems: [{ system: { id: ws, kind: "website", lifecycle: "live" }, references: { tenantId: "gldf" } }] })),
     tenant: vi.fn(async () => ({ id: "gldf", active: true, deliveryModel: "custom_repo" })),
     allowed: vi.fn(async () => true), template: vi.fn(async () => ({ contentSections: ["contact"] })),
@@ -34,14 +38,23 @@ beforeEach(() => vi.stubEnv("STRELVA_WEBSITE_NATIVE_FACTS_ENABLED", "1"));
 
 describe("native website facts review", () => {
   it("retains the approved contact shape, excluding private and unconfirmed record values", () => {
-    const r = record();r.facts.phone!.source = "website_rebuild";
-    const next = nativeContactFacts(r, ["phone", "email", "address", "hours", "owner_recipient"], current);
+    const c = confirmed();delete c.facts.phone;c.facts.owner_recipient = { email: "private-owner@example.test" };
+    const next = nativeContactFacts(c, ["phone", "email", "address", "hours", "owner_recipient"], current);
     expect(next.phone).toBe(current.phone);
     expect(next.email).toBe("public@example.test");expect(next.address).toBe("123 Fictional St, Buffalo, NY, 14201");
     expect(next.hours).toContain("Monday: 09:00–17:00");expect(next.hours).toContain("2026-12-25 (Holiday): Closed");expect(next.hours).toContain("Timezone: America/New_York");
     expect(next).toMatchObject({ headline: current.headline, description: current.description, instagramUrl: current.instagramUrl, locationDescription: current.locationDescription });
     expect(JSON.stringify(next)).not.toContain("private-owner");
-    expect(nativeContactFacts(record(), ["phone"], current)).toMatchObject({ phone: "716-555-0123", email: current.email });
+    expect(nativeContactFacts(confirmed(), ["phone"], current)).toMatchObject({ phone: "716-555-0123", email: current.email });
+  });
+  it("never dispatches an operator's or agency's pending edit, even one marked verified (#509)", async () => {
+    for (const source of ["operator", "agency"] as const) {
+      const { ports, service } = makePorts();
+      const pending = record();pending.facts.phone = { value: "716-555-0199", source, verified: source === "operator", updatedAt: at, updatedBy: actor.userId };
+      ports.record.mockResolvedValue(pending);ports.confirmed.mockResolvedValue({ ...confirmed(), facts: { ...confirmed().facts, phone: current.phone } });
+      await service(actor, ws, 3, ["phone"]);
+      expect(ports.apply).not.toHaveBeenCalled();expect(ports.reviews.claim).not.toHaveBeenCalled();
+    }
   });
   it("off means zero added reads, claims, drafts, queue or operator events", async () => {
     const { ports, service } = makePorts();ports.enabled.mockReturnValue(false);

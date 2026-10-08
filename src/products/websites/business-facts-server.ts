@@ -1,17 +1,20 @@
 import { getSupabase } from "@/platform/infra/db/client";
 import { websiteRebuildReleaseEnabledForTenant } from "./rebuild-release";
 import { websiteBusinessFactsSchema, type WebsiteBusinessFacts } from "./business-facts";
-import { readBusinessRecord } from "@/platform/business-record";
+import { readConfirmedBusinessFacts } from "@/platform/business-record";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 
-export async function readCandidateBusinessFacts(actor: WorkspaceActor, workspaceId: string): Promise<WebsiteBusinessFacts | null> {
+const CANDIDATE_FACTS = ["display_name", "phone", "email", "address", "hours"] as const;
+
+/** Only confirmed facts enter a candidate: an operator's or agency's edit
+ * waits for the owner's decision like any other provider's (#509). */
+export async function readCandidateBusinessFacts(actor: WorkspaceActor, workspaceId: string, read = readConfirmedBusinessFacts): Promise<WebsiteBusinessFacts | null> {
   if (process.env.STRELVA_WEBSITE_BUSINESS_FACTS_ENABLED !== "1") return null;
   try {
-    const record = await readBusinessRecord(actor, workspaceId);
-    const allowed = new Set(["display_name", "phone", "email", "address", "hours"]);
-    return websiteBusinessFactsSchema.parse({ revision: record.revision,
-      facts: Object.fromEntries(Object.entries(record.facts).filter(([key, value]) => allowed.has(key) && value && (value.verified || value.source === "owner" || value.source === "operator")).map(([key, value]) => [key, value!.value])),
-      services: record.services.filter(value => value.active && (value.verified || value.source === "owner" || value.source === "operator")).slice(0,40).map(({ name, description, priceText }) => ({ name, description, priceText })),
+    const confirmed = await read(actor, workspaceId);
+    return websiteBusinessFactsSchema.parse({ revision: confirmed.revision,
+      facts: Object.fromEntries(CANDIDATE_FACTS.flatMap(key => confirmed.facts[key] === undefined ? [] : [[key, confirmed.facts[key]]])),
+      services: confirmed.services,
     });
   } catch { return null; }
 }

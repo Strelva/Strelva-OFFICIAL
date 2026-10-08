@@ -51,6 +51,14 @@ begin
     (ws,'email','"agency-guess@example.test"','agency',false,owner_id),
     (ws,'owner_recipient','{"email":"cs-owner@example.test"}','owner',true,owner_id);
   insert into public.business_services(workspace_id,name,source,verified,created_by,updated_by) values (ws,'Custom cakes','owner',false,owner_id,owner_id),(ws,'Guessed service','agent',false,owner_id,owner_id),(ws,'Operator guess','operator',false,owner_id,owner_id),(ws,'Agency guess','agency',false,owner_id,owner_id),(ws,'Verified trim','operator',true,owner_id,owner_id);
+  -- After 20261011133700 (#509) sites read only the confirmed copy. These
+  -- direct inserts stand in for the owner's own writes, which confirm.
+  if to_regclass('public.business_record_confirmed') is not null then
+    insert into public.business_record_confirmed(workspace_id,entity,entity_id,state,confirmed_by_kind)
+      select ws,'fact',f.fact_key,public.business_record_entity_state(ws,'fact',f.fact_key),'owner_write' from public.business_record_facts f where f.workspace_id=ws and f.source='owner'
+      union all
+      select ws,'service',s.id::text,public.business_record_entity_state(ws,'service',s.id::text),'owner_write' from public.business_services s where s.workspace_id=ws and s.source='owner';
+  end if;
 
   -- Create: managers only, customer businesses only, valid input only.
   perform pg_temp.expect_error(format('select public.create_connected_site(%L,%L,%L,%L)',ws,member_id,'cs-member@example.test',jsonb_build_object('publicKey',key,'verificationToken',token,'label','Bakery','siteUrl',origin||'/','siteHost','www.fictional-bakery.example','allowedOrigins',jsonb_build_array(origin))),'workspace_access_denied');
@@ -115,12 +123,29 @@ begin
 
   -- Public context: confirmed facts and services only; never the owner recipient.
   context := public.read_connected_site_context(key);
-  perform pg_temp.assert_true(context->'facts'->>'display_name'='Fictional Bakery' and not (context->'facts' ? 'phone') and not (context->'facts' ? 'email'),'owner-stated facts are served; unverified operator/agency facts are excluded');
-  perform pg_temp.assert_true(not (context->'facts' ? 'description') and not (context->'facts' ? 'owner_recipient'),'model guesses and the owner recipient are not served');
-  perform pg_temp.assert_true(jsonb_array_length(context->'services')=2 and context->'services' @> '[{"name":"Custom cakes"},{"name":"Verified trim"}]'::jsonb,'only owner-stated or verified services are served');
-  update public.business_record_facts set verified=true where workspace_id=ws and fact_key='phone';
-  context := public.read_connected_site_context(key);
-  perform pg_temp.assert_true(context->'facts'->>'phone'='716-555-0100','verified operator facts are served');
+  if to_regclass('public.business_record_confirmed') is null then
+    perform pg_temp.assert_true(context->'facts'->>'display_name'='Fictional Bakery' and not (context->'facts' ? 'phone') and not (context->'facts' ? 'email'),'owner-stated facts are served; unverified operator/agency facts are excluded');
+    perform pg_temp.assert_true(not (context->'facts' ? 'description') and not (context->'facts' ? 'owner_recipient'),'model guesses and the owner recipient are not served');
+    perform pg_temp.assert_true(jsonb_array_length(context->'services')=2 and context->'services' @> '[{"name":"Custom cakes"},{"name":"Verified trim"}]'::jsonb,'only owner-stated or verified services are served');
+    update public.business_record_facts set verified=true where workspace_id=ws and fact_key='phone';
+    context := public.read_connected_site_context(key);
+    perform pg_temp.assert_true(context->'facts'->>'phone'='716-555-0100','verified operator facts are served');
+  else
+    -- #509: only what the owner confirmed. An operator marking its own fact
+    -- or service verified is not the owner's decision.
+    perform pg_temp.assert_true(context->'facts'->>'display_name'='Fictional Bakery' and not (context->'facts' ? 'phone') and not (context->'facts' ? 'email'),'owner facts are served; unconfirmed operator/agency facts are not (#509)');
+    perform pg_temp.assert_true(not (context->'facts' ? 'description') and not (context->'facts' ? 'owner_recipient'),'model guesses and the owner recipient are not served');
+    perform pg_temp.assert_true(context->'services' = '[{"name":"Custom cakes","description":null,"priceText":null}]'::jsonb,'only owner-confirmed services; an operator-verified one waits: '||(context->'services')::text);
+    update public.business_record_facts set verified=true where workspace_id=ws and fact_key='phone';
+    context := public.read_connected_site_context(key);
+    perform pg_temp.assert_true(not (context->'facts' ? 'phone'),'an operator-verified fact is not served without the owner (#509)');
+    -- The owner's decision (confirm_business_facts) copies the working state.
+    insert into public.business_record_confirmed(workspace_id,entity,entity_id,state,confirmed_by_kind)
+      values (ws,'fact','phone',public.business_record_entity_state(ws,'fact','phone'),'owner_write');
+    update public.business_record_facts set value='"716-555-0199"' where workspace_id=ws and fact_key='phone';
+    context := public.read_connected_site_context(key);
+    perform pg_temp.assert_true(context->'facts'->>'phone'='716-555-0100','the confirmed value is served; a later unconfirmed edit is not');
+  end if;
   perform pg_temp.assert_true((context - 'site') = public.business_confirmed_public_facts(ws),'connect.js uses exactly the server-surface read');
   perform pg_temp.assert_true(public.read_connected_site_context('sk_pub_'||repeat('z',24)) is null,'an unknown key reads nothing');
 

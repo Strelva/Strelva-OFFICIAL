@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { bindWebsiteBusinessRecord, projectWebsiteBusinessFacts, type WebsiteBusinessFacts } from "@/products/websites/business-facts";
-import { readHostedBusinessFacts } from "@/products/websites/business-facts-server";
+import { readCandidateBusinessFacts, readHostedBusinessFacts } from "@/products/websites/business-facts-server";
 import { siteDocumentHash, siteDocumentSchema } from "@/products/websites/site-document";
 import { SiteRenderer } from "@/products/websites/SiteRenderer";
 const ports = vi.hoisted(() => ({ rpc: vi.fn(), released: vi.fn() }));
@@ -22,6 +22,14 @@ describe("hosted websites read confirmed business facts", () => {
     ports.released.mockResolvedValue(true);expect(await readHostedBusinessFacts("fictional")).toEqual(record);expect(ports.rpc).toHaveBeenCalledWith("read_hosted_website_business_facts",{p_tenant_id:"fictional"});
     ports.rpc.mockRejectedValue(Error("storage down"));expect(await readHostedBusinessFacts("fictional")).toBeNull();
     ports.rpc.mockResolvedValue({data:{...record,facts:{...record.facts,owner_recipient:{email:"private@example.test"}}},error:null});expect(await readHostedBusinessFacts("fictional")).toBeNull();
+  });
+  it("builds candidates only from the confirmed copy: no pending provider fact, private fact or other key (#509)", async () => {
+    const actor={userId:"7e000000-0000-4000-8000-000000000001",verifiedEmail:"owner@example.test"};const ws="7e000000-0000-4000-8000-000000000010";
+    const read=vi.fn(async () => ({revision:4,facts:{phone:"7165550123",description:"Confirmed copy"},services:[{name:"Fresh bread",description:null,priceText:"$4"}]}));
+    expect(await readCandidateBusinessFacts(actor,ws,read)).toEqual({revision:4,facts:{phone:"7165550123"},services:[{name:"Fresh bread",description:null,priceText:"$4"}]});
+    expect(read).toHaveBeenCalledWith(actor,ws);expect(ports.rpc).not.toHaveBeenCalled();
+    read.mockRejectedValueOnce(Error("confirmed copy unavailable"));expect(await readCandidateBusinessFacts(actor,ws,read)).toBeNull();
+    vi.stubEnv("STRELVA_WEBSITE_BUSINESS_FACTS_ENABLED","0");read.mockClear();expect(await readCandidateBusinessFacts(actor,ws,read)).toBeNull();expect(read).not.toHaveBeenCalled();
   });
   it("projects only declared catalog slots, keeping the original document, hash, navigation and provenance", () => {
     const doc=bindWebsiteBusinessRecord(document(),record);const snapshot=structuredClone(doc);const hash=siteDocumentHash(doc);

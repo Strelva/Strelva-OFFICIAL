@@ -182,6 +182,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261010165600": "workspace_exit_handoff_receipts",
   "20261010165700": "workspace_export_recovery",
   "20261011100000": "workspace_newsletter_batches",
+  "20261011133700": "business_record_confirmed",
   "20261011170000": "prospects",
   "20261012110000": "business_pages",
 };

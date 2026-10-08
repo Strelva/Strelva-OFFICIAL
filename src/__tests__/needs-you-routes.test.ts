@@ -24,8 +24,10 @@ vi.mock("@/platform/workspaces", () => ({ listWorkspaces: mocks.workspaces }));
 vi.mock("@/platform/needs-you/server", () => ({
   needsYouReleaseEnabled: mocks.released,
   needsYouService: () => ({ chase: mocks.chase, list: mocks.list, decide: mocks.decide }),
+  needsYouStore: {},
   readStrelvaHandled: mocks.handled,
 }));
+vi.mock("@/app/workspace/business-details/native-website-facts", () => ({ createConfirmedNativeFactsEffect: () => "native-facts-effect" }));
 vi.mock("@/platform/business-record", () => ({
   undoBusinessRecordRevision: mocks.undo,
   BusinessRecordConflictError: class extends Error { code = "business_record_undo_conflict"; },

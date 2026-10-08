@@ -816,6 +816,31 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010115500_web
 psql "${psql_args[@]}" --file="$repo_root/tests/website-business-facts-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010115700_website_native_fact_reviews.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/website-native-fact-reviews-schema.sql"
+# #509: provider and operator facts reach client sites only by owner decision.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011133700_business_facts_owner_decision.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011133700_business_facts_owner_decision.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-business-facts-schema.sql"
+# Owner history before the forward migration: the confirmed copy keeps it.
+psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-backfill-seed.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011133700_business_facts_owner_decision.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-backfill.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-business-facts-schema.sql"
+# #509 after #521: every public facts reader (connect.js, /biz, llms.txt,
+# JSON-LD) reads only the owner-confirmed copy. #509's rollback refuses to run
+# before it; its own rollback restores the 20261012110000 reader.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013110000_public_facts_read_confirmed.sql"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011133700_business_facts_owner_decision.sql" >"$cluster_root/facts-rollback-order.log" 2>&1; then
+  printf '#509 rollback ran before the public-facts reader stopped reading its copy.\n' >&2
+  exit 1
+fi
+grep -q 'business_facts_rollback_order' "$cluster_root/facts-rollback-order.log"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013110000_public_facts_read_confirmed.sql"
+psql "${psql_args[@]}" -Atc "select prosrc not like '%business_record_confirmed%' from pg_proc where oid='public.business_confirmed_public_facts(uuid)'::regprocedure" | grep -qx t
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013110000_public_facts_read_confirmed.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/website-cutover-undo-schema.sql"
 # Wave 6 catalog: additive submit/contact RPCs, report receipts, newsletter
 # projection and delegated Make authority. Run after all required flag names,
