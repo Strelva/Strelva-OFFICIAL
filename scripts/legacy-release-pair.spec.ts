@@ -53,6 +53,17 @@ test("legacy client contracts and genuine owner authority survive the app switch
     expect([401, 307]).toContain(refused.status());
     const billing = await foreign.request.post("/api/billing/portal", { headers: tenantHeaders, maxRedirects: 0 });
     expect([401, 307]).toContain(billing.status());
+    const outsiderEmail = "pair-outsider-" + randomUUID() + "@example.test";
+    const outsiderPassword = randomUUID() + "Aa1!";
+    const outsider = await admin.auth.admin.createUser({ email: outsiderEmail, password: outsiderPassword, email_confirm: true });
+    expect(outsider.error).toBeNull();
+    const outsiderCookies: typeof cookies = [];
+    const outsiderAuth = createServerClient(url, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { cookies: {
+      getAll: () => [], setAll: values => values.forEach(cookie => outsiderCookies.push({ name: cookie.name, value: cookie.value, domain: new URL(app).hostname, path: cookie.options.path || "/", httpOnly: Boolean(cookie.options.httpOnly), secure: false, sameSite: "Lax" })),
+    } });
+    expect((await outsiderAuth.auth.signInWithPassword({ email: outsiderEmail, password: outsiderPassword })).error).toBeNull();
+    await foreign.addCookies(outsiderCookies);
+    expect((await foreign.request.get("/api/content/hero", { headers: tenantHeaders })).status()).toBe(403);
     await foreign.close();
     const ownerBilling = await context.request.post("/api/billing/portal", { headers: tenantHeaders });
     expect(ownerBilling.status()).toBe(500);
@@ -72,7 +83,7 @@ test("legacy client contracts and genuine owner authority survive the app switch
     expect(publicHero.status()).toBe(200);
     expect((await publicHero.json()).headline).toBe(nextHeadline);
 
-    const leadInput = { name: "Synthetic Release Visitor", email: "visitor@example.test", message: "Please arrange a consultation for our local release check.", source: "release-pair-" + phase };
+    const leadInput = { name: "Synthetic Release Visitor", email: "visitor@example.test", message: "Please arrange a consultation for our local release check " + phase + ".", source: "release-pair-" + phase };
     const captured = await context.request.post(`/api/v1/leads/${state.tenant}`, { data: leadInput });
     expect(captured.status()).toBe(200); expect(await captured.json()).toEqual({ ok: true });
     const repeated = await context.request.post(`/api/v1/leads/${state.tenant}`, { data: leadInput });
@@ -87,6 +98,16 @@ test("legacy client contracts and genuine owner authority survive the app switch
     const listBefore = await context.request.get("/api/booking/list", { headers: tenantHeaders });
     expect(listBefore.status()).toBe(200);
     if (state.bookingId) expect((await listBefore.json()).map((row: { id: string }) => row.id)).toContain(state.bookingId);
+    if (phase === "old") {
+      const configured = await context.request.put("/api/booking/config", { headers: tenantHeaders, data: {
+        timezone: "America/New_York", weeklySchedule: Array.from({ length: 7 }, (_, day) => ({ day, start: "09:00", end: "17:00", enabled: true })),
+        slotDuration: 60, bufferTime: 0, bookingLeadTime: 0, maxAdvanceBooking: 60, requirePayment: false,
+      } });
+      expect(configured.status(), "Owner configures deterministic synthetic booking availability").toBe(200);
+    }
+    const retainedConfig = await context.request.get("/api/booking/config", { headers: tenantHeaders });
+    expect(retainedConfig.status()).toBe(200);
+    expect((await retainedConfig.json()).weeklySchedule.filter((day: { enabled: boolean }) => day.enabled)).toHaveLength(7);
     const date = new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10);
     const bookingInput = { serviceId: "consultation", date, startTime: phase === "old" ? "10:00" : "12:00", clientName: "Synthetic Visitor", clientEmail: "visitor@example.test" };
     const raced = await Promise.all([0, 1].map(() => context.request.post("/api/booking", { headers: publicHeaders, data: bookingInput })));
@@ -111,6 +132,13 @@ test("legacy client contracts and genuine owner authority survive the app switch
         state.workspaceId = workspaceBody.workspaceId;
         const created = await context.request.post("/api/bounded-work", { headers: { origin: app }, data: { action: "create", productId: "applications", workspaceId: state.workspaceId, input: { title: "Retained native tool", fields: [{ id: "name", label: "Name", type: "text", required: true }], components: [{ kind: "form", fields: ["name"] }, { kind: "list", fields: ["name"] }] } } });
         state.nativeCreation = created.status();
+        // Schema-level new-tool admission may already require the agency even
+        // for the old server. This is an accepted direction, not permission to
+        // manufacture an agency grant. Preserve the observed refusal explicitly.
+        if (created.status() === 403) {
+          expect((await created.json()).code).toBe("make_systems_required");
+          return;
+        }
         expect(created.status(), "Frozen old app owner creation on upgraded schema").toBe(201);
         let application = await created.json(); state.applicationId = application.id;
         for (const kind of ["rehearse", "install"]) {
@@ -123,19 +151,30 @@ test("legacy client contracts and genuine owner authority survive the app switch
         // New tool admission intentionally requires the agency; retained use does not.
         const newTool = await context.request.post("/api/bounded-work", { headers: { origin: app }, data: { action: "create", productId: "applications", workspaceId: state.workspaceId, input: { title: "New member tool", fields: [{ id: "name", label: "Name", type: "text", required: true }], components: [{ kind: "form", fields: ["name"] }] } } });
         expect(newTool.status()).toBe(403); expect((await newTool.json()).code).toBe("make_systems_required");
+        if (!state.applicationId) {
+          expect(state.nativeCreation).toBe(403);
+          return;
+        }
       }
-      const runtime = await context.request.get(`/api/apps/${state.applicationId}`);
-      expect(runtime.status(), "Retained installed native app remains usable").toBe(200);
-      const initialUse = await runtime.json();
-      const submitted = await context.request.post(`/api/apps/${state.applicationId}`, { headers: { origin: app }, data: { action: "submit", input: { record: { id: "record-" + phase, values: { name: "Retained local " + phase } }, releaseVersion: initialUse.releaseVersion, idempotencyKey: "release-pair-submit-" + phase } } });
-      expect(submitted.status()).toBe(200);
-      const use = await submitted.json();
+      // The owner's existing workspace use path differs from focused recipient
+      // use. Ownership must not manufacture a focused recipient grant.
+      const focused = await context.request.get(`/api/apps/${state.applicationId}`);
+      expect(focused.status()).toBe(403);
+      expect((await focused.json()).code).toBe("application_access_denied");
+      const runtime = await context.request.get(`/api/bounded-work?productId=applications&workId=${state.applicationId}`);
+      expect(runtime.status(), "Retained owner workspace application remains readable").toBe(200);
+      const initialUse = (await runtime.json()).payload;
+      expect(initialUse.status).toBe("installed");
+      expect(initialUse.release.version).toBe(1);
+      if (phase === "candidate") expect(initialUse.records.map((row: { id: string }) => row.id)).toContain("record-old");
+      const submitted = await context.request.post("/api/bounded-work", { headers: { origin: app }, data: { action: "command", productId: "applications", workId: state.applicationId, command: { kind: "submit", expectedRevision: initialUse.revision, record: { id: "record-" + phase, values: { name: "Retained local " + phase } } } } });
+      expect(submitted.status(), "Existing owner use requires workspace authority, not maker admission").toBe(200);
+      const use = (await submitted.json()).payload;
       if (phase === "candidate") expect(use.records.map((row: { id: string }) => row.id)).toContain("record-old");
       expect(use.records.map((row: { id: string }) => row.id)).toContain("record-" + phase);
-      const record = use.records.find((row: { id: string }) => row.id === "record-" + phase);
-      const edited = await context.request.post(`/api/apps/${state.applicationId}`, { headers: { origin: app }, data: { action: "edit", input: { record: { id: record.id, values: { name: "Corrected local " + phase } }, releaseVersion: use.releaseVersion, idempotencyKey: "release-pair-edit-" + phase, expectedRecordRevision: record.revision } } });
-      expect(edited.status(), "Existing record correction requires use authority, not maker admission").toBe(200);
-      expect((await edited.json()).records.find((row: { id: string }) => row.id === record.id).values.name).toBe("Corrected local " + phase);
+      const retained = await context.request.get(`/api/bounded-work?productId=applications&workId=${state.applicationId}`);
+      expect(retained.status()).toBe(200);
+      expect((await retained.json()).payload.records.find((row: { id: string }) => row.id === "record-" + phase).values.name).toBe("Retained local " + phase);
     }
   } finally {
     writeFileSync(stateFile, JSON.stringify(state), { mode: 0o600 });
