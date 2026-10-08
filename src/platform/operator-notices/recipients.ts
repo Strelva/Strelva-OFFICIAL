@@ -11,4 +11,3 @@ export function resolveLeadNotifyRecipients(): string[] {
     .filter(Boolean);
   return parsed.length > 0 ? parsed : ["jacob@strelva.com"];
 }
-
