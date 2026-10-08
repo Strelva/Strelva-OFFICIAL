@@ -183,6 +183,13 @@ fixtures and public-key/read-only checks. See
 current gates. The optional Sandbox adapter does not authorize installing its SDK,
 changing resource limits, enabling custom apps or using a paid provider.
 
+Completed-month evidence additionally uses
+`PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH bash scripts/check-recurring-responsibilities.sh`.
+Keep its actual populated rollback refusal, historical identity/coverage checks,
+READ ONLY reader and controlled current-actor races. The
+[private monthly contract](docs/operations/responsibility-month-evidence-2026-10-08.md)
+distinguishes observed history from unavailable period-end state and billing.
+
 ## Done means proven
 
 - Code: the test that covers the change, plus `pnpm typecheck`.

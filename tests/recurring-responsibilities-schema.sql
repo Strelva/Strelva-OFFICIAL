@@ -57,4 +57,64 @@ select public.update_standing_responsibility(id,workspace_id,owner_id,'rr-owner@
 select pg_temp.assert_ok(public.snapshot_due_responsibility_meters(1)->>'failed'='1','unqualified background capture records isolated failure');
 select pg_temp.assert_ok(public.snapshot_due_responsibility_meters(1)->>'failed'='1','second bounded batch progresses despite first failure');
 select pg_temp.assert_ok((select count(*)=2 from public.responsibility_meter_capture_attempts where status='unavailable' and business_workspace_id in ('99100000-0000-4000-8000-000000000031','99100000-0000-4000-8000-000000000032')),'failed business cannot starve subsequent candidates');
+-- #299: a completed month's missing history must be represented explicitly,
+-- rather than rejected as an invalid month or rebuilt from today's policies.
+create temp table rr_missing_month as select public.snapshot_responsibility_meter(
+ '99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',
+ (date_trunc('month',clock_timestamp() at time zone 'UTC')-interval '1 month')::date) snapshot;
+select pg_temp.assert_ok(snapshot->>'stage'='monthly_snapshot' and snapshot->>'availability'='unavailable'
+ and jsonb_array_length(snapshot->'observations')=0 and snapshot->>'priced'='false'
+ and snapshot->>'stripeExportEnabled'='false','missing historical month is explicit and never billed') from rr_missing_month;
+-- Synthetic past immutable capture payloads exercise history handling. These
+-- local fixture inserts are not an application backfill or past-period claim.
+create temp table rr_history_period as select (date_trunc('month',clock_timestamp() at time zone 'UTC')-interval '2 months')::date as month;
+insert into public.responsibility_meter_periods(business_workspace_id,month,captured_at,capture_day,snapshot)
+select '99100000-0000-4000-8000-000000000011',h.month,t.at,(t.at at time zone 'UTC')::date,
+ (m.snapshot||jsonb_build_object('month',to_char(h.month,'YYYY-MM'),'capturedAt',t.at,
+   'payerParty',jsonb_build_object('kind','agency','workspaceId','99100000-0000-4000-8000-000000000099'),
+   'standingResponsibilities',jsonb_build_array(jsonb_build_object('id','fixture-standing','version',n,'acceptedAt',h.month,'providerWorkspaceId','fixture-original-provider','serviceRequestId','fixture-mandate','evidence','fixture:accepted-standing')),
+   'acceptedOfferings',jsonb_build_array(jsonb_build_object('installationId','fixture-installation','definitionVersion',n,'sourceRevisionId','fixture-source-'||n,'versionId','fixture-version-'||n,'providerWorkspaceId','fixture-original-provider','acceptedAt',h.month,'evidence','fixture:accepted-delivery')),
+   'slaEvidence',public.inquiry_outcome_cohort('99100000-0000-4000-8000-000000000011',h.month::timestamp at time zone 'UTC',t.at)))
+from rr_meter m cross join rr_history_period h cross join generate_series(1,2) n
+cross join lateral(select (h.month+n)::timestamp at time zone 'UTC' as at) t;
+create temp table rr_history_month as select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',month) snapshot from rr_history_period;
+select pg_temp.assert_ok(snapshot->>'availability'='partial' and snapshot->'coverage'->>'observationCount'='2'
+ and snapshot->'coverage'->>'completePeriod'='false' and snapshot->>'responsibilityStateAtPeriodEnd'='unavailable'
+ and snapshot->'slaEvidence'->>'status'='unavailable' and snapshot->'billableQuantity'='null'::jsonb
+ and snapshot->'acceptedOfferings'->0->>'sourceRevisionId'='fixture-source-2'
+ and snapshot->'acceptedOfferings'->0->>'versionId'='fixture-version-2'
+ and snapshot->'standingResponsibilities'->0->>'providerWorkspaceId'='fixture-original-provider'
+ and snapshot->'payerParty'->>'kind'='agency' and snapshot->'payerParty'->>'workspaceId'='99100000-0000-4000-8000-000000000099'
+ and snapshot->'period'->>'endExclusive'='true' and snapshot->>'priced'='false' and snapshot->>'stripeExportEnabled'='false'
+ and not(snapshot ? 'hours') and not(snapshot ? 'compute'),'monthly inventory retains observed payer, provider, source and Version without reconstructing period-end state') from rr_history_month;
+select pg_temp.assert_ok(not exists(select 1 from rr_history_month h cross join lateral jsonb_array_elements(h.snapshot->'observations') o
+ where o->>'snapshotSha256' is distinct from encode(digest((o->'snapshot')::text,'sha256'),'hex')),'all attached immutable captures have exact hashes');
+-- Today's accepted mandate was revoked above. Historical receipt does not
+-- change, authorize a new mandate or count the current state in a past period.
+select pg_temp.assert_ok((select snapshot from rr_history_month)=public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',month),'exact monthly replay despite changed present acceptance') from rr_history_period;
+select pg_temp.expect_fail('update public.responsibility_meter_months set snapshot=''{}''','snapshot_immutable');
+select pg_temp.expect_fail('delete from public.responsibility_meter_months','snapshot_immutable');
+select pg_temp.assert_ok(not has_table_privilege('service_role','public.responsibility_meter_months','SELECT')
+ and not has_table_privilege('service_role','public.responsibility_meter_months','INSERT')
+ and not has_function_privilege('service_role','public.snapshot_responsibility_meter_preview_v1(uuid,uuid,text,date)','EXECUTE')
+ and not has_function_privilege('authenticated','public.snapshot_responsibility_meter(uuid,uuid,text,date)','EXECUTE'),'monthly history is RPC only; hidden preview helper has no actor bypass');
+select pg_temp.expect_fail($q$select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000003','rr-other@example.test',(date_trunc('month',now() at time zone 'UTC')-interval '2 months')::date)$q$,'membership_denied');
+select pg_temp.expect_fail($q$select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000032','99100000-0000-4000-8000-000000000002','rr-agency@example.test',(date_trunc('month',now() at time zone 'UTC')-interval '2 months')::date)$q$,'provider_unqualified');
+update public.workspace_memberships set role='member' where workspace_id='99100000-0000-4000-8000-000000000011' and user_id='99100000-0000-4000-8000-000000000001';
+select pg_temp.expect_fail($q$select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',(date_trunc('month',now() at time zone 'UTC')-interval '2 months')::date)$q$,'membership_denied');
+update public.workspace_memberships set role='owner' where workspace_id='99100000-0000-4000-8000-000000000011' and user_id='99100000-0000-4000-8000-000000000001';
+update public.users set verified_at=null where id='99100000-0000-4000-8000-000000000001';
+select pg_temp.expect_fail($q$select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',(date_trunc('month',now() at time zone 'UTC')-interval '2 months')::date)$q$,'actor_unverified');
+update public.users set verified_at=now() where id='99100000-0000-4000-8000-000000000001';
+select pg_temp.expect_fail($q$select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',(date_trunc('month',now() at time zone 'UTC')+interval '1 month')::date)$q$,'month_invalid');
+select pg_temp.expect_fail($q$select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',current_date-1)$q$,'month_invalid');
+-- A source row stamped outside its declared month is never silently accepted.
+insert into public.responsibility_meter_periods(business_workspace_id,month,captured_at,capture_day,snapshot)
+select '99100000-0000-4000-8000-000000000011',(h.month-interval '1 month')::date,clock_timestamp(),current_date,m.snapshot from rr_history_period h cross join rr_meter m;
+select pg_temp.expect_fail($q$select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',(date_trunc('month',now() at time zone 'UTC')-interval '3 months')::date)$q$,'source_evidence_invalid');
+select pg_temp.assert_ok((select snapshot from rr_history_month)=public.read_responsibility_month_evidence('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',month),'read exact immutable monthly receipt') from rr_history_period;
+\if :{?responsibility_meter_retain}
+commit;
+\else
 rollback;
+\endif
