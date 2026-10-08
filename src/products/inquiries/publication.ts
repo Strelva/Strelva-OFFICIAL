@@ -170,6 +170,7 @@ async function verifyPublication(repository: InquiryRepository, claim: Publicati
     const saved = await repository.compareAndSwap({ tenantId: claim.tenantId, businessId: claim.businessId, expectedRevision: observed.revision, actorId: claim.actorId, state: engine.snapshot() });
     if (!saved.changed) throw new Error("verification_receipt_conflict");
     if (!verified) throw new Error("definition_readback_mismatch");
+    try{await inquiryRecordsRpc("reconcile_bundle_inquiry_releases",{p_workspace_id:claim.businessId,p_capability_id:claim.capabilityId});}catch{console.warn("[inquiries] Bundle native release receipt needs reconciliation");}
     return { accepted: true, verified: true };
   } catch {
     await repository.markPublicationFailed({ tenantId: claim.tenantId, claimId: claim.id, claimToken: publicationClaimToken(claim), reason: "Published configuration requires read-back verification.", verificationFailed: true }).catch(() => {});

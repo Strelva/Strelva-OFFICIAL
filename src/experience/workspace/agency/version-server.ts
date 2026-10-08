@@ -1,5 +1,6 @@
 import { createSystemVersions, isRevisionQualified, VersionAccessError, VersionStaleError, VersionValidationError, type VersionConflictResolution, type JsonValue, type SystemRevisionRef, type VersionContext } from "@/platform/system-versions";
 import { createSupabaseConnectionOwnership, createSupabaseVersionStore, readVersionActor, versionsDb, type VersionsDb } from "@/platform/system-versions/supabase-store";
+import {readVersionRuntime} from "@/platform/system-versions/native-runtime";
 import { prepareVersionRelease } from "@/platform/system-versions/preparation";
 import { projectVersionPossibilities } from "@/platform/system-versions/possibilities";
 import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
@@ -8,7 +9,17 @@ import { requireAgencyAuthoring } from "./authoring-server";
 import { readAgencyLibrary } from "../agency-server";
 import { z } from "zod";
 import { mapVersionsError } from "@/platform/system-versions/supabase-store";
+import {prepareNativeBundleVersion} from "./bundle-lifecycle-server";
 import { createApplicationDraft } from "@/products/applications/server";
+
+async function prepareOwnedVersion(actor:WorkspaceActor,lineage:import("@/platform/system-versions").VersionLineage,db:VersionsDb,resolutions?:import("@/platform/system-versions/native-preparation-contracts").NativeVersionResolution[]){
+ return lineage.sourceComponentKey && ["inquiry_pattern","website_section"].includes(String(lineage.baseline.definition.kind)) ? prepareNativeBundleVersion(actor,lineage,db,resolutions) : prepareVersionRelease(actor,lineage,{db});
+}
+
+function preparedResult(rowRevision:number,receipt:Awaited<ReturnType<typeof prepareOwnedVersion>>){
+ if(receipt&&"kind" in receipt&&receipt.kind==="native_conflict")return {outcome:"conflicted" as const,rowRevision,receipt:null,conflict:receipt};
+ return {outcome:"prepared" as const,rowRevision:receipt?.rowRevision??rowRevision,receipt};
+}
 
 /** The System id, never a caller-chosen client id, resolves its lineage. Every
  * native store read rechecks the same business scope in Postgres. */
@@ -25,6 +36,7 @@ export async function readSystemVersion(actor: WorkspaceActor, workspaceId: stri
     label: lineage.context.label, baselineRevision: lineage.baseline.revision, currentRelease: lineage.currentRelease,
     workingDefinition: view.workingDefinition, overrides: view.overrides, bindings: view.bindings ?? [], releases: view.releases, source: view.source,
     offers, ...projectVersionPossibilities(lineage, offers, "The source System"),
+    nativeRuntime:lineage.sourceComponentKey&&["inquiry_pattern","website_section"].includes(String(lineage.baseline.definition.kind)) ? await readVersionRuntime(actor,lineage,db):null,
     canMakeReal: versionActor.memberships.some(membership => membership.businessId === workspaceId && membership.role === "owner"),
     canManage: versionActor.memberships.some(membership => membership.businessId === workspaceId && (membership.role === "owner" || membership.role === "admin")) || Boolean(versionActor.delegatedSystems?.some(scope => scope.businessId === workspaceId && scope.systemId === systemId && scope.canWrite)),
   };
@@ -85,7 +97,7 @@ export async function installBusinessPackage(actor: WorkspaceActor, input: { wor
 
 export type ManageVersionInput = { workspaceId: string; systemId: string; versionId: string; rowRevision: number } & (
   { action: "override"; path: string; value?: JsonValue; clear?: boolean } | { action: "bind"; kind: string; connectionId: string }
-  | { action: "restore"; releaseNumber: number } | { action: "prepare_release" });
+  | { action: "restore"; releaseNumber: number } | { action: "prepare_release";nativeResolutions?:import("@/platform/system-versions/native-preparation-contracts").NativeVersionResolution[] });
 
 export async function manageBusinessVersion(actor: WorkspaceActor, input: ManageVersionInput, db: VersionsDb = versionsDb()) {
   const versionActor = await readVersionActor(actor, db), store = createSupabaseVersionStore(db);
@@ -102,7 +114,7 @@ export async function manageBusinessVersion(actor: WorkspaceActor, input: Manage
   else if (input.action === "restore") draft = await versions.restoreReleaseDraft(versionActor, lineage.id, { releaseNumber: input.releaseNumber, expectedRowRevision: input.rowRevision });
   else {
     if (!needsYouReleaseEnabled()) throw new WorkspaceStoreError("Needs you is not enabled. Nothing went live.");
-    return { outcome: "prepared" as const, rowRevision: draft.rowRevision, receipt: await prepareVersionRelease(actor, draft, { db }) };
+    return preparedResult(draft.rowRevision,await prepareOwnedVersion(actor,draft,db,input.nativeResolutions));
   }
   return { outcome: "saved" as const, rowRevision: draft.rowRevision, receipt: null };
 }
@@ -126,7 +138,7 @@ export async function decideSystemImprovement(actor: WorkspaceActor, input: { wo
     if (!versionActor.memberships.some(item => item.businessId === input.workspaceId && (item.role === "owner" || item.role === "admin")) && !versionActor.delegatedSystems?.some(scope => scope.businessId === input.workspaceId && scope.systemId === input.systemId && scope.canWrite)) throw new VersionAccessError();
     if (input.action === "decline") return { outcome: "declined", rowRevision: lineage.rowRevision, receipt: null };
     if (!needsYouReleaseEnabled()) throw new WorkspaceStoreError("Needs you is not enabled. Nothing was released.");
-    return { outcome: "prepared", rowRevision: lineage.rowRevision, receipt: await prepareVersionRelease(actor, lineage, { db }) };
+    return preparedResult(lineage.rowRevision,await prepareOwnedVersion(actor,lineage,db));
   }
   const versions = createSystemVersions({ store, connections: createSupabaseConnectionOwnership(db) });
   if (input.action === "decline") {
@@ -135,6 +147,6 @@ export async function decideSystemImprovement(actor: WorkspaceActor, input: { wo
   }
   if (!needsYouReleaseEnabled()) throw new WorkspaceStoreError("Needs you is not enabled. Nothing was adopted or released.");
   const adopted = await versions.adoptImprovement(versionActor, lineage.id, { revision: input.revision, resolutions: input.resolutions, expectedRowRevision: input.rowRevision });
-  const receipt = await prepareVersionRelease(actor, adopted, { db });
-  return { outcome: "prepared", rowRevision: adopted.rowRevision, receipt };
+  const receipt = await prepareOwnedVersion(actor,adopted,db);
+  return preparedResult(adopted.rowRevision,receipt);
 }

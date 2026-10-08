@@ -69,3 +69,5 @@ export { askExistingPagesSchema, existingWebsitePageOperations } from "./ask-exi
 export const prepareExistingWebsitePages: typeof import("./rebuild-service").prepareExistingWebsitePages = (...args) => import("./rebuild-service").then(module => module.prepareExistingWebsitePages(...args));
 export { prepareBundleWebsiteSection } from "./bundle";
 export { rehearseBundleWebsiteSection } from "./bundle";
+
+export {prepareBundleWebsiteUpdate} from "./bundle-lifecycle";

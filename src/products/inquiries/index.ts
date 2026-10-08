@@ -84,3 +84,7 @@ export { inquiryBookingHandoffEnabled, prepareInquiryBookingInput, prepareWorksp
 export type { InquiryBookingOffer, InquiryBookingChoice, PrepareInquiryBookingInput } from "./booking-handoff";
 export { prepareBundleInquiry } from "./bundle";
 export { rehearseBundleInquiry } from "./bundle";
+
+export {prepareBundleInquiryUpdate} from "./bundle-lifecycle";
+
+export {InquiryEngine} from "./inquiry-engine";

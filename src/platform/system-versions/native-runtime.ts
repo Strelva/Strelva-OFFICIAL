@@ -2,7 +2,9 @@ import { z } from "zod";
 import { WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { mapVersionsError, type VersionsDb } from "./supabase-store";
 import type { VersionLineage } from "./types";
-const runtime = z.object({ kind: z.literal("internal_app"), workId: z.string().uuid(), releaseNumber: z.number().int().positive().nullable(), designRevision: z.number().int().nonnegative() }).strict();
+const appRuntime = z.object({ kind: z.literal("internal_app"), workId: z.string().uuid(), releaseNumber: z.number().int().positive().nullable(), designRevision: z.number().int().nonnegative() }).strict();
+const runtime=z.union([appRuntime,z.object({kind:z.enum(["inquiry_pattern","website_section"]),workId:z.string().uuid(),releaseNumber:z.number().int().positive().nullable(),designRevision:z.number().int().nonnegative(),status:z.enum(["draft","verified","unverified"]),reviewHref:z.string().regex(/^\/workspace\?/)}).strict()]);
+
 
 /** A definition snapshot cannot claim a running product. Native adapters
  * check the destination's own runtime, never the source's records/accounts. */
@@ -18,6 +20,7 @@ export async function readVersionRuntime(actor: WorkspaceActor, lineage: Version
 }
 export async function requireVersionRuntime(actor: WorkspaceActor, lineage: VersionLineage, db: VersionsDb) {
   const value = await readVersionRuntime(actor, lineage, db);
+  if(value&&value.kind!=="internal_app")throw new WorkspaceStoreError("This Version uses its business’s native inquiry or website review. Generic release approval cannot publish it.");
   if (!value) throw new WorkspaceStoreError("This Version needs operator-prepared work to change its running System. A lineage snapshot cannot make it live.");
   return value;
 }
