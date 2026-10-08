@@ -19,6 +19,10 @@ async function click(node: HTMLElement, name: string) { const button = [...node.
 beforeEach(() => { vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT",true); rpc.mockReset(); setInquiryRecordsDb({ rpc }); vi.stubEnv("STRELVA_INQUIRY_RECORDS", "1"); vi.stubEnv("STRELVA_INQUIRY_OWNER_NOTICES", "1"); vi.stubEnv("DUAL_WRITE_PG", "1"); });
 afterEach(async () => { for (const root of roots.splice(0)) await act(async () => root.unmount()); document.body.innerHTML=""; setInquiryRecordsDb(undefined); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 describe("operator inquiry records", () => {
+  it("returns no customer data when native audit persistence fails", async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: "fictional audit unavailable" } });
+    await expect(readOperatorInquiryReview(actor,"held")).rejects.toThrow("fictional audit unavailable");
+  });
   it("makes no read while the relevant flag is off", async () => {
     vi.stubEnv("STRELVA_INQUIRY_RECORDS", "0"); vi.stubEnv("STRELVA_INQUIRY_OWNER_NOTICES", "0");
     expect((await readOperatorInquiryReview(actor,"held")).state).toBe("off");
@@ -28,7 +32,7 @@ describe("operator inquiry records", () => {
     rpc.mockResolvedValue({ data: Array.from({length:51},(_,i) => ({...row,id:`ca500000-0000-4000-8000-${String(i).padStart(12,"0")}`})), error:null });
     const result = await readOperatorInquiryReview(actor,"held","2026-10-07T00:00:00Z",row.id);
     expect(result.held).toHaveLength(50); expect(result.next).toMatchObject({at:row.capturedAt});
-    expect(rpc).toHaveBeenCalledWith("read_operator_held_inquiries",expect.objectContaining({p_user_id:actor.userId,p_verified_email:actor.verifiedEmail,p_limit:51,p_before_id:row.id,p_state:"held_as_spam"}));
+    expect(rpc).toHaveBeenCalledWith("read_operator_inquiry_review_audited",expect.objectContaining({p_user_id:actor.userId,p_verified_email:actor.verifiedEmail,p_limit:51,p_before_id:row.id,p_view:"held"}));
   });
   it("refuses a SQL access denial and preserves failed/malformed storage as an error", async () => {
     rpc.mockResolvedValueOnce({data:null,error:{message:"inquiry_access_denied"}});
