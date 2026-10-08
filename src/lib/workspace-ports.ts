@@ -8,13 +8,14 @@
  * (src/register-workspace-ports.ts, imported by instrumentation.ts,
  * vitest.setup.ts and the scripts that reach these modules).
  *
- * Every port is a loader, called where the module used to be imported, so
+ * Module ports are loaders, called where the module used to be imported, so
  * the workspace module is resolved at call time exactly as a dynamic import
  * would be: same module instance, same test mocks. The registration lives on
  * globalThis so every bundle in one process shares it. An unregistered port
  * throws: a missing registration is a deploy bug, never a silent skip.
  */
 import type { UnifiedEvent } from "./types";
+import type { BookingConfirmationInput, BookingOwnerNoticeInput, NewIntakeLeadInput, NewSignupInput, PaymentFailedInput } from "@/platform/infra/email/notice-contracts";
 
 // ── Shared shapes ─────────────────────────────────────────────────────────────
 
@@ -308,6 +309,17 @@ export interface PublishingContentPort {
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 export interface WorkspacePorts {
+  /** Pure operator recipient configuration; preserves the legacy synchronous API. */
+  operatorNoticeRecipients(): { resolveLeadNotifyRecipients(): string[] };
+  bookingEmails(): Promise<{
+    sendBookingConfirmation(input: BookingConfirmationInput): Promise<boolean>;
+    sendNewBookingOwnerEmail(input: BookingOwnerNoticeInput): Promise<boolean>;
+  }>;
+  operatorNotices(): Promise<{
+    sendNewIntakeLeadEmail(input: NewIntakeLeadInput): Promise<boolean>;
+    sendNewSignupEmail(input: NewSignupInput): Promise<boolean>;
+    sendPaymentFailedEmail(input: PaymentFailedInput): Promise<boolean>;
+  }>;
   bookingProof(): Promise<{ readAgentRequestProof(tenantId: string, from: string, to: string): Promise<string | null> }>;
   clientRecords(): Promise<ClientRecordsPort>;
   tenantPolicy(): Promise<TenantPolicyPort>;

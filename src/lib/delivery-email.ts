@@ -5,27 +5,16 @@ import {
 import { renderEmailHtml, renderEmailText, type EmailOptions, type EmailRow } from "@/platform/infra/email/layout";
 import { sendEmail } from "@/platform/infra/email/send";
 import { cleanSubjectText } from "@/platform/infra/email/text";
+import { logSentEmailToCrm } from "@/platform/infra/email/sent-activity";
+import { workspacePorts } from "./workspace-ports";
+import type { BookingConfirmationInput, BookingOwnerNoticeInput, NewIntakeLeadInput, NewSignupInput, PaymentFailedInput } from "@/platform/infra/email/notice-contracts";
 
-/**
- * Log a real client-comms send into the tenant's operator CRM activity timeline
- * so comms history accrues automatically ("Sent: welcome email"). Called ONLY
- * after a send actually goes out — every sender returns early (false) when
- * paused or missing an API key, so a suppressed send is never recorded as sent.
- * A no-op when no `tenantId` is passed. Fail-soft by contract: a CRM-log failure
- * must never break the send, so it swallows every error.
- */
-async function logSentEmailToCrm(
-  tenantId: string | undefined,
-  summary: string,
-): Promise<void> {
-  if (!tenantId) return;
-  try {
-    const { addTenantActivity } = await import("@/lib/tenant-crm");
-    await addTenantActivity(tenantId, { kind: "email", summary, author: "Strelva" });
-  } catch (err) {
-    console.error("[delivery-email] CRM comms log failed (non-fatal):", err);
-  }
+/** Legacy synchronous API for the platform-owned operator recipient rule. */
+export function resolveLeadNotifyRecipients(): string[] {
+  return workspacePorts().operatorNoticeRecipients().resolveLeadNotifyRecipients();
 }
+export type { IntakeLeadFields } from "@/platform/infra/email/notice-contracts";
+
 
 function buildUpdateLiveEmailOptions(params: {
   whatChanged: string;
@@ -114,72 +103,6 @@ export async function sendUpdateLiveEmail(params: {
     return true;
   } catch (err) {
     console.error(`${params.logPrefix || "[delivery-email]"} Update-live email failed:`, err);
-    return false;
-  }
-}
-
-function buildBookingConfirmationOptions(params: {
-  clientName: string;
-  serviceName: string;
-  date: string;
-  time: string;
-  businessName: string;
-}): EmailOptions {
-  const business = cleanSubjectText(params.businessName);
-  const withBusiness = business ? ` with ${business}` : "";
-  const rows: EmailRow[] = [
-    { label: "Service", value: cleanSubjectText(params.serviceName) },
-    { label: "Date", value: cleanSubjectText(params.date) },
-    { label: "Time", value: cleanSubjectText(params.time) },
-  ];
-  return {
-    preheader: `Your ${cleanSubjectText(params.serviceName)} booking${withBusiness} is confirmed.`,
-    heading: "You're booked",
-    paragraphs: [
-      `Hi ${cleanSubjectText(params.clientName) || "there"}, your booking${withBusiness} is confirmed. Here are the details:`,
-      "Need to change or cancel? Just reply to this email.",
-    ],
-    rows,
-    footerNote: business ? `For ${business}` : undefined,
-  };
-}
-
-/**
- * Booking confirmation — sent to the studio's END CUSTOMER (the person who booked), not the
- * owner. This is the ONLY end-customer transactional send in the codebase, so it sits behind
- * its OWN gate, `customerEmailPaused()` (default off), distinct from the owner/prospect pause.
- * Fails soft: returns false on pause / missing key / Resend error so it can never block a
- * booking that already committed.
- */
-export async function sendBookingConfirmation(params: {
-  to: string;
-  clientName: string;
-  serviceName: string;
-  date: string;
-  time: string;
-  businessName: string;
-  /** When set, a real send is logged to this tenant's CRM comms timeline. */
-  tenantId?: string;
-  logPrefix?: string;
-}): Promise<boolean> {
-  try {
-    const business = cleanSubjectText(params.businessName);
-    // Send "from" the studio's name when we have it, but always over the verified domain.
-    const fromName = business || "Strelva";
-    const opts = buildBookingConfirmationOptions(params);
-
-    const sent = await sendEmail({
-      audience: "customer",
-      fromName,
-      to: params.to,
-      subject: business ? `Your booking with ${business} is confirmed` : "Your booking is confirmed",
-      options: opts,
-    });
-    if (!sent) return false;
-    await logSentEmailToCrm(params.tenantId, "Sent: booking confirmation");
-    return true;
-  } catch (err) {
-    console.error(`${params.logPrefix || "[delivery-email]"} Booking confirmation failed:`, err);
     return false;
   }
 }
@@ -308,271 +231,6 @@ export async function sendNewLeadEmail(params: {
     return true;
   } catch (err) {
     console.error(`${params.logPrefix || "[delivery-email]"} New-lead email failed:`, err);
-    return false;
-  }
-}
-
-function buildNewBookingOwnerEmailOptions(params: {
-  customerName: string;
-  customerEmail?: string;
-  serviceName: string;
-  when: string;
-  dashboardUrl: string;
-}): EmailOptions {
-  const rows = [
-    { label: "Who", value: cleanSubjectText(params.customerName) },
-    { label: "What", value: cleanSubjectText(params.serviceName) },
-    { label: "When", value: cleanSubjectText(params.when) },
-  ];
-  if (params.customerEmail) rows.push({ label: "Email", value: cleanSubjectText(params.customerEmail) });
-  return {
-    heading: "New booking",
-    paragraphs: ["Someone booked through your website. It's confirmed and on your schedule."],
-    rows,
-    button: { label: "See your bookings", url: params.dashboardUrl },
-  };
-}
-
-/**
- * "New booking" to the business's owner recipient (bookings spec,
- * notifications table): a notice, sent once when a visitor's booking is
- * confirmed. A booking *request* is a Needs you item instead, emailed by
- * Needs you, so the owner never gets two emails for one booking. The caller
- * resolves the address through the owner-recipient rule
- * (src/lib/owner-recipient.ts). Fails soft: returns false on any error so it
- * can never undo a booking that is already kept.
- */
-export async function sendNewBookingOwnerEmail(params: {
-  email: string;
-  siteName: string;
-  booking: { customerName: string; customerEmail?: string; serviceName: string; when: string };
-  dashboardUrl: string;
-  tenantId?: string;
-  logPrefix?: string;
-}): Promise<boolean> {
-  try {
-    const options = buildNewBookingOwnerEmailOptions({ ...params.booking, dashboardUrl: params.dashboardUrl });
-    const sent = await sendEmail({
-      audience: "client",
-      tenantId: params.tenantId,
-      to: params.email,
-      subject: `New booking: ${cleanSubjectText(params.booking.customerName)}, ${cleanSubjectText(params.booking.when)}`,
-      html: renderEmailHtml(options),
-      text: renderEmailText(options),
-    });
-    if (!sent) return false;
-    await logSentEmailToCrm(params.tenantId, "Sent: new-booking email");
-    return true;
-  } catch (err) {
-    console.error(`${params.logPrefix || "[delivery-email]"} New-booking email failed:`, err);
-    return false;
-  }
-}
-
-/**
- * Every field that comes in on the /access-request intake form. Carried whole
- * into the team-notification email so nobody has to open a screen to triage.
- */
-export interface IntakeLeadFields {
-  businessName: string;
-  description?: string | null;
-  location?: string | null;
-  email: string;
-  phone?: string | null;
-  currentWebsite?: string | null;
-  plan?: string | null;
-  planLabel: string;
-  referredBy?: string | null;
-}
-
-/**
- * Who gets the "new lead" notification. Reads LEAD_NOTIFY_EMAILS (comma-
- * separated) and DEFAULTS to jacob@strelva.com when it's unset or empty — the
- * whole point of this path is that an unset env can never silence a lead.
- * Exported so the fallback behavior is directly testable.
- */
-export function resolveLeadNotifyRecipients(): string[] {
-  const parsed = (process.env.LEAD_NOTIFY_EMAILS ?? "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-  return parsed.length > 0 ? parsed : ["jacob@strelva.com"];
-}
-
-function buildIntakeLeadRows(lead: IntakeLeadFields): Array<[string, string]> {
-  return [
-    ["Business", lead.businessName],
-    ["Email", lead.email],
-    ["Phone", lead.phone || "—"],
-    ["Location", lead.location || "—"],
-    ["Current site", lead.currentWebsite || "—"],
-    ["Wants", lead.planLabel],
-    ["Referred by", lead.referredBy || "Direct"],
-    ["What they want", lead.description || "—"],
-  ];
-}
-
-function buildNewIntakeLeadEmailOptions(params: {
-  lead: IntakeLeadFields;
-  leadsUrl: string;
-}): EmailOptions {
-  return {
-    heading: `New lead: ${cleanSubjectText(params.lead.businessName)}`,
-    paragraphs: ["A new lead just came in through the Strelva site."],
-    rows: buildIntakeLeadRows(params.lead).map(([label, value]) => ({
-      label,
-      value: cleanSubjectText(value),
-    })),
-    button: { label: "Open the leads board", url: params.leadsUrl },
-    footerNote: "Operator notification",
-  };
-}
-
-function buildNewIntakeLeadEmailHtml(params: {
-  lead: IntakeLeadFields;
-  leadsUrl: string;
-}): string {
-  return renderEmailHtml(buildNewIntakeLeadEmailOptions(params));
-}
-
-function buildNewIntakeLeadEmailText(params: {
-  lead: IntakeLeadFields;
-  leadsUrl: string;
-}): string {
-  return renderEmailText(buildNewIntakeLeadEmailOptions(params));
-}
-
-/**
- * "New lead: {businessName}" — notifies the team the moment a genuinely-new
- * marketing lead lands, carrying every intake field plus a link to the admin
- * leads board. Slack-independent by design: this is the notification path that
- * must work with no env configured (recipients default to jacob@strelva.com).
- * This is an OPERATOR notification, so it gates on operatorEmailsEnabled() (ON
- * by default) — NOT the client `emailSendingPaused()` switch — and keeps firing
- * to the team while customer email stays paused. Fails soft: returns false on
- * any error (missing API key, Resend failure) so a failed notification can
- * never fail the intake response.
- */
-export async function sendNewIntakeLeadEmail(params: {
-  lead: IntakeLeadFields;
-  leadsUrl: string;
-  logPrefix?: string;
-}): Promise<boolean> {
-  try {
-    return await sendEmail({
-      audience: "operator",
-      to: resolveLeadNotifyRecipients(),
-      subject: `New lead: ${cleanSubjectText(params.lead.businessName)}`,
-      html: buildNewIntakeLeadEmailHtml({ lead: params.lead, leadsUrl: params.leadsUrl }),
-      text: buildNewIntakeLeadEmailText({ lead: params.lead, leadsUrl: params.leadsUrl }),
-    });
-  } catch (err) {
-    console.error(`${params.logPrefix || "[delivery-email]"} New-intake-lead email failed:`, err);
-    return false;
-  }
-}
-
-function buildNewSignupEmailOptions(params: {
-  businessName: string;
-  plan?: string;
-  ownerEmail?: string;
-  mrrDollars?: number;
-  tenantUrl: string;
-}): EmailOptions {
-  const business = cleanSubjectText(params.businessName);
-  const rows = [{ label: "Client", value: business }];
-  if (params.plan) rows.push({ label: "Plan", value: cleanSubjectText(params.plan) });
-  if (params.ownerEmail) rows.push({ label: "Owner", value: cleanSubjectText(params.ownerEmail) });
-  if (typeof params.mrrDollars === "number") {
-    rows.push({
-      label: "MRR",
-      value: `${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(params.mrrDollars)}/mo`,
-    });
-  }
-  return {
-    heading: "New paying signup 🎉",
-    paragraphs: [`${business} just started a paid subscription.`],
-    rows,
-    button: { label: "Open the tenant", url: params.tenantUrl },
-    footerNote: "Operator notification",
-  };
-}
-
-/**
- * "New paying signup 🎉" — alerts the operators (Noah + Jacob) the moment a
- * client starts a paid subscription, so a new paying customer is never a silent
- * row in Stripe. OPERATOR notification: gates on operatorEmailsEnabled() (ON by
- * default), independent of the client email pause. Recipients default to
- * jacob@strelva.com via resolveLeadNotifyRecipients(). Fails soft: returns false
- * on any error so a failed alert can never affect the billing webhook.
- */
-export async function sendNewSignupEmail(params: {
-  businessName: string;
-  plan?: string;
-  ownerEmail?: string;
-  mrrDollars?: number;
-  tenantUrl: string;
-  logPrefix?: string;
-}): Promise<boolean> {
-  try {
-    const opts = buildNewSignupEmailOptions(params);
-
-    return await sendEmail({
-      audience: "operator",
-      to: resolveLeadNotifyRecipients(),
-      subject: `New paying signup: ${cleanSubjectText(params.businessName)}`,
-      options: opts,
-    });
-  } catch (err) {
-    console.error(`${params.logPrefix || "[delivery-email]"} New-signup email failed:`, err);
-    return false;
-  }
-}
-
-function buildPaymentFailedEmailOptions(params: {
-  businessName: string;
-  ownerEmail?: string;
-  tenantUrl: string;
-}): EmailOptions {
-  const business = cleanSubjectText(params.businessName);
-  const rows = [{ label: "Client", value: business }];
-  if (params.ownerEmail) rows.push({ label: "Owner", value: cleanSubjectText(params.ownerEmail) });
-  return {
-    heading: `Payment failed: ${business}`,
-    paragraphs: [
-      `A subscription payment for ${business} failed. They're now past due. Check the Stripe dashboard and follow up before access lapses.`,
-    ],
-    rows,
-    button: { label: "Open the tenant", url: params.tenantUrl },
-    footerNote: "Operator notification",
-  };
-}
-
-/**
- * "Payment failed: {business}" — alerts the operators (Noah + Jacob) when a
- * client's subscription payment fails, so a lapsing paying customer is never
- * silent. OPERATOR notification: gates on operatorEmailsEnabled() (ON by
- * default), independent of the client email pause. Recipients default to
- * jacob@strelva.com via resolveLeadNotifyRecipients(). Fails soft: returns false
- * on any error so a failed alert can never affect the billing webhook.
- */
-export async function sendPaymentFailedEmail(params: {
-  businessName: string;
-  ownerEmail?: string;
-  tenantUrl: string;
-  logPrefix?: string;
-}): Promise<boolean> {
-  try {
-    const opts = buildPaymentFailedEmailOptions(params);
-
-    return await sendEmail({
-      audience: "operator",
-      to: resolveLeadNotifyRecipients(),
-      subject: `Payment failed: ${cleanSubjectText(params.businessName)}`,
-      options: opts,
-    });
-  } catch (err) {
-    console.error(`${params.logPrefix || "[delivery-email]"} Payment-failed email failed:`, err);
     return false;
   }
 }
@@ -936,3 +594,53 @@ export async function sendDeliveryStatusEmail(params: {
 }
 
 export { sendOpsDigestEmail, type OpsDigestAtRisk } from "@/lib/ops-digest-email";
+
+/** Legacy API; the owning platform module keeps the complete send behavior. */
+export async function sendBookingConfirmation(params: BookingConfirmationInput): Promise<boolean> {
+  try {
+    return await (await workspacePorts().bookingEmails()).sendBookingConfirmation(params);
+  } catch (err) {
+    console.error(`${params.logPrefix || "[delivery-email]"} Booking confirmation failed:`, err);
+    return false;
+  }
+}
+
+/** Legacy API; the owning platform module keeps the complete send behavior. */
+export async function sendNewBookingOwnerEmail(params: BookingOwnerNoticeInput): Promise<boolean> {
+  try {
+    return await (await workspacePorts().bookingEmails()).sendNewBookingOwnerEmail(params);
+  } catch (err) {
+    console.error(`${params.logPrefix || "[delivery-email]"} New-booking email failed:`, err);
+    return false;
+  }
+}
+
+/** Legacy API; the owning platform module keeps the complete send behavior. */
+export async function sendNewIntakeLeadEmail(params: NewIntakeLeadInput): Promise<boolean> {
+  try {
+    return await (await workspacePorts().operatorNotices()).sendNewIntakeLeadEmail(params);
+  } catch (err) {
+    console.error(`${params.logPrefix || "[delivery-email]"} New-intake-lead email failed:`, err);
+    return false;
+  }
+}
+
+/** Legacy API; the owning platform module keeps the complete send behavior. */
+export async function sendNewSignupEmail(params: NewSignupInput): Promise<boolean> {
+  try {
+    return await (await workspacePorts().operatorNotices()).sendNewSignupEmail(params);
+  } catch (err) {
+    console.error(`${params.logPrefix || "[delivery-email]"} New-signup email failed:`, err);
+    return false;
+  }
+}
+
+/** Legacy API; the owning platform module keeps the complete send behavior. */
+export async function sendPaymentFailedEmail(params: PaymentFailedInput): Promise<boolean> {
+  try {
+    return await (await workspacePorts().operatorNotices()).sendPaymentFailedEmail(params);
+  } catch (err) {
+    console.error(`${params.logPrefix || "[delivery-email]"} Payment-failed email failed:`, err);
+    return false;
+  }
+}

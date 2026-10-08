@@ -9,7 +9,7 @@
 
 import { cleanSubjectText } from "@/platform/infra/email/text";
 import { sendEmail } from "@/platform/infra/email/send";
-import { resolveLeadNotifyRecipients } from "@/lib/delivery-email";
+import { resolveLeadNotifyRecipients } from "@/platform/operator-notices/recipients";
 
 export interface DomainAlertLine {
   siteName: string;

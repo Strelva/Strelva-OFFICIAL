@@ -4,7 +4,7 @@ import { claimInquiryMessagePurpose, releaseRejectedInquiryMessagePurpose } from
 import { createMemoryInquiryDeliveryStore, deliverInquiryAction, type InquiryDeliveryDependencies, type InquiryOutboundTransport } from "@/products/inquiries/delivery";
 
 vi.mock("@/platform/infra/inquiry-records", async (original) => ({ ...await original<typeof import("@/platform/infra/inquiry-records")>(), inquiryRecordsRpc: vi.fn() }));
-vi.mock("@/lib/tenant-crm", () => ({ addTenantActivity: vi.fn() }));
+vi.mock("@/platform/infra/tenant-crm", () => ({ addTenantActivity: vi.fn() }));
 const rpc = vi.mocked(inquiryRecordsRpc);
 const attemptId = "d0000000-0000-4000-8000-0000000000f8";
 const now = new Date("2026-10-05T12:00:00Z");
