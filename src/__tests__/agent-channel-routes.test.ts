@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const ports = vi.hoisted(() => ({ session: vi.fn(), authorize: vi.fn(), parse: vi.fn(), rpc: vi.fn() }));
+const ports = vi.hoisted(() => ({ rate: vi.fn(), session: vi.fn(), authorize: vi.fn(), parse: vi.fn(), rpc: vi.fn() }));
 vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: ports.session }));
 vi.mock("@/platform/agent-channel/oauth", async original => ({
   ...await original<typeof import("@/platform/agent-channel/oauth")>(),
   authorizeAgent: ports.authorize, parseAuthorization: ports.parse, oauthRpc: ports.rpc,
 }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: ports.rate, rateLimitKey: () => "fixture" }));
 import { POST as authorize } from "@/app/api/mcp/oauth/authorize/route";
 import { POST as revoke } from "@/app/api/mcp/oauth/revoke/route";
 const token = "a".repeat(43);
@@ -14,7 +15,7 @@ function request(path: string, body: unknown, origin: string | null = "https://a
   return new Request(`https://app.strelva.test/api/mcp/oauth/${path}`, { method: "POST", headers: { "Content-Type": "application/json", ...(origin ? { Origin: origin } : {}), ...other }, body: JSON.stringify(body) });
 }
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.clearAllMocks(); ports.rate.mockResolvedValue(false);
   vi.stubEnv("STRELVA_MCP_OAUTH", "1"); vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
   ports.session.mockResolvedValue({ id: "ac161100-0000-4000-8000-000000000001", email: "owner@example.test", email_confirmed_at: "2026-10-07T00:00:00Z" });
   ports.authorize.mockResolvedValue("https://assistant.example/callback?code=opaque");
@@ -44,11 +45,9 @@ describe("assistant consent and revocation routes", () => {
     expect(new URL((await response.json()).redirectTo).searchParams.get("error")).toBe("access_denied");
     expect(ports.authorize).not.toHaveBeenCalled();
   });
-  it("requires same-origin session token revocation and hashes the token", async () => {
-    expect((await revoke(request("revoke",{token},"https://evil.example"))).status).toBe(403);
-    expect((await revoke(request("revoke",{token}))).status).toBe(200);
-    expect(ports.rpc).toHaveBeenCalledWith("revoke_agent_oauth_token",expect.objectContaining({p_token_hash:expect.stringMatching(/^[a-f0-9]{64}$/)}));
-    expect(JSON.stringify(ports.rpc.mock.calls)).not.toContain(token);
+  it("does not accept raw bearers for owner management", async () => {
+    expect((await revoke(request("revoke",{token}))).status).toBe(400);
+    expect(ports.rpc).not.toHaveBeenCalled();
   });
   it("supports client-bound public RFC7009 revocation with singleton fields", async () => {
     const form = (body:string) => new Request("https://app.strelva.test/api/mcp/oauth/revoke",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body});
