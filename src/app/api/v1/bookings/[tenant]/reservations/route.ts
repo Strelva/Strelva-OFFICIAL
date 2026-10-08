@@ -3,6 +3,7 @@ import { agentBookingSchema, agentReceipt, requestAgentBooking } from "@/platfor
 import { deliverBookingUpdates } from "@/platform/bookings/updates";
 import { isTenantId } from "@/lib/scaffold-contracts";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
+import { agentCallLimited, agentHoldCall, agentIdentityLimitsEnabled, isDisposableEmail } from "@/platform/agent-channel/limits";
 import { publicBookingVisitorSchema } from "@/products/scheduling/server";
 import { bookingConflictError, bookingJson, bookingOptions, bookingService, bodyObject, stringValue } from "../../_shared";
 
@@ -17,16 +18,23 @@ export async function OPTIONS(): Promise<Response> {
 export async function POST(request: Request, { params }: { params: Promise<{ tenant: string }> }) {
   const { tenant } = await params;
   if (!isTenantId(tenant)) return bookingJson({ error: "Invalid tenant." }, 400);
+  const body = await bodyObject(request);
+  // Assistant holds arrive from shared provider egress; with identity limits
+  // on they are counted by business, customer, request and agent, not by IP.
+  const agentHold = body?.origin === "agent" && agentIdentityLimitsEnabled();
   try {
-    if (await isRateLimitedAsync(rateLimitKey(request, `v1-bookings:${tenant}`), 20)) return bookingJson({ error: "Too many booking requests." }, 429);
+    const limited = agentHold
+      ? await agentCallLimited(request, agentHoldCall(tenant, body), { legacyPrefix: `v1-bookings:${tenant}` })
+      : await isRateLimitedAsync(rateLimitKey(request, `v1-bookings:${tenant}`), 20);
+    if (limited) return bookingJson({ error: "Too many booking requests." }, 429);
   } catch {
     return bookingJson({ error: "Booking requests are temporarily unavailable. Nothing was booked." }, 503);
   }
-  const body = await bodyObject(request);
   if (!body) return bookingJson({ error: "Invalid request body." }, 400);
   if (body.origin === "agent") {
     const parsed = agentBookingSchema.safeParse(body);
     if (!parsed.success) return bookingJson({ error: "Enter the service, time, agent and customer details." }, 400);
+    if (agentHold && isDisposableEmail(parsed.data.customer.email)) return bookingJson({ error: "Use the customer's own email address. The confirmation is sent there." }, 400);
     try {
       const result = await requestAgentBooking(tenant, parsed.data);
       await deliverBookingUpdates(result.booking.id).catch(() => undefined);

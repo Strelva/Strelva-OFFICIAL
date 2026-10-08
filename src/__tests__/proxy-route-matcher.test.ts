@@ -23,6 +23,13 @@ describe("isPublicRoute", () => {
     expect(isPublicRoute(req("/api/public-continuation/import"))).toBe(false);
     expect(isPublicRoute(req("/api/public-continuation/anything-else"))).toBe(false);
   });
+  it("opens only the public agent channel, never other MCP paths", () => {
+    expect(isPublicRoute(req("/api/mcp/public"))).toBe(true);
+    expect(isPublicRoute(req("/api/mcp/bookings/gldf"))).toBe(true);
+    for (const p of ["/api/mcp", "/api/mcp/owner", "/api/mcp/public/owner", "/api/mcp/publicx", "/api/mcp/bookings"]) {
+      expect(isPublicRoute(req(p))).toBe(false);
+    }
+  });
   it("treats exact public paths as public", () => {
     for (const p of ["/", "/no-access", "/api/health", "/api/track", "/api/billing/webhook"]) {
       expect(isPublicRoute(req(p))).toBe(true);

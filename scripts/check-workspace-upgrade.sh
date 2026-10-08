@@ -268,6 +268,35 @@ psql "${psql_args[@]}" --file="$repo_root/tests/operator-action-approvals-schema
 psql "${psql_args[@]}" --file="$repo_root/tests/business-ownership-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/release-flags-agency-workspaces-schema.sql"
+
+# Tracking signing keys have no browser grants and refuse rollback while a
+# site's verification identity remains configured.
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-track-signing-keys-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-track-signing-key-rotation.sql"
+psql "${psql_args[@]}" --command="insert into public.tenants(id,site_name) values('track-signing-rollback-fixture','Tracking key rollback fixture'); insert into public.tenant_track_signing_keys(tenant_id,public_key) values('track-signing-rollback-fixture',repeat('o',100)); select public.rotate_tenant_track_signing_key('track-signing-rollback-fixture',repeat('n',100));" >/dev/null
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012120000_track_signing_key_rotation.sql" >"$cluster_root/track-key-rotation-rollback.log" 2>&1; then
+  printf 'Tracking key rotation rollback discarded an in-window key.\n' >&2
+  exit 1
+fi
+grep -q 'track_signing_key_rotation_rollback_requires_data_preservation' "$cluster_root/track-key-rotation-rollback.log"
+psql "${psql_args[@]}" -Atc "select public_key = repeat('n',100) and previous_public_key = repeat('o',100) from public.tenant_track_signing_keys where tenant_id='track-signing-rollback-fixture'" | grep -qx t
+psql "${psql_args[@]}" --command="update public.tenant_track_signing_keys set previous_public_key=null, previous_valid_until=null where tenant_id='track-signing-rollback-fixture';" >/dev/null
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012120000_track_signing_key_rotation.sql"
+psql "${psql_args[@]}" -Atc "select public_key = repeat('n',100) and not exists(select 1 from information_schema.columns where table_schema='public' and table_name='tenant_track_signing_keys' and column_name='previous_public_key') and to_regprocedure('public.rotate_tenant_track_signing_key(text,text)') is null from public.tenant_track_signing_keys where tenant_id='track-signing-rollback-fixture'" | grep -qx t
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012010000_tenant_track_signing_keys.sql" >"$cluster_root/track-key-rollback.log" 2>&1; then
+  printf 'Tracking key rollback discarded an active site key.\n' >&2
+  exit 1
+fi
+grep -q 'tenant_track_signing_keys_rollback_requires_data_preservation' "$cluster_root/track-key-rollback.log"
+psql "${psql_args[@]}" --command="delete from public.tenant_track_signing_keys where tenant_id='track-signing-rollback-fixture'; delete from public.tenants where id='track-signing-rollback-fixture';" >/dev/null
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012010000_tenant_track_signing_keys.sql"
+if [[ "$(psql "${psql_args[@]}" -Atc "select to_regclass('public.tenant_track_signing_keys') is null;")" != t ]]; then
+  printf 'Tracking key rollback left its table behind.\n' >&2
+  exit 1
+fi
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012010000_tenant_track_signing_keys.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012120000_track_signing_key_rotation.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-track-signing-keys-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 

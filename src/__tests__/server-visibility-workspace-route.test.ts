@@ -43,6 +43,7 @@ describe("/api/workspace/connected-sites/visibility", () => {
       set: vi.fn(async (_actor, _ws, input: { handle: string; published: boolean }) => ({ ...input, publishedAt: input.published ? "2026-10-05T00:00:00Z" : null, updatedAt: "2026-10-05T00:00:00Z" })),
       confirmedFacts: vi.fn(async () => confirmed),
       published: vi.fn(),
+      listPublished: vi.fn(),
     };
     setConnectedSitesStoreForTests(sites);
     setBusinessPagesStoreForTests(pages);
