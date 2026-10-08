@@ -89,7 +89,7 @@ export type SandboxBuildObservation = {
   sessionId: string | null; payload: { activeCpuDurationMs: number; ingressBytes: number; egressBytes: number } | Record<string, never>;
 };
 const stoppedUsage = z.object({
-  activeCpuDurationMs: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  activeCpuDurationMs: z.number().finite().nonnegative().max(Number.MAX_SAFE_INTEGER),
   networkTransfer: z.object({ ingress: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), egress: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER) }),
 });
 

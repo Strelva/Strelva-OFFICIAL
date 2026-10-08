@@ -8,8 +8,8 @@ import {
 const input = { workspaceId: "11111111-1111-4111-8111-111111111111", resourceId: "22222222-2222-4222-8222-222222222222", applicationVersion: 1, files: { "build.mjs": "import{writeFile}from'node:fs/promises';await writeFile('/output/index.html','<main>Local</main>');", "data/value.txt": "Fixture" } };
 // Fictional operator image digest, never selected as an actual provider image.
 const image = `fixture-team/qualification-node@sha256:${"a".repeat(64)}`;
-function fixture(options: { failPhase?: number; logs?: number; bytes?: Buffer | null; createFailure?: boolean; stopFailure?: boolean; mismatch?: boolean; cancel?: AbortController } = {}) {
-  const stop = vi.fn(async (cleanup: { signal: AbortSignal }) => { expect(cleanup.signal.aborted).toBe(false); if (options.stopFailure) throw new Error("Provider-private failure"); return { activeCpuDurationMs: 142, networkTransfer: { ingress: 500, egress: 200 } }; });
+function fixture(options: { failPhase?: number; logs?: number; bytes?: Buffer | null; createFailure?: boolean; stopFailure?: boolean; mismatch?: boolean; cpuDurationMs?: number; cancel?: AbortController } = {}) {
+  const stop = vi.fn(async (cleanup: { signal: AbortSignal }) => { expect(cleanup.signal.aborted).toBe(false); if (options.stopFailure) throw new Error("Provider-private failure"); return { activeCpuDurationMs: options.cpuDurationMs ?? 142, networkTransfer: { ingress: 500, egress: 200 } }; });
   const writeFiles = vi.fn(async (files: { path: string; content: Buffer; mode: number }[]) => { expect(files.length).toBeGreaterThan(0); });
   let phase = 0;
   const runCommand = vi.fn(async (command: Parameters<Awaited<ReturnType<VercelSandboxBuildPort["create"]>>["runCommand"]>[0]) => {
@@ -116,5 +116,10 @@ describe("prepared Vercel Sandbox build port (no provider operations)", () => {
     await createVercelSandboxBuilder(f.port, { image, enabled: () => true, admit: f.admit, observe })(input);
     expect(observe.mock.calls).toHaveLength(2);
     expect(observe).toHaveBeenLastCalledWith({ attemptName: expect.stringMatching(/^strelva-build-/), kind: "stopped", sessionId: "sbx_fixture_session", payload: { activeCpuDurationMs: 142, ingressBytes: 500, egressBytes: 200 } });
+  });
+  it("preserves fractional CPU milliseconds permitted by the SDK numeric usage contract", async () => {
+    const f = fixture({ cpuDurationMs: 142.25 }); const observe = vi.fn(async () => undefined);
+    await createVercelSandboxBuilder(f.port, { image, enabled: () => true, admit: f.admit, observe })(input);
+    expect(observe).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "stopped", payload: { activeCpuDurationMs: 142.25, ingressBytes: 500, egressBytes: 200 } }));
   });
 });

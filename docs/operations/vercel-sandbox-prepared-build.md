@@ -148,7 +148,7 @@ included. A real Vercel per-session dollar retrieval path remains unsupported.
 
 `src/__tests__/vercel-sandbox-build.test.ts` uses an injected SDK-shaped fake;
 it makes no provider calls. Together with the evidence adapter and retained
-custom build/CSP suite, 34 tests cover resource/digest binding, exact request shape, stable attempts,
+custom build/CSP suite, 35 tests cover resource/digest binding, exact request shape, stable attempts,
 disabled/denied admission, immutable input, command failures, missing/oversized
 or invalid output, provider-image mismatch, logs, cancellation and cleanup.
 Type checking, focused lint and trusted wrapper shell syntax checks pass.

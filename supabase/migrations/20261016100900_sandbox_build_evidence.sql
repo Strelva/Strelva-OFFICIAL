@@ -97,7 +97,7 @@ begin
  if p_kind='stopped' then
   if (select count(*) from jsonb_object_keys(p_payload))<>3 then raise exception 'sandbox_build_observation_invalid';end if;
   foreach n in array array['activeCpuDurationMs','ingressBytes','egressBytes'] loop
-   v:=p_payload->>n;if v is null or jsonb_typeof(p_payload->n)<>'number' or v!~'^[0-9]{1,16}$' or v::numeric>9007199254740991 then raise exception 'sandbox_build_observation_invalid';end if;
+   v:=p_payload->>n;if v is null or jsonb_typeof(p_payload->n)<>'number' or v::numeric<0 or v::numeric>9007199254740991 or (n<>'activeCpuDurationMs' and v!~'^[0-9]{1,16}$') then raise exception 'sandbox_build_observation_invalid';end if;
   end loop;
  else if p_payload<>'{}' then raise exception 'sandbox_build_observation_invalid';end if;end if;
  if p_kind in('created','stopped') and (p_session is null or p_session!~'^[A-Za-z0-9_-]{1,128}$') then raise exception 'sandbox_build_observation_invalid';end if;
