@@ -37,7 +37,7 @@ describe("workspace ports", () => {
     const ports = workspacePorts();
     const expected: Record<keyof WorkspacePorts, string[]> = {
       responsibilityProof: ["responsibilityProofEmailParagraphs"],
-      bookingProof: ["readAgentRequestProof"],
+      bookingProof: ["readAgentBookingOutcomes", "agentBookingOutcomesLine"],
       clientRecords: ["mirrorClientRecord", "mirrorClientRecordRemoval", "readThroughFlag"],
       tenantPolicy: ["readTenantPolicyRoute", "writeTenantPolicySetting", "contentAutonomyFromRoute", "planContentAutonomy", "replyModeFromRoute", "planReplyMode"],
       outsideWriteReceipts: ["recordReviewReply", "recordDomainAdd", "recordDomainClaimRemoval"],

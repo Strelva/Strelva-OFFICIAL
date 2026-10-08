@@ -3,7 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { bookingAgentVisibilityEnabled, resetBookingFlagCache } from "@/platform/bookings/flags";
 import { bookingAgentLabel } from "@/platform/bookings/agent-source";
-import { agentRequestProofLine, readAgentRequestProof } from "@/platform/bookings/agent-proof";
+import { agentBookingOutcomesLine, agentRequestProofLine, readAgentBookingOutcomes, readAgentRequestProof, recordAgentBusinessDiscoveries } from "@/platform/bookings/agent-proof";
+import { readAgentBookingAvailability } from "@/platform/agent-channel/public-tools";
 import { bookingRequestAdapter, bookingRequestItem } from "@/platform/bookings/needs-you-adapter";
 import { parseStoreBooking, setBookingStoreDb, type StoreBooking } from "@/platform/bookings/store";
 import { createNeedsYouService } from "@/platform/needs-you/service";
@@ -123,6 +124,37 @@ it("reads an accurate weekly count and omits unavailable proof without sending",
  expect(rpc).toHaveBeenLastCalledWith("read_agent_booking_proof",{p_tenant_id:"fixture",p_from:"2026-11-02T00:00:00Z",p_to:"2026-11-08T23:59:59Z"});
  setBookingStoreDb({rpc:async()=>({data:null,error:{message:"unavailable"}})});
  expect(await readAgentRequestProof("fixture","2026-11-02","2026-11-08")).toBeNull();
+});
+
+it("reads bounded business outcomes and labels discovery coverage instead of implying an unmeasured zero", async () => {
+ vi.stubEnv("STRELVA_BOOKING_AGENT_VISIBILITY","1"); vi.stubEnv("STRELVA_BOOKING_STORE_WRITE","1"); vi.stubEnv("STRELVA_BOOKING_STORE_READ","postgres");
+ const outcomes = { businessName: "Fixture Services", discoveryCalls: 2, discoveryCoverage: "partial", discoverySince: "2026-11-05", holds: 3, confirmations: 1, completed: 1 } as const;
+ const rpc=vi.fn(async (name:string) => ({ data:name==="booking_parity_streak" ? {days:7} : outcomes, error:null })); setBookingStoreDb({rpc}); resetBookingFlagCache();
+ expect(await readAgentBookingOutcomes("fixture","2026-11-02T00:00:00Z","2026-11-09T00:00:00Z")).toEqual(outcomes);
+ expect(rpc).toHaveBeenLastCalledWith("read_agent_booking_outcomes",{p_tenant_id:"fixture",p_from:"2026-11-02T00:00:00Z",p_to:"2026-11-09T00:00:00Z"});
+ expect(agentBookingOutcomesLine(outcomes)).toContain("2 recorded discovery appearances since 2026-11-05; earlier coverage is unknown");
+ expect(agentBookingOutcomesLine({ ...outcomes, discoveryCoverage: "unknown", discoveryCalls: 0 })).toContain("discovery count unavailable; tracking was not established");
+ setBookingStoreDb({rpc:async (name:string) => ({data:name==="booking_parity_streak" ? {days:7} : { ...outcomes, holds: "3" },error:null})}); resetBookingFlagCache();
+ expect(await readAgentBookingOutcomes("fixture","2026-11-02T00:00:00Z","2026-11-09T00:00:00Z")).toBeNull();
+});
+
+it("does not claim Strelva booking for an unrelated site that only shares the submitted business name", async () => {
+ const availability = await readAgentBookingAvailability({
+  list: async () => [{ business: "other", name: "Fixture", industry: null, website: "https://other.example/" }],
+  scope: async () => "other",
+ }, "Fixture", "https://fixture.example");
+ expect(availability.status).toBe("unknown");
+ expect(availability.detail).toContain("No matching Strelva business profile");
+});
+
+it("records only deduplicated business scopes for discovery evidence", async () => {
+ vi.stubEnv("STRELVA_BOOKING_AGENT_VISIBILITY","1");
+ const rpc=vi.fn(async () => ({data:1,error:null})); setBookingStoreDb({rpc});
+ expect(await recordAgentBusinessDiscoveries(["fixture","fixture"])).toBe(true);
+ expect(rpc).toHaveBeenCalledWith("record_agent_business_discovery",{p_scopes:["fixture"]});
+ expect(JSON.stringify(rpc.mock.calls)).not.toMatch(/email|customer|token|query/i);
+ setBookingStoreDb({rpc:async () => ({data:null,error:{message:"unavailable"}})});
+ expect(await recordAgentBusinessDiscoveries(["fixture"])).toBe(false);
 });
 
 

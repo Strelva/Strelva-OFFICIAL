@@ -14,6 +14,8 @@ import { bookingScopeFor } from "@/platform/bookings/booking-scope";
 import { agentConfirmationAvailable, agentReceipt, nativeBookingByToken, nativeServices, nativeSlots, requestAgentBooking, requireAgentBookings, statusAccessLive, tokenHash } from "@/platform/bookings/native";
 import { servicePolicy } from "@/platform/bookings/service-policy";
 import { bookingStoreDb, readBookingContext } from "@/platform/bookings/store";
+import { bookingAgentsEnabled, bookingReadSource } from "@/platform/bookings/flags";
+import { recordAgentBusinessDiscoveries } from "@/platform/bookings/agent-proof";
 import { deliverBookingUpdates } from "@/platform/bookings/updates";
 import { agentCallLimited, agentHoldCall, agentIdentityLimitsEnabled, isDisposableEmail, type AgentCall } from "./limits";
 import type { McpServer, McpTool, ToolOutcome } from "./protocol";
@@ -98,6 +100,50 @@ async function acceptsRequests(directory: BusinessDirectory, business: string): 
   }
 }
 
+export type AgentBookingAvailability = { status: "yes" | "no" | "unknown"; detail: string };
+
+const hostOf = (value: string | null | undefined) => {
+  if (!value) return null;
+  try {
+    const url = new URL(value.startsWith("http") ? value : `https://${value}`);
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    const path = url.pathname.replace(/\/+$/, "") || "/";
+    return `${url.protocol}//${host}${path}`;
+  }
+  catch { return null; }
+};
+
+/** Exact name or site match only; discovery order and loose search are not identity proof. */
+export async function readAgentBookingAvailability(directory: BusinessDirectory, business: string, website?: string): Promise<AgentBookingAvailability> {
+  let entries: DirectoryEntry[];
+  try { entries = await directory.list(); }
+  catch { return { status: "unknown", detail: "We couldn't check the Strelva business directory." }; }
+  const expectedHost = hostOf(website);
+  const exactName = normal(business);
+  if (website && !expectedHost) return { status: "unknown", detail: "The website could not be matched to a Strelva business profile." };
+  const matches = entries.filter(entry => website ? hostOf(entry.website) === expectedHost : normal(entry.name) === exactName);
+  if (matches.length === 0) return { status: "unknown", detail: "No matching Strelva business profile was found; booking through another provider was not checked." };
+  if (matches.length > 1) return { status: "unknown", detail: "More than one Strelva business matched this name or website." };
+  const entry = matches[0]!;
+  try {
+    if (!bookingAgentsEnabled() || await bookingReadSource() !== "postgres") {
+      return { status: "no", detail: "Strelva agent booking is not enabled for this business." };
+    }
+    const scope = await directory.scope(entry.business);
+    if (!scope) return { status: "no", detail: "This business has no active booking connection in Strelva." };
+    const ctx = await readBookingContext(scope);
+    if (!ctx?.workspaceId || ctx.paused || !ctx.services.some(s => s.active && servicePolicy(ctx, s.id).bookable)) {
+      return { status: "no", detail: "This business has no active bookable service in Strelva." };
+    }
+    if (!await agentConfirmationAvailable(scope)) {
+      return { status: "no", detail: "Customer confirmation is not available for this business." };
+    }
+    return { status: "yes", detail: "A customer can confirm an agent-requested booking through Strelva." };
+  } catch {
+    return { status: "unknown", detail: "We couldn't confirm the live agent-booking path." };
+  }
+}
+
 const normal = (value: string) => value.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, " ").trim();
 
 async function searchBusinesses(directory: BusinessDirectory, args: Record<string, unknown>) {
@@ -112,7 +158,15 @@ async function searchBusinesses(directory: BusinessDirectory, args: Record<strin
       || a.name.localeCompare(b.name) || a.business.localeCompare(b.business))
     .slice(0, 25);
   const open = await Promise.all(matches.map(e => acceptsRequests(directory, e.business)));
-  return { businesses: matches.filter((_, i) => open[i]).slice(0, limit).map(({ business, name, industry, website }) => ({ business, name, industry, website })) };
+  const businesses = matches.filter((_, i) => open[i]).slice(0, limit).map(({ business, name, industry, website }) => ({ business, name, industry, website }));
+  if (process.env.STRELVA_BOOKING_AGENT_VISIBILITY?.trim() === "1") {
+    const scopes = await Promise.all(businesses.map(entry => Promise.resolve(directory.scope(entry.business)).catch(() => null)));
+    const resolved = scopes.filter((scope): scope is string => typeof scope === "string");
+    if (resolved.length !== businesses.length || !await recordAgentBusinessDiscoveries(resolved)) {
+      throw new PublicBookingError("unavailable", "Discovery results could not be recorded. Try again.");
+    }
+  }
+  return { businesses };
 }
 
 async function getBusiness(directory: BusinessDirectory, business: string, scope: string) {
@@ -200,7 +254,14 @@ export function platformMcpServer(directory: BusinessDirectory): McpServer {
       return outcome(async () => {
         const scope = await directory.scope(business);
         if (!scope) throw new PublicBookingError("not_found", "This business is unavailable.");
-        return name === "get_business" ? await getBusiness(directory, business, scope) : await runBookingTool(scope, name, rest);
+        if (name === "get_business") {
+          const details = await getBusiness(directory, business, scope);
+          if (process.env.STRELVA_BOOKING_AGENT_VISIBILITY?.trim() === "1" && !await recordAgentBusinessDiscoveries([scope])) {
+            throw new PublicBookingError("unavailable", "Discovery results could not be recorded. Try again.");
+          }
+          return details;
+        }
+        return await runBookingTool(scope, name, rest);
       });
     },
   };

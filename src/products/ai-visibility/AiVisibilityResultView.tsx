@@ -134,6 +134,14 @@ export function AiVisibilityResultView({ result: raw, scanId, shareUrl, workspac
         </div>
       )}
 
+      {result.agentBookingAvailability && (
+        <section className="mt-6 rounded-2xl border border-m-rule-soft bg-m-panel p-5" aria-label="Agent booking availability">
+          <h3 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-m-text-3">Can agents book you through Strelva?</h3>
+          <p className="mt-2 text-[16px] font-semibold text-m-text">{result.agentBookingAvailability.status === "yes" ? "Yes" : result.agentBookingAvailability.status === "no" ? "No" : "Unknown"}</p>
+          <p className="mt-1 text-[14px] leading-[1.6] text-m-text-2">{result.agentBookingAvailability.detail}</p>
+        </section>
+      )}
+
       <div className="mt-6 rounded-2xl border border-m-rule-soft bg-m-panel p-5">
         <h3 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-m-text-3">Live AI citation probe</h3>
         <p className="mt-2 text-[14px] leading-[1.6] text-m-text-2">{result.citation.note}</p>

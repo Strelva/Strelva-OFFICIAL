@@ -96,6 +96,8 @@ export function renderAiVisibilityHtml(raw: AiVisibilityResult): string {
   const topFix = escapeHtml(result.topFix);
   const probeLine = probeStatusLine(result.citation, result.business, result.measurementStatus);
   const probeLabel = probeStatusLabel(result.citation);
+  const agentBooking = result.agentBookingAvailability;
+  const agentBookingLabel = agentBooking?.status === "yes" ? "Yes" : agentBooking?.status === "no" ? "No" : "Unknown";
 
   const signalRows = result.signals
     .map((s) => {
@@ -249,6 +251,12 @@ export function renderAiVisibilityHtml(raw: AiVisibilityResult): string {
     </div>
 
     <p class="verdict">${verdict}</p>
+
+    ${agentBooking ? `<h2>Agent booking</h2>
+    <div class="card">
+      <div class="card-head"><span class="card-title">Can agents book you through Strelva?</span><span class="badge">${agentBookingLabel}</span></div>
+      <p>${escapeHtml(agentBooking.detail)}</p>
+    </div>` : ""}
 
     <h2>AI readiness signals</h2>
 ${signalsBlock}

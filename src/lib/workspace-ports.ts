@@ -309,7 +309,10 @@ export interface PublishingContentPort {
 
 export interface WorkspacePorts {
   responsibilityProof(): Promise<{ responsibilityProofEmailParagraphs(tenantId: string, from: string, to: string): Promise<string[]> }>;
-  bookingProof(): Promise<{ readAgentRequestProof(tenantId: string, from: string, to: string): Promise<string | null> }>;
+  bookingProof(): Promise<{
+    readAgentBookingOutcomes(tenantId: string, from: string, to: string): Promise<{ businessName: string; discoveryCalls: number; discoveryCoverage: "complete" | "partial" | "unknown"; discoverySince: string | null; holds: number; confirmations: number; completed: number } | null>;
+    agentBookingOutcomesLine(outcomes: { businessName: string; discoveryCalls: number; discoveryCoverage: "complete" | "partial" | "unknown"; discoverySince: string | null; holds: number; confirmations: number; completed: number } | null): string | null;
+  }>;
   clientRecords(): Promise<ClientRecordsPort>;
   tenantPolicy(): Promise<TenantPolicyPort>;
   outsideWriteReceipts(): Promise<OutsideWriteReceiptsPort>;

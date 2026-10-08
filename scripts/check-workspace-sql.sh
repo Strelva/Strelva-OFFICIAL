@@ -1073,6 +1073,12 @@ psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-visibility-schema.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011140000_agent_booking_visibility.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011140000_agent_booking_visibility.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-visibility-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021090031_agent_booking_outcomes.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-outcomes-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261021090031_agent_booking_outcomes.sql"
+psql "${psql_args[@]}" -Atc "select to_regclass('public.agent_business_discovery_days') is null and to_regprocedure('public.read_agent_booking_outcomes(text,timestamptz,timestamptz)') is null" | grep -qx t
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021090031_agent_booking_outcomes.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-outcomes-schema.sql"
 
 # #529: anonymous booking caps, email-only placement, and reversible schema.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011150000_public_booking_admission.sql"

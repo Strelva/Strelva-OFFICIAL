@@ -241,7 +241,11 @@ export async function generateWeeklyBrief(tenantId: string): Promise<WeeklyBrief
     : [];
   // Metric-source registry (GBP, etc.) contributes owner-facing proof for the week.
   const sourceHighlights = await collectPeriodHighlights(tenantId, weekStartDate, weekEndDate);
-  const agentProof = await workspacePorts().bookingProof().then(port => port.readAgentRequestProof(tenantId, weekStartDate.toISOString(), weekEndDate.toISOString())).catch(() => null);
+  const agentProof = await workspacePorts().bookingProof().then(async (port) => {
+    const toExclusive = new Date(`${weekEnd}T00:00:00.000Z`);
+    toExclusive.setUTCDate(toExclusive.getUTCDate() + 1);
+    return port.agentBookingOutcomesLine(await port.readAgentBookingOutcomes(tenantId, weekStartDate.toISOString(), toExclusive.toISOString()));
+  }).catch(() => null);
   const highlights = [
     ...inquiryProofHighlights(proof),
     ...(agentProof ? [agentProof] : []),

@@ -4,6 +4,9 @@ import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { scoreAiVisibility, type ScoreInput, saveAiVisibilityResult } from "@/products/ai-visibility/server";
 import { isRateLimitedWindowedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
+import { readAgentBookingAvailability } from "@/platform/agent-channel/public-tools";
+import { tenantDirectory } from "@/app/api/mcp/_directory";
+import { bookingAgentVisibilityEnabled } from "@/platform/bookings/flags";
 
 /**
  * Public AI-visibility audit endpoint (sales lead-magnet front door).
@@ -59,7 +62,11 @@ export async function POST(request: NextRequest) {
   try {
     const agency = await resolveAgencyAttribution(request.nextUrl.searchParams.get("agency") ?? body.agency);
     if (agency) await admitAgencyCheck(agency);
-    const result = attributedAiVisibility(await scoreAiVisibility(input), agency);
+    const scored = await scoreAiVisibility(input);
+    const agentBookingAvailability = bookingAgentVisibilityEnabled()
+      ? await readAgentBookingAvailability(tenantDirectory, input.business, input.url)
+      : undefined;
+    const result = attributedAiVisibility({ ...scored, ...(agentBookingAvailability ? { agentBookingAvailability } : {}) }, agency);
     const stored = await saveAiVisibilityResult(result, {
       category: input.category,
       location: input.location,
