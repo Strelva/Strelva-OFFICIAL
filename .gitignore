@@ -121,3 +121,4 @@ clear-stale-reval-failures.mjs
 
 # Isolated Ask setup runtime proof (private local DB/token receipts).
 /output/ask456/
+output/pr-review-*/

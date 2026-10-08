@@ -1,6 +1,7 @@
 import { recordGoogleApprovalPolicyEnabled } from "@/products/publishing/server";
 import { publishingEnabledForWorkspace } from "@/products/publishing/server";
 import { recordGoogleApprovalCopy } from "@/products/publishing/server";
+import { systemsReleasedFor } from "@/platform/systems-release";
 import type { Metadata } from "next";
 import { isSuperAdmin } from "@/platform/infra/auth";
 import { readBusinessRecord } from "@/platform/business-record/service";
@@ -11,6 +12,7 @@ import { openWorkspacePlace } from "@/platform/owner-entry/place";
 import { readPlace } from "@/platform/owner-entry/place-state";
 import { WorkspaceBusinessDetails } from "@/experience/places/WorkspaceBusinessDetails";
 import { saveBusinessDetailsAction } from "./actions";
+import { createNativeWebsiteMappingService } from "./native-website-facts";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Business details", robots: { index: false, follow: false }, referrer: "no-referrer" };
@@ -29,7 +31,9 @@ export default async function BusinessDetailsPage({ searchParams }: { searchPara
       isSuperAdmin().catch(() => false),
     ]);
     const googleApprovalCopy = recordGoogleApprovalCopy(record, await recordGoogleApprovalPolicyEnabled(workspaceId, actor));
-    return { record, operator, googleApprovalCopy, publishing: await publishingEnabledForWorkspace(workspaceId, actor), sites: linked.sites, denied: linked.denied };
+    const nativeFactsEnabled = process.env.STRELVA_WEBSITE_NATIVE_FACTS_ENABLED === "1" && await systemsReleasedFor(actor, workspaceId);
+    const nativeFactSites = nativeFactsEnabled && record.access === "owner" ? await createNativeWebsiteMappingService().eligibleSites(actor, workspaceId, linked.sites) : [];
+    return { record, operator, googleApprovalCopy, nativeFactsEnabled, nativeFactSites, publishing: await publishingEnabledForWorkspace(workspaceId, actor), sites: linked.sites, denied: linked.denied };
   });
   const result = typeof params.result === "string" && OUTCOMES.has(params.result as DetailsSaveOutcome) ? params.result as DetailsSaveOutcome : null;
   const field = typeof params.field === "string" && (EDITABLE_DETAILS as readonly string[]).includes(params.field) ? params.field as EditableDetail : null;

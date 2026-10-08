@@ -27,6 +27,8 @@ import { readGoogleWriteUncertainty, readListingReadbackFailures, type ListingRe
 import { operatorQueueReleaseEnabled } from "./release";
 import { EVENT_RETENTION_DAYS, DOMAIN_VERIFICATION_ESCALATION_DAYS } from "./rules";
 import { readInquiryOwnerNoticeIssues } from "./inquiry-owner-notices";
+import { agentHoldRatioAlertsEnabled } from "@/platform/bookings/agent-proof";
+import { readAgentHoldRatioAlerts } from "./agent-booking-ratio";
 
 /**
  * Readers for every source in spec §3.1. Each reader returns its rows or names
@@ -497,6 +499,7 @@ export async function readAllSources(input: { tenants: QueueTenant[]; context: Q
     guard("site_draft", "Site drafts", () => readSiteDrafts(tenants, now)),
     guard("maintenance_digest", "Maintenance digests", readMaintenanceDigests),
     guard("ops_alert", "Operations alerts", readOpsAlerts),
+    ...(agentHoldRatioAlertsEnabled() ? [guard("ops_alert", "Agent hold confirmations", () => readAgentHoldRatioAlerts(actor, context, now, undefined, tenants))] : []),
     guard("ops_alert", "Report delivery", () => readCatalogReportFailures(actor)),
     guard("ops_alert", "Internal tool notifications", () => readToolNoticeFailures(actor)),
     guard("ops_alert", "Internal tool contact links", () => readToolContactConflicts(actor)),

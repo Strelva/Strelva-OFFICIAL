@@ -1,4 +1,4 @@
-import { fetchPinnedPublicText } from "@/lib/pinned-public-text";
+import { fetchPinnedPublicText } from "@/platform/infra/pinned-public-text";
 export interface HostedWebsiteHealthTarget { workspaceId: string; workId: string; tenantId: string; revision: number; contentHash: string; url: string }
 export interface WebsiteHealthReceipt extends HostedWebsiteHealthTarget { checkedAt: string; status: "healthy" | "unreachable" | "hash_missing" | "hash_mismatch"; observedHash?: string }
 export async function checkWebsiteHealth(target: HostedWebsiteHealthTarget, dependencies: { fetch?: (url: string) => Promise<string | null>; now?: () => Date } = {}): Promise<WebsiteHealthReceipt> {

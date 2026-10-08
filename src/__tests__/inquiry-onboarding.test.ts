@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-vi.mock("@/lib/pinned-public-text", () => ({ fetchPinnedPublicText: vi.fn() }));
-import { fetchPinnedPublicText } from "@/lib/pinned-public-text";
+vi.mock("@/platform/infra/pinned-public-text", () => ({ fetchPinnedPublicText: vi.fn() }));
+import { fetchPinnedPublicText } from "@/platform/infra/pinned-public-text";
 import { extractOnboardingFacts, onboardingEvidence, projectOnboardingCorrections, readOnboardingWebsite, recordedOnboarding } from "@/products/inquiries/onboarding";
 import type { ActionReceipt } from "@/products/inquiries/contracts";
 import { __private } from "@/products/inquiries/repository";

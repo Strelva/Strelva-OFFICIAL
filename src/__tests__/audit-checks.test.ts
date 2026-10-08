@@ -26,6 +26,7 @@ vi.mock("../lib/audit/pinned-fetch", () => ({
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
 import { isPrivateIP, validateUrlSafety, runAudit } from "../lib/audit/checks";
+import { isPrivateIP as sharedIsPrivateIP, validateUrlSafety as sharedValidateUrlSafety } from "@/platform/infra/public-url-safety";
 import {
   computeOverallScore,
   scoreToGrade,
@@ -70,6 +71,11 @@ afterEach(() => {
 // SSRF Protection
 // ===========================================================================
 describe("SSRF Protection", () => {
+  it("keeps legacy audit exports on the shared URL-safety implementation", () => {
+    expect(isPrivateIP).toBe(sharedIsPrivateIP);
+    expect(validateUrlSafety).toBe(sharedValidateUrlSafety);
+  });
+
   describe("isPrivateIP", () => {
     it.each([
       ["10.0.0.1", "10.x.x.x (Class A private)"],

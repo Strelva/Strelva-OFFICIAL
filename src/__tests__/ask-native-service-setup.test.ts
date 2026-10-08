@@ -4,9 +4,13 @@ import { compiledAskServiceSetup } from "@/products/scheduling/server";
 import { prepareAskServiceSetup } from "@/app/api/workspace/ask/service-setup-possibility-server";
 import { createBookingPageAdapter } from "@/platform/make-real/live-adapters";
 import { createAskPossibilityPort } from "@/app/api/workspace/ask/possibilities-server";
-import { createInMemoryPossibilityRepository } from "@/platform/possibilities";
+import { createInMemoryPossibilityRepository, createPossibility } from "@/platform/possibilities";
 import type { AskPossibilityInput } from "@/platform/ask/ports";
 import { contentWithBusinessRecord,nativeBusinessServiceReference } from "@/lib/business-record-reader";
+
+import { syncAskServiceSetupPossibilities, storedPossibilityViews } from "@/experience/systems/stored-possibilities";
+import type { SupabasePossibilityRepository } from "@/platform/possibilities/supabase-repository";
+import { createInMemoryLiveSystems } from "@/platform/make-real";
 
 const business = "45600000-0000-4000-8000-000000000010";
 const actor = { userId:"45600000-0000-4000-8000-000000000001", verifiedEmail:"owner@example.test" };
@@ -46,6 +50,28 @@ describe("Ask native service setup",()=>{
     const repository=createInMemoryPossibilityRepository(); const released=vi.fn();
     const port=createAskPossibilityPort(actor,{repository,released,serviceSetup:async()=>result});
     const opened=await port.open(actor,input); expect(opened.durable).toBe(true); expect(released).not.toHaveBeenCalled();
+  });
+  it("shows uncertain service authority as Exploring without changing saved pins, then recovers on a confirmed read", async () => {
+    const result = await prepared();
+    const original = { ...createPossibility({ title: input.title, intent: input.intent,
+      introduces: [{ key: input.introduces!.key, name: input.introduces!.name, purpose: input.introduces!.purpose, candidate: { summary: input.introduces!.summary, content: result.content } }],
+      effects: result.effects, checks: [{ id: "owner-tries-it", description: input.check }] }, { id, businessId: business, actorId: actor.userId, at }), status: "ready" as const };
+    const inner = createInMemoryPossibilityRepository(); await inner.create(original);
+    const save = vi.fn(inner.save);
+    const repo: SupabasePossibilityRepository = { ...inner, save,
+      createFromSource: async value => { await inner.create(value); return { possibility: value, replayed: false }; },
+      listWithSources: async workspaceId => (await inner.list(workspaceId)).map(possibility => ({ possibility, sourceRef: null, lastActivityAt: at })) };
+    const stored = await repo.listWithSources(business);
+    const deps = { repo, live: createInMemoryLiveSystems().port, actorId: actor.userId, at, stored, canWrite: true };
+    const uncertain = await syncAskServiceSetupPossibilities({ ...deps, current: async () => { throw Error("authority unavailable"); } });
+    expect(storedPossibilityViews(uncertain, [])[0]).toMatchObject({ status: "exploring", staleReason: expect.stringContaining("could not be confirmed") });
+    expect(await inner.get(business, id)).toEqual(original); expect(save).not.toHaveBeenCalled();
+    save.mockRejectedValueOnce(Error("concurrent stale save refused"));
+    const failedSave = await syncAskServiceSetupPossibilities({ ...deps, current: async () => false });
+    expect(storedPossibilityViews(failedSave, [])[0]).toMatchObject({ status: "exploring", staleReason: expect.stringContaining("could not be confirmed") });
+    expect(await inner.get(business, id)).toEqual(original);
+    const confirmed = await syncAskServiceSetupPossibilities({ ...deps, current: async () => true });
+    expect(storedPossibilityViews(confirmed, [])[0]).toMatchObject({ status: "ready", staleReason: null });
   });
   it("flag off refuses before lookup, and near/late times refuse before preparing",async()=>{
     const lookup=vi.fn(); await expect(prepareAskServiceSetup(actor,input,id,{enabled:async()=>false,inspect:lookup})).rejects.toThrow("not enabled"); expect(lookup).not.toHaveBeenCalled();

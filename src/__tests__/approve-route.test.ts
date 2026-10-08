@@ -11,12 +11,17 @@ const mockBrand = vi.hoisted(() => vi.fn());
 vi.mock("@/platform/agency-brand/server", () => ({ resolveTenantBrand: mockBrand, resolveOwnerBrand: mockBrand }));
 
 const mockGetTenantConfig = vi.hoisted(() => vi.fn());
+const mockIsRateLimitedAsync = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/event-actions", () => ({ resolveEventAction: mockResolveEventAction }));
 // Existing tenant links must not load the unreleased workspace decision runtime.
 vi.mock("@/platform/needs-you/server", () => { throw new Error("Legacy approval loaded workspace runtime"); });
 vi.mock("@/app/api/owner-website-preview/preview", () => { throw new Error("Legacy approval loaded website renderer"); });
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mockGetTenantConfig }));
+vi.mock("@/platform/infra/rate-limit", () => ({
+  isRateLimitedAsync: mockIsRateLimitedAsync,
+  rateLimitKey: (_request: Request, prefix: string) => prefix,
+}));
 vi.mock("@/lib/tenant-urls", () => ({
   getTenantDashboardUrl: (t: { id: string }, path: string) => `https://admin.${t.id}.strelva.com${path}`,
 }));
@@ -52,13 +57,18 @@ async function postReq(token: string | null) {
 }
 
 beforeEach(() => {
+  vi.unstubAllEnvs();
   vi.clearAllMocks();
   mockBrand.mockResolvedValue({ agencyId: null });
+  mockIsRateLimitedAsync.mockResolvedValue(false);
   process.env.APPROVE_LINK_SECRET = "test-approve-secret";
   mockGetTenantConfig.mockResolvedValue({ id: "gldf", siteName: "GLDF" });
   mockResolveEventAction.mockResolvedValue({ changed: true });
 });
-afterEach(() => vi.resetModules());
+afterEach(() => {
+  vi.resetModules();
+  vi.unstubAllEnvs();
+});
 
 describe("GET /api/approve (confirm step — must NOT mutate)", () => {
   it("valid approve link renders a confirm page and resolves NOTHING (scanner-safe)", async () => {
@@ -91,6 +101,36 @@ describe("GET /api/approve (confirm step — must NOT mutate)", () => {
 });
 
 describe("POST /api/approve (the real resolve)", () => {
+  it.each([
+    { name: "NODE_ENV=production", nodeEnv: "production", vercelEnv: "", supabaseUrl: "", serviceRoleKey: "" },
+    { name: "VERCEL_ENV=production", nodeEnv: "test", vercelEnv: "production", supabaseUrl: "", serviceRoleKey: "" },
+    { name: "VERCEL_ENV=preview", nodeEnv: "test", vercelEnv: "preview", supabaseUrl: "", serviceRoleKey: "" },
+    { name: "missing service-role key", nodeEnv: "production", vercelEnv: "", supabaseUrl: "https://example.supabase.co", serviceRoleKey: "" },
+  ])("fails closed when the database is unavailable in $name", async ({ nodeEnv, vercelEnv, supabaseUrl, serviceRoleKey }) => {
+    vi.stubEnv("NODE_ENV", nodeEnv);
+    vi.stubEnv("VERCEL_ENV", vercelEnv);
+    vi.stubEnv("SUPABASE_URL", supabaseUrl);
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", serviceRoleKey);
+    const tenant = { id: "gldf", ownerEmail: "operator-replaced@example.test" };
+    mockGetTenantConfig.mockResolvedValue({ ...tenant, siteName: "GLDF" });
+
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const recipients = await import("@/lib/owner-recipient");
+    const recipient = await recipients.ownerNoticeEmail(tenant);
+    const legacyAllowed = await recipients.legacyOwnerLinkAllowed(tenant);
+    const { signApproveToken } = await import("@/lib/approve-link");
+    const response = await postReq(signApproveToken(claims));
+    const body = await response.text();
+
+    expect.soft(recipient).toBeNull();
+    expect.soft(warn).toHaveBeenCalledWith(expect.stringContaining("not sent: owner recipient unavailable"));
+    expect.soft(legacyAllowed).toBe(false);
+    expect.soft(response.status).toBe(403);
+    expect.soft(body).toContain("Decide this in Strelva");
+    expect.soft(mockResolveEventAction).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
   it("approves: verifies token and calls resolveEventAction with 'approved'", async () => {
     const { signApproveToken } = await import("@/lib/approve-link");
     const res = await postReq(signApproveToken(claims));

@@ -62,7 +62,7 @@ test("an exact verified successor accepts future jobs while existing unknown cos
     ]);
     expect(proposalResponse.status(), await proposalResponse.text()).toBe(200);
     const proposal = await proposalResponse.json();
-    const transitionId = proposal.pending.id as string;
+    const transitionId = proposal.receipt.id as string;
     await expect(ownerPanel).toContainText(successor.email);
     await ownerPage.screenshot({ path: testInfo.outputPath("payer-proposal-owner-desktop.png"), fullPage: true });
 
@@ -93,8 +93,8 @@ test("an exact verified successor accepts future jobs while existing unknown cos
     await successorPanel.getByRole("button", { name: "Accept future payer role", exact: true }).click();
     await expect(successorPanel.getByRole("alert")).toContainText("hid the accepted response");
     await successorPage.unroute("**/api/work-economics/payer-transition");
-    await successorPanel.getByRole("button", { name: "Accept future payer role", exact: true }).click();
-    await expect(successorPanel).toContainText("Accepted future payer role for Payer Boundary Workshop");
+    await successorPanel.getByRole("button", { name: "Refresh payer history", exact: true }).click();
+    await expect(successorPanel).toContainText("Current accepted payer for Payer Boundary Workshop");
     await successorPage.setViewportSize({ width: 1440, height: 1000 });
     await expect(successorPanel).toBeVisible();
     await successorPage.screenshot({ path: testInfo.outputPath("payer-accepted-desktop.png"), fullPage: true });
@@ -129,10 +129,10 @@ test("an exact verified successor accepts future jobs while existing unknown cos
     const removedProposal = await post(owner.context.request, "/api/work-economics/payer-transition", { action: "propose", workspaceId, successorEmail: removed.email });
     expect((await admin.from("workspace_memberships").delete().eq("workspace_id", workspaceId).eq("user_id", owner.userId)).error).toBeNull();
     const removedAttempt = await removed.context.request.post("/api/work-economics/payer-transition", {
-      headers: { origin: env.app }, data: { action: "accept", transitionId: removedProposal.pending.id },
+      headers: { origin: env.app }, data: { action: "accept", transitionId: removedProposal.receipt.id },
     });
     expect(removedAttempt.status(), await removedAttempt.text()).toBe(200);
-    expect((await removedAttempt.json()).transitions).toEqual(expect.arrayContaining([expect.objectContaining({ id: removedProposal.pending.id, status: "stale", acceptedAt: null })]));
+    expect((await removedAttempt.json()).receipt).toMatchObject({ id: removedProposal.receipt.id, status: "stale" });
   } finally {
     await admin.from("workspaces").delete().eq("id", workspaceId);
     for (const person of [owner, successor, wrong, removed]) {

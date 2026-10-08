@@ -2,12 +2,14 @@ import { notFound } from "next/navigation";
 import { strelvaUiPreviewEnabled } from "@/experience/workspace/preview/enabled";
 import { PublishingContentPreview } from "@/experience/workspace/preview/PublishingContentPreview";
 import { WorkspaceGoogle } from "@/experience/places/WorkspaceGoogle";
+import { BusinessFactMappingsPreview } from "@/experience/workspace/preview/BusinessFactMappingsPreview";
 import { PublishingRecordPreview } from "@/experience/workspace/preview/PublishingRecordPreview";
 
 export const dynamic = "force-dynamic";
 export default async function PublishingPreviewPage({ searchParams }: { searchParams: Promise<{ kind?: string; state?: string }> }) {
   if (!strelvaUiPreviewEnabled()) notFound();
   const { kind, state = "ready" } = await searchParams;
+  if (kind === "mappings") return <BusinessFactMappingsPreview state={state} />;
   if (kind === "record") return <PublishingRecordPreview state={state} />;
   const action = async () => { "use server"; };
   if (kind === "google") return <WorkspaceGoogle workspaceId="5e000000-0000-4000-8000-000000000010" action={action} reviewId="fictional-review" replyText="Thanks for visiting, Dana."

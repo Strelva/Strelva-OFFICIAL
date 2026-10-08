@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { inferPackageDeclaration } from "@/platform/system-versions";
 import {
   ApplicationUseAccessError,
   ApplicationUseConflictError,
@@ -86,6 +87,29 @@ function fakePersistence(initial: ApplicationUseContext): ApplicationUsePersiste
 }
 
 describe("focused application use access", () => {
+  it("declares labels and select options actually emitted without any record-read grant", async () => {
+    const definition = {
+      kind: "internal_app", title: "Private tiers",
+      fields: [
+        { id: "tier", type: "select", label: "Internal tier", required: true, options: ["Tier A", "Tier B"] },
+        { id: "hidden", type: "select", label: "Hidden tiers", required: true, options: ["Private"] },
+      ],
+      components: [{ kind: "form", fields: ["tier"] }],
+    };
+    const service = createApplicationAccessService(fakePersistence(context({
+      releasedSpec: definition, records: [], grant: grant({ recordRead: "none", recordSubmit: false }),
+    })), () => now);
+    const snapshot = await service.inspect(actor, workId);
+    expect(snapshot.records).toEqual([]);
+    expect(snapshot.views[0]?.fields).toEqual([
+      { id: "tier", label: "Internal tier", type: "select", required: true, options: ["Tier A", "Tier B"] },
+    ]);
+    const shared = inferPackageDeclaration(definition).dataEgress.find(flow => flow.destination === "shared_application_view")!;
+    expect(shared.fields).toEqual(expect.arrayContaining(["application.labels.tier", "application.options.tier"]));
+    expect(shared.fields).not.toContain("application.labels.hidden");
+    expect(shared.fields).not.toContain("application.options.hidden");
+  });
+
   it("projects only the released views and own records", async () => {
     const persistence = fakePersistence(context());
     const service = createApplicationAccessService(persistence, () => now);

@@ -20,24 +20,35 @@ select public.choose_business_provider('13230000-0000-4000-8000-000000000002','r
  '13230000-0000-4000-8000-000000000011','13230000-0000-4000-8000-000000000010');
 select public.set_agency_client_staff('13230000-0000-4000-8000-000000000001','readonly-owner@example.test',
  '13230000-0000-4000-8000-000000000010','13230000-0000-4000-8000-000000000011','13230000-0000-4000-8000-000000000001',true);
+-- Historical readers also run before package declarations exist. At the
+-- complete schema, publish a real inspected declaration and keep that metadata
+-- out of the native application payload.
+create function pg_temp.vn_definition() returns jsonb language plpgsql as $$
+declare definition jsonb := '{"kind":"internal_app","title":"Client intake","fields":[{"id":"problem","label":"Problem","type":"text","required":true}],"components":[{"kind":"form","fields":["problem"]},{"kind":"list","fields":["problem"]}]}'::jsonb;
+begin
+  if to_regprocedure('public.system_version_native_behavior(jsonb)') is not null then
+    return definition || jsonb_build_object('declaration',public.system_version_native_behavior(definition));
+  end if;
+  return definition;
+end $$;
 create temporary table vn_source(id uuid);
 insert into vn_source select (public.create_system_version_source('13230000-0000-4000-8000-000000000010','13230000-0000-4000-8000-000000000001',
  'readonly-owner@example.test','{"name":"Source","kind":"internal_app"}','13230000-0000-4000-8000-000000000020',repeat('a',64))->'system'->>'id')::uuid;
 select public.publish_system_version_source_revision('13230000-0000-4000-8000-000000000001','readonly-owner@example.test',jsonb_build_object(
  'source',jsonb_build_object('businessId','13230000-0000-4000-8000-000000000010','systemId',(select id from vn_source),'revisionId','13230000-0000-4000-8000-000000000021','number',1),
- 'definition','{"kind":"internal_app","title":"Client intake","fields":[{"id":"problem","label":"Problem","type":"text","required":true}],"components":[{"kind":"form","fields":["problem"]},{"kind":"list","fields":["problem"]}]}'::jsonb,'summary','First','requires','{"bindingKinds":[]}'::jsonb,
+ 'definition',pg_temp.vn_definition(),'summary','First','requires','{"bindingKinds":[]}'::jsonb,
  'publishedBy','13230000-0000-4000-8000-000000000001','publishedAt',now()));
 create function pg_temp.vn_lineage() returns jsonb language sql as $$ select jsonb_build_object(
  'id',gen_random_uuid(),'version',jsonb_build_object('businessId','13230000-0000-4000-8000-000000000011','systemId','13230000-0000-4000-8000-000000000030'),
  'source',jsonb_build_object('businessId','13230000-0000-4000-8000-000000000010','systemId',(select id from vn_source)),
- 'context','{"kind":"agency_client","label":"Client"}'::jsonb,'baseline','{"revision":1,"definition":{"kind":"internal_app","title":"Client intake","fields":[{"id":"problem","label":"Problem","type":"text","required":true}],"components":[{"kind":"form","fields":["problem"]},{"kind":"list","fields":["problem"]}]}}'::jsonb,
+ 'context','{"kind":"agency_client","label":"Client"}'::jsonb,'baseline',jsonb_build_object('revision',1,'definition',pg_temp.vn_definition()),
  'overrides','[]'::jsonb,'bindings','[]'::jsonb,'localData','{}'::jsonb,'releases','[]'::jsonb,'currentRelease',null,
  'decisions','[]'::jsonb,'grants','[]'::jsonb,'rowRevision',1,'createdBy','13230000-0000-4000-8000-000000000001','createdAt',now(),'updatedAt',now()) $$;
 
 create function pg_temp.vn_payload() returns jsonb language sql as $$ select jsonb_build_object(
  'version',1,'revision',0,'title','Client intake','createdBy','13230000-0000-4000-8000-000000000001','createdAt',now(),
- 'history','[]'::jsonb,'spec',((pg_temp.vn_lineage()->'baseline'->'definition')-'kind')||jsonb_build_object('maintenanceOwner','13230000-0000-4000-8000-000000000001'),
- 'specVersion',1,'status','draft','versions',jsonb_build_array(jsonb_build_object('version',1,'spec',((pg_temp.vn_lineage()->'baseline'->'definition')-'kind')||jsonb_build_object('maintenanceOwner','13230000-0000-4000-8000-000000000001'))),
+ 'history','[]'::jsonb,'spec',((pg_temp.vn_lineage()->'baseline'->'definition')-'kind'-'declaration')||jsonb_build_object('maintenanceOwner','13230000-0000-4000-8000-000000000001'),
+ 'specVersion',1,'status','draft','versions',jsonb_build_array(jsonb_build_object('version',1,'spec',((pg_temp.vn_lineage()->'baseline'->'definition')-'kind'-'declaration')||jsonb_build_object('maintenanceOwner','13230000-0000-4000-8000-000000000001'))),
  'rehearsal',null,'records','[]'::jsonb) $$;
 create temporary table vn_created(value jsonb);
 insert into vn_created select public.create_version_system_command('13230000-0000-4000-8000-000000000001','readonly-owner@example.test',pg_temp.vn_lineage(),'Client intake','internal_app','13230000-0000-4000-8000-000000000030',pg_temp.vn_payload());

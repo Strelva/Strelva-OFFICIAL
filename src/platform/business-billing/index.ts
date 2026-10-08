@@ -163,12 +163,17 @@ export const businessBillingSchema = z.object({
   openItem: z.boolean(), paymentStatus: z.string(), monthlyCents: z.number().int().nonnegative(),
   planKey: z.string().nullable(), grandfatheredTerms: z.string().nullable(), paidThrough: z.string().nullable(),
   payer: z.object({ email: z.string().email(), name: z.string().nullable().optional() }).passthrough().nullable(),
+  // Batch 7A identifies the party separately from the billing recipient.
+  // Older projections can omit it; never infer a party from a person's email.
+  payerParty: z.object({
+    kind: z.enum(["business", "agency"]), workspaceId: z.string().uuid(), name: z.string().nullable(),
+  }).nullable().optional(),
   sites: z.array(z.object({ tenantId: z.string(), siteName: z.string(), amountCents: z.number().int().nonnegative() })),
   sources: z.unknown(), paymentUpdatedAt: z.string().nullable(),
 }).passthrough();
 export type BusinessBilling = z.infer<typeof businessBillingSchema>;
 
-/** Owner/operator read. A member cannot read the billing home. Sends nothing. */
+/** Business or paying-agency owner/admin read; SQL rechecks access. Sends nothing. */
 export async function readBusinessBilling(actor: WorkspaceActor, workspaceId: string, client: RpcDb | null = db()): Promise<BusinessBilling | null> {
   if (!businessBillingEnabled()) return null;
   if (!client) throw new WorkspaceStoreError("Business billing is unavailable.");

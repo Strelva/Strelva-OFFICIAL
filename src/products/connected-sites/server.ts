@@ -14,7 +14,7 @@ import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { scoreLeadSpam } from "@/lib/lead-spam";
-import { fetchPinnedPublicText } from "@/lib/pinned-public-text";
+import { fetchPinnedPublicText } from "@/platform/infra/pinned-public-text";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { releaseFlagEnvMode } from "@/platform/release-flags/resolve";
 import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";

@@ -1268,8 +1268,14 @@
       "batch": "12",
       "status": "prepared locally; unapplied; qualification required",
       "description": "October 8 prepared backlog successors; no production authority",
-      "note": "Local qualification only. Preserve existing baseline and original batch-8 RPC recovery scope. Audit raw server mutations remain restricted during forward-only application recovery; established lifecycle cleanup remains unchanged.",
+      "note": "Local qualification only. Preserve existing baseline and original batch-8 RPC recovery scope. Audit raw server mutations remain restricted during forward-only application recovery; established lifecycle cleanup remains unchanged. Includes revision declarations from PR 587 before later owner-authority successors in chronological replay; all original five successor pins are preserved.",
       "items": [
+        {
+          "file": "20261019110000_package_declarations.sql",
+          "sha256": "7bc067853cfd285d9654e1bf8fe7b2a7e2293acec0ebd47fd60682eae0cff07c",
+          "rollback": "rollback-20261019110000_package_declarations.sql",
+          "rollbackSha256": "52ffc0e29de2864c363dbd6d0fc5879f14777901f74a81e8ca088dba22ac2d82"
+        },
         {
           "file": "20261020110000_content_publication_authority.sql",
           "sha256": "7ede6209f1c40f785a5a4934fb6ffedc9643676f5c7795f19fc12925222a4078",
@@ -1297,6 +1303,55 @@
           "file": "20261020114000_public_business_verification.sql",
           "sha256": "16f0410a21de96b8800e7a408f5222599543e5760896c8b498f75e819822efa5",
           "rollback": "rollback-20261020114000_public_business_verification.sql"
+        }
+      ]
+    },
+    {
+      "batch": "13",
+      "status": "prepared locally; unapplied; human qualification policy remains pending",
+      "description": "Append-only source revision evidence; depends on package declarations and exposes no qualified release gate",
+      "items": [
+        {
+          "file": "20261019111000_system_revision_qualifications.sql",
+          "sha256": "b4fb95e1442eaec5d612406502a78f7aba9be856e5def87bed8995f99d299c46",
+          "rollback": "rollback-20261019111000_system_revision_qualifications.sql",
+          "rollbackSha256": "8a76eb86940a2bd387ea05948357456a9d4be8838750ac03686e1b9c897fc447"
+        }
+      ]
+    },
+    {
+      "batch": "14",
+      "description": "Provisional read-only aggregate agent hold confirmation observation; off by default",
+      "items": [
+        {
+          "file": "20261019112000_agent_hold_ratio.sql",
+          "sha256": "f5a7310e328782957f2b194b5c3d94706a43316bd5760762569649fd2db823a1",
+          "rollback": "rollback-20261019112000_agent_hold_ratio.sql"
+        }
+      ]
+    },
+    {
+      "batch": "15",
+      "description": "Explicit native website fact mappings and reviewed section propagation (#457), proposed only",
+      "items": [
+        {
+          "file": "20261019113000_native_website_fact_mappings.sql",
+          "sha256": "4ba7a4a3c7b96765020c8569da536cc29d2765ca451b32999aecdfe796e4a156",
+          "rollback": "rollback-20261019113000_native_website_fact_mappings.sql",
+          "rollbackStatus": "guarded; refuses retained mappings or non-contact/explicit-mapping review claims"
+        }
+      ]
+    },
+    {
+      "batch": "16",
+      "description": "Party-aware payer transition read projections and UI capabilities",
+      "status": "proposed, not deployed",
+      "note": "Additive service-only v2 snapshot/inbox with current response/revoke eligibility and business-successor inbox. Existing readers, mutation semantics and commitments unchanged. Guarded rollback removes only exact new functions and preserves financial records. No pricing, Stripe or rollout authorization.",
+      "items": [
+        {
+          "file": "20261019114000_payer_transition_actions.sql",
+          "sha256": "7355e8c52f6a94a559bebc74aa995be9b04c81461f1c2b1c2d760f137a4a9cfd",
+          "rollback": "rollback-20261019114000_payer_transition_actions.sql"
         }
       ]
     }

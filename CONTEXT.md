@@ -1,5 +1,16 @@
 # Strelva interface and Managed Websites context
 
+## October 8 reviewed engineering backlog (source only)
+
+The recent backlog is being integrated into `release/security-runtime-20261007`:
+#602 merged; follow-up #603 combines the reviewed billing, email, declaration,
+pending qualification, native mapping, hold-alarm and payer-proposal work. The
+[merge review](docs/operations/pr-merge-review-2026-10-08.md) records integration
+repairs, local evidence, remaining issue scope and the exact next action. These
+source merges do not change the deployed October 7 release or authorize pending
+migrations, external writes, flag activation or commercial qualification. The
+independent frozen launch candidate still needs a separate comparison.
+
 ## October 7 security/runtime and bounded agency release (deployed)
 
 The four requested repairs are deployed at `https://app.strelva.com`: snapshot

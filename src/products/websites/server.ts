@@ -566,3 +566,7 @@ export { createSiteChangeStore, SiteChangeOrderError } from "./site-changes";
 /** The public-URL crawler and fact extraction, for products that seed a business from its site (agency clients, #259). */
 export { crawlWebsite, normalizeRebuildUrl, WebsiteCrawlError } from "./rebuild-crawl";
 export { extractBusinessFacts } from "./rebuild-pipeline";
+
+export { createNativeFactMappingStore } from "./native-fact-mappings-store";
+export { nativeFactMappingInputSchema, nativeFactMappingSchema, nativeMappedFactsSchema, defaultNativeFactMapping, nativeMappingSections, nativeMappedSection, nativeChangedKeys } from "./native-fact-mappings";
+export type { NativeFactMappingInput, NativeFactMapping, NativeMappedFacts, NativeFactSection } from "./native-fact-mappings";

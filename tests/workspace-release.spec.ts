@@ -1186,10 +1186,10 @@ test("unavailable payer history does not claim that no payer exists", async ({ p
   await page.route("**/api/work-allowances?**", route => fulfill(route, { error: "Allowance unavailable." }, 503));
   await page.goto(`/workspace?workspaceId=${CUSTOMER_ID}&view=settings`);
   await expect(page.getByText("Payer history could not be loaded.", { exact: true })).toBeVisible();
-  await expect(page.getByText("No successor payer has been accepted for future jobs.", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Retry payer history", exact: true })).toBeVisible();
+  await expect(page.getByText("No current accepted payer change is visible here.", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Refresh payer history", exact: true })).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("button", { name: "Retry payer history", exact: true }).scrollIntoViewIfNeeded();
+  await page.getByRole("button", { name: "Refresh payer history", exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: "/tmp/strelva-billing-unavailable-mobile.png" });
 });
 
@@ -1223,7 +1223,7 @@ test("switching businesses clears the previous payer while the next history load
   let pending: Route | undefined;
   await page.route("**/api/work-economics/payer-transition**", route => {
     if (new URL(route.request().url()).searchParams.get("workspaceId") === nextId) { pending = route; return; }
-    return fulfill(route, { currentActorId: "owner", transitions: [], pending: null, current: { id: "accepted", successorEmail: "harbor-payer@example.test", status: "accepted", acceptedAt: "2026-09-20T12:00:00Z" } });
+    return fulfill(route, { workspaceId: CUSTOMER_ID, currentActorId: "owner", transitions: [], pending: null, current: { id: "accepted", workspaceId: CUSTOMER_ID, successorKind: "user", successorEmail: "harbor-payer@example.test", isCurrent: true, canRespond: false, canRevoke: false, status: "accepted", acceptedAt: "2026-09-20T12:00:00Z" } });
   });
   await page.goto(`/workspace?workspaceId=${CUSTOMER_ID}&view=settings`);
   await expect(page.getByText("harbor-payer@example.test", { exact: false })).toBeVisible();
@@ -1232,8 +1232,8 @@ test("switching businesses clears the previous payer while the next history load
   await page.getByRole("link", { name: "Business details", exact: true }).click();
   await expect.poll(() => Boolean(pending)).toBe(true);
   await expect(page.getByText("harbor-payer@example.test", { exact: false })).toHaveCount(0);
-  await fulfill(pending!, { currentActorId: "owner", transitions: [], pending: null, current: null });
-  await expect(page.getByText("No successor payer has been accepted for future jobs.", { exact: true })).toBeVisible();
+  await fulfill(pending!, { workspaceId: nextId, currentActorId: "owner", transitions: [], pending: null, current: null });
+  await expect(page.getByText("No current accepted payer change is visible here.", { exact: true })).toBeVisible();
 });
 
 test("onboarding opens inside the shared workspace navigation", async ({ page }) => {

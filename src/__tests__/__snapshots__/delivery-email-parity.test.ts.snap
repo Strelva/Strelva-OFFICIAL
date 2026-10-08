@@ -1,0 +1,1193 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`delivery email compatibility and output parity > 'booking owner notice without email' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [
+    [
+      "example-tenant",
+      {
+        "author": "Strelva",
+        "kind": "email",
+        "summary": "Sent: new-booking email",
+      },
+    ],
+  ],
+  "input": {
+    "audience": "client",
+    "subject": "New booking: A, Monday at 9 AM",
+    "tenantId": "example-tenant",
+    "to": "owner@example.com",
+  },
+  "renderedHtmlSha256": "f257766312fa001a33ca2c3ffceb1dd61240cebfb386ecbe637d3a23f724d1b2",
+  "renderedTextSha256": "9b62e12ba6fdb43f5b16152e750fea6ab087be21fb093bb5e1a71d43341235d7",
+  "text": "New booking
+
+Someone booked through your website. It's confirmed and on your schedule.
+
+Who: A
+What: Consultation & advice
+When: Monday at 9 AM
+
+See your bookings: https://example.com/dashboard?tab=overview&from=email
+
+Strelva",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'booking owner notice' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [
+    [
+      "example-tenant",
+      {
+        "author": "Strelva",
+        "kind": "email",
+        "summary": "Sent: new-booking email",
+      },
+    ],
+  ],
+  "input": {
+    "audience": "client",
+    "subject": "New booking: A, Monday at 9 AM",
+    "tenantId": "example-tenant",
+    "to": "owner@example.com",
+  },
+  "renderedHtmlSha256": "fe2eabad6015dbfb2250edec1e0f2d47e7f8cb181e0f1e1011fc77b9eb1b2e7e",
+  "renderedTextSha256": "ebfba276a035da038219bb7cf16a0fcb6bf85b7ff0dc98dba63b04c20117f187",
+  "text": "New booking
+
+Someone booked through your website. It's confirmed and on your schedule.
+
+Who: A
+What: Consultation & advice
+When: Monday at 9 AM
+Email: customer@example.com
+
+See your bookings: https://example.com/dashboard?tab=overview&from=email
+
+Strelva",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'customer booking without names' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [
+    [
+      "example-tenant",
+      {
+        "author": "Strelva",
+        "kind": "email",
+        "summary": "Sent: booking confirmation",
+      },
+    ],
+  ],
+  "input": {
+    "audience": "customer",
+    "fromName": "Strelva",
+    "options": {
+      "footerNote": undefined,
+      "heading": "You're booked",
+      "paragraphs": [
+        "Hi there, your booking is confirmed. Here are the details:",
+        "Need to change or cancel? Just reply to this email.",
+      ],
+      "preheader": "Your Consultation & advice booking is confirmed.",
+      "rows": [
+        {
+          "label": "Service",
+          "value": "Consultation & advice",
+        },
+        {
+          "label": "Date",
+          "value": "2026-10-12",
+        },
+        {
+          "label": "Time",
+          "value": "09:00",
+        },
+      ],
+    },
+    "subject": "Your booking is confirmed",
+    "to": "customer@example.com",
+  },
+  "renderedHtmlSha256": "eaad9e90d3c3c46c1c18cf8c32baba54be9801521bba00951d6bdff81c654e9d",
+  "renderedTextSha256": "ec025e086bd5924d69cdd9abaa2dd17b8017457096327804e7d0856bcd304144",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'customer booking' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [
+    [
+      "example-tenant",
+      {
+        "author": "Strelva",
+        "kind": "email",
+        "summary": "Sent: booking confirmation",
+      },
+    ],
+  ],
+  "input": {
+    "audience": "customer",
+    "fromName": "Example & Co Business",
+    "options": {
+      "footerNote": "For Example & Co Business",
+      "heading": "You're booked",
+      "paragraphs": [
+        "Hi A, your booking with Example & Co Business is confirmed. Here are the details:",
+        "Need to change or cancel? Just reply to this email.",
+      ],
+      "preheader": "Your Consultation & advice booking with Example & Co Business is confirmed.",
+      "rows": [
+        {
+          "label": "Service",
+          "value": "Consultation & advice",
+        },
+        {
+          "label": "Date",
+          "value": "2026-10-12",
+        },
+        {
+          "label": "Time",
+          "value": "09:00",
+        },
+      ],
+    },
+    "subject": "Your booking with Example & Co Business is confirmed",
+    "to": "customer@example.com",
+  },
+  "renderedHtmlSha256": "fe0b403f04474bda63ba6fe84e0e4fd86c4197e9c82ad850fa47010b7ec15d0a",
+  "renderedTextSha256": "5e817f668a8bf31d139d6fa3e5b43b194ca01b031d7e68f8ff3fc6720bdc0a7c",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'health regression without owner name' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [
+    [
+      "example-tenant",
+      {
+        "author": "Strelva",
+        "kind": "email",
+        "summary": "Sent: health-drop alert (A → C)",
+      },
+    ],
+  ],
+  "input": {
+    "audience": "client",
+    "options": {
+      "button": {
+        "label": "See what changed",
+        "url": "https://example.com/dashboard?tab=overview&from=email",
+      },
+      "footerNote": "For Example & Co Business",
+      "heading": "Your site health dropped",
+      "manageUrl": "https://example.com/dashboard?tab=overview&from=email",
+      "paragraphs": [
+        "our latest scan of Example & Co Business found the site-health grade slipped from A to C. This usually means something changed: a slower page, a broken link, or an SEO signal that regressed.",
+        "You don't need to do anything technical. Open your dashboard to see what changed, or just tell the assistant and we'll look into it for you.",
+      ],
+      "preheader": "Example & Co Business's site health slipped to a C.",
+      "rows": [
+        {
+          "label": "Previous",
+          "value": "A (95)",
+        },
+        {
+          "label": "Now",
+          "value": "C (70)",
+        },
+      ],
+    },
+    "subject": "Example & Co Business's site health dropped to C",
+    "tenantId": "example-tenant",
+    "to": "owner@example.com",
+  },
+  "renderedHtmlSha256": "431b56f2348afaa6ceaade11949ef94e85d2f7796b2901ba40efd92f7f32bf97",
+  "renderedTextSha256": "7e16e922a2bb0545dddbb3fd8f4ff2e31bc00979287d4aae66ee22ac975eeaaf",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'health regression' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [
+    [
+      "example-tenant",
+      {
+        "author": "Strelva",
+        "kind": "email",
+        "summary": "Sent: health-drop alert (A → C)",
+      },
+    ],
+  ],
+  "input": {
+    "audience": "client",
+    "options": {
+      "button": {
+        "label": "See what changed",
+        "url": "https://example.com/dashboard?tab=overview&from=email",
+      },
+      "footerNote": "For Example & Co Business",
+      "heading": "Your site health dropped",
+      "manageUrl": "https://example.com/dashboard?tab=overview&from=email",
+      "paragraphs": [
+        "Hi Dana, our latest scan of Example & Co Business found the site-health grade slipped from A to C. This usually means something changed: a slower page, a broken link, or an SEO signal that regressed.",
+        "You don't need to do anything technical. Open your dashboard to see what changed, or just tell the assistant and we'll look into it for you.",
+      ],
+      "preheader": "Example & Co Business's site health slipped to a C.",
+      "rows": [
+        {
+          "label": "Previous",
+          "value": "A (95)",
+        },
+        {
+          "label": "Now",
+          "value": "C (70)",
+        },
+      ],
+    },
+    "subject": "Example & Co Business's site health dropped to C",
+    "tenantId": "example-tenant",
+    "to": "owner@example.com",
+  },
+  "renderedHtmlSha256": "cc675501db223f5e815cce40788c5a96e75d6bf1f5317a60be969f67783eb7ba",
+  "renderedTextSha256": "1ebc33555fd2d5e6f74a3597586a99d8210a289cb987cd804b4297cf211c39eb",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'intake minimal notice' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [],
+  "input": {
+    "audience": "operator",
+    "subject": "New lead: Example & Co Business",
+    "to": [
+      "first@example.com",
+      "second@example.com",
+    ],
+  },
+  "renderedHtmlSha256": "19a6210a3e0741e45b6234f2fc186e94a12b310e781df582e7b6e10589a8bbcc",
+  "renderedTextSha256": "bf738c5b6c649322431f635797d24e798cde16abdb9c5bbbc907769e9dec43ff",
+  "text": "New lead: Example & Co Business
+
+A new lead just came in through the Strelva site.
+
+Business: Example & Co Business
+Email: prospect@example.com
+Phone: —
+Location: —
+Current site: —
+Wants: Managed site
+Referred by: Direct
+What they want: —
+
+Open the leads board: https://example.com/dashboard?tab=overview&from=email
+
+Operator notification
+Strelva",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'intake operator notice' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [],
+  "input": {
+    "audience": "operator",
+    "subject": "New lead: Example & Co Business",
+    "to": [
+      "first@example.com",
+      "second@example.com",
+    ],
+  },
+  "renderedHtmlSha256": "f542af3dd78224a94547f4a41228f30907b6c3dc95b979e158a0364a60b75dc7",
+  "renderedTextSha256": "32b8896c75a947f4ee8b313b503a22afa4bfc5a2aa21c2c0f9ec247538f716c5",
+  "text": "New lead: Example & Co Business
+
+A new lead just came in through the Strelva site.
+
+Business: Example & Co Business
+Email: prospect@example.com
+Phone: 555-0100
+Location: Buffalo, NY
+Current site: https://example.com/
+Wants: Managed site
+Referred by: Example Agency
+What they want: A new & booking flow
+
+Open the leads board: https://example.com/dashboard?tab=overview&from=email
+
+Operator notification
+Strelva",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'lead minimal notice' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [
+    [
+      "example-tenant",
+      {
+        "author": "Strelva",
+        "kind": "email",
+        "summary": "Sent: new-lead email",
+      },
+    ],
+  ],
+  "input": {
+    "audience": "client",
+    "subject": "Someone reached out through your website",
+    "tenantId": "example-tenant",
+    "to": "owner@example.com",
+  },
+  "renderedHtmlSha256": "dd6503cd46cda4fed2999aa28e9f16fd1d93eae6ae7b903c27b7730de709cb59",
+  "renderedTextSha256": "a50542b9660610526813cf9c9fb6d88f36da844d60cb804302c0acb196151a56",
+  "text": "Someone reached out
+
+Name: A Lead
+
+See it in your dashboard: https://example.com/dashboard?tab=overview&from=email
+
+Strelva",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'lead owner notice' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [
+    [
+      "example-tenant",
+      {
+        "author": "Strelva",
+        "kind": "email",
+        "summary": "Sent: new-lead email",
+      },
+    ],
+  ],
+  "input": {
+    "audience": "client",
+    "subject": "Someone reached out through your website",
+    "tenantId": "example-tenant",
+    "to": "owner@example.com",
+  },
+  "renderedHtmlSha256": "7ff83cedc1687ce7f64a4ab1728416d36e18ede6291dac23dee5a9a00d6b745d",
+  "renderedTextSha256": "b3cc415f33f7c2249b17c1fb231b62be2d2a13a2f1d70b04ad681db0c2205549",
+  "text": "Someone reached out
+
+Name: A
+Email: lead@example.com
+Message: Please call & discuss my site
+
+See it in your dashboard: https://example.com/dashboard?tab=overview&from=email
+
+Strelva",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'ops digest re-export' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [],
+  "input": {
+    "audience": "operator",
+    "options": {
+      "button": {
+        "label": "Open the ops board",
+        "url": "https://example.com/dashboard?tab=overview&from=email",
+      },
+      "footerNote": "Operator notification",
+      "heading": "Strelva daily ops",
+      "paragraphs": [
+        "2 unworked leads of 5 total · 1 client at risk · 1 new signup this week.",
+      ],
+      "rows": [
+        {
+          "label": "Unworked leads",
+          "value": "2 of 5",
+        },
+        {
+          "label": "At-risk clients",
+          "value": "1",
+        },
+        {
+          "label": "Example & Co Business",
+          "value": "Payment failed",
+        },
+        {
+          "label": "New signups (7d)",
+          "value": "A & B",
+        },
+      ],
+    },
+    "subject": "Strelva daily ops",
+    "to": [
+      "first@example.com",
+      "second@example.com",
+    ],
+  },
+  "renderedHtmlSha256": "1efd54c997e119faf4b18492c2de739fd6a5eeacddcc88c193733aa7821bbd00",
+  "renderedTextSha256": "ae54257daba67d346ee625eefb769b0c6f4f918e91b6e8d4be3918eab2a11893",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'paying signup minimal' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [],
+  "input": {
+    "audience": "operator",
+    "options": {
+      "button": {
+        "label": "Open the tenant",
+        "url": "https://example.com/dashboard?tab=overview&from=email",
+      },
+      "footerNote": "Operator notification",
+      "heading": "New paying signup 🎉",
+      "paragraphs": [
+        "Example & Co Business just started a paid subscription.",
+      ],
+      "rows": [
+        {
+          "label": "Client",
+          "value": "Example & Co Business",
+        },
+      ],
+    },
+    "subject": "New paying signup: Example & Co Business",
+    "to": [
+      "first@example.com",
+      "second@example.com",
+    ],
+  },
+  "renderedHtmlSha256": "9b0055bfe87a94c5ee6dc40818e859d8bf9cc5f4178d4d26ed3de9779053d94b",
+  "renderedTextSha256": "ef655c81c59b17c6185945832f9c385b6ca5871235bdaa9ace6ea6811b98cd96",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'paying signup' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [],
+  "input": {
+    "audience": "operator",
+    "options": {
+      "button": {
+        "label": "Open the tenant",
+        "url": "https://example.com/dashboard?tab=overview&from=email",
+      },
+      "footerNote": "Operator notification",
+      "heading": "New paying signup 🎉",
+      "paragraphs": [
+        "Example & Co Business just started a paid subscription.",
+      ],
+      "rows": [
+        {
+          "label": "Client",
+          "value": "Example & Co Business",
+        },
+        {
+          "label": "Plan",
+          "value": "Managed",
+        },
+        {
+          "label": "Owner",
+          "value": "owner@example.com",
+        },
+        {
+          "label": "MRR",
+          "value": "$199/mo",
+        },
+      ],
+    },
+    "subject": "New paying signup: Example & Co Business",
+    "to": [
+      "first@example.com",
+      "second@example.com",
+    ],
+  },
+  "renderedHtmlSha256": "07d368e774fcb65a6e20bbe1a2cc9b60ba4c52e2f806e2eabf6c0563e1f5d91f",
+  "renderedTextSha256": "0b43c5e496b172808b30cf794edf57b6ccc1dcaee513df0ee22f751c81f7c878",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'payment failed minimal' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [],
+  "input": {
+    "audience": "operator",
+    "options": {
+      "button": {
+        "label": "Open the tenant",
+        "url": "https://example.com/dashboard?tab=overview&from=email",
+      },
+      "footerNote": "Operator notification",
+      "heading": "Payment failed: Example & Co Business",
+      "paragraphs": [
+        "A subscription payment for Example & Co Business failed. They're now past due. Check the Stripe dashboard and follow up before access lapses.",
+      ],
+      "rows": [
+        {
+          "label": "Client",
+          "value": "Example & Co Business",
+        },
+      ],
+    },
+    "subject": "Payment failed: Example & Co Business",
+    "to": [
+      "first@example.com",
+      "second@example.com",
+    ],
+  },
+  "renderedHtmlSha256": "5b2a2d96e55495f2e90d3ee62b5c41a65e9472b28b64fd3690119898be68305f",
+  "renderedTextSha256": "4716a2356e46593b73fbcbe0caa7406d68d46bd63ed805fb23a417a41d42946d",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'payment failed' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [],
+  "input": {
+    "audience": "operator",
+    "options": {
+      "button": {
+        "label": "Open the tenant",
+        "url": "https://example.com/dashboard?tab=overview&from=email",
+      },
+      "footerNote": "Operator notification",
+      "heading": "Payment failed: Example & Co Business",
+      "paragraphs": [
+        "A subscription payment for Example & Co Business failed. They're now past due. Check the Stripe dashboard and follow up before access lapses.",
+      ],
+      "rows": [
+        {
+          "label": "Client",
+          "value": "Example & Co Business",
+        },
+        {
+          "label": "Owner",
+          "value": "owner@example.com",
+        },
+      ],
+    },
+    "subject": "Payment failed: Example & Co Business",
+    "to": [
+      "first@example.com",
+      "second@example.com",
+    ],
+  },
+  "renderedHtmlSha256": "814ce3c75348083c92f04e74228784755e7999dd9749f9c609fa055d3f6851f6",
+  "renderedTextSha256": "66a73c393359f10060b6ef0ec3952925f53c4efbf7e43ed193b11e4dc9bff513",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'payment past due' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [
+    [
+      "example-tenant",
+      {
+        "author": "Strelva",
+        "kind": "email",
+        "summary": "Sent: payment-past-due email",
+      },
+    ],
+  ],
+  "input": {
+    "audience": "client",
+    "options": {
+      "button": {
+        "label": "Update your card",
+        "url": "https://example.com/dashboard?tab=overview&from=email",
+      },
+      "footerNote": "For Example & Co Business",
+      "heading": "Your payment didn't go through",
+      "paragraphs": [
+        "We tried to charge your card for Example & Co Business and it didn't go through. Your site is still live for now, but if the payment isn't updated in the next few days your dashboard access will pause.",
+        "Updating your card takes a minute. Open your dashboard and click Manage billing.",
+      ],
+      "preheader": "We couldn't process your payment for Example & Co Business.",
+    },
+    "subject": "Action needed: your payment for Example & Co Business didn't go through",
+    "tenantId": "example-tenant",
+    "to": "owner@example.com",
+  },
+  "renderedHtmlSha256": "c2d8851d893e69f6a2836284595afb97963d6444263dddf66c0d4b3e316d9e26",
+  "renderedTextSha256": "318f69fc187cf0d7a9130fa31b26a5a6f6314f58c5505230b61a958841b95c16",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'prospect delivery status' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [],
+  "input": {
+    "audience": "prospect",
+    "subject": "We received Example & Co Business's site request",
+    "to": "prospect@example.com",
+  },
+  "renderedHtmlSha256": "4307306bb765a2e81426420fe69744802b7749ae8306bacd8ef81b92ef22e9e9",
+  "renderedTextSha256": "7a579b7bebfafebb5d91445effd6deff2d5e3bd384db22d352f95267ef1d8205",
+  "text": "We've got your request
+
+We received the request for Example & Co Business. The first status is request received. Next we review the business, the current site, and what the site should help customers do. We will follow up after review.
+
+No login is needed yet. This private tracking link shows where the request stands and what happens next.
+
+Track your request: https://example.com/status?token=fixture
+
+Strelva",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'review approval URLs without draft' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [
+    [
+      "example-tenant",
+      {
+        "author": "Strelva",
+        "kind": "email",
+        "summary": "Sent: review-reply alert (4-star from A Name)",
+      },
+    ],
+  ],
+  "input": {
+    "audience": "client",
+    "options": {
+      "button": {
+        "label": "Reply in your dashboard",
+        "url": "https://example.com/reviews",
+      },
+      "footerNote": "For Example & Co Business",
+      "heading": "A new review needs your reply",
+      "manageUrl": "https://example.com/reviews",
+      "paragraphs": [
+        "Hi Dana, A Name left Example & Co Business a new 4-star review. A quick reply (especially in the first day or two) is one of the best local-SEO signals you can send, and it shows customers you're paying attention.",
+      ],
+      "preheader": "A Name left Example & Co Business a 4-star review.",
+      "rows": [
+        {
+          "label": "From",
+          "value": "A Name",
+        },
+        {
+          "label": "Rating",
+          "value": "★★★★ (4/5)",
+        },
+        {
+          "label": "Review",
+          "value": "Helpful & quick. Thank you!",
+        },
+      ],
+    },
+    "subject": "New 4-star review for Example & Co Business",
+    "tenantId": "example-tenant",
+    "to": "owner@example.com",
+  },
+  "renderedHtmlSha256": "cdb733ea85248308b6f68a2d96f1cd9c742bb7c353cfcafedbfadae7ab3280ea",
+  "renderedTextSha256": "593693df1c53eff0621a9ec33478e8b18b4a43be547703279e5b5dc8845e9fd5",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'review draft with approval' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [
+    [
+      "example-tenant",
+      {
+        "author": "Strelva",
+        "kind": "email",
+        "summary": "Sent: review-reply alert (4-star from A Name)",
+      },
+    ],
+  ],
+  "input": {
+    "audience": "client",
+    "options": {
+      "button": {
+        "label": "Approve & post this reply",
+        "url": "https://example.com/approve?token=fixture&action=approve",
+      },
+      "footerNote": "For Example & Co Business",
+      "heading": "A new review needs your reply",
+      "manageUrl": "https://example.com/reviews",
+      "paragraphs": [
+        "Hi Dana, A Name left Example & Co Business a new 4-star review. A quick reply (especially in the first day or two) is one of the best local-SEO signals you can send, and it shows customers you're paying attention.",
+        "We drafted a reply you can post as-is, or tweak in your dashboard:",
+      ],
+      "preheader": "A Name left Example & Co Business a 4-star review.",
+      "rows": [
+        {
+          "label": "From",
+          "value": "A Name",
+        },
+        {
+          "label": "Rating",
+          "value": "★★★★ (4/5)",
+        },
+        {
+          "label": "Review",
+          "value": "Helpful & quick. Thank you!",
+        },
+        {
+          "label": "Suggested reply",
+          "value": "Thank you & come again!",
+        },
+      ],
+    },
+    "subject": "New 4-star review for Example & Co Business",
+    "tenantId": "example-tenant",
+    "to": "owner@example.com",
+  },
+  "renderedHtmlSha256": "f147818951355a841f3ae3c2c38c9c67a43fddd66ce0e1eaa6fa8bcebf1f6705",
+  "renderedTextSha256": "fcfafd1a96cb03ae23e920b719e4d2a44daa8050a8ffb05e60771d65d84a2e1f",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'review draft with both decisions' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [
+    [
+      "example-tenant",
+      {
+        "author": "Strelva",
+        "kind": "email",
+        "summary": "Sent: review-reply alert (4-star from A Name)",
+      },
+    ],
+  ],
+  "input": {
+    "audience": "client",
+    "options": {
+      "button": {
+        "label": "Approve & post this reply",
+        "url": "https://example.com/approve?token=fixture&action=approve",
+      },
+      "footerNote": "For Example & Co Business",
+      "heading": "A new review needs your reply",
+      "manageUrl": "https://example.com/reviews",
+      "paragraphs": [
+        "Hi Dana, A Name left Example & Co Business a new 4-star review. A quick reply (especially in the first day or two) is one of the best local-SEO signals you can send, and it shows customers you're paying attention.",
+        "We drafted a reply you can post as-is, or tweak in your dashboard:",
+      ],
+      "preheader": "A Name left Example & Co Business a 4-star review.",
+      "rows": [
+        {
+          "label": "From",
+          "value": "A Name",
+        },
+        {
+          "label": "Rating",
+          "value": "★★★★ (4/5)",
+        },
+        {
+          "label": "Review",
+          "value": "Helpful & quick. Thank you!",
+        },
+        {
+          "label": "Suggested reply",
+          "value": "Thank you & come again!",
+        },
+      ],
+      "secondaryButton": {
+        "label": "Not yet",
+        "url": "https://example.com/approve?token=fixture&action=not-yet",
+      },
+    },
+    "subject": "New 4-star review for Example & Co Business",
+    "tenantId": "example-tenant",
+    "to": "owner@example.com",
+  },
+  "renderedHtmlSha256": "8236430f685d30f0890895f56d0dff242ea6f300a668f1d78b12f044c9e40300",
+  "renderedTextSha256": "7fe8de9ea8017a18fcedd8ea75c0262ecc4bc704bca5bd0e28a15b56c67c79e2",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'review draft without approval' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [
+    [
+      "example-tenant",
+      {
+        "author": "Strelva",
+        "kind": "email",
+        "summary": "Sent: review-reply alert (4-star from A Name)",
+      },
+    ],
+  ],
+  "input": {
+    "audience": "client",
+    "options": {
+      "button": {
+        "label": "Reply in your dashboard",
+        "url": "https://example.com/reviews",
+      },
+      "footerNote": "For Example & Co Business",
+      "heading": "A new review needs your reply",
+      "manageUrl": "https://example.com/reviews",
+      "paragraphs": [
+        "Hi Dana, A Name left Example & Co Business a new 4-star review. A quick reply (especially in the first day or two) is one of the best local-SEO signals you can send, and it shows customers you're paying attention.",
+        "We drafted a reply you can post as-is, or tweak in your dashboard:",
+      ],
+      "preheader": "A Name left Example & Co Business a 4-star review.",
+      "rows": [
+        {
+          "label": "From",
+          "value": "A Name",
+        },
+        {
+          "label": "Rating",
+          "value": "★★★★ (4/5)",
+        },
+        {
+          "label": "Review",
+          "value": "Helpful & quick. Thank you!",
+        },
+        {
+          "label": "Suggested reply",
+          "value": "Thank you & come again!",
+        },
+      ],
+    },
+    "subject": "New 4-star review for Example & Co Business",
+    "tenantId": "example-tenant",
+    "to": "owner@example.com",
+  },
+  "renderedHtmlSha256": "78be69b3971c5b0078ccdda1e4727738e483a2399783bc01fa864f22f2c17da0",
+  "renderedTextSha256": "82f047db53c883f88ac4f37eb7d91bb76d62bd98ddf1413312baa41aafcde797",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'review request without owner name' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [
+    [
+      "example-tenant",
+      {
+        "author": "Strelva",
+        "kind": "email",
+        "summary": "Sent: review-request email",
+      },
+    ],
+  ],
+  "input": {
+    "audience": "client",
+    "options": {
+      "button": {
+        "label": "Open your review link",
+        "url": "https://example.com/review",
+      },
+      "footerNote": "For Example & Co Business",
+      "heading": "A few reviews go a long way",
+      "paragraphs": [
+        "Reviews are one of the strongest signals for Example & Co Business in local search.",
+        "Here's your review link. Send it to a few recent customers, or add it to your receipts and follow-up messages. A handful this month makes a real difference.",
+      ],
+      "preheader": "Your review link, ready to share with a few happy customers.",
+    },
+    "subject": "A few reviews go a long way for Example & Co Business",
+    "tenantId": "example-tenant",
+    "to": "owner@example.com",
+  },
+  "renderedHtmlSha256": "afddeb26a5ec5f38a3d949f42f2f1aabfb06777d0c3b8ad0aba71e6c86f95488",
+  "renderedTextSha256": "486c7d3aef81a09ccb021788db5d8460fdbd69188afcd9a51c67fcb41467e61c",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'review request' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [
+    [
+      "example-tenant",
+      {
+        "author": "Strelva",
+        "kind": "email",
+        "summary": "Sent: review-request email",
+      },
+    ],
+  ],
+  "input": {
+    "audience": "client",
+    "options": {
+      "button": {
+        "label": "Open your review link",
+        "url": "https://example.com/review",
+      },
+      "footerNote": "For Example & Co Business",
+      "heading": "A few reviews go a long way",
+      "paragraphs": [
+        "Hi Dana, reviews are one of the strongest signals for Example & Co Business in local search.",
+        "Here's your review link. Send it to a few recent customers, or add it to your receipts and follow-up messages. A handful this month makes a real difference.",
+      ],
+      "preheader": "Your review link, ready to share with a few happy customers.",
+    },
+    "subject": "A few reviews go a long way for Example & Co Business",
+    "tenantId": "example-tenant",
+    "to": "owner@example.com",
+  },
+  "renderedHtmlSha256": "dab8df2bcfb87f762dc9acc763fa19e5440ba1fa7efd2fcf742e814cdb086ce1",
+  "renderedTextSha256": "4a40a1e7e4eaa241448641828ed48bcb097f9d6da1bb8814df84edbdfed94010",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'review without draft' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [
+    [
+      "example-tenant",
+      {
+        "author": "Strelva",
+        "kind": "email",
+        "summary": "Sent: review-reply alert (4-star from A Name)",
+      },
+    ],
+  ],
+  "input": {
+    "audience": "client",
+    "options": {
+      "button": {
+        "label": "Reply in your dashboard",
+        "url": "https://example.com/reviews",
+      },
+      "footerNote": "For Example & Co Business",
+      "heading": "A new review needs your reply",
+      "manageUrl": "https://example.com/reviews",
+      "paragraphs": [
+        "Hi Dana, A Name left Example & Co Business a new 4-star review. A quick reply (especially in the first day or two) is one of the best local-SEO signals you can send, and it shows customers you're paying attention.",
+      ],
+      "preheader": "A Name left Example & Co Business a 4-star review.",
+      "rows": [
+        {
+          "label": "From",
+          "value": "A Name",
+        },
+        {
+          "label": "Rating",
+          "value": "★★★★ (4/5)",
+        },
+        {
+          "label": "Review",
+          "value": "Helpful & quick. Thank you!",
+        },
+      ],
+    },
+    "subject": "New 4-star review for Example & Co Business",
+    "tenantId": "example-tenant",
+    "to": "owner@example.com",
+  },
+  "renderedHtmlSha256": "cdb733ea85248308b6f68a2d96f1cd9c742bb7c353cfcafedbfadae7ab3280ea",
+  "renderedTextSha256": "593693df1c53eff0621a9ec33478e8b18b4a43be547703279e5b5dc8845e9fd5",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'review without owner or text and clam…' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [
+    [
+      "example-tenant",
+      {
+        "author": "Strelva",
+        "kind": "email",
+        "summary": "Sent: review-reply alert (6-star from A Name)",
+      },
+    ],
+  ],
+  "input": {
+    "audience": "client",
+    "options": {
+      "button": {
+        "label": "Reply in your dashboard",
+        "url": "https://example.com/reviews",
+      },
+      "footerNote": "For Example & Co Business",
+      "heading": "A new review needs your reply",
+      "manageUrl": "https://example.com/reviews",
+      "paragraphs": [
+        "A Name left Example & Co Business a new 6-star review. A quick reply (especially in the first day or two) is one of the best local-SEO signals you can send, and it shows customers you're paying attention.",
+      ],
+      "preheader": "A Name left Example & Co Business a 6-star review.",
+      "rows": [
+        {
+          "label": "From",
+          "value": "A Name",
+        },
+        {
+          "label": "Rating",
+          "value": "★★★★★ (6/5)",
+        },
+      ],
+    },
+    "subject": "New 6-star review for Example & Co Business",
+    "tenantId": "example-tenant",
+    "to": "owner@example.com",
+  },
+  "renderedHtmlSha256": "58d592882766212bf25ea389d6be4fe3be7fa51f931baa17b2530b56fe342ed2",
+  "renderedTextSha256": "a89994d9319bcb5707eea731ee94ba3d9d4731a9306a08fa56372f2d1eb4832c",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'site live' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [
+    [
+      "example-tenant",
+      {
+        "author": "Strelva",
+        "kind": "email",
+        "summary": "Sent: site-live email",
+      },
+    ],
+  ],
+  "input": {
+    "audience": "client",
+    "options": {
+      "button": {
+        "label": "View your site",
+        "url": "https://example.com/",
+      },
+      "footerNote": "For Example & Co Business",
+      "heading": "Your site is live",
+      "manageUrl": "https://example.com/dashboard?tab=overview&from=email",
+      "paragraphs": [
+        "Example & Co Business's new site is live and ready for visitors. Take a look, and if anything needs a tweak, just tell the assistant in your dashboard.",
+      ],
+      "preheader": "Example & Co Business is live and ready for visitors.",
+      "rows": [
+        {
+          "label": "Your site",
+          "value": "https://example.com/",
+        },
+      ],
+    },
+    "subject": "Example & Co Business is live",
+    "tenantId": "example-tenant",
+    "to": "owner@example.com",
+  },
+  "renderedHtmlSha256": "d82220336dbcfdcbafb3ddbc6fdd74f7e9e10150dbf8dfc06fd6dc5287336dde",
+  "renderedTextSha256": "4567009199c1996966342feded64a1645366fd2f2b2fb849b8a139f9a7eda0e6",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'update live' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [
+    [
+      "example-tenant",
+      {
+        "author": "Strelva",
+        "kind": "email",
+        "summary": "Sent: update-live email",
+      },
+    ],
+  ],
+  "input": {
+    "audience": "client",
+    "subject": "Your update to Example & Co Business is live",
+    "tenantId": "example-tenant",
+    "to": "owner@example.com",
+  },
+  "renderedHtmlSha256": "475a5a08e8b09ffd088d11be198ce05dcba9355c02f5df520528eb302c81a8c7",
+  "renderedTextSha256": "c5a2247a910bc368101539c1038898f534861bdc5e345dab1e9e9fc95153929e",
+  "text": "Your update is live.
+
+We just updated hours & contact information on your site. It's published and live for visitors right now.
+
+Want something else changed? Just reply or tell the assistant in your dashboard.
+
+See it on your site: https://example.com/
+
+Strelva",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'update rolling out' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [
+    [
+      "example-tenant",
+      {
+        "author": "Strelva",
+        "kind": "email",
+        "summary": "Sent: update-live email",
+      },
+    ],
+  ],
+  "input": {
+    "audience": "client",
+    "subject": "Your update to Example & Co Business is rolling out",
+    "tenantId": "example-tenant",
+    "to": "owner@example.com",
+  },
+  "renderedHtmlSha256": "b994bc1459e24a8ef29e302b93295b11e35fd6a535c86a52aadcc50dea74e659",
+  "renderedTextSha256": "1bd12b4a5138f95ed35de339c56d8c21df70f337db65ac01f4af353a029ff40c",
+  "text": "Your update is approved.
+
+We just approved an update to hours on your site. It's rolling out now. It can take a few minutes to appear.
+
+Want something else changed? Just reply or tell the assistant in your dashboard.
+
+See it on your site: https://example.com/
+
+Strelva",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'welcome without tenant or owner name' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [],
+  "input": {
+    "audience": "client",
+    "options": {
+      "button": {
+        "label": "Open your dashboard",
+        "url": "https://example.com/dashboard?tab=overview&from=email",
+      },
+      "footerNote": "For Example & Co Business",
+      "heading": "Welcome to Strelva",
+      "paragraphs": [
+        "Your Strelva dashboard for Example & Co Business is ready.",
+        "From here, we manage your site for you. Tell the assistant in your dashboard what you want changed, in plain words, and we handle the update.",
+        "Once a month you'll get a report showing what's working: who found you, what they clicked, and what we changed. Reply to any of our emails anytime and a real person will get back to you.",
+      ],
+      "preheader": "Your dashboard is ready. Here's what happens next.",
+    },
+    "subject": "Welcome to Strelva",
+    "tenantId": undefined,
+    "to": "owner@example.com",
+  },
+  "renderedHtmlSha256": "bcc1ca04f34812f95411b2bd2c3725a468538e508798c3aed516ee65b7c9058a",
+  "renderedTextSha256": "eae4e070d3d3e1bb75933f005b88eb7c626b2d13df42f523618948c78e4f0800",
+}
+`;
+
+exports[`delivery email compatibility and output parity > 'welcome' > preserves sender input, rendered bytes and successful CRM effects 1`] = `
+{
+  "crm": [
+    [
+      "example-tenant",
+      {
+        "author": "Strelva",
+        "kind": "email",
+        "summary": "Sent: welcome email",
+      },
+    ],
+  ],
+  "input": {
+    "audience": "client",
+    "options": {
+      "button": {
+        "label": "Open your dashboard",
+        "url": "https://example.com/dashboard?tab=overview&from=email",
+      },
+      "footerNote": "For Example & Co Business",
+      "heading": "Welcome to Strelva",
+      "paragraphs": [
+        "Hi Dana, your Strelva dashboard for Example & Co Business is ready.",
+        "From here, we manage your site for you. Tell the assistant in your dashboard what you want changed, in plain words, and we handle the update.",
+        "Once a month you'll get a report showing what's working: who found you, what they clicked, and what we changed. Reply to any of our emails anytime and a real person will get back to you.",
+      ],
+      "preheader": "Your dashboard is ready. Here's what happens next.",
+    },
+    "subject": "Welcome to Strelva",
+    "tenantId": "example-tenant",
+    "to": "owner@example.com",
+  },
+  "renderedHtmlSha256": "6423700cb607714821ab09ae7b6079483aa14433a7d3193aa28af64dcb2958d0",
+  "renderedTextSha256": "ea0c0dcb18c460a2fa1c46d64c1a006479386eaa1a7aad0d526e602e0a1b3a57",
+}
+`;

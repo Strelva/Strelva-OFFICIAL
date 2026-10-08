@@ -16,8 +16,8 @@
  */
 
 import * as cheerio from "cheerio";
-import { validateUrlSafety } from "@/lib/audit/checks";
-import { fetchPinnedPublicText } from "@/lib/pinned-public-text";
+import { validateUrlSafety } from "@/platform/infra/public-url-safety";
+import { fetchPinnedPublicText } from "@/platform/infra/pinned-public-text";
 import type { AiVisibilityResult, CitationProbe, Grade, MeasurementStatus, ScoreInput, Signal } from "./contracts";
 
 export type { AiVisibilityResult, CitationProbe, ScoreInput, Signal } from "./contracts";

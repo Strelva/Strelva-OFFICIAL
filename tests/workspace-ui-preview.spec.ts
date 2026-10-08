@@ -161,10 +161,14 @@ test("a business owner can propose a future payer and the exact addressee can ac
     if (request.method() === "POST") {
       const action = (request.postDataJSON() as { action: string }).action;
       state = action === "accept" ? "accepted" : "pending";
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ receipt: { kind: "payer_transition", action, id: transitionId, workspaceId, status: state, successorKind: "user" } }) });
+      return;
     }
     const transition = {
       id: transitionId,
       workspaceId,
+      successorKind: "user", successorWorkspaceId: null, successorWorkspaceName: null,
+      isCurrent: state === "accepted", canRespond: state === "pending", canRevoke: state === "pending",
       successorUserId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
       successorEmail: "successor@harbordental.example",
       proposerEmail: "owner@harbordental.example",
@@ -177,6 +181,7 @@ test("a business owner can propose a future payer and the exact addressee can ac
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
+        workspaceId,
         transitions: state === "empty" ? [] : [transition],
         current: state === "accepted" ? transition : null,
         pending: state === "pending" ? transition : null,
@@ -191,10 +196,10 @@ test("a business owner can propose a future payer and the exact addressee can ac
   await expect(payer).toContainText("Existing budgets, reservations, recorded costs, and unresolved holds keep their original payer and limit.");
   await payer.getByLabel("Verified payer email").fill("successor@harbordental.example");
   await payer.getByRole("button", { name: "Propose new payer" }).click();
-  await expect(payer).toContainText("Only this addressed verified person can accept.");
+  await expect(payer).toContainText("Only the addressed verified person can accept.");
   await payer.getByRole("button", { name: "Accept future payer role" }).click();
   await expect(payer).toContainText("Current accepted successor: successor@harbordental.example");
-  await expect(payer.getByRole("status")).toContainText("You accepted responsibility for future jobs.");
+  await expect(payer.getByRole("status")).toContainText("Payer acceptance is recorded.");
 });
 
 test("direct customer can inspect an offering setup and its local allowance", async ({ page }) => {
