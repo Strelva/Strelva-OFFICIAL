@@ -65,7 +65,9 @@
     ".next-inquiry-running-proof/types/**/*.ts",
     ".next-inquiry-running-proof/dev/types/**/*.ts",
     ".next-w6-ui/types/**/*.ts",
-    ".next-w6-ui/dev/types/**/*.ts"
+    ".next-w6-ui/dev/types/**/*.ts",
+    ".next-full-model-journeys/types/**/*.ts",
+    ".next-full-model-journeys/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

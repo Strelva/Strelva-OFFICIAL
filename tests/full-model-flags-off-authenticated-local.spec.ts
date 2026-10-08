@@ -41,7 +41,6 @@ test(masterOff ? 'master workspace switch refuses additive effects through real 
   const admin = createClient(env.url, env.service, { auth: { persistSession: false, autoRefreshToken: false } });
   const owner = await signedInContext(browser, admin, masterOff ? 'full-dark-master' : 'full-dark-additive');
   const workspaceId = randomUUID();
-  let workId: string | undefined;
   const headers = { origin: env.app, 'sec-fetch-site': 'same-origin' };
   try {
     // Same confirmed identity as real local Auth, seeded only to arrange the
@@ -49,20 +48,23 @@ test(masterOff ? 'master workspace switch refuses additive effects through real 
     expect((await admin.from('users').upsert({ id: owner.userId, email: owner.email, verified_at: new Date().toISOString() })).error).toBeNull();
     expect((await admin.from('workspaces').insert({ id: workspaceId, kind: 'customer', name: 'Full dark proof business', created_by: owner.userId })).error).toBeNull();
     expect((await admin.from('workspace_memberships').insert({ workspace_id: workspaceId, user_id: owner.userId, role: 'owner', created_by: owner.userId })).error).toBeNull();
+    const before = effectSnapshot();
+    const statuses: Array<{ method: string; path: string; status: number }> = [];
     if (!masterOff) {
-      // Native custom work remains available independently of provider approval.
-      // Arrange it through its real Auth API, then prove selected Sandbox cannot
-      // start without the current source/reviewer/resource/payer qualification.
+      // An ordinary customer owner cannot make Systems. That current native
+      // authority boundary precedes Sandbox selection; it must not be relaxed
+      // just to arrange a build fixture. This case does not prove Sandbox build
+      // qualification; its separate provider journey remains held/unproved.
       const created = await owner.context.request.post('/api/custom-applications', { headers, data: {
         workspaceId, application: { title: 'Unqualified Sandbox proof', files: {
           'build.mjs': 'import { writeFile } from "node:fs/promises"; await writeFile("/output/index.html", "<main>Proof</main>");',
         }, budget: { maxAuthorizedCents: 0, estimateCents: 0 } },
       } });
-      expect(created.status(), await created.text()).toBe(201);
-      workId = (await created.json()).application.workId;
+      expect(created.status(), await created.text()).toBe(403);
+      expect(await created.json()).toMatchObject({ code: 'make_systems_required' });
+      statuses.push({ method: 'POST', path: '/api/custom-applications', status: created.status() });
+      expect(effectSnapshot()).toEqual(before);
     }
-    const before = effectSnapshot();
-    const statuses: Array<{ method: string; path: string; status: number }> = [];
     async function get(path: string) {
       const response = await owner.context.request.get(path);
       expect(response.status(), await response.text()).toBe(503);
@@ -109,7 +111,6 @@ test(masterOff ? 'master workspace switch refuses additive effects through real 
       await post('/api/workspace-export', { workspaceId });
       await post('/api/custom-applications', { workspaceId });
     } else {
-      await post(`/api/custom-applications/${workId}/manage`, { action: 'build', input: { expectedCandidateRevision: 0 } });
       const page = await owner.context.newPage();
       const response = await page.goto('/connect/authorize');
       expect(response?.status()).toBe(404);
@@ -120,12 +121,10 @@ test(masterOff ? 'master workspace switch refuses additive effects through real 
     }
     expect(effectSnapshot()).toEqual(before);
     await testInfo.attach('native-dark-effect-receipt', { body: JSON.stringify({ workspaceId, masterOff, statuses,
-      before, after: effectSnapshot(), fullReleaseQualified: false }), contentType: 'application/json' });
+      before, after: effectSnapshot(),
+      sandboxRuntime: 'not_exercised_customer_owner_has_no_make_systems_authority',
+      fullReleaseQualified: false }), contentType: 'application/json' });
   } finally {
-    if (workId) {
-      for (const table of ['custom_application_states', 'job_economics']) await admin.from(table).delete().eq('work_id', workId);
-      await admin.from('saved_product_work').delete().eq('id', workId);
-    }
     await admin.from('workspaces').delete().eq('id', workspaceId);
     await owner.context.close();
     await admin.auth.admin.deleteUser(owner.userId);

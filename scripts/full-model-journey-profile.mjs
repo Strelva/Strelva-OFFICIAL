@@ -50,7 +50,7 @@ const nativeSpecs = [
   spec('operational-assignments'), spec('horizontal-operations', 3), spec('standing-responsibilities', 2),
   spec('work-authority'), spec('agent-access'), spec('workspace-exit'),
   // Required new native paths are deliberately not replaced by passing previews.
-  spec('public-check-conversion'), spec('make-real-live'), spec('agent-business-booking'),
+  spec('public-check-conversion'), spec('make-real-live'), spec('agent-business-booking', 2),
   spec('access-review'), spec('units-standards'), spec('investigation-history'), spec('workspace-export-v3'),
   spec('client-records-cutover'),
   spec('assistant-connections', 2), spec('billing-payments-prerequisites'),
@@ -80,7 +80,7 @@ export function journeyProfile(name, masterOff = false) {
       'MAKE_REAL_OWNER_LINK_RELEASE', 'INQUIRY_RECORDS', 'AGENCY_ADD_CLIENT_RELEASE', 'WEBSITE_REBUILD_RELEASE',
       'MAKE_REAL_LIVE', 'CONNECTED_SITES_RELEASE', 'OWNER_DECISION_LINKS_RELEASE', 'OWNER_INVITATIONS_RELEASE',
       'OWNER_INVITATION_CLAIM', 'OPERATOR_QUEUE_RELEASE', 'FINITE_JOBS_RELEASE', 'APPROVAL_STORE_RELEASE',
-      'AGENT_CHANNEL_RELEASE', 'MCP_OAUTH', 'AGENT_INQUIRIES', 'BOOKING_AGENTS', 'BOOKING_AGENT_VISIBILITY', 'BOOKING_SETTINGS',
+      'AGENT_CHANNEL_RELEASE', 'MCP_OAUTH', 'AGENT_INQUIRIES', 'AGENT_IDENTITY_LIMITS', 'BOOKING_AGENTS', 'BOOKING_AGENT_VISIBILITY', 'BOOKING_SETTINGS',
       'BUSINESS_BILLING', 'BUSINESS_RECORD_READS', 'BUSINESS_PAGES', 'CUSTOMERS_RELEASE',
       'CLIENT_RECORDS_DUAL_WRITE', 'EXPORT_SCHEMA_3', 'EXPORT_RECOVERY', 'EXIT_HANDOFF',
       'BUSINESS_OUTCOME_REPORTS', 'INQUIRY_OUTCOMES']) env[`STRELVA_${suffix}`] = '1';

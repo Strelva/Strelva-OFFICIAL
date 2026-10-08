@@ -1,0 +1,177 @@
+import { randomUUID } from 'node:crypto';
+import { createClient } from '@supabase/supabase-js';
+import { expect, test, type APIRequestContext } from '@playwright/test';
+import { z } from 'zod';
+import { createSystemVersions } from '@/platform/system-versions';
+import { createSupabaseConnectionOwnership, createSupabaseVersionStore, readVersionActor, type VersionsDb } from '@/platform/system-versions/supabase-store';
+import { unitsViewSchema, unitVersionChoicesSchema } from '@/platform/enterprise/contracts';
+import { localEnvironment, signedInContext } from './support/local-auth';
+import { nativeWorkspace } from './support/money-agent-native';
+import { localSql } from './support/journeys';
+
+test.beforeAll(() => {
+  for (const name of ['STRELVA_LOCAL_AUTH_PROOF', 'STRELVA_WORKSPACE_RELEASE', 'STRELVA_SYSTEMS_RELEASE', 'STRELVA_NEEDS_YOU_RELEASE'])
+    expect(process.env[name], name).toBe('1');
+});
+test.setTimeout(300_000);
+const versionViewSchema = z.object({ versionId: z.string().uuid(), rowRevision: z.number().int().positive(),
+  baselineRevision: z.number().int().positive(), currentRelease: z.number().nullable(),
+  workingDefinition: z.object({ followUp: z.object({ message: z.string() }), routing: z.object({ minutes: z.number() }) }),
+  offers: z.array(z.object({ sourceRevision: z.number(), lockedPaths: z.array(z.string()).optional(),
+    conflicts: z.array(z.object({ path: z.string() }).passthrough()) }).passthrough()),
+}).passthrough();
+
+test('real Auth Units bind business Versions, preserve owner decisions on standards and stop writes after authority withdrawal', async ({ browser }, info) => {
+  const env = localEnvironment();
+  const admin = createClient(env.url, env.service, { auth: { persistSession: false, autoRefreshToken: false } });
+  const owner = await signedInContext(browser, admin, 'unit-owner');
+  const manager = await signedInContext(browser, admin, 'unit-manager');
+  const outsider = await signedInContext(browser, admin, 'unit-outsider');
+  try {
+    const organizationId = await nativeWorkspace(owner.context.request);
+    const businessId = await nativeWorkspace(owner.context.request);
+    await nativeWorkspace(manager.context.request);
+    const otherBusinessId = await nativeWorkspace(outsider.context.request);
+    expect((await admin.from('workspace_memberships').insert([organizationId, businessId].map(id => ({
+      workspace_id: id, user_id: manager.userId, role: 'admin', created_by: owner.userId,
+    })))).error).toBeNull();
+    async function post(request: APIRequestContext, path: string, body: unknown, status = 200) {
+      const response = await request.post(path, { headers: { origin: env.app }, data: body });
+      expect(response.status(), await response.text()).toBe(status);
+      return response;
+    }
+    const rootId = randomUUID();
+    const root = { action: 'put', organizationId, id: rootId, businessId: organizationId,
+      parentId: null, name: 'Organization control root', kind: 'business', expectedRevision: 0 };
+    expect(await (await post(owner.context.request, '/api/workspace/units', root)).json()).toMatchObject({ ok: true, id: rootId, revision: 1 });
+    await post(owner.context.request, '/api/workspace/units', root); // exact command replay
+    expect(localSql<number>(`select count(*) from public.enterprise_unit_audit where unit_id=:'v1'::uuid and action='put';`, rootId)).toBe(1);
+    expect((await outsider.context.request.get(`/api/workspace/units?organizationId=${organizationId}`)).status()).toBe(403);
+    await post(owner.context.request, '/api/workspace/units', { ...root, id: randomUUID(), businessId: otherBusinessId, name: 'Must not grant access' }, 403);
+
+    const page = await owner.context.newPage();
+    await page.goto(`/workspace/units?workspaceId=${organizationId}`);
+    await expect(page.getByRole('heading', { name: 'Business Units', exact: true })).toBeVisible();
+    await page.getByLabel('Business that owns this Unit', { exact: true }).selectOption(businessId);
+    await page.getByLabel('Unit name', { exact: true }).fill('Buffalo operating unit');
+    await page.getByLabel('Parent Unit', { exact: true }).selectOption(rootId);
+    const created = page.waitForResponse(response => new URL(response.url()).pathname === '/api/workspace/units'
+      && response.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Add Unit', exact: true }).click();
+    const response = await created;
+    expect(response.status(), await response.text()).toBe(200);
+    const child = z.object({ ok: z.literal(true), id: z.string().uuid(), revision: z.literal(1) }).parse(await response.json());
+    const hierarchy = page.getByRole('region', { name: 'Unit hierarchy', exact: true });
+    const childRow = hierarchy.getByRole('listitem').filter({ hasText: 'Buffalo operating unit' });
+    await expect(childRow).toBeVisible();
+    await post(owner.context.request, '/api/workspace/units', { ...root, expectedRevision: 1, parentId: child.id }, 409);
+    await post(owner.context.request, '/api/workspace/units', { action: 'archive', organizationId, id: rootId, expectedRevision: 1 }, 409);
+    await post(owner.context.request, '/api/workspace/units', { action: 'archive', organizationId, id: child.id, expectedRevision: 8 }, 409);
+
+    // Native fixture Systems and the same service-role RPC ports used by the
+    // product arrange a reusable, non-running source and business-owned draft.
+    // This is standards/authority proof, not a claimed provider/app activation.
+    function system(workspaceId: string, name: string) {
+      const id = randomUUID();
+      localSql(`insert into public.systems(id,business_workspace_id,name,kind,command_id,command_digest,created_by,updated_by)
+        values(:'v1'::uuid,:'v2'::uuid,:'v3','inquiry',gen_random_uuid(),repeat('a',64),:'v4'::uuid,:'v4'::uuid);`, id, workspaceId, name, owner.userId);
+      return id;
+    }
+    const db: VersionsDb = admin;
+    const versions = createSystemVersions({ store: createSupabaseVersionStore(db), connections: createSupabaseConnectionOwnership(db) });
+    const identity = { userId: owner.userId, verifiedEmail: owner.email };
+    const actor = await readVersionActor(identity, db);
+    const source = { businessId: organizationId, systemId: system(organizationId, 'Organization reply standard') };
+    const first = await versions.publishSourceRevision(actor, { source,
+      definition: { followUp: { message: 'Organization first reply' }, routing: { minutes: 30 } }, summary: 'Initial unpushed draft' });
+    await versions.shareSource(actor, source, businessId);
+    const local = { businessId, systemId: system(businessId, 'Business-owned reply Version') };
+    const version = await versions.createVersion(actor, { source: first.source, version: local, context: { kind: 'location', label: 'Buffalo operating unit' } });
+    const versionPath = `/api/workspace/versions?workspaceId=${businessId}&systemId=${local.systemId}`;
+    async function view() {
+      const read = await owner.context.request.get(versionPath);
+      expect(read.status(), await read.text()).toBe(200);
+      return versionViewSchema.parse(await read.json());
+    }
+    async function override(path: string, value: string | number, status = 200) {
+      const current = await view();
+      return post(owner.context.request, '/api/workspace/versions/manage', { action: 'override', workspaceId: businessId,
+        systemId: local.systemId, versionId: version.id, rowRevision: current.rowRevision, path, value }, status);
+    }
+    await override('followUp.message', 'Business local reply');
+    await override('routing.minutes', 20);
+
+    await childRow.getByRole('button', { name: 'Bind a Version', exact: true }).click();
+    await page.getByLabel('Business Version', { exact: true }).selectOption(version.id);
+    const bound = page.waitForResponse(read => new URL(read.url()).pathname === '/api/workspace/units' && read.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Bind business-owned Version', exact: true }).click();
+    expect((await bound).status()).toBe(200);
+    await expect(childRow).toContainText('1 business-owned Versions');
+    const choicesResponse = await owner.context.request.get(`/api/workspace/units?organizationId=${organizationId}&unitId=${child.id}`);
+    expect(choicesResponse.status(), await choicesResponse.text()).toBe(200);
+    expect(unitVersionChoicesSchema.parse(await choicesResponse.json()).versions).toEqual(expect.arrayContaining([expect.objectContaining({ id: version.id, assigned: true })]));
+
+    await versions.publishSourceRevision(await readVersionActor(identity, db), { source,
+      definition: { followUp: { message: 'Organization approved reply' }, routing: { minutes: 15 } },
+      summary: 'Push the reply standard; keep routing business-owned', lockedPaths: ['followUp.message'] });
+    const offered = await view();
+    expect(offered.baselineRevision).toBe(1);
+    expect(offered.currentRelease).toBeNull();
+    expect(offered.workingDefinition.followUp.message).toBe('Business local reply');
+    expect(offered.offers.find(offer => offer.sourceRevision === 2)).toMatchObject({ lockedPaths: ['followUp.message'],
+      conflicts: expect.arrayContaining([expect.objectContaining({ path: 'followUp.message' }), expect.objectContaining({ path: 'routing.minutes' })]) });
+    const decision = { workspaceId: businessId, systemId: local.systemId, versionId: version.id, revision: 2 };
+    await post(owner.context.request, '/api/workspace/versions', { ...decision, action: 'decline', rowRevision: offered.rowRevision,
+      reason: 'The business owner has not accepted the new reply yet.' });
+    const declined = await view();
+    expect(declined.baselineRevision).toBe(1);
+    await post(owner.context.request, '/api/workspace/versions', { ...decision, action: 'adopt', rowRevision: declined.rowRevision,
+      resolutions: [{ path: 'followUp.message', choice: 'keep_local' }, { path: 'routing.minutes', choice: 'keep_local' }] }, 400);
+    expect((await view()).rowRevision).toBe(declined.rowRevision);
+    // Draft adoption through the actual native RPC port avoids inventing a
+    // running adapter or live-release receipt for this non-running source.
+    await versions.adoptImprovement(await readVersionActor(identity, db), version.id, { revision: 2,
+      expectedRowRevision: declined.rowRevision,
+      resolutions: [{ path: 'followUp.message', choice: 'take_upstream' }, { path: 'routing.minutes', choice: 'keep_local' }] });
+    const adopted = await view();
+    expect(adopted.baselineRevision).toBe(2);
+    expect(adopted.currentRelease).toBeNull();
+    expect(adopted.workingDefinition).toEqual({ followUp: { message: 'Organization approved reply' }, routing: { minutes: 20 } });
+    await override('followUp.message', 'Must not override a pushed standard', 400);
+    await override('routing.minutes', 25);
+
+    const beforeRevoke = await manager.context.request.get(`/api/workspace/units?organizationId=${organizationId}`);
+    expect(beforeRevoke.status(), await beforeRevoke.text()).toBe(200);
+    expect(unitsViewSchema.parse(await beforeRevoke.json()).units.some(unit => unit.id === child.id)).toBe(true);
+    // Withdrawal is a native table fixture; the following Auth reads/writes
+    // must consult current authority rather than cache the earlier grant.
+    expect((await admin.from('workspace_memberships').delete().eq('workspace_id', businessId).eq('user_id', manager.userId)).error).toBeNull();
+    const afterRevoke = await manager.context.request.get(`/api/workspace/units?organizationId=${organizationId}`);
+    expect(afterRevoke.status(), await afterRevoke.text()).toBe(200);
+    const hidden = unitsViewSchema.parse(await afterRevoke.json());
+    expect(hidden.inaccessibleUnits).toBe(1);
+    expect(hidden.units.some(unit => unit.id === child.id)).toBe(false);
+    expect(JSON.stringify(hidden)).not.toContain('Buffalo operating unit');
+    expect((await manager.context.request.get(`/api/workspace/units?organizationId=${organizationId}&unitId=${child.id}`)).status()).toBe(403);
+    await post(manager.context.request, '/api/workspace/units', { action: 'archive', organizationId, id: child.id, expectedRevision: 2 }, 403);
+    expect((await manager.context.request.get(versionPath)).status()).toBe(403);
+    const current = await view();
+    await post(manager.context.request, '/api/workspace/versions/manage', { action: 'override', workspaceId: businessId,
+      systemId: local.systemId, versionId: version.id, rowRevision: current.rowRevision, path: 'routing.minutes', value: 999 }, 403);
+    expect((await view()).rowRevision).toBe(current.rowRevision);
+    expect(localSql<number>(`select count(*) from public.enterprise_unit_audit where unit_id=:'v1'::uuid and actor_id=:'v2'::uuid;`, child.id, manager.userId)).toBe(0);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload();
+    await expect(childRow).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    await page.screenshot({ path: info.outputPath('native-units-bound-version-390.png'), fullPage: true });
+    await info.attach('units-standards-native-receipt', { body: JSON.stringify({ organizationId, businessId, unitId: child.id,
+      versionId: version.id, acceptedSourceRevision: 2, liveRelease: null, removedManagerId: manager.userId, fullReleaseQualified: false }), contentType: 'application/json' });
+  } finally {
+    // Retain actual native audit/Version decisions in the disposable stack.
+    for (const person of [owner, manager, outsider]) {
+      await person.context.close();
+      await admin.auth.admin.deleteUser(person.userId);
+    }
+  }
+});
