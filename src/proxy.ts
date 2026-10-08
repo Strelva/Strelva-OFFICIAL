@@ -77,6 +77,11 @@ const PUBLIC_EXACT = new Set([
   // owner may never sign in); the route serves nothing without it.
   "/api/workspace-export/v3/download",
   "/api/health",
+  // Visitor entry on the tenant's public site. The handlers resolve the
+  // trusted tenant and enforce booking availability, intake and rate limits.
+  // Keep this exact: owner controls and other booking APIs stay session-gated.
+  "/api/booking",
+  "/api/booking/availability",
   "/api/newsletter/subscribe",
   // Signed one-click unsubscribe (RFC 8058); the token is the authorization.
   "/api/newsletter/unsubscribe",

@@ -1,6 +1,7 @@
+import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { localEnvironment, signedInContext } from "./support/local-auth";
+import { localEnvironment, seedLocalNativeMaker, signedInContext } from "./support/local-auth";
 
 test.skip(
   process.env.STRELVA_LOCAL_AUTH_PROOF !== "1" || process.env.STRELVA_APPLICATION_USE_JOURNEY !== "1",
@@ -45,10 +46,16 @@ test("a verified staff recipient uses one released version while a candidate cha
   const admin = createClient(env.url, env.service, { auth: { persistSession: false, autoRefreshToken: false } });
   const owner = await signedInContext(browser, admin, "application-owner");
   const staff = await signedInContext(browser, admin, "application-staff");
+  let removeMaker: (() => void) | undefined;
+  let customerWorkspaceId = "";
   try {
-    const workspace = await owner.context.request.get("/api/workspace");
+    const workspace = await owner.context.request.post("/api/workspace/businesses", {
+      headers: { origin: env.app }, data: { destination: { kind: "new", name: "Local native-tool customer" }, initialRequest: null, idempotencyKey: randomUUID() },
+    });
     expect(workspace.status(), await workspace.text()).toBe(200);
     const { workspaceId } = await workspace.json();
+    customerWorkspaceId = workspaceId;
+    removeMaker = seedLocalNativeMaker(workspaceId, owner.userId);
 
     let app = await post(owner.context.request, "/api/bounded-work", {
       action: "create",
@@ -198,7 +205,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     await ownerReviewPage.reload({ waitUntil: "domcontentloaded" });
     await ownerReviewPage.getByRole("tab", { name: "Edit", exact: true }).click();
     await expect(ownerReviewPage.getByText("Review changes", { exact: true })).toBeVisible();
-    const mobileNavigation = ownerReviewPage.getByRole("complementary", { name: "Strelva navigation", exact: true });
+    const mobileNavigation = ownerReviewPage.getByRole("dialog", { name: "Strelva workspace navigation", exact: true });
     await expect(mobileNavigation).not.toBeVisible();
     const reviewMainBox = await ownerReviewPage.locator("main[data-frame-main]").boundingBox();
     expect(reviewMainBox?.x ?? -1).toBeLessThan(2);
@@ -294,8 +301,11 @@ test("a verified staff recipient uses one released version while a candidate cha
 
     expect(apiPaths.some(path => /chat|agent|generate|workspace/.test(path))).toBe(false);
   } finally {
+    removeMaker?.();
+    if (customerWorkspaceId) await admin.from("workspaces").delete().eq("id", customerWorkspaceId);
     await owner.context.close();
     await staff.context.close();
+    for (const identity of [owner, staff]) await admin.auth.admin.deleteUser(identity.userId);
   }
 });
 
@@ -305,10 +315,16 @@ test("a verified recipient edits a date record through a stale correction and re
   const owner = await signedInContext(browser, admin, "application-edit-owner");
   const staff = await signedInContext(browser, admin, "application-edit-staff");
   const editor = await signedInContext(browser, admin, "application-edit-all");
+  let removeMaker: (() => void) | undefined;
+  let customerWorkspaceId = "";
   try {
-    const workspace = await owner.context.request.get("/api/workspace");
+    const workspace = await owner.context.request.post("/api/workspace/businesses", {
+      headers: { origin: env.app }, data: { destination: { kind: "new", name: "Local native-tool customer" }, initialRequest: null, idempotencyKey: randomUUID() },
+    });
     expect(workspace.status(), await workspace.text()).toBe(200);
     const { workspaceId } = await workspace.json();
+    customerWorkspaceId = workspaceId;
+    removeMaker = seedLocalNativeMaker(workspaceId, owner.userId);
 
     let app = await post(owner.context.request, "/api/bounded-work", {
       action: "create",
@@ -411,20 +427,29 @@ test("a verified recipient edits a date record through a stale correction and re
     expect(use.records[0]).toMatchObject({ values: { visit_date: "2024-03-03", problem: "Correction recovered" }, revision: 3 });
     await page.close();
   } finally {
+    removeMaker?.();
+    if (customerWorkspaceId) await admin.from("workspaces").delete().eq("id", customerWorkspaceId);
     await owner.context.close();
     await staff.context.close();
     await editor.context.close();
+    for (const identity of [owner, staff, editor]) await admin.auth.admin.deleteUser(identity.userId);
   }
 });
 
-test("self-service template becomes a private native app, then a live app without copying preview records", async ({ browser }, info) => {
+test("agency maker template becomes a private native app, then a live app without copying preview records", async ({ browser }, info) => {
   const env = localEnvironment();
   const admin = createClient(env.url, env.service, { auth: { persistSession: false, autoRefreshToken: false } });
   const owner = await signedInContext(browser, admin, "template-owner");
+  let removeMaker: (() => void) | undefined;
+  let customerWorkspaceId = "";
   try {
-    const workspaceResponse = await owner.context.request.get("/api/workspace");
+    const workspaceResponse = await owner.context.request.post("/api/workspace/businesses", {
+      headers: { origin: env.app }, data: { destination: { kind: "new", name: "Local native-tool customer" }, initialRequest: null, idempotencyKey: randomUUID() },
+    });
     expect(workspaceResponse.status(), await workspaceResponse.text()).toBe(200);
     const { workspaceId } = await workspaceResponse.json();
+    customerWorkspaceId = workspaceId;
+    removeMaker = seedLocalNativeMaker(workspaceId, owner.userId);
     const page = await owner.context.newPage();
     await page.goto(`/workspace?workspaceId=${workspaceId}&view=products`);
     await page.getByRole("button", { name: "Preview Staff requests", exact: true }).click();
@@ -470,5 +495,10 @@ test("self-service template becomes a private native app, then a live app withou
     await expect(page.getByRole("tab", { name: "Use", exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: info.outputPath("self-service-live-app-mobile.png"), fullPage: true });
-  } finally { await owner.context.close(); }
+  } finally {
+    removeMaker?.();
+    if (customerWorkspaceId) await admin.from("workspaces").delete().eq("id", customerWorkspaceId);
+    await owner.context.close();
+    await admin.auth.admin.deleteUser(owner.userId);
+  }
 });

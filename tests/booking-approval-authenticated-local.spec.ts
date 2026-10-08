@@ -76,7 +76,7 @@ test("a visitor's request-mode booking on the tenant site reaches Needs you", as
   try {
     setup = await convertedBusinessWithOwner(browser, admin, "j10-visitor");
     const { owner, businessId, tenantId } = setup;
-    await serveBookingsFromTheStore(admin, tenantId, { id: "consultation", name: "Consultation" });
+    await serveBookingsFromTheStore(admin, tenantId, { id: "consultation", name: "Consultation" }, businessId, owner.userId);
 
     // The visitor, on the tenant's own site, with no session.
     const visitor = await browser.newContext({ viewport: { width: 390, height: 844 } });

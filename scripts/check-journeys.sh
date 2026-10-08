@@ -175,9 +175,9 @@ run_phase() {
 }
 
 # The flags-on world is the one after the bookings move: seven clean parity days.
-# The streak is global and the app caches it for five minutes, and parity rows
-# cascade away with a test's tenant, so one fixture tenant that no spec deletes
-# holds the streak for the whole run, whatever order the specs run in.
+# The cutover requires every tenant to have parity. Seed existing disposable
+# fixtures, and fixtureTenant seeds each new one before the app can cache its
+# read-source decision. These invented clean days only qualify the local harness.
 seed_parity() {
   [[ "$(python3 -c 'import sys,urllib.parse;print(urllib.parse.urlparse(sys.argv[1]).hostname)' "$STRELVA_LOCAL_DB_URL")" == 127.0.0.1 ]] \
     || { echo 'STRELVA_LOCAL_DB_URL is not the loopback stack.' >&2; return 1; }
@@ -186,7 +186,6 @@ insert into public.tenants(id, site_name, active) values ('journeys-parity', 'Jo
 insert into public.tenant_client_record_parity(store, tenant_stable_id, checked_on, ok, redis_count, postgres_count, missing, mismatched)
   select s.store, t.stable_id, (clock_timestamp() at time zone 'UTC')::date - d, true, 0, 0, 0, 0
   from public.tenants t, generate_series(0, 7) d, (values ('bookings'), ('tenant_leads')) s(store)
-  where t.id = 'journeys-parity'
   on conflict do nothing;
 SQL
 }

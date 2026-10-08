@@ -8,13 +8,13 @@ import {
 // operator converts a fixture tenant, designates Strelva's agency workspace,
 // invites the owner; the owner accepts the signed link, lands in the
 // workspace on the client admin host, sees Systems and Needs you, approves a
-// booking request by the one-tap email link, and sees Strelva handled with
+// booking request in the authenticated workspace, and sees Strelva handled with
 // a working undo.
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local Supabase Auth and Postgres (see docs/operations/testing-and-ci.md).");
 test.beforeAll(() => { journeyEnvironment(); });
 test.setTimeout(300_000);
 
-test("operator converts and invites; the owner accepts, lands on the admin host and decides by one-tap link", async ({ browser }, testInfo) => {
+test("operator invites; the owner accepts, refuses anonymous approval and decides in the workspace", async ({ browser }, testInfo) => {
   const admin = adminClient();
   const operator = await person(browser, admin, "j10-operator");
   const stranger = await person(browser, admin, "j10-stranger");
@@ -31,20 +31,21 @@ test("operator converts and invites; the owner accepts, lands on the admin host 
     const adminOrigin = adminHost(tenantId);
     owner = await person(browser, admin, "j10-owner", { email: ownerEmail, origins: [adminOrigin] });
 
+    // Explicit agency and named staff are required before conversion.
+    const designation = await designateAgency(admin, operator);
     // 1. Operator converts the fixture tenant (real script, --apply on loopback only).
-    businessId = convertTenant(tenantId, operator.email);
-    const replay = convertTenant(tenantId, operator.email);
+    businessId = convertTenant(tenantId, operator.email, designation.agencyId);
+    const replay = convertTenant(tenantId, operator.email, designation.agencyId);
     expect(replay).toBe(businessId);
 
     // 2. Operator designates Strelva's agency workspace; the converted business is marked as operated by it.
-    const designation = await designateAgency(admin, operator);
     expect(designation.agencyId).toMatch(/^[0-9a-f-]{36}$/);
     const clients = await admin.rpc("list_provided_clients", { p_user_id: operator.userId, p_verified_email: operator.email, p_agency_workspace_id: designation.agencyId });
     expect(clients.error).toBeNull();
     expect((clients.data as Array<{ customerWorkspaceId: string; source: string }>).some((row) => row.customerWorkspaceId === businessId && row.source === "tenant_conversion")).toBe(true);
 
     // 3. Operator invites the owner. The email needs Jacob's yes, so the link comes back for this local run.
-    const invitation = inviteOwner(tenantId, operator.email);
+    const invitation = inviteOwner(tenantId, operator);
     expect(invitation.workspaceName.length).toBeGreaterThan(0);
 
     // The link alone grants nothing: another verified account cannot accept it.
@@ -86,7 +87,8 @@ test("operator converts and invites; the owner accepts, lands on the admin host 
     await expect(needsYou.getByText(/^Booking request: Dana Reed/)).toBeVisible();
     await home.screenshot({ path: testInfo.outputPath("owner-home-admin-host-1440.png"), fullPage: true });
 
-    // 7. The owner approves by the one-tap email link: no session, confirm step, then done.
+    // 7. An email link alone cannot confirm a booking. The owner decides
+    // in the authenticated workspace; the signed link remains only an entry.
     const open = (await decisions(admin, businessId, owner, false)).find((row) => row.sourceLifecycle === "booking_request" && row.sourceId === booking.id);
     expect(open?.state).toBe("open");
     // A link for anyone but the owner on record is refused and changes nothing.
@@ -96,12 +98,17 @@ test("operator converts and invites; the owner accepts, lands on the admin host 
     expect((await decision(admin, businessId, open!.id)).state).toBe("open");
 
     const approved = await decideByLink(browser, oneTapLink(open!, ownerEmail, "approve"), /Confirm — approve/);
-    await expect(approved.getByRole("heading", { name: "Approved" })).toBeVisible();
+    await expect(approved.getByRole("heading", { name: /This link isn't for this account|Sign in to decide this/ })).toBeVisible();
+    expect((await decision(admin, businessId, open!.id)).state).toBe("open");
+    expect(await bookingStatus(admin, tenantId, booking.id)).toBe("requested");
+    const confirmation = home.waitForResponse(r => new URL(r.url()).pathname === "/api/workspace/needs-you" && r.request().method() === "POST");
+    await home.getByRole("region", { name: "Needs you" }).getByRole("button", { name: /^Confirm: Booking request: Dana Reed/ }).click();
+    expect((await (await confirmation).json()).status).toBe("done");
     await noHorizontalOverflow(approved);
-    await approved.screenshot({ path: testInfo.outputPath("one-tap-approved-390.png"), fullPage: true });
+    await approved.screenshot({ path: testInfo.outputPath("one-tap-owner-refused-390.png"), fullPage: true });
     await approved.context().close();
     const decided = await decision(admin, businessId, open!.id);
-    expect(decided).toMatchObject({ state: "approved", outcome: "done", decidedByKind: "owner_link" });
+    expect(decided).toMatchObject({ state: "approved", outcome: "done", decidedByKind: "owner_session" });
     expect(await bookingStatus(admin, tenantId, booking.id)).toBe("confirmed");
 
     // Replaying the link is idempotent: already handled, nothing done twice.
@@ -132,7 +139,7 @@ test("operator converts and invites; the owner accepts, lands on the admin host 
 
 // The decision itself under Strelva handled
 // (20261009130000_strelva_handled_decisions.sql): after the owner approves a
-// booking request by one-tap link, Home says Strelva confirmed it, and says
+// booking request in the workspace, Home says Strelva confirmed it, and says
 // honestly why it isn't a one-tap undo (a confirmed booking is moved or
 // cancelled in Bookings, and the customer is told).
 test("Strelva handled lists the approved booking decision with its undo state", async ({ browser }, testInfo) => {
@@ -151,7 +158,12 @@ test("Strelva handled lists the approved booking decision with its undo state", 
     expect(open?.state).toBe("open");
 
     const approved = await decideByLink(browser, oneTapLink(open!, owner.email, "approve"), /Confirm — approve/);
-    await expect(approved.getByRole("heading", { name: "Approved" })).toBeVisible();
+    await expect(approved.getByRole("heading", { name: /This link isn't for this account|Sign in to decide this/ })).toBeVisible();
+    expect((await decision(admin, businessId, open!.id)).state).toBe("open");
+    expect(await bookingStatus(admin, tenantId, booking.id)).toBe("requested");
+    const confirmation = home.waitForResponse(r => new URL(r.url()).pathname === "/api/workspace/needs-you" && r.request().method() === "POST");
+    await home.getByRole("region", { name: "Needs you" }).getByRole("button", { name: /^Confirm: Booking request: Dana Reed/ }).click();
+    expect((await (await confirmation).json()).status).toBe("done");
     await approved.context().close();
     expect(await bookingStatus(admin, tenantId, booking.id)).toBe("confirmed");
 
