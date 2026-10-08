@@ -1252,6 +1252,12 @@ psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-schema.sql"
 printf 'Owner recipient trust rollback is exact (%s schema objects compared) and reapplies.\n' \
   "$(wc -l <"$cluster_root/owner-trust-before.txt" | tr -d ' ')"
 
+# #525: owner-approved Ask changes confirm the same touched facts.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013130000_ask_confirms_owner_facts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/ask-confirmed-facts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013130000_ask_confirms_owner_facts.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013130000_ask_confirms_owner_facts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/ask-confirmed-facts-schema.sql"
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 

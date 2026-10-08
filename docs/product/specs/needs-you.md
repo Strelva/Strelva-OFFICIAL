@@ -171,7 +171,13 @@ nothing that wasn't theirs did.
    *Built for client sites (#509, ADR 0012):* a fact or service written by
    anyone but a verified owner (a Strelva operator, any agency including
    Strelva's, an admin, an import or a model) stays out of the confirmed copy
-   (`business_record_confirmed`) that hosted and connected sites read. All of
+   (`business_record_confirmed`) that hosted and connected sites read. An owner-approved Ask
+   business-record draft confirms only the entities written by that draft's
+   exact receipt, under the same owner session or signed-link decision. It does
+   not reopen a second facts approval or confirm unrelated pending edits. Plain
+   admin approval still carries no owner confirmation. Native custom-repo
+   contact changes enter the existing forced review; unavailable or held review
+   is reported as pending, with no automatic provider write. All of
    a business's pending changes form one `business_facts` item
    (`fact.inferred`, `owner_decides`, admins never decide).
    `confirm_business_facts` applies it only for the owner's session or a

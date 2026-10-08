@@ -90,7 +90,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, ef
         list: (actor, businessId) => PostgresServiceRequestStore.list(actor, { businessId }),
         change: (actor, input) => commitments.execute(actor, { action: "delivery_commitment", ...input }),
       }),
-      businessRecordDraftAdapter(PostgresBusinessFactDraftStore, askReleaseMayBeOn),
+      businessRecordDraftAdapter(PostgresBusinessFactDraftStore, askReleaseMayBeOn, effects.businessFactsConfirmed),
       ...systemsSourceAdapters(store),
       ...deliverySourceAdapters(),
       ...productSourceAdapters(),
