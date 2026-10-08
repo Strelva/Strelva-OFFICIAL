@@ -1,5 +1,5 @@
 -- Local-only Supabase compatibility shim for throwaway PostgreSQL clusters.
--- Supabase owns auth.users and auth.uid(); the public schema itself comes from
+-- Supabase owns auth.users, auth.uid() and auth.role(); the public schema itself comes from
 -- the repository's real migrations. Used by scripts/check-workspace-upgrade.sh
 -- and the scrubbed production copy (scripts/scrubbed-production-copy.ts).
 -- Never run this against a hosted database.
@@ -25,7 +25,25 @@ create table auth.users (
   email text,
   email_confirmed_at timestamptz
 );
+create table auth.identities (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  identity_data jsonb not null default '{}'::jsonb
+);
 create function auth.uid()
 returns uuid
 language sql stable
-as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+as $$
+  select coalesce(
+    nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub', ''),
+    nullif(current_setting('request.jwt.claim.sub', true), '')
+  )::uuid
+$$;
+create function auth.role()
+returns text
+language sql stable
+as $$
+  select coalesce(
+    nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role', ''),
+    nullif(current_setting('request.jwt.claim.role', true), '')
+  )
+$$;

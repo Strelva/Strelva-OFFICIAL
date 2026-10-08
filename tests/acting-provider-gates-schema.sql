@@ -1,6 +1,6 @@
 \set ON_ERROR_STOP on
 -- Client-resource mandates and the acting-provider gates (20261014100000,
--- 20261014101000; agency 1.0 #255, #534). Fictional rows on an isolated
+-- 20261014112000; agency 1.0 #255, #534). Fictional rows on an isolated
 -- cluster, inside a transaction that is rolled back.
 --
 -- For every effect the same matrix: a stranger, a platform operator who is

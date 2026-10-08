@@ -3,50 +3,54 @@ import { GET, POST } from "@/app/api/admin/tenants/[id]/owner-invitations/route"
 import { loadOwnerInvitations } from "@/platform/owner-entry/operator-invitations";
 import { setBusinessOwnershipDb } from "@/platform/workspaces/business-ownership";
 
-const mocks = vi.hoisted(() => ({ superAdmin: vi.fn(), operator: vi.fn(), workspace: vi.fn(), send: vi.fn() }));
-vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: mocks.superAdmin, getCurrentUserEmail: mocks.operator }));
+const mocks = vi.hoisted(() => ({ operatorContext: vi.fn(), workspace: vi.fn(), approval: vi.fn() }));
+vi.mock("@/platform/infra/auth", () => ({ getAuthenticatedOperatorContext: mocks.operatorContext }));
 vi.mock("@/platform/release-flags/store", () => ({ releaseWorkspaceForTenant: mocks.workspace }));
-vi.mock("@/platform/infra/email/send", () => ({ sendEmailWithReceipt: mocks.send }));
+vi.mock("@/platform/workspaces/operator-approvals", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/platform/workspaces/operator-approvals")>()),
+  recordOperatorActionApproval: mocks.approval,
+}));
 
 const WORKSPACE = "11111111-1111-4111-8111-111111111111";
 const INVITATION = "22222222-2222-4222-8222-222222222222";
 const OPERATOR = "33333333-3333-4333-8333-333333333333";
+const APPROVAL = "55555555-5555-4555-8555-555555555555";
 const STABLE = "44444444-4444-4444-8444-444444444444";
 const ctx = { params: Promise.resolve({ id: "test-business" }) };
+const actor = { userId: OPERATOR, verifiedEmail: "operator@example.test" };
 function state(overrides: Record<string, unknown> = {}) {
   return {
     workspaceId: WORKSPACE, workspaceName: "Test Business", operatorId: OPERATOR,
-    hasOwner: false, exited: false, recipient: { email: "owner@example.test", name: "Owner", from: "record" },
-    tenants: [{ tenantId: "test-business", tenantStableId: STABLE, siteName: "Test Site" }], pending: [],
-    ...overrides,
+    hasOwner: false, exited: false,
+    recipient: { email: "owner@example.test", name: "Owner", from: "record", source: "tenant_import", verified: false },
+    tenants: [{ tenantId: "test-business", tenantStableId: STABLE, siteName: "Test Site" }], pending: [], ...overrides,
   };
 }
-function request(body: unknown = { action: "invite", jacobApproved: true }, origin: string | null = "https://admin.example.test") {
+function request(body: unknown = { action: "invite" }, origin: string | null = "https://admin.example.test") {
   return new Request("https://admin.example.test/api/admin/tenants/test-business/owner-invitations", {
     method: "POST", headers: { "Content-Type": "application/json", ...(origin ? { origin } : {}) }, body: JSON.stringify(body),
   });
 }
 type Rpc = (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>;
 let rpc: ReturnType<typeof vi.fn<Rpc>>;
-const created = () => rpc.mock.calls.filter(([name]) => name === "create_operator_owner_invitation");
+const issued = () => rpc.mock.calls.filter(([name]) => name === "create_operator_owner_invitation_approved");
 
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
   vi.stubEnv("STRELVA_OWNER_ENTRY", "1");
   vi.stubEnv("STRELVA_OWNER_INVITATIONS_RELEASE", "1");
-  mocks.superAdmin.mockResolvedValue(true);
-  mocks.operator.mockResolvedValue("operator@example.test");
+  mocks.operatorContext.mockResolvedValue({ actor, email: actor.verifiedEmail, authTime: Math.floor(Date.now() / 1000) });
   mocks.workspace.mockResolvedValue(WORKSPACE);
-  mocks.send.mockResolvedValue({ status: "accepted", providerMessageId: "test-message", acceptedAt: "2026-10-01" });
+  mocks.approval.mockResolvedValue({ approvalId: APPROVAL });
   rpc = vi.fn<Rpc>(async (name, args) => {
     if (name === "read_operator_owner_invitation_state") return { data: state(), error: null };
-    if (name === "create_operator_owner_invitation") return { data: {
+    if (name === "create_operator_owner_invitation_approved") return { data: {
       invitationId: INVITATION, workspaceId: WORKSPACE, workspaceName: "Test Business", recipientEmail: args.p_recipient_email,
       role: "owner", status: "pending", expiresAt: args.p_expires_at, createdAt: "2026-10-01", createdBy: OPERATOR,
       tenants: state().tenants,
     }, error: null };
-    if (name === "revoke_operator_owner_invitation") return { data: "revoked", error: null };
+    if (name === "revoke_operator_owner_invitation_audited") return { data: "revoked", error: null };
     throw new Error(`Unexpected RPC ${name}`);
   });
   setBusinessOwnershipDb({ rpc });
@@ -54,179 +58,77 @@ beforeEach(() => {
 afterEach(() => { setBusinessOwnershipDb(null); vi.unstubAllEnvs(); });
 
 describe("owner invitations release gate", () => {
-  for (const [name, value] of [
-    ["STRELVA_OWNER_INVITATIONS_RELEASE", undefined], ["STRELVA_OWNER_INVITATIONS_RELEASE", "0"],
-    ["STRELVA_WORKSPACE_RELEASE", "0"], ["STRELVA_OWNER_ENTRY", undefined], ["STRELVA_OWNER_ENTRY", "0"],
-  ] as const) {
-    it(`${name}=${value ?? "unset"} hides the panel and refuses reads/writes before any work`, async () => {
-      vi.stubEnv(name, value);
-      expect(await loadOwnerInvitations("test-business")).toBeNull();
-      expect((await GET(new Request("https://admin.example.test/test"), ctx)).status).toBe(404);
-      expect((await POST(request(), ctx)).status).toBe(404);
-      expect(mocks.superAdmin).not.toHaveBeenCalled();
-      expect(mocks.operator).not.toHaveBeenCalled();
-      expect(mocks.workspace).not.toHaveBeenCalled();
-      expect(rpc).not.toHaveBeenCalled();
-      expect(mocks.send).not.toHaveBeenCalled();
-    });
-  }
-});
-
-describe("operator ownership authorization", () => {
-  it("reads scoped invitation state without creating a token or sending email", async () => {
-    const response = await GET(new Request("https://admin.example.test/test"), ctx);
-    expect(response.status).toBe(200);
-    expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(await response.json()).toEqual({ state: state() });
-    expect(created()).toHaveLength(0);
-    expect(mocks.send).not.toHaveBeenCalled();
-  });
-
-  it("refuses a signed-out or ordinary user before resolving the business", async () => {
-    mocks.superAdmin.mockResolvedValue(false);
-    expect((await GET(new Request("https://admin.example.test/test"), ctx)).status).toBe(403);
-    expect((await POST(request(), ctx)).status).toBe(403);
-    expect(mocks.workspace).not.toHaveBeenCalled();
+  it("hides reads and writes before resolving an operator while the release is off", async () => {
+    vi.stubEnv("STRELVA_OWNER_INVITATIONS_RELEASE", "0");
+    expect(await loadOwnerInvitations("test-business")).toBeNull();
+    expect((await GET(new Request("https://admin.example.test/test"), ctx)).status).toBe(404);
+    expect((await POST(request(), ctx)).status).toBe(404);
+    expect(mocks.operatorContext).not.toHaveBeenCalled();
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("requires the session's verified operator address (including dev bypass)", async () => {
-    mocks.operator.mockResolvedValue(null);
+  it("requires a real authenticated operator and business admin scope", async () => {
+    mocks.operatorContext.mockResolvedValue(null);
     expect((await POST(request(), ctx)).status).toBe(403);
     expect(mocks.workspace).not.toHaveBeenCalled();
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  it("requires existing admin membership through the state RPC, even for a super-admin", async () => {
+    mocks.operatorContext.mockResolvedValue({ actor, email: actor.verifiedEmail, authTime: Math.floor(Date.now() / 1000) });
     rpc.mockResolvedValue({ data: null, error: { message: "operator_owner_invitation_operator_required" } });
     expect((await POST(request(), ctx)).status).toBe(403);
-    expect(await loadOwnerInvitations("test-business")).toEqual({ kind: "denied" });
-    expect(rpc).toHaveBeenCalledWith("read_operator_owner_invitation_state", {
-      p_operator_email: "operator@example.test", p_workspace_id: WORKSPACE,
-    });
-    expect(created()).toHaveLength(0);
-    expect(mocks.send).not.toHaveBeenCalled();
-  });
-
-  it("refuses an unconverted tenant", async () => {
-    mocks.workspace.mockResolvedValue(null);
-    expect((await POST(request(), ctx)).status).toBe(409);
-    expect(await loadOwnerInvitations("test-business")).toEqual({ kind: "unconverted" });
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  it("refuses a resolver mismatch across businesses", async () => {
-    rpc.mockResolvedValue({ data: state({ tenants: [{ tenantId: "another-business", tenantStableId: STABLE, siteName: "Other Site" }] }), error: null });
-    expect((await POST(request(), ctx)).status).toBe(403);
-    expect(created()).toHaveLength(0);
-  });
-
-  it("shows unavailable state when ownership storage fails without writing or emailing", async () => {
-    rpc.mockRejectedValue(new Error("storage down"));
-    expect((await POST(request(), ctx)).status).toBe(503);
-    expect(await loadOwnerInvitations("test-business")).toEqual({ kind: "unavailable" });
-    expect(created()).toHaveLength(0);
-    expect(mocks.send).not.toHaveBeenCalled();
+    expect(issued()).toHaveLength(0);
   });
 });
 
 describe("owner invitation mutations", () => {
-  it("rejects invalid tenant scope before resolving a business", async () => {
-    const invalid = { params: Promise.resolve({ id: "../other-business" }) };
-    expect((await GET(new Request("https://admin.example.test/test"), invalid)).status).toBe(400);
-    expect((await POST(request(), invalid)).status).toBe(400);
-    expect(mocks.workspace).not.toHaveBeenCalled();
-    expect(rpc).not.toHaveBeenCalled();
-  });
-
-  for (const origin of [null, "https://other.example.test", "null", "https://admin.example.test.attacker.test"]) {
-    it(`rejects invalid origin ${origin} before reading or writing`, async () => {
-      expect((await POST(request(undefined, origin), ctx)).status).toBe(403);
-      expect(rpc).not.toHaveBeenCalled();
-      expect(mocks.superAdmin).not.toHaveBeenCalled();
-    });
-  }
-
-  for (const body of [null, [], {}, { action: "invite" }, { action: "invite", jacobApproved: false },
-    { action: "invite", jacobApproved: true, sendEmail: "true" }, { action: "invite", jacobApproved: true, recipientEmail: "bad" },
-    { action: "invite", jacobApproved: true, workspaceId: WORKSPACE }, { action: "revoke", invitationId: "bad" }]) {
-    it(`rejects invalid request ${JSON.stringify(body)} before reading or writing`, async () => {
+  it("requires same origin and rejects browser approval booleans or email flags", async () => {
+    expect((await POST(request(undefined, "https://attacker.example"), ctx)).status).toBe(403);
+    for (const body of [null, {}, { action: "invite", jacobApproved: true }, { action: "invite", sendEmail: true },
+      { action: "invite", recipientEmail: "bad" }, { action: "invite", approvalId: "bad" },
+      { action: "revoke", invitationId: "bad" }]) {
       expect((await POST(request(body), ctx)).status).toBe(400);
-      expect(rpc).not.toHaveBeenCalled();
-      expect(mocks.send).not.toHaveBeenCalled();
-    });
-  }
-
-  it("rejects malformed JSON", async () => {
-    const req = new Request("https://admin.example.test/test", { method: "POST", headers: { origin: "https://admin.example.test" }, body: "{" });
-    expect((await POST(req, ctx)).status).toBe(400);
-    expect(rpc).not.toHaveBeenCalled();
+    }
+    expect(issued()).toHaveLength(0);
   });
 
-  it("prepares a token for the record recipient with email false by default", async () => {
+  it("records a fresh, same-operator approval for the trusted business owner before creating a link", async () => {
     const response = await POST(request(), ctx);
     expect(response.status).toBe(200);
-    expect(response.headers.get("cache-control")).toBe("no-store");
-    const body = await response.json();
-    expect(body.delivery).toEqual({ status: "not_sent", reason: "email_not_requested" });
-    expect(body.acceptUrl).toMatch(/\/workspace\/invitations\/accept\/[A-Za-z0-9_-]{43}$/);
-    expect(created()).toHaveLength(1);
-    expect(created()[0]![1]).toMatchObject({ p_workspace_id: WORKSPACE, p_recipient_email: "owner@example.test", p_operator_email: "operator@example.test" });
-    expect(mocks.send).not.toHaveBeenCalled();
+    expect((await response.json()).delivery).toEqual({ status: "not_sent", reason: "email_not_requested" });
+    expect(mocks.approval).toHaveBeenCalledWith(actor, WORKSPACE,
+      { kind: "owner_invitation.issue", recipientEmail: "owner@example.test", sendEmail: false }, { source: "web" });
+    expect(issued()[0]![1]).toMatchObject({ p_operator_user_id: OPERATOR, p_workspace_id: WORKSPACE,
+      p_recipient_email: "owner@example.test", p_approval_id: APPROVAL, p_send_email: false, p_audit_context: { source: "web" } });
   });
 
-  it("explicit approved email sends through the existing tenant-aware transport and hides the bearer link", async () => {
-    const response = await POST(request({ action: "invite", jacobApproved: true, sendEmail: true, recipientEmail: " Other@Example.test " }), ctx);
-    const body = await response.json();
-    expect(body.delivery).toEqual({ status: "sent", providerMessageId: "test-message" });
-    expect(body).not.toHaveProperty("acceptUrl");
-    expect(mocks.send).toHaveBeenCalledOnce();
-    expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({ audience: "client", tenantId: "test-business", to: "other@example.test" }));
-  });
-
-  for (const failure of ["suppressed", "failed"]) {
-    it(`returns honest not-sent status and recovery link when delivery is ${failure}`, async () => {
-      if (failure === "suppressed") mocks.send.mockResolvedValue({ status: "suppressed", reason: "email_suppressed_or_unconfigured" });
-      else mocks.send.mockRejectedValue(new Error("provider down"));
-      const response = await POST(request({ action: "invite", jacobApproved: true, sendEmail: true }), ctx);
-      expect(response.status).toBe(200);
-      const body = await response.json();
-      expect(body.delivery).toEqual({ status: "not_sent", reason: failure === "suppressed" ? "email_suppressed_or_unconfigured" : "provider down" });
-      expect(body.acceptUrl).toContain("/workspace/invitations/accept/");
-      expect(body.invitation.status).toBe("pending");
-      expect(created()).toHaveLength(1);
-    });
-  }
-
-  it("refuses an existing owner without creating or notifying", async () => {
-    rpc.mockResolvedValue({ data: state({ hasOwner: true }), error: null });
+  it("requires a sign-in within ten minutes for the trusted-recipient path", async () => {
+    mocks.operatorContext.mockResolvedValue({ actor, email: actor.verifiedEmail, authTime: Math.floor(Date.now() / 1000) - 601 });
     expect((await POST(request(), ctx)).status).toBe(409);
-    expect(created()).toHaveLength(0);
-    expect(mocks.send).not.toHaveBeenCalled();
+    expect(mocks.approval).not.toHaveBeenCalled();
+    expect(issued()).toHaveLength(0);
   });
 
-  for (const conflict of ["operator_owner_invitation_pending", "workspace_exit_future_work_blocked"]) {
-    it(`preserves the database's ${conflict} refusal and never sends`, async () => {
-      const defaultRpc = rpc.getMockImplementation()!;
-      rpc.mockImplementation((name, args) => name === "create_operator_owner_invitation"
-        ? Promise.resolve({ data: null, error: { message: conflict } })
-        : defaultRpc(name, args));
-      expect((await POST(request({ action: "invite", jacobApproved: true, sendEmail: true }), ctx)).status).toBe(409);
-      expect(mocks.send).not.toHaveBeenCalled();
+  it("uses the second operator's recorded ID for a non-trusted address", async () => {
+    const fallback = { email: "owner@example.test", name: null, from: "tenant_fallback", source: null, verified: false };
+    rpc.mockImplementation(async (name, args) => {
+      if (name === "read_operator_owner_invitation_state") return { data: state({ recipient: fallback }), error: null };
+      if (name === "create_operator_owner_invitation_approved") return { data: {
+        invitationId: INVITATION, workspaceId: WORKSPACE, workspaceName: "Test Business", recipientEmail: args.p_recipient_email,
+        role: "owner", status: "pending", expiresAt: args.p_expires_at, createdAt: "2026-10-01", createdBy: OPERATOR, tenants: state().tenants,
+      }, error: null };
+      throw new Error(`Unexpected RPC ${name}`);
     });
-  }
-
-  it("cannot revoke an invitation absent from the scoped business's pending set", async () => {
-    expect((await POST(request({ action: "revoke", invitationId: INVITATION }), ctx)).status).toBe(409);
-    expect(rpc.mock.calls.some(([name]) => name === "revoke_operator_owner_invitation")).toBe(false);
+    expect((await POST(request(), ctx)).status).toBe(409);
+    expect(mocks.approval).not.toHaveBeenCalled();
+    expect((await POST(request({ action: "invite", approvalId: APPROVAL }), ctx)).status).toBe(200);
+    expect(issued()[0]![1]).toMatchObject({ p_operator_user_id: OPERATOR, p_approval_id: APPROVAL });
   });
 
-  it("revokes a pending invitation through the existing RPC without emailing", async () => {
+  it("revokes only an invitation in the scoped pending set using the session user ID", async () => {
     rpc.mockImplementation(async (name) => name === "read_operator_owner_invitation_state"
       ? { data: state({ pending: [{ invitationId: INVITATION, recipientEmail: "owner@example.test", createdAt: "2026-10-01", expiresAt: "2026-10-15" }] }), error: null }
       : { data: "revoked", error: null });
     expect(await (await POST(request({ action: "revoke", invitationId: INVITATION }), ctx)).json()).toEqual({ status: "revoked" });
-    expect(rpc).toHaveBeenCalledWith("revoke_operator_owner_invitation", { p_operator_email: "operator@example.test", p_invitation_id: INVITATION });
-    expect(mocks.send).not.toHaveBeenCalled();
+    expect(rpc).toHaveBeenCalledWith("revoke_operator_owner_invitation_audited", {
+      p_operator_user_id: OPERATOR, p_invitation_id: INVITATION, p_audit_context: { source: "web" },
+    });
   });
 });

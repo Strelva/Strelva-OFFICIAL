@@ -106,6 +106,8 @@ export const SEPT30_EXTRA_APPLIED = ["20260930120000"];
  * `accounts`. "missing" there is a stop.
  */
 export const MIGRATION_SENTINELS: Record<string, string> = {
+  "20261016110000": "operator_action_approvals",
+  "20261015110000": "super_admin_access_events",
   "20261012010000": "tenant_track_signing_keys",
   "20261011180000": "provider_disconnect_receipts",
   "20261011102000": "workspace_collection_entries",
@@ -187,8 +189,8 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261011133700": "business_record_confirmed",
   "20261011170000": "prospects",
   "20261012110000": "business_pages",
-  "20261013120000": "business_owner_recipient_trust",
   "20261015100000": "agency_client_additions",
+  "20261013120000": "business_owner_recipient_trust",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */

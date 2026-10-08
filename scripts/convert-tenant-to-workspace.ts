@@ -2,20 +2,21 @@
 /**
  * Convert one managed tenant into a customer business workspace.
  *
- *   npx tsx scripts/convert-tenant-to-workspace.ts <slug>                                   # dry run (default)
- *   npx tsx scripts/convert-tenant-to-workspace.ts <slug> --operator-email=<super admin>    # dry run + link state
- *   npx tsx scripts/convert-tenant-to-workspace.ts <slug> --apply --operator-email=<email>  # local database only
+ *   npx tsx scripts/convert-tenant-to-workspace.ts <slug> --agency=<uuid> --agency-staff=<email[,email...]> --agency-basis=<existing_contract|owner_choice>  # dry run
+ *   npx tsx scripts/convert-tenant-to-workspace.ts <slug> --agency=<uuid> --agency-staff=<email[,email...]> --agency-basis=<...> --apply --operator-email=<email>  # local only
  *
  * A dry run reads the tenant, content, booking config, leads, bookings and
  * account through the existing src/lib readers and prints the exact plan. It
  * writes nothing: no Postgres, no Redis (the tenant row is read directly so the
- * tenant-list cache is not refreshed), no email.
+ * tenant-list cache is not refreshed), no invitation or email.
  *
  * --apply writes through one atomic RPC (convert_tenant_to_business). It
  * refuses unless SUPABASE_URL is a loopback host, or --i-have-jacobs-yes is
  * passed: a production conversion is Jacob's call. It never changes the tenant
- * row, `reb:` keys, /api/v1, memberships, Stripe, and never invites anyone.
- * Reruns are no-ops; a failed run left nothing behind and can simply rerun.
+ * row, `reb:` keys, /api/v1 or Stripe. It creates provider-seat access for the
+ * explicitly named agency staff and no personal admin membership. Owner
+ * invitation behavior stays unchanged; this command sends no invitation or
+ * email. Reruns are no-ops; a failed run left nothing behind and can rerun.
  *
  *   npx tsx scripts/convert-tenant-to-workspace.ts <slug> --separate-business --operator-email=<email>  # dry run
  *

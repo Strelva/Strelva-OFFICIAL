@@ -27,13 +27,13 @@ export type SendEmailInput = RenderedEmail & {
    * Absent (or any other audience) ⇒ behavior is unchanged (follow the global
    * switch). */
   tenantId?: string;
-  /** Business scope for owner presentation; never an authority grant. */
-  workspaceId?: string;
   /** Set when an agency sends this for a business (an owner invitation, a
    * client's mail). The send then also needs that agency's seat, its email
    * verification and the business's mandate for the sending domain
    * (provider-gate.ts). Absent ⇒ behavior is unchanged. */
   provider?: EmailProvider;
+  /** Business scope for owner presentation; never an authority grant. */
+  workspaceId?: string;
   fromName?: string;
   /** Presentation already rendered into raw reports; envelope is revalidated here. */
   brand?: OwnerBrand;
@@ -142,8 +142,7 @@ export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendE
   const defaultReplyTo = process.env.REPLY_TO_EMAIL || "hello@strelva.com";
   const replyTo = agencyId ? identity?.replyTo || defaultReplyTo : input.replyTo || defaultReplyTo;
 
-
-  // Resolve branding first, then authorize the actual envelope domain.
+  // Authorize the actual sending domain after resolving agency branding.
   if (input.provider && !(await providerEmailSendAllowed(input.provider, senderDomain(fromAddress)))) {
     return { status: "suppressed", reason: "email_suppressed_or_unconfigured" };
   }
@@ -165,6 +164,9 @@ export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendE
         }
       : {}),
   };
+  if (input.provider && !(await providerEmailSendAllowed(input.provider, senderDomain(fromAddress)))) {
+    return { status: "suppressed", reason: "provider_not_cleared" };
+  }
   const result = input.idempotencyKey
     ? await resend.emails.send(payload, { idempotencyKey: input.idempotencyKey })
     : await resend.emails.send(payload);
@@ -191,10 +193,10 @@ export interface SendBatchInput {
   requireClientGate?: boolean;
   audience: EmailAudience;
   tenantId?: string;
-  /** Business scope for owner presentation; never an authority grant. */
-  workspaceId?: string;
   /** As SendEmailInput.provider; checked against fromAddress's domain. */
   provider?: EmailProvider;
+  /** Business scope for owner presentation; never an authority grant. */
+  workspaceId?: string;
   fromName: string;
   /** Must be on updates.strelva.com or mail.strelva.com. */
   fromAddress: string;
@@ -247,6 +249,9 @@ export async function sendBatchWithReceipt(input: SendBatchInput): Promise<SendB
     text: message.text,
     ...(message.headers ? { headers: message.headers } : {}),
   }));
+  if (input.provider && !(await providerEmailSendAllowed(input.provider, domain))) {
+    return { status: "suppressed", reason: "not sent: provider not cleared" };
+  }
   const result = input.idempotencyKey
     ? await resend.batch.send(payload, { idempotencyKey: input.idempotencyKey })
     : await resend.batch.send(payload);

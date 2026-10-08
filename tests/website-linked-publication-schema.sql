@@ -56,7 +56,7 @@ begin
   insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values
     (ws,owner_id,'owner',owner_id),(ws,operator_id,'admin',owner_id),(ws,admin_id,'admin',owner_id),(ws,member_id,'member',owner_id),
     (other_ws,outsider_id,'owner',outsider_id),(fresh_ws,owner_id,'owner',owner_id);
-  -- After 20261014101000 the operator's provider path is an agency's, as for
+  -- After 20261014112000 the operator's provider path is an agency's, as for
   -- every agency: a seat, a staff row, publish verification and the owner's
   -- mandate for each hostname. super_admins alone grants nothing.
   if acting then

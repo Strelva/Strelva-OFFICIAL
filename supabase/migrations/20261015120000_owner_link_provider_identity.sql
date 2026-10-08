@@ -19,12 +19,5 @@ begin
   if strpos(definition,original)=0 then raise exception 'owner_link_provider_identity_drift: assertion'; end if;
   execute replace(definition,original,replacement);
 
-  -- #560 replaced the launch body after #534 had added this native resource
-  -- check. Restore it at both reserve/publish's shared choke point.
-  definition:=pg_get_functiondef('public.assert_website_owner_link(uuid,uuid,uuid,text,integer,text,uuid,uuid,text,text)'::regprocedure);
-  original:='  perform public.website_document_assert_actor(p_workspace_id,p_work_id,p_user_id,p_verified_email,true,true);';
-  replacement:=E'  if public.platform_provider_for_resource(p_workspace_id,session_row.provider_workspace_id,''publish'',''website'',\n    public.system_origin_id(p_workspace_id,''saved_work'',p_work_id::text)::text) is null then\n    raise exception ''strelva_service_access_denied'';\n  end if;\n  perform public.website_document_assert_actor(p_workspace_id,p_work_id,p_user_id,p_verified_email,true,true);';
-  if strpos(definition,original)=0 then raise exception 'owner_link_provider_identity_drift: website'; end if;
-  execute replace(definition,original,replacement);
 end $$;
 commit;

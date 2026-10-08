@@ -63,7 +63,7 @@ insert into public.workspace_memberships(workspace_id, user_id, role, created_by
   ('ae000000-0000-4000-8000-000000000010', 'ae000000-0000-4000-8000-000000000003', 'member', 'ae000000-0000-4000-8000-000000000001'),
   ('ae000000-0000-4000-8000-000000000011', 'ae000000-0000-4000-8000-000000000004', 'owner', 'ae000000-0000-4000-8000-000000000004'),
   ('ae000000-0000-4000-8000-000000000012', 'ae000000-0000-4000-8000-000000000001', 'owner', 'ae000000-0000-4000-8000-000000000001');
--- After 20261014101000 the provider layer belongs to the business's acting
+-- After 20261014112000 the provider layer belongs to the business's acting
 -- provider, not super_admins: the operator works for this business through an
 -- agency's seat and staff row, the way any agency does.
 do $$ begin
