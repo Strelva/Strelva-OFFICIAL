@@ -26,3 +26,5 @@
  */
 
 export * from "./storage/index";
+
+export { nativeBusinessServiceReference } from "./business-record-reader";

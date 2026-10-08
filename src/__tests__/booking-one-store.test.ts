@@ -32,6 +32,7 @@ vi.mock("@/lib/storage/core", () => ({
 }));
 vi.mock("@/lib/storage/content-store", () => ({ getContent: async () => ({ services: h.services }) }));
 vi.mock("@/lib/storage", async () => ({
+  nativeBusinessServiceReference: (await vi.importActual<typeof import("@/lib/business-record-reader")>("@/lib/business-record-reader")).nativeBusinessServiceReference,
   ...(await vi.importActual<typeof import("@/platform/bookings/legacy-store")>("@/platform/bookings/legacy-store")),
   getContent: async () => ({ services: h.services }),
   logActivity: h.logActivity,

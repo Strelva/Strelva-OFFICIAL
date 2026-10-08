@@ -1,3 +1,4 @@
+import { resolvePublicBookingWithAskSetup, guardAskServicePublicOperations, resolveAskServiceInquiryWorkspace, askServiceTokenStore } from "./ask-service-public-server";
 import { publicBookingAdmission } from "@/platform/bookings/public-admission";
 import { cachedPublicCalendarRead } from "@/platform/bookings/public-read";
 import { createHash, randomUUID } from "node:crypto";
@@ -210,7 +211,7 @@ function publicInquiryCapture(): PublicBookingInquiryCapture {
     async capture(input) {
       const config = await getTenantConfig(input.tenantId);
       if (!config?.active) throw new Error("Inquiry tenant is unavailable.");
-      const workspace = await resolveInquiryWorkspace({
+      const workspace = await resolveAskServiceInquiryWorkspace(input.tenantId,input.capabilityId) ?? await resolveInquiryWorkspace({
         tenantId: input.tenantId,
         tenantStableId: config.stableId,
         fallbackBusinessId: config.stableId ?? input.tenantId,
@@ -325,14 +326,14 @@ function nativeCalendar(): PublicBookingCalendar {
   };
 }
 
-export function createPublicWebsiteBookingService() {
-  return createPublicBookingService({
-    resolve: resolvePublishedPublicBooking,
+export function createPublicWebsiteBookingService(dependencies: {resolve?:typeof resolvePublishedPublicBooking} = {}) {
+  return guardAskServicePublicOperations(createPublicBookingService({
+    resolve: dependencies.resolve ?? resolvePublicBookingWithAskSetup,
     inquiries: publicInquiryCapture(),
     calendar: nativeCalendar(),
-    tokens: postgresPublicBookingTokenStore,
+    tokens: askServiceTokenStore(postgresPublicBookingTokenStore),
     store: publicBookingStoreHook(),
     admission: publicBookingAdmission,
     createRequestId: () => `public-${randomUUID()}`,
-  });
+  }));
 }

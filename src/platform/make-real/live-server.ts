@@ -77,6 +77,9 @@ export function liveChannelAdapters(actor: WorkspaceActor, workspaceId: string) 
       claim: async (tenantId, claimId) => (await import("@/products/inquiries/repository")).getInquiryRepository().getPublicationClaim(tenantId, claimId),
     }, ctx),
     createBookingPageAdapter({
+      publishSetup: async (a, selection) => (await import("@/products/scheduling/server")).publishAskServiceSetup(a, selection),
+      verifySetup: async (a, businessId, grantId) => (await import("@/products/scheduling/server")).readBackAskServiceSetup(a, businessId, grantId),
+      revokeSetup: async (a, input) => (await import("@/products/scheduling/server")).revokeAskServiceSetup(a, input),
       publish: async (a, input) => (await import("@/products/scheduling/server")).publishPublicWebsiteBookingGrant(a, input),
       list: async (a, businessId) => (await import("@/products/scheduling/server")).listPublicWebsiteBookingGrants(a, businessId),
       revoke: async (a, input) => (await import("@/products/scheduling/server")).revokePublicWebsiteBookingGrant(a, input),

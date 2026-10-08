@@ -1,6 +1,7 @@
 import { publicBookingAdmission } from "@/platform/bookings/public-admission";
 import type { PublicBookingAdmission } from "@/platform/bookings/public-request";
 import { z } from "zod";
+import { resolvePublicBookingWithAskSetup, recoverAskServiceRecord, readPublicAskServiceSetup, requireAskServicePublicSource } from "./ask-service-public-server";
 import { resolvePublishedPublicBooking } from "./public-booking-server";
 import { postgresPublicBookingTokenStore } from "./public-booking-store";
 import { scheduleSchema } from "./contracts";
@@ -134,15 +135,20 @@ export async function recoverPublicWebsiteBooking(
   if (!tokenResult.success || !input.tenantId || !input.reservationId) throw new PublicBookingError("invalid", "The booking recovery request is incomplete.");
 
   const tokens = dependencies.tokens ?? postgresPublicBookingTokenStore;
-  const resolve = dependencies.resolve ?? resolvePublishedPublicBooking;
+  const resolve = dependencies.resolve ?? resolvePublicBookingWithAskSetup;
   const calendar = dependencies.calendar ?? calendarSchedulingService;
   const ref = await findToken(tokens, { tenantId: input.tenantId, managementToken: tokenResult.data });
   if (!ref || ref.tenantId !== input.tenantId || ref.reservationId !== input.reservationId || ref.managementToken !== tokenResult.data) throw notFound();
 
+  if (/^ask-service-[a-f0-9]{32}$/.test(ref.capabilityId)) {
+    const setup=await readPublicAskServiceSetup(input.tenantId,ref.capabilityId);
+    if (setup) await requireAskServicePublicSource(setup);
+  }
   // A status refresh cannot recover provider work before the email-only gate,
   // or resurrect an expired/cancelled unconfirmed hold.
   if (!await (dependencies.admission ?? publicBookingAdmission).verified(ref)) return receipt(ref);
 
+  if (/^ask-service-[a-f0-9]{32}$/.test(ref.capabilityId)) return recoverAskServiceRecord(ref,tokens);
   let binding: PublicBookingBinding | null;
   try {
     binding = await resolve({ tenantId: input.tenantId, capabilityId: ref.capabilityId, includeRevoked: true });

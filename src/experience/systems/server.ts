@@ -60,6 +60,7 @@ import {
   syncRebuildPossibilities,
   syncAskPageSetPossibilities,
   syncAskInquiryFollowUpPossibilities,
+  syncAskServiceSetupPossibilities,
 } from "./stored-possibilities";
 
 export interface SystemsProjectionInput {
@@ -437,7 +438,9 @@ export async function withStoredPossibilities(projection: WorkspaceSystems, inpu
     canWrite: deps.canWrite === true, read: workId => readWebsiteRebuild(deps.actor, workId),
   });
   const { askInquiryFollowUpStillCurrent } = await import("@/products/inquiries/server");
-  const stored = await syncAskInquiryFollowUpPossibilities({ repo, live, stored: websiteStored, actorId: deps.actor.userId, at: new Date(input.now).toISOString(), canWrite: deps.canWrite === true, current: selection => askInquiryFollowUpStillCurrent(deps.actor, selection) });
+  const inquiryStored = await syncAskInquiryFollowUpPossibilities({ repo, live, stored: websiteStored, actorId: deps.actor.userId, at: new Date(input.now).toISOString(), canWrite: deps.canWrite === true, current: selection => askInquiryFollowUpStillCurrent(deps.actor, selection) });
+  const { askServiceSetupStillCurrent } = await import("@/products/scheduling/server");
+  const stored = await syncAskServiceSetupPossibilities({ repo, live, stored: inquiryStored, actorId: deps.actor.userId, at: new Date(input.now).toISOString(), canWrite: deps.canWrite === true, current: selection => askServiceSetupStillCurrent(deps.actor, selection) });
   const activations = createSupabaseActivationRepository(deps.actor);
   const withActivation = await Promise.all(stored.map(async ({ possibility }) => ({
     possibility,

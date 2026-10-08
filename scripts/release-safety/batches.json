@@ -1263,6 +1263,19 @@
           "rollback": "rollback-20261019100000_actor_rpc_service_boundary.sql"
         }
       ]
+    },
+    {
+      "batch": "12",
+      "status": "proposed, unapplied; qualification required",
+      "description": "October8 prepared backlog successors; unapplied; qualification required",
+      "items": [
+        {
+          "file": "20261020113000_ask_native_service_setup.sql",
+          "sha256": "fec9e56cf6c214424fd24fd35eb7f9ca3f012a28742da08d88ad09e1b8bd64b2",
+          "rollback": "rollback-20261020113000_ask_native_service_setup.sql",
+          "rollbackStatus": "guarded; pre-adoption only; accepted setup and booking/inquiry history retained"
+        }
+      ]
     }
   ]
 }

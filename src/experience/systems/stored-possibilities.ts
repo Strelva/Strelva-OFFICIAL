@@ -1,3 +1,4 @@
+import { askServiceSetupSelectionSchema } from "@/platform/ask/new-service";
 /**
  * Possibilities in Postgres for the Systems experience (systems-experience
  * spec behavior 15). Server only.
@@ -210,7 +211,7 @@ function lastStale(p: Possibility): string | null {
 export function storedPossibilityViews(stored: readonly ListedPossibility[], candidates: readonly WebsiteRebuildCandidate[], summaries: { evidence: (workId: string) => string | null } = { evidence: () => null }): WorkspaceSystemPossibility[] {
   return stored.flatMap(({ possibility: p, sourceRef }) => {
     if (p.status !== "exploring" && p.status !== "ready") return [];
-    const askContent = [...p.introduces, ...p.changes].find(item => item.candidate.content.kind === "ask-inquiry-follow-up" || ["ask-website-pages", "ask-existing-booking-page", "ask-existing-website-pages"].includes(String(item.candidate.content.kind)))?.candidate.content;
+    const askContent = [...p.introduces, ...p.changes].find(item => item.candidate.content.kind === "ask-new-service-setup" || item.candidate.content.kind === "ask-inquiry-follow-up" || ["ask-website-pages", "ask-existing-booking-page", "ask-existing-website-pages"].includes(String(item.candidate.content.kind)))?.candidate.content;
     const workId = sourceRef?.startsWith(REBUILD_SOURCE_PREFIX) ? sourceRef.slice(REBUILD_SOURCE_PREFIX.length)
       : typeof askContent?.rebuildWorkId === "string" ? askContent.rebuildWorkId : null;
     const candidate = workId ? candidates.find((item) => item.workId === workId) : undefined;
@@ -338,6 +339,32 @@ export async function syncAskInquiryFollowUpPossibilities(deps: {
       }
       if (p.status === "exploring") rows[index] = { ...row, possibility: await prepare(p, true, deps) };
     } catch { /* Missing authority, moved native rules, or concurrent saves remain held for review. */ }
+  }
+  return rows;
+}
+
+/** New native setups stay Ready only while owner authority and native pins still hold. */
+export async function syncAskServiceSetupPossibilities(deps: {
+  repo: SupabasePossibilityRepository; live: LiveSystemsReader; actorId: string; at: string;
+  stored: ListedPossibility[]; canWrite: boolean; current(selection: unknown): Promise<boolean>;
+}): Promise<ListedPossibility[]> {
+  if (!deps.canWrite) return deps.stored;
+  const rows = [...deps.stored];
+  for (let index = 0; index < rows.length; index++) {
+    const row = rows[index]!; const p = row.possibility;
+    const content = p.introduces.find(item => item.candidate.content.kind === "ask-new-service-setup")?.candidate.content;
+    if (!content || p.activationId || !["exploring", "ready"].includes(p.status)) continue;
+    try {
+      const valid = askServiceSetupSelectionSchema.safeParse(content.selection);
+      if (!valid.success || !await deps.current(valid.data)) {
+        if (p.status === "ready") {
+          const stale = returnToExploring(p, "The tenant, calendar, record or inquiry configuration changed. Prepare a refreshed service alternative.", deps.actorId, deps.at);
+          await deps.repo.save(stale, p.revision); rows[index] = {...row, possibility:stale};
+        }
+        continue;
+      }
+      if (p.status === "exploring") rows[index] = {...row, possibility:await prepare(p,true,deps)};
+    } catch { /* Unreadable authority and pins remain held; no live effect runs. */ }
   }
   return rows;
 }
