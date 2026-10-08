@@ -312,3 +312,6 @@ export function createInvestigationService(store: BoundedStore = boundedStore, d
   };
 }
 export const { create: createWorkspaceInvestigation, read: readWorkspaceInvestigation, command: changeWorkspaceInvestigation, run: runWorkspaceInvestigation, history: readWorkspaceInvestigationHistory } = createInvestigationService();
+
+/** Exact durable receipt, authorized by the history RPC even after snapshot eviction. */
+export const readWorkspaceInvestigationRun = investigationHistory.find;

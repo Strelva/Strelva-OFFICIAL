@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const state = vi.hoisted(() => ({ redis: new Map<string, unknown>(), rows: new Map<string, unknown[]>(), fail: false, days: 7 }));
+const state = vi.hoisted(() => ({ redis: new Map<string, unknown>(), redisReads: [] as string[], rows: new Map<string, unknown[]>(), fail: false, days: 7 }));
 vi.mock("@/platform/infra/redis", () => ({ getRedis: () => ({
-  get: async (key: string) => state.redis.get(key) ?? null,
+  get: async (key: string) => { state.redisReads.push(key); return state.redis.get(key) ?? null; },
   smembers: async () => [],
   mget: async (...keys: string[]) => keys.map(key => state.redis.get(key) ?? null),
 }) }));
@@ -13,7 +13,7 @@ import { setClientRecordDb } from "@/platform/client-records/mirror";
 
 const account = { id: "bundle", name: "Two sites", tenantIds: ["one", "two"], status: "active", createdAt: "2026-10-01T12:00:00Z", updatedAt: "2026-10-07T12:00:00Z", subscription: { items: [], amountCents: 30000 } };
 beforeEach(() => {
-  state.redis.clear(); state.rows.clear(); state.fail = false; state.days = 7;
+  state.redis.clear(); state.redisReads.length = 0; state.rows.clear(); state.fail = false; state.days = 7;
   vi.stubEnv("STRELVA_CLIENT_RECORDS_READ", "account_grouping");
   vi.stubEnv("STRELVA_CLIENT_RECORDS_DUAL_WRITE", "1"); vi.stubEnv("DUAL_WRITE_PG", "1");
   for (const tenant of account.tenantIds) state.rows.set(tenant, [{ recordId: account.id, payload: account, capturedAt: account.updatedAt }]);
@@ -35,12 +35,14 @@ describe("durable account grouping reads", () => {
     expect((await getAccountForTenant("one"))?.id).toBe("old");
     expect(await getAccount("bundle")).toBeNull(); expect(await getAllAccounts()).toEqual([]);
   });
-  it("falls back to the Redis grouping on database failure or incomplete parity", async () => {
+  it("fails closed without reading Redis when requested durable authority is unavailable or unqualified", async () => {
     state.redis.set("account-of:one", "old"); state.redis.set("account:old", { ...account, id: "old" });
     state.fail = true;
-    expect((await getAccountForTenant("one"))?.id).toBe("old");
+    await expect(getAccountForTenant("one")).rejects.toThrow("client_records_parity_unavailable");
+    expect(state.redisReads).toEqual([]);
     state.fail = false; state.days = 6;
-    expect((await getAccountForTenant("one"))?.id).toBe("old");
+    await expect(getAccountForTenant("one")).rejects.toThrow("client_records_cutover_not_qualified");
+    expect(state.redisReads).toEqual([]);
   });
   it("does not return a stale grouping payload that excludes the requested site", async () => {
     state.rows.set("one", [{ recordId: account.id, payload: { ...account, tenantIds: ["two"] }, capturedAt: account.updatedAt }]);

@@ -26,7 +26,7 @@ function databaseBoundary() {
     // may make internal tools (make_systems). The plain-owner refusal has its
     // own test below.
     acting_provider_staff: [{ user_id: owner.id, revoked_at: null }],
-    saved_product_work: [], workspace_delegations: [], operational_assignments: [], offering_provider_deliveries: [], offering_installations: [], standing_responsibility_jobs: [], standing_responsibility_runs: [], application_states: [], application_releases: [], application_records: [], job_economics: [], job_economics_usage: [], job_economics_reservations: [], job_economics_executions: [],
+    saved_product_work: [], investigation_history_events: [], workspace_delegations: [], operational_assignments: [], offering_provider_deliveries: [], offering_installations: [], standing_responsibility_jobs: [], standing_responsibility_runs: [], application_states: [], application_releases: [], application_records: [], job_economics: [], job_economics_usage: [], job_economics_reservations: [], job_economics_executions: [],
   };
   const packageReads = new Set<string>();
   let rpcError: string | null = null;
@@ -106,6 +106,19 @@ function databaseBoundary() {
           && tables.workspace_memberships.some((m) => m.workspace_id === row.agency_workspace_id && m.user_id === args.p_user_id))) return "agency";
         return member ? "member" : null;
       };
+      if (name === "read_investigation_runs") {
+        const work = tables.saved_product_work.find(row => row.id === args.p_work_id && row.product_id === "investigations");
+        const actor = [owner, outsider, agency].find(user => user.id === args.p_user_id && user.email.toLowerCase() === String(args.p_verified_email).toLowerCase());
+        if (!actor || !work || !tables.workspace_memberships.some(row => row.workspace_id === work.workspace_id && row.user_id === actor.id)) return { data: null, error: { message: "workspace_access_denied" } };
+        const limit = Number(args.p_limit);
+        if (!Number.isInteger(limit) || limit < 1 || limit > 101) return { data: null, error: { message: "investigation_page_invalid" } };
+        const rows = tables.investigation_history_events!.filter(row => row.work_id === work.id && row.run
+          && (args.p_request_id == null || (row.run as Row).requestId === args.p_request_id)
+          && (args.p_before_revision == null || Number(row.revision) < Number(args.p_before_revision)))
+          .sort((a, b) => Number(b.revision) - Number(a.revision)).slice(0, limit)
+          .map(row => ({ revision: row.revision, run: structuredClone(row.run) }));
+        return { data: rows, error: null };
+      }
       if (name === "workspace_make_systems_authority") return { data: makeAuthority(), error: null };
       // Mirrors public.save_workspace_work and public.save_system_work: membership
       // or make_systems is re-checked inside the write.
@@ -222,6 +235,15 @@ function databaseBoundary() {
       if (!["update_bounded_product_work", "update_work_responsibility", "update_document_work"].includes(name)) throw new Error(`Unexpected SQL command: ${name}`);
       const work = tables.saved_product_work.find(row => row.id === args.p_work_id);
       if (!work) return { data: null, error: { message: "workspace_access_denied" } };
+      if (name === "update_bounded_product_work" && work.product_id === "investigations") {
+        const next = args.p_payload as Row;
+        const run = (next.runs as Row[] | undefined)?.at(-1);
+        // The SQL trigger archives committed receipts before the client receives
+        // its response; snapshot eviction and lost responses cannot remove them.
+        if (run && !tables.investigation_history_events!.some(row => row.work_id === work.id && (row.run as Row).requestId === run.requestId)) {
+          tables.investigation_history_events!.push({ work_id: work.id, revision: next.revision, run: structuredClone(run) });
+        }
+      }
       work.payload = structuredClone(args.p_payload); work.updated_at = new Date().toISOString();
       if (lostCommitResponse === name) { lostCommitResponse = null; return { data: null, error: { message: "database connection lost after commit" } }; }
       return { data: [structuredClone(work)], error: null };
@@ -503,6 +525,9 @@ describe("horizontal work HTTP authority and execution", () => {
     expect(interrupted).toMatchObject({ payload: { status: "needs_attention", steps: [{ effect: "unknown" }] } });
     vi.setSystemTime(new Date("2026-09-12T12:01:00Z"));
     await postDocuments(post("documents", { action: "command", workId: docs[0]!.workId, command: { kind: "edit", expectedRevision: 0, title: "Source", text: "Changed after the recorded check" } }));
+    // Evict the snapshot copy: reconciliation must still find the exact durable receipt.
+    const investigationRow = database.tables.saved_product_work.find(row => row.id === investigation.id)!;
+    (investigationRow.payload as Row).runs = [];
     // Active work still cannot use a stale finding to authorize dependent actions.
     expect((await postOperations(post("operations", { action: "command", workId: work.id, command: { kind: "reconcile", expectedRevision: interrupted.payload.revision, stepId: "check", resolution: "completed", evidence: "Old receipt" } }))).status).toBe(409);
     const cancelled = await (await postOperations(post("operations", { action: "command", workId: work.id, command: { kind: "cancel", expectedRevision: interrupted.payload.revision } }))).json();
