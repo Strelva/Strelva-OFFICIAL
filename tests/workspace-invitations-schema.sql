@@ -91,6 +91,9 @@ end $$;
 -- accept_workspace_invitation observes no row but before its insert resolves
 -- the primary-key conflict. This exercises the real concurrency branch.
 create extension if not exists dblink;
+-- This disposable concurrency fixture needs regular dblink, never its unsafe
+-- security-definer connection helpers. Keep the final public-key scan exact.
+revoke all on function public.dblink_connect_u(text), public.dblink_connect_u(text,text) from public,anon,authenticated,service_role;
 create or replace function pg_temp.inject_stronger_invitation_membership() returns trigger
 language plpgsql as $$
 begin

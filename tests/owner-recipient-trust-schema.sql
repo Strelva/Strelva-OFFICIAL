@@ -282,6 +282,8 @@ rollback;
 --     address's claim, started meanwhile, waits for B and is refused.
 --     Committed fictional fixture, removed at the end.
 create extension if not exists dblink;
+-- Local race orchestration never needs unsafe security-definer connections.
+revoke all on function public.dblink_connect_u(text), public.dblink_connect_u(text,text) from public,anon,authenticated,service_role;
 create or replace function pg_temp.rt_assert(v boolean, message text) returns void language plpgsql as $$
 begin if v is not true then raise exception 'owner recipient trust: %', message; end if; end $$;
 do $$
