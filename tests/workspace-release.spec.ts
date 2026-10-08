@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
+import { expect, test, type Page, type Request, type Route } from "@playwright/test";
 import { createPreviewInquiryAdapter } from "../src/experience/inquiries/preview-fixture";
 import { createTracker, previewTrackerImport } from "../src/products/tracker";
 import type { WorkspaceHandoffPreview, WorkspaceSnapshot, WorkspaceWork } from "../src/experience/workspace/contracts";
@@ -1056,6 +1056,15 @@ test(`agency queue pages through all clients and reports unavailable work at ${v
   }));
   const workspaceReads: string[] = [];
   const clientPages: Array<string | null> = [];
+  const completedClientPages: Array<string | null> = [];
+  const failedClientPages: Array<{ cursor: string | null; error: string }> = [];
+  const isClientPage = (request: Request) => new URL(request.url()).pathname === "/api/workspace/agency-clients";
+  page.on("requestfinished", request => {
+    if (isClientPage(request)) completedClientPages.push(new URL(request.url()).searchParams.get("cursor"));
+  });
+  page.on("requestfailed", request => {
+    if (isClientPage(request)) failedClientPages.push({ cursor: new URL(request.url()).searchParams.get("cursor"), error: request.failure()?.errorText ?? "" });
+  });
   const mutations: string[] = [];
   let recovered = false;
   const cursor = customers[AGENCY_CLIENT_PAGE_SIZE - 1]!.id;
@@ -1101,6 +1110,18 @@ test(`agency queue pages through all clients and reports unavailable work at ${v
   await expect(page.getByText("Showing 100 of 102 clients", { exact: true })).toBeVisible();
   await expect(clients.getByRole("listitem")).toHaveCount(100);
   await expect(page.getByText("Review client 1", { exact: true })).toBeVisible();
+  // Development Strict Mode replays startup effects. Only one initial page
+  // completes; any extra attempt must be the single explicitly aborted read.
+  const startupClientPages = [...clientPages];
+  const startupWorkspaceReads = [...workspaceReads];
+  expect([1, 2]).toContain(startupClientPages.length);
+  expect(startupClientPages).toEqual(Array(startupClientPages.length).fill(null));
+  await expect.poll(() => completedClientPages.length + failedClientPages.length).toBe(startupClientPages.length);
+  expect(completedClientPages).toEqual([null]);
+  const startupFailures = startupClientPages.length === 2 ? [{ cursor: null, error: "net::ERR_ABORTED" }] : [];
+  expect(failedClientPages).toEqual(startupFailures);
+  expect([1, 2]).toContain(startupWorkspaceReads.length);
+  expect(startupWorkspaceReads).toEqual(Array(startupWorkspaceReads.length).fill(AGENCY_ID));
   await page.getByRole("button", { name: "Show more clients", exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByText("102 clients", { exact: true })).toBeVisible();
@@ -1110,8 +1131,10 @@ test(`agency queue pages through all clients and reports unavailable work at ${v
   await expect(page.getByText("Review client 1", { exact: true })).toBeVisible();
   await expect(page.getByText("Page Client 102 could not be loaded.", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Show more clients", exact: true })).toHaveCount(0);
-  expect(clientPages).toEqual([null, cursor]);
-  expect(workspaceReads).toEqual([AGENCY_ID]);
+  expect(clientPages).toEqual([...startupClientPages, cursor]);
+  await expect.poll(() => completedClientPages).toEqual([null, cursor]);
+  expect(failedClientPages).toEqual(startupFailures);
+  expect(workspaceReads).toEqual(startupWorkspaceReads);
 
   recovered = true;
   await page.getByRole("button", { name: "Retry loading Page Client 102", exact: true }).click();
@@ -1120,18 +1143,22 @@ test(`agency queue pages through all clients and reports unavailable work at ${v
   await expect(clients.getByRole("listitem")).toHaveCount(102);
   await expect(clients.getByText("Page Client 1", { exact: true })).toBeVisible();
   await expect(page.getByText("Review client 102", { exact: true })).toBeVisible();
-  expect(clientPages).toEqual([null, cursor, cursor]);
-  expect(workspaceReads).toEqual([AGENCY_ID]);
+  expect(clientPages).toEqual([...startupClientPages, cursor, cursor]);
+  await expect.poll(() => completedClientPages).toEqual([null, cursor, cursor]);
+  expect(failedClientPages).toEqual(startupFailures);
+  expect(workspaceReads).toEqual(startupWorkspaceReads);
   expect(mutations).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await clients.getByText("Page Client 102", { exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: testInfo.outputPath(`agency-batched-clients-${viewport.width}.png`), fullPage: true });
+  await page.getByText("102 clients", { exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath(`agency-batched-clients-viewport-${viewport.width}.png`), fullPage: false });
 
   // A queue action opens its exact client/work; discovery did not fetch it.
   await page.getByRole("button", { name: /^Review client 101,/ }).click();
   await expect(page.getByRole("combobox", { name: "Current workspace" })).toHaveValue(customers[100]!.id);
   await expect(page).toHaveURL(new RegExp(`workspaceId=${customers[100]!.id}.*work=${workId(100)}`));
-  expect(workspaceReads).toEqual([AGENCY_ID, customers[100]!.id]);
+  expect(workspaceReads).toEqual([...startupWorkspaceReads, customers[100]!.id]);
   expect(mutations).toEqual([]);
 });
 }
