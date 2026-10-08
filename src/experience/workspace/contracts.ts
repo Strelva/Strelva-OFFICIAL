@@ -166,6 +166,8 @@ export interface WorkspaceSnapshot {
 }
 
 export interface WorkspaceReleases {
+  /** Renewable owner assistant connections: STRELVA_MCP_OAUTH and workspace release. */
+  assistantConnections?: boolean;
   /** Agency-owned public check leads, off unless explicitly released. */
   agencyProspecting?: boolean;
   systems: boolean;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Check, CircleAlert, ExternalLink, Globe, Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { TextArea, TextInput, SelectInput } from "@/components/ui/TextInput";
@@ -100,7 +100,8 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
   }
   const decisions = record ? flaggedFacts(record) : [];
   const startReady = descriptionMode ? Boolean(businessName.trim() && description.trim()) : Boolean(url.trim());
-  const disabled = busy || readOnly;
+  const ready = useSyncExternalStore(() => () => {}, () => true, () => false);
+  const disabled = !ready || busy || readOnly;
   const candidate = record?.candidate;
   const agencyPermission = record?.agencyPublishPermission;
   const pathHosted = Boolean(SITES_PATH_ORIGIN && record?.publishedUrl?.startsWith(`${SITES_PATH_ORIGIN}/sites/`));
@@ -143,7 +144,7 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
               } catch { setPreviewFailed(true); setPreviewLoaded(true); }
             }} onError={() => setPreviewFailed(true)} />{!previewLoaded ? <p className={styles.meta} role="status">Loading the private preview…</p> : null}{previewFailed ? <div className={styles.error} role="alert"><p>The preview has not opened. Your review decisions are saved.</p><Button variant="secondary" onClick={() => setPreviewAttempt(value => value + 1)}>Reload preview</Button></div> : null}</> : <p className={styles.notice}>The preview address is unavailable. Refresh the saved website before approving.</p>}
           </section>
-          <aside className={styles.decisions} aria-labelledby="rebuild-decisions-heading"><div className={styles.sectionHeader}><h2 id="rebuild-decisions-heading">{decisions.length ? `${decisions.length} decisions need you` : "Ready for your review"}</h2><p>Only uncertain facts and sensitive claims appear here.</p></div>
+          <aside className={styles.decisions} aria-labelledby="rebuild-decisions-heading"><div className={styles.sectionHeader}><h2 id="rebuild-decisions-heading">{decisions.length ? `${decisions.length} ${decisions.length === 1 ? "decision needs" : "decisions need"} you` : "Ready for your review"}</h2><p>Only uncertain facts and sensitive claims appear here.</p></div>
             {decisions.length === 0 ? <p className={styles.notice}><Check size={18} aria-hidden="true" />All flagged facts have been resolved. Review the full site before approving.</p> : decisions.map(([id, fact]) => <article key={id} className={styles.fact}><p className={styles.tag}>{fact.highRisk ? "Sensitive claim · confirmation required" : "Could not confirm"}</p><p className={styles.factText}>{fact.text}</p><div className={styles.source}><strong>Source</strong>{fact.sources.length ? fact.sources.map((source, index) => <blockquote key={index}>“{source.quote}”<span>{source.sourceId.split("#sha256=")[0]}</span></blockquote>) : <p>No source found.</p>}</div>
               {editing === id ? <form onSubmit={event => { event.preventDefault(); if (editedText.trim()) void run(() => transport.mutate(record, "edit", { factId: id, text: editedText.trim() }), "Fact updated in a new revision. Review the changed preview."); }}><TextArea label="Corrected fact" value={editedText} onChange={event => setEditedText(event.target.value)} maxLength={500} disabled={disabled} required /><div className={styles.actions}><Button type="submit" size="sm" disabled={disabled || !editedText.trim()}>Save correction</Button><Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => setEditing(null)}>Cancel</Button></div></form>
                 : <div className={styles.actions}><Button size="sm" variant="secondary" disabled={disabled} onClick={() => void run(() => transport.mutate(record, "confirm", { factId: id }), "Fact confirmed in a new revision.")}>Confirm</Button><Button size="sm" variant="ghost" disabled={disabled} onClick={() => { setEditing(id); setEditedText(fact.text); }}>Edit</Button><Button size="sm" variant="danger" disabled={disabled} onClick={() => void run(() => transport.mutate(record, "remove", { factId: id }), "Fact removed in a new revision.")}>Remove</Button></div>}
