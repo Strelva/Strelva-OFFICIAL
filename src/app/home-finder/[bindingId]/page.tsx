@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { createHomeFinderEntry } from "@/products/home-finder/entry";
+import { createHomeFinderEntry } from "@/products/home-finder/server";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { customersReleaseEnabled } from "@/platform/customers/release";

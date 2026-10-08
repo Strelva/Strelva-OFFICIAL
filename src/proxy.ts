@@ -590,7 +590,7 @@ export default async function proxy(req: NextRequest) {
   const finderEntry = /^\/home-finder\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/.exec(pathname);
   if (finderEntry) {
     if (!workspaceReleaseEnabled() || !customersReleaseEnabled()) return applySecurityHeaders(new NextResponse("Home Finder unavailable", { status: 404 }), req);
-    const { homeFinderFrameAncestors } = await import("./products/home-finder/entry");
+    const { homeFinderFrameAncestors } = await import("./products/home-finder/server");
     const ancestors = await homeFinderFrameAncestors(finderEntry[1]!);
     const forwarded = new Headers(req.headers);
     for (const header of ["x-tenant", "x-preview-mode", "x-client-fallback-root", DASHBOARD_PATH_HEADER]) forwarded.delete(header);

@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/Button";
 import { TextArea, TextInput } from "@/components/ui/TextInput";
-import { homeFinderSearchResultSchema, type HomeFinderInquiry } from "@/products/home-finder/runtime-contracts";
+import { homeFinderSearchResultSchema, type HomeFinderInquiry } from "@/products/home-finder/contracts";
 import type { HomeFinderDeliveryDetail } from "@/platform/customers/home-finder-port";
 type Search = z.infer<typeof homeFinderSearchResultSchema>;
 const resultSchema = z.object({ status: z.enum(["pending", "delivered", "unavailable"]), requestId: z.string().uuid(), message: z.string(), reference: z.string() });

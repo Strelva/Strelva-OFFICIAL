@@ -40,3 +40,38 @@ It rolls back by default; keep_fixture=true retains fictional274 data and runs
 readers in BEGIN READ ONLY. This fixture is no licensed-provider proof. Forward,
 unused inverse/catalog equivalence, retained-history rollback refusal and actual
 native race proof remain pending coordinator qualification.
+
+## Observed native read-only repair
+
+Root's native scanner on composed43dd5758 observed three STABLE readers reaching
+writer lock graphs (25006): read_enterprise_units/read_enterprise_unit_versions
+through enterprise_require, and read_home_finder_bindings through the package
+System writer scope. Root log /private/tmp/strelva-full-model-billing-native-second.log
+retains the original failure. Revised NEW/unapplied211100 adds a private STABLE
+enterprise_read_require snapshot with identical verified direct-membership
+checks; only the two readers use it. Writer enterprise_require and all mutation
+locks/CAS/exit checks remain unchanged. Its inverse removes the added helper.
+NEW/unapplied211120 reader now uses the pre-existing system_read_scope snapshot
+contract, retaining current staffed seats, delegated/package/bundle work scope
+and system_in_scope filtering rather than broadening grants.
+
+Native tests/enterprise-home-finder-readonly.sql persists isolated27410000
+fictional seeds, then asserts all three readers under BEGIN READ ONLY for owner
+and member. Home Finder also checks current staffed agency authority; Units deny
+agency seats without direct organization membership. Unassigned agency staff,
+outsiders, unverified/mismatched actors, withdrawn business membership and ended
+provider seats must not regain access. Owner access remains. Script
+scripts/sql/enterprise-home-finder-atomicity.sh injects errors after authority/
+reader replacements on an already migrated disposable cluster and compares exact
+public catalog fingerprints. Both are authored, NOT executed in this lane under
+the coordinator resource stop; root owns native qualification and packet hashes.
+
+Public import repair: routes/page/enterprise experience/proxy use existing
+Home Finder contracts/server entrypoints. Native schemas/types are exported only
+through browser-safe contracts; server exposes entry/native management/health
+composition. Five focused files40tests pass including transitive contracts
+Node/storage-free checks, product import boundary checks and public server
+composition, plus existing runtime, adapter, Units and exact proxy matcher.
+Scoped lint, shell syntax and whitespace checks pass. No full typecheck/build/
+SQL/stack ran during this followup. Systems/server root integration should import
+readHomeFinderSystemObservations from @/products/home-finder/server.

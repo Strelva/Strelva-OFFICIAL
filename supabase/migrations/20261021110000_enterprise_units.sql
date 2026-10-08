@@ -40,11 +40,23 @@ begin
  if p_write and public.workspace_exit_completed(p_workspace_id) then raise exception 'workspace_exit_future_work_blocked'; end if;
  return role;
 end;$$;
+-- Snapshot authority for STABLE readers. Structure never inherits provider seats.
+create function public.enterprise_read_require(p_workspace_id uuid,p_user_id uuid,p_verified_email text) returns text
+language plpgsql stable security definer set search_path=public,pg_temp as $$
+declare role text;
+begin
+ select m.role into role from public.workspace_memberships m join public.users u on u.id=m.user_id
+ where m.workspace_id=p_workspace_id and m.user_id=p_user_id
+ and lower(u.email)=lower(btrim(p_verified_email)) and u.verified_at is not null;
+ if role is null then raise exception 'enterprise_denied'; end if;
+ return role;
+end;$$;
+revoke all on function public.enterprise_read_require(uuid,uuid,text) from public,anon,authenticated,service_role;
 create function public.read_enterprise_units(p_organization_id uuid,p_user_id uuid,p_verified_email text) returns jsonb
 language plpgsql stable security definer set search_path=public,pg_temp as $$
 declare result jsonb; inaccessible integer;
 begin
- perform public.enterprise_require(p_organization_id,p_user_id,p_verified_email,false);
+ perform public.enterprise_read_require(p_organization_id,p_user_id,p_verified_email);
  select count(*) into inaccessible from public.enterprise_units e where e.organization_workspace_id=p_organization_id and not exists(select 1 from public.workspace_memberships m where m.workspace_id=e.business_workspace_id and m.user_id=p_user_id);
  select coalesce(jsonb_agg(jsonb_build_object('id',e.id,'organizationId',e.organization_workspace_id,'businessId',e.business_workspace_id,
   'parentId',case when exists(select 1 from public.enterprise_units p join public.workspace_memberships m on m.workspace_id=p.business_workspace_id and m.user_id=p_user_id where p.id=e.parent_id) then e.parent_id else null end,
@@ -204,10 +216,10 @@ end;$$;
 create function public.read_enterprise_unit_versions(p_organization_id uuid,p_unit_id uuid,p_user_id uuid,p_verified_email text) returns jsonb language plpgsql stable security definer set search_path=public,pg_temp as $$
 declare e public.enterprise_units; result jsonb;
 begin
- perform public.enterprise_require(p_organization_id,p_user_id,p_verified_email,false);
+ perform public.enterprise_read_require(p_organization_id,p_user_id,p_verified_email);
  select * into e from public.enterprise_units where id=p_unit_id and organization_workspace_id=p_organization_id;
  if not found then raise exception 'enterprise_denied'; end if;
- perform public.enterprise_require(e.business_workspace_id,p_user_id,p_verified_email,false);
+ perform public.enterprise_read_require(e.business_workspace_id,p_user_id,p_verified_email);
  select coalesce(jsonb_agg(jsonb_build_object('id',v.id,'name',s.name,'context',v.context_label,'baselineRevision',v.baseline_revision,'assigned',exists(select 1 from public.enterprise_unit_versions a where a.version_id=v.id)) order by s.name,v.id),'[]'::jsonb) into result from public.system_versions v join public.systems s on s.id=v.version_system_id where v.business_workspace_id=e.business_workspace_id;
  return jsonb_build_object('unitId',e.id,'businessId',e.business_workspace_id,'versions',result);
 end;$$;

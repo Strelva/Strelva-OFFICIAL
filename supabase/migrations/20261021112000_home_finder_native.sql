@@ -61,7 +61,7 @@ create function public.read_home_finder_bindings(p_workspace_id uuid,p_user_id u
 language plpgsql stable security definer set search_path=public,pg_temp as $$
 declare scope record; result jsonb;
 begin
- scope:=public.system_actor_scope(p_workspace_id,p_user_id,p_verified_email,false);
+ scope:=public.system_read_scope(p_workspace_id,p_user_id,p_verified_email,false);
  select coalesce(jsonb_agg(public.home_finder_binding_json(b) order by b.created_at,b.id),'[]'::jsonb) into result from public.home_finder_bindings b join public.systems s on s.id=b.system_id where b.business_workspace_id=p_workspace_id and public.system_in_scope(p_workspace_id,s.origin_kind,s.origin_ref,scope.work_ids);
  return result;
 end;$$;

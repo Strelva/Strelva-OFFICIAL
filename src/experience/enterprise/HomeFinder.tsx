@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/Button";
 import { SelectInput, TextInput } from "@/components/ui/TextInput";
-import { homeFinderBindingSchema, type HomeFinderBinding } from "@/products/home-finder/runtime-contracts";
+import { homeFinderBindingSchema, type HomeFinderBinding } from "@/products/home-finder/contracts";
 const viewSchema = z.object({ bindings: z.array(homeFinderBindingSchema.extend({ changeNumber: z.number().int().positive() })), catalog: z.object({ name: z.string(), requirements: z.array(z.string()) }) });
 type View = z.infer<typeof viewSchema>;
 export function HomeFinder({ workspaceId, agencies }: { workspaceId: string; agencies: { id: string; name: string }[] }) { return <HomeFinderLoader key={workspaceId} workspaceId={workspaceId} agencies={agencies} />; }

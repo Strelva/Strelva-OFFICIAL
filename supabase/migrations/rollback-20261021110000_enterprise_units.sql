@@ -100,6 +100,7 @@ end;$$;
 drop function public.read_enterprise_unit_versions(uuid,uuid,uuid,text);
 drop function public.change_enterprise_unit(uuid,text,jsonb);
 drop function public.read_enterprise_units(uuid,uuid,text);
+drop function public.enterprise_read_require(uuid,uuid,text);
 drop function public.enterprise_require(uuid,uuid,text,boolean);
 drop table public.enterprise_unit_audit,public.enterprise_unit_versions,public.enterprise_units;
 
