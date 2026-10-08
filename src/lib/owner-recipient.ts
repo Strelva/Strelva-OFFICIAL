@@ -1,27 +1,29 @@
 /**
  * Who an owner notice goes to: the one owner-recipient rule (Strelva Reborn §1).
  *
- *   1. the linked business record's owner contact (`owner_recipient` fact);
- *   2. this tenant's own `owner_email` (every unconverted tenant lands here,
- *      so live clients see exactly today's recipient);
- *   3. the business's earliest linked site's `owner_email`.
+ *   1. a converted site: its business's trusted owner address, and nothing
+ *      else (imported at conversion or set by the owner; an `owner_recipient`
+ *      or `owner_email` an operator or agency edited is never used, #524);
+ *   2. a site with no business: its own `owner_email` (live unconverted
+ *      clients see exactly today's recipient).
  *
  * Every tenant-model owner notice (lead, weekly/monthly report, review alert,
  * review and order nudges, health drop, inquiry owner notification) asks this
  * one function instead of reading `tenant.ownerEmail` itself.
  *
- * Fail-soft by design: if the database is unconfigured, slow (bounded at
- * 1.5 s) or the migration is not applied, the notice falls back to the
- * tenant's own `owner_email`, which is the pre-rule behavior. A notice is never
- * dropped because the resolver failed.
+ * Fail-closed: if the database is slow (bounded at 1.5 s), errors, or names
+ * nobody, the notice is not sent and the reason is logged. The tenant's own
+ * `owner_email` is read only when no database is configured at all (local
+ * development and unit tests), where no site can have a business.
  */
 import { z } from "zod";
 import { workspacePorts } from "./workspace-ports";
+import { isSupabaseConfigured } from "@/platform/infra/db/client";
 
 export interface OwnerNoticeRecipient {
   email: string;
   name: string | null;
-  /** `tenant_fallback` means the rule could not be read and the tenant's own address was used. */
+  /** `tenant_fallback`: no database is configured, so the tenant's own address was used. */
   from: "record" | "tenant" | "linked_tenant" | "tenant_fallback";
   workspaceId: string | null;
 }
@@ -41,32 +43,55 @@ export function setOwnerRecipientResolver(next: Resolver | null): void {
   resolver = next ?? resolveTenantOwnerRecipient;
 }
 
-function fallback(tenant: { ownerEmail?: string | null }): OwnerNoticeRecipient | null {
+function withoutDatabase(tenant: { ownerEmail?: string | null }): OwnerNoticeRecipient | null {
   const parsed = email.safeParse(tenant.ownerEmail ?? "");
   return parsed.success ? { email: parsed.data, name: null, from: "tenant_fallback", workspaceId: null } : null;
+}
+
+type NotSent = "resolver_timeout" | "resolver_error" | "no_owner_recipient" | "malformed_owner_recipient";
+
+async function resolve(tenant: { id: string; ownerEmail?: string | null }): Promise<OwnerNoticeRecipient | NotSent> {
+  if (resolver === resolveTenantOwnerRecipient && !isSupabaseConfigured()) return withoutDatabase(tenant) ?? "no_owner_recipient";
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const outcome = await Promise.race([
+      resolver(tenant.id),
+      new Promise<"timeout">((done) => { timer = setTimeout(() => done("timeout"), RESOLVE_TIMEOUT_MS); }),
+    ]);
+    if (outcome === "timeout") return "resolver_timeout";
+    // Null: no tenant row, a converted site with no trusted address, or an
+    // unconverted site with no owner_email.
+    if (!outcome) return "no_owner_recipient";
+    const parsed = email.safeParse(outcome.email);
+    if (!parsed.success) return "malformed_owner_recipient";
+    return { email: parsed.data, name: outcome.name, from: outcome.from, workspaceId: outcome.workspaceId };
+  } catch {
+    return "resolver_error";
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 export async function resolveOwnerNoticeRecipient(
   tenant: { id: string; ownerEmail?: string | null },
 ): Promise<OwnerNoticeRecipient | null> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    const outcome = await Promise.race([
-      resolver(tenant.id),
-      new Promise<"timeout">((resolve) => { timer = setTimeout(() => resolve("timeout"), RESOLVE_TIMEOUT_MS); }),
-    ]);
-    if (outcome === "timeout") return fallback(tenant);
-    // Null: no tenant row or no address on record. The caller's own tenant
-    // config is then the only source (it is the same row when it exists).
-    if (!outcome) return fallback(tenant);
-    const parsed = email.safeParse(outcome.email);
-    if (!parsed.success) return fallback(tenant);
-    return { email: parsed.data, name: outcome.name, from: outcome.from, workspaceId: outcome.workspaceId };
-  } catch {
-    return fallback(tenant);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
+  const outcome = await resolve(tenant);
+  if (typeof outcome !== "string") return outcome;
+  console.warn(`[owner-recipient] owner notice not sent for ${tenant.id}: ${outcome}`);
+  return null;
+}
+
+/**
+ * Whether a legacy tenant approve link (src/lib/approve-link.ts, no recipient
+ * bound) may still decide. Only for a site with no business: a converted
+ * site's owner decides through Needs you, whose links are bound to the
+ * trusted address. Unknown (database error or timeout) is no. Without a
+ * database no site has a business.
+ */
+export async function legacyOwnerLinkAllowed(tenant: { id: string; ownerEmail?: string | null }): Promise<boolean> {
+  if (resolver === resolveTenantOwnerRecipient && !isSupabaseConfigured()) return true;
+  const outcome = await resolve(tenant);
+  return typeof outcome !== "string" && outcome.workspaceId === null;
 }
 
 /** Convenience for senders that only need the address. */

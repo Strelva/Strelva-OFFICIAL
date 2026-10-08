@@ -130,8 +130,9 @@ export async function readBusinessRecordHistory(actor: WorkspaceActor, workspace
   }, z.array(businessRecordRevisionSchema), "The business record history could not be loaded.");
 }
 
-/** Who Strelva would notify for this business. Server-only: the caller must
- * already hold its own authority. It resolves an address and sends nothing. */
+/** The business's trusted owner address (#524): imported at conversion or set
+ * by the owner, never one an operator or agency wrote. Server-only: the caller
+ * must already hold its own authority. It resolves an address and sends nothing. */
 export async function resolveOwnerRecipient(workspace: string): Promise<OwnerRecipient | null> {
   return callBusinessRecord("resolve_business_owner_recipient", { p_workspace_id: workspaceId.parse(workspace) },
     ownerRecipientSchema.nullable(), "The owner recipient could not be resolved.");

@@ -337,9 +337,10 @@ rollback_readers() {
     20261013110000_public_facts_read_confirmed) printf '%s' 'business_confirmed_public_facts|read_connected_site_context' ;;
   esac
 }
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-recipient-trust-schema.sql"
 catalog_fingerprint >"$cluster_root/catalog-full.txt"
 # Newest first; the public-facts reader is last.
-public_facts_rollbacks=(20261013115000_booking_reads_confirmed_facts 20261013110000_public_facts_read_confirmed)
+public_facts_rollbacks=(20261013120000_owner_recipient_trust 20261013115000_booking_reads_confirmed_facts 20261013110000_public_facts_read_confirmed)
 for name in "${public_facts_rollbacks[@]}"; do
   catalog_fingerprint >"$cluster_root/catalog-before-rollback-$name.txt"
   psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-$name.sql"
@@ -376,6 +377,7 @@ fi
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/business-pages-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-confirmed-facts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-recipient-trust-schema.sql"
 printf 'Booking-reader, public-facts and #509 rollbacks restored the exact catalog in reverse order.\n'
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
