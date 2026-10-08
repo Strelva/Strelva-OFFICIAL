@@ -1,0 +1,59 @@
+--- a/src/products/inquiries/booking-handoff.ts
++++ b/src/products/inquiries/booking-handoff.ts
+@@ -1,3 +1,4 @@
++import { issuePublicInquiryConfirmation, requirePublicBookingEmail } from "@/platform/bookings/public-confirmation";
+ import { createHmac, timingSafeEqual } from "node:crypto";
+ import { z } from "zod";
+ import { inquiryRecordsRpc, inquiryRecordsEnabled } from "@/platform/infra/inquiry-records";
+@@ -27,8 +28,11 @@
+   busy: typeof readCalendarBusy;
+   now(): Date;
+   secret(): string;
++  requireConfirmation?(scope: string): Promise<void>;
++  confirm?(booking: StoreBooking): Promise<void>;
+ }
+ const defaults: InquiryBookingDependencies = {
++  requireConfirmation: requirePublicBookingEmail, confirm: issuePublicInquiryConfirmation,
+   enabled: inquiryBookingHandoffEnabled, released: (tenantId) => inquiryReleaseEnabledForTenant(tenantId), workspaceReleased: (workspaceId) => inquiryReleaseEnabledForWorkspace(workspaceId), rpc: inquiryRecordsRpc,
+   bookings: readTenantBookings,
+   nativeBookings: async (workspaceId, range) => {
+@@ -143,7 +147,8 @@
+   const raw = await deps.rpc("read_inquiry_booking_offer", { p_offer_id: id }) as { tenantId: string | null; workspaceId: string; offer: unknown; booking: unknown; context: BookingContext } | null;
+   if (!raw || !(raw.tenantId ? await deps.released(raw.tenantId) : await deps.workspaceReleased?.(raw.workspaceId))) throw new WorkspaceConflictError("These times are no longer available.");
+   const existing = parseStoreBooking(raw.booking);
+-  if (existing) return existing;
++  if (existing) { await deps.confirm?.(existing); return existing; }
++  await deps.requireConfirmation?.(raw.tenantId ?? `workspace:${raw.workspaceId}`);
+   const offer = offerSchema.parse(raw.offer);
+   const chosen = offer.slots[index];
+   if (!chosen) throw new WorkspaceConflictError("Choose an offered time.");
+@@ -152,6 +157,7 @@
+   const result = await deps.rpc("choose_inquiry_booking_slot", { p_offer_id: id, p_slot_index: index });
+   const booking = parseStoreBooking(result);
+   if (!booking) throw new WorkspaceConflictError("That time is no longer available. Nothing was confirmed.");
++  await deps.confirm?.(booking);
+   return booking;
+ }
+ /** The same saved offer is hashed into the governed email review and the actual send. */
+--- a/src/app/inquiry-booking/[token]/action/route.ts
++++ b/src/app/inquiry-booking/[token]/action/route.ts
+@@ -1,3 +1,4 @@
++import { isSameOriginBookingForm } from "@/platform/bookings/public-form";
+ import { NextResponse } from "next/server";
+ import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
+ import { readBoundedBody } from "@/platform/workspaces/http";
+@@ -7,13 +8,7 @@
+   if (!inquiryBookingHandoffEnabled()) return new NextResponse("Not found", { status: 404 });
+   const { token } = await params;
+   const page = new URL(`/inquiry-booking/${encodeURIComponent(token)}`, request.url);
+-  page.host = request.headers.get("host") ?? page.host;
+-  const origin = request.headers.get("origin");
+-  if (origin) {
+-    try {
+-      if (new URL(origin).host !== page.host) return new NextResponse("Forbidden", { status: 403 });
+-    } catch { return new NextResponse("Forbidden", { status: 403 }); }
+-  }
++  if (!isSameOriginBookingForm(request)) return new NextResponse("Forbidden", { status: 403 });
+   if (await isRateLimitedAsync(rateLimitKey(request, "inquiry-booking"), 10)) {
+     page.searchParams.set("error", "rate");
+     return new NextResponse(null, { status: 303, headers: { Location: page.toString() } });

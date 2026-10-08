@@ -603,7 +603,11 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
               selectedWork={selectedWork}
               postAction={postAction}
               onChanged={() => void loadWorkspace(snapshot.workspaceId, true)}
-              onAgencyCreated={(workspaceId) => { requestedWorkspaceRef.current = workspaceId; void loadWorkspace(workspaceId); }}
+              onAgencyCreated={(workspaceId) => {
+                // With the agency front door on, a new agency opens its setup checklist (#258).
+                if (snapshot.releases?.agencySetup) { window.location.assign(new URL(`${appBase}/workspace/agency/start?workspaceId=${encodeURIComponent(workspaceId)}`, window.location.origin)); return; }
+                requestedWorkspaceRef.current = workspaceId; void loadWorkspace(workspaceId);
+              }}
               setNotice={setNotice}
             />
           ) : delegatedRead && !selectedWork ? (
@@ -636,6 +640,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
             />
           ) : isHorizontalView(view) ? <>
             {view === "operations" ? <WorkspaceOngoing
+              inquiriesEnabled={snapshot.releases?.inquiries === true && !delegatedRead}
               workspaceId={snapshot.workspaceId}
               monthlyRecap={snapshot.releases?.systems === true && snapshot.systems?.systems.some(system => system.kind === "website" && !!system.tenantId)}
               sources={snapshot.work}

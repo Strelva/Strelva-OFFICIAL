@@ -130,13 +130,13 @@ export function AgencyQueueList({
       return <li key={`${item.workspaceId}:${item.id}`} className={row}>
         <button
           type="button"
-          onClick={() => item.workId ? onOpenClientWork(item.workspaceId, item.workId) : onWorkspace(item.workspaceId)}
+          onClick={() => item.href ? window.location.assign(item.href) : item.workId ? onOpenClientWork(item.workspaceId, item.workId) : onWorkspace(item.workspaceId)}
           className="grid w-full gap-x-6 gap-y-1 px-2 py-4 text-left hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-text sm:grid-cols-[minmax(0,1fr)_96px_16px] sm:items-center"
           aria-label={`${item.title}, ${item.clientName}, ${queueKindLabel(item.kind)}${wait ? `, waiting ${wait}` : ""}`}
         >
           <span className="min-w-0">
             <strong className="block text-[14px] font-medium text-warm-black">{item.title}</strong>
-            <small className={`${meta} mt-1 block`}>{item.clientName} · {queueKindLabel(item.kind)}</small>
+            <small className={`${meta} mt-1 block`}>{item.clientName} · {item.label ?? queueKindLabel(item.kind)}</small>
           </span>
           <span className="font-mono text-[12px] leading-4 tabular-nums text-gray-muted sm:text-right">{wait === "today" ? "Today" : wait}</span>
           <ArrowRight className="hidden text-gray-muted sm:block" size={16} aria-hidden="true" />

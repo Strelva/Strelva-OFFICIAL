@@ -15,11 +15,20 @@
  * STRELVA_BUSINESS_BILLING=1 turns the checkout metadata and webhook mirror
  * on. Off by default. Nothing here changes a price, amount, plan or card.
  */
+import { z } from "zod";
+import type { WorkspaceActor } from "@/platform/workspaces/types";
+import { WorkspaceAccessError, WorkspaceStoreError } from "@/platform/workspaces/types";
 import { getSupabase } from "@/platform/infra/db/client";
 import { resolveBillingType, type BillingFields } from "@/lib/billing-type";
 
 export const BUSINESS_BILLING_STATES = ["subscription", "custom", "comped", "grandfathered", "none"] as const;
 export type BusinessBillingState = (typeof BUSINESS_BILLING_STATES)[number];
+
+/** A price decision and a separate sale path are still required. Existing
+ * tenant checkout plans and charges stay unchanged. */
+export const WORKSPACE_SUBSCRIPTION_PLAN = Object.freeze({
+  key: "workspace", billingState: "subscription", monthlyCents: null, stripePriceId: null, purchasable: false,
+} as const);
 
 export function businessBillingEnabled(): boolean {
   return process.env.STRELVA_BUSINESS_BILLING === "1";
@@ -121,4 +130,57 @@ export function stripeBillingContext(object: unknown): { workspaceId: string | n
   const subId = typeof sub === "string" ? sub : (sub as { id?: string } | undefined)?.id ?? null;
   const end = o.current_period_end ?? o.items?.data?.[0]?.current_period_end;
   return { workspaceId: workspaceId ?? null, stripeSubscriptionId: subId ?? null, currentPeriodEnd: typeof end === "number" ? new Date(end * 1000).toISOString() : null };
+}
+
+
+export interface BusinessPortfolioBilling {
+  workspaceId: string;
+  monthlyCents: number;
+  tenantIds: string[];
+}
+
+/** Internal operator/cron projection; one amount per business, not per site. */
+export async function readBusinessPortfolioMrr(tenantIds: string[], client: RpcDb | null = db()): Promise<BusinessPortfolioBilling[] | null> {
+  if (!businessBillingEnabled() || !client) return null;
+  try {
+    const result = await client.rpc("read_business_portfolio_billing", { p_tenant_ids: tenantIds });
+    if (result.error || !Array.isArray(result.data)) return null;
+    const rows: BusinessPortfolioBilling[] = [];
+    for (const raw of result.data) {
+      if (!raw || typeof raw !== "object") return null;
+      const row = raw as BusinessPortfolioBilling;
+      if (typeof row.workspaceId !== "string" || !Number.isSafeInteger(row.monthlyCents) || row.monthlyCents < 0
+        || !Array.isArray(row.tenantIds) || !row.tenantIds.every(id => typeof id === "string")) return null;
+      rows.push(row);
+    }
+    return rows;
+  } catch { return null; }
+}
+
+
+export const businessBillingSchema = z.object({
+  workspaceId: z.string().uuid(), accountId: z.string().uuid(), state: z.enum(BUSINESS_BILLING_STATES),
+  openItem: z.boolean(), paymentStatus: z.string(), monthlyCents: z.number().int().nonnegative(),
+  planKey: z.string().nullable(), grandfatheredTerms: z.string().nullable(), paidThrough: z.string().nullable(),
+  payer: z.object({ email: z.string().email(), name: z.string().nullable().optional() }).passthrough().nullable(),
+  sites: z.array(z.object({ tenantId: z.string(), siteName: z.string(), amountCents: z.number().int().nonnegative() })),
+  sources: z.unknown(), paymentUpdatedAt: z.string().nullable(),
+}).passthrough();
+export type BusinessBilling = z.infer<typeof businessBillingSchema>;
+
+/** Owner/operator read. A member cannot read the billing home. Sends nothing. */
+export async function readBusinessBilling(actor: WorkspaceActor, workspaceId: string, client: RpcDb | null = db()): Promise<BusinessBilling | null> {
+  if (!businessBillingEnabled()) return null;
+  if (!client) throw new WorkspaceStoreError("Business billing is unavailable.");
+  const result = await client.rpc("read_business_billing", {
+    p_workspace_id: z.string().uuid().parse(workspaceId), p_user_id: actor.userId, p_verified_email: actor.verifiedEmail,
+  });
+  if (result.error) {
+    if (result.error.message?.includes("business_billing_denied")) throw new WorkspaceAccessError();
+    throw new WorkspaceStoreError("Business billing could not be loaded.");
+  }
+  if (result.data === null) return null;
+  const parsed = businessBillingSchema.safeParse(result.data);
+  if (!parsed.success) throw new WorkspaceStoreError("Business billing returned an invalid record.");
+  return parsed.data;
 }

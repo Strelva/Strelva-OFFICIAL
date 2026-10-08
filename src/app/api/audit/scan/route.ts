@@ -1,3 +1,6 @@
+import { resolveAgencyAttribution, admitAgencyCheck, AgencyProspectingError } from "@/platform/agency-prospecting/server";
+import type { AgencyAttribution } from "@/platform/infra/agency-attribution";
+import { attributedAudit } from "@/lib/audit/attribution";
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { getRedis } from "@/platform/infra/redis";
@@ -9,9 +12,10 @@ import type { AuditResult } from "@/lib/audit/types";
 
 import { saveAuditReport } from "@/lib/audit-report-store";
 
-async function retainedResponse(result: AuditResult) {
+async function retainedResponse(raw: AuditResult, agency?: AgencyAttribution) {
+  const result = attributedAudit(raw, agency);
   const reportId = await saveAuditReport(result, { name: "", email: "", url: result.url });
-  return NextResponse.json({ ...result, ...(reportId ? { reportId: `audit_${reportId}` } : {}) });
+  return NextResponse.json({ ...result, ...(agency ? { findings: findingsFromCategories(result.categories) } : {}), ...(reportId ? { reportId: `audit_${reportId}` } : {}) });
 }
 
 const MAX_SCANS_PER_DAY = 3;
@@ -76,7 +80,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: { url?: string; businessName?: string; location?: string };
+  let body: { url?: string; businessName?: string; location?: string; agency?: string };
   try {
     body = await request.json();
   } catch {
@@ -122,6 +126,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  let agency: AgencyAttribution | undefined;
+  try {
+    agency = await resolveAgencyAttribution(request.nextUrl.searchParams.get("agency") ?? body.agency);
+    if (agency) await admitAgencyCheck(agency);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Agency check unavailable." },
+      { status: error instanceof AgencyProspectingError ? error.status : 503 });
+  }
+
   // Check result cache before running audit
   const cacheKey = `reb:audit:${normalizedUrl}`;
   const cacheRedis = getRedis();
@@ -129,7 +142,7 @@ export async function POST(request: NextRequest) {
     try {
       const cached = await cacheRedis.get(cacheKey);
       if (cached) {
-        return retainedResponse(typeof cached === "string" ? JSON.parse(cached) : cached as AuditResult);
+        return retainedResponse(typeof cached === "string" ? JSON.parse(cached) : cached as AuditResult, agency);
       }
     } catch {
       // Cache miss or error — proceed with fresh audit
@@ -161,7 +174,7 @@ export async function POST(request: NextRequest) {
       await cacheRedis.set(cacheKey, JSON.stringify(result), { ex: 3600 }).catch(() => {});
     }
 
-    return retainedResponse(result);
+    return retainedResponse(result, agency);
   } catch (err) {
     Sentry.captureException(err, {
       tags: { feature: "audit-scan" },

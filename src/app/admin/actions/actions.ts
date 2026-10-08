@@ -1,13 +1,14 @@
 "use server";
 
 /**
- * Server action behind the portfolio bulk-approve buttons. Re-verifies
- * super-admin independently (the /admin layout gate does NOT protect a server
- * action's POST surface), then resolves each item through the governed
- * `bulkResolvePortfolioActions` → `resolveEventAction` spine. Returns per-item
+ * Server action behind the portfolio bulk-approve buttons. Re-verifies the
+ * operator independently (the /admin layout gate does NOT protect a server
+ * action's POST surface), then resolves each item as that operator through the
+ * governed `bulkResolvePortfolioActions` → `resolveEventAction` spine. Returns per-item
  * results so the UI can report honest partial failures.
  */
 import { isSuperAdmin } from "@/platform/infra/auth";
+import { auditOperatorDecision, verifiedOperator } from "../operator-audit";
 import { getAllTenants } from "@/lib/tenants";
 import { escalateEventToOwner } from "@/lib/event-actions";
 import {
@@ -26,7 +27,8 @@ const MAX_BATCH = 500;
 export async function resolvePortfolioActions(
   items: PortfolioResolveInput[],
 ): Promise<{ ok: boolean; results: PortfolioResolveResult[] }> {
-  if (!(await isSuperAdmin())) return { ok: false, results: [] };
+  const operator = await verifiedOperator();
+  if (!operator) return { ok: false, results: [] };
   if (!Array.isArray(items) || items.length === 0) return { ok: true, results: [] };
 
   // Validate tenantIds against known DB records so client-supplied IDs cannot
@@ -45,7 +47,7 @@ export async function resolvePortfolioActions(
     )
     .slice(0, MAX_BATCH);
 
-  const results = await bulkResolvePortfolioActions(safe);
+  const results = await bulkResolvePortfolioActions(safe, operator);
   return { ok: true, results };
 }
 
@@ -58,7 +60,8 @@ export async function resolvePortfolioActions(
 export async function escalatePortfolioActions(
   items: PortfolioResolveInput[],
 ): Promise<{ ok: boolean; results: Array<{ eventId: string; changed: boolean; reason?: string }> }> {
-  if (!(await isSuperAdmin())) return { ok: false, results: [] };
+  const operator = await verifiedOperator();
+  if (!operator) return { ok: false, results: [] };
   if (!Array.isArray(items) || items.length === 0) return { ok: true, results: [] };
 
   const knownTenantIds = new Set((await getAllTenants().catch(() => [])).map((t) => t.id));
@@ -73,8 +76,20 @@ export async function escalatePortfolioActions(
     )
     .slice(0, MAX_BATCH);
 
+  // An escalation is audited like an approval: no attempt row, no change.
   const results = await Promise.all(
-    safe.map(async (i) => ({ eventId: i.eventId, ...(await escalateEventToOwner(i.tenantId, i.eventId)) })),
+    safe.map(async (i) => {
+      const audit = { operator, tenantId: i.tenantId, eventId: i.eventId, action: "portfolio.draft.escalate" };
+      try {
+        await auditOperatorDecision({ ...audit, phase: "attempt" });
+      } catch {
+        return { eventId: i.eventId, changed: false, reason: "audit_unavailable" };
+      }
+      const result = await escalateEventToOwner(i.tenantId, i.eventId);
+      await auditOperatorDecision({ ...audit, phase: "result", detail: { changed: result.changed, reason: result.reason ?? null } })
+        .catch(() => console.error(`[admin/actions] audit result row failed for ${i.eventId}; its attempt row stands.`));
+      return { eventId: i.eventId, ...result };
+    }),
   );
   return { ok: true, results };
 }

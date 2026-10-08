@@ -5,7 +5,8 @@
  * capture-side writes stay there, and these calls use its bounded RPC.
  * Everyone the database refuses gets WorkspaceAccessError.
  */
-import { InquiryRecordsError, inquiryRecordsRpc } from "@/lib/inquiry-records";
+import { InquiryRecordsError, inquiryRecordsRpc } from "@/platform/infra/inquiry-records";
+import { workspaceInquiryRepliesEnabled, type WorkspaceReplyOutcome } from "./workspace-replies";
 import { WorkspaceAccessError, type WorkspaceActor } from "@/platform/workspaces/types";
 
 const denied = () => new WorkspaceAccessError();
@@ -15,6 +16,7 @@ export type IntakeState = "kept" | "held_as_spam" | "released" | "confirmed_spam
 export interface WorkspaceInquiryLead {
   id: string;
   tenantId: string | null;
+  connectedSiteId?: string | null;
   leadId: string;
   name: string;
   email: string | null;
@@ -26,6 +28,8 @@ export interface WorkspaceInquiryLead {
   intakeStateAt: string | null;
   contactId: string | null;
   capturedAt: string;
+  reply?: WorkspaceReplyOutcome;
+  replyPermission?: "owner" | "member" | "none";
 }
 
 const STATES: readonly IntakeState[] = ["kept", "held_as_spam", "released", "confirmed_spam"];
@@ -46,6 +50,7 @@ export function parseWorkspaceLead(raw: unknown): WorkspaceInquiryLead | null {
   return {
     id: r.id,
     tenantId: str(r.tenantId),
+    ...(str(r.connectedSiteId) ? { connectedSiteId: str(r.connectedSiteId) } : {}),
     leadId: r.leadId,
     name: typeof r.name === "string" ? r.name : "",
     email: str(r.email),
@@ -57,6 +62,8 @@ export function parseWorkspaceLead(raw: unknown): WorkspaceInquiryLead | null {
     intakeStateAt: str(r.intakeStateAt),
     contactId: str(r.contactId),
     capturedAt: r.capturedAt,
+    ...(r.replyPermission === undefined ? {} : { replyPermission: r.replyPermission === "owner" || r.replyPermission === "member" ? r.replyPermission : "none" as const }),
+    ...(r.reply && typeof r.reply === "object" && typeof (r.reply as Record<string, unknown>).status === "string" ? { reply: { ...(r.reply as Omit<WorkspaceReplyOutcome, "retryable">), retryable: false as const } } : {}),
   };
 }
 
@@ -70,7 +77,7 @@ export async function readWorkspaceInquiryLeads(
   workspaceId: string,
   options: { states?: IntakeState[]; limit?: number; before?: string } = {},
 ): Promise<WorkspaceInquiryLead[]> {
-  const data = await inquiryRecordsRpc("read_workspace_leads", {
+  const data = await inquiryRecordsRpc(workspaceInquiryRepliesEnabled() ? "read_workspace_inquiry_leads_with_receipts" : "read_workspace_leads", {
     ...actorArgs(actor, workspaceId),
     p_states: options.states ?? null,
     p_limit: options.limit ?? 100,

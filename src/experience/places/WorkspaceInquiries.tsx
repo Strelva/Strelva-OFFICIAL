@@ -1,6 +1,7 @@
 import { ProposeBookingTimes } from "@/experience/bookings/ProposeBookingTimes";
 import { Card } from "@/components/ui/Card";
 import type { HeldInquiries, HeldView, LeadView, WorkspaceLeads } from "@/products/inquiries/linked-leads";
+import { REPLY_OUTCOME, WorkspaceInquiryReply } from "./WorkspaceInquiryReply";
 import { HeldInquiryActions } from "./HeldInquiryActions";
 import { NoSiteCard, SiteHeading, WorkspacePlace, whenLabel, type PlaceState } from "./WorkspacePlace";
 
@@ -14,7 +15,7 @@ function sourceLabel(source: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function LeadCard({ lead, workspaceId, tenantId, bookingProposals }: { lead: LeadView; workspaceId: string; tenantId: string | null; bookingProposals?: boolean }) {
+function LeadCard({ lead, workspaceId, tenantId, bookingProposals, replies, bookingOffers }: { lead: LeadView; workspaceId: string; tenantId: string | null; bookingProposals?: boolean; replies?: boolean; bookingOffers?: boolean }) {
   return (
     <Card padding="md">
       <article aria-labelledby={`lead-${lead.id}`}>
@@ -31,7 +32,7 @@ function LeadCard({ lead, workspaceId, tenantId, bookingProposals }: { lead: Lea
             {lead.fields.map(([key, value]) => <div key={key} className="flex gap-2"><dt className="text-gray-muted">{sourceLabel(key)}:</dt><dd className="min-w-0 break-words">{value}</dd></div>)}
           </dl>
         ) : null}
-        {lead.email ? (
+        {replies && lead.reply && Object.hasOwn(REPLY_OUTCOME, lead.reply.status) ? <p role="status" className="mt-4 text-sm">{REPLY_OUTCOME[lead.reply.status]}{lead.reply.providerMessageId ? <span className="mt-1 block break-all text-xs text-gray-muted">Provider receipt: {lead.reply.providerMessageId}</span> : null}</p> : lead.email && replies && lead.rowId && lead.replyPermission === "none" ? <p className="mt-4 text-sm text-gray-muted">The owner or the assigned team member can reply to this inquiry.</p> : lead.email && replies && lead.rowId ? <WorkspaceInquiryReply workspaceId={workspaceId} rowId={lead.rowId} name={lead.name} email={lead.email} bookingOffers={bookingOffers && lead.replyPermission !== "member"} member={lead.replyPermission === "member"} /> : lead.email ? (
           <p className="mt-4 flex flex-wrap items-center gap-3 text-sm">
             <a className="inline-flex min-h-[40px] items-center rounded-lg bg-warm-black px-3 font-medium text-warm-white" href={`mailto:${encodeURIComponent(lead.email).replace(/%40/g, "@")}`}>Reply by email</a>
             <span className="break-all text-gray-muted">{lead.email}</span>
@@ -90,19 +91,19 @@ function HeldSection({ held, workspaceId }: { held: HeldInquiries; workspaceId: 
   );
 }
 
-export function WorkspaceInquiries({ workspaceId, state }: { workspaceId: string; state: PlaceState<WorkspaceLeads> }) {
+export function WorkspaceInquiries({ workspaceId, state, embedded = false }: { workspaceId: string; state: PlaceState<WorkspaceLeads>; embedded?: boolean }) {
   const data = state.kind === "ready" ? state.data : null;
   return (
-    <WorkspacePlace workspaceId={workspaceId} eyebrow="Inquiries" title="Who reached out"
-      intro="Everyone who contacted you through your site, newest first. Strelva keeps the last 90 days here."
+    <WorkspacePlace embedded={embedded} workspaceId={workspaceId} eyebrow="Inquiries" title="Who reached out"
+      intro={data?.durable ? "Everyone who contacted you through your site, newest first. Your inquiries stay on record." : "Everyone who contacted you through your site, newest first. Strelva keeps the last 90 days here."}
       state={state} denied={data?.denied.map((site) => site.siteName)}
-      errorTitle="Inquiries couldn't load" errorBody="Nothing is lost. New messages still reach your inbox. Reload the page to try again.">
+      errorTitle="Inquiries couldn't load" errorBody="Nothing is lost. Reload to check the current records. Reload the page to try again.">
       {data && data.sites.length === 0 && data.denied.length === 0 ? <NoSiteCard body="Inquiries start once Strelva runs a website with a contact form for this business." /> : null}
       {data?.sites.map((site) => (
         <section key={site.key} className="mt-8" aria-labelledby={`site-${site.key.replace(/[^a-z0-9-]/gi, "-")}`}>
           <SiteHeading id={`site-${site.key.replace(/[^a-z0-9-]/gi, "-")}`} name={site.connected ? `${site.siteName} (your site)` : site.siteName} multiple={data.sites.length > 1} />
           {site.unavailable ? (
-            <Card padding="lg" role="status"><p className="text-sm leading-6 text-gray-muted">Messages for {site.siteName} couldn&apos;t be read right now. New messages are still captured and emailed to you.</p></Card>
+            <Card padding="lg" role="status"><p className="text-sm leading-6 text-gray-muted">Messages for {site.siteName} couldn&apos;t be read right now. Reload to check the current records.</p></Card>
           ) : site.leads.length === 0 ? (
             <Card padding="lg">
               <h3 className="text-base font-medium">No one has reached out yet</h3>
@@ -112,12 +113,13 @@ export function WorkspaceInquiries({ workspaceId, state }: { workspaceId: string
             </Card>
           ) : (
             <>
-              <p className="mb-3 text-sm text-gray-muted">{site.lastThirtyDays} in the last 30 days · {site.leads.length} in all</p>
-              <div className="grid gap-3">{site.leads.map((lead) => <LeadCard key={lead.id} lead={lead} workspaceId={workspaceId} tenantId={site.tenantId} bookingProposals={site.bookingProposals} />)}</div>
+              <p className="mb-3 text-sm text-gray-muted">{data.paged ? "" : `${site.lastThirtyDays} in the last 30 days · `}{site.leads.length} shown</p>
+              <div className="grid gap-3">{site.leads.map((lead) => <LeadCard key={lead.id} lead={lead} workspaceId={workspaceId} tenantId={site.tenantId} bookingProposals={site.bookingProposals} replies={data.workspaceReplies} bookingOffers={data.bookingOffers} />)}</div>
             </>
           )}
         </section>
       ))}
+      {data?.nextPage ? <a className="mt-6 inline-flex min-h-12 items-center text-sm underline" href={`/workspace/inquiries?workspaceId=${encodeURIComponent(workspaceId)}&before=${encodeURIComponent(data.nextPage.before)}&beforeId=${encodeURIComponent(data.nextPage.beforeId)}`}>Earlier inquiries</a> : null}
       {data?.held ? <HeldSection held={data.held} workspaceId={workspaceId} /> : null}
     </WorkspacePlace>
   );

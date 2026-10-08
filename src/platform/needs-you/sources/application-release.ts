@@ -137,6 +137,7 @@ export function applicationReleaseAdapter(ports: ApplicationReleasePorts): Sourc
   return {
     lifecycle: "application_release",
     needsMemberActor: true,
+    ownerLinkWithoutAccount: true,
     async propose(ctx) {
       if (!ctx.actor) return { items: [], complete: false };
       const items: ProposedItem[] = [];

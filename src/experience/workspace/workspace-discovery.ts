@@ -1,3 +1,4 @@
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import type { ManagedWork, WorkspaceProduct } from "./contracts";
 
 /**
@@ -30,7 +31,7 @@ export function sameAppHref(href: string, options: SameAppHrefOptions = {}): str
     const url = new URL(value);
     if (url.username || url.password) return null;
 
-    if (url.protocol === "https:" && url.hostname === "app.strelva.com") {
+    if (url.protocol === "https:" && url.hostname === new URL(CONTROL_PLANE_URL).hostname) {
       return !url.port || url.port === "443" ? value : null;
     }
 

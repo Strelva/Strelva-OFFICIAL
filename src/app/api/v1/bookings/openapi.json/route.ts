@@ -5,7 +5,7 @@ const tenant = { name: "tenant", in: "path", required: true, schema: string };
 const ok = { "200": { description: "Success" }, "400": { description: "Invalid input" }, "404": { description: "Not found" }, "429": { description: "Rate limited" }, "503": { description: "Unavailable or disabled" } };
 export function GET() {
   if (!bookingAgentsEnabled()) return bookingJson({ error: "Agent bookings are not enabled." }, 503);
-  return bookingJson({ openapi: "3.1.0", info: { title: "Strelva Bookings", version: "1.0.0", description: "An agent receives a 15-minute hold. Only the customer's emailed confirmation places the booking. Ten agent holds per business per hour; 20 requests per IP window." },
+  return bookingJson({ openapi: "3.1.0", info: { title: "Strelva Bookings", version: "1.0.0", description: "An agent receives a 15-minute hold. Only the customer's emailed confirmation places the booking. Agent holds share each business's limit of 20 open unconfirmed requests and the per-mailbox limits; 20 requests per IP window. The status token stops answering (404) 24 hours after the booking ends." },
     paths: {
       "/api/v1/bookings/{tenant}/services": { get: { operationId: "list_services", parameters: [tenant], responses: ok } },
       "/api/v1/bookings/{tenant}/slots": { get: { operationId: "find_slots", parameters: [tenant, ...["service", "from", "to"].map(name => ({ name, in: "query", required: true, schema: string }))], responses: ok } },

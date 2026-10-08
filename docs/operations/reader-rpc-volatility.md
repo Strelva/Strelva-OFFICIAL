@@ -46,7 +46,7 @@ the function's live `pg_proc.provolatile`, READ COMMITTED isolation, and
 POST. The test executes all ten real functions, including both export branches
 that reach locks, with a verified operator/owner and a real website work row.
 
-The test applies `rollback-reader-rpc-volatility.sql`, asserts the original
+The test applies `rollback-20261009150000_reader_rpc_volatility.sql`, asserts the original
 STABLE declarations, and reproduces SQLSTATE 25006 on all eleven locking
 paths. It reapplies the migration and requires successful calls with the
 expected response shapes. Verified outsiders must still receive the original

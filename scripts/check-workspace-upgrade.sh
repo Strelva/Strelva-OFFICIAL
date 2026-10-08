@@ -5,24 +5,9 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 baseline_migration="20260802120000_report_snapshots.sql"
 upgrade_migration="20260905190000_release_one_workspaces.sql"
 schema_test="$repo_root/tests/workspace-upgrade-schema.sql"
-cluster_root="$(mktemp -d "${TMPDIR:-/tmp}/strelva-workspace-upgrade.XXXXXX")"
-cluster_data="$cluster_root/data"
-cluster_socket="$(mktemp -d /tmp/strelva-upgrade-socket.XXXXXX)"
-cluster_log="$cluster_root/postgres.log"
+source "$repo_root/scripts/temp-postgres.sh"
+create_temp_postgres strelva-workspace-upgrade strelva-upgrade-socket
 cluster_port="$((61000 + ($$ % 3000)))"
-cluster_started=0
-
-cleanup() {
-  local exit_code=$?
-  trap - EXIT INT TERM
-  if [[ "$cluster_started" -eq 1 ]]; then
-    pg_ctl -D "$cluster_data" -m fast -w stop >/dev/null 2>&1 || true
-  fi
-  rm -rf "$cluster_socket"
-  printf 'Workspace upgrade cluster preserved at: %s\n' "$cluster_root"
-  exit "$exit_code"
-}
-trap cleanup EXIT INT TERM
 
 for command_name in initdb pg_ctl psql grep; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -41,7 +26,7 @@ pg_ctl -D "$cluster_data" \
   -l "$cluster_log" \
   -o "-F -k '$cluster_socket' -c listen_addresses='' -p $cluster_port" \
   -w start >/dev/null
-cluster_started=1
+read -r cluster_postmaster_pid < "$cluster_data/postmaster.pid"
 
 psql_args=(
   --host="$cluster_socket"
@@ -252,8 +237,14 @@ psql "${psql_args[@]}" --file="$repo_root/tests/website-linked-publication-schem
 # 20261008151000 widens tenant_leads, tenant_client_records and
 # system_origin_kinds; their earlier contracts ran above against it.
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-pages-schema.sql"
 # 20261009100000 (Strelva service actor) replaces owner_decision_json and
 # workspace_release_flag_names(); its contract holds after the full ordered upgrade.
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-inbox-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-cache-presence-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-export-before-teardown-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-reply-purpose-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-inquiry-owner-notices-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
 # 20261009130000 replaces read_strelva_handled and 20261009131000 replaces
 # record_strelva_service_action; both contracts hold after the full upgrade.
@@ -267,6 +258,14 @@ psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-flag-schema
 psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 # Batch 7A readers must work in the transaction mode PostgREST chooses for POST.
 psql "${psql_args[@]}" --file="$repo_root/tests/reader-rpc-volatility-schema.sql"
+# Batch 7A (20261009151000-20261009154000) replaces the actor, service-actor
+# and payer functions; its contracts hold after the full ordered upgrade, and
+# the replaced contracts above ran against the replacements.
+psql "${psql_args[@]}" --file="$repo_root/tests/provider-seats-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-verifications-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/platform-service-actor-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/payer-party-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/batch-7a-reader-modes.sql"
 # Native publishing and booking email on the full retained tenant schema.
 psql "${psql_args[@]}" --file="$repo_root/tests/native-publishing-targets-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/business-booking-email-schema.sql"
@@ -278,5 +277,63 @@ psql "${psql_args[@]}" --file="$repo_root/tests/native-publishing-targets-schema
 psql "${psql_args[@]}" --file="$repo_root/tests/business-booking-email-schema.sql"
 # #528: no client privilege on legacy tenant tables; every member role and anon refused.
 psql "${psql_args[@]}" --file="$repo_root/tests/legacy-tenant-client-access-schema.sql"
+
+# Tracking signing keys have no browser grants and refuse rollback while a
+# site's verification identity remains configured.
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-track-signing-keys-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-track-signing-key-rotation.sql"
+psql "${psql_args[@]}" --command="insert into public.tenants(id,site_name) values('track-signing-rollback-fixture','Tracking key rollback fixture'); insert into public.tenant_track_signing_keys(tenant_id,public_key) values('track-signing-rollback-fixture',repeat('o',100)); select public.rotate_tenant_track_signing_key('track-signing-rollback-fixture',repeat('n',100));" >/dev/null
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012120000_track_signing_key_rotation.sql" >"$cluster_root/track-key-rotation-rollback.log" 2>&1; then
+  printf 'Tracking key rotation rollback discarded an in-window key.\n' >&2
+  exit 1
+fi
+grep -q 'track_signing_key_rotation_rollback_requires_data_preservation' "$cluster_root/track-key-rotation-rollback.log"
+psql "${psql_args[@]}" -Atc "select public_key = repeat('n',100) and previous_public_key = repeat('o',100) from public.tenant_track_signing_keys where tenant_id='track-signing-rollback-fixture'" | grep -qx t
+psql "${psql_args[@]}" --command="update public.tenant_track_signing_keys set previous_public_key=null, previous_valid_until=null where tenant_id='track-signing-rollback-fixture';" >/dev/null
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012120000_track_signing_key_rotation.sql"
+psql "${psql_args[@]}" -Atc "select public_key = repeat('n',100) and not exists(select 1 from information_schema.columns where table_schema='public' and table_name='tenant_track_signing_keys' and column_name='previous_public_key') and to_regprocedure('public.rotate_tenant_track_signing_key(text,text)') is null from public.tenant_track_signing_keys where tenant_id='track-signing-rollback-fixture'" | grep -qx t
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012010000_tenant_track_signing_keys.sql" >"$cluster_root/track-key-rollback.log" 2>&1; then
+  printf 'Tracking key rollback discarded an active site key.\n' >&2
+  exit 1
+fi
+grep -q 'tenant_track_signing_keys_rollback_requires_data_preservation' "$cluster_root/track-key-rollback.log"
+psql "${psql_args[@]}" --command="delete from public.tenant_track_signing_keys where tenant_id='track-signing-rollback-fixture'; delete from public.tenants where id='track-signing-rollback-fixture';" >/dev/null
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012010000_tenant_track_signing_keys.sql"
+if [[ "$(psql "${psql_args[@]}" -Atc "select to_regclass('public.tenant_track_signing_keys') is null;")" != t ]]; then
+  printf 'Tracking key rollback left its table behind.\n' >&2
+  exit 1
+fi
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012010000_tenant_track_signing_keys.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012120000_track_signing_key_rotation.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-track-signing-keys-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
+
+# Wave 6 inquiry contracts against the complete upgrade.
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-decision-notice-claims-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-decision-notice-events-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-lead-parity-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-member-replies-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-business-facts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-operator-authority-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-operator-revocation-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-workspace-replies-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-context-notices-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-inquiry-records-schema.sql"
+
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-booking-handoff-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-operator-review-schema.sql"
+
+# #261 Team authority, atomic staffing, membership cleanup and invitation acceptance.
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-team-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011160000_agency_team.sql"
+psql "${psql_args[@]}" -At --file="$repo_root/tests/support/public-catalog-fingerprint.sql" >"$cluster_root/catalog-before-agency-team.txt"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011160000_agency_team.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-team-schema.sql"
+
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011160000_agency_team.sql"
+psql "${psql_args[@]}" -At --file="$repo_root/tests/support/public-catalog-fingerprint.sql" >"$cluster_root/catalog-after-agency-team-rollback.txt"
+diff -u "$cluster_root/catalog-before-agency-team.txt" "$cluster_root/catalog-after-agency-team-rollback.txt"
+printf 'Agency Team upgrade rollback restored the public catalog exactly.\n'
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011160000_agency_team.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-team-schema.sql"

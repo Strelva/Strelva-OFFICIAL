@@ -1,3 +1,4 @@
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 /**
  * Tell a business someone reached out through its connected site.
  *
@@ -7,13 +8,15 @@
  * before this runs; a failure here never loses it.
  */
 import { customerEmailPaused, emailSendingPaused } from "@/platform/infra/email/enabled";
+import { inquiryRecordsEnabled } from "@/platform/infra/inquiry-records";
 import { getClientEmailOverride } from "@/platform/infra/email/client-override";
 import { sendEmail } from "@/platform/infra/email/send";
 import { resolveOwnerRecipient } from "@/platform/business-record/service";
 import type { ConnectedInquiry, ResolvedConnectedSite } from "./contracts";
+import { notifyDurableConnectedInquiryOwner } from "./inquiry-owner-notice";
 
 function appOrigin(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL || "https://app.strelva.com").replace(/\/+$/, "");
+  return (process.env.NEXT_PUBLIC_APP_URL || CONTROL_PLANE_URL).replace(/\/+$/, "");
 }
 
 export function connectedInquiryEmail(site: Pick<ResolvedConnectedSite, "siteHost" | "workspaceId">, inquiry: Pick<ConnectedInquiry, "name" | "email" | "message">) {
@@ -35,6 +38,11 @@ export function connectedInquiryEmail(site: Pick<ResolvedConnectedSite, "siteHos
 }
 
 export async function notifyConnectedSiteInquiry({ site, inquiry }: { site: ResolvedConnectedSite; inquiry: Pick<ConnectedInquiry, "id" | "name" | "email" | "message"> }, deps: { paused?: () => boolean; customerPaused?: () => boolean; clientOverride?: typeof getClientEmailOverride; recipient?: typeof resolveOwnerRecipient; send?: typeof sendEmail } = {}): Promise<"sent" | "paused" | "no_recipient" | "no_tenant"> {
+  // Durable records claim and gate their own send, including the arming switch below.
+  if (inquiryRecordsEnabled()) {
+    const email = connectedInquiryEmail(site, inquiry);
+    return notifyDurableConnectedInquiryOwner({ rowId: inquiry.id, siteId: site.id, workspaceId: site.workspaceId, ...email });
+  }
   // Connected-site rollout is silent unless explicitly armed. A per-tenant
   // override cannot bypass either global gate for this new sender.
   if (process.env.STRELVA_CONNECTED_SITE_EMAIL_ENABLED !== "1" || (deps.paused ?? emailSendingPaused)() || (deps.customerPaused ?? customerEmailPaused)()) return "paused";

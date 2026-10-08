@@ -20,6 +20,9 @@ export interface MessageReceiptContext {
   capability: InquiryCapabilityState;
   status: InquiryRecordStatus;
   responsibilityAction: ResponsibilityAction;
+  /** Present only after the signed owner decision authorization check. */
+  ownerDecisionActor?: string;
+  operatorReviewActor?: string;
 }
 
 /**
@@ -78,7 +81,7 @@ export async function writeMessageReceipt(input: {
         approvedBy: input.metadata.requestedBy,
         at: input.providerResult.acceptedAt || new Date().toISOString(),
         what: `Sent the reviewed inquiry ${input.metadata.action} to ${input.metadata.recipient}.`,
-        why: "The responsibility sponsor approved the exact rendered message.",
+        why: input.context.ownerDecisionActor ? "The business owner approved the exact rendered message through a signed decision." : input.context.operatorReviewActor ? "Strelva reviewed the exact rendered message under the owner’s current supervised inquiry responsibility." : "The responsibility sponsor approved the exact rendered message.",
         lookedAt: [
           `recipient ${input.metadata.recipient}`,
           `message digest ${input.metadata.messageDigest}`,
@@ -87,6 +90,8 @@ export async function writeMessageReceipt(input: {
         ],
         outcome: "accepted",
         outcomeEvidence: [
+          ...(input.context.operatorReviewActor ? [`verified operator approval ${input.context.operatorReviewActor}`] : []),
+          ...(input.context.ownerDecisionActor ? [`signed owner decision ${input.context.ownerDecisionActor}`] : []),
           `provider status ${input.providerResult.status}`,
           ...(input.providerResult.providerMessageId ? [`provider message ${input.providerResult.providerMessageId}`] : []),
           ...(input.providerResult.verificationEvidence ?? []),

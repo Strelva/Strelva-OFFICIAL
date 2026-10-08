@@ -1,6 +1,8 @@
 \set ON_ERROR_STOP on
 -- Local fixture authority, bounds, evidence and no-show transition proof. Rolls back.
 begin;
+-- This test supplies UTC date ranges and UTC booking times below.
+set local time zone 'UTC';
 create or replace function pg_temp.oe_assert(condition boolean,message text) returns void language plpgsql as $$
 begin if condition is not true then raise exception 'booking owner evidence assertion failed: %',message; end if; end $$;
 create or replace function pg_temp.oe_expect(statement text,expected text) returns void language plpgsql as $$
@@ -29,7 +31,7 @@ create function pg_temp.oe_read() returns jsonb language sql as $$
  select public.read_workspace_booking_evidence((select id from oe_workspace),'ce000000-0000-4000-8000-000000000001','owner-evidence@example.test','oe-site',(now() at time zone 'UTC')::date,(now() at time zone 'UTC')::date+1)
 $$;
 select public.record_tenant_booking('oe-site',jsonb_build_object('legacyId','oe-past','status','confirmed','origin','site','serviceName','Consultation',
- 'start',date_trunc('day',now()),'end',date_trunc('day',now())+interval '1 minute','timeZone','UTC','bufferMinutes',0,'customer',jsonb_build_object('name','Past Customer')),'native');
+ 'start',(now() at time zone 'UTC')::date::timestamp at time zone 'UTC','end',((now() at time zone 'UTC')::date::timestamp at time zone 'UTC')+interval '1 minute','timeZone','UTC','bufferMinutes',0,'customer',jsonb_build_object('name','Past Customer')),'native');
 select public.record_tenant_booking('oe-site',jsonb_build_object('legacyId','oe-future','status','confirmed','origin','site','serviceName','Consultation',
  'start',now()+interval '1 day','end',now()+interval '1 day 30 minutes','timeZone','UTC','bufferMinutes',0,'customer',jsonb_build_object('name','Future Customer')),'native');
 select pg_temp.oe_assert(jsonb_array_length(pg_temp.oe_read()->'bookings')=2,'range reads real bookings');

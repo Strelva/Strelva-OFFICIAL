@@ -166,7 +166,7 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
         lineage: `${stored.context.label} is adapted from ${sourceLabel}.${waiting ? " An improvement is waiting for a decision." : ""} Records and accounts stay here.` });
       for (const sibling of stored.siblings) {
         versions.push({ id: `${stored.id}->${sibling.id}`, relation: "version", context: sibling.context.label, title: sibling.context.label, systemId: sibling.systemId,
-          lineage: `Another Version of the same ${stored.source.hidden ? "setup" : "source"}, with its own accounts.` });
+          comparison: sibling.comparison, lineage: `Another Version of the same ${stored.source.hidden ? "setup" : "source"}, with its own accounts.` });
       }
     }
     return {
@@ -184,6 +184,7 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
       ...(kind === "bookings" && entry.views?.length ? { views: bookingViews(entry.views, entry.tenantId ? siteById.get(entry.tenantId) : undefined) } : {}),
       ...(kind === "website" && domain ? auditsFor(domain, snapshot.work) : {}),
       connections: [], possibilities: [], versions,
+      ...(stored ? { storedVersionId: stored.id } : {}),
       ...(publishing?.websiteParts[entry.ref.systemId]?.length ? { parts: publishing.websiteParts[entry.ref.systemId]!.map(({ label, published, drafts }) => ({ label, published, drafts })) } : {}),
       ...(publishing?.offers.some(offer => offer.systemId === entry.ref.systemId)
         ? { offers: publishing.offers.filter(offer => offer.systemId === entry.ref.systemId).map(({ kind, label }) => ({ kind, label })) } : {}),
@@ -242,7 +243,7 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
       affects: possibility.affects.filter(id => byId.has(id)),
       ...(possibility.evidence ? { evidence: possibility.evidence } : {}),
       ...(possibility.previewHref && sameAppHref(possibility.previewHref) ? { previewSrc: sameAppHref(possibility.previewHref) || undefined } : {}),
-      openHref: `/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&view=websites&work=${encodeURIComponent(possibility.workId)}`,
+      openHref: (possibility.tryHref && sameAppHref(possibility.tryHref)) || `/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&view=websites&work=${encodeURIComponent(possibility.workId)}`,
       ...(possibility.staleReason ? { staleReason: possibility.staleReason } : {}),
     };
     for (const id of view.affects) byId.get(id)!.possibilities.push(view);

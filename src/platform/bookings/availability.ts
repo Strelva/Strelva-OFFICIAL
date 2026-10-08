@@ -147,8 +147,12 @@ export function resolveService(
   return { bookable: true, durationMinutes: Number.isFinite(parsed) && parsed > 0 ? parsed : settings.defaultLengthMinutes, name: siteService.name, businessServiceId: null };
 }
 
-/** Store rows that hold time on a calendar: held, requested, confirmed, plus imported bookings. */
+/** Store rows that hold time on a calendar: held, requested, confirmed, plus
+ * imported bookings. An anonymous hold (website, inquiry or agent) stops
+ * holding time 15 minutes after it was made, before any sweep releases it. */
 export function blocksTime(booking: StoreBooking): boolean {
+  if (booking.status === "held" && (booking.origin === "site" || booking.origin === "inquiry" || booking.origin === "agent")
+    && Date.parse(booking.createdAt) <= Date.now() - 15 * 60000) return false;
   return SLOT_HOLDING_STATUSES.has(booking.status) || (booking.origin === "import" && booking.status === "confirmed");
 }
 

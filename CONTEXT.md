@@ -93,6 +93,21 @@ resolve older font-selection guidance in favor of the recorded Geist/custom-logo
 decision. This is structural documentation work; component implementation and
 adoption gaps remain in the foundation inventory.
 
+## Agency Team implementation, October 7, 2026
+
+Branch `a1/agency-team` prepares #261 locally: workspace/Systems-gated Team
+management uses existing invitation records and acceptance, extends agency
+admin sponsorship only for staff invitations, protects owner/self memberships,
+and assigns staff through 7A's SQL command in an atomic bulk wrapper. Removal
+extends the 7A membership-deletion trigger to end staff rows and revoke
+offered/accepted agency work assignments with removal actor/time; rejoining
+restores neither.
+Browser evidence uses fictional responses; permission, cleanup and rollback
+proof use isolated PostgreSQL. This is not deployed or adopted. Per-client
+permissions remain the 7A provider-seat policy; #241 is still a production
+decision. [The handoff](./docs/product/streams/a1-agency-team.md) owns commands,
+limits, touched shared files and the next integration action.
+
 ## Current product work
 
 Jacob's October 1 direction makes managed delivery the default for managed
@@ -414,3 +429,13 @@ presence of these routes.
   and [acceptance matrix](./docs/capabilities/inquiries/inquiry-first-acceptance-2026-09-11.md).
 - [Client dashboard surfaces](./docs/architecture/client-dashboard-ia.md) and
   [operator responsibilities](./docs/architecture/operator-command-center.md).
+
+## Agency prospecting (October 7, local)
+
+The `a1/agency-prospecting` stream prepares agency-attributed public checks,
+name-only report/email branding, agency-owned prospect capture, membership-only
+reads and durable per-agency quota behind the default-off
+`STRELVA_AGENCY_PROSPECTING_RELEASE`. Its [stream contract](./docs/product/streams/a1-agency-prospecting.md)
+owns the routes, configuration, migration/rollback proof and extension handoff.
+This is local implementation, not a production change or evidence of agency
+adoption. Extensions and richer agency profiles/branding remain unfinished.

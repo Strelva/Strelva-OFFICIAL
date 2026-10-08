@@ -3,8 +3,8 @@
  *
  * This is an acquisition artifact, not tenant state. Redis provides a bounded
  * public-result lifetime; the unguessable id is the read capability. Monitoring
- * interest is promoted into the existing pre-tenant Delivery Lead lifecycle so
- * it becomes operator-actionable instead of landing in an invisible side store.
+ * interest goes to the attributed agency’s prospects store. Unattributed
+ * scorecards keep the existing pre-tenant Delivery Lead lifecycle.
  */
 import { getRedis } from "@/platform/infra/redis";
 import type { AiVisibilityResult, ScoreInput, StoredAiVisibilityResult } from "./contracts";

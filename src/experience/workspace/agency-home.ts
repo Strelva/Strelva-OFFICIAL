@@ -51,6 +51,7 @@ export interface AgencyClientsView {
   team: AgencyTeamMember[];
   total: number;
   nextCursor: string | null;
+  queueGaps: string[];
 }
 
 /**
@@ -79,6 +80,7 @@ export function combineAgencyPages(pages: readonly AgencyLoadedPage[]): AgencyCl
     team: [...team.values()],
     total: last?.total ?? 0,
     nextCursor: last?.nextCursor ?? null,
+    queueGaps: [...new Set(pages.flatMap(({ page }) => page.queueGaps ?? []))],
   };
 }
 
@@ -92,6 +94,7 @@ const LIFECYCLE_LABEL: Record<AgencyClientSystem["lifecycle"], string> = { draft
 export function clientSystemLabel(system: AgencyClientSystem): string {
   const parts = [system.name, LIFECYCLE_LABEL[system.lifecycle]];
   if (system.versionContext) parts.push(`${system.versionContext} Version`);
+  if (system.health) parts.push({ healthy: "Working", degraded: "Needs attention", blocked: "Blocked", unknown: "Not verified" }[system.health.status]);
   return parts.join(" · ");
 }
 
@@ -132,6 +135,9 @@ const QUEUE_KIND_LABEL: Record<AgencyQueueItem["kind"], string> = {
   request: "Request",
   needs_you: "Waiting on the owner",
   improvement: "Improvement ready",
+  health: "System health",
+  owner_email: "Owner email",
+  operator: "Strelva's work",
 };
 
 export function queueKindLabel(kind: AgencyQueueItem["kind"]): string {

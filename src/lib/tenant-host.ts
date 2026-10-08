@@ -1,3 +1,4 @@
+import { APP_ROOT_DOMAIN, SITES_ROOT_DOMAIN } from "@/platform/infra/brand";
 import { isMarketingHost } from "./marketing-hosts";
 
 /**
@@ -19,7 +20,7 @@ export const RESERVED_SUBDOMAINS = new Set(["www", "admin", "app", "api"]);
  * identity at this layer. The stable UUID is resolved downstream from the loaded
  * tenant record (TenantConfig.stableId), not from the host.
  */
-export function parseTenantHost(host: string): { tenant: string | null; isAdmin: boolean } {
+export function parseTenantHost(host: string, sitesRoot = SITES_ROOT_DOMAIN, appRoot = APP_ROOT_DOMAIN): { tenant: string | null; isAdmin: boolean } {
   const hostWithoutPort = host.toLowerCase().split(":")[0] ?? "";
 
   if (isMarketingHost(host)) {
@@ -30,7 +31,7 @@ export function parseTenantHost(host: string): { tenant: string | null; isAdmin:
     suffix: string,
     applyReserved: boolean,
   ): { tenant: string | null; isAdmin: boolean } => {
-    const subdomain = hostWithoutPort.replace(suffix, "");
+    const subdomain = hostWithoutPort.slice(0, -suffix.length);
     if (subdomain.startsWith("admin.")) {
       const tenant = subdomain.replace(/^admin\./, "");
       return tenant ? { tenant, isAdmin: true } : { tenant: null, isAdmin: false };
@@ -41,9 +42,16 @@ export function parseTenantHost(host: string): { tenant: string | null; isAdmin:
     return { tenant: null, isAdmin: false };
   };
 
-  // Production: tenant.strelva.com (reserved subdomains excluded).
-  if (hostWithoutPort.endsWith(".strelva.com")) {
-    return parseSuffix(".strelva.com", true);
+  // A separate sites apex only hosts one-label public tenants. Admin stays
+  // on the app/custom domains; admin.<tenant> needs a deeper wildcard cert.
+  if (sitesRoot !== appRoot && hostWithoutPort.endsWith(`.${sitesRoot}`)) {
+    const slug = hostWithoutPort.slice(0, -sitesRoot.length - 1);
+    return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(slug) && !RESERVED_SUBDOMAINS.has(slug)
+      ? { tenant: slug, isAdmin: false } : { tenant: null, isAdmin: false };
+  }
+  // Keep existing tenant and tenant-admin hosts on the app apex during cutover.
+  if (hostWithoutPort.endsWith(`.${appRoot}`)) {
+    return parseSuffix(`.${appRoot}`, true);
   }
 
   // Local dev: tenant.localhost (e.g., gldf.localhost:3000) — no reserved filter.

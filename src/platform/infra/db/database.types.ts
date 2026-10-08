@@ -75,6 +75,8 @@ export type Database = {
           monthly_cents: number | null
           name: string
           notes: string | null
+          payer_kind: string
+          payer_workspace_id: string | null
           payment_status: string | null
           payment_updated_at: string | null
           phone: string | null
@@ -97,6 +99,8 @@ export type Database = {
           monthly_cents?: number | null
           name: string
           notes?: string | null
+          payer_kind?: string
+          payer_workspace_id?: string | null
           payment_status?: string | null
           payment_updated_at?: string | null
           phone?: string | null
@@ -119,6 +123,8 @@ export type Database = {
           monthly_cents?: number | null
           name?: string
           notes?: string | null
+          payer_kind?: string
+          payer_workspace_id?: string | null
           payment_status?: string | null
           payment_updated_at?: string | null
           phone?: string | null
@@ -130,7 +136,15 @@ export type Database = {
           updated_at?: string
           workspace_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "accounts_payer_workspace_id_fkey"
+            columns: ["payer_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       activity_log: {
         Row: {
@@ -310,6 +324,78 @@ export type Database = {
           {
             foreignKeyName: "agency_application_draft_grants_revoked_by_fkey"
             columns: ["revoked_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agency_client_staff: {
+        Row: {
+          agency_workspace_id: string
+          assigned_at: string
+          assigned_by: string
+          customer_workspace_id: string
+          ended_at: string | null
+          ended_by: string | null
+          id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          agency_workspace_id: string
+          assigned_at?: string
+          assigned_by: string
+          customer_workspace_id: string
+          ended_at?: string | null
+          ended_by?: string | null
+          id?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          agency_workspace_id?: string
+          assigned_at?: string
+          assigned_by?: string
+          customer_workspace_id?: string
+          ended_at?: string | null
+          ended_by?: string | null
+          id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_client_staff_agency_workspace_id_fkey"
+            columns: ["agency_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_client_staff_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_client_staff_customer_workspace_id_fkey"
+            columns: ["customer_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_client_staff_ended_by_fkey"
+            columns: ["ended_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_client_staff_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -619,6 +705,60 @@ export type Database = {
           {
             foreignKeyName: "agency_managed_website_draft_revisions_operator_user_id_fkey"
             columns: ["operator_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agency_verifications: {
+        Row: {
+          agency_workspace_id: string
+          effect: string
+          evidence: Json
+          id: string
+          reason: string | null
+          recorded_at: string
+          sequence: number
+          status: string
+          verified_by: string
+          verifier_is_agency_member: boolean
+        }
+        Insert: {
+          agency_workspace_id: string
+          effect: string
+          evidence?: Json
+          id?: string
+          reason?: string | null
+          recorded_at?: string
+          sequence?: never
+          status: string
+          verified_by: string
+          verifier_is_agency_member: boolean
+        }
+        Update: {
+          agency_workspace_id?: string
+          effect?: string
+          evidence?: Json
+          id?: string
+          reason?: string | null
+          recorded_at?: string
+          sequence?: never
+          status?: string
+          verified_by?: string
+          verifier_is_agency_member?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agency_verifications_agency_workspace_id_fkey"
+            columns: ["agency_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agency_verifications_verified_by_fkey"
+            columns: ["verified_by"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -4260,6 +4400,8 @@ export type Database = {
           id: string
           max_authorized_cents: number
           payer_id: string
+          payer_kind: string
+          payer_workspace_id: string | null
           product_id: string
           request_id: string | null
           reserved_cents: number
@@ -4286,6 +4428,8 @@ export type Database = {
           id?: string
           max_authorized_cents: number
           payer_id: string
+          payer_kind?: string
+          payer_workspace_id?: string | null
           product_id: string
           request_id?: string | null
           reserved_cents?: number
@@ -4312,6 +4456,8 @@ export type Database = {
           id?: string
           max_authorized_cents?: number
           payer_id?: string
+          payer_kind?: string
+          payer_workspace_id?: string | null
           product_id?: string
           request_id?: string | null
           reserved_cents?: number
@@ -4344,6 +4490,13 @@ export type Database = {
             columns: ["payer_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_economics_payer_workspace_id_fkey"
+            columns: ["payer_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
           {
@@ -5836,6 +5989,74 @@ export type Database = {
           },
         ]
       }
+      provider_seats: {
+        Row: {
+          agency_workspace_id: string
+          customer_workspace_id: string
+          end_reason: string | null
+          ended_at: string | null
+          ended_by: string | null
+          granted_at: string
+          granted_by: string
+          granted_by_kind: string
+          id: string
+          status: string
+        }
+        Insert: {
+          agency_workspace_id: string
+          customer_workspace_id: string
+          end_reason?: string | null
+          ended_at?: string | null
+          ended_by?: string | null
+          granted_at?: string
+          granted_by: string
+          granted_by_kind: string
+          id?: string
+          status?: string
+        }
+        Update: {
+          agency_workspace_id?: string
+          customer_workspace_id?: string
+          end_reason?: string | null
+          ended_at?: string | null
+          ended_by?: string | null
+          granted_at?: string
+          granted_by?: string
+          granted_by_kind?: string
+          id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_seats_agency_workspace_id_fkey"
+            columns: ["agency_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_seats_customer_workspace_id_fkey"
+            columns: ["customer_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_seats_ended_by_fkey"
+            columns: ["ended_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_seats_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       public_continuation_imports: {
         Row: {
           continuation_id: string
@@ -7134,6 +7355,7 @@ export type Database = {
           id: string
           on_behalf_role: string | null
           on_behalf_user_id: string | null
+          provider_workspace_id: string | null
           purpose: string
           session_id: string | null
           subject: string | null
@@ -7147,6 +7369,7 @@ export type Database = {
           id?: string
           on_behalf_role?: string | null
           on_behalf_user_id?: string | null
+          provider_workspace_id?: string | null
           purpose: string
           session_id?: string | null
           subject?: string | null
@@ -7160,6 +7383,7 @@ export type Database = {
           id?: string
           on_behalf_role?: string | null
           on_behalf_user_id?: string | null
+          provider_workspace_id?: string | null
           purpose?: string
           session_id?: string | null
           subject?: string | null
@@ -7171,6 +7395,13 @@ export type Database = {
             columns: ["on_behalf_user_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "strelva_service_actions_provider_workspace_id_fkey"
+            columns: ["provider_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
           {
@@ -8964,6 +9195,38 @@ export type Database = {
           },
         ]
       }
+      tenant_track_signing_keys: {
+        Row: {
+          created_at: string
+          public_key: string
+          previous_public_key: string | null
+          previous_valid_until: string | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          public_key: string
+          previous_public_key?: string | null
+          previous_valid_until?: string | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          public_key?: string
+          previous_public_key?: string | null
+          previous_valid_until?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_track_signing_keys_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       unified_events: {
         Row: {
           body: string | null
@@ -9782,6 +10045,8 @@ export type Database = {
           last_event_created: number
           last_event_id: string
           payer_id: string
+          payer_kind: string
+          payer_workspace_id: string | null
           period_end: string
           period_start: string
           source: string
@@ -9802,6 +10067,8 @@ export type Database = {
           last_event_created: number
           last_event_id: string
           payer_id: string
+          payer_kind?: string
+          payer_workspace_id?: string | null
           period_end: string
           period_start: string
           source?: string
@@ -9822,6 +10089,8 @@ export type Database = {
           last_event_created?: number
           last_event_id?: string
           payer_id?: string
+          payer_kind?: string
+          payer_workspace_id?: string | null
           period_end?: string
           period_start?: string
           source?: string
@@ -9834,6 +10103,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "work_allowance_subscription_entitlement_payer_workspace_id_fkey"
+            columns: ["payer_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "work_allowance_subscription_entitlements_allowance_id_fkey"
             columns: ["allowance_id"]
@@ -9867,6 +10143,8 @@ export type Database = {
           created_by: string
           id: string
           payer_id: string
+          payer_kind: string
+          payer_workspace_id: string | null
           period_end: string
           period_start: string
           source: string
@@ -9884,6 +10162,8 @@ export type Database = {
           created_by: string
           id?: string
           payer_id: string
+          payer_kind?: string
+          payer_workspace_id?: string | null
           period_end: string
           period_start: string
           source?: string
@@ -9901,6 +10181,8 @@ export type Database = {
           created_by?: string
           id?: string
           payer_id?: string
+          payer_kind?: string
+          payer_workspace_id?: string | null
           period_end?: string
           period_start?: string
           source?: string
@@ -9929,6 +10211,13 @@ export type Database = {
             columns: ["payer_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_allowances_payer_workspace_id_fkey"
+            columns: ["payer_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
           {
@@ -11212,8 +11501,10 @@ export type Database = {
           resolved_at: string | null
           resolved_by: string | null
           status: string
-          successor_email: string
-          successor_user_id: string
+          successor_email: string | null
+          successor_kind: string
+          successor_user_id: string | null
+          successor_workspace_id: string | null
           workspace_id: string
         }
         Insert: {
@@ -11224,8 +11515,10 @@ export type Database = {
           resolved_at?: string | null
           resolved_by?: string | null
           status?: string
-          successor_email: string
-          successor_user_id: string
+          successor_email?: string | null
+          successor_kind?: string
+          successor_user_id?: string | null
+          successor_workspace_id?: string | null
           workspace_id: string
         }
         Update: {
@@ -11236,8 +11529,10 @@ export type Database = {
           resolved_at?: string | null
           resolved_by?: string | null
           status?: string
-          successor_email?: string
-          successor_user_id?: string
+          successor_email?: string | null
+          successor_kind?: string
+          successor_user_id?: string | null
+          successor_workspace_id?: string | null
           workspace_id?: string
         }
         Relationships: [
@@ -11260,6 +11555,13 @@ export type Database = {
             columns: ["successor_user_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_payer_transitions_successor_workspace_id_fkey"
+            columns: ["successor_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
           {
@@ -11574,6 +11876,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      rotate_tenant_track_signing_key: {
+        Args: {
+          p_public_key: string | null
+          p_tenant_id: string
+        }
+        Returns: undefined
+      }
       business_policy_integer_valid: {
         Args: {
           hi: number
@@ -11873,6 +12182,12 @@ export type Database = {
           operator_user_id: string
         }[]
       }
+      agency_billing_recipient: {
+        Args: {
+          p_agency_workspace_id: string
+        }
+        Returns: Json
+      }
       agency_can_read_assigned_work: {
         Args: {
           p_user_id: string
@@ -11891,6 +12206,17 @@ export type Database = {
           p_verified_email: string
         }
         Returns: Json
+      }
+      agency_effect_allowed: {
+        Args: {
+          p_agency_workspace_id: string
+          p_effect: string
+        }
+        Returns: boolean
+      }
+      agency_effect_names: {
+        Args: never
+        Returns: string[]
       }
       agency_managed_website_delivery_target: {
         Args: {
@@ -11954,6 +12280,12 @@ export type Database = {
           p_user_id: string
           p_verified_email: string
           p_workspace_id: string
+        }
+        Returns: Json
+      }
+      agency_verification_state: {
+        Args: {
+          p_agency_workspace_id: string
         }
         Returns: Json
       }
@@ -12250,6 +12582,18 @@ export type Database = {
         }
         Returns: Json
       }
+      business_payer_apply: {
+        Args: {
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      business_payer_party: {
+        Args: {
+          p_workspace_id: string
+        }
+        Returns: Record<string, unknown>
+      }
       business_record_agency_work_ids: {
         Args: {
           p_user_id: string
@@ -12404,6 +12748,15 @@ export type Database = {
           updated_at: string
           workspace_id: string
         }[]
+      }
+      choose_business_provider: {
+        Args: {
+          p_agency_workspace_id: string
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
       }
       claim_booking_messages: {
         Args: {
@@ -13168,6 +13521,25 @@ export type Database = {
           workspace_id: string
         }[]
       }
+      end_business_provider: {
+        Args: {
+          p_reason: string
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      end_provider_seat: {
+        Args: {
+          p_agency_workspace_id: string
+          p_reason: string
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       enter_customer_business: {
         Args: {
           p_business_id: string
@@ -13375,6 +13747,8 @@ export type Database = {
           id: string
           max_authorized_cents: number
           payer_id: string
+          payer_kind: string
+          payer_workspace_id: string | null
           product_id: string
           request_id: string | null
           reserved_cents: number
@@ -13691,6 +14065,8 @@ export type Database = {
           id: string
           max_authorized_cents: number
           payer_id: string
+          payer_kind: string
+          payer_workspace_id: string | null
           product_id: string
           request_id: string | null
           reserved_cents: number
@@ -13724,6 +14100,8 @@ export type Database = {
           id: string
           max_authorized_cents: number
           payer_id: string
+          payer_kind: string
+          payer_workspace_id: string | null
           product_id: string
           request_id: string | null
           reserved_cents: number
@@ -13757,6 +14135,8 @@ export type Database = {
           id: string
           max_authorized_cents: number
           payer_id: string
+          payer_kind: string
+          payer_workspace_id: string | null
           product_id: string
           request_id: string | null
           reserved_cents: number
@@ -14342,6 +14722,48 @@ export type Database = {
         }
         Returns: number
       }
+      platform_serves_business: {
+        Args: {
+          p_effect: string
+          p_workspace_id: string
+        }
+        Returns: boolean
+      }
+      platform_service_effect: {
+        Args: {
+          p_purpose: string
+        }
+        Returns: string
+      }
+      platform_service_identity: {
+        Args: {
+          p_provider_workspace_id: string
+          p_workspace_id: string
+        }
+        Returns: Record<string, unknown>
+      }
+      platform_service_identity_holds: {
+        Args: {
+          p_provider_workspace_id: string
+          p_role: string
+          p_user_id: string
+          p_workspace_id: string
+        }
+        Returns: boolean
+      }
+      platform_service_session_holds: {
+        Args: {
+          p_session: unknown
+        }
+        Returns: boolean
+      }
+      platform_serving_provider: {
+        Args: {
+          p_effect: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
       prepare_agency_managed_website_draft: {
         Args: {
           p_assignment_id: string
@@ -14444,6 +14866,36 @@ export type Database = {
           p_tenant_id: string
         }
         Returns: Json
+      }
+      provider_seat_assert_owner: {
+        Args: {
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      provider_seat_businesses: {
+        Args: {
+          p_user_id: string
+          p_verified_email: string
+        }
+        Returns: {
+          role: string
+          workspace_id: string
+        }[]
+      }
+      provider_seat_direct_role: {
+        Args: never
+        Returns: string
+      }
+      provider_seat_role: {
+        Args: {
+          p_lock: boolean
+          p_user_id: string
+          p_workspace_id: string
+        }
+        Returns: string
       }
       prune_website_crawl_pages: {
         Args: never
@@ -14756,6 +15208,29 @@ export type Database = {
           updated_at: string
           visibility: Json | null
         }[]
+      }
+      read_agency_provider_seats: {
+        Args: {
+          p_agency_workspace_id: string
+          p_user_id: string
+          p_verified_email: string
+        }
+        Returns: Json
+      }
+      read_agency_verification: {
+        Args: {
+          p_agency_workspace_id: string
+          p_user_id: string
+          p_verified_email: string
+        }
+        Returns: Json
+      }
+      read_agency_verification_history: {
+        Args: {
+          p_agency_workspace_id: string
+          p_operator_email: string
+        }
+        Returns: Json
       }
       read_agency_website_document_candidate: {
         Args: {
@@ -15817,6 +16292,17 @@ export type Database = {
         }
         Returns: Json
       }
+      record_agency_verification: {
+        Args: {
+          p_agency_workspace_id: string
+          p_effect: string
+          p_evidence: Json
+          p_operator_email: string
+          p_reason: string
+          p_status: string
+        }
+        Returns: Json
+      }
       record_business_billing_payment: {
         Args: {
           p_current_period_end: string
@@ -16772,6 +17258,17 @@ export type Database = {
         }
         Returns: undefined
       }
+      set_agency_client_staff: {
+        Args: {
+          p_active: boolean
+          p_agency_workspace_id: string
+          p_staff_user_id: string
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       set_decision_policy: {
         Args: {
           p_expected_version: number
@@ -16949,6 +17446,7 @@ export type Database = {
           id: string
           on_behalf_role: string | null
           on_behalf_user_id: string | null
+          provider_workspace_id: string | null
           purpose: string
           session_id: string | null
           subject: string | null
@@ -17948,8 +18446,10 @@ export type Database = {
           resolved_at: string | null
           resolved_by: string | null
           status: string
-          successor_email: string
-          successor_user_id: string
+          successor_email: string | null
+          successor_kind: string
+          successor_user_id: string | null
+          successor_workspace_id: string | null
           workspace_id: string
         }[]
       }
@@ -17968,7 +18468,10 @@ export type Database = {
           resolved_by: string
           status: string
           successor_email: string
+          successor_kind: string
           successor_user_id: string
+          successor_workspace_id: string
+          successor_workspace_name: string
           workspace_id: string
           workspace_name: string
         }[]
@@ -17989,7 +18492,10 @@ export type Database = {
           resolved_by: string
           status: string
           successor_email: string
+          successor_kind: string
           successor_user_id: string
+          successor_workspace_id: string
+          successor_workspace_name: string
           workspace_id: string
         }[]
       }

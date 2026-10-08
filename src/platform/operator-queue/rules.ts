@@ -35,6 +35,7 @@ export function priorityFor(raw: QueueItemRaw, now: number): PriorityResult {
     case "lead_unkept":
       return { priority: "P1", move: "strelva", reason: "A lead is safe in Redis but not yet kept in Postgres." };
     case "readback_failed":
+      if (facts.writeAcceptance === "unknown") return { priority: "P1", move: "strelva", reason: "The provider's acceptance is uncertain. Never re-sent automatically." };
       return { priority: "P1", move: "strelva", reason: "The provider accepted the write but the read-back did not match. Never re-sent automatically." };
     case "domain_alert": {
       if (facts.domainState && facts.domainState !== "expiring") {
