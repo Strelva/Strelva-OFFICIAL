@@ -60,10 +60,10 @@ describe("one business record readers", () => {
     expect(preview).toContain("Old name"); expect(preview).not.toContain("Fresh name");
     expect(siteWithBusinessRecord(document, { ...context, facts: { display_name: "x".repeat(1000) } })).toBe(document);
   });
-  it("new owner notice adapters share record precedence and failure fallback only after rollout", async () => {
+  it("new owner notice adapters share trusted record precedence and fail closed after rollout", async () => {
     setOwnerRecipientResolver(async () => ({ email: "record@example.test", name: null, from: "record", workspaceId: "w" }));
     expect(await releasedOwnerNoticeEmail({ id: "fixture", ownerEmail: "old@example.test" })).toBe("record@example.test");
     setOwnerRecipientResolver(async () => { throw new Error("offline"); });
-    expect(await releasedOwnerNoticeEmail({ id: "fixture", ownerEmail: "old@example.test" })).toBe("old@example.test");
+    expect(await releasedOwnerNoticeEmail({ id: "fixture", ownerEmail: "old@example.test" })).toBeNull();
   });
 });
