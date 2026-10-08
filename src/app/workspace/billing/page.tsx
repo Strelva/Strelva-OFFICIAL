@@ -18,7 +18,8 @@ export default async function BusinessBillingPage({ searchParams }: { searchPara
   if (!actor) redirect("/sign-in?next=%2Fworkspace");
   const query = await searchParams;
   const workspaceId = query.workspaceId ?? "";
-  const workspace = (await listWorkspaces(actor)).find(item => item.id === workspaceId);
+  const workspaces = await listWorkspaces(actor);
+  const workspace = workspaces.find(item => item.id === workspaceId);
   if (workspace?.kind === "agency") {
     let agency;
     try { agency = await readAgencyBilling(actor, workspaceId); }
@@ -45,6 +46,6 @@ export default async function BusinessBillingPage({ searchParams }: { searchPara
       {billing.payerParty?.kind === "agency" ? <p className="mt-4 text-sm text-gray-muted">This amount records the existing business agreement. Agency wholesale pricing and any separate retail invoice are shown in the agency’s billing records.</p> : null}
     </Card> : <p className="mt-8 text-gray-muted">No billing record is attached to this business yet. The existing agreement and chosen payer need to be recorded.</p>}
     {query.invoiceId ? <AgencyInvoiceAcceptance invoiceId={query.invoiceId} /> : null}
-    <WorkspacePayerTransition workspaceId={workspaceId} canPropose={workspace?.role === "owner"} providerChangeEnabled={process.env.STRELVA_PROVIDER_CHANGE === "1"} />
+    <WorkspacePayerTransition key={workspaceId} workspaceId={workspaceId} canPropose={workspace?.role === "owner"} agencyChoices={workspaces.filter(item => item.kind === "agency").map(item => ({ id: item.id, name: item.name })).concat(billing?.payerParty?.kind === "agency" && billing.payerParty.workspaceId && !workspaces.some(item => item.id === billing.payerParty?.workspaceId) ? [{ id: billing.payerParty.workspaceId, name: billing.payerParty.name ?? "Current payer agency" }] : [])} providerChangeEnabled={process.env.STRELVA_PROVIDER_CHANGE === "1"} />
   </main>;
 }

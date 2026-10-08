@@ -1,16 +1,24 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { SelectInput, TextInput } from "@/components/ui/TextInput";
 import type { AgencyInvoice } from "@/platform/agency-billing/types";
 
-export function AgencyInvoiceControls({agencyWorkspaceId,businessWorkspaceId,initialInvoices=[]}:{agencyWorkspaceId:string;businessWorkspaceId:string;initialInvoices?:AgencyInvoice[]}) {
+type ControlsProps = {agencyWorkspaceId:string;businessWorkspaceId:string;initialInvoices?:AgencyInvoice[];request?:typeof fetch};
+export function AgencyInvoiceControls(props:ControlsProps) {
+ return <ScopedAgencyInvoiceControls key={`${props.agencyWorkspaceId}:${props.businessWorkspaceId}`} {...props}/>;
+}
+function ScopedAgencyInvoiceControls({agencyWorkspaceId,businessWorkspaceId,initialInvoices=[],request=fetch}:ControlsProps) {
  const [kind,setKind]=useState("rebill");const [invoice,setInvoice]=useState<AgencyInvoice|null>(initialInvoices[0]??null);const [idempotencyKey,setIdempotencyKey]=useState("");const [error,setError]=useState("");const [busy,setBusy]=useState(false);
+ const inflight=useRef<AbortController|null>(null);
+ useEffect(()=>()=>inflight.current?.abort(),[]);
  async function command(body:Record<string,unknown>) {
+  if(inflight.current)return;
+  const controller=new AbortController();inflight.current=controller;
   setBusy(true);setError("");try {
-   const response=await fetch((body.action==="propose"?kind:invoice?.kind)==="rebill"?`/api/agency/clients/${businessWorkspaceId}/rebill`:"/api/agency/pay-links",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-   const value=await response.json();if(!response.ok)throw new Error(value.error??"The invoice could not be confirmed.");setInvoice(value);if(body.action==="propose")setIdempotencyKey("");
-  }catch(cause){setError(cause instanceof Error?cause.message:"The invoice could not be confirmed.");}finally{setBusy(false);}
+   const response=await request((body.action==="propose"?kind:invoice?.kind)==="rebill"?`/api/agency/clients/${businessWorkspaceId}/rebill`:"/api/agency/pay-links",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:controller.signal});
+   const value=await response.json();if(controller.signal.aborted)return;if(!response.ok)throw new Error(value.error??"The invoice could not be confirmed.");setInvoice(value);if(body.action==="propose")setIdempotencyKey("");
+  }catch(cause){if(!controller.signal.aborted)setError(cause instanceof Error?cause.message:"The invoice could not be confirmed.");}finally{if(!controller.signal.aborted){inflight.current=null;setBusy(false);}}
  }
  return <details className="mt-4"><summary className="cursor-pointer text-sm">Set a client retail agreement</summary>
   <p className="mt-3 text-sm text-gray-muted">The business owner reviews the exact terms before any checkout or subscription is created. Your wholesale bill stays separate.</p>
@@ -19,15 +27,19 @@ export function AgencyInvoiceControls({agencyWorkspaceId,businessWorkspaceId,ini
    <TextInput label="Amount in cents (USD)" name="amountCents" type="number" min={1} max={100000000} step={1} required disabled={busy} />
    <TextInput label="What this covers" name="description" maxLength={300} required disabled={busy}/><Button type="submit" disabled={busy}>Prepare client agreement</Button>
   </form>
-  {initialInvoices.length > 1 ? <SelectInput className="mt-4" label="Existing client agreements" value={invoice?.id ?? ""} onChange={event=>setInvoice(initialInvoices.find(item=>item.id===event.target.value)??null)} options={initialInvoices.map(item=>({value:item.id,label:`${item.description} · ${item.status.replaceAll("_"," ")}`}))} /> : null}
+  {initialInvoices.length > 1 ? <SelectInput className="mt-4" label="Existing client agreements" disabled={busy} value={invoice?.id ?? ""} onChange={event=>{if(!inflight.current){setInvoice(initialInvoices.find(item=>item.id===event.target.value)??null);setError("");}}} options={initialInvoices.map(item=>({value:item.id,label:`${item.description} · ${item.status.replaceAll("_"," ")}`}))} /> : null}
   {invoice?<div className="mt-4 space-y-3 text-sm"><p role="status">Agreement {invoice.status.replaceAll("_"," ")}. ${(invoice.amount_cents/100).toFixed(2)}{invoice.kind==="rebill"?" / month":" once"}.</p><a className="underline" href={`/workspace/billing?workspaceId=${businessWorkspaceId}&invoiceId=${invoice.id}`}>Client review page</a>{invoice.status==="accepted"?<Button disabled={busy} onClick={()=>void command({action:"fulfill",intentId:invoice.id})}>Create accepted checkout</Button>:null}{invoice.checkout_url?<a className="block underline" href={invoice.checkout_url}>Open payment page</a>:null}</div>:null}
   {error?<p role="alert" className="mt-3 text-sm text-critical">{error}</p>:null}
  </details>;
 }
-export function AgencyInvoiceAcceptance({invoiceId}:{invoiceId:string}) {
+type AcceptanceProps={invoiceId:string;request?:typeof fetch};
+export function AgencyInvoiceAcceptance(props:AcceptanceProps) {return <ScopedAgencyInvoiceAcceptance key={props.invoiceId} {...props}/>;}
+function ScopedAgencyInvoiceAcceptance({invoiceId,request=fetch}:AcceptanceProps) {
  const [invoice,setInvoice]=useState<AgencyInvoice|null>(null);const [error,setError]=useState("");const [busy,setBusy]=useState(false);
- const load=useCallback(async()=> {const response=await fetch(`/api/agency/pay-links?intentId=${invoiceId}`,{cache:"no-store"});const value=await response.json();if(!response.ok)throw new Error(value.error??"The agreement could not be loaded.");setInvoice(value);},[invoiceId]);
- useEffect(()=>{void load().catch(cause=>setError(cause instanceof Error?cause.message:"The agreement could not be loaded."));},[load]);
- async function respond(action:"accept"|"decline"|"fulfill") {setBusy(true);setError("");try {const response=await fetch("/api/agency/pay-links",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,intentId:invoiceId})});const value=await response.json();if(!response.ok)throw new Error(value.error??"Your answer could not be confirmed.");setInvoice(value);}catch(cause){setError(cause instanceof Error?cause.message:"Your answer could not be confirmed.");}finally{setBusy(false);}}
+ const inflight=useRef<AbortController|null>(null);
+ useEffect(()=>()=>inflight.current?.abort(),[]);
+ const load=useCallback(async(signal:AbortSignal)=> {const response=await request(`/api/agency/pay-links?intentId=${invoiceId}`,{cache:"no-store",signal});const value=await response.json();if(signal.aborted)return;if(!response.ok)throw new Error(value.error??"The agreement could not be loaded.");setInvoice(value);},[invoiceId,request]);
+ useEffect(()=>{const controller=new AbortController();void load(controller.signal).catch(cause=>{if(!controller.signal.aborted)setError(cause instanceof Error?cause.message:"The agreement could not be loaded.");});return()=>controller.abort();},[load]);
+ async function respond(action:"accept"|"decline"|"fulfill") {if(inflight.current)return;const controller=new AbortController();inflight.current=controller;setBusy(true);setError("");try {const response=await request("/api/agency/pay-links",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,intentId:invoiceId}),signal:controller.signal});const value=await response.json();if(controller.signal.aborted)return;if(!response.ok)throw new Error(value.error??"Your answer could not be confirmed.");setInvoice(value);}catch(cause){if(!controller.signal.aborted)setError(cause instanceof Error?cause.message:"Your answer could not be confirmed.");}finally{if(!controller.signal.aborted){inflight.current=null;setBusy(false);}}}
  return <section className="mt-8" aria-labelledby="retail-agreement"><h2 id="retail-agreement" className="font-medium">Agency retail agreement</h2>{invoice?<><p className="mt-3">{invoice.description}</p><p className="mt-3 tabular-nums">{new Intl.NumberFormat(undefined,{style:"currency",currency:invoice.currency}).format(invoice.amount_cents/100)}{invoice.kind==="rebill"?" / month":" once"}</p><p className="mt-3 text-sm text-gray-muted">Your agency is the seller. This agreement is separate from its wholesale bill and existing job limits. Status: {invoice.status.replaceAll("_"," ")}.</p>{invoice.status==="proposed"&&invoice.can_accept?<div className="mt-4 flex flex-wrap gap-3"><Button disabled={busy} onClick={()=>void respond("accept")}>Accept these terms</Button><Button variant="secondary" disabled={busy} onClick={()=>void respond("decline")}>Decline</Button></div>:null}{invoice.status==="accepted"&&invoice.can_manage?<Button className="mt-4" disabled={busy} onClick={()=>void respond("fulfill")}>Create accepted checkout</Button>:null}{invoice.status==="awaiting_payment"&&!invoice.checkout_url?<p role="status" className="mt-4 text-sm">The subscription is recorded. Its payment page still needs reconciliation; no new subscription is being created.</p>:null}{invoice.checkout_url?<a className="mt-4 inline-flex min-h-12 items-center underline" href={invoice.checkout_url}>Pay this agreement</a>:null}</>:error?null:<p role="status" className="mt-4 text-sm">Loading agreement…</p>}{error?<p role="alert" className="mt-4 text-sm text-critical">{error}</p>:null}</section>;
 }

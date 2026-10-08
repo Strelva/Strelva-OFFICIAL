@@ -12,12 +12,13 @@ function successorLabel(item: PayerTransition): string {
   return item.successorEmail;
 }
 
-export function WorkspacePayerTransition({ workspaceId, canPropose, providerChangeEnabled = false, request = fetch }: { workspaceId: string; canPropose: boolean; providerChangeEnabled?: boolean; request?: typeof fetch }) {
+export function WorkspacePayerTransition({ workspaceId, canPropose, agencyChoices = [], providerChangeEnabled = false, request = fetch }: { workspaceId: string; canPropose: boolean; agencyChoices?: { id: string; name: string }[]; providerChangeEnabled?: boolean; request?: typeof fetch }) {
   const [data, setData] = useState<PayerTransitionSnapshot | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [successorKind, setSuccessorKind] = useState("business");
+  const [successorAgencyWorkspaceId, setSuccessorAgencyWorkspaceId] = useState("");
   const [providerChange, setProviderChange] = useState<{ id: string; status: string } | null>(null);
 
   const load = useCallback(async (signal?: AbortSignal) => {
@@ -76,8 +77,8 @@ export function WorkspacePayerTransition({ workspaceId, canPropose, providerChan
       <div className="mt-3 flex flex-wrap gap-2">{addressed ? <><Button disabled={busy} onClick={() => void command({ action: "accept", transitionId: pending.id })}>Accept future payer role</Button><Button variant="secondary" disabled={busy} onClick={() => void command({ action: "reject", transitionId: pending.id })}>Decline</Button></> : null}{canPropose ? <Button variant="secondary" disabled={busy} onClick={() => void command({ action: "revoke", transitionId: pending.id })}>Revoke proposal</Button> : null}</div>
     </div> : canPropose && data ? <form className="max-w-md space-y-3" onSubmit={event => { event.preventDefault(); const form = new FormData(event.currentTarget); void command(successorKind === "agency" ? { action: "propose", workspaceId, successorAgencyWorkspaceId: form.get("successorAgencyWorkspaceId") } : successorKind === "business" ? { action: "propose", workspaceId, successorKind: "business" } : { action: "propose", workspaceId, successorEmail: form.get("successorEmail") }); }}>
       <SelectInput label="Who pays for future jobs?" value={successorKind} onChange={event => setSuccessorKind(event.target.value)} options={[{ value: "business", label: "This business" }, { value: "agency", label: "An agency" }, { value: "user", label: "A named business signer" }]} />
-      {successorKind === "agency" ? <TextInput label="Agency workspace ID" name="successorAgencyWorkspaceId" required helperText="An owner or admin of this agency must accept in their account." /> : successorKind === "user" ? <TextInput label="Verified payer email" name="successorEmail" type="email" maxLength={254} required /> : <p className="text-sm text-gray-muted">A business owner accepts this change. Existing job limits and billing agreements are preserved.</p>}
-      <Button type="submit" disabled={busy}>Propose new payer</Button>
+      {successorKind === "agency" ? <><SelectInput label="Agency" name="successorAgencyWorkspaceId" value={successorAgencyWorkspaceId} onChange={event => setSuccessorAgencyWorkspaceId(event.target.value)} options={[{ value: "", label: "Choose an accessible agency" }, ...agencyChoices.map(agency => ({ value: agency.id, label: agency.name }))]} disabled={busy || !agencyChoices.length} required helperText="An owner or admin of this agency must accept in their account." />{!agencyChoices.length ? <p className="text-sm text-gray-muted">No agency is available to your account. Ask its owner for an invitation before choosing it as payer.</p> : null}</> : successorKind === "user" ? <TextInput label="Verified payer email" name="successorEmail" type="email" maxLength={254} required /> : <p className="text-sm text-gray-muted">A business owner accepts this change. Existing job limits and billing agreements are preserved.</p>}
+      <Button type="submit" disabled={busy || (successorKind === "agency" && !successorAgencyWorkspaceId)}>Propose new payer</Button>
     </form> : null}
     {data?.transitions.length ? <details><summary className="cursor-pointer text-sm">Payer change history</summary><ul className="mt-3 space-y-2 text-sm">{data.transitions.map(item => <li key={item.id} className="border-b border-gray-border pb-2"><span className="capitalize">{item.status}</span> · {successorLabel(item)}<span className="block text-xs text-gray-muted">Proposed {new Date(item.proposedAt).toLocaleString()}</span></li>)}</ul></details> : null}
   </section>;

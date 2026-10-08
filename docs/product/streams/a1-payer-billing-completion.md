@@ -25,6 +25,13 @@ allowance receipts and provider-held costs remain on their original party.
 SQL supplies current authority to the UI; historical signer IDs grant no agency
 authority after demotion/removal.
 
+The agency selector uses names from the actor's accessible agency workspaces
+plus the current payer agency returned by authorized billing. It does not expose
+a raw workspace ID input. An outside agency requires an invitation before this
+scoped picker can propose it. Invoice controls remount for each agency/client
+or invoice, abort outstanding requests, and suppress late responses and errors;
+agreement selection is disabled while a command is unresolved.
+
 Each agency has one account and wholesale subscription shell. One client line
 is active for each business accepting that agency as payer. Wholesale amounts
 are null; converted retail prices are untouched. Payer changes end old lines
