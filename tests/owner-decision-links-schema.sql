@@ -48,7 +48,7 @@ begin
   sid:=(link->>'sessionId')::uuid;
   perform pg_temp.ol_assert(link->>'role'='admin' and link->>'recipient'='ol-owner@example.test' and link->>'decisionId'=id::text,'bound unchanged admin identity');
   perform pg_temp.ol_assert(link->>'providerWorkspaceId'='b2000000-0000-4000-8000-0000000000a1'
-    and (select provider_workspace_id from public.strelva_service_actions where id=sid)='b2000000-0000-4000-8000-0000000000a1','session names the agency of record');
+    and (select a.provider_workspace_id from public.strelva_service_actions a where a.id=sid)='b2000000-0000-4000-8000-0000000000a1','session names the agency of record');
   perform pg_temp.ol_expect(format('select public.authorize_owner_decision_link_run(%L,%L,%L,%L,%L)',ws,sid,id,revision_hash,'ol-owner@example.test'),'strelva_service_access_denied');
   perform public.claim_owner_decision(ws,id,revision_hash,'approve','owner_link',null,null,'ol-owner@example.test');
   perform public.authorize_owner_decision_link_run(ws,sid,id,revision_hash,'ol-owner@example.test');
