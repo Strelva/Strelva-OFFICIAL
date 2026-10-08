@@ -278,7 +278,8 @@ select pg_temp.bo_assert(public.read_tenant_leads('bo-unconverted', 50, null) = 
 select pg_temp.bo_assert((public.purge_expired_tenant_leads(100)->>'purged') = '0'
   and exists (select 1 from public.tenant_leads where tenant_stable_id = 'b0000000-0000-4000-8000-0000000000a3'), 'nothing purged before its deadline');
 update public.tenant_leads set retain_until = now() - interval '1 second' where tenant_stable_id = 'b0000000-0000-4000-8000-0000000000a3';
-select pg_temp.bo_assert(public.purge_expired_tenant_leads(100) = '{"purged": 1, "tenants": 1}'::jsonb, 'expired lead purged');
+-- Retention adds dependency/minimization counts without changing these counts.
+select pg_temp.bo_assert(public.purge_expired_tenant_leads(100) @> '{"purged": 1, "tenants": 1}'::jsonb, 'expired lead purged');
 select pg_temp.bo_assert(not exists (select 1 from public.tenant_leads where tenant_stable_id = 'b0000000-0000-4000-8000-0000000000a3')
   and exists (select 1 from public.tenant_leads where tenant_stable_id = 'b0000000-0000-4000-8000-0000000000a1'), 'only the expired lead went');
 select pg_temp.bo_assert((select purged_count = 1 and tenant_slug = 'bo-unconverted' and site_name = 'Unconverted Fixture'

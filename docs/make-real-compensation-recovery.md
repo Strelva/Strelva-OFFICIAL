@@ -28,5 +28,9 @@ Local proof: `bash scripts/check-make-real-compensation-sql.sh` applies the full
 ordered schema in a disposable Unix-socket PostgreSQL cluster. It exercises the
 actual RPC repository, stale revisions, accepted-receipt preservation, refused
 and ambiguous undo, forged claim replacement/removal/closure, private-helper
-ACLs and disable/reapplication. Provider operations use isolated adapters;
+ACLs and disable/reapplication. Direct saves cannot close an accepted undoable
+effect before compensation, mark a new step compensated without its claim, or
+close while an internal live pointer remains switched. Historical compensated
+rows remain readable; new compensated transitions require typed evidence.
+Provider operations use isolated adapters;
 this does not qualify a hosted database or a real provider cancellation.
