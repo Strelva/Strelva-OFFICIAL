@@ -76,14 +76,14 @@ begin
   ev := pg_temp.rt_last(ws);
   perform pg_temp.rt_assert(ev.event = 'trusted' and ev.actor_kind = 'conversion' and ev.actor_id = operator_id::text, 'conversion trust is logged with the converting operator');
   perform pg_temp.rt_assert(public.resolve_business_owner_recipient(ws)
-    = '{"email":"rt-owner@example.test","name":"Robin Owner","from":"record","source":"tenant_import","verified":false,"tenantId":null}'::jsonb,
+    = '{"email":"rt-owner@example.test","name":"Robin Owner","from":"record","source":"tenant_import","verified":false,"tenantId":null,"trusted":true}'::jsonb,
     'resolver keeps its JSON for an imported address');
   result := public.convert_tenant_to_business('rt-operator@strelva.example.test', 'rt-quiet',
     '{"tenantId":"rt-quiet","tenantStableId":"52400000-0000-4000-8000-0000000000a2","workspaceName":"RT Quiet","billing":null,"account":null,"patch":{},"contacts":[]}',
     '52400000-0000-4000-8000-0000000000c2', repeat('a', 64));
   quiet_ws := (result->>'workspaceId')::uuid;
   perform pg_temp.rt_assert(public.resolve_business_owner_recipient(quiet_ws)
-    = '{"email":"rt-quiet@example.test","name":null,"from":"tenant_fallback","source":null,"verified":false,"tenantId":"rt-quiet"}'::jsonb,
+    = '{"email":"rt-quiet@example.test","name":null,"from":"tenant_fallback","source":null,"verified":false,"tenantId":"rt-quiet","trusted":true}'::jsonb,
     'a site''s own owner_email is trusted when nothing was imported');
   update public.tenants set owner_email = 'rt-operator@strelva.example.test' where id = 'rt-quiet';
   perform pg_temp.rt_assert(public.resolve_business_owner_recipient(quiet_ws)->>'email' = 'rt-quiet@example.test',
