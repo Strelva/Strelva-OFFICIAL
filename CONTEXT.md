@@ -1,5 +1,22 @@
 # Strelva interface and Managed Websites context
 
+## October 8 private readiness convergence
+
+`prepare/launch-readiness-convergence-20261008` combines isolated local repairs
+after frozen candidate `e28e1a5f`: no-policy provider-request recovery, completed-month
+evidence, original-bringer attribution, creator-maintenance identity and Connect
+profile validation. Attribution's prepared inverse now fences concurrent writers
+before checking for retained receipts. Earlier section proof counts refer to their
+own exact branch checkpoints; they are not results for this combined source.
+
+The explicit attribution ledger bridge, approved bundle maintenance and original
+provider-change/exit cleanup are still separate active preparations. Exact combined
+native/upgrade, units/build, affected API/UI and actual Auth/client qualification
+must follow convergence. No existing SQL, production data, public origin, price,
+provider configuration, Google project, billing or directory activation is granted
+by local source availability. Workspace `PRODUCT_MODEL.md` remains canonical;
+this worktree contains no competing model.
+
 ## October 8 private creator maintenance identity #287
 
 Migration 35 protects current verified identity only around the existing creator
