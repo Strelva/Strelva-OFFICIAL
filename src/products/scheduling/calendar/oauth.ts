@@ -2,6 +2,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { getRedis } from "@/platform/infra/redis";
 import { calendarProviderSchema, type CalendarProvider } from "./contracts";
 import { CalendarProviderError } from "./adapters";
+import { revokeProviderAuthorization } from "@/platform/infra/provider-revocation";
 
 type State = { workspaceId: string; userId: string; provider: CalendarProvider; exp: number; nonce: string };
 type CalendarFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -165,8 +166,9 @@ export function calendarOAuthRedirectUri(provider: CalendarProvider, appUrl = pr
  * revokeSignInSessions (all apps, requires a broader permission).
  * https://developers.google.com/identity/protocols/oauth2/web-server#tokenrevoke */
 export async function revokeCalendarOAuthToken(provider: CalendarProvider, token: string, fetcher: CalendarFetch = fetch): Promise<void> {
-  if (provider !== "google" || !token) return;
-  const response = await fetcher("https://oauth2.googleapis.com/revoke", { method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ token }).toString(), signal: AbortSignal.timeout(10000) });
-  if (!response.ok) throw new CalendarProviderError({ provider, code: "provider", message: "Google could not revoke calendar consent. Try disconnecting again.", status: response.status });
+  const result = await revokeProviderAuthorization(provider, token, fetcher);
+  if (result.outcome === "failed") {
+    const status = result.errorCode?.startsWith("http_") ? Number(result.errorCode.slice(5)) : undefined;
+    throw new CalendarProviderError({ provider, code: result.errorCode === "request_failed" ? "timeout" : "provider", message: "Google could not revoke calendar consent. Try disconnecting again.", ...(status ? { status } : {}) });
+  }
 }

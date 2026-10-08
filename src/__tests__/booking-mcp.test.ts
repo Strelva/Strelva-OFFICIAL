@@ -57,7 +57,10 @@ describe("bounded booking MCP transport", () => {
   it("returns a held receipt with only the status credential even if email read-back fails", async () => {
     ports.request.mockResolvedValue({ booking: { id: "b1", status: "held", start: "start", end: "end" }, statusToken: "status-only", confirmationRequired: true });
     ports.updates.mockRejectedValue(new Error("read-back failed"));
-    const args = { serviceId: "consult", start: "start", requestId: "retry-1", origin: "owner", customer: { name: "Dana", email: "dana@example.test" }, agent: { name: "Assistant" } };
+    const args = { serviceId: "consult", start: "start", requestId: "retry-1", customer: { name: "Dana", email: "dana@example.test" }, agent: { name: "Assistant" } };
+    // A caller cannot pick its own origin: undeclared arguments are refused.
+    expect((await (await call("tools/call", { name: "request_booking", arguments: { ...args, origin: "owner" } })).json()).result.isError).toBe(true);
+    expect(ports.request).not.toHaveBeenCalled();
     const body = await (await call("tools/call", { name: "request_booking", arguments: args })).json();
     expect(ports.request).toHaveBeenCalledWith("fixture", { ...args, origin: "agent" });
     expect(body.result).toMatchObject({ isError: false, structuredContent: { reservationId: "b1", status: "held", statusToken: "status-only", confirmationRequired: true } });
@@ -68,9 +71,10 @@ describe("bounded booking MCP transport", () => {
 
   it("hashes status credentials, rejects foreign businesses and never exposes customer data", async () => {
     const token = "s".repeat(43);
-    ports.lookup.mockResolvedValue({ id: "b1", tenantId: "fixture", status: "held", start: "start", end: "end", customer: { email: "private@example.test" } });
+    const end = new Date(Date.now() + 3_600_000).toISOString();
+    ports.lookup.mockResolvedValue({ id: "b1", tenantId: "fixture", status: "held", start: "start", end, customer: { email: "private@example.test" } });
     const read = () => call("tools/call", { name: "get_booking_status", arguments: { statusToken: token } });
-    expect((await (await read()).json()).result.structuredContent).toEqual({ reservationId: "b1", status: "held", start: "start", end: "end" });
+    expect((await (await read()).json()).result.structuredContent).toEqual({ reservationId: "b1", status: "held", start: "start", end });
     expect(ports.lookup).toHaveBeenCalledWith(tokenHash(token), "status");
     ports.lookup.mockResolvedValue({ tenantId: "other" });
     expect((await (await read()).json()).result.isError).toBe(true);

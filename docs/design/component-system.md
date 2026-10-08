@@ -7,6 +7,22 @@ The [visual direction map](../../DESIGN.md#visual-direction-and-extension-map) o
 how identity, imagery, composition and component treatment fit together. This
 file owns component contracts, extension and adoption, including gaps in source.
 
+## Agency Team management, October 7, 2026
+
+[AgencyTeamView](../../src/experience/workspace/agency/AgencyTeamView.tsx) composes
+the owned Button, TextInput and SelectInput, semantic lists, native details and
+labelled checkboxes. Agency owners/admins manage invitation links, Member/Admin
+roles, confirmed staff removal and individual/bulk client assignments. Owners
+and the actor's own membership have no role/removal control. Members see the
+same agency's assignments without management controls. A failed mutation locks
+management until an explicit reload; a confirmed write with a failed refresh is
+reported separately. Team reads active seats independently of the Clients page.
+Workspace and Systems flags gate the API and tab. Local browser proof covers
+1280px and 390px, keyboard focus, loading/error/empty/member states and fictional
+management actions. Real SQL proof and limitations are in
+[the #261 handoff](../product/streams/a1-agency-team.md); no production or actual
+staff adoption is claimed.
+
 ## Start with tokens and atoms
 
 September 17 clarification: Jacob wants to inspect the tokens and agreed atoms
@@ -123,11 +139,13 @@ the owning implementation and the affected rendered behavior has been checked.
 | Workspace shell stop state | [StrelvaShell](../../src/experience/app-frame/StrelvaShell.tsx) and [StrelvaSidebar](../../src/experience/app-frame/StrelvaSidebar.tsx) expose the optional `startDisabled` API. [WorkspaceLayout](../../src/experience/workspace/WorkspaceLayout.tsx) uses it for an exited or unconfirmed workspace while keeping saved work and export links available. | September 20, 2026: `workspace-exit-ui.test.tsx` verifies the stopped banner, disabled New control, retained-work link and export link. The authenticated desktop/mobile reopening journey remains the product proof for this consumer. |
 | Managed website editor fields and recovery | [ContentWorkspace](../../src/components/dashboard/ContentWorkspace.tsx) composes [SitePreview](../../src/components/dashboard/SitePreview.tsx), [PropertiesEditor](../../src/components/dashboard/PropertiesEditor.tsx), [VersionHistory](../../src/components/dashboard/VersionHistory.tsx), [PublishBar](../../src/components/dashboard/design/PublishBar.tsx), and the shared [field family](../../src/components/ui/TextInput.tsx). History recovery uses the draft boundary; mobile editing uses the same preview, fields and publish controls in a stacked layout. | September 20, 2026: `content-versioning.test.ts` and `site-editor-publish.test.ts` pass 23/23; `owner-journey-copy.test.ts`, `website-history.test.ts`, and `website-history-page.test.tsx` pass 19/19; isolated `workspace-ui-preview.spec.ts` passes desktop history recovery, 390px draft editing and 390px permission recovery 3/3 on port 3249. The focused browser check verified keyboard focus on the mobile field, the PublishBar and Save changes button within the 390px viewport, and a disabled publish control after a denied draft save. Screenshots: `/tmp/strelva-website-history-desktop.png`, `/tmp/strelva-website-editor-mobile.png`, `/tmp/strelva-website-editor-mobile-permission.png`. The browser fixture has no authenticated provider or live publish, and the preview iframe emitted a synthetic image warning; physical-device, screen-reader and production verification remain open. |
 | Ask Strelva and the workspace website | [AskStrelva](../../src/experience/ask/AskStrelva.tsx) is the workspace chat (`view=ask`, and `compact` beside the editor): streamed reply, one receipt line per result item (drafted and not live, Possibility opened, Request filed), earlier conversations in an 8/4 split, pill composer; read-only, error, unsaved and release-off states. [WorkspaceSiteFrame](../../src/experience/websites/WorkspaceSiteFrame.tsx) hosts a managed website's own pages at `/workspace/site` and reuses the dashboard panels unchanged: `DashboardProvider` takes `resolveHref` so their `/dashboard/...` links stay in the workspace and `/api/...` calls reach the tenant through `/client/<tenant>`; `ContentWorkspace` takes `assistant` to put Ask Strelva in its right panel. [WebsiteChangeRequests](../../src/experience/websites/WebsiteChangeRequests.tsx) is Ask for a change on a repo-only site with preview, owner decision and deploy receipts. | October 6, 2026 (`w2/owner-surfaces-b`, local): rendered at 1440×900 and 390×844 through `/preview/strelva?…&ask=on|error|forbidden` and `/preview/strelva/workspace-site` fixtures: empty, streaming draft and request turns, error, shared read-only, member read-only, permission, filed-request success and request-read error. Tenant-backed tabs (photos, look, collections, history, connections, Google) were not exercised against a live tenant. |
+| Signed website review | `/api/owner-website-preview` renders the exact native candidate for one signed Needs you decision. Its review banner shows complete copy as readable paragraphs, then the website with internal page navigation. Visitor buttons and fields are disabled; external actions have no destination. No account is created. | October 7, 2026 (`w6/owner-ask`, local only): fictional `/preview/strelva/owner-website-preview` inspected at 1280×800 and 390×844. Long copy wraps without horizontal overflow. SQL and route tests cover recipient/revision mismatch, expiry, disabled flags, no GET writes, token-preserving navigation and no-referrer protection. |
+| Working website Try | [SiteDocumentTry](../../src/products/websites/SiteDocumentTry.tsx) uses the native website catalog inside the signed [PossibilityTry](../../src/experience/systems/PossibilityTry.tsx) page. Informational candidates support isolated page navigation. Ask and System Open link to the exact signed Try revision, while the comparison iframe keeps its native review preview. Existing-site booking candidates open their new page with the shared `StrelvaBookingForm`, configured test slots, local callbacks and explicit test-only wording; visitor details are cleared after the test. Outside links are held. Make real still needs owner review and current Connections. Unsupported flows remain Requests. | October 7, 2026 (`w6/owner-ask`, local only): fixtures `/preview/strelva/try?state=pages` and `state=booking`; automated navigation, interactive booking, no-network/no-storage, immutable signed revision and failure-path checks. Native collaborative browser inspected both at 1280px and 390px, including a completed fictional booking. `w6-owner-ask-ui.spec.ts` passes 14 checks with keyboard navigation, no horizontal overflow and no booking write requests. This is fixture proof; authenticated service publication remains unproven. |
 | Self-service website brief and artifact review | [WebsiteExperience](../../src/experience/websites/WebsiteExperience.tsx) and its [visitor form selector](../../src/experience/websites/WebsiteConnections.tsx) use the shared [field family](../../src/components/ui/TextInput.tsx) and [Button](../../src/components/ui/Button.tsx). The product-owned `WebsiteRecord` and `WebsiteArtifact` remain the lifecycle and preview authority; the customer component renders `candidate.preview.href` in an iframe and carries the candidate hash through approval and launch preparation. | September 20, 2026: `website-experience.test.tsx` passes 9/9 and `website-connections.test.tsx` passes 4/4. Coverage includes explicit source selection, connection failure/retry, empty/read-only states, response ownership, and saved-artifact reopen, exact candidate hash/revision actions, conflict-preserved brief, artifact failure recovery, permission state, late-response ownership and `/api/websites/{workId}` transport paths. Local authenticated desktop/mobile artifact proof is recorded separately; no provider launch or production publication is implied. |
 | URL rebuild, factual review and hosted website operation | [RebuildExperience](../../src/experience/websites/RebuildExperience.tsx) composes existing [Button](../../src/components/ui/Button.tsx) and [fields](../../src/components/ui/TextInput.tsx), with product schema validation in [rebuild transport](../../src/experience/websites/rebuild-transport.ts). It provides URL/description intake, persisted progress, source-backed fact decisions, a sandboxed hash-checked private iframe, exact candidate approval, launch verification, domain records, measured HTML before/after comparisons, document-revision restore and exact-revision export. The existing visitor-form selector is shared with v1. [Operator entry](../../src/experience/websites/OperatorRebuildEntry.tsx) preserves workspace/work selection in the URL. [Monthly report](../../src/experience/websites/WebsiteRebuildReport.tsx) shows recorded counts or explicit unavailable measurements, and separates saved assistant citation results from website readiness checks; [agency sharing](../../src/experience/websites/WebsiteRebuildSharing.tsx) prepares recipient-bound links without sending messages. Managed customers review results; operators handle creation and domain work. | October 1, 2026: `website-rebuild-experience.test.tsx` and the existing v1 experience/connection tests pass 20/20; `pnpm typecheck` passes locally. Native collaborative browser inspected desktop 1280px and mobile 390px, including confirm/edit/approve, read-only and failed mutation preservation. After the native browser host disconnected, local headless Chromium checked 320px reflow (document scroll width 320px), remove/approve/publish, read-back-failure copy and loading. Publication and pending/verified/error domain fixtures also cover exact long synthetic DNS records and unavailable monthly measurements at 1280, 390 and 320px; provider error messages remain visible. These are synthetic interface fixtures, not authenticated provider or production proof. The rebuild release flag preserves v1 creation when disabled. No dependency installed; the 21st CLI is unavailable in this environment. |
 | Scoped agency website document drafts | [AgencyWebsiteDocumentDraftExperience](../../src/experience/agency-website/AgencyWebsiteDocumentDraftExperience.tsx) is reached from the existing agency client-work website link. It discovers a version 2 candidate through the managed binding, edits only accepted native sections with shared fields and buttons, sends controlled props/order patches with exact candidate identity, and saves for customer review. Private multi-page previews use the current scoped grant on every request. Navigation/footer preparation stays with the customer or Strelva. The original [legacy editor](../../src/experience/agency-website/AgencyManagedWebsiteDraftExperience.tsx) remains the default when rollout is off or the binding has no version 2 document. | October 1, 2026: agency document and legacy UI tests pass 24/24; typecheck and product boundaries pass locally. Headless Chromium inspected 24 active/loading/expired/revoked/no-permission/error/stale/private-preview-denial states at 1280, 390 and 320px, plus saved section ordering and a detail-page edit. Unsaved changes survive preview page navigation and stale saves; permission failures remove save controls. Followed sign-in redirects, non-JSON responses and incomplete successful envelopes require a fresh permission read while retaining unsaved proposals; the disabled discovery envelope still preserves the legacy editor. The actual no-session private-preview request returns an auth redirect with SAMEORIGIN/private CSP and exposes recovery, not document data. Local interface/HTTP proof is in `output/website-rebuild-spike-2026-10-01/ui-proof/agency-evidence.json`; it does not claim an authenticated client save or production publication. |
 | Generated client visitor forms | The starter [renderer](../../custom-repo-starter/website-generation/renderer.ts) and exported [runtime](../../custom-repo-starter/website-generation/renderer.mjs) own capability form layout and styling using the generated site's existing theme variables. This is a client-site renderer, not a replacement for REB field components. | September 20, 2026: the native booking Auth journey exports and builds the selected project, submits inquiries and confirms bookings on desktop, then changes and cancels at 390px. Rendered controls use full-width fields, visible focus and 44px minimum targets. Exact local captures and provider-fixture limits are in the horizontal acceptance ledger. |
-| Booking customer and owner controls | [ManageBooking](../../src/experience/bookings/ManageBooking.tsx) owns the signed manage page and held confirmation, request, paused, unavailable and recovery states. [InquiryBookingOffer](../../src/experience/bookings/InquiryBookingOffer.tsx) never preselects a time or labels a request confirmed. Owner [BookingActions](../../src/experience/bookings/BookingActions.tsx) and [BookingHoursEditor](../../src/experience/bookings/BookingHoursEditor.tsx) retain the shared Button API and desktop compact sizing; buttons gain a 44px minimum height below 640px, in addition to the primitive's coarse-pointer sizing. [WorkspaceBookings](../../src/experience/bookings/WorkspaceBookings.tsx) adds gated authority/status/history, calendar health and record-hours evidence. [ProposeBookingTimes](../../src/experience/bookings/ProposeBookingTimes.tsx) lets an owner inspect the named inquiry recipient, choose up to three current times and explicitly send one request-mode reply; accepted, suppressed and unknown delivery remain distinct. [ManualBookingForm](../../src/experience/bookings/ManualBookingForm.tsx) takes an owner booking request using shared labelled service/time/customer/intake fields, preserves the customer draft on reopen, and separates the saved request from owner confirmation. The gated workspace-only path lists a real Bookings System without a website tenant; its setup prompt uses a Request, and taking a booking still requires the owner’s confirmation. [CalendarConnectionPanel](../../src/experience/scheduling/CalendarConnectionPanel.tsx) validates the gated Outlook disconnect follow-up before rendering a status and fixed Microsoft My Apps consent-removal link; the link has a 44px target and a visible 2px keyboard outline. A failed Google revocation retains the connection. Manage times, proposal checkboxes and booking-hour inputs have 44px targets; the final manual input/select recheck measures 44px at 390px, and required textarea intake measures 64px. | October 7, 2026, local preview fixtures only: desktop 1280px, mobile layout 390px, and representative 320px reflow. Native radio/checkbox Tab and arrow selection have visible 2px outlines. The generated visitor fixture uses the exported starter renderer/runtime with entirely synthetic transport and visible 3px field focus. State captures and exact limits live in [booking UI evidence](../../output/w6-bookings-ui/README.md). No provider write, authenticated save, physical-device or screen-reader proof. |
+| Booking customer and owner controls | [ManageBooking](../../src/experience/bookings/ManageBooking.tsx) owns the signed manage page and held confirmation, request, paused, unavailable and recovery states. [InquiryBookingOffer](../../src/experience/bookings/InquiryBookingOffer.tsx) never preselects a time or labels a request confirmed. Owner [BookingActions](../../src/experience/bookings/BookingActions.tsx) and [BookingHoursEditor](../../src/experience/bookings/BookingHoursEditor.tsx) retain the shared Button API and desktop compact sizing; buttons gain a 44px minimum height below 640px, in addition to the primitive's coarse-pointer sizing. [WorkspaceBookings](../../src/experience/bookings/WorkspaceBookings.tsx) adds gated authority/status/history, calendar health and record-hours evidence. [ProposeBookingTimes](../../src/experience/bookings/ProposeBookingTimes.tsx) lets an owner inspect the named inquiry recipient, choose up to three current times and explicitly send one request-mode reply; accepted, suppressed and unknown delivery remain distinct. [ManualBookingForm](../../src/experience/bookings/ManualBookingForm.tsx) takes an owner booking request using shared labelled service/time/customer/intake fields, preserves the customer draft on reopen, and separates the saved request from owner confirmation. The gated workspace-only path lists a real Bookings System without a website tenant; its setup prompt uses a Request, and taking a booking still requires the owner’s confirmation. [CalendarConnectionPanel](../../src/experience/scheduling/CalendarConnectionPanel.tsx) validates the gated Outlook disconnect follow-up before rendering a status and fixed Microsoft My Apps consent-removal link; the link has a 44px target and a visible 2px keyboard outline. A failed Google revocation is recorded while local credentials are cleared. Manage times, proposal checkboxes and booking-hour inputs have 44px targets; the final manual input/select recheck measures 44px at 390px, and required textarea intake measures 64px. | October 7, 2026, local preview fixtures only: desktop 1280px, mobile layout 390px, and representative 320px reflow. Native radio/checkbox Tab and arrow selection have visible 2px outlines. The generated visitor fixture uses the exported starter renderer/runtime with entirely synthetic transport and visible 3px field focus. State captures and exact limits live in [booking UI evidence](../../output/w6-bookings-ui/README.md). No provider write, authenticated save, physical-device or screen-reader proof. |
 | Tabs | REB Tabs.tsx. Shared variants implement a roving tab stop, orientation-aware keyboard navigation, disabled handling and optional panel relationships; the component reference uses actual tabs and `TabsPanel`. | Verify automatic/manual activation, selected tab stop, arrow/Home/End handling, panel relationships and visible focus in affected consumers; current local browser coverage is the component specimen, while route-like consumer semantics remain open. |
 | Marketing primitives and composition | Marketing owns its components and CSS. Earlier audit findings must be rechecked against current code. | Adopt the agreed measurements and semantic roles at primitive owners; migrate page controls without breaking brief persistence, dialogs, keyboard or recovery. |
 | Materials | REB owns AtmosphericCard; marketing has a separate implementation. Latest study variant 6 is not in the product API. | Choose any new material explicitly; record its implementation and consumers, and verify readability, pause, reduced motion and fallback. Similar-looking blur is not parity. |
@@ -210,6 +228,25 @@ plus partial and empty Loop ribbon and an empty AI mirror) and
 [outcomes-fixture.ts](../../src/experience/workspace/preview/outcomes-fixture.ts)
 (fictional Hertel Ave Bakery and Comfort Air). Checked in Chromium at 1440 and
 390 px with and without reduced motion: 200s, no console errors, no
+horizontal overflow. Jacob's visual acceptance, screen readers and physical
+devices remain open.
+
+### Agency setup checklist (October 7, flag off)
+
+[AgencyOnboarding](../../src/experience/workspace/agency/AgencyOnboarding.tsx)
+at `/workspace/agency/start` (#258, `STRELVA_AGENCY_SIGNUP_RELEASE`). Composed
+from `Button`, `TextInput` and dashboard tokens under `data-dashboard`; rules
+and whitespace group the steps, with no cards. One ordered list of four steps
+(profile, team, verification, first client), each with a ring or check mark
+and a text status ("Done", "Next", "Recorded by Strelva", "Not started"), so
+colour is never the only signal. Verification is a four-row list of effects
+with what each unlocks and "Not verified"/"Verified". The dashed monogram
+stands in for the agency logo until the brand layer (#264). States: loading,
+signed out (sign-in link back to `?as=agency`), not a member, failed read
+with retry, choose among several agencies, create (inline validation and
+the per-account cap message), ready. The `/sign-up` account-kind choice is
+two plain links in a pill group with `aria-current`. Checked in Chromium at
+1440 and 390 px by `tests/agency-signup.spec.ts` with intercepted APIs: no
 horizontal overflow. Jacob's visual acceptance, screen readers and physical
 devices remain open.
 
@@ -551,7 +588,16 @@ starting implementation.
 
 Publishing uses [ContentWorkspace](../../src/experience/publishing/ContentWorkspace.tsx)
 for exact-content review, collection publication/restore, and immutable newsletter
-issues with sending paused. [RecordPublishingFields](../../src/experience/publishing/RecordPublishingFields.tsx)
+issues. Native website Systems use the same panel and approval controls;
+publication confirms the content store, while website rendering remains unverified.
+Native newsletter approval stays paused. Approved issue data may include a separate
+optional `delivery` projection for linked tenants: current state, accepted/suppressed
+counts, unconfirmed batches and append-only batch receipts. The view preserves
+approved words and distinguishes provider acceptance, not-sent gates and unconfirmed
+sends; it never claims delivery. October 7, 2026, `a1/newsletter-sender`: accepted
+desktop and gated/unconfirmed 390px fixtures were observed locally. Sending still
+defaults off; see the [implementation handoff](../product/streams/a1-newsletter-sender.md).
+[RecordPublishingFields](../../src/experience/publishing/RecordPublishingFields.tsx)
 saves hours, special hours and website facts through the owner boundary, shows
 the optional Google approval disclosure, and reports each location separately
 as confirmed, awaiting approval, unapplied or unknown. Unknown writes never say
@@ -566,6 +612,9 @@ fixtures live at `/preview/strelva/publishing`; these do not prove provider writ
 | Button / IconButton | [Button.tsx](../../src/components/ui/Button.tsx) | Button variants primary, secondary, ghost, danger, contrast; sizes sm/md/lg; loading disables and sets aria-busy; `static` disables press scale. IconButton requires `label`. |
 | Card | [Card.tsx](../../src/components/ui/Card.tsx) | Default solid surface; padding none/sm/md/lg. md is 24 px padding/radius; sm is 16/16; lg is 32/24. `interactive` changes hover styling only, not semantics. |
 | Toggle | [Toggle.tsx](../../src/components/ui/Toggle.tsx) | Controlled checked/onChange, required accessible label, optional disabled, 44 px minimum hit height. |
+| Agency client and Queue rows | [AgencyViews.tsx](../../src/experience/workspace/agency/AgencyViews.tsx) | Existing row controls and tokens; released operator overview adds a separate health label beside lifecycle, scoped links into the client's System, and a named incomplete-source alert. Missing or stale health says Not verified. The old overview remains when the operator release flag is off. |
+| Version Possibilities | [SystemVersionImprovements.tsx](../../src/experience/systems/SystemVersionImprovements.tsx), [SystemPage.tsx](../../src/experience/systems/SystemPage.tsx) | Version improvements and unreleased alternatives share the existing Possibilities panel. Native disclosure compares current and alternative definitions; closed native app candidates reuse ApplicationDraftPreview with isolated test records. Conflicts show both values, and shared fields/buttons prepare a draft. Make real approves the existing exact `version_release` Needs you item; only the business owner can decide. Row revision pins invalidate edited candidates. Failed, foreign, stale and uncertain acknowledgments stay visible, and retries retain the same decision command. Local DOM tests cover these states. After the collaborative host disconnected, the existing headless Playwright runner verified 1280px/390px preparation and same-decision Make real, isolated native-app submission, keyboard focus, no page overflow, and mobile loading/error/empty/read-only/missing-account fixtures. These are fictional local records; no authenticated provider or production proof. |
+| Operator queue | [QueueBoard.tsx](../../src/app/admin/queue/QueueBoard.tsx), [QueueSourceActions.tsx](../../src/app/admin/queue/QueueSourceActions.tsx), [QueueLoadState.tsx](../../src/app/admin/queue/QueueLoadState.tsx) | Composes console Chips/Panels and shared Button/fields; row and source buttons use the shared 48px large control size, links and checkbox labels have 48px touch areas. Owner decisions offer only Stop chasing in the operator close form. The real loading, unavailable and permission states share the preview specimens at `/preview/strelva/operator-queue?scenario=loading`, `error`, or `denied`. |
 | AtmosphericCard | [AtmosphericCard.tsx](../../src/components/ui/atmosphere/AtmosphericCard.tsx) | Semantic section, ref forwarding, theme light/dark, numeric composition variant 0–5, contentClassName, optional controlled paused/onPausedChange. |
 | AtmosphericCardHeader / Detail / Footer | [AtmosphericCardParts.tsx](../../src/components/ui/atmosphere/AtmosphericCardParts.tsx) | Content slots inheriting card roles. Header accepts an optional decorative icon; caller supplies heading semantics. Detail is optional, never automatic filler. |
 | GooeyDisclosure | [GooeyDisclosure.tsx](../../src/components/ui/motion/GooeyDisclosure.tsx) | Controlled `open`, required `id`, children and optional className. Spring height, sharp content, inert when closed, reduced-motion support. |
@@ -729,3 +778,136 @@ marks business confirmation explicitly: calendar sync is a copy, and a pending
 request awaits the business. Native visitor forms accept optional phone and show
 slots and receipts in the browser time zone, with the zone named. Without native
 authority metadata, the flags-off flow keeps its fields and provider wording.
+
+### Inquiry System detail (wave 6)
+
+`src/experience/places/InquirySystemDetails.tsx` composes the owned `TextInput`,
+`TextArea`, `SelectInput` and `Button` for a viewing copy of the accepted inquiry
+form. The published form comes first, the existing records follow, and typed
+Connections and recorded History sit below. Lifecycle and health stay separate.
+The viewing copy cannot submit an inquiry. The component preserves records during
+loading and errors, offers retry, aborts old business reads, and never projects
+private routing destinations into form data. Connected and native website sources
+are named without fabricating their current form or History; external forms are
+explicitly managed on the business’s own site. Fixture projection, authorization,
+publication health and failure states have focused local tests; desktop/mobile
+browser inspection remains separate evidence in the stream handoff.
+
+### Inquiry booking choice (wave 6)
+
+[InquiryBookingChoice](../../src/experience/bookings/InquiryBookingChoice.tsx) composes Card and Button for the signed customer choice page. It shows up to three actual appointment times, a saved requested/confirmed booking, an expired link or a storage error. Each time uses a plain POST form; opening a mail link never requests an appointment. Dates use the booking time zone, controls have visible labels, and failure text uses an alert. The component does not confirm appointments or send email. Desktop/mobile visual proof belongs in the inquiry stream handoff.
+
+`InquiryBookingOfferComposer` uses shared Button and SelectInput to prepare up to
+three times and append their signed choices to the existing exact-message reply.
+Preparation sends nothing. Loading disables selection; failures preserve the
+editable inquiry reply. Only the owner can add a booking proposal. The local
+System browser journey covers selection, no send before approval, receipt and
+390px keyboard use.
+
+### Operator inquiry review (wave 6)
+
+`OperatorInquiryReview` and `OperatorInquiryActions` compose console Panel/Chip
+and shared Button (`lg`). `/admin/client-leads/inquiries` is super-admin-only,
+paged and bounded. With flags off, the existing lead screen stays unchanged.
+Held-message decisions never email. Corrected-recipient notice repairs show
+refusals separately from accepted provider receipts. Local fictional previews
+cover held, empty, loading, error and permission states at 1440px and 390px,
+visible keyboard focus and no horizontal overflow. The stream handoff records
+the 28 focused tests and isolated SQL fixture; this is not provider or production
+proof.
+
+Workspace inquiry replies: current owner/member/none permission comes from the scoped inquiry read. Assigned or routed members see “Send reply” and the owner approval requirement for prices, dates and promises; unassigned members see the permission explanation. Booking commitments stay owner-only.
+
+### Inquiry Versions in the agency Library (wave 6)
+
+`src/experience/workspace/agency/AgencyLibraryView.tsx` includes read-only inquiry
+Versions projected from the existing accepted pattern installations. Source
+revision and the client’s own release are separate. Source access comes from
+current agency links, target access from current tenant memberships, and both
+inquiry release switches still apply. No inquiry data, permissions, connections,
+credentials or shape snapshots are copied into the Library. Unavailable reads
+remain explicit. The existing client inquiry review and testing commands handle
+updates; the owner still approves going live. The rows use the existing type,
+border and spacing tokens, wrap on mobile, and expose keyboard-focusable links.
+Focused server, current Library tab and desktop/mobile fixture tests cover this
+projection; local proof does not establish production adoption.
+
+### Inquiry policy sentences in Running (wave 6)
+
+`src/experience/workspace/InquiryRunning.tsx` reads the same strict-gated System
+projection used by the Inquiries page. It displays only the current policy for
+an accepted inquiry form, with policy hours, daily limit, trust/approval route,
+and separate paused or needs-checking state. It does not promise a universal
+reply deadline or create another standing responsibility. The existing Running
+surface retains operational work. Off flags hide the section without a read;
+revoked/delegated access shows no inquiry policy. Loading and storage errors
+leave other work available; retries use the shared Button. Scoped identity and
+aborted requests discard old sentences when the business changes. Current
+projection, integration, gate, zero, pause and failure tests plus desktop/mobile
+rendered fixtures cover the component locally.
+
+## Business portability
+
+`WorkspaceExport` and `WorkspaceExit` compose shared Button, Card and fields.
+Export schema 3 exposes background preparation, an authenticated ready download,
+and retained failure/expiry messages; the bounded legacy export remains with
+schema 3 off. Exit keeps loading, error/retry, permission refusal and retained
+billing/provider/site handoff obligations explicit. Optional request injection
+uses the existing fetch default and permits fictional local review without
+provider writes. `/preview/strelva/portability?surface=export|exit&state=ready|loading|error|permission|empty|completed`
+is gated by development and `STRELVA_UI_PREVIEW=1`; fixtures prove presentation,
+not export completeness or production handoff.
+
+
+October 7, 2026, local: the System Versions panel now shows each scoped sibling’s reusable definition changes in keyboard-native disclosures, with source-baseline and local values, removed-path labels, and explicit empty/Not verified states. Private records, bindings, grants, maintenance authority and secret-shaped content are omitted by the scoped PostgreSQL projection. `sibling=ready|empty|unavailable` selects fictional comparison states in the existing preview.
+
+### Agent booking source, October 7, 2026
+
+`WorkspaceBookings` reuses Card, semantic status text, native details disclosures
+and existing navigation. Agent source is a wrapping text pill using the owned
+gray surface tokens; it grants no authority. The source filter preserves the
+chosen date and view, has 44px targets, and names the selected source with
+`aria-current`. Delegated reads hide all booking actions. `ManageBooking` reuses
+its receipt definition list for Source. These additions are default off under
+`STRELVA_BOOKING_AGENT_VISIBILITY`; agent names are supplied at booking.
+Local proof and remaining limits live in
+[the #304 handoff](../product/streams/a1-agent-bookings-visible.md).
+
+### Agency check attribution (October 7, local)
+
+`AiVisibilityPage`, `AiVisibilityResultView`, and `WebsiteAuditPage` retain their
+owned forms/result geometry and semantic marketing tokens. Public attributed
+results add name-only agency identity, neutral provider advice and an agency
+contact CTA. Embed routes compose those same components without account chrome.
+The shared email layout retains optional `preparedBy` compatibility; absent identity
+retains the existing Strelva logo markup. The agency brand contract below owns rich identity.
+The agency prospects page uses a semantic table, scoped to direct agency members.
+See [the stream contract](../product/streams/a1-agency-prospecting.md) for flag,
+state, permission and local-proof limitations; no visual acceptance or production
+adoption is implied.
+
+### October 7 public booking email confirmation
+
+`/booking-confirm/[token]` uses the owned `Card` and `Button` primitives and
+semantic canvas/text roles. Opening the page is read-only; the native form
+POSTs to its action route. Expired/unavailable and rate-limit states keep the
+customer from claiming a booking was made. This is local implementation for
+#529; no production adoption or new visual-system decision is implied.
+
+### Agency owner brand (#264, local implementation)
+
+`OwnerBrandIdentity` accepts an authorized `OwnerBrand` presentation value. It
+renders a bounded raster logo, wrapping name, optional reply contact and retained
+"Runs on Strelva." credit. Any six-digit accent may fill the identity; black or
+white text is selected at 4.5:1 minimum contrast. The sidebar `rail` variant uses
+the owned surface and an accent rule, avoiding a second name/logo block.
+`StrelvaShell.ownerBrand` supplies workspace identity; legacy tenant shells read
+the authorized owner-brand endpoint. A changed workspace cannot reuse the last
+workspace's fetched identity. Strelva controls and authority remain explicit.
+
+`AgencyBrandEditor` composes owned `TextInput` and `Button` with native file input,
+save/error status and preview. Only direct agency owners can persist a brand.
+Public attributed audit/AI-check components and email layouts consume the same
+presentation contract, retaining native identity without agency attribution.
+R23 remains open: this implements brand presentation, not an accepted decision
+to remove platform identity. See [#264 evidence and limits](../product/streams/a1-agency-brand.md).

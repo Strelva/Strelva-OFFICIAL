@@ -120,15 +120,22 @@ export function compareWorkspaceTarget(catalog, deployment, migrations, options)
   };
 }
 
+// Retained helpers are explicit exceptions; new rollbacks use the timestamped
+// convention. Never broaden this to rollback-*.sql: typos must fail closed.
+export const MANUAL_MIGRATION_HELPERS = Object.freeze([
+  "rollback-business-effort-coverage.sql",
+  "rollback-identity-spine-expand.sql",
+  "rollback-newsletter-backfill-identity.sql",
+  "rollback-org-layer-phase0.sql",
+  "rollback-workspace-newsletter-sender.sql",
+  "verify-identity-spine-expand.sql",
+]);
+const manualHelpers = new Set(MANUAL_MIGRATION_HELPERS);
+export const ROLLBACK_HELPER_PATTERN = /^rollback-\d{14}_.+\.sql$/;
+
 export function readCandidateMigrations(directory) {
-  // These retained manual helpers are not forward migrations. Keep the list
-  // explicit so an accidentally misnamed new migration still fails closed.
-  const helpers = new Set([
-    "rollback-identity-spine-expand.sql",
-    "rollback-org-layer-phase0.sql",
-    "verify-identity-spine-expand.sql",
-  ]);
-  return readdirSync(directory).filter(name => name.endsWith(".sql") && !helpers.has(name)).sort().map(name => {
+  return readdirSync(directory).filter(name => name.endsWith(".sql") &&
+    !manualHelpers.has(name) && !ROLLBACK_HELPER_PATTERN.test(name)).sort().map(name => {
     const match = /^(\d{14})_(.+)\.sql$/.exec(name);
     if (!match) throw new Error("Candidate contains a non-versioned SQL migration filename.");
     return { version: match[1], name: match[2] };

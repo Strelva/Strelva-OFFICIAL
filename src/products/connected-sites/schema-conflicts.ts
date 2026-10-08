@@ -1,19 +1,25 @@
 /** Connected-site observations become a record-only Needs you ask. Never edits or emails. */
 import { createHash } from "node:crypto";
+import { fetchPinnedPublicText } from "@/lib/pinned-public-text";
 import type { ProposedItem } from "@/platform/needs-you/contracts";
 import { schemaConflictReleaseEnabled } from "@/platform/needs-you/release";
 import { connectedSitesStore, type ConnectedSitesStore } from "./store";
 import { publicFactsFromRecord, type ResolvedConnectedSite } from "./contracts";
-import { comparePlatformSchema, platformSchemaReportSchema, schemaConflictSignature } from "./schema-facts";
+import { comparePlatformSchema, platformSchemaFromHtml, platformSchemaHintSchema, schemaConflictSignature } from "./schema-facts";
 
-export async function recordPlatformSchema(publicKey: string, site: ResolvedConnectedSite, origin: string | null, raw: unknown, store: ConnectedSitesStore = connectedSitesStore()): Promise<void> {
+export async function recordPlatformSchema(publicKey: string, site: ResolvedConnectedSite, origin: string | null, raw: unknown, store: ConnectedSitesStore = connectedSitesStore(), deps: { fetchPage?: (url: string) => Promise<string | null> } = {}): Promise<void> {
   if (!schemaConflictReleaseEnabled() || !site.injectSchema) return;
-  const report = platformSchemaReportSchema.parse(raw);
+  platformSchemaHintSchema.parse(raw);
+  let html: string | null = null;
+  try { html = await (deps.fetchPage ?? (url => fetchPinnedPublicText(url, { timeoutMs: 8000, maxBytes: 2_000_000 })))(site.siteUrl); }
+  catch { return; }
+  if (html === null) return;
+  const report = platformSchemaFromHtml(html);
   // This RPC exposes only owner/operator-stated or verified facts. Guesses
   // never enter the comparator, and no owner account/session is required.
   const context = await store.context(publicKey);
   if (!context) return;
-  const conflicts = comparePlatformSchema(report, publicFactsFromRecord(context));
+  const conflicts = comparePlatformSchema(report, publicFactsFromRecord(context), site.siteUrl);
   if (!conflicts.length) return;
   const item: ProposedItem = {
     kind: "fact.inferred", route: "owner_decides", sourceLifecycle: "connected_site_schema", sourceId: site.id,

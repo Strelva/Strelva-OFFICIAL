@@ -20,6 +20,7 @@ import {
 import { systemsReleaseEnabled, systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";
 import { inquiryReleaseEnabled, inquiryReleaseEnabledForWorkspace } from "@/products/inquiries/release";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
+import { setOperatorApprovalsDb } from "@/platform/workspaces/operator-approvals";
 
 const WS = "7f000000-0000-4000-8000-000000000010";
 const TESTER = "7f000000-0000-4000-8000-000000000005";
@@ -41,6 +42,7 @@ function fakeDb(data: unknown, error: { message: string } | null = null) {
 
 afterEach(() => {
   setReleaseFlagsDb(null);
+  setOperatorApprovalsDb(null);
   vi.unstubAllEnvs();
 });
 
@@ -148,21 +150,44 @@ describe("per-workspace resolution through the store", () => {
 
   it("covers every flag the spec names", () => {
     expect([...RELEASE_FLAGS].sort()).toEqual([
-      "catalog_reports", "connected_sites", "inquiries", "internal_tool_notices",
+      "approval_store", "catalog_reports", "connected_sites", "finite_jobs", "inquiries", "internal_tool_notices",
       "make_real_live:booking_page", "make_real_live:hosted_website", "make_real_live:inquiry_form",
       "make_real_live:internal_app", "make_real_live:tenant_content",
-      "make_real_owner_link", "newsletter_contacts", "owner_entry", "publishing", "publishing_record_google_policy", "systems", "website_rebuild",
+      "make_real_owner_link", "newsletter_contacts", "owner_decision_links", "owner_entry", "publishing", "publishing_record_google_policy", "systems", "website_rebuild",
     ]);
   });
 });
 
 describe("operator writes", () => {
-  const input = { operatorEmail: "Op@Example.test", workspaceId: WS, flag: "owner_entry" as const, state: "operators" as const, reason: "Walk the pages", expectedRevision: 0 };
+  const actor = { userId: "33333333-3333-4333-8333-333333333333", verifiedEmail: "op@example.test" };
+  const input = { actor, workspaceId: WS, flag: "owner_entry" as const, state: "operators" as const, reason: "Walk the pages", expectedRevision: 0 };
 
-  it("sends the normalized operator email and the expected revision", async () => {
+  it("sends the verified user ID and expected revision", async () => {
     const rpc = fakeDb(rows({ owner_entry: "operators" }));
     await setWorkspaceReleaseFlag(input);
-    expect(rpc).toHaveBeenCalledWith("set_workspace_release_flag", expect.objectContaining({ p_operator_email: "op@example.test", p_expected_revision: 0, p_state: "operators" }));
+    expect(rpc).toHaveBeenCalledWith("set_workspace_release_flag_approved", expect.objectContaining({ p_operator_user_id: actor.userId, p_expected_revision: 0, p_state: "operators", p_approval_id: null }));
+  });
+
+  it("records a same-operator audited approval before switching a flag on", async () => {
+    const approvalId = "55555555-5555-4555-8555-555555555555";
+    const approvalRpc = vi.fn(async (_name: string, args: Record<string, unknown>) => ({ data: {
+      approvalId, workspaceId: args.p_workspace_id, actionKind: args.p_action_kind, target: args.p_target,
+      approvedBy: actor.userId, approvedEmail: actor.verifiedEmail, approvedAt: "2026-10-07T12:00:00Z", expiresAt: "2026-10-07T12:15:00Z",
+    }, error: null }));
+    setOperatorApprovalsDb({ rpc: approvalRpc });
+    const flagRpc = vi.fn(async (name: string) => ({
+      data: name === "read_workspace_release_flags" ? rows({ owner_entry: "operators" }) : rows({ owner_entry: "on" }), error: null,
+    }));
+    setReleaseFlagsDb({ rpc: flagRpc });
+    await setWorkspaceReleaseFlag({ ...input, state: "on", auditContext: { source: "cli", osUser: "jacob", machine: "laptop" } });
+    expect(approvalRpc).toHaveBeenCalledWith("create_operator_action_approval", expect.objectContaining({
+      p_approver_user_id: actor.userId,
+      p_target: { flag: "owner_entry", state: "on", reason: "Walk the pages" },
+      p_audit_context: { source: "cli", osUser: "jacob", machine: "laptop" },
+    }));
+    expect(flagRpc).toHaveBeenCalledWith("set_workspace_release_flag_approved", expect.objectContaining({
+      p_operator_user_id: actor.userId, p_approval_id: approvalId, p_state: "on",
+    }));
   });
 
   it("maps a non-operator to an access error, a race to a conflict and bad input to validation", async () => {

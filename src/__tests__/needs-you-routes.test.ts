@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   actor: vi.fn(),
   workspaces: vi.fn(),
   undo: vi.fn(),
+  superAdmin: vi.fn(async () => false),
 }));
 
 vi.mock("@/lib/cron-auth", () => ({ requireCronRequest: mocks.auth }));
@@ -21,11 +22,14 @@ vi.mock("@/platform/infra/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat 
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: vi.fn(async () => false) }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: mocks.workspaceReleased }));
 vi.mock("@/platform/workspaces", () => ({ listWorkspaces: mocks.workspaces }));
+vi.mock("@/platform/infra/db/repositories", () => ({ isSuperAdminUser: mocks.superAdmin }));
 vi.mock("@/platform/needs-you/server", () => ({
   needsYouReleaseEnabled: mocks.released,
   needsYouService: () => ({ chase: mocks.chase, list: mocks.list, decide: mocks.decide }),
+  needsYouStore: {},
   readStrelvaHandled: mocks.handled,
 }));
+vi.mock("@/app/workspace/business-details/native-website-facts", () => ({ createConfirmedNativeFactsEffect: () => "native-facts-effect" }));
 vi.mock("@/platform/business-record", () => ({
   undoBusinessRecordRevision: mocks.undo,
   BusinessRecordConflictError: class extends Error { code = "business_record_undo_conflict"; },
@@ -52,6 +56,7 @@ beforeEach(() => {
   mocks.workspaces.mockResolvedValue([{ id: WS, kind: "customer", access: "member", role: "owner", name: "Mooney" }]);
   mocks.list.mockResolvedValue({ items: [], complete: true });
   mocks.handled.mockResolvedValue([]);
+  mocks.superAdmin.mockResolvedValue(false);
 });
 
 describe("needs-you cron", () => {
@@ -134,6 +139,30 @@ describe("/api/workspace/needs-you", () => {
     expect((await POST(jsonPost("https://app.example.test/api/workspace/needs-you", body))).status).toBe(403);
     mocks.decide.mockResolvedValueOnce({ status: "changed", item: null });
     expect((await POST(jsonPost("https://app.example.test/api/workspace/needs-you", body))).status).toBe(409);
+  });
+
+  it("refuses a Strelva operator holding an admin seat: the owner decides (#530)", async () => {
+    const { POST } = await import("@/app/api/workspace/needs-you/route");
+    const body = { workspaceId: WS, itemId: ITEM, revision: "a".repeat(64), decision: "approve" };
+    mocks.superAdmin.mockResolvedValue(true);
+    mocks.workspaces.mockResolvedValue([{ id: WS, kind: "customer", access: "member", role: "admin", name: "Mooney" }]);
+    const refused = await POST(jsonPost("https://app.example.test/api/workspace/needs-you", body));
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toMatchObject({ status: "forbidden" });
+    expect(mocks.superAdmin).toHaveBeenCalledWith(ACTOR.userId);
+    expect(mocks.decide).not.toHaveBeenCalled();
+  });
+
+  it("lets a super admin who owns the business decide, and an ordinary admin reach the SQL check", async () => {
+    const { POST } = await import("@/app/api/workspace/needs-you/route");
+    const body = { workspaceId: WS, itemId: ITEM, revision: "a".repeat(64), decision: "approve" };
+    mocks.decide.mockResolvedValue({ status: "done", item: { id: ITEM } });
+    mocks.superAdmin.mockResolvedValue(true);
+    expect((await POST(jsonPost("https://app.example.test/api/workspace/needs-you", body))).status).toBe(200);
+    mocks.superAdmin.mockResolvedValue(false);
+    mocks.workspaces.mockResolvedValue([{ id: WS, kind: "customer", access: "member", role: "admin", name: "Mooney" }]);
+    expect((await POST(jsonPost("https://app.example.test/api/workspace/needs-you", body))).status).toBe(200);
+    expect(mocks.decide).toHaveBeenCalledTimes(2);
   });
 
   it("refuses a cross-site post and a malformed body", async () => {

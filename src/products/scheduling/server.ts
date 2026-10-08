@@ -180,7 +180,8 @@ export const calendarSchedulingService = createCalendarSchedulingService(undefin
 // resolver, receipt store, and governed calendar adapter stay server-only.
 export { createPublicWebsiteBookingService, resolvePublishedPublicBooking } from "./public-booking-server";
 export { recoverPublicWebsiteBooking } from "./public-booking-recovery";
-export { listPublicWebsiteBookingGrants, publishPublicWebsiteBookingGrant, revokePublicWebsiteBookingGrant } from "./public-booking-admin";
+export { listPublicWebsiteBookingGrants, publishPublicWebsiteBookingGrant, revokePublicWebsiteBookingGrant, readWorkspacePublicBookingReceipts } from "./public-booking-admin";
+export { publicBookingScheduleSchema } from "./public-booking";
 export {
   PublicBookingError,
   publicBookingRangeSchema,

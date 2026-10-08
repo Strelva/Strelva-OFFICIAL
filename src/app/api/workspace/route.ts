@@ -1,3 +1,6 @@
+import { resolveOwnerBrand } from "@/platform/agency-brand/server";
+import { agencyProspectingEnabled } from "@/platform/agency-prospecting/server";
+import { agencyAddClientReleaseEnabled } from "@/products/agency-clients";
 import { websiteRebuildReleaseEnabledForWorkspace, websiteRebuildReleasedFor } from "@/products/websites/index";
 import { websiteRebuildSchema } from "@/products/websites/index";
 import { initializeRebuildHandoff } from "@/products/websites/index";
@@ -11,6 +14,8 @@ import { getSessionUser } from "@/platform/infra/db/server-client";
 import { isSuperAdminUser } from "@/platform/infra/db/repositories";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
+import { WORKSPACE_LIMIT_MESSAGE } from "@/platform/workspaces/types";
+import { agencySignupReleaseEnabled } from "@/platform/agency-signup-release";
 import type { ProductDefinition } from "@/platform/products";
 import { workspaceDiscoveryProducts, workspaceExecutables } from "@/capability-registry";
 import {
@@ -27,6 +32,7 @@ import {
 import { listManagedPresenceWork } from "@/products/managed-presence/server";
 import { publicHostname } from "@/products/managed-presence";
 import { resolveHomeFinderPreviewHref } from "@/products/home-finder/server";
+import { inquiryRecordsEnabled } from "@/platform/infra/inquiry-records";
 import { inquiryReleaseEnabledForWorkspace } from "@/products/inquiries";
 import { parseTrackerWorkPayload, presentTrackerHandoffPreview } from "@/products/tracker";
 import { presentWorkspaceWork } from "@/experience/workspace/result";
@@ -79,6 +85,7 @@ function failed(error: unknown) {
   if (error instanceof WorkspaceOperationPendingError) return json({ error: error.message }, 409);
   if (error instanceof Error && error.name === "PublicWebsiteAuditUnavailableError") return json({ error: "This website report has expired or is unavailable. Run another audit." }, 404);
   if (error instanceof WorkspaceAccessError) return json({ error: "This work or invitation is unavailable to your account." }, 403);
+  if (error instanceof WorkspaceConflictError && error.message === WORKSPACE_LIMIT_MESSAGE) return json({ error: WORKSPACE_LIMIT_MESSAGE, code: "workspace_limit_reached" }, 409);
   if (error instanceof WorkspaceConflictError) return json({ error: "This action is no longer available or a workspace limit has been reached. Refresh your workspace before continuing." }, 409);
   if (error instanceof Error && ["PrivateAiVisibilityAssessmentRateLimitError", "PublicAiVisibilityImportRateLimitError"].includes(error.name)) {
     return json({ error: error.name === "PublicAiVisibilityImportRateLimitError"
@@ -300,6 +307,7 @@ export async function GET(request: Request) {
     // off for this workspace. The route still enforces the flag per site.
     if (inquiriesReleased) products.push({ id: "inquiries", name: "Inquiry work", description: "Keep customer requests moving with a clear, inspectable thread.", availability: "available" });
     const snapshot: WorkspaceSnapshot = {
+      ownerBrand: await resolveOwnerBrand(selected.id),
       actor: { email: current.verifiedEmail, localPreview: false },
       workspaces: workspaces.map(({ id, kind, name, access, role }) => ({ id, kind, name, access, role })), workspaceId: selected.id,
       workspaceExitState,
@@ -313,7 +321,7 @@ export async function GET(request: Request) {
       ...(providedClients ? { providedClients } : {}),
       products,
       ...(systems ? { systems } : {}),
-      releases: { systems: systemsReleased, needsYou: needsYouReleaseEnabled(), ask: askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}) },
+      releases: { ...(agencyProspectingEnabled() ? { agencyProspecting: true } : {}), systems: systemsReleased, needsYou: needsYouReleaseEnabled(), ...(agencySignupReleaseEnabled() ? { agencySetup: true } : {}), ...(agencyAddClientReleaseEnabled() ? { agencyAddClient: true } : {}), ask: askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, ...(inquiriesReleased && inquiryRecordsEnabled() ? { inquiryInbox: true } : {}), websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}) },
     };
     return json(snapshot);
   } catch (error) { return failed(error); }

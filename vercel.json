@@ -5,6 +5,10 @@
   },
   "crons": [
     {
+      "path": "/api/cron/workspace-export-recovery",
+      "schedule": "*/10 * * * *"
+    },
+    {
       "path": "/api/cron/domain-monitor",
       "schedule": "*/30 * * * *"
     },
@@ -131,6 +135,10 @@
     {
       "path": "/api/cron/connected-sites-purge",
       "schedule": "50 5 * * *"
+    },
+    {
+      "path": "/api/cron/newsletter-sender",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

@@ -20,6 +20,8 @@
  * tenant that stays "inherit".
  */
 
+import { mirrorClientRecord } from "@/platform/client-records/mirror";
+import { readThroughFlag } from "@/platform/client-records/move";
 import { getRedis } from "@/platform/infra/redis";
 
 export type ClientEmailOverride = "inherit" | "on" | "off";
@@ -32,14 +34,20 @@ function key(tenant: string): string {
 }
 
 /** Read a tenant's client-email override. Defaults to "inherit". Null-safe. */
-export async function getClientEmailOverride(tenant: string): Promise<ClientEmailOverride> {
+export async function getClientEmailOverride(tenant: string, options: { failClosed?: boolean } = {}): Promise<ClientEmailOverride> {
+  return readThroughFlag("tenant_settings", tenant, () => getRedisOverride(tenant, options), (rows) => {
+    const value = rows.find((r) => r.recordId === "client_email")?.payload.value;
+    return value === "on" || value === "off" ? value : DEFAULT_CLIENT_EMAIL_OVERRIDE;
+  });
+}
+async function getRedisOverride(tenant: string, options: { failClosed?: boolean }): Promise<ClientEmailOverride> {
   const redis = getRedis();
-  if (!redis) return DEFAULT_CLIENT_EMAIL_OVERRIDE;
+  if (!redis) return options.failClosed ? "off" : DEFAULT_CLIENT_EMAIL_OVERRIDE;
   try {
     const stored = await redis.get<string>(key(tenant));
     return stored === "on" || stored === "off" ? stored : DEFAULT_CLIENT_EMAIL_OVERRIDE;
   } catch {
-    return DEFAULT_CLIENT_EMAIL_OVERRIDE;
+    return options.failClosed ? "off" : DEFAULT_CLIENT_EMAIL_OVERRIDE;
   }
 }
 
@@ -51,6 +59,9 @@ export async function setClientEmailOverride(
   const value: ClientEmailOverride =
     state === "on" || state === "off" ? state : DEFAULT_CLIENT_EMAIL_OVERRIDE;
   const redis = getRedis();
-  if (redis) await redis.set(key(tenant), value);
+  if (redis) {
+    await redis.set(key(tenant), value);
+    await mirrorClientRecord("tenant_settings", tenant, { recordId: "client_email", payload: { value }, capturedAt: new Date().toISOString() });
+  }
   return value;
 }

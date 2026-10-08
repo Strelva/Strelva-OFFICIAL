@@ -1,8 +1,11 @@
 "use client";
+import { OwnerBrandIdentity } from "@/components/brand/OwnerBrandIdentity";
+import { STRELVA_BRAND } from "@/platform/infra/agency-brand";
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { ArrowRight, Check, CheckCircle2, Share2, XCircle } from "lucide-react";
+import { attributedAiVisibility } from "./attribution";
 import type { AiVisibilityResult, Grade } from "./contracts";
 
 interface AiVisibilityResultViewProps {
@@ -25,7 +28,9 @@ function gradeColor(grade: Grade): string {
   }
 }
 
-export function AiVisibilityResultView({ result, scanId, shareUrl, workspaceEnabled = false, onReset }: AiVisibilityResultViewProps) {
+export function AiVisibilityResultView({ result: raw, scanId, shareUrl, workspaceEnabled = false, onReset }: AiVisibilityResultViewProps) {
+  const result = attributedAiVisibility(raw, raw.agency);
+  const agency = result.agency;
   const [shareStatus, setShareStatus] = useState<"idle" | "copied">("idle");
   const [email, setEmail] = useState("");
   const [monitorState, setMonitorState] = useState<MonitorState>("idle");
@@ -80,6 +85,7 @@ export function AiVisibilityResultView({ result, scanId, shareUrl, workspaceEnab
 
   return (
     <div className="motion-rise">
+      {agency && <OwnerBrandIdentity brand={{ ...STRELVA_BRAND, agencyId: agency.workspaceId, name: agency.name, logoUrl: agency.brand.logoUrl, accentColor: agency.brand.accentColor ?? STRELVA_BRAND.accentColor, replyTo: agency.replyTo ?? null }} />}
       <div className="flex flex-col items-center text-center">
         <div className="flex size-28 items-center justify-center rounded-full border-4 sm:size-32" style={{ borderColor: measured ? gradeColor(result.grade) : "var(--m-rule)", background: measured ? `color-mix(in oklch, ${gradeColor(result.grade)} 10%, transparent)` : "var(--m-panel)" }}>
           <div>
@@ -139,14 +145,14 @@ export function AiVisibilityResultView({ result, scanId, shareUrl, workspaceEnab
 
       {scanId && (
         <div className="mt-8 rounded-2xl border border-m-rule-soft bg-m-panel p-6">
-          <h3 className="text-lg font-semibold text-m-text">Join the monitoring pilot</h3>
-          <p className="mt-2 text-[14px] leading-[1.6] text-m-text-2">We’re testing recurring AI Visibility checks. Leave your email and we’ll contact you when a monitoring spot opens.</p>
+          <h3 className="text-lg font-semibold text-m-text">{agency ? `Contact ${agency.name}` : "Join the monitoring pilot"}</h3>
+          <p className="mt-2 text-[14px] leading-[1.6] text-m-text-2">{agency ? `Leave your email to ask ${agency.name} about recurring AI Visibility checks.` : "We’re testing recurring AI Visibility checks. Leave your email and we’ll contact you when a monitoring spot opens."}</p>
           {monitorState === "saved" ? (
-            <p className="mt-4 flex items-center gap-2 text-[14px] font-medium text-m-success"><CheckCircle2 className="size-5" />You’re on the pilot list.</p>
+            <p className="mt-4 flex items-center gap-2 text-[14px] font-medium text-m-success"><CheckCircle2 className="size-5" />{agency ? `Your request was sent to ${agency.name}.` : "You’re on the pilot list."}</p>
           ) : (
             <form onSubmit={handleMonitor} className="mt-4 flex flex-col gap-3 sm:flex-row">
-              <input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@business.com" autoComplete="email" className="h-12 min-w-0 flex-1 rounded-xl border border-m-rule bg-m-surface px-4 text-[15px] text-m-text outline-none placeholder:text-m-text-3 focus:border-m-accent" />
-              <button type="submit" disabled={monitorState === "saving"} className="marketing-button-secondary h-12 px-5 disabled:opacity-60">{monitorState === "saving" ? "Saving…" : "Join pilot"}</button>
+              <input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} aria-label="Email address" placeholder="you@business.com" autoComplete="email" className="h-12 min-w-0 flex-1 rounded-xl border border-m-rule bg-m-surface px-4 text-[15px] text-m-text outline-none placeholder:text-m-text-3 focus:border-m-accent" />
+              <button type="submit" disabled={monitorState === "saving"} className="marketing-button-secondary h-12 px-5 disabled:opacity-60">{monitorState === "saving" ? "Saving…" : agency ? "Send request" : "Join pilot"}</button>
             </form>
           )}
           {monitorError && <p role="alert" className="mt-3 text-[13px] text-m-danger">{monitorError}</p>}
@@ -155,9 +161,9 @@ export function AiVisibilityResultView({ result, scanId, shareUrl, workspaceEnab
 
       <div className="mt-10 rounded-2xl border border-m-accent bg-m-accent-faint p-6 text-center sm:p-8">
         <h3 className="text-xl font-semibold text-m-text sm:text-2xl">Want to be the answer AI gives?</h3>
-        <p className="mx-auto mt-3 max-w-[480px] text-[15px] leading-[1.6] text-m-text-2">Strelva builds and manages local business websites so their facts are easier for people and AI systems to find, understand, and trust.</p>
+        <p className="mx-auto mt-3 max-w-[480px] text-[15px] leading-[1.6] text-m-text-2">{agency ? `Ask ${agency.name} about improving these results. Share this scorecard to agree the work.` : "Strelva builds and manages local business websites so their facts are easier for people and AI systems to find, understand, and trust."}</p>
         <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Link href={`/access-request?ref=ai-visibility${scanId ? `&scan=${encodeURIComponent(scanId)}` : ""}`} className="marketing-button-primary h-12 px-6">Get this fixed <ArrowRight className="size-4" /></Link>
+          <Link href={agency?.contactUrl ?? `/access-request?ref=ai-visibility${scanId ? `&scan=${encodeURIComponent(scanId)}` : ""}`} target={agency ? "_blank" : undefined} rel={agency ? "noopener noreferrer" : undefined} className="marketing-button-primary h-12 px-6">Get this fixed <ArrowRight className="size-4" /></Link>
           <button type="button" onClick={onReset} className="marketing-button-secondary h-12 px-6">Audit another business</button>
         </div>
       </div>

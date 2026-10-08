@@ -11,7 +11,8 @@ import { listAgencyDelegations, listWorkspaces, WorkspaceAccessError, type Works
 export async function workPlanFundingWorkspace(actor: WorkspaceActor, workspaceId: string): Promise<string> {
   if (!await systemsReleasedFor(actor, workspaceId)) return workspaceId;
   const authority = await assertCanMakeSystems(actor, workspaceId);
-  if (authority === "operator") return workspaceId;
+  // The acting provider works inside the business, as a direct member would.
+  if (authority === "provider") return workspaceId;
   const agencies = (await listWorkspaces(actor)).filter(workspace => workspace.kind === "agency" && workspace.access === "member").sort((a, b) => a.id.localeCompare(b.id));
   for (const agency of agencies) {
     const delegations = await listAgencyDelegations(actor, agency.id);

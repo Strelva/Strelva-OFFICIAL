@@ -165,6 +165,9 @@ export const SOURCE_LIFECYCLES = [
   "version_release",
   "booking_request",
   "booking_settings",
+  "inquiry_fact",
+  "business_record_draft",
+  "business_facts",
   "connected_site_schema",
 ] as const;
 export type SourceLifecycle = (typeof SOURCE_LIFECYCLES)[number];
@@ -199,6 +202,12 @@ export const ownerDecisionSchema = z.object({
   expiresAt: isoSchema,
   reminded1At: isoSchema.nullable(),
   reminded2At: isoSchema.nullable(),
+  /**
+   * Not stored. Set by the service for a source whose item detail can't hold
+   * every value (SourceAdapter.review): the complete lines the owner approves.
+   * Null: the review could not be shown, so the item can't be decided here.
+   */
+  review: z.array(z.string()).nullable().optional(),
   /** "Strelva (system)" when the hourly cron opened it for an owner who wasn't signed in (20261009100000). */
   openedBy: z.literal("Strelva (system)").nullable().optional(),
   deliveries: z.array(z.object({

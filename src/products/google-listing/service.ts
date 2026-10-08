@@ -23,7 +23,10 @@ import { hoursMatch, hoursToGoogle, infoMatches, infoToGoogle, type RecordInfo }
  *   1. refuses while the listing is Paused (reviews still sync, nothing posts);
  *   2. needs an authority (owner approval, a recorded operator instruction,
  *      or the auto-reply policy for a 3+ star reply). The Google token is
- *      never authority;
+ *      never authority. An operator instruction or undo is an agency acting
+ *      for the business, so it also needs ctx.authorizeProvider (the acting
+ *      provider for `google` on this location, #255), checked before the
+ *      receipt and again just before the write;
  *   3. reads Google's current state first, as the undo snapshot;
  *   4. records a receipt before calling Google, keyed so a replay never
  *      writes twice;
@@ -45,6 +48,10 @@ export interface ListingContext {
   onWriteAccepted?: () => Promise<void>;
   onWriteUnconfirmed?: () => Promise<void>;
   checkUrl?: (url: string) => Promise<void>;
+  /** Throws unless the person behind an operator_* authority is the
+   * business's acting provider for Google on this location (seat, staff row,
+   * verification, the owner's mandate). Without it those authorities are refused. */
+  authorizeProvider?: () => Promise<void>;
 }
 
 export type ListingWriteOutcome =
@@ -53,11 +60,12 @@ export type ListingWriteOutcome =
   | { status: "failed"; receipt: ListingReceipt; message: string; accessPending: boolean }
   | { status: "refused"; reason: ListingRefusal; message: string };
 
-export type ListingRefusal = "paused" | "authority" | "invalid" | "snapshot_unavailable" | "api_access_pending" | "not_undoable" | "unsafe_url" | "nothing_to_change";
+export type ListingRefusal = "paused" | "authority" | "provider" | "invalid" | "snapshot_unavailable" | "api_access_pending" | "not_undoable" | "unsafe_url" | "nothing_to_change";
 
 const MESSAGES = {
   paused: "The Google listing is paused, so Strelva isn't changing it.",
   authority: "This change needs the owner's approval.",
+  provider: "Your agency isn't cleared to change this listing for the business. Nothing was sent.",
   invalid: "That change can't be sent to Google as written.",
   snapshot_unavailable: "Strelva couldn't read Google's current listing, so nothing was changed.",
   api_access_pending: "Waiting for Google to approve API access. Your draft is kept. Nothing was sent.",
@@ -126,6 +134,13 @@ async function governedWrite<T>(ctx: ListingContext, plan: WritePlan<T>): Promis
   if (!parsed.success || !authorityAllowedFor(plan.action, parsed.data)) return refused("authority");
   const undoKinds = parsed.data.kind === "owner_undo" || parsed.data.kind === "operator_undo";
   if (undoKinds !== Boolean(plan.undoesReceiptId)) return refused("authority");
+  const byProvider = parsed.data.kind === "operator_instruction" || parsed.data.kind === "operator_undo";
+  const providerCleared = async () => {
+    if (!byProvider) return true;
+    if (!ctx.authorizeProvider) return false;
+    try { await ctx.authorizeProvider(); return true; } catch { return false; }
+  };
+  if (!(await providerCleared())) return refused("provider");
   const idempotencyKey = plan.idempotencyKey ?? `${plan.action}:${key([plan.targetRef, plan.after, plan.undoesReceiptId ?? null, ctx.location.locationId])}`;
   const receiptInput = {
     workspaceId: ctx.workspaceId, bindingId: ctx.bindingId, locationId: ctx.location.locationId, action: plan.action,
@@ -151,6 +166,14 @@ async function governedWrite<T>(ctx: ListingContext, plan: WritePlan<T>): Promis
     return { status: "write_unconfirmed", receipt, message: receiptHeadline(receipt) };
   }
 
+  // Recheck at the moment of the effect: a seat, staff row, verification or
+  // mandate may have ended since the receipt was recorded.
+  if (!(await providerCleared())) {
+    const settled = await ctx.receipts.settle(receipt.id, ctx.workspaceId, {
+      status: "failed", error: "The agency's permission ended before the write. Nothing was sent.", undo: null,
+    });
+    return { status: "failed", receipt: settled, accessPending: false, message: MESSAGES.provider };
+  }
   let written: GoogleResult<T>;
   try { written = await plan.write(); }
   catch {

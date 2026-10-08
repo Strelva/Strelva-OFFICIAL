@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { getAuthUserId, verifyAuth, requireTenantPermission } from "@/platform/infra/auth";
+import { verifyAuth, requireTenantPermission } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
-import { resolveEventAction } from "@/lib/event-actions";
+import { decideTenantEvent, operatorRefusal, sessionTenantDecider } from "@/lib/operator-decisions";
 import { readJsonObject } from "@/lib/request-body";
 
 export async function PATCH(
@@ -11,14 +11,15 @@ export async function PATCH(
 ) {
   const authed = await verifyAuth();
   if (!authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const actorId = await getAuthUserId();
-  if (!actorId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
 
   const tenant = await getTenantFromHeaders();
   const permissionDenied = await requireTenantPermission(tenant, "publishing:manage");
   if (permissionDenied) return permissionDenied;
+  // An operator or agency staff decide as themselves, never as the owner (operator-decisions.ts).
+  const decider = await sessionTenantDecider(tenant);
+  if (!decider) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const blocked = await requireActiveSubscription(tenant);
   if (blocked) return blocked;
@@ -35,7 +36,10 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    const result = await resolveEventAction(tenant, id, status, actorId);
+    const result = await decideTenantEvent(decider, { tenantId: tenant, eventId: id, action: status, auditAction: `dashboard.event.${status}` });
+    const refused = operatorRefusal(result.reason);
+    if (refused) return NextResponse.json({ error: refused.error }, { status: refused.status });
+    if (result.reason === "permission_denied") return NextResponse.json({ error: "Only the current business owner can decide on this change. Nothing changed." }, { status: 403 });
     if (result.reason === "not_found" || result.reason === "wrong_tenant") {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }

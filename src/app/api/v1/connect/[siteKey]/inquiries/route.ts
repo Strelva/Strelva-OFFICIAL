@@ -44,7 +44,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ siteKey
       notify: async ({ site, inquiry }) => { await notifyConnectedSiteInquiry({ site, inquiry }); },
     });
     if (outcome.status === "ignored" || outcome.status === "held_as_spam") return connectJson({ ok: true, id: randomUUID() }, 201);
-    return connectJson({ ok: true, id: outcome.id, ...(outcome.status === "duplicate" ? { duplicate: true } : {}) }, outcome.status === "duplicate" ? 200 : 201);
+    let bookingOffer: unknown;
+    if (process.env.STRELVA_INQUIRY_BOOKING_HANDOFF === "1") {
+      const { prepareInquiryBookingOffer } = await import("@/products/inquiries");
+      bookingOffer = await prepareInquiryBookingOffer({ tenantId: null, inquiryId: outcome.id, workspaceId: resolved.site.workspaceId }).catch(() => null);
+    }
+    return connectJson({ ok: true, id: outcome.id, ...(bookingOffer ? { bookingOffer } : {}), ...(outcome.status === "duplicate" ? { duplicate: true } : {}) }, outcome.status === "duplicate" ? 200 : 201);
   } catch (error) {
     return connectErrorResponse(error, "inquiries");
   }

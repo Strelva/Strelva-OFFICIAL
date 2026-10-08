@@ -1,0 +1,53 @@
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { isolatedRedisAvailable, startIsolatedRedis, type IsolatedRedis } from "./support/isolated-redis";
+const holder = vi.hoisted(() => ({ client: null as unknown }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => holder.client }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => null }));
+import { mirrorClientRecord, pendingPayloadKey, setClientRecordDb, type ClientRecord, type ClientRecordDb } from "@/platform/client-records/mirror";
+import { repairPendingClientRecords } from "@/platform/client-records/move";
+const first = { recordId: "record", capturedAt: "2026-10-07T12:00:00Z", payload: { value: "earlier" } };
+const later = { recordId: "record", capturedAt: "2026-10-07T13:00:00Z", payload: { value: "later" } };
+type RpcResult = { data: unknown; error: { message: string } | null };
+const failure: RpcResult = { data: null, error: { message: "database unavailable" } };
+const success: RpcResult = { data: { status: "recorded" }, error: null };
+describe.skipIf(!isolatedRedisAvailable)("retained retry snapshots under concurrent writes", () => {
+  let redis: IsolatedRedis;
+  beforeAll(async () => { redis = await startIsolatedRedis("client-record-races"); holder.client = redis.client; });
+  beforeEach(() => { redis.cli("FLUSHDB"); vi.stubEnv("STRELVA_CLIENT_RECORDS_DUAL_WRITE", "1"); vi.stubEnv("DUAL_WRITE_PG", "1"); vi.spyOn(console, "error").mockImplementation(() => {}); });
+  afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); setClientRecordDb(undefined); });
+  afterAll(async () => { await redis?.stop(); });
+  const pending = async (store = "orders") => await redis.client.get<ClientRecord>(pendingPayloadKey(`${store}|fixture|record`));
+  it("does not let a late older failure replace a newer failed write after both caches expire", async () => {
+    const callbacks: ((result: RpcResult) => void)[] = [];
+    const db: ClientRecordDb = { rpc: () => new Promise<RpcResult>(resolve => callbacks.push(resolve)) }; setClientRecordDb(db);
+    const olderWrite = mirrorClientRecord("orders", "fixture", first);
+    const newerWrite = mirrorClientRecord("orders", "fixture", later);
+    callbacks[1]!(failure); await newerWrite;
+    callbacks[0]!(failure); await olderWrite;
+    expect((await pending())?.payload).toEqual(later.payload);
+    const rpc = vi.fn(async () => success);
+    expect(await repairPendingClientRecords({ db: { rpc } })).toMatchObject({ repaired: 1, remaining: 0 });
+    expect(rpc).toHaveBeenCalledWith("record_tenant_client_record", expect.objectContaining({ p_payload: later.payload }));
+  });
+  it("retains the earliest first reply across failed writes and a later successful reply", async () => {
+    setClientRecordDb({ rpc: async () => failure });
+    await mirrorClientRecord("inquiry_reply", "fixture", first, "keep_first");
+    await mirrorClientRecord("inquiry_reply", "fixture", later, "keep_first");
+    setClientRecordDb({ rpc: async () => success });
+    await mirrorClientRecord("inquiry_reply", "fixture", later, "keep_first");
+    expect((await pending("inquiry_reply"))?.payload).toEqual(first.payload);
+    expect(await repairPendingClientRecords()).toMatchObject({ repaired: 1, remaining: 0 });
+  });
+  it("cannot acknowledge a newer failure that arrived while an older snapshot was repairing", async () => {
+    setClientRecordDb({ rpc: async () => failure });
+    await mirrorClientRecord("orders", "fixture", first);
+    let finish!: (result: RpcResult) => void;
+    const repairing = repairPendingClientRecords({ db: { rpc: () => new Promise<RpcResult>(resolve => { finish = resolve; }) } });
+    await vi.waitFor(() => expect(finish).toBeDefined());
+    await mirrorClientRecord("orders", "fixture", later);
+    finish(success);
+    expect(await repairing).toMatchObject({ repaired: 1, remaining: 1 });
+    expect((await pending())?.payload).toEqual(later.payload);
+    expect(await repairPendingClientRecords({ db: { rpc: async () => success } })).toMatchObject({ repaired: 1, remaining: 0 });
+  });
+});

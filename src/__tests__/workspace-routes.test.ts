@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  user: vi.fn(), rate: vi.fn(), score: vi.fn(), personal: vi.fn(), list: vi.fn(), work: vi.fn(), getWork: vi.fn(),
+  brandRpc: vi.fn(), user: vi.fn(), rate: vi.fn(), score: vi.fn(), personal: vi.fn(), list: vi.fn(), work: vi.fn(), getWork: vi.fn(),
   save: vi.fn(), createAgency: vi.fn(), handoff: vi.fn(), inspect: vi.fn(), accept: vi.fn(),
   revoke: vi.fn(), cancel: vi.fn(), handoffs: vi.fn(), agencyDelegations: vi.fn(), workDelegations: vi.fn(),
   pending: vi.fn(), operation: vi.fn(), saveAudit: vi.fn(), preflight: vi.fn(), runPrivate: vi.fn(), savePublicResult: vi.fn(), managedWork: vi.fn(), exitRead: vi.fn(), exitCompleted: vi.fn(), systems: vi.fn(), provided: vi.fn(),
 }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mocks.brandRpc }) }));
 vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.user }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate }));
 vi.mock("@/products/ai-visibility/server", () => ({ runPrivateAiVisibilityAssessment: mocks.runPrivate, savePublicAiVisibilityResult: mocks.savePublicResult }));
@@ -25,7 +26,7 @@ vi.mock("@/platform/workspaces", async () => {
 });
 
 import { GET, POST } from "@/app/api/workspace/route";
-import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError } from "@/platform/workspaces/types";
+import { WORKSPACE_LIMIT_MESSAGE, WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError } from "@/platform/workspaces/types";
 import { createTrackerFromImport } from "@/products/tracker";
 
 const workspaceId = "11111111-1111-4111-8111-111111111111";
@@ -53,6 +54,7 @@ beforeEach(() => {
   vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
   vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "1");
   mocks.user.mockResolvedValue({ id: "actor", email: "OWNER@example.com", email_confirmed_at: "2026-09-05" });
+  mocks.brandRpc.mockResolvedValue({ data: null, error: null });
   mocks.rate.mockResolvedValue(false);
   mocks.pending.mockResolvedValue([]);
   mocks.personal.mockResolvedValue(workspace);
@@ -106,6 +108,13 @@ describe("release-one private workspace routes", () => {
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(await response.json()).toMatchObject({ workspaceId, work: [{ id: workId }], actor: { email: "owner@example.com" } });
     expect(mocks.work).toHaveBeenCalledWith({ userId: "actor", verifiedEmail: "owner@example.com" }, workspaceId);
+  });
+  it.each(["missing column", "thrown error"])("keeps the workspace usable on a brand %s", async failure => {
+    if (failure === "missing column") mocks.brandRpc.mockResolvedValue({ data: null, error: { message: "column w.agency_brand does not exist" } });
+    else mocks.brandRpc.mockRejectedValue(new Error("offline"));
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ownerBrand: { agencyId: null, name: "Strelva" }, work: [{ id: workId }] });
   });
   it("reports an owner exit-state read failure so the browser can fail closed", async () => {
     mocks.exitRead.mockRejectedValue(new Error("temporary exit-state store failure"));
@@ -485,5 +494,55 @@ describe("assessment recovery and website report routes", () => {
     expect((await POST(request({action:"save_website_audit",workspaceId,resultId}))).status).toBe(200);
     expect(mocks.saveAudit).toHaveBeenCalledWith({actor:{userId:"actor",verifiedEmail:"owner@example.com"},workspaceId,resultId});
     expect((await POST(request({action:"save_website_audit",workspaceId,resultId,payload:result}))).status).toBe(400);
+  });
+});
+
+describe("create_agency: the ordinary agency path behind open signup (#258)", () => {
+  const agencyId = "44444444-4444-4444-8444-444444444444";
+  it("creates the actor's agency with only a trimmed name, under the verified actor", async () => {
+    mocks.createAgency.mockResolvedValue({ id: agencyId, kind: "agency", name: "Northside Web Care", access: "member", role: "owner" });
+    const response = await POST(request({ action: "create_agency", name: "  Northside Web Care  " }));
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({ workspaceId: agencyId });
+    expect(mocks.createAgency).toHaveBeenCalledExactlyOnceWith({ userId: "actor", verifiedEmail: "owner@example.com" }, "Northside Web Care");
+  });
+  it("tells the person when they have reached the per-account workspace cap", async () => {
+    mocks.createAgency.mockRejectedValue(new WorkspaceConflictError(WORKSPACE_LIMIT_MESSAGE));
+    const response = await POST(request({ action: "create_agency", name: "Sixth Agency" }));
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: WORKSPACE_LIMIT_MESSAGE, code: "workspace_limit_reached" });
+  });
+  it("keeps other conflicts generic", async () => {
+    mocks.createAgency.mockRejectedValue(new WorkspaceConflictError());
+    const response = await POST(request({ action: "create_agency", name: "Northside" }));
+    expect(response.status).toBe(409);
+    expect((await response.json()).code).toBeUndefined();
+  });
+  it.each([
+    ["an empty name", { action: "create_agency", name: "   " }],
+    ["a name over 120 characters", { action: "create_agency", name: "x".repeat(121) }],
+    ["a requested kind", { action: "create_agency", name: "Northside", kind: "customer" }],
+    ["a requested verification", { action: "create_agency", name: "Northside", verified: ["publish"] }],
+    ["a requested client", { action: "create_agency", name: "Northside", customerWorkspaceId: workspaceId }],
+  ])("refuses %s before creating anything", async (_label, body) => {
+    expect((await POST(request(body))).status).toBe(400);
+    expect(mocks.createAgency).not.toHaveBeenCalled();
+  });
+  it("refuses an unverified or missing session", async () => {
+    for (const user of [null, { id: "actor", email: "owner@example.com" }]) {
+      mocks.user.mockResolvedValue(user);
+      expect((await POST(request({ action: "create_agency", name: "Northside" }))).status).toBe(401);
+    }
+    expect(mocks.createAgency).not.toHaveBeenCalled();
+  });
+  it("is rate limited per person", async () => {
+    mocks.rate.mockResolvedValue(true);
+    expect((await POST(request({ action: "create_agency", name: "Northside" }))).status).toBe(429);
+    expect(mocks.createAgency).not.toHaveBeenCalled();
+  });
+  it("tells the browser when the agency setup checklist is on", async () => {
+    expect((await (await GET(new Request("https://strelva.com/api/workspace"))).json()).releases.agencySetup).toBeUndefined();
+    vi.stubEnv("STRELVA_AGENCY_SIGNUP_RELEASE", "1");
+    expect((await (await GET(new Request("https://strelva.com/api/workspace"))).json()).releases.agencySetup).toBe(true);
   });
 });

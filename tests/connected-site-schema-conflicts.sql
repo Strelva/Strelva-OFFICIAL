@@ -59,4 +59,8 @@ begin
   perform pg_temp.assert_true(public.read_connected_site_schema_conflict(ws,(site->>'id')::uuid) is null,'revoked source no longer waits');
   perform pg_temp.expect_error(format('select public.record_connected_site_schema_conflict(%L,%L,%L)',key,origin,item),'connected_site_unknown');
 end $$;
+\if :{?keep_fixture}
+commit;
+\else
 rollback;
+\endif

@@ -16,7 +16,8 @@ async function prepared() {
   const reserved = await repository.claimPublication({ tenantId: "tenant-one", businessId: "business-one", requestId: work.id, capabilityId: work.capabilityId, changeId: ready.activeChangeId!, action: "make_live", version: ready.draft!.version, idempotencyKey: "first-publication", actorId: "owner-one" });
   if (!reserved.acquired) throw new Error("Fixture claim was not acquired");
   await repository.linkPublicationEvent({ tenantId: "tenant-one", claimId: reserved.claim.id, claimToken: reserved.claimToken, governanceEventId: "event-one" });
-  return { repository, work: ready, claim: reserved.claim, input: { tenantId: "tenant-one", eventId: "event-one", claimId: reserved.claim.id, repository } };
+  return { repository, work: ready, claim: reserved.claim, input: { tenantId: "tenant-one", eventId: "event-one", claimId: reserved.claim.id, repository,
+    actorId: "owner-one", authorizeActor: async () => ({ allowed: true }) } };
 }
 
 describe("governed inquiry publication transaction", () => {
@@ -47,6 +48,13 @@ describe("governed inquiry publication transaction", () => {
     await repository.compareAndSwap({ tenantId: input.tenantId, businessId: claim.businessId, expectedRevision: saved!.revision, state: changed.snapshot() });
     commit.mockClear();
     expect((await executeInquiryPublication(input)).reason).toBe("publication_approval_is_stale");
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it("refuses an unauthorized click before changing the public form, even for an existing owner-prepared claim", async () => {
+    const { input, repository } = await prepared();
+    const commit = vi.spyOn(repository, "compareAndSwap");
+    expect(await executeInquiryPublication({ ...input, actorId: "operator", authorizeActor: async () => ({ allowed: false, reason: "permission_denied" }) })).toEqual({ accepted: false, verified: false, reason: "permission_denied" });
     expect(commit).not.toHaveBeenCalled();
   });
 

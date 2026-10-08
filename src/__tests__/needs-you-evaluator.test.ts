@@ -121,10 +121,13 @@ describe("evaluateRoute: owner and Strelva layers", () => {
     expect(evaluateRoute({ kind: "copy.routine", origin: "strelva", signals: { earnedTrust: trust }, policies: [{ layer: "owner", systemId: null, kind: "copy.routine", route: "owner_decides" }] }).route).toBe("owner_decides");
   });
 
-  it("inquiry messages follow the inquiry policy, within the floor", () => {
-    expect(evaluateRoute({ kind: "customer.message", origin: "strelva", signals: { inquiryDecision: "approval_required" } })).toMatchObject({ route: "owner_decides", urgent: true });
-    expect(evaluateRoute({ kind: "customer.message", origin: "strelva", signals: { inquiryDecision: "allow" } })).toMatchObject({ route: "strelva_reviews", rule: "floor" });
+  it("supervised inquiry messages get Strelva review and current trusted ordinary messages are handled", () => {
+    expect(evaluateRoute({ kind: "customer.message", origin: "strelva", signals: { inquiryDecision: "approval_required" } })).toMatchObject({ route: "strelva_reviews", urgent: false });
+    expect(evaluateRoute({ kind: "customer.message", origin: "strelva", signals: { inquiryDecision: "allow" } })).toMatchObject({ route: "handle", rule: "inquiry:policy" });
     expect(evaluateRoute({ kind: "customer.message", origin: "strelva", signals: { inquiryDecision: "block" } }).route).toBe("never");
+    expect(evaluateRoute({ kind: "customer.message", origin: "strelva", signals: { inquiryDecision: "allow" }, policies: [{ kind: "customer.message", layer: "owner", systemId: null, route: "owner_decides" }] }).route).toBe("owner_decides");
+    expect(evaluateRoute({ kind: "customer.commitment", origin: "strelva", signals: { inquiryDecision: "allow" } }).route).toBe("owner_decides");
+    expect(evaluateRoute({ kind: "customer.message", origin: "strelva", policies: [{ kind: "customer.message", layer: "strelva", systemId: null, route: "handle" }] }).route).toBe("strelva_reviews");
   });
 });
 

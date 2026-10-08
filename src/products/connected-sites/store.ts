@@ -5,6 +5,8 @@
  * calls recheck the key, the proven host and the Origin.
  */
 import { z } from "zod";
+import { dualWritePgEnabled } from "@/platform/infra/db/dual-write";
+import { businessRecordSchema, type BusinessRecord } from "@/platform/business-record/contracts";
 import { ownerDecisionSchema, type OwnerDecision, type ProposedItem } from "@/platform/needs-you/contracts";
 import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
@@ -33,15 +35,16 @@ export interface ConnectedSitesStore {
   inquiries(actor: WorkspaceActor, workspaceId: string, limit: number): Promise<ConnectedInquiry[]>;
   activity(actor: WorkspaceActor, workspaceId: string, days: number): Promise<Record<string, Record<string, number>>>;
   resolve(publicKey: string): Promise<ResolvedConnectedSite | null>;
-  context(publicKey: string): Promise<{ revision: number; facts: Record<string, unknown>; services: Array<{ name: string; description: string | null; priceText: string | null }>; site: { captureForms: boolean; injectSchema: boolean } } | null>;
+  context(publicKey: string): Promise<{ policyFacts?: BusinessRecord["facts"]; revision: number; facts: Record<string, unknown>; services: Array<{ name: string; description: string | null; priceText: string | null }>; site: { captureForms: boolean; injectSchema: boolean } } | null>;
   recordEvents(publicKey: string, origin: string | null, events: StoredEvent[]): Promise<number>;
+  recordSchemaConflict(publicKey: string, origin: string | null, item: ProposedItem): Promise<OwnerDecision>;
   recordInquiry(publicKey: string, origin: string | null, lead: StoredLead): Promise<{ status: "recorded" | "exists" | "duplicate"; id: string; workspaceId: string }>;
   recordSpam(publicKey: string, origin: string | null, input: { recordId: string; payload: Record<string, unknown>; payloadHash: string; capturedAt: string }): Promise<{ status: "recorded" | "exists" }>;
-  recordSchemaConflict(publicKey: string, origin: string | null, item: ProposedItem): Promise<OwnerDecision>;
   purge(limit: number): Promise<{ events: number; spam: number }>;
 }
 
 const uuid = z.string().uuid();
+export const connectedInquiryRecordsEnabled = () => process.env.STRELVA_INQUIRY_RECORDS?.trim() === "1" && dualWritePgEnabled();
 const identity = (actor: WorkspaceActor) => ({ p_user_id: uuid.parse(actor.userId), p_verified_email: z.string().email().parse(actor.verifiedEmail.trim().toLowerCase()) });
 const inquirySchema = z.object({ id: z.string(), siteId: z.string(), siteHost: z.string(), leadId: z.string(), name: z.string(), email: z.string().nullable(), message: z.string().nullable(), source: z.string().nullable(), capturedAt: z.string() });
 
@@ -73,27 +76,27 @@ export function createConnectedSitesStore(db?: ConnectedSitesRpc): ConnectedSite
     async update(actor, workspaceId, siteId, patch) { return site(await rpc("update_connected_site", { p_workspace_id: uuid.parse(workspaceId), ...identity(actor), p_site_id: uuid.parse(siteId), p_patch: patch })); },
     async revoke(actor, workspaceId, siteId) { return site(await rpc("revoke_connected_site", { p_workspace_id: uuid.parse(workspaceId), ...identity(actor), p_site_id: uuid.parse(siteId) })); },
     async confirmVerification(actor, workspaceId, siteId, observed) { return site(await rpc("confirm_connected_site_verification", { p_workspace_id: uuid.parse(workspaceId), ...identity(actor), p_site_id: uuid.parse(siteId), p_observed: observed.slice(0, 20) })); },
-    async inquiries(actor, workspaceId, limit) { return z.array(inquirySchema).parse(await rpc("read_connected_site_inquiries", { p_workspace_id: uuid.parse(workspaceId), ...identity(actor), p_limit: limit })); },
+    async inquiries(actor, workspaceId, limit) { return z.array(inquirySchema).parse(await rpc(connectedInquiryRecordsEnabled() ? "read_connected_site_inquiries_v2" : "read_connected_site_inquiries", { p_workspace_id: uuid.parse(workspaceId), ...identity(actor), p_limit: limit })); },
     async activity(actor, workspaceId, days) { return z.record(z.string(), z.record(z.string(), z.number())).parse(await rpc("read_connected_site_activity", { p_workspace_id: uuid.parse(workspaceId), ...identity(actor), p_days: days }) ?? {}); },
     async resolve(publicKey) { const data = await rpc("resolve_connected_site", { p_public_key: publicKey }); return data ? resolvedConnectedSiteSchema.parse(data) : null; },
     async context(publicKey) {
       const data = await rpc("read_connected_site_context", { p_public_key: publicKey });
       if (!data) return null;
       return z.object({
-        revision: z.number(), facts: z.record(z.string(), z.unknown()),
+        revision: z.number(), facts: z.record(z.string(), z.unknown()), policyFacts: businessRecordSchema.shape.facts.optional(),
         services: z.array(z.object({ name: z.string(), description: z.string().nullable(), priceText: z.string().nullable() })),
         site: z.object({ captureForms: z.boolean(), injectSchema: z.boolean() }),
       }).parse(data);
     },
     async recordEvents(publicKey, origin, events) { return z.number().int().parse(await rpc("record_connected_site_events", { p_public_key: publicKey, p_origin: origin, p_events: events })); },
+    async recordSchemaConflict(publicKey, origin, item) { return ownerDecisionSchema.parse(await rpc("record_connected_site_schema_conflict", { p_public_key: publicKey, p_origin: origin, p_item: item })); },
     async recordInquiry(publicKey, origin, lead) {
       return z.object({ status: z.enum(["recorded", "exists", "duplicate"]), id: z.string(), workspaceId: z.string() })
-        .parse(await rpc("record_connected_site_inquiry", { p_public_key: publicKey, p_origin: origin, p_lead: lead }));
+        .parse(await rpc(connectedInquiryRecordsEnabled() ? "record_connected_site_inquiry_v2" : "record_connected_site_inquiry", { p_public_key: publicKey, p_origin: origin, p_lead: lead }));
     },
     async recordSpam(publicKey, origin, input) {
-      return z.object({ status: z.enum(["recorded", "exists"]) }).parse(await rpc("record_connected_site_spam", { p_public_key: publicKey, p_origin: origin, p_record_id: input.recordId, p_payload: input.payload, p_payload_hash: input.payloadHash, p_captured_at: input.capturedAt }));
+      return z.object({ status: z.enum(["recorded", "exists"]) }).parse(await rpc(connectedInquiryRecordsEnabled() ? "record_connected_site_spam_v2" : "record_connected_site_spam", { p_public_key: publicKey, p_origin: origin, p_record_id: input.recordId, p_payload: input.payload, p_payload_hash: input.payloadHash, p_captured_at: input.capturedAt }));
     },
-    async recordSchemaConflict(publicKey, origin, item) { return ownerDecisionSchema.parse(await rpc("record_connected_site_schema_conflict", { p_public_key: publicKey, p_origin: origin, p_item: item })); },
     async purge(limit) { return z.object({ events: z.number(), spam: z.number() }).parse(await rpc("purge_connected_site_records", { p_limit: limit })); },
   };
 }

@@ -13,3 +13,12 @@ export function publicRecordManagementToken(tenantStableId: string, requestId: s
   if (!key) throw new PublicBookingError("unavailable", "Booking token encryption is not configured. Nothing was booked.");
   return createHmac("sha256", key).update(JSON.stringify([tenantStableId, requestId])).digest("base64url");
 }
+
+export interface PublicBookingAdmission {
+  claim(input: { binding: { tenantId: string; workspaceId: string }; requestId: string; fingerprint: string; visitor: { name: string; email: string; phone?: string; message?: string; intakeAnswers?: Record<string, string> }; start: string; end: string }): Promise<void>;
+  send(input: { tenantId: string; requestId: string }): Promise<void>;
+  consume(token: string): Promise<{ tenantId: string; requestId: string; visitor: { name: string; email: string; phone?: string; message?: string; intakeAnswers?: Record<string, string> } }>;
+  placed(input: { tenantId: string; requestId: string }): Promise<void>;
+  verified(input: { tenantId: string; requestId: string }): Promise<boolean>;
+  cancel(input: { tenantId: string; requestId: string }): Promise<boolean>;
+}

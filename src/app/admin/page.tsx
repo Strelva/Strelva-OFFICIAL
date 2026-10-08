@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
+import QueuePage from "./queue/page";
 import { Plus, CheckCircle2, Flag, UserPlus } from "lucide-react";
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
 import { getTenantSiteName } from "@/lib/tenant-display";
@@ -10,7 +12,7 @@ import { getWeeklyBrief } from "@/lib/weekly-brief";
 import { getEffectiveSubscriptionStatus, isGrandfathered } from "@/lib/subscription";
 import { buildTenantLaunchReadiness, tenantHasOwnerMessage } from "@/lib/launch-readiness";
 import { listThreads } from "@/lib/threads";
-import { getPortfolioSummaryState, computeMrrDollars } from "@/lib/portfolio";
+import { getPortfolioSummaryState, computeBusinessMrrDollars } from "@/lib/portfolio";
 import { buildAttentionFromSnapshot, buildAttentionBriefing } from "@/lib/attention";
 import { getDeliveryLeads } from "@/lib/access-request-delivery";
 import { getAllLeadWorkflow } from "@/lib/lead-workflow";
@@ -62,6 +64,7 @@ function countUnworkedLeads(
 }
 
 export default async function AdminPage() {
+  if (operatorQueueReleaseEnabled()) return QueuePage();
   const ALL_TENANTS = await getAllTenants();
   const TENANTS = ALL_TENANTS.filter(isActiveTenant);
   const archivedTenantCount = ALL_TENANTS.length - TENANTS.length;
@@ -108,7 +111,7 @@ export default async function AdminPage() {
   const activeTenants = TENANTS.filter((t) => t.active).length;
   // MRR counted in ONE place (computeMrrDollars) so this card and Mission
   // Control never disagree; grandfathered/founder-comp ($0) excluded.
-  const mrr = computeMrrDollars(TENANTS);
+  const mrr = await computeBusinessMrrDollars(TENANTS);
   const activeSubscriptions = TENANTS.filter(
     (tenant) =>
       tenant.subscriptionStatus === "active" &&

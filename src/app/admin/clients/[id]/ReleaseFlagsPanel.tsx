@@ -6,9 +6,10 @@ import type { TenantReleaseState } from "@/platform/owner-entry/operator";
 
 /**
  * Per-workspace release flags for one converted client (owner-entry spec §3.7).
- * Every change needs a reason. `On` also needs Jacob's yes, and owner entry
- * can go `on` only once every page this client uses has moved; until then
- * `Operators` sends only Strelva operators and named testers to the workspace.
+ * Every change needs a reason. `On` records an approval for the signed-in
+ * operator, and owner entry can go `on` only once every page this
+ * client uses has moved; until then `Operators` stays limited to operators
+ * and named testers.
  */
 
 type FlagState = "unset" | "off" | "operators" | "on";
@@ -31,7 +32,6 @@ export function ReleaseFlagsPanel({ tenantId }: { tenantId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState("");
-  const [jacobApproved, setJacobApproved] = useState(false);
   const [testerEmail, setTesterEmail] = useState("");
 
   const load = useCallback(async () => {
@@ -61,7 +61,6 @@ export function ReleaseFlagsPanel({ tenantId }: { tenantId: string }) {
       if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
       setState(data as TenantReleaseState);
       setReason("");
-      setJacobApproved(false);
       setTesterEmail("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Nothing was changed.");
@@ -98,10 +97,7 @@ export function ReleaseFlagsPanel({ tenantId }: { tenantId: string }) {
         <div className="space-y-1.5">
           <label htmlFor={`release-reason-${tenantId}`} className={labelCls}>Reason for the next change</label>
           <input id={`release-reason-${tenantId}`} className={inputCls} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Walk every gldf page before the owner invite" maxLength={480} />
-          <label className="flex items-center gap-2 text-[12px] text-gray-muted">
-            <input type="checkbox" checked={jacobApproved} onChange={(e) => setJacobApproved(e.target.checked)} />
-            Jacob said yes (needed to turn a client on)
-          </label>
+          <p className="text-[11px] text-gray-faint">Turning a flag on records a single use approval for your signed-in operator account, bound to this business, flag and reason.</p>
         </div>
 
         <ul className="space-y-4">
@@ -121,8 +117,8 @@ export function ReleaseFlagsPanel({ tenantId }: { tenantId: string }) {
                       key={option.value}
                       type="button"
                       aria-pressed={current === option.value}
-                      disabled={busy || current === option.value || !reasonOk || (option.value === "on" && !jacobApproved)}
-                      onClick={() => void send({ kind: "flag", flag: flag.flag, state: option.value, reason, expectedRevision: flag.revision, jacobApproved })}
+                      disabled={busy || current === option.value || !reasonOk}
+                      onClick={() => void send({ kind: "flag", flag: flag.flag, state: option.value, reason, expectedRevision: flag.revision })}
                       className={`rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors disabled:cursor-not-allowed ${current === option.value ? "bg-accent text-on-accent" : "text-gray-muted hover:text-warm-white disabled:opacity-40"}`}
                     >
                       {option.label}

@@ -1,13 +1,22 @@
+import { withCanonicalApprovalStore } from "@/platform/approval-store";
+import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
+import { businessRecordDraftAdapter } from "./sources/business-record-draft";
+import { PostgresBusinessFactDraftStore } from "@/platform/ask/workspace-drafts-repository";
+import { askReleaseMayBeOn } from "@/platform/ask/release";
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
+import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { chaseBookingCalendarHealth } from "@/platform/bookings/calendar-health";
 import { bookingSettingsAdapter } from "@/platform/bookings/setup";
 import { deliverBookingUpdates } from "@/platform/bookings/updates";
 import { connectedSiteSchemaAdapter } from "./sources/connected-site-schema";
-import { getEventRaw, getEvents } from "@/lib/events";
+import { getEventRaw, getEvents, getEventsRaw } from "@/lib/events";
 import { readCatalogReportHandled } from "@/platform/catalog-reports/receipts";
 import { readToolNoticeHandled } from "@/platform/catalog-reports/tool-notices";
 import { resolveEventAction } from "@/lib/event-actions";
 import { sendEmailWithReceipt } from "@/platform/infra/email/send";
 import { publishingDecisionDeliveryAllowed } from "./publishing-delivery";
+import { customerEmailEnabled, emailSendingEnabled } from "@/platform/infra/email/enabled";
+import { getClientEmailOverride } from "@/platform/infra/email/client-override";
 import { DeliveryCommitmentService, PostgresServiceRequestStore, mutateServiceRequestCommitment } from "@/platform/service-requests";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { serviceRequestAdapter, tenantEventAdapter } from "./adapters";
@@ -18,10 +27,12 @@ import { createNeedsYouService } from "./service";
 import { systemsSourceAdapters } from "./systems-sources";
 import { deliverySourceAdapters } from "./sources/live-delivery";
 import { productSourceAdapters } from "./sources/live-products";
+import { businessFactsAdapter, createBusinessFactReviewStore, type BusinessFactsPorts } from "./sources/business-facts";
 import { bookingRequestAdapter, bookingRequestItem } from "@/platform/bookings/needs-you-adapter";
 import { decideBookingRequest, readWorkspaceBooking, readWorkspaceBookingRequests, readNativeBookingWorkspaces } from "@/platform/bookings/store";
 import { bookingStoreWriteEnabled, bookingOwnerNoticeEnabled, bookingReadSource } from "@/platform/bookings/flags";
 import { updateBooking as updateLegacyBookingStatus } from "@/platform/bookings/legacy-store";
+import { inquiryFactAdapter } from "./sources/inquiry-fact";
 
 import { needsYouReleaseEnabled } from "./release";
 export { needsYouReleaseEnabled } from "./release";
@@ -30,17 +41,29 @@ export { needsYouReleaseEnabled } from "./release";
 export const needsYouStore: NeedsYouStore = PostgresNeedsYouStore;
 
 export function needsYouAppOrigin(): string {
-  return process.env.NEXT_PUBLIC_APP_URL || "https://app.strelva.com";
+  return process.env.NEXT_PUBLIC_APP_URL || CONTROL_PLANE_URL;
 }
 
-export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
+/** What a decision carries past the source, wired at the app edge (routes may import what platform can't). */
+export interface NeedsYouEffects {
+  /** After business facts are confirmed: native websites follow (#509). */
+  businessFactsConfirmed?: BusinessFactsPorts["confirmed"];
+}
+
+export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, effects: NeedsYouEffects = {}) {
   const commitments = new DeliveryCommitmentService(mutateServiceRequestCommitment);
+  const facts = createBusinessFactReviewStore();
   return createNeedsYouService({
     store,
     appOrigin: needsYouAppOrigin(),
     now: () => Date.now(),
     bookingCalendarHealth: chaseBookingCalendarHealth,
+    bookingUrgentAllowed: async workspaceId => {
+      try { return !await isRateLimitedWindowedAsync(`booking-owner-urgent:${workspaceId}`, 5, 3600000); }
+      catch { return false; } // keep the durable item for the digest on outages
+    },
     bookingWorkspaces: async () => bookingStoreWriteEnabled() && await bookingReadSource() === "postgres" ? readNativeBookingWorkspaces() : [],
+    pendingWorkspaces: () => facts.pendingWorkspaces(),
     async sendEmail(input) {
       if (input.tags?.lifecycle === "booking_request" || input.tags?.lifecycle === "booking_calendar_health") {
         const { bookingCustomerEmailAllowed } = await import("@/platform/bookings/updates");
@@ -55,6 +78,8 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
       return domains.websiteDomainEmailAllowed(request?.tenantId);
     },
     canDeliver: publishingDecisionDeliveryAllowed,
+    urgentInquiryAllowed: async (tenantId) => process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && needsYouReleaseEnabled()
+      && emailSendingEnabled() && customerEmailEnabled() && (!tenantId || await getClientEmailOverride(tenantId) !== "off"),
     adapters: [
       connectedSiteSchemaAdapter(),
       tenantEventAdapter({
@@ -67,10 +92,14 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
         list: (actor, businessId) => PostgresServiceRequestStore.list(actor, { businessId }),
         change: (actor, input) => commitments.execute(actor, { action: "delivery_commitment", ...input }),
       }),
+      businessRecordDraftAdapter(PostgresBusinessFactDraftStore, askReleaseMayBeOn, effects.businessFactsConfirmed),
       ...systemsSourceAdapters(store),
       ...deliverySourceAdapters(),
       ...productSourceAdapters(),
       bookingSettingsAdapter(),
+      inquiryFactAdapter(),
+      // Provider and operator edits to business details wait for the owner (#509).
+      businessFactsAdapter({ read: facts.read, confirm: facts.confirm, ...(effects.businessFactsConfirmed ? { confirmed: effects.businessFactsConfirmed } : {}) }),
       // Booking requests in the one booking store (empty until request mode is used).
       bookingRequestAdapter({
         // Nothing to read until the store receives writes (and its migration exists).
@@ -85,7 +114,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
           }
         },
       }),
-    ],
+    ].map(adapter => withCanonicalApprovalStore(adapter, { store, enabled: businessId => workspaceReleaseFlagEnabled("approval_store", businessId) })),
   });
 }
 
@@ -110,4 +139,15 @@ export async function notifyBookingRequestNow(booking: import("@/platform/bookin
   if (!item) return;
   const opened = await store.open(booking.workspaceId, item);
   await needsYouService(store).notifyBookingRequest(booking.workspaceId, opened.id);
+}
+
+/** Pending inquiry drafts use the same tenant event adapter as Needs you. */
+export function pendingInquiryDecisionEvents(tenantId: string) {
+  return getEventsRaw(tenantId, { status: "pending", limit: 1000 });
+}
+
+/** Trusted event lookup for inquiry decision executors; a global id never grants tenant access. */
+export async function readInquiryDecisionEvent(tenantId: string, eventId: string) {
+  const event = await getEventRaw(eventId);
+  return event?.tenantId === tenantId ? event : null;
 }

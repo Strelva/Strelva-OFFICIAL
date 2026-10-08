@@ -4,7 +4,8 @@ import { createPublicWebsiteBookingService } from "@/products/scheduling/server"
 import { PublicBookingError } from "./errors";
 import type { ManageDeps } from "./manage";
 import { readReservationByManageTokenHash } from "./store";
-import { bookingMessagesEnabled, bookingAgentsEnabled } from "./flags";
+import { bookingAgentLabel } from "./agent-source";
+import { bookingMessagesEnabled, bookingAgentsEnabled, bookingAgentVisibilityEnabled } from "./flags";
 import { nativeBookingByToken, nativeSlots, tokenHash, changeNativeBooking, confirmAgent } from "./native";
 import { deliverBookingUpdates, notifyBookingRequestNow } from "./updates";
 
@@ -17,7 +18,8 @@ export function manageDeps(): ManageDeps {
       if (receipt || !nativeEnabled()) return receipt;
       const native = await nativeBookingByToken(hash, "manage") ?? await nativeBookingByToken(hash, "confirm");
       if (!native || !bookingScopeFor(native)) return null;
-      return { tenantId: bookingScopeFor(native)!, siteName: native.siteName, reservationId: native.id,
+      const agentSource = bookingAgentVisibilityEnabled() ? bookingAgentLabel(native) : null;
+      return { ...(agentSource ? { agentSource } : {}), tenantId: bookingScopeFor(native)!, siteName: native.siteName, reservationId: native.id,
         capabilityId: `native:${native.serviceRef ?? ""}`, capabilityVersion: 1, title: native.serviceName,
         start: native.start, end: native.end, timeZone: native.timeZone,
         status: native.status === "confirmed" ? "confirmed" : native.status === "held" ? "held" : native.status === "cancelled" || native.status === "declined" ? "cancelled" : "pending",
@@ -46,7 +48,7 @@ export function manageDeps(): ManageDeps {
       return service.cancel(input);
     },
     async confirm(token) {
-      if (!bookingAgentsEnabled()) throw new PublicBookingError("not_found", "Agent bookings are unavailable.");
+      if (!nativeEnabled()) throw new PublicBookingError("not_found", "Booking confirmation is unavailable.");
       const booking = await confirmAgent(tokenHash(token));
       await notifyBookingRequestNow(booking);
       await deliverBookingUpdates(booking.id).catch(() => undefined);

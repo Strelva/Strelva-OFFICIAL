@@ -55,6 +55,25 @@ insert into public.tenant_workspace_links(tenant_stable_id, tenant_slug_at_link,
   ('6b000000-0000-4000-8000-0000000000a2', 'ml-fixture-site-2', '6b000000-0000-4000-8000-000000000012',
     '6b000000-0000-4000-8000-000000000002', '6b000000-0000-4000-8000-0000000000b2', repeat('b', 64), '{}'::jsonb);
 
+-- Batch 7A (20261009153000): the service actor serves a business whose
+-- provider of record is an agency verified for the effect, Strelva's included.
+-- From 7A on, these converted fixtures are provided by a Strelva agency that
+-- is verified through the ordinary record; before 7A this block does nothing.
+do $$
+begin
+  if to_regprocedure('public.record_agency_verification(text,uuid,text,text,jsonb,text)') is null then return; end if;
+  insert into public.super_admins(user_id, email)
+    select '6b000000-0000-4000-8000-000000000002', 'ml-operator@strelva.example.test'
+    where not exists (select 1 from public.super_admins where user_id = '6b000000-0000-4000-8000-000000000002');
+  insert into public.workspaces(id, kind, name, created_by)
+    values ('6b000000-0000-4000-8000-000000000020', 'agency', 'Strelva agency fixture', '6b000000-0000-4000-8000-000000000002');
+  insert into public.workspace_memberships(workspace_id, user_id, role, created_by)
+    values ('6b000000-0000-4000-8000-000000000020', '6b000000-0000-4000-8000-000000000002', 'owner', '6b000000-0000-4000-8000-000000000002');
+  perform public.designate_strelva_agency_workspace('ml-operator@strelva.example.test', '6b000000-0000-4000-8000-000000000020');
+  perform public.record_agency_verification('ml-operator@strelva.example.test', '6b000000-0000-4000-8000-000000000020', 'email', 'verified', '{"fixture": true}', null);
+  perform public.record_agency_verification('ml-operator@strelva.example.test', '6b000000-0000-4000-8000-000000000020', 'publish', 'verified', '{"fixture": true}', null);
+end $$;
+
 create temporary table ml_items(name text primary key, id uuid) on commit drop;
 insert into ml_items values
   ('plan', (public.open_owner_decision('6b000000-0000-4000-8000-000000000010', pg_temp.ml_item('system.change_live', 'website-rebuild:w1@2', repeat('1', 64)))->>'id')::uuid),
@@ -100,6 +119,9 @@ select pg_temp.ml_expect(format($$select public.record_strelva_service_action('6
 -- The owner approves by link: the decision names the owner's link, and the plan fingerprint must match.
 select pg_temp.ml_assert((public.claim_owner_decision('6b000000-0000-4000-8000-000000000010', (select id from ml_items where name = 'plan'), repeat('9', 64),
   'approve', 'owner_link', null, null, 'ml-owner@example.test')->>'status') = 'changed', 'a stale plan fingerprint refuses');
+-- From 20261013120000 a link decides only once it was sent to the trusted owner.
+select pg_temp.ml_assert((public.record_owner_decision_delivery('6b000000-0000-4000-8000-000000000010', (select id from ml_items where name = 'plan'),
+  'digest', 'sent', 'ml-owner@example.test', 'ml-plan-message', null)->>'deliveryState') = 'sent', 'the plan link is sent to the owner');
 select pg_temp.ml_assert((public.claim_owner_decision('6b000000-0000-4000-8000-000000000010', (select id from ml_items where name = 'plan'), repeat('1', 64),
   'approve', 'owner_link', null, null, 'ml-owner@example.test')->>'status') = 'claimed', 'the owner link approves the plan');
 

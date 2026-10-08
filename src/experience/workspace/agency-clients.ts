@@ -30,6 +30,7 @@ export const agencyClientSystemSchema = z.object({
   lifecycle: z.enum(["draft", "live", "paused"]),
   /** Set when this System is a Version of a source: its context label. */
   versionContext: z.string().max(200).nullable(),
+  health: z.object({ status: z.enum(["healthy", "degraded", "blocked", "unknown"]), summary: z.string(), lastVerifiedAt: iso.nullable() }).strict().optional(),
 }).strict();
 
 export const agencyClientRowSchema = z.object({
@@ -50,11 +51,12 @@ export const agencyClientRowSchema = z.object({
   openRequests: z.number().int().min(0),
   improvementsWaiting: z.number().int().min(0),
   lastReceiptAt: iso.nullable(),
+  agentBookings: z.boolean().optional(),
 }).strict();
 
 export const agencyQueueItemSchema = z.object({
   id: z.string().min(1).max(200),
-  kind: z.enum(["request", "needs_you", "improvement"]),
+  kind: z.enum(["request", "needs_you", "improvement", "health", "owner_email", "operator"]),
   workspaceId: uuid,
   clientName: z.string().min(1).max(120),
   title: z.string().min(1).max(300),
@@ -62,6 +64,8 @@ export const agencyQueueItemSchema = z.object({
   systemId: uuid.nullable(),
   workId: uuid.nullable(),
   since: iso,
+  label: z.string().max(120).optional(),
+  href: z.string().startsWith("/").max(500).optional(),
 }).strict();
 
 export const agencyTeamMemberSchema = z.object({
@@ -81,6 +85,8 @@ export const agencyClientsPageSchema = z.object({
   nextCursor: z.string().max(200).nullable(),
   /** Whether the provider relationship table was read. False until it is migrated. */
   providersRead: z.boolean(),
+  queueComplete: z.boolean().optional(),
+  queueGaps: z.array(z.string().max(300)).optional(),
 }).strict();
 
 export type AgencyClientSystem = z.infer<typeof agencyClientSystemSchema>;
@@ -126,6 +132,12 @@ export const agencyLibrarySourceSchema = z.object({
 export const agencyLibrarySchema = z.object({
   agencyWorkspaceId: uuid,
   sources: z.array(agencyLibrarySourceSchema).max(500),
+  inquiryVersions: z.array(z.object({
+    id: z.string(), tenantId: z.string(), businessName: z.string(), name: z.string(),
+    sourceBusinessId: z.string(), sourceSystemId: z.string(), sourceRevision: z.number().int().positive(),
+    currentRelease: z.number().int().positive(), improvement: z.enum(["none", "auto_applicable", "blocked"]),
+  }).strict()).optional(),
+  inquiryVersionsUnavailable: z.boolean().optional(),
 }).strict();
 
 export type AgencyLibraryVersion = z.infer<typeof agencyLibraryVersionSchema>;
@@ -142,6 +154,9 @@ export const agencyBulkReviewResultSchema = z.object({
     clientName: z.string().min(1).max(120),
     outcome: z.enum(["prepared", "skipped_conflicts", "skipped_missing_accounts", "skipped_up_to_date", "failed"]),
     detail: z.string().max(500),
+    receiptId: uuid.optional(),
+    decisionId: uuid.optional(),
+    rowRevision: z.number().int().positive().optional(),
   }).strict()).max(1000),
 }).strict();
 export type AgencyBulkReviewResult = z.infer<typeof agencyBulkReviewResultSchema>;

@@ -1,3 +1,4 @@
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import { bookingScopeFor, workspaceBookingScope } from "./booking-scope";
 import { resolveOwnerRecipient } from "@/platform/business-record";
 import { emailSendingEnabled } from "@/platform/infra/email/enabled";
@@ -6,6 +7,7 @@ import { emailSendingEnabled } from "@/platform/infra/email/enabled";
  * functions, the tenant config and owner-recipient rule for the business, the
  * store-served slot engine for new times, and the one email path.
  */
+import { readReleasedTenantBusinessContext } from "@/platform/business-record/public-reader";
 import { decryptSecret } from "@/platform/infra/crypto/secrets";
 import { getSupabase } from "@/platform/infra/db/client";
 import { sendEmailWithReceipt } from "@/platform/infra/email/send";
@@ -25,7 +27,7 @@ import {
 } from "./store";
 
 export function bookingAppOrigin(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL || "https://app.strelva.com").replace(/\/$/, "");
+  return (process.env.NEXT_PUBLIC_APP_URL || CONTROL_PLANE_URL).replace(/\/$/, "");
 }
 
 /** Up to three currently offered times for the same active service. Removed
@@ -92,8 +94,9 @@ export const bookingLifecyclePorts: BookingLifecyclePorts = {
     const details = await bookingStoreDb()?.rpc("read_booking_business_details", { p_tenant_id: booking.tenantId });
     if (details?.error) throw new Error("booking_business_facts_unavailable");
     const facts = details?.data as { name?: string; address?: string } | null;
+    const context = facts?.name ? null : await readReleasedTenantBusinessContext(booking.tenantId);
     return {
-      name: facts?.name ?? config.siteName ?? "",
+      name: facts?.name || context?.facts.display_name || context?.facts.legal_name || config.siteName || "",
       address: facts?.address ?? "",
       tenantId: booking.tenantId,
       ownerEmail: await ownerNoticeEmail(config).catch(() => null),

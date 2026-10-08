@@ -63,6 +63,20 @@ insert into public.workspace_memberships(workspace_id, user_id, role, created_by
   ('ae000000-0000-4000-8000-000000000010', 'ae000000-0000-4000-8000-000000000003', 'member', 'ae000000-0000-4000-8000-000000000001'),
   ('ae000000-0000-4000-8000-000000000011', 'ae000000-0000-4000-8000-000000000004', 'owner', 'ae000000-0000-4000-8000-000000000004'),
   ('ae000000-0000-4000-8000-000000000012', 'ae000000-0000-4000-8000-000000000001', 'owner', 'ae000000-0000-4000-8000-000000000001');
+-- After 20261014112000 the provider layer belongs to the business's acting
+-- provider, not super_admins: the operator works for this business through an
+-- agency's seat and staff row, the way any agency does.
+do $$ begin
+  if to_regprocedure('public.acting_provider(uuid,uuid,text,text,text)') is null then return; end if;
+  insert into public.workspaces(id, kind, name, created_by)
+    values ('ae000000-0000-4000-8000-000000000020', 'agency', 'Fixture Provider Agency', 'ae000000-0000-4000-8000-000000000005');
+  insert into public.workspace_memberships(workspace_id, user_id, role, created_by)
+    values ('ae000000-0000-4000-8000-000000000020', 'ae000000-0000-4000-8000-000000000005', 'owner', 'ae000000-0000-4000-8000-000000000005');
+  insert into public.provider_seats(customer_workspace_id, agency_workspace_id, granted_by_kind, granted_by)
+    values ('ae000000-0000-4000-8000-000000000010', 'ae000000-0000-4000-8000-000000000020', 'owner', 'ae000000-0000-4000-8000-000000000001');
+  insert into public.agency_client_staff(agency_workspace_id, customer_workspace_id, user_id, assigned_by)
+    values ('ae000000-0000-4000-8000-000000000020', 'ae000000-0000-4000-8000-000000000010', 'ae000000-0000-4000-8000-000000000005', 'ae000000-0000-4000-8000-000000000005');
+end $$;
 -- The owner recipient falls back to the linked tenant's owner email.
 insert into public.tenants(id, stable_id, site_name, active, owner_email) values
   ('ny-fixture-site', 'ae000000-0000-4000-8000-0000000000a1', 'Mooney Fixture Site', true, 'NY-Owner@example.test');
@@ -170,7 +184,10 @@ select pg_temp.ny_expect(format($$select public.claim_owner_decision('ae000000-0
 -- A stale revision is reported, not acted on.
 select pg_temp.ny_assert((public.claim_owner_decision('ae000000-0000-4000-8000-000000000010',(select id from ny_items where name = 'reply'),repeat('9',64),'approve','owner_link',null,null,'ny-owner@example.test')->>'status') = 'changed',
   'stale revision refuses');
--- The owner recipient approves by link; a replay is "already handled".
+-- The owner recipient approves by link; a replay is "already handled". From
+-- 20261013120000 a link decides only once it was sent to the trusted owner.
+select pg_temp.ny_assert((public.record_owner_decision_delivery('ae000000-0000-4000-8000-000000000010',(select id from ny_items where name = 'reply'),'digest','sent','ny-owner@example.test','ny-reply-message',null)->>'deliveryState') = 'sent',
+  'the reply link is sent to the owner');
 select pg_temp.ny_assert((public.claim_owner_decision('ae000000-0000-4000-8000-000000000010',(select id from ny_items where name = 'reply'),repeat('1',64),'approve','owner_link',null,null,' NY-Owner@example.test ')->>'status') = 'claimed',
   'owner recipient approves by link');
 select pg_temp.ny_assert((public.claim_owner_decision('ae000000-0000-4000-8000-000000000010',(select id from ny_items where name = 'reply'),repeat('1',64),'approve','owner_link',null,null,'ny-owner@example.test')->>'status') = 'already_handled',

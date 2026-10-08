@@ -4,9 +4,10 @@ import type { InquirySurfaceSnapshot } from "@/products/inquiries/contracts";
 import { createPreviewInquiryAdapter } from "@/experience/inquiries/preview-fixture";
 
 test.skip(
-  process.env.STRELVA_INQUIRIES_RELEASE !== "1" || process.env.REB_DEV_UNGATED_ACCESS !== "1",
-  "Requires the released inquiry route with the local development access bypass.",
+  process.env.STRELVA_UI_PREVIEW !== "1" && (process.env.STRELVA_INQUIRIES_RELEASE !== "1" || process.env.REB_DEV_UNGATED_ACCESS !== "1"),
+  "Requires isolated interface fixtures or the released inquiry route with local development access.",
 );
+const entry = process.env.STRELVA_UI_PREVIEW === "1" ? "/preview/strelva/inquiries?bridge=1" : "/business/gldf";
 
 async function fulfill(route: Route, value: unknown, status = 200) {
   await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(value) });
@@ -97,7 +98,7 @@ async function mockSnapshot(page: Page, current: InquirySurfaceSnapshot) {
 test("provider bounce and blocked follow-up are visible in Needs you, Inspector, and Why", async ({ page }) => {
   const snapshot = await mockProviderTimeline(page);
   const record = snapshot.state.inquiries[0]!;
-  await page.goto("/business/gldf", { waitUntil: "domcontentloaded" });
+  await page.goto(entry, { waitUntil: "domcontentloaded" });
 
   await expect(page.getByRole("heading", { name: "Needs you", exact: true })).toBeVisible();
   await page.getByRole("button", { name: `Inspect ${record.id}`, exact: true }).click();
@@ -122,7 +123,7 @@ test("a provider timeline outage is visible and removes the unsafe Why fix", asy
   };
   await mockSnapshot(page, current);
   const record = current.state.inquiries[0]!;
-  await page.goto("/business/gldf", { waitUntil: "domcontentloaded" });
+  await page.goto(entry, { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("status")).toContainText("Provider outcomes may be missing");
   await page.getByRole("button", { name: `Inspect ${record.id}`, exact: true }).click();
   await expect(page.locator("main").getByRole("status")).toContainText("Provider outcomes may be missing");

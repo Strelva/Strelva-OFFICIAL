@@ -102,3 +102,24 @@ export async function loadGoogleBusinessData(tenant: string) {
   const state = connected ? await getGbpState(tenant).catch(() => null) : null;
   return { connected, state };
 }
+
+/** Existing store/member evidence. The caller authorizes workspace AND tenant first. */
+export async function loadWebsiteStoreData(tenant: string) {
+  const [{ getOrderSummary, getOrders }, { getProducts }, { tenantHasStore }] = await Promise.all([
+    import("@/lib/orders"), import("@/lib/products"), import("@/lib/dashboard-surfaces"),
+  ]);
+  const [config, summary, orders, products] = await Promise.all([
+    getTenantConfig(tenant), getOrderSummary(tenant, 30), getOrders(tenant, 20), getProducts(tenant),
+  ]);
+  return { configured: tenantHasStore({ tenantConfig: { features: config?.features }, hasCommerce: products.length > 0 }), summary, orders, products };
+}
+
+export async function loadWebsiteMembersData(tenant: string) {
+  const config = await getTenantConfig(tenant);
+  if (!config?.features?.includes("members")) return { configured: false as const };
+  const [{ listMembers }, { KvNotConfiguredError }] = await Promise.all([
+    import("@/lib/rewards/memberRepositoryKv"), import("@/lib/rewards/kv"),
+  ]);
+  try { return { configured: true as const, members: await listMembers(tenant) }; }
+  catch (error) { if (error instanceof KvNotConfiguredError) return { configured: false as const }; throw error; }
+}

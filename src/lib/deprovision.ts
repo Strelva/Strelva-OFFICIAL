@@ -13,6 +13,7 @@
  * server-side (confirmSlug === id in the request body).
  */
 
+import { leadAuthorityIsPostgres } from "./lead-reads";
 import { getSupabase } from "@/platform/infra/db/client";
 import { getRedis } from "@/platform/infra/redis";
 import type { TenantConfig } from "@/lib/types";
@@ -56,15 +57,16 @@ export const WORKSPACE_OWNED_TENANT_TABLES = [
   "website_document_publications", "website_hosted_tenant_reservations",
 ] as const;
 
-// Tables with a tenant_id that the sweep does NOT cover yet, found when
-// database.types.ts was regenerated from every migration (Strelva Reborn
-// section 7, 2026-10-06). None has a foreign key to `tenants`, so their rows
-// outlive a deprovisioned tenant. Whether each is purged, kept as a receipt
-// (outside_write_receipts) or settled through its workspace (the agency draft
-// tables) is an open decision for Jacob; this list changes nothing at run
-// time. It only shrinks; deprovision-coverage.test.ts still fails on any new
-// tenant_id table.
-export const TENANT_TABLES_SWEEP_UNDECIDED = [
+// The tenant delete removes these through ON DELETE CASCADE. Count them for
+// dry runs and receipts without changing the atomic teardown's explicit sweep.
+export const CASCADED_TENANT_TABLES = ["tenant_track_signing_keys"] as const;
+
+// Finding 19 resolved in Wave 6: preserve the five tables as historical
+// receipts. STRELVA_TENANT_RECEIPT_RETENTION=1 selects the atomic adapter
+// that records counts and expires draft grants; off uses the original RPC.
+// Retention is indefinite pending an explicit later deletion policy/yes.
+export const TENANT_TABLES_SWEEP_UNDECIDED = [] as const;
+export const TENANT_TABLES_RETAINED_AS_RECEIPTS = [
   "agency_managed_website_draft_grants", "agency_managed_website_draft_preparations",
   "agency_managed_website_draft_revisions", "outside_write_receipts", "report_snapshots",
 ] as const;
@@ -153,7 +155,12 @@ export async function pauseStoredSystems(tenantId: string): Promise<{ ok: true; 
 async function deleteTenantRowsAtomically(tenantId: string): Promise<Record<string, number>> {
   const call = rpc();
   if (!call) return {};
-  const { data, error } = await call("deprovision_tenant_rows", { p_tenant_id: tenantId });
+  // Each switch adds one atomic wrapper; both on uses the combined wrapper.
+  const retained = process.env.STRELVA_TENANT_RECEIPT_RETENTION === "1";
+  const name = leadAuthorityIsPostgres()
+    ? retained ? "deprovision_tenant_rows_retained_after_inquiry_export" : "deprovision_tenant_rows_after_inquiry_export"
+    : retained ? "deprovision_tenant_rows_retained" : "deprovision_tenant_rows";
+  const { data, error } = await call(name, { p_tenant_id: tenantId });
   if (error) throw new Error(`deprovision_tenant_rows: ${error.message}`);
   return Object.fromEntries(Object.entries((data ?? {}) as Record<string, unknown>).map(([table, n]) => [table, Number(n)]));
 }
@@ -175,6 +182,7 @@ export function tenantRedisPatterns(tenantId: string, ownerEmail?: string): stri
     `events:${tenantId}`, // event index; its id-keyed blobs are found by value below
     `account-of:${tenantId}`, // multi-site grouping reverse lookup
     `calendly-meta:${tenantId}`,
+    ...(process.env.STRELVA_TENANT_RECEIPT_RETENTION === "1" ? [`reb:client-records:pending-payload:*|${tenantId}|*`] : []),
     `reb:content:${tenantId}:*`,
     `reb:chat:${tenantId}:*`,
     `reb:rewards:${tenantId}:*`,
@@ -319,11 +327,21 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
     };
   }
 
+  // Check before pausing any System or touching Redis/Vercel. The atomic
+  // teardown repeats this guard under the tenant lock, so a stale export
+  // cannot authorize teardown after a fresh lead arrived.
+  if (executed && leadAuthorityIsPostgres()) {
+    const call = rpc();
+    if (!call) throw new Error("inquiry_export_guard_unavailable");
+    const checked = await call("assert_tenant_inquiry_export", { p_tenant_id: tenantId });
+    if (checked.error) throw new Error(`inquiry_export_guard: ${checked.error.message}`);
+  }
+
   // Postgres: count (always), then purge every table and the tenant in one
   // transaction. A failure throws here, before Redis or Vercel are touched.
   let pgTotal = 0;
   const found: Array<[string, number]> = [];
-  for (const table of [...TENANT_SCOPED_TABLES, "tenants"]) {
+  for (const table of [...TENANT_SCOPED_TABLES, ...CASCADED_TENANT_TABLES, "tenants"]) {
     const n = await countRows(table, tenantId);
     pgTotal += n;
     if (n > 0) found.push([table, n]);
@@ -338,9 +356,16 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
   } else {
     summary.postgres!.push({ target: "systems", found: "?", deleted: false, detail: "would pause any stored Systems (dry run)" });
   }
+  if (process.env.STRELVA_TENANT_RECEIPT_RETENTION === "1") {
+    for (const table of TENANT_TABLES_RETAINED_AS_RECEIPTS) {
+      summary.postgres!.push({ target: table, found: await countRows(table, tenantId), deleted: false,
+        detail: "kept as historical receipts; outstanding draft grants expire on teardown" });
+    }
+  }
   const removed = executed ? await deleteTenantRowsAtomically(tenantId) : {};
   for (const [table, n] of found) {
-    summary.postgres!.push({ target: table, found: n, deleted: executed && (removed[table] ?? 0) > 0 });
+    const cascaded = CASCADED_TENANT_TABLES.some(candidate => candidate === table) && (removed.tenants ?? 0) > 0;
+    summary.postgres!.push({ target: table, found: n, deleted: executed && ((removed[table] ?? 0) > 0 || cascaded) });
   }
 
   // Redis: per-tenant keys (pinned patterns) + global cache busts.

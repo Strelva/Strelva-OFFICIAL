@@ -1,3 +1,4 @@
+import { withAgencyTeamPreview } from "./agency-team-fixture";
 /**
  * Local fixture for the agency home's batched read (`agency-clients.ts`).
  *
@@ -171,7 +172,7 @@ export function withAgencyPreview(base: typeof fetch, scenario: string, state: A
   // Dev StrictMode reads twice on mount; McClear’s loads from the first retry on.
   // Dev StrictMode reads twice on mount, so McClear's loads from the first Retry on.
   let clientReads = 0;
-  return async (input, init) => {
+  return withAgencyTeamPreview(async (input, init) => {
     const raw = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const url = new URL(raw, "http://preview.invalid");
     const method = init?.method || "GET";
@@ -185,10 +186,44 @@ export function withAgencyPreview(base: typeof fetch, scenario: string, state: A
       const offset = Number(url.searchParams.get("cursor") || 0) || 0;
       const slice = rows.slice(offset, offset + PAGE);
       const page: AgencyClientsPage = {
-        agencyWorkspaceId, clients: slice, queue: offset === 0 && rows.length ? queue(now) : [], team: team(slice),
+        agencyWorkspaceId, clients: slice.map(client => ({ ...client, systems: client.systems.map(system => ({ ...system,
+          health: { status: client.workspaceId === ELMWOOD ? "blocked" as const : "unknown" as const,
+            summary: client.workspaceId === ELMWOOD ? "Fixture: the domain check failed." : "Fixture: no recent health evidence.",
+            lastVerifiedAt: client.workspaceId === ELMWOOD ? at(0, now) : null },
+        })) })), queue: offset === 0 && rows.length ? queue(now).map(item => ({ ...item,
+          ...(item.systemId ? { href: `/workspace?view=system&system=${item.systemId}&workspaceId=${item.workspaceId}` } : {}),
+        })) : [], team: team(slice), queueComplete: true, queueGaps: [],
         total: rows.length, nextCursor: offset + PAGE < rows.length ? String(offset + PAGE) : null, providersRead: true,
       };
       return json(page);
+    }
+
+    if ((url.pathname === "/api/workspace/agency-authoring" || url.pathname === "/api/workspace/versions/manage") && method === "GET") {
+      const agencyId = url.searchParams.get("agencyWorkspaceId") || agencyWorkspaceId;
+      if (state === "loading") return new Promise<Response>(() => undefined);
+      if (state === "error") return json({ error: "Agency sources could not be read." }, 503);
+      if (state === "delegated") return json({ error: "This agency is shared read-only." }, 403);
+      const source = library(agencyId, now).sources[0]!;
+      if (url.pathname === "/api/workspace/versions/manage") return json({ workspaceId: agencyId, sources: state === "empty" ? [] : [{
+        systemId: source.systemId, name: source.name, revisions: [{ source: { businessId: agencyId, systemId: source.systemId,
+          revisionId: hex("d5000000", 1), number: 4 }, summary: "Follow up after one business day" }],
+      }] });
+      return json({ workspaceId: agencyId, choices: state === "empty" ? [] : [{ systemId: source.systemId, name: source.name,
+        revision: 4, fingerprint: "fixture:source:4", definition: { title: "Inquiry intake", followUp: { message: "Someone will reply by the end of the next business day." } } }], unavailable: [] });
+    }
+
+    if (url.pathname === "/api/workspace/agency-authoring" && method === "POST" && url.searchParams.get("action") === "package") {
+      const body = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as { workspaceId?: string; systemId?: string };
+      if (state === "delegated") return json({ error: "This agency is shared read-only." }, 403);
+      return json({ workspaceId: body.workspaceId, systemId: body.systemId, revision: 5, revisionId: hex("d5000000", 2) });
+    }
+
+    if (url.pathname === "/api/workspace/versions/manage" && method === "POST") {
+      const body = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as { action?: string; workspaceId?: string; commandId?: string };
+      if (body.action === "create") {
+        if (state === "delegated") return json({ error: "This agency is shared read-only." }, 403);
+        return json({ workspaceId: body.workspaceId, systemId: body.commandId, versionId: hex("d6000000", 1), rowRevision: 1, outcome: "created" }, 201);
+      }
     }
 
     if (url.pathname === "/api/workspace/agency-library" && method === "GET") {
@@ -213,5 +248,5 @@ export function withAgencyPreview(base: typeof fetch, scenario: string, state: A
     if (state !== "delegated" || url.pathname !== "/api/workspace" || method !== "GET" || !response.ok) return response;
     const snapshot = await response.json() as { workspaces?: Array<{ kind: string; access?: string; role?: string }> };
     return json({ ...snapshot, workspaces: snapshot.workspaces?.map((workspace) => workspace.kind === "agency" ? { ...workspace, access: "delegated_read", role: undefined } : workspace) });
-  };
+  }, state);
 }

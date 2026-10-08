@@ -1,14 +1,12 @@
 /** Acknowledges published-fact follow-up; never changes facts or a provider. */
 import type { SourceAdapter } from "../adapters";
 import { readConnectedSiteSchemaDecision } from "../repository";
-import { schemaConflictReleaseEnabled } from "../release";
 
 export function connectedSiteSchemaAdapter(read = readConnectedSiteSchemaDecision): SourceAdapter {
   return {
     lifecycle: "connected_site_schema", needsMemberActor: false,
     async propose() { return { items: [], complete: true }; },
     async currentRevision(ctx, sourceId) {
-      if (!schemaConflictReleaseEnabled()) throw new Error("schema_conflicts_disabled");
       return (await read(ctx.workspaceId, sourceId))?.revisionHash ?? null;
     },
     async resolve(_ctx, _item, decision, by) {

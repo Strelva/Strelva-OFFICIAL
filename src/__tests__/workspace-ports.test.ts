@@ -36,13 +36,15 @@ describe("workspace ports", () => {
   it("every port loads the workspace module with the functions src/lib calls", async () => {
     const ports = workspacePorts();
     const expected: Record<keyof WorkspacePorts, string[]> = {
+      bookingProof: ["readAgentRequestProof"],
       clientRecords: ["mirrorClientRecord", "mirrorClientRecordRemoval", "readThroughFlag"],
       tenantPolicy: ["readTenantPolicyRoute", "writeTenantPolicySetting", "contentAutonomyFromRoute", "planContentAutonomy", "replyModeFromRoute", "planReplyMode"],
       outsideWriteReceipts: ["recordReviewReply", "recordDomainAdd", "recordDomainClaimRemoval"],
       businessRecord: ["resolveTenantOwnerRecipient"],
       googleBindings: ["googleBindingsEnabled", "readBindingTarget", "readGoogleBindingForTenant", "setGoogleBindingStatus", "updateGoogleBindingTokens", "upsertGoogleBinding", "upsertGoogleLocation", "BindingEncryptionRefused", "AccountBindingStoreError"],
+      providerDisconnect: ["recordTenantProviderDisconnect"],
       businessBilling: ["businessBillingCheckoutMetadata"],
-      inquiries: ["isInquiryMessageReviewEvent", "authorizeInquiryMessageReviewActor", "executeInquiryMessageReview", "reconcileInquiryMessageReview", "executeInquiryPublication"],
+      inquiries: ["isInquiryMessageReviewEvent", "authorizeInquiryMessageReviewActor", "executeInquiryMessageReview", "reconcileInquiryMessageReview", "authorizeInquiryPublicationActor", "executeInquiryPublication"],
       tenantReviewReplies: ["defaultTenantReplyDeps", "routeTenantReviewReply", "postTenantReviewReply"],
       publishingContent: ["executePublishingEvent", "authorizePublishingEvent", "prepareTenantCollectionDraft"],
       websites: ["websiteRebuildReleaseMayBeOn", "websiteRebuildReleasedFor", "websiteDocumentStore", "readWebsiteRebuild", "readSiteNodes", "patchWebsiteRebuild"],
@@ -53,7 +55,8 @@ describe("workspace ports", () => {
       const port = (await ports[name]()) as unknown as Record<string, unknown>;
       for (const member of members) expect(port[member], `${name}.${member}`).toBeDefined();
     }
-  });
+  // Cold-imports every workspace module graph; transform time, not runtime.
+  }, 30_000);
 
   it("a port returns the same module instance a direct import does", async () => {
     const direct = await import("@/platform/account-bindings/store");

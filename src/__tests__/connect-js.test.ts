@@ -69,6 +69,28 @@ afterEach(() => {
 });
 
 describe("connect.js", () => {
+  it("renders offered native booking times only from signed app links after inquiry confirmation", async () => {
+    const page = load('<div data-strelva-form></div>');
+    await tick();
+    page.fetch.mockImplementation(async (url: string) => url.endsWith("/inquiries") ? { ok: true, status: 201, json: async () => ({ ok: true, bookingOffer: { serviceName: "Consultation", slots: [{ label: "Friday 9 AM", chooseUrl: "/inquiry-booking/encoded.signature?slot=0" }] } }) } : { ok: true, status: 200, json: async () => DEFAULT_CONTEXT });
+    const form = page.win.document.querySelector<HTMLFormElement>("[data-strelva-form] form")!;
+    form.querySelector<HTMLInputElement>('input[name="name"]')!.value = "Dana";
+    form.querySelector<HTMLInputElement>('input[name="email"]')!.value = "dana@example.test";
+    form.dispatchEvent(new page.win.Event("submit", { bubbles: true, cancelable: true }));
+    await tick();
+    const link = form.querySelector<HTMLAnchorElement>('[aria-label="Appointment times"] a')!;
+    expect(link.textContent).toBe("Friday 9 AM");
+    expect(link.href).toBe("https://app.strelva.test/inquiry-booking/encoded.signature?slot=0");
+    expect(form.textContent).toContain("business must confirm");
+    page.fetch.mockImplementation(async () => ({ ok: true, status: 201, json: async () => ({ ok: true, bookingOffer: { serviceName: "Consultation", slots: [{ label: "Bad link", chooseUrl: "https://other.test/path" }] } }) }));
+    form.querySelector<HTMLInputElement>('input[name="name"]')!.value = "Dana";
+    form.querySelector<HTMLInputElement>('input[name="email"]')!.value = "dana@example.test";
+    form.dispatchEvent(new page.win.Event("submit", { bubbles: true, cancelable: true }));
+    await tick();
+    expect(form.querySelector('[aria-label="Appointment times"] a')).toBeNull();
+    expect(form.textContent).toContain("Thanks. Your message was sent.");
+  });
+
   it("sends a visit with the path but no query string, and only the referrer's origin", async () => {
     const page = load("<main>Hi</main>");
     await tick();
@@ -196,7 +218,7 @@ describe("connect.js", () => {
     expect(own.win.document.querySelector("script[data-strelva]")).toBeNull();
   });
 
-  it("reports platform business fields from a graph without changing its schema", async () => {
+  it("reports only schema presence without exposing client-supplied business fields", async () => {
     const ld = { "@context": "https://schema.org", "@graph": [
       { "@type": "WebSite", name: "Unrelated page" },
       { "@type": ["Organization", "LocalBusiness"], name: "Old Mooney", telephone: "716-555-0199",
@@ -207,24 +229,28 @@ describe("connect.js", () => {
     const original = JSON.stringify(ld);
     const page = load("", { head: `<script type="application/ld+json">${original}</script>` });
     await tick();
-    expect(posts(page, "/events")).toEqual([{ events: [], platformSchema: { present: true, businesses: [{
-      name: "Old Mooney", telephone: "716-555-0199", address: { streetAddress: "1 Main St", addressLocality: "Buffalo", addressRegion: "NY", postalCode: "14201", addressCountry: "US" },
-      openingHours: "Mo-Fr 08:00-16:00", openingHoursSpecification: [{ dayOfWeek: ["Monday", "Tuesday"], opens: "08:00", closes: "16:00" }],
-    }] } }]);
+    expect(posts(page, "/events")).toEqual([{ events: [], platformSchema: { present: true } }]);
     expect(page.win.document.querySelector('script[type="application/ld+json"]')!.textContent).toBe(original);
     expect(page.win.document.querySelector("script[data-strelva]")).toBeNull();
-    expect(JSON.stringify(posts(page, "/events"))).not.toContain("not-reported");
+    expect(JSON.stringify(posts(page, "/events"))).not.toContain("Old Mooney");
   });
 
   it("reports presence for malformed platform schema and leaves injection off untouched", async () => {
     const page = load("", { head: '<script type="application/ld+json">{"@type":"LocalBusiness", invalid}</script>' });
     await tick();
-    expect(posts(page, "/events")).toEqual([{ events: [], platformSchema: { present: true, businesses: [] } }]);
+    expect(posts(page, "/events")).toEqual([{ events: [], platformSchema: { present: true } }]);
     expect(page.win.document.querySelector("script[data-strelva]")).toBeNull();
     page.close();
     const off = load("", { head: '<script type="application/ld+json">{"@type":"LocalBusiness","name":"Old"}</script>', context: { ...DEFAULT_CONTEXT, site: { captureForms: true, injectSchema: false } } });
     await tick();
     expect(posts(off, "/events")).toEqual([]);
+  });
+
+  it("reports an existing platform schema even when there are no confirmed facts to inject", async () => {
+    const context = { ...DEFAULT_CONTEXT, jsonLd: null };
+    const page = load("", { head: '<script type="application/ld+json">{"@type":"LocalBusiness","name":"Existing"}</script>', context });
+    await tick();
+    expect(posts(page, "/events")).toEqual([{ events: [], platformSchema: { present: true } }]);
   });
 
   it("sends nothing until consent when consent is required", async () => {

@@ -7,6 +7,8 @@ import {
 import { projectQueue } from "./project";
 import { readAllSources } from "./sources";
 import { readQueueContext, writeQueueMark } from "./store";
+import { operatorQueueReleaseEnabled } from "./release";
+import { readQueueLeadCounts } from "./lead-counts";
 
 /**
  * Read the whole queue for a verified operator. The SQL boundary rechecks the
@@ -17,6 +19,7 @@ export interface QueueDependencies {
   readTenants: () => Promise<{ id: string; siteName?: string; stableId?: string }[]>;
   readSources: typeof readAllSources;
   emailPaused: () => boolean;
+  readLeadCounts?: typeof readQueueLeadCounts;
 }
 
 export const defaultQueueDependencies: QueueDependencies = {
@@ -24,6 +27,7 @@ export const defaultQueueDependencies: QueueDependencies = {
   readTenants: async () => (await getActiveTenants()).map((tenant) => ({ id: tenant.id, siteName: tenant.siteName, stableId: tenant.stableId })),
   readSources: readAllSources,
   emailPaused: emailSendingPaused,
+  readLeadCounts: readQueueLeadCounts,
 };
 
 function requireActor(actor: QueueActor | null): QueueActor {
@@ -55,6 +59,13 @@ export async function readOperatorQueue(
   }
   const reads = await deps.readSources({ tenants, context, actor, now });
   const queue = projectQueue({ reads, context, contextFailure, tenants, emailPaused: deps.emailPaused(), now });
+  if (operatorQueueReleaseEnabled() && deps.readLeadCounts) {
+    queue.businessLeads = await deps.readLeadCounts(tenants, context?.links ?? [], now);
+    if (queue.businessLeads.some(row => row.failure)) {
+      queue.gaps.push({ kind: "lead_unkept", source: "Client lead counts", reason: "One or more business lead counts could not be read" });
+      queue.complete = false;
+    }
+  }
   if (tenantFailure) {
     queue.gaps.unshift({ kind: "draft_review", source: "Client sites", reason: tenantFailure });
     queue.complete = false;

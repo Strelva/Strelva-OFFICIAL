@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { AskStrelva } from "@/experience/ask/AskStrelva";
-import { askErrorMessage, readAskResult, receiptLines, resultHeadline, sameAppPath } from "@/experience/ask/ask-model";
+import { askHistoryFailure, askErrorMessage, readAskResult, receiptLines, resultHeadline, sameAppPath } from "@/experience/ask/ask-model";
 import { workspaceReturnTarget } from "@/platform/workspaces/location";
 import { sectionFromView, sectionTitle } from "@/experience/app-frame/workspace-places";
 
@@ -73,9 +73,26 @@ describe("Ask Strelva in the workspace", () => {
     expect(html).not.toMatch(/\b(AI|agent|automation|workflow)\b/);
   });
 
+  it("lets an operator record email or phone origin without moving the decision into chat", () => {
+    const html = renderToStaticMarkup(createElement(AskStrelva, { workspaceId: WS, businessName: "The Mooney Firm", canAskOnBehalf: true }));
+    expect(html).toContain("Who asked for this?");
+    expect(html).toContain("The owner, by email");
+    expect(html).toContain("The owner, by phone");
+    expect(html).toContain("The owner still decides in Needs you.");
+    const owner = renderToStaticMarkup(createElement(AskStrelva, { workspaceId: WS, businessName: "The Mooney Firm" }));
+    expect(owner).not.toContain("Who asked for this?");
+  });
+
   it("disables asking with the reason when the person can't ask", () => {
     const html = renderToStaticMarkup(createElement(AskStrelva, { workspaceId: WS, businessName: "The Mooney Firm", readOnly: true, readOnlyReason: "Work in this workspace has stopped.", request: (async () => new Response("{}")) as typeof fetch }));
     expect(html).toContain('placeholder="Work in this workspace has stopped."');
     expect(html).toMatch(/<textarea[^>]*disabled/);
   });
+});
+
+it("distinguishes a paused Ask release from unavailable conversation storage", () => {
+  expect(askHistoryFailure(503, { error: "Ask Strelva is not enabled." })).toBe("off");
+  expect(askHistoryFailure(503, { error: "The operation could not be confirmed." })).toBe("unavailable");
+  expect(askHistoryFailure(503, null)).toBe("unavailable");
+  expect(askHistoryFailure(403, { error: "Ask Strelva is not enabled." })).toBe("unavailable");
 });

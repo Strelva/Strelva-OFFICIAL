@@ -7,6 +7,7 @@ import {
   WorkspaceMakeSystemsError,
   WorkspaceStoreError,
   WORKSPACE_EXIT_STOPPED_MESSAGE,
+  WORKSPACE_LIMIT_MESSAGE,
   type AcceptedHandoff,
   type Delegation,
   type Handoff,
@@ -62,7 +63,8 @@ function workspaceDbFailure(error: DbFailure, fallback: string): never {
     throw new WorkspaceAccessError();
   }
   if (CONFLICT_FAILURES.some((value) => detail.includes(value))) {
-    throw new WorkspaceConflictError(detail.includes("workspace_exit_future_work_blocked") ? WORKSPACE_EXIT_STOPPED_MESSAGE : undefined);
+    throw new WorkspaceConflictError(detail.includes("workspace_exit_future_work_blocked") ? WORKSPACE_EXIT_STOPPED_MESSAGE
+      : detail.includes("workspace_limit_reached") ? WORKSPACE_LIMIT_MESSAGE : undefined);
   }
   throw new WorkspaceStoreError(fallback);
 }
@@ -375,24 +377,25 @@ export async function saveWork(input: WorkspaceActor, workspaceId: string, work:
 
 /**
  * How the actor relates to making Systems in this workspace, from
- * public.workspace_make_systems_authority: "operator" (Strelva staff with a
- * membership), "agency" (an active delegation into this business), "member"
+ * public.workspace_make_systems_authority: "provider" (the business's acting
+ * provider: an agency's seat, membership and staff row, the same for every
+ * agency, Strelva's included), "agency" (an active delegation into this business), "member"
  * (a direct member who may use but not make tools), or null.
  */
-export type MakeSystemsAuthority = "operator" | "agency" | "member" | null;
+export type MakeSystemsAuthority = "provider" | "agency" | "member" | null;
 
 export async function makeSystemsAuthority(input: WorkspaceActor, workspaceId: string): Promise<MakeSystemsAuthority> {
   const a = actor(input);
   const { data, error } = await rpc("workspace_make_systems_authority", { p_workspace_id: workspaceId, p_user_id: a.userId });
   if (error) workspaceDbFailure(error, "Workspace authority is unavailable");
   const value = Array.isArray(data) ? data[0] : data;
-  return value === "operator" || value === "agency" || value === "member" ? value : null;
+  return value === "provider" || value === "agency" || value === "member" ? value : null;
 }
 
 /** First gate for making or changing an internal tool. SQL rechecks on create. */
-export async function assertCanMakeSystems(input: WorkspaceActor, workspaceId: string): Promise<"operator" | "agency"> {
+export async function assertCanMakeSystems(input: WorkspaceActor, workspaceId: string): Promise<"provider" | "agency"> {
   const authority = await makeSystemsAuthority(input, workspaceId);
-  if (authority === "operator" || authority === "agency") return authority;
+  if (authority === "provider" || authority === "agency") return authority;
   if (authority === "member") throw new WorkspaceMakeSystemsError();
   throw new WorkspaceAccessError();
 }

@@ -5,6 +5,11 @@ Status: draft spec; workspace implementation extended on `w6/publishing`,
 no production deployment, migration, Google write or live email in this stream.
 See the Wave 6 status below and [stream handoff](../../product/streams/w6-publishing.md).
 
+October 7 follow-up #467: `a1/google-lineage` adds explicit Google location
+Versions and shared hours/post preparation through existing per-location
+approvals. See [Google location lineage](google-location-versions.md) for
+the API contract, local evidence and remaining limits. No live release implied.
+
 Publishing here means four jobs: replying to reviews, keeping the Google
 Business Profile right (hours, info, posts), publishing blog and collection
 entries, and sending a newsletter. At launch, all four run from the workspace, through

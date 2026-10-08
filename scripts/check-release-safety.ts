@@ -1,11 +1,11 @@
 #!/usr/bin/env npx tsx
 /** Forward → rollback → forward for packet batches 0–7, in a private Unix-socket cluster. */
 import { createHash } from "node:crypto";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import manifest from "./release-safety/batches.json";
+import { createTempPostgres } from "./release-safety/temp-postgres";
 import { catalog, command, databaseUrl, sql, type Catalog } from "./release-safety/postgres";
 import { compareCounts, rehearse, tableCounts } from "./rehearse-database-restore";
 
@@ -40,8 +40,8 @@ function expectRefusal(url: string, operation: () => void, label: string) {
 }
 
 async function main() {
-  const cluster = mkdtempSync(join(tmpdir(), "strelva-release-safety-"));
-  chmodSync(cluster, 0o700);
+  const temporary = createTempPostgres();
+  const { cluster } = temporary;
   const socket = join(cluster, "socket");
   mkdirSync(socket, { mode: 0o700 });
   const port = 61_000 + process.pid % 3000;
@@ -49,11 +49,10 @@ async function main() {
   const receipt: { scope: string; postgres: string; batches: object[]; passed: boolean; upgradedRestore?: Awaited<ReturnType<typeof rehearse>>; restore?: Awaited<ReturnType<typeof rehearse>>; julyOrgLayer?: boolean } = {
     scope: "Local Postgres only; hosted/current deployed app not exercised", postgres: command("psql", ["--version"]), batches: [], passed: false,
   };
-  let started = false;
   try {
     command("initdb", ["-D", join(cluster, "data"), "--locale=C", "--encoding=UTF8", "--auth=trust", "--no-instructions"]);
     command("pg_ctl", ["-D", join(cluster, "data"), "-l", join(cluster, "postgres.log"), "-o", `-F -k '${socket}' -c listen_addresses='' -p ${port}`, "-w", "start"]);
-    started = true;
+    temporary.recordPostmaster();
     sql(admin, { file: join(root, "scripts/sql/local-supabase-shim.sql") });
     for (const item of manifest.baseline) apply(admin, item);
     sql(admin, { text: `insert into public.users(id,email,verified_at) values
@@ -172,9 +171,14 @@ end; $seed$;` });
     receipt.passed = true;
     console.log("July org layer: forward, rollback, forward; legacy behavior and catalog passed.");
   } finally {
-    if (started) command("pg_ctl", ["-D", join(cluster, "data"), "-m", "fast", "-w", "stop"]);
-    writeFileSync(join(cluster, "release-safety-receipt.json"), JSON.stringify(receipt, null, 2) + "\n", { mode: 0o600 });
-    console.log("Private local rehearsal artifact: " + cluster);
+    try {
+      const artifact = join(root, "output/release-safety", `${Date.now()}-${process.pid}`);
+      mkdirSync(artifact, { recursive: true, mode: 0o700 });
+      writeFileSync(join(artifact, "release-safety-receipt.json"), JSON.stringify(receipt, null, 2) + "\n", { mode: 0o600 });
+      console.log("Private local rehearsal artifact: " + artifact);
+    } finally {
+      temporary.cleanup();
+    }
   }
 }
 main().catch((error: unknown) => {

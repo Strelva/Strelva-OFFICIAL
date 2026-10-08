@@ -18,7 +18,7 @@ vi.mock("@/lib/owner-recipient", () => ({ ownerNoticeEmail: async (t: { ownerEma
 
 import { captureLead, getLeadById, getLeads, getLeadSummary, leadSubmissionHash, type LeadRecord } from "@/lib/leads";
 import { LEAD_MIRROR_PENDING_KEY, setLeadMirrorDb, type LeadMirrorDb } from "@/lib/lead-mirror";
-import { compareLeadLists, leadFromPostgres, leadReadSource, resetLeadReadCache } from "@/lib/lead-reads";
+import { compareLeadLists, leadFromPostgres, leadReadSource, leadReadStoreReady, resetLeadReadCache } from "@/lib/lead-reads";
 import { runLeadReadParity } from "@/lib/client-leads";
 
 type Row = { tenant: string; leadId: string; hash: string; lead: Record<string, unknown>; capturedAt: string };
@@ -55,11 +55,19 @@ const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => {
     rows.push({ tenant, leadId: String(lead.leadId), hash: String(lead.submissionHash), lead, capturedAt: String(lead.capturedAt) });
     return { data: { status: "recorded", id: lead.leadId, workspaceId: null }, error: null };
   }
-  if (name === "read_tenant_leads") {
-    const list = rows.filter((r) => r.tenant === args.p_tenant_id)
-      .sort((a, b) => Date.parse(b.capturedAt) - Date.parse(a.capturedAt))
+  if (name === "read_tenant_leads" || name === "read_tenant_leads_page") {
+    const list = rows.filter((r) => r.tenant === args.p_tenant_id && (!args.p_before || Date.parse(r.capturedAt) < Date.parse(String(args.p_before)) || (args.p_before_id && r.capturedAt === args.p_before && r.leadId < String(args.p_before_id))))
+      .sort((a, b) => Date.parse(b.capturedAt) - Date.parse(a.capturedAt) || (a.leadId < b.leadId ? 1 : -1))
       .slice(0, Number(args.p_limit));
     return { data: list.map(pgItem), error: null };
+  }
+  if (name === "read_tenant_lead_presence") {
+    return { data: rows.filter(row => row.tenant === args.p_tenant_id && (args.p_lead_ids as string[]).includes(row.leadId)).map(row => row.leadId), error: null };
+  }
+  if (name === "read_tenant_lead_summary") {
+    const list = rows.filter((row) => row.tenant === args.p_tenant_id && Date.parse(row.capturedAt) >= Date.parse(String(args.p_since)))
+      .sort((a, b) => Date.parse(b.capturedAt) - Date.parse(a.capturedAt));
+    return { data: { count: list.length, recent: list.slice(0, 5).map(pgItem) }, error: null };
   }
   if (name === "read_tenant_lead") {
     const row = rows.find((r) => r.tenant === args.p_tenant_id && r.leadId === args.p_lead_id);
@@ -68,8 +76,8 @@ const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => {
   if (name === "read_tenant_lead_digests") {
     return { data: Object.fromEntries(rows.filter((r) => r.tenant === args.p_tenant_id).map((r) => [r.leadId, r.hash])), error: null };
   }
-  if (name === "client_record_parity_streak") return { data: { store: args.p_store, days: streakDays }, error: null };
-  if (name === "record_client_record_parity") {
+  if (name === "tenant_lead_read_parity_streak") return { data: { store: "tenant_leads", days: streakDays }, error: null };
+  if (name === "record_tenant_lead_read_parity") {
     parity.push(args);
     return { data: { ok: args.p_missing === 0 && args.p_mismatched === 0 }, error: null };
   }
@@ -162,9 +170,27 @@ describe("compare mode", () => {
   it("does not report a Postgres lead older than Redis's window (explained: Redis expired it)", async () => {
     redisOnlyLead("t1", "lead_both", "2026-10-05T10:00:00.000Z", "Both");
     pgOnlyLead("t1", "lead_both", "2026-10-05T10:00:00.000Z", "Both");
+    rows[0]!.lead.message = "hi";
     pgOnlyLead("t1", "lead_ancient", "2026-01-01T10:00:00.000Z");
     expect((await getLeads("t1")).map((l) => l.id)).toEqual(["lead_both"]);
     expect(mocks.alertOnce).not.toHaveBeenCalled();
+  });
+
+  it("detects a recent Postgres-only lead even when Redis is empty", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-06T00:00:00Z"));
+    pgOnlyLead("t1", "lead_missing_cache", "2026-10-05T10:00:00.000Z");
+    expect(await getLeads("t1")).toEqual([]);
+    expect(mocks.alertOnce).toHaveBeenCalledWith("lead_read_parity_miss", "high", expect.objectContaining({ missingFromRedis: 1 }), 3600);
+  });
+
+  it("detects different submission fields for the same lead id", async () => {
+    redisOnlyLead("t1", "lead_changed", "2026-10-05T10:00:00.000Z", "Original");
+    pgOnlyLead("t1", "lead_changed", "2026-10-05T10:00:00.000Z", "Changed");
+    await getLeads("t1");
+    expect(mocks.alertOnce).toHaveBeenCalledWith("lead_read_parity_miss", "high", expect.objectContaining({ mismatched: 1 }), 3600);
+    mocks.alertOnce.mockClear();
+    await getLeadById("t1", "lead_changed");
+    expect(mocks.alertOnce).toHaveBeenCalledWith("lead_read_parity_miss", "high", expect.objectContaining({ reader: "by_id", mismatched: 1 }), 3600);
   });
 
   it("a Postgres failure still serves Redis", async () => {
@@ -230,6 +256,79 @@ describe("postgres mode (flipped reads)", () => {
     vi.useRealTimers();
   });
 
+  it("adds pending Redis copies to the durable summary without counting mirrored leads twice", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-06T00:00:00Z"));
+    pgOnlyLead("t1", "lead_both", "2026-10-04T10:00:00.000Z");
+    redisOnlyLead("t1", "lead_both", "2026-10-04T10:00:00.000Z");
+    redisOnlyLead("t1", "lead_pending", "2026-10-05T10:00:00.000Z");
+    expect(await getLeadSummary("t1", 30)).toMatchObject({ count: 2, recent: [{ id: "lead_pending" }, { id: "lead_both" }] });
+  });
+
+  it("durable exclusions win over a stale Redis copy", async () => {
+    redisOnlyLead("t1", "lead_held", "2026-10-05T10:00:00.000Z");
+    const impl = rpc.getMockImplementation()!;
+    rpc.mockImplementation(async (name, args) => name === "read_tenant_lead_presence"
+      ? { data: ["lead_held"], error: null } : impl(name, args));
+    expect(await getLeads("t1")).toEqual([]);
+    expect(await getLeadById("t1", "lead_held")).toBeNull();
+    rpc.mockImplementation(impl);
+  });
+
+  it("a newer held cache entry cannot hide a pending lead beyond the requested page limit", async () => {
+    redisOnlyLead("t1", "lead_held", "2026-10-05T10:00:00.000Z");
+    redisOnlyLead("t1", "lead_pending", "2026-10-04T10:00:00.000Z");
+    pgOnlyLead("t1", "lead_older", "2026-10-01T10:00:00.000Z");
+    const impl = rpc.getMockImplementation()!;
+    rpc.mockImplementation(async (name, args) => name === "read_tenant_lead_presence"
+      ? { data: (args.p_lead_ids as string[]).filter(id => id === "lead_held" || id === "lead_older"), error: null }
+      : impl(name, args));
+    expect((await getLeads("t1", 1)).map(lead => lead.id)).toEqual(["lead_pending"]);
+    rpc.mockImplementation(impl);
+  });
+
+  it("counts every recent Postgres lead beyond the Redis retention cap", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-06T00:00:00Z"));
+    for (let index = 0; index < 650; index++) pgOnlyLead("t1", `lead_${index}`, "2026-10-05T10:00:00.000Z");
+    const summary = await getLeadSummary("t1", 30);
+    expect(summary.count).toBe(650);
+    expect(summary.recent).toHaveLength(5);
+  });
+
+  it("pages to older durable records with the existing timestamp cursor", async () => {
+    pgOnlyLead("t1", "lead_new", "2026-10-05T10:00:00.000Z");
+    pgOnlyLead("t1", "lead_old", "2026-01-01T10:00:00.000Z");
+    expect((await getLeads("t1", 1, "2026-10-05T10:00:00.000Z")).map((lead) => lead.id)).toEqual(["lead_old"]);
+    expect(rpc).toHaveBeenCalledWith("read_tenant_leads_page", expect.objectContaining({ p_before: "2026-10-05T10:00:00.000Z" }));
+  });
+
+  it("does not skip submissions sharing the page boundary timestamp", async () => {
+    const at = "2026-10-05T10:00:00.000Z";
+    pgOnlyLead("t1", "lead_c", at);
+    pgOnlyLead("t1", "lead_b", at);
+    pgOnlyLead("t1", "lead_a", at);
+    const first = await getLeads("t1", 2);
+    expect(first.map((lead) => lead.id)).toEqual(["lead_c", "lead_b"]);
+    const second = await getLeads("t1", 2, first.at(-1)!.createdAt, first.at(-1)!.id);
+    expect(second.map((lead) => lead.id)).toEqual(["lead_a"]);
+  });
+
+  it("exposes read readiness without Redis only after the parity gate passes", async () => {
+    redisAvailable = false;
+    expect(await leadReadStoreReady()).toBe(true);
+    resetLeadReadCache();
+    streakDays = 6;
+    expect(await leadReadStoreReady()).toBe(false);
+    vi.stubEnv("STRELVA_LEADS_READ", "redis");
+    expect(await leadReadStoreReady()).toBe(false);
+  });
+
+  it("does not mistake both unreachable read stores for an empty inbox", async () => {
+    await leadReadSource();
+    redisAvailable = false;
+    pgDown = true;
+    await expect(getLeads("t1")).rejects.toThrow("lead_read_unavailable");
+  });
+
   it("rollback: switching back to redis serves Redis again; both stores kept every write", async () => {
     const captured = await captureLead("t1", { name: "Dana", email: "dana@example.test", message: "Party for 30" });
     expect(captured.status).toBe("captured");
@@ -277,6 +376,25 @@ describe("Postgres authority on capture", () => {
     expect(redis.zsets.get(LEAD_MIRROR_PENDING_KEY)?.has(`t1:${id}`)).toBe(true);
   });
 
+  it("Postgres down retry uses the Redis duplicate guard and keeps one pending original", async () => {
+    pgDown = true;
+    const first = await captureLead("t1", { name: "Dana", message: "Party for 30" });
+    const second = await captureLead("t1", { name: "Dana", message: "Party for 30" });
+    expect(first.status).toBe("captured");
+    expect(second).toMatchObject({ status: "duplicate", lead: { id: (first as { lead: LeadRecord }).lead.id } });
+    expect(redis.zsets.get("leads:t1")?.size).toBe(1);
+    expect(redis.zsets.get(LEAD_MIRROR_PENDING_KEY)?.size).toBe(1);
+    expect(mocks.sendNewLeadEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads the Postgres duplicate when no Redis cache is configured", async () => {
+    redisAvailable = false;
+    const first = await captureLead("t1", { name: "Dana", message: "Party for 30" });
+    const second = await captureLead("t1", { name: "Dana", message: "Party for 30" });
+    expect(first.status).toBe("captured");
+    expect(second).toMatchObject({ status: "duplicate", lead: { id: (first as { lead: LeadRecord }).lead.id } });
+  });
+
   it("Redis down after Postgres kept the lead: the visitor still succeeds", async () => {
     redis.set = vi.fn(async () => { throw new Error("redis down"); }) as typeof redis.set;
     const result = await captureLead("t1", { name: "Dana", message: "Party for 30" });
@@ -318,8 +436,8 @@ describe("daily parity", () => {
     const run = await runLeadReadParity({ mode: "compare" });
     expect(run).toMatchObject({ ran: true, checked: 2, inParity: 1, outOfParity: [{ tenant: "t2", missing: 1, mismatched: 0 }] });
     expect(parity).toEqual([
-      expect.objectContaining({ p_store: "tenant_leads", p_tenant_id: "t1", p_missing: 0, p_mismatched: 0 }),
-      expect.objectContaining({ p_store: "tenant_leads", p_tenant_id: "t2", p_missing: 1 }),
+      expect.objectContaining({ p_tenant_id: "t1", p_missing: 0, p_mismatched: 0 }),
+      expect.objectContaining({ p_tenant_id: "t2", p_missing: 1 }),
     ]);
   });
 
@@ -335,6 +453,39 @@ describe("daily parity", () => {
     const run = await runLeadReadParity({ mode: "compare", tenants: async () => ["t1"] });
     expect(run.failed).toHaveLength(1);
     expect(parity).toEqual([]);
+  });
+
+  it("unconfigured Redis records failure, never a successful empty day", async () => {
+    redisAvailable = false;
+    const run = await runLeadReadParity({ mode: "compare", tenants: async () => ["t1"] });
+    expect(run).toMatchObject({ inParity: 0, failed: [{ tenant: "t1", reason: "lead_parity_redis_unconfigured" }] });
+    expect(parity).toEqual([expect.objectContaining({ p_tenant_id: "t1", p_missing: 1 })]);
+  });
+
+  it("a configured Redis read failure invalidates today's earlier successful check", async () => {
+    vi.spyOn(redis, "zrange").mockRejectedValueOnce(new Error("redis refused"));
+    const run = await runLeadReadParity({ mode: "compare", tenants: async () => ["t1"] });
+    expect(run).toMatchObject({ inParity: 0, failed: [{ tenant: "t1", reason: "redis refused" }] });
+    expect(parity).toEqual([expect.objectContaining({ p_tenant_id: "t1", p_missing: 1 })]);
+  });
+
+  it("a failed ledger write cannot count as a verified parity day", async () => {
+    const impl = rpc.getMockImplementation()!;
+    rpc.mockImplementation(async (name, args) => name === "record_tenant_lead_read_parity"
+      ? { data: null, error: { message: "ledger unavailable" } } : impl(name, args));
+    const run = await runLeadReadParity({ mode: "compare", tenants: async () => ["t1"] });
+    expect(run).toMatchObject({ inParity: 0, failed: [{ tenant: "t1", reason: "lead_parity_record_failed" }] });
+    rpc.mockImplementation(impl);
+  });
+
+  it("an earlier failed check cannot be reported as healthy after repair on the same day", async () => {
+    const impl = rpc.getMockImplementation()!;
+    rpc.mockImplementation(async (name, args) => name === "record_tenant_lead_read_parity"
+      ? { data: { ok: false }, error: null } : impl(name, args));
+    const run = await runLeadReadParity({ mode: "compare", tenants: async () => ["t1"] });
+    expect(run.inParity).toBe(0);
+    expect(run.outOfParity).toEqual([{ tenant: "t1", missing: 0, mismatched: 0 }]);
+    rpc.mockImplementation(impl);
   });
 });
 

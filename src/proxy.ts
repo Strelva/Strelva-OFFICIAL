@@ -1,3 +1,4 @@
+import { resolveAgencyAttribution } from "@/platform/agency-prospecting/server";
 import {
   applyMiddlewareSupabaseResponse,
   createMiddlewareSupabase,
@@ -9,8 +10,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDevAccessTenant, isDevAccessBypassEnabled } from "@/platform/infra/dev-access";
 import { MARKETING_HOSTS, isMarketingHost } from "./lib/marketing-hosts";
-import { parseTenantHost } from "./lib/tenant-host";
-import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
+import { isSeparateSitesHost, parseTenantHost } from "./lib/tenant-host";
+import { APP_ROOT_DOMAIN, CONTROL_PLANE_URL, MARKETING_URL, OPERATOR_URL, isPlatformDomain, tenantSiteHost } from "@/platform/infra/brand";
 // No workspace is known here: the proxy only asks "could the rebuild be on";
 // the per-site decision is getPublishedSiteDocument's (per tenant).
 import { websiteRebuildReleaseMayBeOn } from "./products/websites/index";
@@ -22,7 +23,7 @@ export { isMarketingHost } from "./lib/marketing-hosts";
 export { validateCronRequest } from "@/lib/cron-auth";
 
 const LEGACY_PUBLIC_SITE_REDIRECTS: Record<string, string> = {
-  "gldf.strelva.com": "https://greatlakesdriedfruit.com",
+  [tenantSiteHost("gldf", APP_ROOT_DOMAIN)]: "https://greatlakesdriedfruit.com",
 };
 
 const cspBaseDirectives = [
@@ -33,7 +34,7 @@ const cspBaseDirectives = [
   // JSON-LD inline); removing it needs a nonce rollout.
   "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://images.unsplash.com https://images.squarespace-cdn.com https://cdn.sanity.io https://*.public.blob.vercel-storage.com https://www.google.com https://*.gstatic.com",
+  `img-src 'self' data: blob: ${CONTROL_PLANE_URL} https://images.unsplash.com https://images.squarespace-cdn.com https://cdn.sanity.io https://*.public.blob.vercel-storage.com https://www.google.com https://*.gstatic.com`,
   "font-src 'self' data:",
   // Prod frame-src: no http://localhost:* (that's a dev/live-preview need only,
   // kept in the looser variant below).
@@ -85,6 +86,9 @@ const PUBLIC_EXACT = new Set([
   "/api/publishing/google/reconnect/callback",
   "/api/track",
   "/api/billing/webhook",
+  // The public agent channel: reads and confirmation-gated holds only, behind
+  // STRELVA_BOOKING_AGENTS. Owner/agency MCP paths stay session-gated (#302).
+  "/api/mcp/public",
 ]);
 // Prefix public paths (the old `/foo(.*)` patterns — literal-prefix match, so
 // `/sign-in`, `/sign-in/x`, `/sign-integration` are all public, matching Clerk).
@@ -95,11 +99,15 @@ const PUBLIC_PREFIXES = [
   // access still require the exact verified Supabase identity.
   "/workspace/invitations/accept/",
   "/api/workspace-invitations/accept/",
+  // An agency's owner claim link (#259): same rule, the link alone grants nothing.
+  "/workspace/claim/",
+  "/api/workspace-claims/",
   "/access-request",
   "/ai-visibility",
   "/onboard",
   "/api/access-request/",
   "/api/audit/",
+  "/api/agency-brand/logo/",
   "/api/onboard/",
   "/api/pay/",
   // Signed provider callbacks authenticate themselves with the provider
@@ -110,6 +118,8 @@ const PUBLIC_PREFIXES = [
   "/api/agent-access/work/",
   "/api/approve",
   "/api/v1/",
+  // Per-business alias of /api/mcp/public (same tools and gates).
+  "/api/mcp/bookings/",
   "/api/cron/",
   "/api/internal/",
 ];
@@ -136,7 +146,7 @@ export function shouldResolveCustomDomain(host: string): boolean {
   return (
     !isMarketingHost(host) &&
     !hostWithoutPort.endsWith(".localhost") &&
-    !hostWithoutPort.endsWith(".strelva.com") &&
+    !isPlatformDomain(hostWithoutPort) &&
     !hostWithoutPort.endsWith(".vercel.app")
   );
 }
@@ -176,7 +186,7 @@ export function shouldRewriteMarketingRoot(host: string, pathname: string): bool
 
 // Root domains under which `admin.<root>` is the OPERATOR console host (not a
 // client's admin dashboard). Mirrors the suffixes extractTenantFromHost keys on.
-const ADMIN_HOST_ROOT_SUFFIXES = [".strelva.com", ".localhost"] as const;
+const ADMIN_HOST_ROOT_SUFFIXES = [`.${APP_ROOT_DOMAIN}`, ".localhost"] as const;
 
 // True only for the BARE admin subdomain of a root domain (admin.strelva.com,
 // admin.localhost[:port]). NOT admin.<tenant>.strelva.com — that is a client's
@@ -258,6 +268,35 @@ function buildTenantFallbackUrl(req: NextRequest, tenantId: string, path: string
   return url;
 }
 
+// These tenant surfaces require the app fallback context. Global app routes
+// (including /auth/callback) must keep their canonical path on the app host.
+function isTenantAppPath(path: string): boolean {
+  return /^\/(?:dashboard|sign-in|sign-up|no-access)(?:\/|$)/.test(path);
+}
+
+function isSitesAppPath(path: string): boolean {
+  if (isTenantAppPath(path)) return true;
+  if (PROTECTED_AREA.test(path)) return !/^\/api\/v1\//.test(path);
+  return /^\/(?:auth|workspace|account|client|admin|studio|onboard|access-request|preview|demo|apps|custom-applications|agency-websites|ai-visibility|audit|embed)(?:\/|$)/.test(path);
+}
+
+function sitesAppRedirect(req: NextRequest, tenant: string, path: string): URL {
+  const url = isTenantAppPath(path)
+    ? buildTenantFallbackUrl(req, tenant, path)
+    : new URL(path, process.env.NEXT_PUBLIC_APP_URL || CONTROL_PLANE_URL);
+  url.search = req.nextUrl.search;
+  // A callback is global, while its tenant dashboard destination is contextual.
+  // Only rewrite a relative tenant app path; callback safeNext owns other input.
+  const next = url.searchParams.get("next");
+  if (next?.startsWith("/") && !next.startsWith("//") && !/[\\\u0000-\u001f]/.test(next)) {
+    const target = new URL(next, CONTROL_PLANE_URL);
+    if (isTenantAppPath(target.pathname)) {
+      url.searchParams.set("next", `/client/${tenant}${target.pathname}${target.search}${target.hash}`);
+    }
+  }
+  return url;
+}
+
 export function extractTenantFromClientPath(pathname: string): {
   tenant: string | null;
   targetPath: string;
@@ -291,14 +330,14 @@ function isLivePreviewRequest(req: NextRequest): boolean {
 function getPreviewFrameAncestors(host: string, protocol: string): string[] {
   const ancestors = new Set([
     "'self'",
-    "https://strelva.com",
-    "https://www.strelva.com",
-    "https://admin.strelva.com",
+    `https://${APP_ROOT_DOMAIN}`,
+    MARKETING_URL,
+    OPERATOR_URL,
     "http://localhost:3000",
     "http://localhost:3001",
   ]);
 
-  if (host && !MARKETING_HOSTS.has(host) && !host.endsWith(".strelva.com")) {
+  if (host && !MARKETING_HOSTS.has(host) && !isPlatformDomain(host)) {
     const bare = host.replace(/^(www|admin)\./, "");
     ancestors.add(`${protocol}//${bare}`);
     ancestors.add(`${protocol}//www.${bare}`);
@@ -321,13 +360,13 @@ export function buildContentSecurityPolicy(params: {
       "default-src 'self' https: data: blob:",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http://localhost:*",
       "style-src 'self' 'unsafe-inline' https:",
-      "img-src 'self' data: blob: https: http://localhost:*",
+      `img-src 'self' data: blob: ${CONTROL_PLANE_URL} https: http://localhost:*`,
       "font-src 'self' data: https:",
       "connect-src 'self' https: http://localhost:*",
       "frame-src 'self' https: http://localhost:* http://*.localhost:*",
       "base-uri 'self' https:",
       "form-action 'self'",
-      "frame-ancestors 'self' http://localhost:3000 http://localhost:3001 https://strelva.com https://admin.strelva.com",
+      `frame-ancestors 'self' http://localhost:3000 http://localhost:3001 https://${APP_ROOT_DOMAIN} ${OPERATOR_URL}`,
     ].join("; ");
   }
 
@@ -508,6 +547,31 @@ export async function requestIsSuperAdmin(req: NextRequest): Promise<boolean> {
 export default async function proxy(req: NextRequest) {
   const host = req.headers.get("host") || "";
   const pathname = req.nextUrl.pathname;
+  // Enforce the public-origin boundary before embeds, dev bypasses, internal
+  // APIs or client/query fallback routing can reach the app or create a session.
+  if (isSeparateSitesHost(host)) {
+    const { tenant } = parseTenantHost(host);
+    const path = normalizePathForMatch(pathname);
+    if (!tenant || path === null) {
+      return applySecurityHeaders(new NextResponse("Not found", { status: 404 }), req);
+    }
+    if (isSitesAppPath(path)) {
+      return applySecurityHeaders(NextResponse.redirect(sitesAppRedirect(req, tenant, path)), req);
+    }
+  }
+  // Embeds admit only the enabled agency's configured HTTPS contact origin.
+  // Every other surface retains DENY. Query params cannot alter frame authority.
+  const agencyEmbed = /^\/embed\/agency\/([a-z0-9][a-z0-9-]{0,63})\/(ai-visibility|audit)$/.exec(pathname);
+  if (agencyEmbed) {
+    const agency = await resolveAgencyAttribution(agencyEmbed[1]).catch(() => null);
+    if (!agency) return applySecurityHeaders(new NextResponse("Agency check unavailable", { status: 404 }), req);
+    const response = applySecurityHeaders(NextResponse.next(), req);
+    const origin = new URL(agency.contactUrl).origin;
+    response.headers.set("Content-Security-Policy", response.headers.get("Content-Security-Policy")!.replace(/frame-ancestors [^;]+/, `frame-ancestors 'self' ${origin}`));
+    response.headers.delete("X-Frame-Options");
+    response.headers.set("Cache-Control", "no-store");
+    return response;
+  }
   // HTML assets skipped the proxy before the v2 redirect matcher was added.
   // Keep the original passthrough bytes while the rebuild release is disabled.
   if (/\.html?$/i.test(pathname) && !websiteRebuildReleaseMayBeOn()) return NextResponse.next();

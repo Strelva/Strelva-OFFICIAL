@@ -1,3 +1,5 @@
+import { workspacePublishingScope } from "@/platform/infra/publishing-scope";
+import { releaseFlagMayBeOn } from "@/platform/release-flags/resolve";
 /**
  * One adapter per source lifecycle. An adapter turns the source's pending
  * asks into Needs you items and resolves a decision through the source's OWN
@@ -35,7 +37,7 @@ export type ResolveBy =
   /**
    * `service` is set only for a lifecycle that runs an owner's link decision
    * without an owner account (`ownerLinkWithoutAccount`): `actor` is then
-   * Strelva (system)'s identity under a `make_real_link` session bound to
+   * Strelva (system)'s identity under an item-bound link session bound to
    * this item, and the owner stays the approver of record.
    */
   | { kind: "owner_link"; recipient: string; actor: WorkspaceActor | null; service?: ServiceSession }
@@ -55,15 +57,29 @@ export interface SourceAdapter {
   /**
    * An owner with no account may still decide this by signed link: Strelva
    * (system) reads and runs it under a session bound to the item
-   * (owner-entry decision 6; Make real only). Never for access, money or exit.
+   * (owner-entry decision 6). Never for access, money or exit.
    */
   ownerLinkWithoutAccount?: boolean;
+  /**
+   * Link decisions only at the business's trusted owner recipient
+   * (resolve_business_owner_recipient `trusted`): any other address gets no
+   * email for this source, since the source would refuse its approval.
+   */
+  trustedRecipientOnly?: boolean;
+  /**
+   * The complete review an owner must see before deciding, when the item's
+   * detail can't hold every value. Null when the source no longer matches the
+   * item's revision: nothing may be approved from it.
+   */
+  review?(ctx: AdapterContext, item: OwnerDecision): Promise<string[] | null>;
   /** Pending asks for this business. `complete: false` means some sources could not be read. */
   propose(ctx: AdapterContext): Promise<{ items: ProposedItem[]; complete: boolean }>;
   /** The source's current revision, or null when it is no longer waiting on anyone. */
   currentRevision(ctx: AdapterContext, sourceId: string): Promise<string | null>;
   /** Optional: why a source stopped waiting (it lapsed on its own clock, the customer cancelled), for the withdrawn item. */
   goneReason?(ctx: AdapterContext, sourceId: string): Promise<string | null>;
+  /** Inquiry publication mail uses the same strict gates as inquiry replies. */
+  inquiryEmailSource?(ctx: AdapterContext, sourceId: string): Promise<boolean>;
   resolve(ctx: AdapterContext, item: OwnerDecision, decision: Decision, by: ResolveBy): Promise<ResolveOutcome>;
 }
 
@@ -126,12 +142,15 @@ export function tenantEventItem(event: UnifiedEvent): ProposedItem | null {
   // A commitment (a price, a date, a promise) is always the owner's, owner only,
   // even when Strelva was reviewing the draft (inquiry 1.0 delta, C6).
   const commitment = kind === "customer.commitment";
-  const route = commitment ? "owner_decides" : observed;
+  const inquiryPublication = event.metadata?.kind === "inquiry_capability_publish" || event.metadata?.kind === "inquiry_capability_undo";
+  const route = commitment || inquiryPublication ? "owner_decides" : observed;
   return {
     kind,
     route,
     title: event.title.slice(0, 200).trim() || "A change is waiting",
-    detail: event.body ? event.body.slice(0, 600) : null,
+    detail: process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && event.metadata?.kind === "inquiry_delivery_approval"
+      ? [event.metadata.recipient, event.metadata.subject, event.metadata.messageBody].filter((value): value is string => typeof value === "string").join("\n").slice(0, 8000)
+      : event.body ? event.body.slice(0, inquiryPublication ? 8000 : 600) : null,
     approveEffect,
     notYetEffect,
     sourceLifecycle: "tenant_event",
@@ -140,22 +159,30 @@ export function tenantEventItem(event: UnifiedEvent): ProposedItem | null {
     urgent: route === "owner_decides" && urgentFor(kind),
     // The chase clock starts when Needs you first sees the ask, not when the
     // tenant event was written, so an older pending ask does not lapse at once.
-    adminMayDecide: !commitment && !String(event.metadata?.kind).startsWith("workspace_") && !OWNER_ONLY_KINDS.has(kind),
+    adminMayDecide: !commitment && !inquiryPublication && !String(event.metadata?.kind).startsWith("workspace_") && !OWNER_ONLY_KINDS.has(kind),
   };
 }
 
 export function tenantEventAdapter(ports: TenantEventPorts): SourceAdapter {
+  const scopes = async (workspaceId: string) => [...await ports.linkedTenants(workspaceId), ...(releaseFlagMayBeOn("publishing") ? [workspacePublishingScope(workspaceId)] : [])];
   return {
     lifecycle: "tenant_event",
     needsMemberActor: false,
+    async inquiryEmailSource(ctx, sourceId) {
+      const source = splitTenantSource(sourceId);
+      if (!source || !(await ports.linkedTenants(ctx.workspaceId)).includes(source.tenantId)) return true;
+      const event = await ports.readEvent(source.eventId);
+      if (!event || event.tenantId !== source.tenantId) return true;
+      return event.metadata?.kind === "inquiry_capability_publish" || event.metadata?.kind === "inquiry_capability_undo";
+    },
     async propose(ctx) {
-      const tenants = await ports.linkedTenants(ctx.workspaceId);
+      const tenants = await scopes(ctx.workspaceId);
       let complete = true;
       const items: ProposedItem[] = [];
       for (const tenantId of tenants) {
         try {
           for (const event of await ports.pendingEvents(tenantId)) {
-            if (event.tenantId !== tenantId) continue;
+            if (event.tenantId !== tenantId || (tenantId === workspacePublishingScope(ctx.workspaceId) && event.metadata?.workspaceId !== ctx.workspaceId)) continue;
             const item = tenantEventItem(event);
             if (item) items.push(item);
           }
@@ -168,14 +195,14 @@ export function tenantEventAdapter(ports: TenantEventPorts): SourceAdapter {
     async currentRevision(ctx, sourceId) {
       const source = splitTenantSource(sourceId);
       if (!source) return null;
-      if (!(await ports.linkedTenants(ctx.workspaceId)).includes(source.tenantId)) return null;
+      if (!(await scopes(ctx.workspaceId)).includes(source.tenantId)) return null;
       const event = await ports.readEvent(source.eventId);
       if (!event || event.tenantId !== source.tenantId || event.status !== "pending") return null;
       return tenantEventRevision(event);
     },
     async resolve(ctx, item, decision, by) {
       const source = splitTenantSource(item.sourceId);
-      if (!source || !(await ports.linkedTenants(ctx.workspaceId)).includes(source.tenantId)) return { outcome: "failed", reason: "source_not_linked" };
+      if (!source || !(await scopes(ctx.workspaceId)).includes(source.tenantId)) return { outcome: "failed", reason: "source_not_linked" };
       // A lapse does nothing at the source: the event stays pending and the
       // operator queue keeps it as the owner's call until someone closes it.
       if (by.kind === "expiry") return { outcome: "done", reason: "Expired, nothing changed" };
@@ -240,6 +267,7 @@ export function serviceRequestAdapter(ports: ServiceRequestPorts): SourceAdapter
   return {
     lifecycle: "service_request",
     needsMemberActor: true,
+    ownerLinkWithoutAccount: true,
     async propose(ctx) {
       if (!ctx.actor) return { items: [], complete: false };
       try {
@@ -262,6 +290,7 @@ export function serviceRequestAdapter(ports: ServiceRequestPorts): SourceAdapter
       try {
         const request = await find(actor, ctx.workspaceId, item.sourceId);
         if (!request) return { outcome: "done", reason: "already_resolved" };
+        if (serviceRevision(request) !== item.revisionHash) return { outcome: "failed", reason: "source_changed" };
         const stage = serviceStage(request);
         const updated = await ports.change(actor, {
           requestId: request.id,

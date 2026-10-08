@@ -4,23 +4,9 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 migration="$repo_root/supabase/migrations/20260905190000_release_one_workspaces.sql"
 schema_test="$repo_root/tests/workspace-schema.sql"
-cluster_root="$(mktemp -d "${TMPDIR:-/tmp}/strelva-workspace-sql.XXXXXX")"
-cluster_data="$cluster_root/data"
-cluster_socket="$cluster_root/socket"
-cluster_log="$cluster_root/postgres.log"
+source "$repo_root/scripts/temp-postgres.sh"
+create_temp_postgres strelva-workspace-sql
 cluster_port="$((61000 + ($$ % 3000)))"
-cluster_started=0
-
-cleanup() {
-  local status=$?
-  trap - EXIT INT TERM
-  if [[ "$cluster_started" -eq 1 ]]; then
-    pg_ctl -D "$cluster_data" -m fast -w stop >/dev/null 2>&1 || true
-  fi
-  printf 'Workspace SQL cluster preserved at: %s\n' "$cluster_root"
-  exit "$status"
-}
-trap cleanup EXIT INT TERM
 
 for command_name in initdb pg_ctl psql; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -40,7 +26,7 @@ pg_ctl -D "$cluster_data" \
   -l "$cluster_log" \
   -o "-F -k '$cluster_socket' -c listen_addresses='' -p $cluster_port" \
   -w start >/dev/null
-cluster_started=1
+read -r cluster_postmaster_pid < "$cluster_data/postmaster.pid"
 
 psql_args=(
   --host="$cluster_socket"
@@ -58,6 +44,22 @@ create role service_role nologin bypassrls;
 create role authenticated nologin;
 create role anon nologin;
 
+-- Supabase owns auth.users, auth.identities and auth.uid(). Keep only the
+-- columns the isolated SQL contracts exercise in this local fixture.
+create schema auth;
+create function auth.uid() returns uuid language sql stable as $$
+  select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
+$$;
+create table auth.users (
+  id uuid primary key,
+  email text,
+  email_confirmed_at timestamptz
+);
+create table auth.identities (
+  user_id uuid not null references auth.users(id),
+  identity_data jsonb not null default '{}'::jsonb
+);
+
 create table public.users (
   id uuid primary key,
   email text unique not null,
@@ -67,6 +69,25 @@ create table public.users (
 create table public.tenants (
   id text primary key,
   subscription_status text not null default 'none'
+);
+
+-- The migration's compatibility mirror targets the legacy operator audit log.
+-- Keep the isolated workspace fixture's subset so linked-client checks still
+-- exercise the mirror while agency workspaces exercise the native audit.
+create table public.audit_logs (
+  id text primary key,
+  tenant_id text not null references public.tenants(id) on delete cascade,
+  tenant_stable_id uuid,
+  action text not null,
+  target_type text not null,
+  target_id text,
+  time timestamptz not null,
+  actor_user_id uuid references public.users(id) on delete set null,
+  actor_email text,
+  actor_type text,
+  actor_is_super_admin boolean not null default false,
+  metadata jsonb,
+  created_at timestamptz not null default now()
 );
 SQL
 
@@ -89,7 +110,7 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260912110000_bou
 psql "${psql_args[@]}" --file="$repo_root/tests/bounded-product-work-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260912120000_work_context_participation.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/work-context-participation-schema.sql"
-psql "${psql_args[@]}" --command="create table public.super_admins(user_id uuid primary key references public.users(id), email text, revoked_at timestamptz);"
+psql "${psql_args[@]}" --command="create table public.super_admins(user_id uuid primary key references public.users(id), email text unique not null, granted_at timestamptz not null default now(), granted_by uuid references public.users(id), revoked_at timestamptz);"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260912143000_product_learning_work.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/product-learning-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260912160000_work_responsibilities.sql"
@@ -350,6 +371,8 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007192000_mak
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-authority-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-systems-schema.sql"
 
+# Hold long enough for a separate psql probe under parallel-stream CPU load.
+# The probe still has its strict 150ms lock timeout; permission assertions do not change.
 authority_leaver='c9000000-0000-4000-8000-000000000005'
 # The holder waits for an explicit parent command instead of a short PgSleep.
 # Its ready application name is set only after the guarded statement finishes.
@@ -486,7 +509,6 @@ psql "${psql_args[@]}" --file="$repo_root/tests/atomic-tenant-teardown-schema.sq
 # invitation (both memberships in one transaction), the tenant owner-recipient
 # rule and client lead copies kept after a tenant is deprovisioned.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007110000_business_ownership.sql"
-psql "${psql_args[@]}" --file="$repo_root/tests/business-ownership-schema.sql"
 # The earlier contracts still hold with the ownership migration applied. (The
 # invitation contract commits its fixture, so the upgrade gate reruns it.)
 psql "${psql_args[@]}" --set=tenant_import="$(cat "$repo_root/tests/fixtures/business-record-tenant-import.json")" \
@@ -495,12 +517,18 @@ psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 # Owner entry: per-workspace release flags layered over the env flags, and
 # the tenant-to-workspace entry resolution, with cross-workspace denial.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007130000_workspace_release_flags.sql"
-psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 # Release rows on agency workspaces too (agency library under `workspace`);
 # the business-workspace contract above still holds with it applied.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008161000_release_flags_agency_workspaces.sql"
-psql "${psql_args[@]}" --file="$repo_root/tests/release-flags-agency-workspaces-schema.sql"
+# Approval APIs bind the authenticated user ID, audit agency workspaces even
+# when no client tenant is linked, and record same-operator flag approvals.
+# Apply after business ownership and release flag RPCs because the wrappers use
+# both sets of tables and invariants.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261016110000_operator_action_approvals.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-action-approvals-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-ownership-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/release-flags-agency-workspaces-schema.sql"
 # Model-call cost log (one model-call helper, Ask Strelva spec section 5).
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007140000_model_call_log.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/model-call-log-schema.sql"
@@ -535,6 +563,7 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007150100_age
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007150200_platform_agency_workspace.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/system-versions-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-client-overview-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163200_version_owner_grants.sql"
 if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
   # The same Version store contract the in-memory store passes, run through
   # createSupabaseVersionStore against this cluster (psql-backed RPC port).
@@ -635,6 +664,11 @@ psql "${psql_args[@]}" --file="$repo_root/tests/website-linked-publication-schem
 # facts from the business record, inquiries in tenant_leads, spam in the
 # spam pit, domain-ownership proof, and the connected_site System origin.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008151000_connected_sites.sql"
+# The new public reader replaces the historical looser connected-site filter.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012110000_business_pages.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012110000_business_pages.sql"
+psql "${psql_args[@]}" -Atc "select to_regclass('public.business_pages') is null and to_regprocedure('public.business_confirmed_public_facts(uuid)') is null" | grep -qx t
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012110000_business_pages.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-client-records-schema.sql"
@@ -646,11 +680,50 @@ psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-records-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-lead-reads-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
+# Wave 6 inquiry closure: additive replies, exact outcome proof, notice context and connected spam review.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010120000_inquiry_workspace_replies.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010121000_inquiry_outcome_proof.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010122000_inquiry_weekly_outcomes.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-workspace-replies-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010123000_inquiry_context_notices.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-context-notices-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010124000_connected_inquiry_records.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-inquiry-records-schema.sql"
 # Strelva (system): the audited service actor for the needs-you and
 # workspace-work crons, and the connected_sites flag row. Replaces
 # owner_decision_json and workspace_release_flag_names(); the Needs you,
 # Make real live and release flag contracts rerun against the replacements.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009100000_strelva_service_actor.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125000_inquiry_urgent_decisions.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125500_inquiry_inbox.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-inbox-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125700_inquiry_cache_presence.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-cache-presence-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125900_inquiry_export_before_teardown.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-export-before-teardown-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125600_inquiry_reply_purpose.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-reply-purpose-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125800_connected_inquiry_owner_notices.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-inquiry-owner-notices-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-reply-purpose-race-setup.sql"
+psql "${psql_args[@]}" --set=engine=true --file="$repo_root/tests/inquiry-reply-purpose-race.sql" >"$cluster_root/inquiry-engine-race.log" 2>&1 &
+inquiry_engine_race=$!
+psql "${psql_args[@]}" --set=engine=false --file="$repo_root/tests/inquiry-reply-purpose-race.sql" >"$cluster_root/inquiry-owner-race.log" 2>&1 &
+inquiry_owner_race=$!
+inquiry_engine_status=0
+inquiry_owner_status=0
+wait "$inquiry_engine_race" || inquiry_engine_status=$?
+wait "$inquiry_owner_race" || inquiry_owner_status=$?
+if [[ "$inquiry_engine_status" -eq 0 && "$inquiry_owner_status" -ne 0 ]]; then
+  grep -q inquiry_reply_already_sent "$cluster_root/inquiry-owner-race.log"
+elif [[ "$inquiry_owner_status" -eq 0 && "$inquiry_engine_status" -ne 0 ]]; then
+  grep -q reply_purpose_already_claimed "$cluster_root/inquiry-engine-race.log"
+else
+  printf 'Inquiry reply purpose race did not produce exactly one winner.\n' >&2
+  cat "$cluster_root/inquiry-engine-race.log" "$cluster_root/inquiry-owner-race.log" >&2
+  exit 1
+fi
+printf 'Inquiry engine/owner reply race passed: exactly one send purpose claimed.\n'
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
@@ -669,6 +742,12 @@ psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql
 # Replaces workspace_release_flag_names(); the release flag contracts rerun.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009140000_make_real_owner_link_flag.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-flag-schema.sql"
+# Publishing listing controls and flag keys, after 20261009140000 (the last
+# pinned literal flag list); the final flag test needs 141000's keys (#253).
+# 142000 needs legacy collection tables this fixture omits; the full ordered
+# replay covers it.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010140000_google_listing_controls.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010141000_publishing_release_flags.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009150000_reader_rpc_volatility.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/reader-rpc-volatility-schema.sql"
 # Full effort coverage, rollback before zero logs, and reapply. Both readers
@@ -693,6 +772,77 @@ fi
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
+# Batch 7A (agency 1.0): provider seats, agency verification, the neutral
+# service actor and the payer party. Each 7A contract runs, then the replaced
+# contracts that can rerun here rerun against the replacements (workspace
+# authority and business billing commit or count fixtures; they rerun after
+# the full ordered upgrade in check-workspace-upgrade.sh). Then the rollback
+# rehearsal: with committed rows in every 7A table, the four rollbacks in
+# reverse order must archive them and leave the public catalog exactly as
+# before 7A; then 7A applies again and its contracts hold.
+batch_7a=(20261009151000_provider_seats 20261009152000_agency_verifications
+  20261009153000_platform_service_actor 20261009154000_payer_party)
+catalog_fingerprint() {
+  psql "${psql_args[@]}" --tuples-only --no-align --file="$repo_root/tests/support/public-catalog-fingerprint.sql"
+}
+apply_batch_7a() {
+  local name
+  for name in "${batch_7a[@]}"; do
+    psql "${psql_args[@]}" --single-transaction --file="$repo_root/supabase/migrations/$name.sql"
+  done
+}
+check_batch_7a_contracts() {
+  psql "${psql_args[@]}" --file="$repo_root/tests/provider-seats-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/agency-verifications-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/platform-service-actor-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/payer-party-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/batch-7a-reader-modes.sql"
+}
+check_batch_7a() {
+  check_batch_7a_contracts
+  psql "${psql_args[@]}" --file="$repo_root/tests/system-versions-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/agency-client-overview-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
+}
+catalog_fingerprint >"$cluster_root/catalog-before-7a.txt"
+apply_batch_7a
+check_batch_7a
+psql "${psql_args[@]}" --file="$repo_root/tests/batch-7a-populated.sql"
+for (( index=${#batch_7a[@]}-1; index>=0; index-- )); do
+  psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-${batch_7a[$index]}.sql"
+done
+catalog_fingerprint >"$cluster_root/catalog-after-7a-rollback.txt"
+if ! diff -u "$cluster_root/catalog-before-7a.txt" "$cluster_root/catalog-after-7a-rollback.txt"; then
+  printf 'Batch 7A rollback did not restore the public catalog.\n' >&2
+  exit 1
+fi
+archived_7a="$(psql "${psql_args[@]}" --tuples-only --no-align --command="
+  select (select count(*) from release_rollback_archive.m20261009151000_provider_seats)
+    || ' ' || (select count(*) from release_rollback_archive.m20261009151000_agency_client_staff)
+    || ' ' || (select count(*) from release_rollback_archive.m20261009151000_workspace_providers)
+    || ' ' || (select count(*) from release_rollback_archive.m20261009152000_agency_verifications)
+    || ' ' || (select count(*) from release_rollback_archive.m20261009153000_strelva_service_actions)
+    || ' ' || (select count(*) from release_rollback_archive.m20261009154000_accounts)
+    || ' ' || (select count(*) from release_rollback_archive.m20261009154000_job_economics)
+    || ' ' || (select count(*) from release_rollback_archive.m20261009154000_workspace_payer_transitions)")"
+if [[ "$archived_7a" != "1 1 1 1 1 1 1 1" ]]; then
+  printf 'Batch 7A rollback archives are wrong: %s\n' "$archived_7a" >&2
+  exit 1
+fi
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-${batch_7a[0]}.sql" >"$cluster_root/7a-wrong-order.log" 2>&1; then
+  printf 'A batch 7A rollback ran against a schema without 7A.\n' >&2
+  exit 1
+fi
+grep -q 'rollback_wrong_order_or_function_drift' "$cluster_root/7a-wrong-order.log"
+# The rehearsal fixture's rows stay committed, so only the 7A contracts rerun.
+apply_batch_7a
+check_batch_7a_contracts
+printf 'Batch 7A forward, populated rollback and reapply passed.\n'
+# Agency signup (#258): the ordinary create path grants nothing outside the
+# agency, every effect starts unverified, and the cap and identity hold.
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-signup-schema.sql"
 # Wave 6 website: fallback undo, immutable release reconciliation, and
 # owner-decided domain proposals. Fictional fixtures and isolated Postgres only.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010110000_website_cutover_undo.sql"
@@ -706,6 +856,31 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010115500_web
 psql "${psql_args[@]}" --file="$repo_root/tests/website-business-facts-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010115700_website_native_fact_reviews.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/website-native-fact-reviews-schema.sql"
+# #509: provider and operator facts reach client sites only by owner decision.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011133700_business_facts_owner_decision.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011133700_business_facts_owner_decision.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-business-facts-schema.sql"
+# Owner history before the forward migration: the confirmed copy keeps it.
+psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-backfill-seed.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011133700_business_facts_owner_decision.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-backfill.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-business-facts-schema.sql"
+# #509 after #521: every public facts reader (connect.js, /biz, llms.txt,
+# JSON-LD) reads only the owner-confirmed copy. #509's rollback refuses to run
+# before it; its own rollback restores the 20261012110000 reader.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013110000_public_facts_read_confirmed.sql"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011133700_business_facts_owner_decision.sql" >"$cluster_root/facts-rollback-order.log" 2>&1; then
+  printf '#509 rollback ran before the public-facts reader stopped reading its copy.\n' >&2
+  exit 1
+fi
+grep -q 'business_facts_rollback_order' "$cluster_root/facts-rollback-order.log"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013110000_public_facts_read_confirmed.sql"
+psql "${psql_args[@]}" -Atc "select prosrc not like '%business_record_confirmed%' from pg_proc where oid='public.business_confirmed_public_facts(uuid)'::regprocedure" | grep -qx t
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013110000_public_facts_read_confirmed.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/website-cutover-undo-schema.sql"
 # Wave 6 catalog: additive submit/contact RPCs, report receipts, newsletter
 # projection and delegated Make authority. Run after all required flag names,
@@ -739,13 +914,111 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010152000_cat
 psql "${psql_args[@]}" --file="$repo_root/tests/catalog-reports-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010153000_newsletter_contacts.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-contacts-schema.sql"
+psql "${psql_args[@]}" <<'SQL'
+create schema auth;
+create function auth.uid() returns uuid language sql stable as $$
+  select coalesce(
+    nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub', ''),
+    nullif(current_setting('request.jwt.claim.sub', true), '')
+  )::uuid
+$$;
+create function auth.role() returns text language sql stable as $$
+  select coalesce(
+    nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role', ''),
+    nullif(current_setting('request.jwt.claim.role', true), '')
+  )
+$$;
+create table public.super_admin_bootstrap (email text primary key);
+insert into public.super_admin_bootstrap(email) values
+  ('rhinehart514@gmail.com'), ('noahowsh@gmail.com');
+-- Match the retained collection table; publishing outputs depend on it.
+create table public.collection_entries (
+ id uuid primary key default gen_random_uuid(),tenant_id text not null references public.tenants(id),
+ type text not null,slug text not null,status text not null default 'draft',data jsonb not null default '{}',
+ created_at timestamptz not null default now(),updated_at timestamptz not null default now(),unique(tenant_id,type,slug)
+);
+SQL
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010142000_workspace_publishing_content.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-publishing-content-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011100000_workspace_newsletter_sender.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-newsletter-sender-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-workspace-newsletter-sender.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011100000_workspace_newsletter_sender.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-newsletter-sender-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011100100_newsletter_backfill_identity.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-backfill-identity-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-newsletter-backfill-identity.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-contacts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011100100_newsletter_backfill_identity.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-backfill-identity-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010154000_system_work_plan_authority.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/system-work-plan-authority-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010155000_failed_system_plan_request.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/failed-system-plan-request-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 
+# Wave 6 agency, operator, durable client records and portability.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010160000_agency_authoring.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-agency-authoring.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163000_agency_operator_overview.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-agency-operator-overview.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163100_version_management.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-management.sql"
+STRELVA_VERSIONS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
+  pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 src/__tests__/system-versions-store-contract.test.ts src/__tests__/agency-versions-server.test.ts
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163300_version_native_applications.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-native-applications.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163400_version_sibling_changes.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-sibling-changes.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010161000_operator_google_attempts.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010161100_operator_effort_context.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-google-attempts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010161200_operator_content_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-content-receipts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010161300_review_reply_reservations.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-review-reply-reservations.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010161400_operator_complete_sources.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-operator-complete-sources.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010162000_complete_client_record_stores.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-client-record-stores.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010162200_inquiry_delivery_records.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-inquiry-delivery-records.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260802120000_report_snapshots.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010162100_tenant_receipt_retention.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-tenant-retention.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010164000_finite_job_adapters.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/finite-job-adapters-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010165500_business_portability.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-business-portability.sql"
+# Roundtrip before later export/exit extensions replace these wrappers.
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-business-portability-rollback.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010165800_unbounded_export_archive.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-unbounded-export-archive.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010165900_export_build_access.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-export-build-access.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010165600_exit_handoff_evidence.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-exit-handoff-evidence.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010165700_export_recovery.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-export-recovery.sql"
 # The real Make real runner, checkpointing through these RPCs (psql-backed port).
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125910_inquiry_decision_notice_claims.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-decision-notice-claims-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125915_inquiry_decision_notice_events.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-decision-notice-events-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125920_tenant_lead_parity_completeness.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-lead-parity-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125925_inquiry_member_replies.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-member-replies-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125930_inquiry_business_facts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-business-facts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125935_inquiry_operator_authority.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-operator-authority-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125940_inquiry_booking_handoff.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-booking-handoff-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125950_inquiry_operator_review.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-operator-review-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125955_inquiry_operator_revocation.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-operator-revocation-schema.sql"
 STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/make-real-activation-repository.test.ts
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010130000_booking_parity.sql"
@@ -773,21 +1046,366 @@ psql "${psql_args[@]}" --file="$repo_root/tests/booking-calendar-health-schema.s
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-native-workspace-schema.sql"
 # Prove the final interrupted checkpoint's rollback restores the tenant-only
 # functions and can be reapplied before any native commitments are admitted.
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-w6-booking-native-workspace.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261010135956_booking_native_workspace.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135956_booking_native_workspace.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-native-workspace-schema.sql"
-# Every stream's release flag key survives the last literal redefinition (#253).
-psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
+# Wave 6: confirmed shared business facts, never private owner contact data.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010165000_tenant_business_context.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-business-context-schema.sql"
+# Agency 1.0 native publishing targets and logged booking email enablement.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011102000_native_publishing_targets.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011101000_business_booking_email.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/native-publishing-targets-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-booking-email-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011101000_business_booking_email.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011102000_native_publishing_targets.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011102000_native_publishing_targets.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011101000_business_booking_email.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/native-publishing-targets-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-booking-email-schema.sql"
+# Native paused issues cannot enter the integrated tenant-only sender;
+# its legacy acceptance/recovery contract remains intact after this migration.
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-newsletter-sender-schema.sql"
+# #304 read-only visibility: forward, rollback and reapply.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011140000_agent_booking_visibility.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-visibility-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011140000_agent_booking_visibility.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011140000_agent_booking_visibility.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-visibility-schema.sql"
+
+# #529: anonymous booking caps, email-only placement, and reversible schema.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011150000_public_booking_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011150000_public_booking_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011150000_public_booking_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/public-booking-admission-schema.sql"
+# #547: agent holds share that admission; live-only agent cap; mailbox caps.
+# Forward, rollback to #529's functions, and reapply; #529's contract reruns.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013210000_agent_booking_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-admission-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013210000_agent_booking_admission.sql"
+psql "${psql_args[@]}" -Atc "select to_regprocedure('public.booking_email_identity(text)') is null and to_regprocedure('public.list_published_business_pages()') is null and position('''agent''' in pg_get_functiondef('public.check_public_booking_budget(uuid,text,timestamptz,timestamptz,text,uuid)'::regprocedure))=0" | grep -qx t
+# The regression probes must fail on #529's functions: dead holds, shared budget, one mailbox.
+if psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-admission-schema.sql" >"$cluster_root/agent-admission-before.log" 2>&1; then
+  printf 'Agent admission probes passed without 20261013210000.\n' >&2
+  exit 1
+fi
+for probe in dead_holds shared_budget one_email; do
+  if ! grep -q "$probe: " "$cluster_root/agent-admission-before.log"; then
+    cat "$cluster_root/agent-admission-before.log" >&2
+    printf 'Agent admission probe %s did not fail before the fix.\n' "$probe" >&2
+    exit 1
+  fi
+done
+psql "${psql_args[@]}" --file="$repo_root/tests/public-booking-admission-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013210000_agent_booking_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-admission-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/public-booking-admission-schema.sql"
+
+# Google location lineage through the real Versions/System stores, after the
+# account-binding migrations. Preparation stays fake; no Google dispatch.
+if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
+  STRELVA_VERSIONS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
+    pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/google-location-versions-postgres.test.ts
+fi
+
+# #530 M8: an operator with an admin seat never decides an owner item.
+# Forward, rollback (the original member branch and the Needs you contract
+# hold again), then forward once more.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011153000_operator_owner_decisions.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-owner-decisions-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011153000_operator_owner_decisions.sql"
+psql "${psql_args[@]}" --set=after_rollback=true --file="$repo_root/tests/operator-owner-decisions-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011153000_operator_owner_decisions.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-owner-decisions-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
 
 # The one booking store through both real route families (legacy /api/booking
 # and the public booking service) against the real booking functions. Last,
 # because it commits its fictional rows.
 STRELVA_BOOKINGS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/booking-one-store.test.ts
+bash "$repo_root/scripts/check-inquiry-rollbacks.sh" "$cluster_socket" "$cluster_port"
+# Wave 6 owner entry and Ask (isolated local proof; explicit rollbacks are never applied here).
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010100000_owner_invitation_claim.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-invitation-claim-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010103000_ask_business_fact_drafts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/ask-business-fact-drafts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010102000_owner_decision_links.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010102100_website_owner_link_launch.sql"
+# The #560 launch regression must fail on the prior email-only gate.
+if psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-links-schema.sql" >"$cluster_root/owner-effects-before.log" 2>&1; then
+  printf 'Owner decision launch probes passed without effect-specific verification.\n' >&2
+  exit 1
+fi
+grep -q 'email-only agency cannot admit launch' "$cluster_root/owner-effects-before.log"
+# #560 owner decision effects: apply, restore old definitions, reapply, then
+# execute the real link/native writer regressions under the corrected gate.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261014110000_owner_decision_effects.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261014110000_owner_decision_effects.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261014110000_owner_decision_effects.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-links-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-effects-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010104000_owner_decision_website_preview.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-website-preview-schema.sql"
+# Retain a fictional native Version, then prove rollback leaves the business's
+# live application, destination records and preparation receipts intact.
+psql "${psql_args[@]}" --set=native_keep_fixture=true --file="$repo_root/tests/w6-version-native-applications.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261010163300_version_native_applications.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-native-rollback.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163300_version_native_applications.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-native-rollforward.sql"
+# Integration: Postgres lead authority plus receipt retention share one teardown wrapper.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010170000_deprovision_retained_after_inquiry_export.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/deprovision-retained-after-inquiry-export-schema.sql"
+# Every stream's release flag key survives every redefinition, in any apply order (#253).
+psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
+# Policy facts: confirmation/provenance/history/undo on the existing record RPC.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011120000_business_policies.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-policies-schema.sql"
+# Rollback before adoption and reapply preserve legacy service areas.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011120000_business_policies.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011120000_business_policies.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-policies-schema.sql"
 
-# Published platform schema disagreements reuse owner decisions.
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010120000_connected_site_schema_conflicts.sql"
-psql "${psql_args[@]}" --file="$repo_root/tests/connected-site-schema-conflicts.sql"
+# Adoption is a stop point: rollback refuses both current facts and historical
+# policy terms, even after Undo. The real rollback file runs in both cases.
+psql "${psql_args[@]}" --set=check_history=0 --set=undo_terms=0 --file="$repo_root/tests/business-policies-rollback-schema.sql"
+for policy_guard_phase in current history; do
+  if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011120000_business_policies.sql" >"$cluster_root/policy-rollback-refusal.log" 2>&1; then
+    printf 'Policy rollback discarded %s terms.\n' "$policy_guard_phase" >&2
+    exit 1
+  fi
+  if ! grep -q 'business_policies_rollback_requires_data_preservation' "$cluster_root/policy-rollback-refusal.log"; then
+    cat "$cluster_root/policy-rollback-refusal.log" >&2
+    exit 1
+  fi
+  if [[ "$policy_guard_phase" == "current" ]]; then
+    psql "${psql_args[@]}" --set=check_history=0 --set=undo_terms=1 --file="$repo_root/tests/business-policies-rollback-schema.sql"
+  else
+    psql "${psql_args[@]}" --set=check_history=1 --set=undo_terms=0 --file="$repo_root/tests/business-policies-rollback-schema.sql"
+  fi
+done
+printf 'Policy rollback guards preserved current terms and undone history.\n'
+# Public policy output after the policy projection exists; saved pages block rollback.
+psql "${psql_args[@]}" --file="$repo_root/tests/business-pages-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-pages-rollback-schema.sql"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012110000_business_pages.sql" >"$cluster_root/business-pages-rollback-refusal.log" 2>&1; then
+  printf 'Business page rollback discarded saved publication settings.\n' >&2
+  exit 1
+fi
+grep -q 'business_pages_rollback_requires_data_preservation' "$cluster_root/business-pages-rollback-refusal.log"
+psql "${psql_args[@]}" -Atc "select exists(select 1 from public.business_pages where handle='rollback-fixture') and to_regprocedure('public.business_confirmed_public_facts(uuid)') is not null" | grep -qx t
+printf 'Business page rollback preserved saved publication settings.\n'
+# #509 round 3: bookings, inquiries and the linked-site overlay read only the
+# owner-confirmed copy. The contract reproduces the leak before the migration
+# (an operator's pending phone reaches booking), holds after it alongside the
+# earlier booking and inquiry contracts, #509's rollback refuses while it is
+# applied, and its rollback restores the exact catalog.
+if psql "${psql_args[@]}" --file="$repo_root/tests/booking-confirmed-facts-schema.sql" >"$cluster_root/booking-facts-before.log" 2>&1; then
+  printf 'Booking readers already ignored pending facts before 20261013115000.\n' >&2
+  exit 1
+fi
+grep -q 'booking phone is confirmed, got 716-555-0999' "$cluster_root/booking-facts-before.log"
+psql "${psql_args[@]}" --tuples-only --no-align --file="$repo_root/tests/support/public-catalog-fingerprint.sql" >"$cluster_root/catalog-before-booking-facts.txt"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013115000_booking_reads_confirmed_facts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-confirmed-facts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-business-context-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-context-notices-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-booking-handoff-schema.sql"
+# The hosted facts contract ran forward/rollback/forward above, before
+# website-cutover-undo intentionally removes its shared publication fixture.
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013110000_public_facts_read_confirmed.sql"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011133700_business_facts_owner_decision.sql" >"$cluster_root/booking-facts-rollback-order.log" 2>&1; then
+  printf '#509 rollback ran while the booking readers still read its copy.\n' >&2
+  exit 1
+fi
+grep -q 'roll back 20261013115000_booking_reads_confirmed_facts first' "$cluster_root/booking-facts-rollback-order.log"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013110000_public_facts_read_confirmed.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013115000_booking_reads_confirmed_facts.sql"
+if ! diff -u "$cluster_root/catalog-before-booking-facts.txt" \
+    <(psql "${psql_args[@]}" --tuples-only --no-align --file="$repo_root/tests/support/public-catalog-fingerprint.sql"); then
+  printf 'Booking-reader rollback did not restore the exact catalog.\n' >&2
+  exit 1
+fi
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013115000_booking_reads_confirmed_facts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-confirmed-facts-schema.sql"
+printf 'Booking readers read only the confirmed copy; rollback is exact and ordered.\n'
+# Every stream's release flag key survives the integrated redefinitions (#253).
+psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
+
+
+# Super-admin grants and revocations use audited functions; rehearse rollback
+# on an empty audit ledger before exercising the append-only SQL contract.
+psql "${psql_args[@]}" --command="delete from public.super_admins;"
+psql "${psql_args[@]}" --command="create table if not exists public.audit_logs(actor_user_id uuid, time timestamptz not null);"
+psql "${psql_args[@]}" <<'SQL'
+create or replace function public.app_is_super_admin() returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from public.super_admins
+    where user_id = auth.uid() and revoked_at is null
+  );
+$$;
+revoke all on function public.app_is_super_admin() from public, anon;
+grant execute on function public.app_is_super_admin() to authenticated, service_role;
+grant select on public.users, public.audit_logs to authenticated, service_role;
+SQL
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261015110000_super_admin_grants.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261015110000_super_admin_grants.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/super-admin-grants-rollback-empty-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261015110000_super_admin_grants.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/super-admin-grants-json-claims-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/super-admin-grants-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/super-admin-grants-rollback-schema.sql"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261015110000_super_admin_grants.sql" >"$cluster_root/super-admin-rollback.log" 2>&1; then
+  printf 'Super-admin grant rollback discarded an existing audit event.\n' >&2
+  exit 1
+fi
+if ! grep -q 'super_admin_grants_rollback_requires_data_preservation' "$cluster_root/super-admin-rollback.log"; then
+  cat "$cluster_root/super-admin-rollback.log" >&2
+  printf 'Super-admin grant rollback did not refuse the populated audit trail.\n' >&2
+  exit 1
+fi
+psql "${psql_args[@]}" <<'SQL'
+do $$
+begin
+  if not exists (
+    select 1 from public.super_admin_access_events
+    where reason = 'rollback must preserve the appended audit event'
+  ) then
+    raise exception 'super-admin audit event was lost by rollback';
+  end if;
+end;
+$$;
+SQL
+printf 'Super-admin rollback preserved the append-only audit trail.\n'
+# Signed tracking keys are service-role-only and cannot be discarded while a
+# site depends on them. Prove guarded rollback, empty rollback, and reapply.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012010000_tenant_track_signing_keys.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012120000_track_signing_key_rotation.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-track-signing-keys-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-track-signing-key-rotation.sql"
+psql "${psql_args[@]}" --command="insert into public.tenants(id,site_name) values('track-signing-rollback-fixture','Tracking key rollback fixture'); insert into public.tenant_track_signing_keys(tenant_id,public_key) values('track-signing-rollback-fixture',repeat('o',100)); select public.rotate_tenant_track_signing_key('track-signing-rollback-fixture',repeat('n',100));" >/dev/null
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012120000_track_signing_key_rotation.sql" >"$cluster_root/track-key-rotation-rollback.log" 2>&1; then
+  printf 'Tracking key rotation rollback discarded an in-window key.\n' >&2
+  exit 1
+fi
+grep -q 'track_signing_key_rotation_rollback_requires_data_preservation' "$cluster_root/track-key-rotation-rollback.log"
+psql "${psql_args[@]}" -Atc "select public_key = repeat('n',100) and previous_public_key = repeat('o',100) from public.tenant_track_signing_keys where tenant_id='track-signing-rollback-fixture'" | grep -qx t
+psql "${psql_args[@]}" --command="update public.tenant_track_signing_keys set previous_public_key=null, previous_valid_until=null where tenant_id='track-signing-rollback-fixture';" >/dev/null
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012120000_track_signing_key_rotation.sql"
+psql "${psql_args[@]}" -Atc "select public_key = repeat('n',100) and not exists(select 1 from information_schema.columns where table_schema='public' and table_name='tenant_track_signing_keys' and column_name='previous_public_key') and to_regprocedure('public.rotate_tenant_track_signing_key(text,text)') is null from public.tenant_track_signing_keys where tenant_id='track-signing-rollback-fixture'" | grep -qx t
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012010000_tenant_track_signing_keys.sql" >"$cluster_root/track-key-rollback.log" 2>&1; then
+  printf 'Tracking key rollback discarded an active site key.\n' >&2
+  exit 1
+fi
+grep -q 'tenant_track_signing_keys_rollback_requires_data_preservation' "$cluster_root/track-key-rollback.log"
+psql "${psql_args[@]}" --command="delete from public.tenant_track_signing_keys where tenant_id='track-signing-rollback-fixture'; delete from public.tenants where id='track-signing-rollback-fixture';" >/dev/null
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012010000_tenant_track_signing_keys.sql"
+if [[ "$(psql "${psql_args[@]}" -Atc "select to_regclass('public.tenant_track_signing_keys') is null;")" != t ]]; then
+  printf 'Tracking key rollback left its table behind.\n' >&2
+  exit 1
+fi
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012010000_tenant_track_signing_keys.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012120000_track_signing_key_rotation.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-track-signing-keys-schema.sql"
+printf 'Tracking key migration passed forward, guarded rollback, empty rollback and reapply.\n'
+# Provider disconnect revocation receipts and local token cleanup: forward,
+# rollback while empty, and reapply. Fixtures use fictional credentials only.
+psql "${psql_args[@]}" --command="alter table public.tenants add column if not exists instagram_access_token text, add column if not exists updated_at timestamptz not null default now();"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011180000_provider_disconnect_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/provider-disconnect-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011180000_provider_disconnect_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011180000_provider_disconnect_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/provider-disconnect-schema.sql"
+# #524: owner links go only to a trusted owner address. The rollback must
+# restore every public function body and privilege, trigger, relation, column
+# and constraint exactly; then the migration reapplies.
+owner_trust_snapshot() {
+  psql "${psql_args[@]}" -At <<'SQL'
+select 'fn ' || p.oid::regprocedure::text || ' ' || md5(pg_get_functiondef(p.oid)) || ' ' || coalesce(p.proacl::text, '')
+  from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind in ('f', 'p')
+union all
+select 'tg ' || t.tgrelid::regclass::text || ' ' || t.tgname || ' ' || t.tgenabled::text || ' ' || md5(pg_get_triggerdef(t.oid))
+  from pg_trigger t join pg_class c on c.oid = t.tgrelid where c.relnamespace = 'public'::regnamespace and not t.tgisinternal
+union all
+select 'rel ' || c.relname || ' ' || c.relkind::text || ' ' || c.relrowsecurity::text || ' ' || coalesce(c.relacl::text, '')
+  from pg_class c where c.relnamespace = 'public'::regnamespace
+union all
+select 'col ' || a.attrelid::regclass::text || '.' || a.attname || ' ' || format_type(a.atttypid, a.atttypmod) || ' ' || a.attnotnull::text
+  from pg_attribute a join pg_class c on c.oid = a.attrelid
+  where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and a.attnum > 0 and not a.attisdropped
+union all
+select 'con ' || conrelid::regclass::text || ' ' || conname || ' ' || md5(pg_get_constraintdef(oid))
+  from pg_constraint where connamespace = 'public'::regnamespace
+order by 1;
+SQL
+}
+owner_trust_snapshot >"$cluster_root/owner-trust-before.txt"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013120000_owner_recipient_trust.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-recipient-trust-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013120000_owner_recipient_trust.sql"
+owner_trust_snapshot >"$cluster_root/owner-trust-after-rollback.txt"
+if ! diff -u "$cluster_root/owner-trust-before.txt" "$cluster_root/owner-trust-after-rollback.txt"; then
+  printf 'Owner recipient trust rollback did not restore the schema exactly.\n' >&2
+  exit 1
+fi
+# The Needs you and Make real link contracts hold on the restored functions
+# and again on the reapplied ones.
+psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013120000_owner_recipient_trust.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-recipient-trust-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-schema.sql"
+printf 'Owner recipient trust rollback is exact (%s schema objects compared) and reapplies.\n' \
+  "$(wc -l <"$cluster_root/owner-trust-before.txt" | tr -d ' ')"
+
+# Agency 1.0 #255/#534: client-resource mandates and the acting-provider
+# gates. Forward, the effect matrix, the older contracts these replace, then
+# rollback in reverse order (wrong order refused, catalog restored exactly)
+# and reapply.
+acting_provider=(20261014100000_client_resource_mandates 20261014112000_acting_provider_gates)
+check_acting_provider() {
+  psql "${psql_args[@]}" --file="$repo_root/tests/acting-provider-gates-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/platform-service-actor-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-links-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-website-preview-schema.sql"
+}
+catalog_fingerprint >"$cluster_root/catalog-before-acting-provider.txt"
+for name in "${acting_provider[@]}"; do
+  psql "${psql_args[@]}" --single-transaction --file="$repo_root/supabase/migrations/$name.sql"
+done
+check_acting_provider
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-${acting_provider[0]}.sql" >"$cluster_root/acting-provider-wrong-order.log" 2>&1; then
+  printf 'The mandates rollback ran while the gates were still applied.\n' >&2
+  exit 1
+fi
+grep -q 'rollback_wrong_order' "$cluster_root/acting-provider-wrong-order.log"
+for (( index=${#acting_provider[@]}-1; index>=0; index-- )); do
+  psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-${acting_provider[$index]}.sql"
+done
+catalog_fingerprint >"$cluster_root/catalog-after-acting-provider-rollback.txt"
+if ! diff -u "$cluster_root/catalog-before-acting-provider.txt" "$cluster_root/catalog-after-acting-provider-rollback.txt"; then
+  printf 'Acting-provider rollback did not restore the public catalog.\n' >&2
+  exit 1
+fi
+for name in "${acting_provider[@]}"; do
+  psql "${psql_args[@]}" --single-transaction --file="$repo_root/supabase/migrations/$name.sql"
+done
+check_acting_provider
+printf 'Acting-provider gates forward, rollback and reapply passed.\n'
+
+
+# #525: owner-approved Ask changes confirm the same touched facts.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013130000_ask_confirms_owner_facts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/ask-confirmed-facts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013130000_ask_confirms_owner_facts.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013130000_ask_confirms_owner_facts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/ask-confirmed-facts-schema.sql"
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 
@@ -799,3 +1417,126 @@ bash "$repo_root/scripts/check-customer-mapping-sql.sh"
 # Inquiry capabilities use their own isolated fictional tenant fixture. This
 # validates the additive migration without connecting to production.
 bash "$repo_root/scripts/check-inquiry-workspace-sql.sh"
+
+
+# #261 Team authority, atomic staffing, membership cleanup and invitation acceptance.
+catalog_fingerprint >"$cluster_root/catalog-before-agency-team.txt"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011160000_agency_team.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-team-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011160000_agency_team.sql"
+catalog_fingerprint >"$cluster_root/catalog-after-agency-team-rollback.txt"
+diff -u "$cluster_root/catalog-before-agency-team.txt" "$cluster_root/catalog-after-agency-team-rollback.txt"
+printf 'Agency Team rollback restored the public catalog exactly.\n'
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011160000_agency_team.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-team-schema.sql"
+
+# Exercise conversion against the final integrated invitation and unlink definitions.
+provider_conversion_catalog() {
+  psql "${psql_args[@]}" --tuples-only --no-align --command="select p.proname || ':' || md5(pg_get_functiondef(p.oid))
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname in ('tenant_workspace_link_guard','tenant_unlink_plan',
+      'preview_tenant_unlink','unlink_tenant_from_business','convert_tenant_to_business',
+      'operator_owner_invitation_assert','accept_workspace_invitation') order by p.proname;"
+}
+provider_conversion_catalog >"$cluster_root/provider-conversion-before.txt"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013220000_provider_seat_tenant_conversion.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/provider-seat-tenant-conversion-schema.sql"
+psql "${psql_args[@]}" --tuples-only --no-align --command="select p.proname || ':' || md5(pg_get_functiondef(p.oid))
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public' and p.proname in ('tenant_workspace_link_guard','tenant_conversion_provider_route',
+    'repath_converted_tenant_provider','tenant_unlink_plan','preview_tenant_unlink',
+    'unlink_tenant_from_business','convert_tenant_to_business','operator_owner_invitation_assert',
+    'accept_workspace_invitation') order by p.proname;" \
+  >"$cluster_root/provider-conversion-forward-hashes.txt"
+cat "$cluster_root/provider-conversion-forward-hashes.txt"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013220000_provider_seat_tenant_conversion.sql"
+provider_conversion_catalog >"$cluster_root/provider-conversion-after-rollback.txt"
+if ! diff -u "$cluster_root/provider-conversion-before.txt" "$cluster_root/provider-conversion-after-rollback.txt"; then
+  printf 'Provider-seat conversion rollback did not restore the prior functions.\n' >&2
+  exit 1
+fi
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013220000_provider_seat_tenant_conversion.sql" >"$cluster_root/provider-conversion-wrong-order.log" 2>&1; then
+  printf 'Provider-seat conversion rollback incorrectly accepted a second application.\n' >&2
+  exit 1
+fi
+grep -q 'rollback_wrong_order_or_function_drift' "$cluster_root/provider-conversion-wrong-order.log"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013220000_provider_seat_tenant_conversion.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/provider-seat-tenant-conversion-schema.sql"
+printf 'Provider-seat conversion, populated fictional contract, rollback and reapply passed.\n'
+# Agency-sourced public checks: real RLS, quota races and rollback stop points.
+bash "$repo_root/scripts/check-agency-prospects-sql.sh"
+
+# Agencies add clients (#259): seat not membership, isolation, limits, owner
+# claim link, and the rollback stop point, on the full ordered schema.
+bash "$repo_root/scripts/check-agency-add-client-sql.sh"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012180000_agency_brand.sql"
+
+# #264 agency brand: full-schema behavior, actual rollback/reapply, configured-data refusal.
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-brand-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012180000_agency_brand.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012180000_agency_brand.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-brand-schema.sql"
+psql "${psql_args[@]}" -c "insert into public.users(id,email,verified_at) values ('b2640000-0000-4000-8000-000000000099','rollback-brand@example.test',now()); insert into public.workspaces(id,kind,name,created_by) values ('b2640000-0000-4000-8000-000000000099','agency','Rollback brand','b2640000-0000-4000-8000-000000000099')"
+psql "${psql_args[@]}" -c "update public.workspaces set agency_brand=jsonb_build_object('displayName',name,'accentColor','#447a4f','replyTo',null,'logo',null,'credit','runs_on_strelva') where id='b2640000-0000-4000-8000-000000000099'"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012180000_agency_brand.sql" >"$cluster_root/brand-rollback-refusal.log" 2>&1; then
+  printf 'Agency brand rollback discarded configured brands.\n' >&2; exit 1
+fi
+grep -q 'agency_brand_rollback_requires_data_preservation' "$cluster_root/brand-rollback-refusal.log"
+psql "${psql_args[@]}" -c "update public.workspaces set agency_brand=null where agency_brand is not null"
+printf 'Agency brand SQL passed: resolution, revocation, exposure, rollback/reapply and preservation.\n'
+
+# Retained owner-link sessions are an explicit rollback stop point. The actual
+# rollback must fail without altering their intended-decision binding or gates.
+psql "${psql_args[@]}" --set=keep_fixture=true --file="$repo_root/tests/owner-decision-effects-schema.sql"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261014110000_owner_decision_effects.sql" >"$cluster_root/owner-effects-rollback.log" 2>&1; then
+  printf 'Owner effect rollback discarded retained session intent.\n' >&2
+  exit 1
+fi
+grep -q 'owner_decision_effects_rollback_requires_data_preservation' "$cluster_root/owner-effects-rollback.log"
+psql "${psql_args[@]}" -Atc "select exists(select 1 from information_schema.columns where table_schema='public' and table_name='owner_decision_link_sessions' and column_name='intended_decision') and exists(select 1 from public.owner_decision_link_sessions) and to_regprocedure('public.owner_decision_provider_holds(uuid,uuid,text[])') is not null" | grep -qx t
+printf 'Owner effect rollback retained sessions and authority gates.\n'
+
+# October 17 retention is last in migration order; deleting its fictional
+# inquiry fixtures has no inverse migration and runs only in this local cluster.
+retention_functions() {
+  psql "${psql_args[@]}" -At <<'SQL'
+select p.proname || ':' || md5(pg_get_functiondef(p.oid)) || ':' || coalesce(p.proacl::text, '')
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public' and p.proname in ('inquiry_events_immutable','purge_expired_tenant_leads')
+  order by p.proname;
+SQL
+}
+retention_functions >"$cluster_root/inquiry-retention-before.txt"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261017110000_inquiry_lead_retention.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-lead-retention.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261017110000_inquiry_lead_retention.sql"
+retention_functions >"$cluster_root/inquiry-retention-after-rollback.txt"
+if ! diff -u "$cluster_root/inquiry-retention-before.txt" "$cluster_root/inquiry-retention-after-rollback.txt"; then
+  printf 'Inquiry retention pre-purge rollback did not restore the prior function definitions and grants.\n' >&2
+  exit 1
+fi
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261017110000_inquiry_lead_retention.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-lead-retention-rollback.sql"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261017110000_inquiry_lead_retention.sql" >"$cluster_root/inquiry-retention-rollback-refusal.log" 2>&1; then
+  printf 'Inquiry retention rollback discarded visitor data after a marked purge.\n' >&2
+  exit 1
+fi
+grep -q 'inquiry_lead_retention_rollback_requires_data_preservation' "$cluster_root/inquiry-retention-rollback-refusal.log"
+printf 'Inquiry retention rollback restores functions before purge and refuses after marked deletion.\n'
+
+# Schema-conflict reports add service-only functions. Rollback restores the
+# pre-report catalog before any records exist and refuses after an owner ask
+# would depend on the adapter for resolution.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261018120000_connected_site_schema_conflicts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-site-schema-conflicts.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261018120000_connected_site_schema_conflicts.sql"
+psql "${psql_args[@]}" -Atc "select to_regprocedure('public.record_connected_site_schema_conflict(text,text,jsonb)') is null and to_regprocedure('public.read_connected_site_schema_conflict(uuid,uuid)') is null" | grep -qx t
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261018120000_connected_site_schema_conflicts.sql"
+psql "${psql_args[@]}" --set=keep_fixture=true --file="$repo_root/tests/connected-site-schema-conflicts.sql"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261018120000_connected_site_schema_conflicts.sql" >"$cluster_root/schema-conflicts-rollback-refusal.log" 2>&1; then
+  printf 'Schema-conflict rollback discarded owner decisions needed by the source adapter.\n' >&2
+  exit 1
+fi
+grep -q 'connected_site_schema_conflicts_rollback_requires_data_preservation' "$cluster_root/schema-conflicts-rollback-refusal.log"
+psql "${psql_args[@]}" -Atc "select to_regprocedure('public.record_connected_site_schema_conflict(text,text,jsonb)') is not null and to_regprocedure('public.read_connected_site_schema_conflict(uuid,uuid)') is not null" | grep -qx t
+printf 'Schema-conflict rollback removes unused functions and refuses after source decisions exist.\n'

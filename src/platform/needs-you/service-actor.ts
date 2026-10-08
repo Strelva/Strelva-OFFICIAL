@@ -1,13 +1,14 @@
 /**
  * Strelva (system): the narrow service actor for work that runs when nobody
  * is signed in (product model rule 6). SQL in
- * supabase/migrations/20261009100000_strelva_service_actor.sql.
+ * supabase/migrations/20261009100000_strelva_service_actor.sql, made
+ * agency-neutral by 20261009153000_platform_service_actor.sql.
  *
  * A session is per business and per purpose, lasts 30 minutes, and is logged
  * in `strelva_service_actions` as "Strelva (system)". It carries the member
  * identity the existing RPCs recheck (the business's verified owner, else
- * its verified admin, which on a converted business is the Strelva
- * operator), because those RPCs are the only read path. What it may do is
+ * a verified direct admin, else a verified staff member on the provider's
+ * seat), because those RPCs are the only read path. What it may do is
  * narrower than that identity:
  *
  * - `needs_you_sync`: read pending asks and open Needs you items. Never
@@ -22,15 +23,24 @@
  *   and only after the link approved the decision
  *   (20261009131000_make_real_owner_link.sql).
  *
- * Only for a business Strelva runs (converted, or provided by Strelva's
- * agency). Anything else gets no session.
+ * - `owner_decision_link`: one routine signed owner decision, bound to its
+ *   ID, recipient, revision and intended approve/decline. Admission and each use
+ *   recheck the actual source effect against the same provider. Draft approval
+ *   and decline have no immediate outside effect. Access, money and exit are never admitted.
+ *   The actual member role is unchanged; a run must be authorized after claim.
+ *
+ * Only for a business whose provider of record is an agency verified for
+ * the purpose's effect (needs_you_sync: email; Make real: publish; owner
+ * decision: the bound source action), the same
+ * rule for every agency, Strelva's included. The session names that
+ * provider. Anything else gets no session.
  */
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 
 export const STRELVA_SYSTEM_LABEL = "Strelva (system)" as const;
-export type ServicePurpose = "needs_you_sync" | "make_real_resume" | "make_real_link";
+export type ServicePurpose = "needs_you_sync" | "make_real_resume" | "make_real_link" | "owner_decision_link";
 
 export interface ServiceSession {
   kind: "strelva_system";
@@ -41,16 +51,26 @@ export interface ServiceSession {
   /** Whose membership the existing RPCs recheck. Never a decider. */
   onBehalf: { role: "owner" | "admin" };
   actor: WorkspaceActor;
+  /** Bound link identity. Required for owner_decision_link; never changes membership. */
+  decisionId?: string;
+  revisionHash?: string;
+  recipient?: string;
+  /** The verified agency of record the platform acted for. */
+  providerWorkspaceId?: string;
 }
 
 const sessionSchema = z.object({
   sessionId: z.string().uuid(),
   workspaceId: z.string().uuid(),
-  purpose: z.enum(["needs_you_sync", "make_real_resume", "make_real_link"]),
+  purpose: z.enum(["needs_you_sync", "make_real_resume", "make_real_link", "owner_decision_link"]),
   label: z.literal(STRELVA_SYSTEM_LABEL),
   role: z.enum(["owner", "admin"]),
   userId: z.string().uuid(),
   verifiedEmail: z.string().email(),
+  decisionId: z.string().uuid().optional(),
+  revisionHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  recipient: z.string().email().optional(),
+  providerWorkspaceId: z.string().uuid().optional(),
 }).nullable();
 
 export function parseServiceSession(data: unknown): ServiceSession | null {
@@ -58,9 +78,12 @@ export function parseServiceSession(data: unknown): ServiceSession | null {
   if (!parsed.success) throw new WorkspaceStoreError("Strelva's service session could not be read. The response was malformed.");
   if (!parsed.data) return null;
   const row = parsed.data;
+  if (row.purpose === "owner_decision_link" && (!row.decisionId || !row.revisionHash || !row.recipient)) throw new WorkspaceStoreError("Strelva's link session was malformed.");
   return {
     kind: "strelva_system", label: STRELVA_SYSTEM_LABEL, sessionId: row.sessionId, workspaceId: row.workspaceId, purpose: row.purpose,
     onBehalf: { role: row.role }, actor: { userId: row.userId, verifiedEmail: row.verifiedEmail.toLowerCase() },
+    ...(row.purpose === "owner_decision_link" ? { decisionId: row.decisionId, revisionHash: row.revisionHash, recipient: row.recipient?.toLowerCase() } : {}),
+    ...(row.providerWorkspaceId ? { providerWorkspaceId: row.providerWorkspaceId } : {}),
   };
 }
 
@@ -75,8 +98,8 @@ function db(): Rpc {
   return client as unknown as Rpc;
 }
 
-/** Start a logged session for one business, or null when Strelva doesn't run it or it has no verified owner or admin. */
-export async function startServiceSession(workspaceId: string, purpose: Exclude<ServicePurpose, "make_real_link">): Promise<ServiceSession | null> {
+/** Start a logged session for one business, or null when no verified provider serves it or nobody verified can be read as. */
+export async function startServiceSession(workspaceId: string, purpose: Exclude<ServicePurpose, "make_real_link" | "owner_decision_link">): Promise<ServiceSession | null> {
   const { data, error } = await db().rpc("strelva_service_reader", { p_workspace_id: z.string().uuid().parse(workspaceId), p_purpose: purpose });
   if (error) throw new WorkspaceStoreError("Strelva's service session could not start.");
   const session = parseServiceSession(data);
@@ -121,4 +144,36 @@ export async function recordServiceAction(session: ServiceSession, action: Servi
     p_workspace_id: session.workspaceId, p_session_id: session.sessionId, p_action: action, p_subject: subject.slice(0, 300), p_detail: detail ? detail.slice(0, 500) : null,
   });
   if (error) throw new WorkspaceStoreError("Strelva's action could not be logged, so it did not run.");
+}
+
+/** Narrow session for one routine owner decision, with the actual reader's existing membership. */
+export async function startOwnerDecisionLinkSession(workspaceId: string, decisionId: string, revisionHash: string, recipient: string, decision: "approve" | "not_yet" = "approve"): Promise<ServiceSession | null> {
+  const normalized = z.string().email().parse(recipient.trim().toLowerCase());
+  const { data, error } = await db().rpc("strelva_owner_decision_link_session", {
+    p_workspace_id: z.string().uuid().parse(workspaceId), p_decision_id: z.string().uuid().parse(decisionId),
+    p_revision_hash: z.string().regex(/^[a-f0-9]{64}$/).parse(revisionHash), p_recipient: normalized, p_decision: decision,
+  });
+  if (error) {
+    const code = LINK_REFUSALS.find(name => error.message?.includes(name));
+    if (code) throw new ServiceSessionRefusedError(code);
+    throw new WorkspaceStoreError("Strelva's link session could not start.");
+  }
+  const session = parseServiceSession(data);
+  if (session && (session.workspaceId !== workspaceId || session.purpose !== "owner_decision_link"
+    || session.decisionId !== decisionId || session.revisionHash !== revisionHash || session.recipient !== normalized)) {
+    throw new WorkspaceStoreError("Strelva's link session was for another decision.");
+  }
+  return session;
+}
+
+/** Recheck the claimed item, current recipient and actual membership before any resolver runs. */
+export async function authorizeOwnerDecisionLinkRun(session: ServiceSession): Promise<void> {
+  if (session.purpose !== "owner_decision_link" || !session.decisionId || !session.revisionHash || !session.recipient) {
+    throw new WorkspaceStoreError("That session can't decide this item.");
+  }
+  const { error } = await db().rpc("authorize_owner_decision_link_run", {
+    p_workspace_id: session.workspaceId, p_session_id: session.sessionId, p_decision_id: session.decisionId,
+    p_revision_hash: session.revisionHash, p_recipient: session.recipient,
+  });
+  if (error) throw new WorkspaceStoreError("Strelva's link action could not be authorized, so it did not run.");
 }

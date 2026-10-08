@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { expect, test, type APIRequestContext } from "@playwright/test";
-import { localEnvironment, signedInContext } from "./support/local-auth";
+import { localEnvironment, seedLocalSuperAdmin, signedInContext } from "./support/local-auth";
 
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1" || process.env.STRELVA_LOCAL_CATALOG_PROOF !== "1", "Requires isolated Auth and catalog provider fixtures.");
 test.setTimeout(240_000);
@@ -19,7 +19,7 @@ function localSql(sql: string): string {
 }
 const literal = (value: string) => `'${value.replace(/'/g, "''")}'`;
 
-test("a Strelva maker takes a sentence through Draft, rehearsal, Live and staff use on desktop and mobile", async ({ browser }, testInfo) => {
+test("a Strelva maker takes a sentence through Draft, rehearsal, Live, member submit and labeled staff use", async ({ browser }, testInfo) => {
   const env = localEnvironment();
   const admin = createClient(env.url, env.service, { auth: { persistSession: false, autoRefreshToken: false } });
   const operator = await signedInContext(browser, admin, "catalog-operator");
@@ -28,7 +28,7 @@ test("a Strelva maker takes a sentence through Draft, rehearsal, Live and staff 
   const businessId = randomUUID();
   try {
     for (const person of [operator, owner, staff]) expect((await person.context.request.get("/api/workspace")).status()).toBe(200);
-    expect((await admin.from("super_admins").insert({ user_id: operator.userId, email: operator.email })).error).toBeNull();
+    seedLocalSuperAdmin(operator.userId, operator.email);
     expect((await admin.from("workspaces").insert({ id: businessId, kind: "customer", name: "Catalog bookkeeping fixture", created_by: operator.userId })).error).toBeNull();
     expect((await admin.from("workspace_memberships").insert([
       { workspace_id: businessId, user_id: operator.userId, role: "owner", created_by: operator.userId },
@@ -58,7 +58,16 @@ test("a Strelva maker takes a sentence through Draft, rehearsal, Live and staff 
     expect(app.payload.rehearsal.checks.every((check: { passed: boolean }) => check.passed)).toBe(true);
     app = await post(operator.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId, command: { kind: "publish", expectedCandidateRevision: app.payload.designRevision, expectedReleaseVersion: null } });
     expect(app.payload.status).toBe("installed");
-    await post(operator.context.request, `/api/apps/${workId}/access`, { recipientEmail: staff.email, views: ["form", "list"], recordRead: "own", recordEdit: "own", recordSubmit: true, purpose: "Bookkeeping intake", expiresAt: new Date(Date.now() + 86_400_000).toISOString() }, 201);
+    // Membership submission uses a different atomic RPC from recipient use.
+    // This owner's record must stay outside the staff recipient's own scope.
+    app = await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId,
+      command: { kind: "submit", expectedReleaseVersion: app.payload.release.version, expectedRecordsRevision: app.payload.recordsRevision,
+        record: { id: randomUUID(), values: { business: "Member-only client", client: "member-only@example.test", handler: staff.email } } } });
+    expect(app.payload.records).toHaveLength(1);
+    expect(app.payload.records[0].values.client).toMatch(/^[0-9a-f-]{36}$/);
+    expect(app.payload.records[0].values.handler).toMatch(/^[0-9a-f-]{36}$/);
+    expect((await staff.context.request.get(`/api/apps/${workId}`)).status()).toBe(403);
+    const grant = await post(operator.context.request, `/api/apps/${workId}/access`, { recipientEmail: staff.email, views: ["form", "list"], recordRead: "own", recordEdit: "own", recordSubmit: true, purpose: "Bookkeeping intake", expiresAt: new Date(Date.now() + 86_400_000).toISOString() }, 201);
     const page = await staff.context.newPage();
     for (const width of [1280, 360]) {
       await page.setViewportSize({ width, height: 900 });
@@ -69,18 +78,51 @@ test("a Strelva maker takes a sentence through Draft, rehearsal, Live and staff 
       await page.getByLabel("Assigned person", { exact: true }).fill(staff.email);
       await page.getByRole("button", { name: "Submit record", exact: true }).click();
       await expect(page.getByRole("status")).toContainText("Record submitted.");
+      const visibleRecord = page.getByRole("article").filter({ hasText: `Acme ${width}` });
+      await expect(visibleRecord.getByText(`acme-${width}@example.test`, { exact: true })).toBeVisible();
+      await expect(visibleRecord.getByText(`Sam · ${staff.email}`, { exact: true })).toBeVisible();
+      await expect(page.getByText("Member-only client", { exact: true })).toHaveCount(0);
+      const read = await staff.context.request.get(`/api/apps/${workId}`);
+      expect(read.status()).toBe(200);
+      const snapshot = await read.json();
+      expect(snapshot.records).toHaveLength(width === 1280 ? 1 : 2);
+      const record = snapshot.records.find((row: { values: { business: string } }) => row.values.business === `Acme ${width}`);
+      expect(record.linkLabels).toEqual({ client: `acme-${width}@example.test`, handler: `Sam · ${staff.email}` });
+      expect(record.values.client).toMatch(/^[0-9a-f-]{36}$/);
+      expect(record.values.handler).toMatch(/^[0-9a-f-]{36}$/);
+      await expect(visibleRecord).not.toContainText(record.values.client);
+      await expect(visibleRecord).not.toContainText(record.values.handler);
+      if (width === 360) {
+        await visibleRecord.getByRole("button", { name: "Edit record", exact: true }).click();
+        await expect(page.getByLabel("Client business", { exact: true })).toBeFocused();
+        await expect(page.getByLabel("Client contact", { exact: true })).toHaveAttribute("placeholder", record.linkLabels.client);
+        await expect(page.getByLabel("Assigned person", { exact: true })).toHaveAttribute("placeholder", record.linkLabels.handler);
+        await page.getByLabel("Client business", { exact: true }).fill("Acme 360 corrected");
+        await page.getByRole("button", { name: "Save correction", exact: true }).click();
+        await expect(page.getByRole("status")).toContainText("Correction saved.");
+        const corrected = await (await staff.context.request.get(`/api/apps/${workId}`)).json();
+        expect(corrected.records.find((row: { id: string }) => row.id === record.id)).toMatchObject({
+          values: { business: "Acme 360 corrected", client: record.values.client, handler: record.values.handler },
+          linkLabels: record.linkLabels, revision: record.revision + 1,
+        });
+      }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await page.screenshot({ path: testInfo.outputPath(`catalog-staff-${width}.png`), fullPage: true });
       const contact = JSON.parse(localSql(`select json_build_object('id',id,'sources',sources) from public.business_contacts where workspace_id=${literal(businessId)} and email=${literal(`acme-${width}@example.test`)};`));
       expect(contact.sources).toContain("internal_app");
     }
     const notices = JSON.parse(localSql(`select json_agg(json_build_object('status',status,'providerMessageId',provider_message_id)) from public.internal_tool_notices where work_id=${literal(workId)};`));
-    expect(notices).toHaveLength(2);
+    expect(notices).toHaveLength(3);
     expect(notices.every((notice: { status: string; providerMessageId: string | null }) => notice.status === "sent" && notice.providerMessageId)).toBe(true);
     const captured = readFileSync(process.env.STRELVA_LOCAL_PROVIDER_LOG!, "utf8").trim().split("\n").map(line => JSON.parse(line));
     const messages = captured.filter(message => message.subject.includes("Bookkeeping intake") && message.to.includes(staff.email));
-    expect(messages).toHaveLength(2); expect(messages[0].text).toContain("Bank statements");
+    expect(messages).toHaveLength(3); expect(messages[0].text).toContain("Bank statements");
     expect(messages.every(message => !message.text.includes("acme-"))).toBe(true);
+    const noticeTarget = `/workspace?workspaceId=${businessId}&view=applications&work=${workId}`;
+    expect(messages.every(message => message.text.includes(`${env.app}/sign-in?next=${encodeURIComponent(noticeTarget)}`))).toBe(true);
+    const revoked = await operator.context.request.delete(`/api/apps/${workId}/access?grantId=${grant.grant.id}`, { headers: { origin: env.app }, data: {} });
+    expect(revoked.status(), await revoked.text()).toBe(200);
+    expect((await staff.context.request.get(`/api/apps/${workId}`)).status()).toBe(403);
   } finally {
     await Promise.all([operator.context.close(), owner.context.close(), staff.context.close()]);
   }
@@ -94,7 +136,7 @@ test("owners file Requests and a failed maker plan files one pending Request wit
   const workspaceId = randomUUID();
   try {
     for (const person of [operator, owner]) expect((await person.context.request.get("/api/workspace")).status()).toBe(200);
-    expect((await admin.from("super_admins").insert({ user_id: operator.userId, email: operator.email })).error).toBeNull();
+    seedLocalSuperAdmin(operator.userId, operator.email);
     expect((await admin.from("workspaces").insert({ id: workspaceId, kind: "customer", name: "Catalog Request fixture", created_by: operator.userId })).error).toBeNull();
     expect((await admin.from("workspace_memberships").insert([operator, owner].map(person => ({ workspace_id: workspaceId, user_id: person.userId, role: "owner", created_by: operator.userId })))).error).toBeNull();
     const ownerPage = await owner.context.newPage();

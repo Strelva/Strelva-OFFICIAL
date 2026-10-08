@@ -4,6 +4,7 @@ import type { ConnectedSitesStore } from "@/products/connected-sites/store";
 const deps = vi.hoisted(() => ({ limited: vi.fn(), spam: vi.fn(), notify: vi.fn(), flag: vi.fn() }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: deps.limited, rateLimitKey: (_req: Request, prefix: string) => prefix }));
 vi.mock("@/lib/lead-spam", () => ({ scoreLeadSpam: deps.spam }));
+vi.mock("@/lib/pinned-public-text", () => ({ fetchPinnedPublicText: async () => '<script type="application/ld+json">{"@type":"LocalBusiness","url":"https://www.fictional-bakery.example/","name":"Old Bakery"}</script>' }));
 vi.mock("@/products/connected-sites/notify", () => ({ notifyConnectedSiteInquiry: deps.notify }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
 vi.mock("@/platform/release-flags/store", () => ({ workspaceReleaseFlagEnabled: deps.flag }));
@@ -104,7 +105,7 @@ describe("public connect routes", () => {
     expect(events.status).toBe(202); expect(await events.json()).toEqual({ accepted: 1 });
   });
   it("accepts additive schema-only reports with the same host gates, default off and no notification", async () => {
-    const body = { events: [], platformSchema: { present: true, businesses: [{ name: "Outdated Bakery" }] } };
+    const body = { events: [], platformSchema: { present: true } };
     const request = (origin = ORIGIN) => new Request(`https://app.strelva.test/api/v1/connect/${KEY}/events`, { method: "POST", headers: { origin }, body: JSON.stringify(body) });
     vi.stubEnv("STRELVA_CONNECTED_SITE_SCHEMA_CONFLICTS_RELEASE", "0");
     expect(await (await postEvents(request(), params())).json()).toEqual({ accepted: 0 });

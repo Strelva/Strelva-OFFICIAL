@@ -1,3 +1,4 @@
+import { isPlatformDomain } from "@/platform/infra/brand";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { isSuperAdmin } from "@/platform/infra/auth";
@@ -22,7 +23,7 @@ function clientDomain(t: { productionDomain?: string; siteUrl?: string }): strin
   const raw = (t.productionDomain || t.siteUrl || "").trim().toLowerCase();
   if (!raw) return null;
   const host = raw.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-  if (!host || host.endsWith(".strelva.com") || host.endsWith(".vercel.app")) return null;
+  if (!host || isPlatformDomain(host) || host.endsWith(".vercel.app")) return null;
   return host;
 }
 

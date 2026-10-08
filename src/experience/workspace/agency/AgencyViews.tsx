@@ -72,7 +72,7 @@ export function AgencyClientList({
             <p className="flex items-center gap-2 text-[13px] text-warm-black"><CircleAlert className="shrink-0 text-warning" size={16} aria-hidden="true" />{client.name} could not be loaded.</p>
             <Button variant="ghost" size="sm" loading={retrying.has(client.pageIndex)} onClick={() => onRetryPage(client.pageIndex)} aria-label={`Retry loading ${client.name}`}>Retry</Button>
           </li>
-        : <li key={client.workspaceId} className={row}><ClientRowButton client={client} agencyName={agencyName} now={now} onOpen={onOpen} /></li>)}
+        : <li key={client.workspaceId} className={row}><ClientRowButton client={client} agencyName={agencyName} now={now} onOpen={onOpen} />{client.agentBookings ? <a href={`/workspace/bookings?${new URLSearchParams({ workspaceId: client.workspaceId, view: "week", source: "agent" })}`} className="mx-2 mb-3 inline-flex min-h-11 items-center text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2">Booked through agents · {client.name}</a> : null}</li>)}
     </ul>
     <div className="flex flex-wrap items-center justify-between gap-3 pt-4">
       <p className={meta} aria-live="polite">{clients.length < total ? `Showing ${clients.length} of ${total} clients` : `${total} ${total === 1 ? "client" : "clients"}`}</p>
@@ -130,13 +130,13 @@ export function AgencyQueueList({
       return <li key={`${item.workspaceId}:${item.id}`} className={row}>
         <button
           type="button"
-          onClick={() => item.workId ? onOpenClientWork(item.workspaceId, item.workId) : onWorkspace(item.workspaceId)}
+          onClick={() => item.href ? window.location.assign(item.href) : item.workId ? onOpenClientWork(item.workspaceId, item.workId) : onWorkspace(item.workspaceId)}
           className="grid w-full gap-x-6 gap-y-1 px-2 py-4 text-left hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-text sm:grid-cols-[minmax(0,1fr)_96px_16px] sm:items-center"
           aria-label={`${item.title}, ${item.clientName}, ${queueKindLabel(item.kind)}${wait ? `, waiting ${wait}` : ""}`}
         >
           <span className="min-w-0">
             <strong className="block text-[14px] font-medium text-warm-black">{item.title}</strong>
-            <small className={`${meta} mt-1 block`}>{item.clientName} · {queueKindLabel(item.kind)}</small>
+            <small className={`${meta} mt-1 block`}>{item.clientName} · {item.label ?? queueKindLabel(item.kind)}</small>
           </span>
           <span className="font-mono text-[12px] leading-4 tabular-nums text-gray-muted sm:text-right">{wait === "today" ? "Today" : wait}</span>
           <ArrowRight className="hidden text-gray-muted sm:block" size={16} aria-hidden="true" />

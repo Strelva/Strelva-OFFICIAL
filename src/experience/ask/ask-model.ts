@@ -151,3 +151,8 @@ export function askErrorMessage(status: number, fallback: string | null): string
   if (status === 503) return fallback?.includes("not enabled") ? "Ask Strelva isn't on for this business yet. Nothing was sent." : "Strelva can't answer right now. Nothing was changed.";
   return fallback || "Strelva can't answer right now. Nothing was changed.";
 }
+/** A storage outage is not a release switch. Only an explicit release refusal is off. */
+export function askHistoryFailure(status: number, body: unknown): "off" | "unavailable" {
+  const error = body && typeof body === "object" && "error" in body ? body.error : null;
+  return status === 503 && typeof error === "string" && /^Ask Strelva is not enabled\b/.test(error) ? "off" : "unavailable";
+}

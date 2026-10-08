@@ -71,6 +71,7 @@ export function changedPaths(before: unknown, after: unknown, ignorePaths?: Read
 
 /** `undefined` means the path is absent. */
 export function readPath(value: unknown, path: string): JsonValue | undefined {
+  if (path === "*") return cloneJson(value as JsonValue);
   if (!path) return value as JsonValue;
   let current: unknown = value;
   for (const part of path.split(".")) {
@@ -81,6 +82,12 @@ export function readPath(value: unknown, path: string): JsonValue | undefined {
 }
 
 export function writePath(target: JsonObject, path: string, value: JsonValue | undefined): void {
+  if (path === "*") {
+    if (!objectLike(value)) throw new Error("A restored definition must be an object.");
+    for (const key of Object.keys(target)) delete target[key];
+    Object.assign(target, cloneJson(value));
+    return;
+  }
   const parts = path.split(".");
   let current: Record<string, unknown> = target;
   for (const part of parts.slice(0, -1)) {
@@ -94,7 +101,7 @@ export function writePath(target: JsonObject, path: string, value: JsonValue | u
 }
 
 function overlaps(left: string, right: string): boolean {
-  return left === right || left.startsWith(`${right}.`) || right.startsWith(`${left}.`);
+  return left === "*" || right === "*" || left === right || left.startsWith(`${right}.`) || right.startsWith(`${left}.`);
 }
 
 export type ThreeWayConflictReason =
@@ -169,7 +176,7 @@ export function threeWayCompare(input: ThreeWayInput): ThreeWayResult {
       changes.push({ ...entry, action: "apply_upstream" });
       continue;
     }
-    const conflictPath = [path, ...touching].sort((left, right) => left.length - right.length)[0]!;
+    const conflictPath = touching.includes("*") ? "*" : [path, ...touching].sort((left, right) => left.length - right.length)[0]!;
     const upstreamAtConflict = readPath(input.upstream, conflictPath);
     const localAtConflict = readPath(input.local, conflictPath);
     if (jsonEqual(upstreamAtConflict, localAtConflict)) {

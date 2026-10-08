@@ -3,8 +3,8 @@ import { z } from "zod";
 /**
  * The business record: one shared set of facts, services, people and contacts
  * per customer workspace. These schemas mirror the SQL validators in
- * supabase/migrations/20261002120000_business_record.sql exactly; the database
- * remains the authority and rejects anything these let through.
+ * 20261002120000_business_record.sql and 20261011120000_business_policies.sql.
+ * The database remains the authority and rejects anything these let through.
  */
 
 export const BUSINESS_RECORD_SOURCES = [
@@ -69,7 +69,46 @@ export const hoursOverrideSchema = z.object({
   : item.opens !== undefined && item.closes !== undefined && item.opens < item.closes,
 "A closed day has no times; an open day opens before it closes");
 
+/** Informational business terms. These facts do not change booking enforcement,
+ * charge deposits, or grant an agent permission to make a reservation. */
+export const policyValueSchemas = {
+  cancellation: z.object({
+    summary: trimmed(1, 2000), noticeHours: z.number().int().min(0).max(8760).optional(),
+  }).strict(),
+  deposit: z.object({
+    required: z.boolean(), summary: trimmed(1, 2000).optional(),
+    amountCents: z.number().int().min(1).max(100000000).optional(),
+    currency: z.string().regex(/^[A-Z]{3}$/).optional(),
+    percent: z.number().int().min(1).max(100).optional(),
+  }).strict().refine((value) =>
+    (value.amountCents === undefined) === (value.currency === undefined)
+    && !(value.amountCents !== undefined && value.percent !== undefined)
+    && (value.required || (value.amountCents === undefined && value.percent === undefined)),
+  "A fixed deposit needs currency; use either amount or percent, and only when required"),
+  // Reuses the existing fact instead of introducing a competing service area.
+  service_area: z.array(trimmed(1, 120)).min(1).max(100),
+  payment_methods: z.array(z.enum(["cash", "credit_card", "debit_card", "bank_transfer", "check", "digital_wallet", "other"]))
+    .min(1).max(7).refine((value) => new Set(value).size === value.length, "No duplicate payment methods"),
+  age_waiver: z.object({
+    minimumAge: z.number().int().min(0).max(120).optional(), waiverRequired: z.boolean(),
+    guardianRequired: z.boolean().optional(), summary: trimmed(1, 2000).optional(),
+  }).strict(),
+  booking_rules: z.object({
+    summary: trimmed(1, 2000), reservationRequired: z.boolean().optional(),
+    advanceNoticeHours: z.number().int().min(0).max(8760).optional(),
+    maximumAdvanceDays: z.number().int().min(0).max(3650).optional(),
+  }).strict(),
+  response_time: z.object({
+    maximumHours: z.number().int().min(1).max(8760), summary: trimmed(1, 2000).optional(),
+  }).strict(),
+} as const;
+export type PolicyKey = keyof typeof policyValueSchemas;
+export const POLICY_KEYS = Object.keys(policyValueSchemas) as PolicyKey[];
+export const policyKeySchema = z.enum(POLICY_KEYS as [PolicyKey, ...PolicyKey[]]);
+export type PolicyValues = { [K in PolicyKey]: z.infer<(typeof policyValueSchemas)[K]> };
+
 export const factValueSchemas = {
+  ...policyValueSchemas,
   legal_name: trimmed(1, 160),
   display_name: trimmed(1, 160),
   phone: phoneSchema,
@@ -84,7 +123,6 @@ export const factValueSchemas = {
     postalCode: trimmed(1, 200).optional(),
     country: trimmed(1, 200).optional(),
   }).strict().refine((value) => value.formatted !== undefined || value.line1 !== undefined, "Needs a formatted address or line1"),
-  service_area: z.array(trimmed(1, 120)).min(1).max(100),
   links: z.array(z.object({
     kind: z.enum(LINK_KINDS),
     url: z.string().min(8).max(2048).regex(/^https?:\/\/\S+$/),
@@ -121,6 +159,12 @@ export const factPatchSchema = z.record(z.string(), factPatchEntry.nullable()).s
     if (!result.success) context.addIssue({ code: "custom", path: [key, "value"], message: result.error.issues[0]?.message ?? "Invalid fact" });
   }
 });
+
+export const businessPolicyPatchSchema = factPatchSchema.superRefine((facts, context) => {
+  for (const key of Object.keys(facts)) {
+    if (!(POLICY_KEYS as string[]).includes(key)) context.addIssue({ code: "custom", path: [key], message: "Not a policy fact" });
+  }
+}).refine((facts) => Object.keys(facts).length > 0, "A policy patch changes something");
 
 const uuid = z.string().uuid();
 const nullableText = (max: number) => z.string().min(1).max(max).nullable().optional();
@@ -215,6 +259,15 @@ export const businessRecordSchema = z.object({
 });
 export type BusinessRecord = z.infer<typeof businessRecordSchema>;
 
+/** The copy client sites read: only what the owner wrote or decided (#509).
+ * Values are as stored; callers parse each with factValueSchemas. */
+export const confirmedBusinessFactsSchema = z.object({
+  revision: z.number().int().min(0),
+  facts: z.partialRecord(factKeySchema, z.unknown()),
+  services: z.array(z.object({ name: z.string(), description: nullableString, priceText: nullableString }).strict()).max(40),
+}).strict();
+export type ConfirmedBusinessFacts = z.infer<typeof confirmedBusinessFactsSchema>;
+
 export const businessContactSchema = z.object({
   id: uuid, name: nullableString, email: nullableString, phone: nullableString,
   sources: z.array(contactSourceSchema).min(1), firstSeenAt: timestamp, lastSeenAt: timestamp,
@@ -263,8 +316,8 @@ export const ownerRecipientSchema = z.object({
 export type OwnerRecipient = z.infer<typeof ownerRecipientSchema>;
 
 /** The one owner-recipient rule keyed by tenant (resolve_tenant_owner_recipient):
- * the linked record's owner contact, else this tenant's owner_email, else the
- * business's earliest linked tenant's owner_email. */
+ * the business's trusted owner address when the record holds it, else this
+ * tenant's owner_email, else the address the business trusted at conversion. */
 export const tenantOwnerRecipientSchema = z.object({
   email: z.string().email(),
   name: nullableString,
@@ -315,6 +368,14 @@ export const tenantImportPayloadSchema = z.object({
    *  true, so default payloads and their digests are unchanged. Needs
    *  20261008160000_convert_separate_business; older databases refuse it. */
   separateBusiness: z.literal(true).optional(),
+  /** Required by conversion; optional in the shared plan type so historical
+   * migration fixtures can still build their original payloads. The CLI
+   * requires all three before planning a real conversion. */
+  agencyWorkspaceId: uuid.optional(),
+  agencyStaffEmails: z.array(z.string().trim().email().transform((email) => email.toLowerCase()))
+    .min(1).max(100)
+    .refine((emails) => new Set(emails).size === emails.length, "Agency staff emails must be unique.").optional(),
+  agencySelectionBasis: z.enum(["existing_contract", "owner_choice"]).optional(),
   billing: conversionBillingSchema.nullable(),
   account: conversionAccountSchema.nullable(),
   patch: z.object({
@@ -325,6 +386,45 @@ export const tenantImportPayloadSchema = z.object({
   contacts: z.array(contactInputSchema).max(1000),
 }).strict();
 export type TenantImportPayload = z.infer<typeof tenantImportPayloadSchema>;
+
+export const providerRouteReceiptSchema = z.object({
+  agencyWorkspaceId: uuid,
+  selectionBasis: z.enum(["existing_contract", "owner_choice"]),
+  source: z.enum(["tenant_conversion", "operator", "business_choice"]),
+  providerId: uuid,
+  providerCreatedByConversion: z.boolean(),
+  providerToEndId: uuid.nullable(),
+  providerToEndWorkspaceId: uuid.nullable(),
+  seatId: uuid,
+  seatGrantedByKind: z.enum(["conversion", "owner"]),
+  staff: z.array(z.object({ staffId: uuid, userId: uuid, email: z.string().email(), createdByConversion: z.boolean() }).strict()).max(100),
+  routedAt: timestamp,
+}).strict();
+export type ProviderRouteReceipt = z.infer<typeof providerRouteReceiptSchema>;
+
+export const providerRepathResultSchema = z.object({
+  tenantId: z.string(),
+  workspaceId: uuid,
+  providerRoute: z.object({
+    agencyWorkspaceId: uuid,
+    selectionBasis: z.enum(["existing_contract", "owner_choice"]),
+    source: z.enum(["tenant_conversion", "operator", "business_choice"]),
+    providerId: uuid.nullable(),
+    providerCreatedByConversion: z.boolean(),
+    providerToEndId: uuid.nullable(),
+    providerToEndWorkspaceId: uuid.nullable(),
+    seatId: uuid.nullable(),
+    seatGrantedByKind: z.enum(["conversion", "owner"]),
+    staff: z.array(z.object({ staffId: uuid.nullable(), userId: uuid, email: z.string().email(), createdByConversion: z.boolean() }).strict()).max(100),
+    routedAt: timestamp.nullable(),
+  }).strict(),
+  staffToAdd: z.array(z.string().email()).max(100),
+  legacyAdminMemberships: z.number().int().min(0),
+  legacyAdminMembershipsRemoved: z.number().int().min(0),
+  alreadyRouted: z.boolean(),
+  applied: z.boolean(),
+}).strict();
+export type ProviderRepathResult = z.infer<typeof providerRepathResultSchema>;
 
 export const conversionReceiptSchema = z.object({
   kind: z.literal("tenant_conversion"),
@@ -338,7 +438,11 @@ export const conversionReceiptSchema = z.object({
   /** Absent on receipts written before 20261008160000. */
   separateBusiness: z.boolean().optional(),
   operatorId: uuid,
-  operatorRole: z.literal("admin"),
+  /** Older receipts record the conversion-created admin membership. New
+   * conversions record `none`; the agency access is in providerRoute. */
+  operatorRole: z.enum(["admin", "none"]),
+  operatorMembershipCreated: z.literal(false).optional(),
+  providerRoute: providerRouteReceiptSchema.optional(),
   billing: conversionBillingSchema.nullable(),
   account: conversionAccountSchema.nullable(),
   sequence: z.number().int().positive(),

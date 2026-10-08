@@ -37,7 +37,6 @@ const meta = "text-[12px] leading-4 text-gray-muted";
 export function AgencyLibraryView({
   request,
   agencyWorkspaceId,
-  onWorkspace,
 }: {
   request: typeof fetch;
   agencyWorkspaceId: string;
@@ -76,25 +75,28 @@ export function AgencyLibraryView({
     <p className="text-[13px] text-warm-black">The library could not be loaded. Nothing was changed.</p>
     <Button variant="secondary" size="sm" icon={<RefreshCw size={14} />} onClick={() => setAttempt((value) => value + 1)}>Retry</Button>
   </div>;
-  if (!state.library.sources.length) return <p className="border-y border-gray-border py-5 text-[13px] leading-relaxed text-gray-muted">No sources yet. When a System is packaged as a source and adapted for a client, it appears here with each client’s Version.</p>;
+  if (!state.library.sources.length && !state.library.inquiryVersions?.length && !state.library.inquiryVersionsUnavailable) return <p className="border-y border-gray-border py-5 text-[13px] leading-relaxed text-gray-muted">No sources yet. When a System is packaged as a source and adapted for a client, it appears here with each client’s Version.</p>;
 
-  return <ul aria-label="Sources" className="space-y-12">
+  return <><ul aria-label="Sources" className="space-y-12">
     {state.library.sources.map((source) => <li key={source.systemId}>
-      <LibrarySource source={source} review={reviews[source.systemId]} onReview={() => void review(source)} onWorkspace={onWorkspace} />
+      <LibrarySource source={source} review={reviews[source.systemId]} onReview={() => void review(source)} />
     </li>)}
-  </ul>;
+  </ul><InquiryLibraryVersions library={state.library} /></>;
+}
+
+export function InquiryLibraryVersions({ library }: { library: AgencyLibrary }) {
+  return <>{library.inquiryVersionsUnavailable ? <p role="status" className="mt-6 text-sm text-gray-muted">Some inquiry Versions could not be checked. Their absence does not mean they were removed.</p> : null}
+    {library.inquiryVersions?.length ? <section className="mt-12" aria-label="Inquiry Versions"><h3 className="font-display text-base font-medium">Inquiry Versions</h3><ul className="mt-4">{library.inquiryVersions.map(version => <li key={version.id} className="border-b border-gray-border py-4"><strong className="text-sm font-medium">{version.businessName} · {version.name}</strong><p className="mt-2 text-xs text-gray-muted">Source revision {version.sourceRevision} · this Version’s release {version.currentRelease}</p><p className="mt-2 text-sm text-gray-muted">{version.improvement === "blocked" ? "A source update needs a choice about local changes." : version.improvement === "auto_applicable" ? "A source update is available for review." : "Based on the accepted source revision. Local changes keep their own release."}</p><a className="mt-3 inline-flex min-h-12 items-center text-sm underline underline-offset-2" href={`/business/${encodeURIComponent(version.tenantId)}?view=patterns`}>Open {version.businessName}’s inquiry form</a></li>)}</ul><p className="mt-4 text-xs text-gray-muted">Updates use the existing inquiry review and testing steps. Each business owner approves going live.</p></section> : null}</>;
 }
 
 function LibrarySource({
   source,
   review,
   onReview,
-  onWorkspace,
 }: {
   source: AgencyLibrarySource;
   review: ReviewState | undefined;
   onReview: () => void;
-  onWorkspace: (workspaceId: string) => void;
 }) {
   const latest = latestRevision(source);
   const ready = reviewableVersionIds(source).length;
@@ -105,7 +107,7 @@ function LibrarySource({
         <h3 id={headingId} className="text-[16px] font-medium leading-6 text-warm-black">{source.name}</h3>
         {latest ? <p className="mt-1 text-[13px] leading-5 text-gray-muted"><span className="font-mono text-[12px] text-warm-black">Revision {latest.number}{latest.label ? ` · ${latest.label}` : ""}</span>{latest.summary ? ` · ${latest.summary}` : ""}</p> : <p className="mt-1 text-[13px] text-gray-muted">No revision published yet.</p>}
         <p className="mt-2 text-[13px] font-medium text-warm-black">{libraryStatusLine(source)}</p>
-        {source.hidden ? <p className={`${meta} mt-1`}>The shared base these Versions grew from. It is not a System of its own.</p> : null}
+        {source.hidden ? <p className={`${meta} mt-1`}>The shared source System these Versions grew from. It stays hidden from the business’s everyday Systems.</p> : null}
       </div>
       {latest ? <Button size="sm" disabled={!ready} loading={review?.status === "running"} onClick={onReview} aria-describedby={`${headingId}-review-note`}>Review all</Button> : null}
       {latest ? <p id={`${headingId}-review-note`} className="sr-only">{ready ? `Prepares revision ${latest.number} for the ${ready} ready ${ready === 1 ? "Version" : "Versions"}. Each owner approves their own.` : "No Version is ready for this revision."}</p> : null}
@@ -115,19 +117,20 @@ function LibrarySource({
 
     {source.versions.length ? <ul aria-label={`Versions of ${source.name}`}>
       {source.versions.map((version) => <li key={version.versionId} className="border-b border-gray-border">
-        <VersionRow version={version} onOpen={() => onWorkspace(version.workspaceId)} />
+        <VersionRow version={version} />
       </li>)}
     </ul> : <p className="border-b border-gray-border py-4 text-[13px] text-gray-muted">No client has a Version of this yet.</p>}
   </section>;
 }
 
-function VersionRow({ version, onOpen }: { version: AgencyLibraryVersion; onOpen: () => void }) {
+function VersionRow({ version }: { version: AgencyLibraryVersion }) {
   const tone = version.state === "ready" ? "text-warm-black" : version.state === "conflicts" || version.state === "missing_accounts" ? "text-warning" : version.state === "unavailable" ? "text-critical" : "text-gray-muted";
+  const href = `/workspace?${new URLSearchParams({ view: "system", system: version.systemId, workspaceId: version.workspaceId })}`;
   return <div className="px-2 py-4">
     <div className="grid gap-x-6 gap-y-1 md:grid-cols-[minmax(0,1fr)_minmax(0,280px)] md:items-baseline">
       <span className="min-w-0">
         <strong className="text-[14px] font-medium text-warm-black">{version.clientName}</strong>
-        <span className={`${meta} ml-2`}>{version.systemName}{version.context.label !== version.clientName ? ` · ${version.context.label}` : ""}</span>
+        <a className={`${meta} ml-2 underline underline-offset-2`} href={href}>{version.systemName}{version.context.label !== version.clientName ? ` · ${version.context.label}` : ""}</a>
       </span>
       <span className={`text-[12px] leading-4 ${tone}`}>{versionStatusLabel(version)}</span>
     </div>
@@ -141,7 +144,7 @@ function VersionRow({ version, onOpen }: { version: AgencyLibraryVersion; onOpen
           </dd>
         </div>)}
       </dl>
-      <p className={`${meta} mt-3`}>The choice is made on {version.clientName}’s System. <button type="button" className="text-warm-black underline underline-offset-2" onClick={onOpen}>Open {version.clientName}</button></p>
+      <p className={`${meta} mt-3`}>The choice is made on {version.clientName}’s System. <a className="text-warm-black underline underline-offset-2" href={href}>Open {version.clientName}’s System</a></p>
     </div> : null}
   </div>;
 }

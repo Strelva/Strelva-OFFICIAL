@@ -4,7 +4,7 @@ import type { UnifiedEvent } from "@/lib/types";
 import type { SendEmailInput, SendEmailResult } from "@/platform/infra/email/send";
 import type { ServiceRequest } from "@/platform/service-requests/types";
 import type { OwnerDecision, ProposedItem } from "@/platform/needs-you/contracts";
-import { serviceRequestAdapter, tenantEventAdapter, type SourceAdapter } from "@/platform/needs-you/adapters";
+import { serviceRequestAdapter, tenantEventAdapter, tenantEventItem, type SourceAdapter } from "@/platform/needs-you/adapters";
 import { NeedsYouRefusedError, type DeliveryRow, type NeedsYouStore } from "@/platform/needs-you/repository";
 import { createNeedsYouService } from "@/platform/needs-you/service";
 import { tenantEventRevision } from "@/platform/needs-you/tenant-classify";
@@ -18,6 +18,7 @@ const DAY = 24 * 3600 * 1000;
 /** In-memory twin of the SQL functions, enough to drive the service. The SQL itself is proven by tests/needs-you-schema.sql. */
 function memoryStore(clock: { now: number }) {
   const items = new Map<string, OwnerDecision>();
+  const noticeClaims = new Map<string, "sending" | "accepted" | "suppressed" | "unknown">();
   const state = { ownerRecipient: "owner@example.test" as string | null, ownerMember: true };
   const store: NeedsYouStore = {
     async open(workspaceId, p: ProposedItem) {
@@ -66,13 +67,25 @@ function memoryStore(clock: { now: number }) {
       return [...items.values()].filter(i => i.state === "open" && i.route === "owner_decides")
         .map(i => ({ ...i, businessName: "Mooney Fixture Firm", timezone: "America/New_York", recipient: state.ownerRecipient ? { email: state.ownerRecipient, from: "tenant_fallback", tenantId: "fixture-firm" } : null }) as DeliveryRow);
     },
+    async claimInquiryNotice(row, recipient) {
+      const prior = noticeClaims.get(row.id);
+      if (prior) return { acquired: false, status: prior };
+      if (items.get(row.id)?.revisionHash !== row.revisionHash || recipient !== state.ownerRecipient) throw new Error("changed");
+      noticeClaims.set(row.id, "sending");
+      return { acquired: true, status: "sending" };
+    },
+    async finishInquiryNotice(row, status, providerMessageId, _acceptedAt, reason) {
+      if (noticeClaims.get(row.id) !== "sending") return;
+      noticeClaims.set(row.id, status);
+      await store.recordDelivery(row.workspaceId, row.id, "urgent", status === "accepted" ? "sent" : status === "suppressed" ? "suppressed" : "failed", state.ownerRecipient, providerMessageId, reason);
+    },
     async linkedTenants(ws) { return ws === OTHER_WS ? [] : [{ workspaceId: WS, tenantId: "fixture-firm" }]; },
     async ownerActor(_ws, recipient) { return state.ownerMember && recipient === state.ownerRecipient ? OWNER : null; },
     async policies() { return []; },
     async setPolicy() { throw new Error("unused"); },
     async handled() { return []; },
   };
-  return { store, items, state };
+  return { store, items, state, noticeClaims };
 }
 
 function ev(over: Partial<UnifiedEvent>): UnifiedEvent {
@@ -88,12 +101,13 @@ let sendEmail: ReturnType<typeof vi.fn<(input: SendEmailInput) => Promise<SendEm
 let requests: ServiceRequest[];
 let change: ReturnType<typeof vi.fn>;
 
-function service(adapters?: SourceAdapter[]) {
+function service(adapters?: SourceAdapter[], urgentInquiryAllowed?: (tenantId: string | null) => Promise<boolean>) {
   return createNeedsYouService({
     store: mem.store,
     appOrigin: "https://app.example.test",
     now: () => clock.now,
     sendEmail,
+    urgentInquiryAllowed,
     adapters: adapters ?? [
       tenantEventAdapter({
         linkedTenants: async (ws) => (await mem.store.linkedTenants(ws)).map(l => l.tenantId),
@@ -266,6 +280,19 @@ describe("service requests", () => {
 });
 
 describe("the chase", () => {
+  it("never sends an inquiry decision without the explicit inquiry email gates", async () => {
+    requests = [];
+    clock.now = Date.parse("2026-10-06T15:00:00Z");
+    events = new Map([["evt-1", ev({ type: "change_request", metadata: {
+      kind: "inquiry_delivery_approval", inquiryId: "lead_fixture", action: "reply",
+      subject: "Party", messageBody: "We can host 30 guests for $40 each.",
+    } })]]);
+    const svc = service();
+    await svc.list(OWNER, WS);
+    expect((await svc.chase()).ownerNotTold).toBeGreaterThan(0);
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect([...mem.items.values()][0]?.deliveries[0]).toMatchObject({ status: "suppressed", reason: "inquiry_email_gates_off" });
+  });
   it("emails an urgent ask at once, records owner not told while email is gated, and never repeats it", async () => {
     clock.now = Date.parse("2026-10-06T15:00:00Z"); // 11:00 New York: not digest time
     const svc = service();
@@ -327,13 +354,13 @@ describe("the chase", () => {
     expect([...mem.items.values()][0]!.state).toBe("withdrawn");
   });
 
-  it("records owner not told when the business has no owner recipient", async () => {
+  it("records not sent when the business has no trusted owner address", async () => {
     mem.state.ownerRecipient = null;
     clock.now = Date.parse("2026-10-06T15:00:00Z");
     const summary = await service().chase();
     expect(summary.ownerNotTold).toBe(1);
     expect(sendEmail).not.toHaveBeenCalled();
-    expect([...mem.items.values()][0]!.deliveries[0]).toMatchObject({ status: "suppressed", reason: "no_owner_recipient" });
+    expect([...mem.items.values()][0]!.deliveries[0]).toMatchObject({ status: "suppressed", reason: "no_trusted_owner_recipient" });
   });
 });
 
@@ -388,5 +415,137 @@ describe("booking calendar health alongside Needs You decisions", () => {
     const bookingCalendarHealth = vi.fn(async () => { throw new Error("health source down"); });
     const svc = createNeedsYouService({ store: mem.store, adapters: [], sendEmail, now: () => clock.now, appOrigin: "https://app.example.test", bookingCalendarHealth });
     expect(await svc.chase()).toMatchObject({failed:1,digests:0});
+  });
+});
+
+describe("strict inquiry fact and publication email gates", () => {
+  it.each(["inquiry_capability_publish","inquiry_capability_undo"])("gates %s digests and reminders before generic tenant overrides", async kind => {
+    requests=[]; events=new Map([["evt-1",ev({type:"change_request",metadata:{kind}})]]);
+    const svc=service(undefined,async()=>false); await svc.list(OWNER,WS);
+    const item=[...mem.items.values()][0]!;
+    await svc.chase(); expect(sendEmail).not.toHaveBeenCalled();
+    mem.items.set(item.id,{...item,deliveryState:"sent"}); clock.now+=4*DAY;
+    await svc.chase(); expect(sendEmail).not.toHaveBeenCalled();
+    expect([...mem.items.values()][0]?.deliveries.at(-1)).toMatchObject({status:"suppressed",reason:"inquiry_email_gates_off"});
+  });
+  it("gates inquiry fact digests and reminders while generic review notices retain their path", async () => {
+    requests=[]; events.clear();
+    const item:ProposedItem={kind:"fact.inferred",route:"owner_decides",title:"Confirm website fact",approveEffect:"Confirm",notYetEffect:"Nothing",sourceLifecycle:"inquiry_fact",sourceId:"fact",revisionHash:"a".repeat(64),urgent:false,adminMayDecide:false};
+    const adapter:SourceAdapter={lifecycle:"inquiry_fact",needsMemberActor:false,propose:async()=>({items:[item],complete:true}),currentRevision:async()=>item.revisionHash,resolve:async()=>({outcome:"done"})};
+    const original=mem.store.dueForDelivery; mem.store.dueForDelivery=async limit=>(await original(limit)).map(row=>({...row,recipient:row.recipient?{...row.recipient,tenantId:null}:null}));
+    const gates=vi.fn(async()=>false); const svc=service([adapter],gates); await svc.list(OWNER,WS); await svc.chase(); expect(sendEmail).not.toHaveBeenCalled(); expect(gates).toHaveBeenCalledWith(null);
+    const opened=[...mem.items.values()][0]!; mem.items.set(opened.id,{...opened,deliveryState:"sent"}); clock.now+=4*DAY;
+    await svc.chase(); expect(sendEmail).not.toHaveBeenCalled();
+    expect([...mem.items.values()][0]?.deliveries.at(-1)).toMatchObject({status:"suppressed",reason:"inquiry_email_gates_off"});
+    events=new Map([["evt-1",ev({})]]); mem=memoryStore(clock); await service(undefined,async()=>false).chase(); expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("durable urgent inquiry owner notices", () => {
+  it.each(["inquiry_capability_publish", "inquiry_capability_undo"])("keeps %s owner-only even when its old event was operator-routed", kind => {
+    const item = tenantEventItem(ev({ type: "change_request", metadata: { kind, reviewAudience: "operator" } }));
+    expect(item).toMatchObject({ route: "owner_decides", adminMayDecide: false });
+  });
+  it("a configured business owner cannot erase the source tenant's disabled mail override", async () => {
+    inquiryService(); const original=mem.store.dueForDelivery;
+    mem.store.dueForDelivery=async limit=>(await original(limit)).map(row=>({...row,recipient:row.recipient?{...row.recipient,tenantId:null}:null}));
+    const allowed=vi.fn(async (tenantId:string|null)=>tenantId!=="fixture-firm");
+    const closed=service(undefined,allowed);
+    expect(await deliver(closed)).toBe("suppressed"); expect(allowed).toHaveBeenCalledWith("fixture-firm"); expect(sendEmail).not.toHaveBeenCalled();
+  });
+  it("sends an allowed urgent notice with its source tenant even when the configured owner has no tenant context",async()=>{
+    const svc=inquiryService(); const original=mem.store.dueForDelivery;
+    mem.store.dueForDelivery=async limit=>(await original(limit)).map(row=>({...row,recipient:row.recipient?{...row.recipient,tenantId:null}:null}));
+    expect(await deliver(svc)).toBe("suppressed"); // The fake transport suppresses; it still exposes the send context.
+    expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({tenantId:"fixture-firm"}));
+  });
+  it("checks every inquiry origin before sending a multi-site digest", async()=>{
+    events.clear(); requests=[];
+    const proposals:ProposedItem[]=["fixture-firm","other-site"].map(tenant=>({kind:"system.go_live",route:"owner_decides",title:"Publish",approveEffect:"Publishes",notYetEffect:"Nothing",sourceLifecycle:"tenant_event",sourceId:`${tenant}:publish`,revisionHash:"a".repeat(64),urgent:false,adminMayDecide:false}));
+    const adapter:SourceAdapter={lifecycle:"tenant_event",needsMemberActor:false,propose:async()=>({items:proposals,complete:true}),currentRevision:async()=>"a".repeat(64),inquiryEmailSource:async()=>true,resolve:async()=>({outcome:"done"})};
+    const allowed=vi.fn(async(tenantId:string|null)=>tenantId!=="other-site"); const svc=service([adapter],allowed);
+    await svc.list(OWNER,WS); await svc.chase();
+    expect(allowed).toHaveBeenCalledWith("fixture-firm"); expect(allowed).toHaveBeenCalledWith("other-site"); expect(sendEmail).not.toHaveBeenCalled();
+  });
+  function inquiryService() {
+    requests = [];
+    clock.now = Date.parse("2026-10-06T15:00:00Z");
+    events = new Map([["evt-1", ev({ type: "change_request", metadata: {
+      kind: "inquiry_delivery_approval", inquiryId: "lead_fixture", action: "reply",
+      subject: "Party", messageBody: "We can host 30 guests for $40 each.",
+    } })]]);
+    return service(undefined, async () => true);
+  }
+  const deliver = (svc: ReturnType<typeof service>) => svc.deliverUrgentSource(WS, "tenant_event", "fixture-firm:evt-1");
+
+  it("serializes immediate delivery against another immediate call and the chase", async () => {
+    const svc = inquiryService();
+    let started!: () => void;
+    const inProvider = new Promise<void>(resolve => { started = resolve; });
+    let accept!: (result: SendEmailResult) => void;
+    sendEmail.mockImplementationOnce(async () => { started(); return new Promise<SendEmailResult>(resolve => { accept = resolve; }); });
+    const first = deliver(svc);
+    await inProvider;
+    expect(await deliver(svc)).toBe("failed");
+    await svc.chase();
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    accept({ status: "accepted", providerMessageId: "msg-race", acceptedAt: new Date(clock.now).toISOString() });
+    expect(await first).toBe("sent");
+    expect(await deliver(svc)).toBe("sent");
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps acceptance closed when its durable checkpoint fails past provider idempotency expiry", async () => {
+    const svc = inquiryService();
+    sendEmail.mockResolvedValue({ status: "accepted", providerMessageId: "msg-accepted", acceptedAt: new Date(clock.now).toISOString() });
+    mem.store.finishInquiryNotice = vi.fn().mockRejectedValue(new Error("database down"));
+    expect(await deliver(svc)).toBe("sent");
+    expect([...mem.noticeClaims.values()]).toEqual(["sending"]);
+    clock.now += 2 * DAY;
+    expect(await deliver(svc)).toBe("failed");
+    await svc.chase();
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("never retries an ambiguous provider response or calls it sent", async () => {
+    const svc = inquiryService();
+    sendEmail.mockRejectedValue(new Error("provider response lost"));
+    expect(await deliver(svc)).toBe("failed");
+    expect([...mem.noticeClaims.values()]).toEqual(["unknown"]);
+    clock.now += 2 * DAY;
+    expect(await deliver(svc)).toBe("failed");
+    await svc.chase();
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a bounced decision as failed without a new email", async () => {
+    const svc = inquiryService();
+    await svc.list(OWNER, WS);
+    const row = [...mem.items.values()][0]!;
+    mem.items.set(row.id, { ...row, deliveryState: "bounced" });
+    expect(await deliver(svc)).toBe("failed");
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("fails closed without the durable claim port", async () => {
+    const svc = inquiryService();
+    delete mem.store.claimInquiryNotice;
+    expect(await deliver(svc)).toBe("suppressed");
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe("booking urgent-mail overflow", () => {
+  it("keeps overflow for the morning digest instead of sending another urgent owner email", async () => {
+    vi.stubEnv("STRELVA_BOOKING_OWNER_NOTICE", "1");
+    const row = await mem.store.open(WS, { kind: "customer.commitment", route: "owner_decides", title: "Consultation request", approveEffect: "Confirm", notYetEffect: "Decline", sourceLifecycle: "booking_request", sourceId: "overflow", revisionHash: "revision", urgent: true, adminMayDecide: false });
+    const allowed = vi.fn(async () => false);
+    const svc = createNeedsYouService({ store: mem.store, adapters: [{ lifecycle: "booking_request", needsMemberActor: false, propose: async () => ({ items: [], complete: true }), currentRevision: async () => "revision", resolve: vi.fn() }],
+      sendEmail, now: () => clock.now, appOrigin: "https://app.example.test", bookingUrgentAllowed: allowed });
+    expect((await svc.notifyBookingRequest(WS, row.id)).urgent).toBe(0);
+    expect(sendEmail).not.toHaveBeenCalled(); expect(mem.items.get(row.id)?.deliveryState).toBe("not_sent");
+    const result = await svc.chase();
+    expect(result.urgent).toBe(0); expect(result.digests).toBe(1);
+    expect(sendEmail.mock.calls[0]?.[0].tags?.kind).toBe("digest");
   });
 });
