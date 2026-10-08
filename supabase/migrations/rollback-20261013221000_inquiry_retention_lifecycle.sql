@@ -3,10 +3,10 @@
 -- separately reviewed backup restoration if recovery of that data is required.
 -- Reapply the forward migration to resume the hourly cleanup.
 begin;
-drop trigger if exists inquiry_events_retention_on_tenant_delete on public.tenants;
-drop trigger if exists inquiry_events_retention_on_workspace_delete on public.workspaces;
 set local lock_timeout = '3s';
 set local statement_timeout = '120s';
+drop trigger if exists inquiry_events_retention_on_tenant_delete on public.tenants;
+drop trigger if exists inquiry_events_retention_on_workspace_delete on public.workspaces;
 
 create or replace function public.purge_expired_tenant_leads(p_limit integer) returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
