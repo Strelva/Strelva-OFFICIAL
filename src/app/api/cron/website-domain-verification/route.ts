@@ -35,7 +35,7 @@ export async function GET(request:Request){
    const listed=await websiteDocumentStore.listPublished();
    const released=await Promise.all(listed.map(row=>websiteRebuildReleaseEnabledForWorkspace(row.workspaceId,OPERATOR_VIEWER)));
    return listed.filter((row,index)=>released[index]&&row.tenantId).map(row=>({tenantId:row.tenantId!}));
-  },claims:listTenantDomainClaims,refresh:refreshDomainClaim,...(alerting?{alert:async(value:{tenantId:string;hostname:string;createdAt:string;checkedAt:string})=>{
+  },claims:listTenantDomainClaims,refresh:refreshDomainClaim,...(!coverageEnabled&&alerting?{alert:async(value:{tenantId:string;hostname:string;createdAt:string;checkedAt:string})=>{
    // Per site under `workspace`: alert only where the client's business has the rebuild on (operators count).
    if(!(await websiteRebuildReleaseEnabledForTenant(value.tenantId,OPERATOR_VIEWER).catch(()=>false)))return;
    const digest=createHash("sha256").update(`${value.tenantId}:${value.hostname}`).digest("hex").slice(0,32);
@@ -46,7 +46,7 @@ export async function GET(request:Request){
   // New owner receipts are isolated behind the rebuild release; the checker
   // reads provider state and never retries an attachment.
   const proposals=alerting?await (await import("@/products/websites/index")).reconcileWebsiteDomainRequests():null;
-  failed+=proposals?.failed??0;ok=failed===0;return NextResponse.json({...result,...(proposals?{domainRequests:proposals}:{}),...(coverageEnabled?{mode:alerting?"alerting":"report_only"}:{})},{status:failed?207:200});
+  failed+=proposals?.failed??0;ok=failed===0;return NextResponse.json({...result,...(proposals?{domainRequests:proposals}:{}),...(coverageEnabled?{mode:"report_only",alertRouting:"provider_queue"}:{})},{status:failed?207:200});
  }catch{failed=Math.max(1,failed);return NextResponse.json({error:"Website domain verification could not be confirmed."},{status:503});}
  finally{await recordHeartbeat("website-domain-verification",{ok,processed,failed,durationMs:Date.now()-started});}
 }
