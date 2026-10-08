@@ -87,7 +87,7 @@ describe("addAgencyClient", () => {
     expect(result.website).toEqual({
       connect: `/workspace/site?workspaceId=${CLIENT}&entry=connect`,
       rebuild: `/workspace/site?workspaceId=${CLIENT}&entry=rebuild`,
-      rebuildOpenToAgency: false,
+      rebuildOpenToAgency: true,
     });
     expect(result.scan.seeded).toEqual(["phone", "email"]);
   });

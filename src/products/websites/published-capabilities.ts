@@ -76,7 +76,7 @@ export async function listPublishedWebsiteCapabilityOptions(
   // Native offering bindings belong to customer workspaces. Personal and
   // agency work can still own a website draft, but cannot expose customer
   // inquiry or booking connections through this selector.
-  if (workspace.kind !== "customer" || workspace.access === "delegated_read") return { tenants: [] };
+  if (workspace.kind !== "customer" || (workspace.access === "delegated_read" || workspace.access === "provider_seat")) return { tenants: [] };
   const inspection = await new PostgresOfferingStore().inspect(actor, workspaceId);
   const bindings = activeWebsiteBindings(inspection);
   if (bindings.length === 0) return { tenants: [] };

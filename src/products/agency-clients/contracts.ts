@@ -108,13 +108,8 @@ export interface ClientSiteScan {
 export interface ClientWebsiteEntries {
   connect: string;
   rebuild: string;
-  /**
-   * Whether the agency itself can open the rebuild today. False: saved work
-   * (the rebuild's store) still resolves direct membership only, not the
-   * provider seat (src/platform/workspaces/repository.ts listWork/getWork, the
-   * TypeScript half of #245). The owner can start it once they claim the
-   * business. Flip when seat access reaches saved work.
-   */
+  /** Named staff can open website work through the verified provider seat.
+   * Individual reads and writes recheck current seat/staff/agency membership. */
   rebuildOpenToAgency: boolean;
 }
 
@@ -129,7 +124,7 @@ export interface AddAgencyClientResult {
 
 export function clientWebsiteEntries(customerWorkspaceId: string): ClientWebsiteEntries {
   const base = (entry: "connect" | "rebuild") => `/workspace/site?${new URLSearchParams({ workspaceId: customerWorkspaceId, entry })}`;
-  return { connect: base("connect"), rebuild: base("rebuild"), rebuildOpenToAgency: false };
+  return { connect: base("connect"), rebuild: base("rebuild"), rebuildOpenToAgency: true };
 }
 
 export const OWNER_CLAIM_PATH = "/workspace/claim/";
