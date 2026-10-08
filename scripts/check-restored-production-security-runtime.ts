@@ -14,7 +14,7 @@ import { verifyReleaseInventory } from "./release-safety/inventory";
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
 const fileDigest = (file: string) => digest(readFileSync(file, "utf8"));
-type Fingerprint = { count: string; hash: string; columns: string[]; retiredEmpty?: boolean };
+type Fingerprint = { count: string; hash: string; columns: string[]; retiredEmpty?: boolean; retiredSeedMetadata?: boolean };
 type Snapshot = Record<string, Fingerprint>;
 
 function main() {
@@ -38,10 +38,14 @@ function main() {
   if (!applied || new Set(applied).size !== applied.length || applied.some(value => !/^\d{14}$/.test(value))) throw new Error("Invalid hosted applied-version receipt");
   const allItems = [...manifest.baseline, ...manifest.batches.flat(), ...manifest.proposed.flatMap(batch => batch.items)];
   // This exact deployment order captures the original scope before any new
-  // entrypoint can enter it. Remaining corrections retain manifest order.
+  // entrypoint can enter it. The combined-release supplements follow the
+  // complete previously rehearsed security packet, matching hosted sequence.
   const prerequisites = [...manifest.baseline, ...manifest.batches.flat(), ...manifest.proposed.filter(batch => ["H", "7A"].includes(String(batch.batch))).flatMap(batch => batch.items)];
   const capturedNames = new Set([...prerequisites, ...originalScope.items].map(item => item.file));
-  const orderedItems = [...prerequisites, ...originalScope.items, ...allItems.filter(item => !capturedNames.has(item.file))];
+  const supplementalNames = ["20261015111000_website_owner_agency_publish.sql", "20261019100000_actor_rpc_service_boundary.sql"];
+  const supplements = supplementalNames.flatMap(file => allItems.filter(item => item.file === file));
+  if (supplements.length !== 0 && supplements.length !== supplementalNames.length) throw new Error("Incomplete combined-release supplemental packet");
+  const orderedItems = [...prerequisites, ...originalScope.items, ...allItems.filter(item => !capturedNames.has(item.file) && !supplementalNames.includes(item.file)), ...supplements];
   if (orderedItems.length !== allItems.length || new Set(orderedItems.map(item => item.file)).size !== allItems.length) throw new Error("Original-scope order inventory mismatch");
   for (const item of originalScope.items) if (!allItems.some(current => current.file === item.file && current.sha256 === item.sha256)) throw new Error("Original scope source differs from candidate");
   const versions = new Set(allItems.map(item => item.file.slice(0, 14)));
@@ -56,18 +60,18 @@ function main() {
   mkdirSync(socket, { mode: 0o700 });
   const dataDirectory = join(out, "cluster"), log = join(out, "postgres.log");
   const receipt: Record<string, unknown> = { scope: "Local PostgreSQL PUBLIC schema/data, actual owners/ACLs; managed Auth/storage schema and provider effects not qualified", passed: false, appliedVersions: applied.length,
-    orderBasis: "prerequisites baseline+batches+H+7A; original85; remaining manifest order including six security tail files", candidateForwards: allItems.length, pending: pending.map(item => ({ file: item.file, sha256: item.sha256 })), dumps: ["schema.sql", "data.sql", "roles.sql"].map(file => ({ file, sha256: fileDigest(join(dump, file)) })), completedMigrations: [], probes: [] };
+    orderBasis: "prerequisites baseline+batches+H+7A; original85; remaining manifest order including six security tail files; combined website consent and actor RPC supplements last", candidateForwards: allItems.length, pending: pending.map(item => ({ file: item.file, sha256: item.sha256 })), dumps: ["schema.sql", "data.sql", "roles.sql"].map(file => ({ file, sha256: fileDigest(join(dump, file)) })), completedMigrations: [], probes: [] };
   let started = false, phase = "initdb";
-  function query(text: string): string {
-    requireLocal(target);
-    return command("psql", ["--dbname=" + target, "--username=postgres", "-X", "-qAt", "-v", "ON_ERROR_STOP=1", "-c", text]);
+  function query(text: string, url = target): string {
+    requireLocal(url);
+    return command("psql", ["--dbname=" + url, "--username=postgres", "-X", "-qAt", "-v", "ON_ERROR_STOP=1", "-c", text]);
   }
-  function runFile(file: string, singleTransaction = false) {
-    requireLocal(target);
-    command("psql", ["--dbname=" + target, "--username=postgres", "-X", "-qAt", "-v", "ON_ERROR_STOP=1", ...(singleTransaction ? ["--single-transaction"] : []), "-f", file]);
+  function runFile(file: string, singleTransaction = false, url = target) {
+    requireLocal(url);
+    command("psql", ["--dbname=" + url, "--username=postgres", "-X", "-qAt", "-v", "ON_ERROR_STOP=1", ...(singleTransaction ? ["--single-transaction"] : []), "-f", file]);
   }
   const runtimeHelpers = readFileSync(join(root, "scripts/release-safety/runtime-catalog.sql"), "utf8");
-  function runtimeFingerprint() { return query(runtimeHelpers + "\nselect pg_temp.batch8_runtime_fingerprint();").split("\n").at(-1)!; }
+  function runtimeFingerprint(url = target) { return query(runtimeHelpers + "\nselect pg_temp.batch8_runtime_fingerprint();", url).split("\n").at(-1)!; }
   function recovery(file: string) {
     const fingerprint = runtimeFingerprint();
     command("psql", ["--dbname=" + target, "--username=postgres", "-X", "-qAt", "-v", "ON_ERROR_STOP=1", "-v", "expected_runtime_fingerprint=" + fingerprint, "-f", join(root, "scripts/release-safety", file)]);
@@ -87,7 +91,7 @@ function main() {
         const declaredSeedRetirement = table.name === "super_admin_bootstrap" && original.count === "2"
           && pending.some(item => item.file === "20261015110000_super_admin_grants.sql");
         if (original.count !== "0" && !declaredSeedRetirement) throw new Error("Populated original public relation removed by upgrade");
-        result[table.name] = { ...original, retiredEmpty: original.count === "0" };
+        result[table.name] = { ...original, retiredEmpty: original.count === "0", retiredSeedMetadata: declaredSeedRetirement };
         continue;
       }
       const projected = table.columns.map(identifier).join(",");
@@ -165,7 +169,7 @@ function main() {
       if (item.file === lastOriginal) {
         phase = "capture original85 RPC scope";
         receipt.recoveryScopeCatalogHash = recovery("capture-batch8-runtime-scope.sql");
-        receipt.originalScope = JSON.parse(query(`select jsonb_build_object('signatures',count(*),'serviceExecutable',(select count(*) from release_runtime_recovery.batch8_scope s join pg_proc p on p.oid=s.function_oid where has_function_privilege('service_role',p.oid,'execute')),'signatureHash',encode(sha256(convert_to(string_agg(signature,E'\\n' order by signature),'UTF8')),'hex')) from release_runtime_recovery.batch8_scope;`));
+        receipt.originalScope = JSON.parse(query(`select jsonb_build_object('signatures',count(*),'serviceExecutable',(select count(*) from release_runtime_recovery.batch8_scope s join pg_proc p on p.oid=s.function_oid where has_function_privilege('service_role',p.oid,'execute')),'signatureHash',encode(sha256(convert_to(string_agg(signature,E'\\n' order by signature collate \"C\"),'UTF8')),'hex')) from release_runtime_recovery.batch8_scope;`));
       }
     }
     phase = "existing public rows after upgrade";
@@ -175,7 +179,8 @@ function main() {
     receipt.retiredEmptyOriginalTables = Object.keys(afterRows).filter(name => afterRows[name]?.retiredEmpty);
     receipt.declaredRetiredSeedMetadata = { table: "super_admin_bootstrap", sourceRows: beforeRows.super_admin_bootstrap?.count,
       sourceHash: beforeRows.super_admin_bootstrap?.hash, reason: "151100 exact seed-set guard retires unsafe allowlist; original seeds remain in verified private dump" };
-    receipt.existingPublicRowsPreserved = true;
+    receipt.originalCustomerProjectionTablesPreserved = Object.keys(afterRows).filter(name => !afterRows[name]?.retiredSeedMetadata && !afterRows[name]?.retiredEmpty).length;
+    receipt.existingCustomerPublicRowsPreserved = true;
     receipt.afterDataHash = digest(JSON.stringify(afterRows));
     const finalCatalog = JSON.parse(query(readFileSync(join(root, "scripts/release-safety/catalog.sql"), "utf8"))) as Catalog;
     writeFileSync(join(out, "public-catalog-after.json"), JSON.stringify(finalCatalog) + "\n", { mode: 0o600 });
@@ -192,7 +197,8 @@ function main() {
     phase = "legacy content/read/write/auth/billing";
     runFile(legacyFile);
     (receipt.probes as string[]).push("legacy-behavior.sql");
-    const probes = ["owner-decision-effects-schema.sql", "inquiry-lead-retention.sql", "inquiry-retention-lifecycle.sql"];
+    const probes = ["owner-decision-effects-schema.sql", "inquiry-lead-retention.sql", "inquiry-retention-lifecycle.sql", ...(supplements.length ? ["website-owner-agency-publish-schema.sql", "actor-rpc-service-boundary-schema.sql", "owner-link-provider-seat-refusal-schema.sql"] : [])];
+    receipt.probeSources = probes.map(file => ({ file, sha256: fileDigest(join(root,"tests",file)) }));
     for (const file of probes) {
       phase = file;
       runFile(join(root, "tests", file));
@@ -202,6 +208,29 @@ function main() {
     // it in a local clone so restored customer data remains an exact source.
     phase = "current durable compensation repository in isolated clone";
     query("create database restored_contract template postgres;");
+    if (supplements.length) {
+      const clone = new URL(target); clone.pathname = "/restored_contract";
+      const cloneTarget = clone.href;
+      const rollback = join(root,"supabase/migrations/rollback-20261019100000_actor_rpc_service_boundary.sql");
+      const beforeRefusal = runtimeFingerprint();
+      let rejected = false;
+      try { runFile(rollback); } catch (error) {
+        const privateLog = error instanceof Error ? error.message.match(/private diagnostics: (.+)$/)?.[1] : undefined;
+        rejected = Boolean(privateLog && readFileSync(privateLog,"utf8").includes("actor_rpc_rollback_requires_authorized_disabled_callers"));
+      }
+      if (!rejected || runtimeFingerprint() !== beforeRefusal) throw new Error("Actor RPC rollback did not refuse unauthorized restoration without public catalog changes");
+      const securedCloneHash = runtimeFingerprint(cloneTarget);
+      const authorized = join(out,"authorized-local-actor-rpc-recovery.sql");
+      writeFileSync(authorized,"set strelva.actor_rpc_recovery_authorized='on';\nset strelva.actor_rpc_callers_disabled='on';\n" + readFileSync(rollback,"utf8"), { mode: 0o600 });
+      // Local clone only: exact observed ACL restoration, then immediate repair.
+      runFile(authorized,false,cloneTarget);
+      const saved = JSON.parse(query("select jsonb_agg(jsonb_build_object('signature',signature,'acl',before_acl::text) order by signature collate \"C\") from release_rollback_baseline.actor_rpc_service_boundary;"));
+      const restored = JSON.parse(query("select jsonb_agg(jsonb_build_object('signature','public.'||p.oid::regprocedure::text,'acl',p.proacl::text) order by p.oid::regprocedure::text collate \"C\") from pg_proc p where p.oid in ('public.workspace_operation(text,uuid,uuid,uuid,text,text,jsonb,uuid,jsonb,text,text)'::regprocedure,'public.grant_agency_application_draft_edit(uuid,text,uuid,uuid)'::regprocedure,'public.update_application_candidate(uuid,uuid,uuid,text,integer,jsonb)'::regprocedure);",cloneTarget));
+      if (digest(JSON.stringify(saved)) !== digest(JSON.stringify(restored))) throw new Error("Actor RPC authorized local clone rollback ACL mismatch");
+      runFile(join(root,"supabase/migrations/20261019100000_actor_rpc_service_boundary.sql"),false,cloneTarget);
+      if (runtimeFingerprint(cloneTarget) !== securedCloneHash) throw new Error("Actor RPC local clone reapply catalog drift");
+      receipt.actorRpcCompanion = { unauthorizedRefused: true, restoredSourceCatalogUnchanged: true, localCloneExactObservedAclRestoration: true, localCloneRepairExactCatalogRestoration: true };
+    }
     const runner = spawnSync("pnpm", ["exec", "vitest", "run", "--maxWorkers=2", "--testTimeout=30000", "--hookTimeout=30000", "src/__tests__/make-real-activation-repository.test.ts"], { cwd: root, env: { ...pgEnv(), PATH: "/opt/homebrew/opt/postgresql@18/bin:" + process.env.PATH, STRELVA_MAKE_REAL_PSQL: `--host=${socket} --port=${port} --username=postgres --dbname=restored_contract` }, encoding: "utf8", timeout: 120_000 });
     writeFileSync(join(out,"compensation-runner.log"), (runner.stdout ?? "") + (runner.stderr ?? ""), { mode: 0o600 });
     if (runner.error || runner.status !== 0) throw new Error("Current compensation repository failed; inspect private runner log");
@@ -226,6 +255,8 @@ function main() {
     assertSourceRows(snapshots(beforeRows), beforeRows);
     const migrationFiles = readdirSync(join(root, "supabase/migrations")).filter(file => /^\d{14}_.+\.sql$/.test(file)).sort();
     if (migrationFiles.length !== allItems.length || pending.some(item => fileDigest(join(root, "supabase/migrations", item.file)) !== item.sha256)) throw new Error("Candidate inventory drift after proof");
+    if ((receipt.probeSources as Array<{ file: string; sha256: string }>).some(item => fileDigest(join(root,"tests",item.file)) !== item.sha256)) throw new Error("SQL probe source drift during restored proof");
+    receipt.harnessSha256 = fileDigest(fileURLToPath(import.meta.url));
     receipt.passed = true;
     console.log(`Actual PUBLIC dump upgrade passed: ${pending.length} pending migrations; ${probes.length} SQL probes; existing source-row hashes preserved.`);
   } catch (error) {
