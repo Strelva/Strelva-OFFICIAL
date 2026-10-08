@@ -107,6 +107,25 @@ describe("report and analytics state copy", () => {
     expect(tenants).not.toHaveBeenCalled();
   });
 
+  const malformedBracketTargets = [
+    "http://[::\n1]:8079", "http://[::\t1]:8079", "http://[::\r1]:8079",
+    "http://[:: 1]:8079", "http://[::\u00001]:8079", "http://[::\u007f1]:8079",
+    "http://[user@::1]:8079", "http://user:secret@[::1]:8079",
+  ];
+  it.each(malformedBracketTargets.flatMap((target) => [
+    { field: "databaseUrl" as const, name: "SUPABASE_URL", target },
+    { field: "redisUrl" as const, name: "UPSTASH_REDIS_REST_URL", target },
+  ]))("rejects bracketed whitespace/control/userinfo before dependencies: $field $target", async ({ field, name, target }) => {
+    const calls = { tenants: vi.fn(async () => []), redis: vi.fn(), postgres: vi.fn(), log: vi.fn() };
+    const d = deps(calls);
+    await expect(runReportAnalyticsCopy({ ...LOCAL, [field]: target, apply: false, jacobsYes: true }, d.value))
+      .rejects.toThrow(`${name} must be an HTTP(S) base URL`);
+    for (const call of Object.values(calls)) expect(call).not.toHaveBeenCalled();
+    expect(d.setCadence).not.toHaveBeenCalled();
+    expect(d.markSent).not.toHaveBeenCalled();
+    expect(d.writeConfig).not.toHaveBeenCalled();
+  });
+
   it.each(["databaseUrl", "redisUrl"] as const)("requires %s before reading", async (missing) => {
     const tenants = vi.fn(async () => []);
     await expect(runReportAnalyticsCopy({ ...LOCAL, [missing]: undefined, apply: false, jacobsYes: false }, deps({ tenants }).value))

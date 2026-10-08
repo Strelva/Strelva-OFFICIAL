@@ -81,8 +81,11 @@ export function parseCopyArgs(argv: string[]): CopyOptions & { json: boolean } {
  * into loopback, but those are not an explicitly selected local target. */
 function targetIsLocal(value: string | undefined, name: string): boolean {
   if (!value) throw new Error(`Refusing: ${name} is not configured.`);
-  const base = /^https?:\/\/(\[[^\]]+\]|[^:/?#@\\\s]+)(?::[0-9]+)?\/?$/i.exec(value);
   const invalid = () => new Error(`Refusing: ${name} must be an HTTP(S) base URL without credentials, path, query or fragment.`);
+  // WHATWG URL strips some embedded controls, including inside IPv6 brackets.
+  // Authorization must never turn such a malformed input into a usable target.
+  if (/[\s\u0000-\u001f\u007f-\u009f]/.test(value)) throw invalid();
+  const base = /^https?:\/\/(\[[0-9a-f:.]+\]|[^:/?#@\\\s]+)(?::[0-9]+)?\/?$/i.exec(value);
   if (!base) throw invalid();
   try {
     const url = new URL(value);
