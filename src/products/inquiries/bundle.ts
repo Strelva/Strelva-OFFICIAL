@@ -1,10 +1,11 @@
 import { inquiryPackageDefinitionSchema } from "@/platform/system-versions/bundle-contracts";
+import {stateForReceive} from "./receive";
 import { InquiryEngine } from "./inquiry-engine";
 import { patternShape } from "./inquiry-pattern-updates";
 import type { InquiryCapabilityDefinition, InquiryEngineState, InquiryFieldDefinition } from "./contracts";
 export function prepareBundleInquiry(raw:unknown,input:{sourceBusinessId:string;sourceId:string;businessId:string;actorId:string;state:InquiryEngineState|null;now:string}) {
  const definition=bundleInquiryDefinition(raw,input);
- const engine=new InquiryEngine({businessId:input.businessId,...(input.state?{state:input.state}:{}),now:()=>input.now,idFactory:()=>crypto.randomUUID()});
+ const engine=new InquiryEngine({businessId:input.businessId,...(input.state?{state:stateForReceive({businessId:input.businessId,state:input.state})}:{}),now:()=>input.now,idFactory:()=>crypto.randomUUID()});
  const work=engine.copyPattern(definition.id,{sourceCapabilityId:definition.id,sourceDefinition:definition,sourceBusinessId:input.sourceBusinessId,targetBusinessId:input.businessId,targetActorId:input.actorId,destination:"your team",emailConnection:{status:"missing",consent:"missing",lastCheckedAt:null}});
  return {state:engine.snapshot(),work};
 }

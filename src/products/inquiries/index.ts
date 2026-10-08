@@ -88,3 +88,7 @@ export { rehearseBundleInquiry } from "./bundle";
 export {prepareBundleInquiryUpdate} from "./bundle-lifecycle";
 
 export {InquiryEngine} from "./inquiry-engine";
+
+export {durableState} from "./repository";
+
+export {stateForReceive} from "./receive";

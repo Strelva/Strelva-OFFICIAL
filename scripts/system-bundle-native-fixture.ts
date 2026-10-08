@@ -1,4 +1,4 @@
-import {InquiryEngine} from "../src/products/inquiries";
+import {InquiryEngine,durableState} from "../src/products/inquiries";
 import {siteDocumentHash,siteDocumentSchema} from "../src/products/websites";
 import { writeFileSync } from "node:fs";
 import { createApplicationDraft, rehearseApplicationPackage } from "../src/products/applications/server";
@@ -38,7 +38,8 @@ async function writeNativeFixture(){
  const version=publisher.getWork(first.work.id).draft!.version;
  publisher.approvePublish(first.work.id,{actorId:owner,version});await publisher.publish(first.work.id,{actorId:owner,explicit:true,version});
  publisher.recordPublishVerification(first.work.id,{actorId:owner,version,verified:true,evidence:["Fictional native provider read back the exact domain-engine publication."]});
- const publishedState=publisher.snapshot(),publishedWork=publisher.getWork(first.work.id);
+ publisher.receiveInquiry({capabilityId:first.work.capabilityId,expectedCapabilityVersion:version,fields:{name:"Existing target buyer",email:"target-buyer@example.test"},inquiryId:"native_existing_customer_record"});
+ const publishedState=durableState(publisher.snapshot(),business),publishedWork=publisher.getWork(first.work.id);
  writeFileSync(process.argv[2]!,`create temp table bundle_native_input(value jsonb); insert into bundle_native_input values(${quote({...data,publishedState,publishedWork})});\n`);
 }
 void writeNativeFixture();

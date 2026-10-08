@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createApplicationDraft, rehearseApplicationPackage } from "@/products/applications/server";
-import { prepareBundleInquiry, rehearseBundleInquiry } from "@/products/inquiries";
+import { prepareBundleInquiry, rehearseBundleInquiry,durableState } from "@/products/inquiries";
 import { prepareBundleWebsiteSection, rehearseBundleWebsiteSection } from "@/products/websites";
 import { bundleInstallReceiptSchema, bundleTargetChoicesSchema, bundleTargetsSchema, type BundleTargets } from "@/platform/system-versions/bundle-contracts";
 import type { SystemRevisionRef, JsonObject } from "@/platform/system-versions";
@@ -32,7 +32,7 @@ export async function installSystemBundle(actor:WorkspaceActor,input:{workspaceI
    parts.push({key,workId,...prepareBundleWebsiteSection(shape,snapshot.website.payload,{actorId:actor.userId,name,pagePath:targets.websitePagePath??"/",now,workId})});
   }else throw new VersionValidationError("This component has no native bundle draft adapter.");
  }
- const committed=await db.rpc("install_system_bundle",{p_workspace_id:input.workspaceId,p_user_id:actor.userId,p_verified_email:actor.verifiedEmail,p_source_revision_id:input.source.revisionId,p_source_system_id:input.source.systemId,p_source_workspace_id:input.source.businessId,p_source_number:input.source.number,p_command_id:input.commandId,p_name:input.name,p_targets:targets,p_expected_inquiry_revision:snapshot.inquiry?.revision??null,p_expected_website_work_revision:snapshot.website?.workRevision??null,p_expected_website_document_revision:snapshot.website?.documentRevision??null,p_parts:parts,p_inquiry_state:state??null});
+ const committed=await db.rpc("install_system_bundle",{p_workspace_id:input.workspaceId,p_user_id:actor.userId,p_verified_email:actor.verifiedEmail,p_source_revision_id:input.source.revisionId,p_source_system_id:input.source.systemId,p_source_workspace_id:input.source.businessId,p_source_number:input.source.number,p_command_id:input.commandId,p_name:input.name,p_targets:targets,p_expected_inquiry_revision:snapshot.inquiry?.revision??null,p_expected_website_work_revision:snapshot.website?.workRevision??null,p_expected_website_document_revision:snapshot.website?.documentRevision??null,p_parts:parts,p_inquiry_state:state?durableState(state,input.workspaceId):null});
  if(committed.error)mapVersionsError(committed.error,"No bundle drafts were committed. Reload the source and this business's target resources.");
  const receipt=bundleInstallReceiptSchema.parse(committed.data);
  if(receipt.workspaceId!==input.workspaceId||receipt.sourceRevisionId!==input.source.revisionId)throw new VersionValidationError("Bundle returned for another business or source revision.");

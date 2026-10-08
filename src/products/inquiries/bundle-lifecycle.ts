@@ -1,3 +1,4 @@
+import {stateForReceive} from "./receive";
 import {InquiryEngine} from "./inquiry-engine";
 import {bundleInquiryDefinition} from "./bundle";
 import {proposePatternUpdate,resolvePatternUpdate,stagePatternUpdate,stagePatternDefinition,type PatternInstallation,type PatternConflictResolution} from "./inquiry-pattern-updates";
@@ -5,7 +6,7 @@ import type {InquiryEngineState} from "./contracts";
 /** The destination's real installation owns local routing, accounts and records.
  * Qualified shape only enters the ordinary explicit-conflict draft workflow. */
 export function prepareBundleInquiryUpdate(raw:unknown,input:{state:InquiryEngineState;businessId:string;capabilityId:string;sourceBusinessId:string;sourceVersion:number;actorId:string;now:string;resolutions?:PatternConflictResolution[]}){
- const engine=new InquiryEngine({businessId:input.businessId,state:input.state,now:()=>input.now,idFactory:()=>crypto.randomUUID()});
+ const engine=new InquiryEngine({businessId:input.businessId,state:stateForReceive({businessId:input.businessId,state:input.state}),now:()=>input.now,idFactory:()=>crypto.randomUUID()});
  const installation=(input.state as InquiryEngineState & {patternInstallations?:PatternInstallation[]}).patternInstallations?.find(i=>i.capabilityId===input.capabilityId);
  if(!installation)throw new Error("The native pattern installation is unavailable.");
  const capability=input.state.capabilities.find(c=>c.id===input.capabilityId),current=input.state.requests.find(r=>r.id===capability?.activeRequestId);

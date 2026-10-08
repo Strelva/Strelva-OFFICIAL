@@ -98,7 +98,7 @@ function existingEvidence(snapshot: InquiryWorkspaceSnapshot, inquiryId: string)
  * authoritative for customer data. Rebuild non-PII timeline stubs only so the
  * engine can validate causal references while appending a new record receipt.
  */
-export function stateForReceive(snapshot: InquiryWorkspaceSnapshot): InquiryEngineState {
+export function stateForReceive(snapshot: {businessId:string;state:InquiryEngineState} & Partial<Omit<InquiryWorkspaceSnapshot,"businessId"|"state">>): InquiryEngineState {
   const state = clone(snapshot.state) as InquiryEngineState;
   const known = new Set(state.inquiries.map((item) => item.id));
   const byInquiry = new Map<string, typeof state.timeline>();

@@ -1,5 +1,5 @@
 import {z} from "zod";
-import {prepareBundleInquiryUpdate} from "@/products/inquiries";
+import {prepareBundleInquiryUpdate,durableState} from "@/products/inquiries";
 import {prepareBundleWebsiteUpdate} from "@/products/websites";
 import type {InquiryEngineState} from "@/products/inquiries/contracts";
 import {applyOverrides,VersionValidationError,type VersionLineage} from "@/platform/system-versions";
@@ -19,7 +19,7 @@ export async function prepareNativeBundleVersion(actor:WorkspaceActor,lineage:Ve
  if(!result.work)return nativeVersionConflictSchema.parse({kind:"native_conflict",workspaceId:lineage.version.businessId,versionId:lineage.id,rowRevision:lineage.rowRevision,nativeKind:"inquiry_pattern",conflicts:result.conflicts.map(c=>({path:c.path,local:c.localValue,source:c.sourceAfter}))});
  const draft=result.work.draft;if(!draft)throw new VersionValidationError("The native inquiry draft is unavailable.");
  const effectiveDefinition={kind:"inquiry_pattern",name:draft.name,title:draft.form.title,intro:draft.form.intro,fields:draft.form.fields.map(({id,label,kind,required})=>({id,label,kind,required})),routingWithinMinutes:draft.routing?.withinMinutes};
- artifact={...result,effectiveDefinition};
+ artifact={...result,state:durableState(result.state,lineage.version.businessId),effectiveDefinition};
  }else{
  const result=prepareBundleWebsiteUpdate(working,data.payload,{actorId:actor.userId,now,sectionId:z.string().parse(data.sectionId),pagePath:z.string().parse(data.pagePath),workId:z.string().uuid().parse(data.workId),...(data.previousDefinition?{expectedDefinition:data.previousDefinition}:{}),resolution:resolutions?.find(r=>r.path==="website_section")?.choice});
  if(result.conflict)return nativeVersionConflictSchema.parse({kind:"native_conflict",workspaceId:lineage.version.businessId,versionId:lineage.id,rowRevision:lineage.rowRevision,nativeKind:"website_section",conflicts:[result.conflict]});artifact={...result,effectiveDefinition:result.effectiveDefinition};
