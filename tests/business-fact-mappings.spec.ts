@@ -38,7 +38,7 @@ test("mobile conflict, empty, permission and loading preserve truthful states", 
   await page.goto("/preview/strelva/publishing?kind=record&state=conflict");
   await page.getByLabel("Service price 1", { exact: true }).fill("$95");
   await page.getByRole("button", { name: "Save hours, services and website", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("Your edits are kept");
+  await expect(page.getByRole("region", { name: "Hours, services and website from your record", exact: true }).getByRole("alert")).toContainText("Your edits are kept");
   await expect(page.getByLabel("Service price 1", { exact: true })).toHaveValue("$95");
   await page.screenshot({ path: testInfo.outputPath("business-facts-conflict-mobile.png"), fullPage: true });
   await page.goto("/preview/strelva/publishing?kind=record&state=read_only");
@@ -54,7 +54,7 @@ test("mobile conflict, empty, permission and loading preserve truthful states", 
   await page.getByLabel("Website to configure", { exact: true }).selectOption("fictional-firm");
   await page.getByLabel("Business name", { exact: true }).check();
   await page.getByRole("button", { name: "Save website fact settings", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("Your choices are kept");
+  await expect(page.getByRole("alert").filter({ hasText: "Your choices are kept" })).toHaveCount(1);
   await expect(page.getByLabel("Business name", { exact: true })).toBeChecked();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

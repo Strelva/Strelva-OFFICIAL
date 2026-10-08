@@ -367,6 +367,10 @@ rollback_readers() {
 }
 psql "${psql_args[@]}" --file="$repo_root/tests/owner-recipient-trust-schema.sql"
 catalog_fingerprint >"$cluster_root/catalog-full.txt"
+# #457 extends the confirmation serializer that #509 also owns. Unwind this
+# unused successor before historical reader recovery, then replay its forward
+# after #509. The final full-catalog comparison still checks every definition.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261019113000_native_website_fact_mappings.sql"
 # The newest gate patches the owner-trust claimant. Undo it first and reapply
 # after those reader/trust rehearsals, preserving #560's actual effect gate.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261017120000_owner_decision_operator_refusal.sql"
@@ -403,6 +407,7 @@ for (( index=${#public_facts_rollbacks[@]}-1; index>=0; index-- )); do
 done
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261014112000_acting_provider_gates.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261017120000_owner_decision_operator_refusal.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261019113000_native_website_fact_mappings.sql"
 catalog_fingerprint >"$cluster_root/catalog-full-reapplied.txt"
 if ! diff -u "$cluster_root/catalog-full.txt" "$cluster_root/catalog-full-reapplied.txt"; then
   printf 'Reapplying #509, the public-facts and booking readers did not restore the full catalog.\n' >&2
