@@ -41,7 +41,11 @@ export async function refreshConnectedAccount(workspaceId:string,accountId:strin
 }
 export async function onboardConnectedAccount(actor:WorkspaceActor,input:{workspaceId:string;configurations:Array<"merchant"|"recipient"|"customer">;origin:string},deps:ConnectDependencies={}) {
  if (!connectEnabled()) throw new WorkspaceStoreError("Connect is not enabled.");
- const profile=connectProfile(); const db=deps.db===undefined?connectDb():deps.db;
+ const profile=connectProfile();
+ // Onboarding requests the full Dashboard, which Stripe does not support when
+ // the platform is responsible for connected-account losses. Check before reserve.
+ if (profile.lossesCollector==="application") throw new WorkspaceStoreError("The full Stripe Dashboard requires Stripe responsibility for connected-account losses.");
+ const db=deps.db===undefined?connectDb():deps.db;
  const reserved=await manageConnectedAccount(actor,input.workspaceId,"reserve",db);
  if (!reserved || reserved.state==="disconnected") throw new WorkspaceStoreError("The account is disconnected.");
  const stripe=deps.stripe??stripeClient();
