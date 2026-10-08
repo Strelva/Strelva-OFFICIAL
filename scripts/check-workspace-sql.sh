@@ -955,3 +955,7 @@ bash "$repo_root/scripts/check-inquiry-workspace-sql.sh"
 
 # Agency-sourced public checks: real RLS, quota races and rollback stop points.
 bash "$repo_root/scripts/check-agency-prospects-sql.sh"
+
+# Agencies add clients (#259): seat not membership, isolation, limits, owner
+# claim link, and the rollback stop point, on the full ordered schema.
+bash "$repo_root/scripts/check-agency-add-client-sql.sh"

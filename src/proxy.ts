@@ -96,6 +96,9 @@ const PUBLIC_PREFIXES = [
   // access still require the exact verified Supabase identity.
   "/workspace/invitations/accept/",
   "/api/workspace-invitations/accept/",
+  // An agency's owner claim link (#259): same rule, the link alone grants nothing.
+  "/workspace/claim/",
+  "/api/workspace-claims/",
   "/access-request",
   "/ai-visibility",
   "/onboard",

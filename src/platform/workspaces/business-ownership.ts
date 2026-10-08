@@ -218,7 +218,7 @@ export const providedClientSchema = z.object({
   role: z.enum(["owner", "admin", "member"]),
   /** How the actor opens it: a direct membership, or the agency's provider seat with the actor staffed on it. */
   access: z.enum(["membership", "provider_seat"]).optional(),
-  source: z.enum(["tenant_conversion", "operator", "business_choice"]),
+  source: z.enum(["tenant_conversion", "operator", "business_choice", "agency_added"]),
   startedAt: z.string(),
 });
 export type ProvidedClient = z.infer<typeof providedClientSchema>;
