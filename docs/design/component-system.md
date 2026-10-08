@@ -794,6 +794,11 @@ after an actual domain is attached to that path publication.
 Preview inquiry and booking controls are disabled and submit nothing. Published
 connections reuse the starter's native inquiry and calendar forms, pinning the
 approved capability version; missing connections display their actual state.
+The hosted fallback `SiteLeadForm` keeps server-rendered controls disabled until
+its client submit handler is ready. It shows a loading state meanwhile and uses
+POST as its native method so visitor details never default to a GET query.
+Pending writes disable the fields; errors preserve the visitor's input and a
+confirmed write resets it. This does not supply a missing published capability.
 V1 section rendering remains the fallback when no v2 published document exists.
 Per-tenant metadata, sitemap and robots derive from trusted configuration;
 private previews are noindexed. The static export includes the immutable
