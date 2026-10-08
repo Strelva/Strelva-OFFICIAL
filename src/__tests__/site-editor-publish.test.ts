@@ -1,4 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ActorContext } from "@/platform/infra/auth";
+
+const OWNER_ACTOR = vi.hoisted(() => ({
+  userId: "ca495000-0000-4000-8000-000000000001",
+  email: "owner@example.com",
+  name: null,
+  type: "user",
+  isSuperAdmin: false,
+  isImpersonating: false,
+} satisfies ActorContext));
 
 const mockHeadersGet = vi.fn((key: string) => {
   if (key === "x-tenant") return "test-tenant";
@@ -51,7 +61,7 @@ vi.mock("@/platform/infra/auth", () => ({
   requireTenantPermission: (...args: unknown[]) => mockRequireTenantPermission(...args),
   isSuperAdmin: () => mockIsSuperAdmin(),
   getActorContext: vi.fn(() =>
-    Promise.resolve({ isImpersonating: false, email: "owner@example.com" })
+    Promise.resolve(OWNER_ACTOR)
   ),
 }));
 
@@ -192,7 +202,7 @@ describe("site editor publish routes", () => {
       publishedPageConfig: true,
       liveSite: { status: "revalidated" },
     });
-    expect(mockSetContent).toHaveBeenCalledWith("hero", HERO_DRAFT, "test-tenant");
+    expect(mockSetContent).toHaveBeenCalledWith("hero", HERO_DRAFT, "test-tenant", OWNER_ACTOR);
     expect(mockClearDraft).toHaveBeenCalledWith("hero", "test-tenant");
     expect(mockSetPageConfig).toHaveBeenCalledWith(PAGE_CONFIG, "test-tenant");
     expect(mockClearDraftPageConfig).toHaveBeenCalledWith("test-tenant");

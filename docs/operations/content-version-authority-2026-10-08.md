@@ -120,6 +120,19 @@ HTTP refusal currently returns the existing generic 500 response. A future
 usability repair can classify current-authority denial explicitly; these tests
 prove refusal/no accepted content or receipt mutation, not a retry entitlement.
 
+Root's first combined full-suite run found one stale publication assertion:
+8,575 passed, one failed, 46 skipped (8,622 total), retained in
+`/tmp/strelva-backlog-combined-full-tests-20261008.log`. The old site-editor mock
+had no user ID and expected three `setContent` arguments. Its follow-up uses a
+complete verified owner `ActorContext` and asserts that exact actor as the fourth
+publication argument. Production code, publication acceptance and snapshot
+behavior were not changed to accommodate the stale test. All 64 focused
+site-editor/content/receipt/Postgres snapshot tests passed in five files;
+typecheck and targeted lint passed. Logs:
+`/tmp/strelva-provider-attribution-publish-followup-tests.log` and
+`/tmp/strelva-provider-attribution-publish-followup-typecheck.log`.
+The full combined-suite rerun belongs to root's integration proof.
+
 ## Limits and next action
 
 Existing actorless automated section updates, internal live Undo, provisioning and public
