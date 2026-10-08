@@ -1,3 +1,4 @@
+import { releasedOwnerNoticeEmail } from "@/lib/owner-recipient";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getActorContext, isSuperAdmin } from "@/platform/infra/auth";
@@ -173,7 +174,7 @@ export async function POST(request: Request) {
     // succeeded above.
     try {
       const tenantConfig = await getTenantConfig(tenant);
-      const ownerEmail = tenantConfig?.ownerEmail;
+      const ownerEmail = await releasedOwnerNoticeEmail({ id: tenant, ownerEmail: tenantConfig?.ownerEmail });
       if (ownerEmail) {
         const siteName = tenantConfig?.siteName || tenant;
         const sectionLabel = SECTION_LABELS[typedSection] || typedSection;

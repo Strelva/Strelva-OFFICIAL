@@ -10,7 +10,7 @@ import { readExistingSystemsSnapshot } from "@/platform/systems/from-existing";
 import { listWorkspaces } from "@/platform/workspaces";
 import { askReleaseMayBeOn } from "@/platform/ask/release";
 import { isSiteTab, workspaceDashboardHref, workspaceSiteHref, type SiteTab } from "@/platform/workspaces/site-places";
-import { loadBrandKitSettings, loadCollectionsData, loadGoogleBusinessData, loadSiteEditorData, siteFrameFor } from "@/lib/website-page-data";
+import { loadWebsiteStoreData, loadWebsiteMembersData, loadBrandKitSettings, loadCollectionsData, loadGoogleBusinessData, loadSiteEditorData, siteFrameFor } from "@/lib/website-page-data";
 import { getTenantPrimaryDomain } from "@/lib/tenant-urls";
 import { resolveWorkspaceSite } from "@/products/websites/server";
 import { WorkspaceSiteFrame, WorkspaceSiteMessage } from "@/experience/websites/WorkspaceSiteFrame";
@@ -23,6 +23,9 @@ import { CollectionsManager } from "@/components/dashboard/CollectionsManager";
 import { ConnectionsPage } from "@/components/dashboard/ConnectionsPage";
 import { ConnectionDetailPage } from "@/components/dashboard/ConnectionDetailPage";
 import { GoogleBusinessPanel } from "@/components/dashboard/GoogleBusinessPanel";
+import { StorePanel } from "@/components/dashboard/StorePanel";
+import { MembersPanel } from "@/components/dashboard/MembersPanel";
+import { ownerEntryHomesOpen } from "@/platform/owner-entry/linked-sites";
 import { SiteHistoryContent } from "@/components/dashboard/SiteHistoryContent";
 import Link from "next/link";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
@@ -86,7 +89,12 @@ export default async function WorkspaceSitePage({ searchParams }: { searchParams
   if (state.kind === "error") return <WorkspaceSiteMessage title="The website didn't open." body="Strelva couldn't read this site's details just now. Nothing was changed. Try again in a moment." href={here} action="Try again" />;
 
   const { site, editing, operator } = state;
-  const { tab, tabs: visibleTabs } = managedSiteNavigation(editing, operator, requestedTab);
+  const connectionTab = requestedTab === "store" || requestedTab === "members" ? requestedTab : null;
+  // These are the existing, frozen evidence surfaces. They move only with owner entry.
+  if (connectionTab && !(await ownerEntryHomesOpen(workspaceId, actor.userId))) redirect(home);
+  const navigation = managedSiteNavigation(editing, operator, connectionTab ? null : requestedTab);
+  const tab: SiteTab = connectionTab ?? navigation.tab;
+  const visibleTabs: readonly SiteTab[] = connectionTab ? [...navigation.tabs, connectionTab] : navigation.tabs;
 
   const requestHeaders = await headers();
   // On a client admin host the proxy already names this tenant; elsewhere its APIs are reached through /client/<tenant>.
@@ -115,6 +123,14 @@ export default async function WorkspaceSitePage({ searchParams }: { searchParams
     const data = await loadSiteEditorData(site.tenantId);
     panel = <ContentWorkspace siteName={data.siteName} ownerName={data.ownerName} sectionData={data.sectionData} timestamps={data.timestamps}
       assistant={askReleased ? <AskStrelva compact workspaceId={workspaceId} businessName={state.workspaceName} systemId={systemId} systemName={siteLabel} readOnly={readOnly} readOnlyReason={readOnly ? "Only an owner or admin can ask for changes here." : undefined} /> : undefined} />;
+  } else if (tab === "store" || tab === "members") {
+    const data = tab === "store"
+      ? await loadWebsiteStoreData(site.tenantId).then(store => ({ kind: "store" as const, store })).catch(() => null)
+      : await loadWebsiteMembersData(site.tenantId).then(members => ({ kind: "members" as const, members })).catch(() => null);
+    panel = !data ? <WorkspaceSiteMessageInline title="These records couldn't load." body="Nothing changed. Try again in a moment." href={here} action="Try again" />
+      : data.kind === "members" ? <MembersPanel {...data.members} />
+      : data.store.configured ? <StorePanel summary={data.store.summary} orders={data.store.orders} products={data.store.products} />
+      : <WorkspaceSiteMessageInline title="This site has no store." body="A store appears here when this website has products or its store connection is enabled." href={home} action="Back to Home" />;
   } else if (tab === "photos") {
     panel = <PhotoLibrary />;
   } else if (tab === "look") {

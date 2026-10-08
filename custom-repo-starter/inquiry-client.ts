@@ -61,7 +61,19 @@ export async function loadInquiryForm(baseUrl: string, tenant: string, capabilit
   return body;
 }
 
+/** Signed booking page with up to three suggested times (bookings `STRELVA_BOOKING_INQUIRY_OFFERS`). */
+export interface PublicInquiryBookingOffer { serviceName: string; timeZone: string; url: string; slots: Array<{ start: string; end: string }> }
+/** One signed link per suggested time (inquiries `STRELVA_INQUIRY_BOOKING_HANDOFF`). */
+export interface PublicInquiryBookingChoices { serviceName: string; slots: Array<{ label: string; chooseUrl: string }> }
+export interface InquirySubmissionReceipt { bookingOffer?: PublicInquiryBookingOffer | PublicInquiryBookingChoices }
+
+/** Old consumers can ignore the result; only a signed booking page offer is returned here. */
 export async function submitInquiryForm(baseUrl: string, tenant: string, definition: PublicInquiryForm, fields: Record<string, string>): Promise<PublicInquiryBookingOffer | void> {
+  const { bookingOffer } = await submitInquiryFormWithReceipt(baseUrl, tenant, definition, fields);
+  if (bookingOffer && isInquiryBookingOffer(bookingOffer)) return bookingOffer;
+}
+
+export async function submitInquiryFormWithReceipt(baseUrl: string, tenant: string, definition: PublicInquiryForm, fields: Record<string, string>): Promise<InquirySubmissionReceipt> {
   const response = await fetch(endpoint(baseUrl, tenant, "leads"), {
     method: "POST",
     credentials: "omit",
@@ -79,10 +91,23 @@ export async function submitInquiryForm(baseUrl: string, tenant: string, definit
   if (!response.ok) throw new Error(response.status === 409 ? "This form changed. Reload it before sending your request." : "Your request was not confirmed. Please try again.");
   const result: unknown = await response.json();
   if (!result || typeof result !== "object" || !("ok" in result) || result.ok !== true) throw new Error("Your request was not confirmed. Please try again.");
-  if ("bookingOffer" in result && isInquiryBookingOffer(result.bookingOffer)) return result.bookingOffer;
+  const receipt: InquirySubmissionReceipt = {};
+  if (!("bookingOffer" in result) || !result.bookingOffer || typeof result.bookingOffer !== "object") return receipt;
+  if (isInquiryBookingOffer(result.bookingOffer)) return { bookingOffer: result.bookingOffer };
+  const offer = result.bookingOffer as Record<string, unknown>;
+  if (typeof offer.serviceName !== "string" || offer.serviceName.length > 160 || !Array.isArray(offer.slots) || offer.slots.length < 1 || offer.slots.length > 3) return receipt;
+  const slots: PublicInquiryBookingChoices["slots"] = [];
+  for (const item of offer.slots) {
+    if (!item || typeof item !== "object" || typeof item.label !== "string" || item.label.length > 200 || typeof item.chooseUrl !== "string"
+      || !/^\/inquiry-booking\/[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\?slot=[0-2]$/.test(item.chooseUrl)) return receipt;
+    const link = new URL(item.chooseUrl, baseUrl);
+    if (link.protocol !== "https:" && link.protocol !== "http:") return receipt;
+    slots.push({ label: item.label, chooseUrl: link.toString() });
+  }
+  receipt.bookingOffer = { serviceName: offer.serviceName, slots };
+  return receipt;
 }
 
-export interface PublicInquiryBookingOffer { serviceName: string; timeZone: string; url: string; slots: Array<{ start: string; end: string }> }
 export function isInquiryBookingOffer(value: unknown): value is PublicInquiryBookingOffer {
   if (!value || typeof value !== "object") return false;
   const offer = value as PublicInquiryBookingOffer;

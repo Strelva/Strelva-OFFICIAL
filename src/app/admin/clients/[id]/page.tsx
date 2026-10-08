@@ -28,6 +28,8 @@ import { emailSendingPaused } from "@/platform/infra/email/enabled";
 import { TenantEditor } from "./TenantEditor";
 import { OperatorControlsPanel } from "./OperatorControlsPanel";
 import { ReleaseFlagsPanel } from "./ReleaseFlagsPanel";
+import { OwnerInvitationsPanel } from "./OwnerInvitationsPanel";
+import { loadOwnerInvitations } from "@/platform/owner-entry/operator-invitations";
 import { SiteScan } from "./SiteScan";
 import { ReviewIntelPanel } from "./ReviewIntelPanel";
 import { DomainManager } from "./DomainManager";
@@ -110,6 +112,7 @@ export default async function ClientDetailPage({
   // loadBusinessEffort never throws; it reports disabled/denied/unavailable states.
   const effortLoad = loadBusinessEffort();
   const domainViewLoad = loadDomainView([{ tenantId: id, label: `${tenant.siteName || id} website` }]).catch(() => null);
+  const ownerInvitationsLoad = loadOwnerInvitations(id);
   const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm, atRisk, dailyMetrics, suggestions, vercelStatus, goal, account, reportCadence, replyVoice, contentAutonomy, clientEmailOverride, clientLeads] =
     await Promise.all([
       getClickCounts("page-view", id).catch(() => ({ thisWeek: 0, total: 0 })),
@@ -135,6 +138,7 @@ export default async function ClientDetailPage({
       getClientLeadsForOperator({ tenant: id, limit: 5 }).catch(() => null),
     ]);
   const effort = await effortLoad;
+  const ownerInvitations = await ownerInvitationsLoad;
   const opportunities = operatorSuggestions(suggestions);
   const deployStatus = vercelStatus && vercelStatus.ok ? vercelStatus.data : null;
 
@@ -364,6 +368,7 @@ export default async function ClientDetailPage({
           }}
         />
         <ReleaseFlagsPanel tenantId={tenant.id} />
+        {ownerInvitations && <OwnerInvitationsPanel tenantId={tenant.id} load={ownerInvitations} />}
         <DomainView load={await domainViewLoad} />
         <DomainManager tenantId={tenant.id} initialDomains={domainClaims.map(serializeDomainClaim)} />
         <IntegrationsPanel tenantId={tenant.id} />

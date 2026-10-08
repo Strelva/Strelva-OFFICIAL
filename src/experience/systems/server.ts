@@ -45,7 +45,7 @@ import {
 } from "@/platform/system-health";
 import { prepareIsolatedPossibility, type IsolatedSandbox, type SandboxRunOptions } from "@/platform/make-real/sandbox";
 import { planFingerprint } from "@/platform/make-real/approvals";
-import { bareHostname, websiteRebuildCandidate, type WebsiteRebuildCandidate } from "@/products/websites/index";
+import { bareHostname, websiteRebuildCandidate, readWebsiteRebuild, type WebsiteRebuildCandidate } from "@/products/websites/index";
 import type { WorkspaceMakeRealResult, WorkspacePublishing, WorkspaceSystems } from "@/experience/workspace/contracts";
 import { addPublishingSystems, type PublishingProjection } from "@/products/publishing/projection";
 import { readPublishingExtras, readPublishingSnapshot } from "@/products/publishing/server";
@@ -58,6 +58,8 @@ import {
   storedPossibilityViews,
   storedTargets,
   syncRebuildPossibilities,
+  syncAskPageSetPossibilities,
+  syncAskInquiryFollowUpPossibilities,
 } from "./stored-possibilities";
 
 export interface SystemsProjectionInput {
@@ -426,10 +428,16 @@ export async function withStoredPossibilities(projection: WorkspaceSystems, inpu
   });
   const revisions = new Map(input.listing.systems.flatMap((item) => item.provenance === "stored" && item.system.currentRevision
     ? [[item.system.id, { revisionId: item.system.currentRevision.revisionId, number: item.system.currentRevision.number }] as const] : []));
-  const stored = await syncRebuildPossibilities({
+  const rebuilds = await syncRebuildPossibilities({
     repo, live, businessId: deps.businessId, targets, revisions, actorId: deps.actor.userId,
     at: new Date(input.now).toISOString(), canWrite: deps.canWrite === true,
   });
+  const websiteStored = await syncAskPageSetPossibilities({
+    repo, live, stored: rebuilds, actorId: deps.actor.userId, at: new Date(input.now).toISOString(),
+    canWrite: deps.canWrite === true, read: workId => readWebsiteRebuild(deps.actor, workId),
+  });
+  const { askInquiryFollowUpStillCurrent } = await import("@/products/inquiries/server");
+  const stored = await syncAskInquiryFollowUpPossibilities({ repo, live, stored: websiteStored, actorId: deps.actor.userId, at: new Date(input.now).toISOString(), canWrite: deps.canWrite === true, current: selection => askInquiryFollowUpStillCurrent(deps.actor, selection) });
   const activations = createSupabaseActivationRepository(deps.actor);
   const withActivation = await Promise.all(stored.map(async ({ possibility }) => ({
     possibility,

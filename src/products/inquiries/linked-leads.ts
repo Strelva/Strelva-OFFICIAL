@@ -1,7 +1,8 @@
-import { ownerCanProposeBookingTimes } from "@/products/bookings/server";
-import { getLeads, type LeadRecord } from "@/lib/leads";
-import { getRedis } from "@/platform/infra/redis";
-import { inquiryRecordsEnabled } from "@/lib/inquiry-records";
+import type { ownerCanProposeBookingTimes } from "@/products/bookings/server";
+import { getLeads, leadReadStoreReady, type LeadRecord } from "@/lib/leads";
+
+import { workspaceInquiryRepliesEnabled, type WorkspaceReplyOutcome } from "./workspace-replies";
+import { inquiryRecordsEnabled } from "@/platform/infra/inquiry-records";
 import { readWorkspaceInquiryLeads, type WorkspaceInquiryLead } from "./workspace-records";
 import { readLinkedSites, type LinkedSite, type LinkedSites } from "@/platform/owner-entry/linked-sites";
 import { WorkspaceAccessError, type WorkspaceActor } from "@/platform/workspaces/types";
@@ -23,6 +24,9 @@ import type { ConnectedInquiry } from "@/products/connected-sites/contracts";
 
 export interface LeadView {
   id: string;
+  rowId?: string;
+  reply?: WorkspaceReplyOutcome;
+  replyPermission?: WorkspaceInquiryLead["replyPermission"];
   /** Set for a held item released from spam review: the `tenant_leads` row id, for putting it back. */
   releasedRowId?: string;
   name: string;
@@ -68,6 +72,11 @@ export interface HeldInquiries {
 
 export interface WorkspaceLeads {
   sites: SiteLeads[];
+  workspaceReplies?: boolean;
+  bookingOffers?: boolean;
+  durable?: boolean;
+  paged?: boolean;
+  nextPage?: { before: string; beforeId: string };
   denied: LinkedSite[];
   held?: HeldInquiries;
 }
@@ -75,6 +84,7 @@ export interface WorkspaceLeads {
 export interface InquiryRecordsRead {
   held: WorkspaceInquiryLead[];
   released: WorkspaceInquiryLead[];
+  kept?: WorkspaceInquiryLead[];
 }
 
 /** The retention cap, as on /dashboard/leads. */
@@ -88,10 +98,11 @@ export interface ConnectedSiteInquiries {
 
 export interface LeadDependencies {
   sites: (actor: WorkspaceActor, workspaceId: string) => Promise<LinkedSites>;
-  storeReady: () => boolean;
+  storeReady: () => boolean | Promise<boolean>;
   leads: (tenantId: string) => Promise<LeadRecord[]>;
   now: () => number;
   /** Held and released items from Postgres; null when the switch is off. Membership is checked again in SQL. */
+  repliesEnabled?: () => boolean;
   records?: (actor: WorkspaceActor, workspaceId: string) => Promise<InquiryRecordsRead> | null;
   /** Null when connected sites are off for this business. Throws when they can't be read. */
   canProposeBookings?: typeof ownerCanProposeBookingTimes;
@@ -113,23 +124,26 @@ export async function readConnectedSiteInquiries(actor: WorkspaceActor, workspac
 
 const defaults: LeadDependencies = {
   sites: (actor, workspaceId) => readLinkedSites(actor, workspaceId),
-  storeReady: () => getRedis() !== null,
+  storeReady: () => leadReadStoreReady(),
+  repliesEnabled: workspaceInquiryRepliesEnabled,
   leads: (tenantId) => getLeads(tenantId, LEAD_READ_LIMIT),
   now: () => Date.now(),
   records: (actor, workspaceId) => inquiryRecordsEnabled()
     ? Promise.all([
-      readWorkspaceInquiryLeads(actor, workspaceId, { states: ["held_as_spam"], limit: 100 }),
-      readWorkspaceInquiryLeads(actor, workspaceId, { states: ["released"], limit: 100 }),
-    ]).then(([held, released]) => ({ held, released }))
+      readWorkspaceInquiryLeads(actor, workspaceId, { states: ["held_as_spam"], limit: 500 }),
+      readWorkspaceInquiryLeads(actor, workspaceId, { states: ["released"], limit: 500 }),
+      workspaceInquiryRepliesEnabled() ? readWorkspaceInquiryLeads(actor, workspaceId, { states: ["kept"], limit: 500 }) : Promise.resolve([]),
+    ]).then(([held, released, kept]) => ({ held, released, kept }))
     : null,
   connected: readConnectedSiteInquiries,
-  canProposeBookings: ownerCanProposeBookingTimes,
+  // Lazy: inquiry reads must not load the bookings server graph.
+  canProposeBookings: async (...args) => (await import("@/products/bookings/server")).ownerCanProposeBookingTimes(...args),
 };
 
 export function heldView(lead: WorkspaceInquiryLead): HeldView {
   return {
     rowId: lead.id,
-    tenantId: lead.tenantId,
+    tenantId: lead.connectedSiteId ? null : lead.tenantId,
     name: lead.name.trim() || "Someone",
     email: lead.email?.trim() || null,
     message: lead.message?.trim() || null,
@@ -143,6 +157,9 @@ export function releasedLeadView(lead: WorkspaceInquiryLead): LeadView {
   return {
     ...leadView({ id: lead.leadId, name: lead.name, email: lead.email ?? undefined, message: lead.message ?? undefined,
       source: lead.source ?? undefined, fields: lead.fields, createdAt: lead.capturedAt }),
+    rowId: lead.id,
+    ...(lead.reply ? { reply: lead.reply } : {}),
+    ...(lead.replyPermission ? { replyPermission: lead.replyPermission } : {}),
     releasedRowId: lead.id,
   };
 }
@@ -155,6 +172,7 @@ export function recentCount(leads: readonly LeadView[], now: number, days = 30):
 export function connectedLeadView(inquiry: ConnectedInquiry): LeadView {
   return {
     id: inquiry.id,
+    rowId: inquiry.id,
     name: inquiry.name.trim() || "Someone",
     email: inquiry.email?.trim() || null,
     message: inquiry.message?.trim() || null,
@@ -182,7 +200,7 @@ export function leadView(lead: LeadRecord): LeadView {
 /** Throws WorkspaceAccessError for anyone who isn't a direct member of this business. */
 export async function readWorkspaceLeads(actor: WorkspaceActor, workspaceId: string, dependencies: LeadDependencies = defaults): Promise<WorkspaceLeads> {
   const { sites, denied } = await dependencies.sites(actor, workspaceId);
-  const ready = dependencies.storeReady();
+  const ready = await dependencies.storeReady();
   const canPropose = await dependencies.canProposeBookings?.(actor, workspaceId).catch(() => false);
   let records: InquiryRecordsRead | null = null;
   let recordsUnavailable = false;
@@ -205,7 +223,9 @@ export async function readWorkspaceLeads(actor: WorkspaceActor, workspaceId: str
       const kept = (await dependencies.leads(site.tenantId)).map(leadView);
       const seen = new Set(kept.map((lead) => lead.id));
       const released = (records?.released ?? []).filter((lead) => lead.tenantId === site.tenantId && !seen.has(lead.leadId)).map(releasedLeadView);
-      const leads = [...kept, ...released].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      const rowById = new Map([...(records?.kept ?? []), ...(records?.released ?? [])].filter((lead) => lead.tenantId === site.tenantId).map((lead) => [lead.leadId, lead]));
+      const mapped = kept.map((lead) => { const row = rowById.get(lead.id); return row ? { ...lead, rowId: row.id, ...(row.reply ? { reply: row.reply } : {}), ...(row.replyPermission ? { replyPermission: row.replyPermission } : {}), ...(row.intakeState === "released" ? { releasedRowId: row.id } : {}) } : lead; });
+      const leads = [...mapped, ...released].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       return { ...base, leads, lastThirtyDays: recentCount(leads, dependencies.now()), unavailable: false, ...(canPropose ? { bookingProposals: true as const } : {}) };
     } catch (error) {
       console.error("[inquiries] lead store read failed", { tenantId: site.tenantId, error: error instanceof Error ? error.message : String(error) });
@@ -213,10 +233,25 @@ export async function readWorkspaceLeads(actor: WorkspaceActor, workspaceId: str
     }
   }));
   const result: WorkspaceLeads = { denied, sites: [...managed, ...(await connectedSections(actor, workspaceId, dependencies))] };
+  // Connected rows share the same review and receipt store. A released row
+  // can be put back, and an accepted purpose remains closed after reload.
+  for (const section of result.sites.filter((site) => site.connected)) {
+    const rows = [...(records?.kept ?? []), ...(records?.released ?? [])].filter((lead) => section.key === `connected:${lead.connectedSiteId}`);
+    const byRow = new Map(rows.map((row) => [row.id, row]));
+    section.leads = section.leads.map((lead) => { const row = byRow.get(lead.id); return row ? { ...lead, rowId: row.id, ...(row.reply ? { reply: row.reply } : {}), ...(row.replyPermission ? { replyPermission: row.replyPermission } : {}), ...(row.intakeState === "released" ? { releasedRowId: row.id } : {}) } : lead; });
+  }
+  if (dependencies.repliesEnabled?.()) result.workspaceReplies = true;
+  const { workspaceReleaseEnabled } = await import("@/platform/workspace-release");
+  const { inquiryBookingHandoffEnabled } = await import("./booking-handoff");
+  if (workspaceReleaseEnabled() && inquiryBookingHandoffEnabled()) {
+    const { inquiryReleaseEnabledForWorkspace } = await import("./release");
+    if (await inquiryReleaseEnabledForWorkspace(workspaceId, { userId: actor.userId, operator: false, tester: false })) result.bookingOffers = true;
+  }
+  if (records) result.durable = true;
   if (pending) {
     // Held items of a site this person can't read through the tenant check stay hidden, like its inbox.
     result.held = {
-      items: (records?.held ?? []).filter((lead) => lead.tenantId !== null && allowed.has(lead.tenantId)).map(heldView),
+      items: (records?.held ?? []).filter((lead) => (lead.connectedSiteId && result.sites.some((site) => site.key === `connected:${lead.connectedSiteId}`)) || (lead.tenantId !== null && allowed.has(lead.tenantId))).map(heldView),
       unavailable: recordsUnavailable,
     };
   }

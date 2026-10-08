@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getScaffoldBaseUrl, getTenantId } from "../scaffold-client";
+import { createTrackSignatureHeaders } from "../track-signature";
 
 /**
  * POST handler for `/api/webhooks/stripe`. Drop into a client repo as
@@ -55,16 +56,19 @@ export async function POST(request: Request): Promise<NextResponse> {
     const base = getScaffoldBaseUrl();
     const tenant = getTenantId();
     if (base && typeof amountCents === "number" && amountCents > 0) {
+      const trackBody = JSON.stringify({
+        event: "order",
+        orderId: session.id,
+        amountCents,
+        currency,
+        ...(items.length ? { items } : {}),
+      });
+      const origin = new URL(request.url).origin;
+      const trackingSignature = createTrackSignatureHeaders({ tenant, origin, rawBody: trackBody });
       await fetch(`${base}/api/v1/track/${tenant}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          event: "order",
-          orderId: session.id,
-          amountCents,
-          currency,
-          ...(items.length ? { items } : {}),
-        }),
+        headers: { "Content-Type": "application/json", ...(trackingSignature ?? {}) },
+        body: trackBody,
       }).catch(() => {});
     } else if (!amountCents) {
       console.warn(`[stripe webhook] session ${session.id} completed with no amount_total — order beacon skipped`);

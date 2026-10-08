@@ -1,3 +1,4 @@
+import { mirrorRecord, removeRecord, readRecord, readRecords } from "./client-records";
 import { getRedis } from "@/platform/infra/redis";
 import { decryptSecret, encryptSecret } from "@/platform/infra/crypto/secrets";
 import type { IntegrationProvider, Connection } from "./types";
@@ -38,14 +39,19 @@ export async function getConnection(
   tenantId: string,
   provider: IntegrationProvider
 ): Promise<Connection | null> {
-  const redis = getRedis();
-  if (!redis) return null;
-
-  const data = await redis.get<Connection>(connectionKey(tenantId, provider));
+  const data = await readRecord<Connection>("provider_connections", tenantId, provider, async () => {
+    const redis = getRedis();
+    return redis ? redis.get<Connection>(connectionKey(tenantId, provider)) : null;
+  });
   return data ? decodeConnection(data) : null;
 }
 
 export async function getConnections(tenantId: string): Promise<Connection[]> {
+  const rows = await readRecords<Connection>("provider_connections", tenantId, () => getRedisConnections(tenantId));
+  return rows.map(decodeConnection);
+}
+
+async function getRedisConnections(tenantId: string): Promise<Connection[]> {
   const redis = getRedis();
   if (!redis) return [];
 
@@ -69,7 +75,7 @@ export async function getConnections(tenantId: string): Promise<Connection[]> {
   const values = await redis.mget<(Connection | null)[]>(...allKeys);
   const connections: Connection[] = [];
   for (const data of values) {
-    if (data) connections.push(decodeConnection(data));
+    if (data) connections.push(data);
   }
   return connections;
 }
@@ -78,10 +84,9 @@ export async function saveConnection(connection: Connection): Promise<void> {
   const redis = getRedis();
   if (!redis) return;
 
-  await redis.set(
-    connectionKey(connection.tenantId, connection.provider),
-    encodeConnection(connection)
-  );
+  const encoded = encodeConnection(connection);
+  await redis.set(connectionKey(connection.tenantId, connection.provider), encoded);
+  await mirrorRecord("provider_connections", connection.tenantId, connection.provider, encoded);
 }
 
 export async function updateLastSynced(
@@ -110,4 +115,5 @@ export async function deleteConnection(
   if (!redis) return;
 
   await redis.del(connectionKey(tenantId, provider));
+  await removeRecord("provider_connections", tenantId, provider);
 }

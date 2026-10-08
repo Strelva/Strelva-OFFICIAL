@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ actor: vi.fn(), rpc: vi.fn(), systemsFor: vi.fn(async (_actor: { userId: string }, _workspaceId: string) => true) }));
+const mocks = vi.hoisted(() => ({ operator: vi.fn(async () => false), actor: vi.fn(), rpc: vi.fn(), systemsFor: vi.fn(async (_actor: { userId: string }, _workspaceId: string) => true) }));
 
 vi.mock("ai", () => ({ tool: (def: unknown) => def, stepCountIs: () => () => true }));
-vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: async () => false }));
+vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: () => mocks.operator() }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: async () => false }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: (...args: unknown[]) => mocks.rpc(...args) }) }));
 vi.mock("@/platform/workspaces/http", async (importOriginal) => {
@@ -26,7 +26,7 @@ const CONVERSATION = "44444444-4444-4444-8444-444444444444";
 const get = (query: string) => GET(new Request(`http://localhost/api/workspace/ask?${query}`));
 
 describe("GET /api/workspace/ask (conversation history)", () => {
-  beforeEach(() => { mocks.actor.mockReset(); mocks.rpc.mockReset(); mocks.systemsFor.mockReset(); mocks.systemsFor.mockResolvedValue(true); });
+  beforeEach(() => { mocks.operator.mockReset(); mocks.operator.mockResolvedValue(false); mocks.actor.mockReset(); mocks.rpc.mockReset(); mocks.systemsFor.mockReset(); mocks.systemsFor.mockResolvedValue(true); });
   afterEach(() => { for (const key of ENV) delete process.env[key]; });
 
   it("is off with the release and reads no session", async () => {
@@ -54,8 +54,17 @@ describe("GET /api/workspace/ask (conversation history)", () => {
       mocks.rpc.mockResolvedValue({ data: [{ id: CONVERSATION, systemId: null, title: "What are my services?", messageCount: 2, mine: true, createdAt: "2026-10-06T10:00:00Z", updatedAt: "2026-10-06T10:00:01Z" }], error: null });
       const response = await get(`workspaceId=${WS}&systemId=${CONVERSATION}`);
       expect(response.status).toBe(200);
-      expect((await response.json()).conversations).toHaveLength(1);
+      const body = await response.json();
+      expect(body.conversations).toHaveLength(1);
+      expect(body.canAskOnBehalf).toBe(false);
       expect(mocks.rpc).toHaveBeenCalledWith("list_ask_conversations", expect.objectContaining({ p_workspace_id: WS, p_system_id: CONVERSATION }));
+    });
+
+    it("enables asked-on-behalf only for a verified Strelva operator", async () => {
+      mocks.actor.mockResolvedValue({ userId: "cccccccc-0000-4000-8000-000000000001", verifiedEmail: "o@example.test" });
+      mocks.rpc.mockResolvedValue({ data: [], error: null });
+      mocks.operator.mockResolvedValue(true);
+      expect(await (await get(`workspaceId=${WS}`)).json()).toMatchObject({ canAskOnBehalf: true });
     });
 
     it("answers someone else's or another business's conversation as not found", async () => {

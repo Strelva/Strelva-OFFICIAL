@@ -3,9 +3,11 @@ import { getRedis } from "@/platform/infra/redis";
 import { getSupabase } from "@/platform/infra/db/client";
 import { getEventsRaw } from "@/lib/events";
 import { listDrafts } from "@/lib/storage";
-import { listPendingDigests } from "@/lib/maintenance-digest";
+import { listPendingDigests, type MaintenanceDigest } from "@/lib/maintenance-digest";
+import { dataSourceIsPostgres } from "@/platform/infra/db/source-flags";
+import { CRON_MAX_AGE_SECONDS } from "@/platform/infra/heartbeat";
 import { buildAttentionBriefing, buildAttentionFromSnapshot } from "@/lib/attention";
-import { getPortfolioSummaryState } from "@/lib/portfolio";
+import { getPortfolioSummaryState, readPortfolioOperations } from "@/lib/portfolio";
 import { getDomainHealth } from "@/lib/domain-monitor-store";
 import { listTenantDomainClaims } from "@/lib/domains";
 import { LEAD_MIRROR_PENDING_KEY, parsePendingMember } from "@/lib/lead-mirror";
@@ -21,8 +23,10 @@ import type { UnifiedEvent } from "@/lib/types";
 import type { QueueActor, QueueContext, QueueItemRaw, QueueKind } from "./contracts";
 import type { SourceRead } from "./project";
 import { readSiteHealth } from "./site-health-store";
-import { readListingReadbackFailures, type ListingReadbackFailure } from "./store";
+import { readGoogleWriteUncertainty, readListingReadbackFailures, type ListingReadbackFailure } from "./store";
+import { operatorQueueReleaseEnabled } from "./release";
 import { EVENT_RETENTION_DAYS, DOMAIN_VERIFICATION_ESCALATION_DAYS } from "./rules";
+import { readInquiryOwnerNoticeIssues } from "./inquiry-owner-notices";
 
 /**
  * Readers for every source in spec §3.1. Each reader returns its rows or names
@@ -68,7 +72,7 @@ export async function readEventKinds(tenants: QueueTenant[], context: QueueConte
   await Promise.all(tenants.map(async (tenant) => {
     let events: UnifiedEvent[];
     try {
-      events = await getEventsRaw(tenant.id, { limit: EVENT_WINDOW, requireStore: true });
+      events = await getEventsRaw(tenant.id, { limit: EVENT_WINDOW, requireStore: true, ...(operatorQueueReleaseEnabled() ? { all: true } : {}) });
     } catch {
       failed.push(tenant.id);
       return;
@@ -96,6 +100,7 @@ export async function readEventKinds(tenants: QueueTenant[], context: QueueConte
         title: event.title || "Draft to review", openedAt: event.createdAt,
         facts: { expiresAt: new Date(Date.parse(event.createdAt) + EVENT_RETENTION_DAYS * DAY).toISOString() },
         href: kind === "owner_pending" ? clientHref(event.tenantId, "needs-you") : "/admin/actions",
+        ...(kind === "draft_review" ? { review: { type: event.type, metadata: event.metadata } } : {}),
       };
       if (event.status === "pending") {
         (kind === "owner_pending" ? owner : drafts).push(base);
@@ -123,6 +128,24 @@ export async function readSiteDrafts(tenants: QueueTenant[], now: number): Promi
   try {
     const rows: QueueItemRaw[] = [];
     for (const tenant of tenants) {
+      if (operatorQueueReleaseEnabled() && dataSourceIsPostgres()) {
+        const db = getSupabase();
+        if (!db) throw new Error("Postgres unavailable");
+        // The legacy helper degrades to an empty dev store on Postgres errors.
+        // The queue must report failure and keep the source's actual age.
+        for (let offset = 0; ; offset += 500) {
+          const page = await db.from("draft_content").select("section,created_at").eq("tenant_id", tenant.id)
+            .order("section", { ascending: true }).range(offset, offset + 499);
+          if (page.error || !page.data) throw new Error("Postgres draft read failed");
+          for (const draft of page.data) rows.push({
+            kind: "site_draft", sourceRef: `${tenant.id}:${draft.section}`, tenantId: tenant.id, workspaceId: null,
+            title: `Draft of the ${draft.section} section`, openedAt: draft.created_at,
+            href: `/admin/drafts?tenant=${encodeURIComponent(tenant.id)}`,
+          });
+          if (page.data.length < 500) break;
+        }
+        continue;
+      }
       const drafts = await listDrafts(tenant.id);
       for (const section of Object.keys(drafts).filter((key) => drafts[key])) {
         rows.push({
@@ -139,9 +162,26 @@ export async function readSiteDrafts(tenants: QueueTenant[], now: number): Promi
 }
 
 export async function readMaintenanceDigests(): Promise<SourceRead> {
-  if (!getRedis()) return noRedis(["maintenance_digest"], "Maintenance digests")[0]!;
+  const redis = getRedis();
+  if (!redis) return noRedis(["maintenance_digest"], "Maintenance digests")[0]!;
   try {
-    const digests = await listPendingDigests();
+    let digests: MaintenanceDigest[];
+    if (!operatorQueueReleaseEnabled()) digests = await listPendingDigests();
+    else {
+      // Legacy listPendingDigests intentionally hides read failures on old
+      // screens. Read the same keys strictly here, without mutating either.
+      const tenants = await redis.smembers<string[]>("maint-digest:pending");
+      const values = await Promise.all(tenants.map(async (tenant) => {
+        const raw = await redis.get<MaintenanceDigest | string>(`maint-digest:${tenant}`);
+        if (!raw) return null; // A source can close between the index and blob reads.
+        const value = typeof raw === "string" ? JSON.parse(raw) as MaintenanceDigest : raw;
+        if (value.tenant !== tenant || !Array.isArray(value.items) || !["pending", "approved", "dismissed"].includes(value.status) || !Number.isFinite(Date.parse(value.createdAt))) {
+          throw new Error("Maintenance digest could not be read");
+        }
+        return value;
+      }));
+      digests = values.filter((value): value is MaintenanceDigest => value !== null && value.status === "pending");
+    }
     return {
       kind: "maintenance_digest", source: "Maintenance digests", ok: true,
       rows: digests.map((digest) => ({
@@ -157,6 +197,24 @@ export async function readMaintenanceDigests(): Promise<SourceRead> {
 
 export async function readOpsAlerts(): Promise<SourceRead> {
   try {
+    if (operatorQueueReleaseEnabled()) {
+      // The cached portfolio is useful for the old overview, but it cannot
+      // prove the queue read today's failure sources completely.
+      const report = await readPortfolioOperations({ requireStore: true });
+      const rows: QueueItemRaw[] = [];
+      if (report.metrics.webhookFailures) rows.push({ kind: "ops_alert", sourceRef: "webhook-failures", tenantId: null, workspaceId: null,
+        title: `${report.metrics.webhookFailures} webhook failure(s)`, openedAt: report.timestamp, facts: { severity: "high" }, href: "/admin/ops" });
+      for (const entry of report.revalidationFailures) rows.push({ kind: "ops_alert", sourceRef: `revalidation:${shortHash(`${entry.tenantId}:${entry.timestamp}:${entry.error}`)}`,
+        tenantId: entry.tenantId, workspaceId: null, title: "A content update did not reach the client site", openedAt: entry.timestamp,
+        facts: { severity: "high" }, href: clientHref(entry.tenantId, "health") });
+      for (const entry of report.metrics.failedAiWriteItems ?? []) rows.push({ kind: "ops_alert", sourceRef: `ai-write:${shortHash(`${entry.tenantId}:${entry.title}:${entry.error}`)}`,
+        tenantId: entry.tenantId, workspaceId: null, title: `${entry.title}: ${entry.error}`, openedAt: report.timestamp,
+        facts: { severity: "medium" }, href: clientHref(entry.tenantId) });
+      for (const entry of report.metrics.domainDrift ?? []) rows.push({ kind: "ops_alert", sourceRef: `domain-drift:${shortHash(`${entry.tenantId}:${entry.message}`)}`,
+        tenantId: entry.tenantId, workspaceId: null, title: entry.message, openedAt: report.timestamp,
+        facts: { severity: "medium" }, href: clientHref(entry.tenantId, "domains") });
+      return { kind: "ops_alert", source: "Operations alerts", ok: true, rows };
+    }
     const state = await getPortfolioSummaryState();
     const briefing = state.snapshot ? buildAttentionFromSnapshot(state.snapshot) : await buildAttentionBriefing();
     return {
@@ -218,7 +276,7 @@ export async function readUnverifiedDomains(tenants: QueueTenant[], now: number)
   }
 }
 
-export async function readSiteHealthItems(context: QueueContext | null, tenants: Map<string, QueueTenant>): Promise<SourceRead> {
+export async function readSiteHealthItems(context: QueueContext | null, tenants: Map<string, QueueTenant>, now = Date.now()): Promise<SourceRead> {
   const source = "Site health";
   let snapshot;
   try {
@@ -227,19 +285,30 @@ export async function readSiteHealthItems(context: QueueContext | null, tenants:
     return failure("site_health", source, error);
   }
   if (!snapshot) return { kind: "site_health", source, ok: false, reason: "No site health run on record" };
-  const rows: QueueItemRaw[] = snapshot.results.filter((result) => result.status !== "healthy").map((result) => ({
+  const checkedAt = Date.parse(snapshot.checkedAt);
+  const stale = operatorQueueReleaseEnabled() && (!Number.isFinite(checkedAt) || now - checkedAt > CRON_MAX_AGE_SECONDS["website-health"] * 1000);
+  const rows: QueueItemRaw[] = snapshot.results.filter((result) => stale || result.status !== "healthy").map((result) => ({
     kind: "site_health" as const, sourceRef: `site:${result.tenantId}`, tenantId: result.tenantId, workspaceId: null,
-    title: result.status === "unknown"
+    title: stale || result.status === "unknown"
       ? `${result.siteName || siteLabel(tenants, result.tenantId)}: no recent evidence`
       : `${result.siteName || siteLabel(tenants, result.tenantId)}: ${result.reasons[0]?.message ?? result.status}`,
-    openedAt: result.lastVerifiedAt ?? snapshot.checkedAt, facts: { healthStatus: result.status }, href: clientHref(result.tenantId, "health"),
+    openedAt: result.lastVerifiedAt ?? snapshot.checkedAt, facts: { healthStatus: stale ? "unknown" : result.status }, href: clientHref(result.tenantId, "health"),
   }));
+  if (operatorQueueReleaseEnabled()) {
+    const covered = new Set(snapshot.results.map((result) => result.tenantId));
+    for (const tenant of tenants.values()) if (!covered.has(tenant.id)) rows.push({
+      kind: "site_health", sourceRef: `site:${tenant.id}`, tenantId: tenant.id, workspaceId: null,
+      title: `${tenant.siteName || tenant.id}: no recent evidence`, openedAt: snapshot.checkedAt,
+      facts: { healthStatus: "unknown" }, href: clientHref(tenant.id, "health"),
+    });
+  }
   for (const health of context?.documentHealth ?? []) {
-    if (health.status === "healthy") continue;
+    const documentStale = operatorQueueReleaseEnabled() && (!Number.isFinite(Date.parse(health.checkedAt)) || now - Date.parse(health.checkedAt) > CRON_MAX_AGE_SECONDS["website-health"] * 1000);
+    if (health.status === "healthy" && !documentStale) continue;
     rows.push({
       kind: "site_health", sourceRef: `document:${health.workId}:${health.revision}`, tenantId: health.tenantId, workspaceId: health.workspaceId,
-      title: `Published revision ${health.revision} is not verified (${health.status.replace("_", " ")})`,
-      openedAt: health.checkedAt, facts: { healthStatus: "blocked" }, href: `/admin/websites`,
+      title: documentStale ? `Published revision ${health.revision}: no recent evidence` : `Published revision ${health.revision} is not verified (${health.status.replace("_", " ")})`,
+      openedAt: health.checkedAt, facts: { healthStatus: documentStale ? "unknown" : "blocked" }, href: `/admin/websites`,
     });
   }
   return { kind: "site_health", source, ok: true, rows };
@@ -263,7 +332,7 @@ export async function readServiceRequests(actor: QueueActor): Promise<SourceRead
 
 export async function readOperationalExceptions(): Promise<SourceRead> {
   try {
-    const exceptions = await listOperationalExceptions();
+    const exceptions = await listOperationalExceptions(operatorQueueReleaseEnabled() ? { all: true } : undefined);
     return {
       kind: "operational_exception", source: "Operational exceptions", ok: true,
       rows: exceptions.map((exception) => ({
@@ -284,18 +353,29 @@ interface UntypedQuery extends PromiseLike<SelectResult> {
   gt(column: string, value: string): UntypedQuery;
   order(column: string, options: { ascending: boolean }): UntypedQuery;
   limit(count: number): UntypedQuery;
+  range(from: number, to: number): UntypedQuery;
 }
 export async function readAssignmentOffers(now: number): Promise<SourceRead> {
   const source = "Assignment offers";
   const db = getSupabase() as unknown as { from(table: string): UntypedQuery } | null;
   if (!db) return { kind: "assignment_offer", source, ok: false, reason: "Postgres unavailable" };
   try {
-    const result = await db.from("operational_assignments")
+    const query = () => db.from("operational_assignments")
       .select("id,workspace_id,work_id,assignee_email,offered_at,expires_at")
-      .eq("status", "offered")
-      .gt("expires_at", new Date(now).toISOString())
-      .order("offered_at", { ascending: true })
-      .limit(500);
+      .eq("status", "offered").gt("expires_at", new Date(now).toISOString())
+      .order("offered_at", { ascending: true });
+    let result: SelectResult;
+    if (!operatorQueueReleaseEnabled()) result = await query().limit(500);
+    else {
+      const rows: NonNullable<SelectResult["data"]> = [];
+      for (let offset = 0; ; offset += 500) {
+        const page = await query().order("id", { ascending: true }).range(offset, offset + 499);
+        if (page.error || !page.data) return { kind: "assignment_offer", source, ok: false, reason: "Postgres read failed" };
+        rows.push(...page.data);
+        if (page.data.length < 500) break;
+      }
+      result = { data: rows, error: null };
+    }
     if (result.error || !result.data) return { kind: "assignment_offer", source, ok: false, reason: "Postgres read failed" };
     return {
       kind: "assignment_offer", source, ok: true,
@@ -316,7 +396,7 @@ export async function readUnkeptLeads(): Promise<SourceRead> {
   const redis = getRedis();
   if (!redis) return noRedis(["lead_unkept"], source)[0]!;
   try {
-    const flat = await redis.zrange<(string | number)[]>(LEAD_MIRROR_PENDING_KEY, 0, 499, { withScores: true });
+    const flat = await redis.zrange<(string | number)[]>(LEAD_MIRROR_PENDING_KEY, 0, operatorQueueReleaseEnabled() ? -1 : 499, { withScores: true });
     const rows: QueueItemRaw[] = [];
     for (let index = 0; index + 1 < flat.length; index += 2) {
       const member = String(flat[index]);
@@ -339,7 +419,7 @@ export async function readProspectLeads(now: number): Promise<SourceRead> {
   const source = "Strelva sales leads";
   if (!getRedis()) return noRedis(["prospect_lead"], source)[0]!;
   try {
-    const leads = await getDeliveryLeads(200);
+    const leads = await getDeliveryLeads(operatorQueueReleaseEnabled() ? 0 : 200);
     const workflow = await getAllLeadWorkflow(leads.map((lead) => lead.statusToken));
     const cutoff = now - PROSPECT_WINDOW_DAYS * DAY;
     return {
@@ -420,9 +500,10 @@ export async function readAllSources(input: { tenants: QueueTenant[]; context: Q
     guard("ops_alert", "Report delivery", () => readCatalogReportFailures(actor)),
     guard("ops_alert", "Internal tool notifications", () => readToolNoticeFailures(actor)),
     guard("ops_alert", "Internal tool contact links", () => readToolContactConflicts(actor)),
+    ...(process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" ? [guard("ops_alert", "Inquiry owner notices", () => readInquiryOwnerNoticeIssues(tenants.map(tenant => tenant.id)))] : []),
     guard("domain_alert", "Domain monitor", readDomainAlerts),
     guard("domain_unverified", "Domain claims", () => readUnverifiedDomains(tenants, now)),
-    guard("site_health", "Site health", () => readSiteHealthItems(context, byId)),
+    guard("site_health", "Site health", () => readSiteHealthItems(context, byId, now)),
     guard("service_request", "Service requests", () => readServiceRequests(actor)),
     guard("operational_exception", "Operational exceptions", readOperationalExceptions),
     guard("assignment_offer", "Assignment offers", () => readAssignmentOffers(now)),
@@ -430,6 +511,15 @@ export async function readAllSources(input: { tenants: QueueTenant[]; context: Q
     guard("prospect_lead", "Strelva sales leads", () => readProspectLeads(now)),
     Promise.resolve([readbackFailureItems(context)]),
     guard("readback_failed", "Google listing receipts", () => readListingReadbackSource(actor)),
+    ...(operatorQueueReleaseEnabled() ? [guard("readback_failed", "Google write attempts", async () => ({
+      kind: "readback_failed", source: "Google write attempts", ok: true,
+      rows: (await readGoogleWriteUncertainty(actor)).map((attempt) => ({
+        kind: "readback_failed", sourceRef: `google-attempt:${attempt.id}`, tenantId: attempt.tenantId, workspaceId: null,
+        title: attempt.acceptance === "accepted" ? `${attempt.writeKind}: Google accepted, read-back not confirmed` : `${attempt.writeKind}: Google acceptance uncertain; do not resend`,
+        facts: { writeAcceptance: attempt.acceptance === "accepted" ? "accepted" : "unknown" },
+        openedAt: attempt.startedAt, receiptIds: attempt.receiptId ? [attempt.receiptId] : [], href: clientHref(attempt.tenantId, "receipts"),
+      })),
+    }))] : []),
   ]);
   return groups.flat();
 }

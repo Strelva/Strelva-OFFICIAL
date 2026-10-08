@@ -24,10 +24,11 @@ import {
   defaultAllowedOrigins, normalizeOrigin, publicFactsFromConfirmedRecord, publicInquirySchema, referrerHost, safePath, verificationProofs,
   type ConnectedInquiry, type ConnectedSite, type PublicContext, type ResolvedConnectedSite,
 } from "./contracts";
-import { ConnectedSiteInputError, connectedSitesStore, type ConnectedSitesStore } from "./store";
+import { ConnectedSiteInputError, connectedInquiryRecordsEnabled, connectedSitesStore, type ConnectedSitesStore } from "./store";
 import { systemOriginId } from "@/platform/systems/invariants";
 
 export { ConnectedSiteInputError, ConnectedSiteRefusedError } from "./store";
+export { repairConnectedInquiryOwnerNotice } from "./inquiry-owner-repair";
 
 /**
  * The cheap early gate: connected sites could be on for at least one
@@ -176,14 +177,14 @@ export async function submitPublicInquiry(publicKey: string, site: ResolvedConne
   const input = publicInquirySchema.parse(raw);
   if (input.capture === "site-form" && !site.captureForms) throw new ConnectedSiteInputError("This site does not send its own forms to Strelva.");
   const trap = input._hp || (input.capture === "strelva-form" ? input.fields.website || input.fields.company : "");
-  if (trap) return { status: "ignored" };
+  if (trap && !connectedInquiryRecordsEnabled()) return { status: "ignored" };
   const contact = contactFromFields(input.fields);
-  if (!contact.email && !contact.phone && !contact.message) throw new ConnectedSiteInputError("Add an email, phone number or message.");
+  if (!trap && !contact.email && !contact.phone && !contact.message) throw new ConnectedSiteInputError("Add an email, phone number or message.");
   const capturedAt = new Date(deps.now ?? Date.now()).toISOString();
   const normalizedOrigin = normalizeOrigin(origin ?? "");
   const verdict = scoreLeadSpam({ businessName: contact.name, description: contact.message, email: contact.email });
-  if (verdict.isSpam) {
-    const payload = { name: contact.name, email: contact.email, phone: contact.phone, message: contact.message, path: safePath(input.path), capture: input.capture, signals: verdict.signals, score: verdict.score };
+  if (trap || verdict.isSpam) {
+    const payload = { name: contact.name, email: contact.email, phone: contact.phone, message: contact.message, path: safePath(input.path), capture: input.capture, signals: verdict.signals, score: verdict.score, ...(trap ? { reason: "honeypot" } : {}) };
     await store.recordSpam(publicKey, normalizedOrigin, { recordId: `inq_${input.id}`, payload, payloadHash: createHash("sha256").update(JSON.stringify(payload)).digest("hex"), capturedAt });
     return { status: "held_as_spam" };
   }
@@ -223,10 +224,11 @@ export async function readConnectedSites(actor: WorkspaceActor, businessId: stri
 // src/lib in Strelva Reborn section 7; routes import them through this entry).
 export { CONNECT_CORS_HEADERS, CONNECT_MAX_BODY_BYTES, ConnectBodyError, connectErrorResponse, connectJson, connectPreflight, readConnectBody, resolveConnectSite } from "./http";
 export { connectedInquiryEmail, notifyConnectedSiteInquiry } from "./notify";
+export { reconcileConnectedInquiryOwnerNotice } from "./inquiry-owner-notice";
 
 // Server-rendered visibility for AI crawlers (#309, #502): the public
 // business page, its llms.txt and the static JSON-LD paste block.
-export { businessPagesReleaseEnabled, checkSchemaBlock, loadPublishedBusinessPage, readBusinessVisibility, setBusinessPage, type BusinessVisibility, type SchemaBlockCheck, type SchemaBlockTarget } from "./business-pages";
+export { businessPagesReleaseEnabled, checkSchemaBlock, listPublishedBusinessPages, loadPublishedBusinessPage, readBusinessVisibility, setBusinessPage, type BusinessVisibility, type SchemaBlockCheck, type SchemaBlockTarget } from "./business-pages";
 export { BUSINESS_HANDLE_PATTERN, businessFactSheet, businessPageUrl, formatAddress, isBusinessHandle, mapsUrl, suggestBusinessHandle, weeklyHours, type PublishedBusinessPage } from "./business-page";
 export { jsonLdScriptContent, schemaBlock, schemaBlockStatus, type SchemaBlock, type SchemaBlockStatus } from "./schema-block";
 

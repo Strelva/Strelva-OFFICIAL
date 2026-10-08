@@ -773,6 +773,13 @@ export interface CustomChangeRequestMetadata {
 
 // --- Weekly Brief Types ---
 
+/** Intake cohort and first business reply accepted by the provider. No claim
+ * of delivery, customer response, bookings or revenue follows from this. */
+export type WeeklyInquiryOutcomeProof =
+  | { status: "available"; inquiries: number; answered: number; withinDay: number; unanswered: number;
+      averageReplySeconds: number | null; medianReplySeconds: number | null; evidence: string }
+  | { status: "unavailable"; reason: string };
+
 export interface WeeklyBriefStats {
   pageViews: number;
   bookingClicks: number;
@@ -784,6 +791,8 @@ export interface WeeklyBriefStats {
    *  is a customer action too, so surfaces total booking + phone clicks. */
   phoneClicks?: number;
   phoneClicksDelta?: number;
+  /** Absent with STRELVA_INQUIRY_OUTCOMES off, including historical recaps. */
+  inquiryOutcomeProof?: WeeklyInquiryOutcomeProof;
 }
 
 export interface WeeklyBriefNextAction {

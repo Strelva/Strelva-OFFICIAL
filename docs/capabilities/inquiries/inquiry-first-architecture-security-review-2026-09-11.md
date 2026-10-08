@@ -1,5 +1,8 @@
 # Inquiry-first architecture and security review
 
+
+**Current implementation, wave 6 round 5 (October 7):** see [wave 6 local verification](./inquiry-wave6-verification-2026-10-07.md) for every retained IF-01–28 criterion and adopted C1–16 delta, exact local gates, failure history and rollout boundaries. The October delta supersedes the old customer builder/frame and partner-agency surfaces. Earlier status rows are historical evidence, not the current completion percentage. No production action is authorized.
+
 Reviewed 2026-09-11. Status: independent local implementation review.
 
 This review applies the selected

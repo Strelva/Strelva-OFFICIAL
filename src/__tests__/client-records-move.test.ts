@@ -52,15 +52,17 @@ function fakeDb() {
           case "read_tenant_client_record_digests": {
             const out: Record<string, string> = {};
             for (const [key, row] of rows) {
-              const [tenant, store, id] = key.split("|");
+              const [tenant, store, ...parts] = key.split("|");
+              const id = parts.join("|");
               if (tenant === args.p_tenant_id && store === args.p_store && !row.removed) out[id!] = row.hash;
             }
             return { data: out, error: null };
           }
-          case "read_tenant_client_records": {
+          case "read_tenant_client_records":
+          case "read_tenant_client_records_page": {
             if (state.readError) return { data: null, error: { message: "timeout" } };
             const out = [...rows].filter(([key, row]) => key.startsWith(`${args.p_tenant_id}|${args.p_store}|`) && !row.removed)
-              .map(([key, row]) => ({ recordId: key.split("|")[2], payload: row.payload, capturedAt: row.capturedAt }))
+              .map(([key, row]) => ({ recordId: key.split("|").slice(2).join("|"), payload: row.payload, capturedAt: row.capturedAt }))
               .sort((a, b) => (a.capturedAt < b.capturedAt ? 1 : -1));
             return { data: out, error: null };
           }
@@ -87,7 +89,7 @@ describe("client-record hashing", () => {
   it("parses pending members and rejects unknown stores", () => {
     expect(parsePendingMember("spam_held|gldf|spam_1")).toEqual({ store: "spam_held", tenant: "gldf", recordId: "spam_1" });
     expect(parsePendingMember("inquiry_timeline|gldf|lead_1:abc")).toEqual({ store: "inquiry_timeline", tenant: "gldf", recordId: "lead_1:abc" });
-    expect(parsePendingMember("orders|gldf|x")).toBeNull();
+    expect(parsePendingMember("unknown_store|gldf|x")).toBeNull();
     expect(parsePendingMember("spam_held||x")).toBeNull();
   });
 });
@@ -188,6 +190,12 @@ describe.skipIf(!isolatedRedisAvailable)("client-record move pattern (isolated R
     expect(await clientRecordReadSource("spam_held")).toBe("redis");
     fake.state.streak = 7;
     expect(await clientRecordReadSource("spam_held")).toBe("postgres");
+    vi.stubEnv("DUAL_WRITE_PG", "0");
+    expect(await clientRecordReadSource("spam_held")).toBe("redis");
+    vi.stubEnv("DUAL_WRITE_PG", "1");
+    vi.stubEnv("STRELVA_CLIENT_RECORDS_DUAL_WRITE", "0");
+    expect(await clientRecordReadSource("spam_held")).toBe("redis");
+    vi.stubEnv("STRELVA_CLIENT_RECORDS_DUAL_WRITE", "1");
     expect(await clientRecordReadSource("account_grouping")).toBe("redis");
     fake.state.streakError = true;
     expect(await clientRecordReadSource("spam_held")).toBe("redis");
@@ -201,6 +209,53 @@ describe.skipIf(!isolatedRedisAvailable)("client-record move pattern (isolated R
     fake.state.readError = true;
     expect(await getSpam("acme")).toEqual([]);
     expect(await readThroughFlag("spam_held", "acme", async () => "redis", () => "postgres")).toBe("redis");
+  });
+
+  it("backfills every new store dry-run first and detects payload drift", async () => {
+    const fixtures = {
+      orders: ["SET", "order:acme:o1", JSON.stringify({ id: "o1", amountCents: 100, createdAt: "2026-10-06T12:00:00Z" })],
+      threads: ["SET", "threads:acme:t1", JSON.stringify({ id: "t1", messages: [], createdAt: "2026-10-06T12:00:00Z" })],
+      provider_connections: ["SET", "connections:acme:google", JSON.stringify({ provider: "google", accessToken: "enc:v1:test-only-envelope" })],
+      provider_metadata: ["SET", "google-meta:acme", JSON.stringify({ accountId: "a", locationId: "l" })],
+      tenant_settings: ["SET", "reb:client-email:acme", "off"],
+      reward_members: ["HSET", "reb:rewards:acme:member:m@example.test", "email", "m@example.test", "starsAvailable", "8"],
+      reward_transactions: ["LPUSH", "reb:rewards:acme:txns:m@example.test", JSON.stringify({ id: "txn1", amount: 8, timestamp: "2026-10-06T12:00:00Z" })],
+    } as const;
+    cli("ZADD", "orders:acme", "1", "o1");
+    cli("ZADD", "threads:acme:index", "1", "t1");
+    for (const [store, fixture] of Object.entries(fixtures)) {
+      cli(...fixture);
+      const name = store as Parameters<typeof backfillClientRecords>[0];
+      const dry = await backfillClientRecords(name, "acme", { apply: false });
+      expect(dry.redisRecords).toBe(1);
+      expect(fake.rows.size).toBe(Object.keys(fixtures).indexOf(store));
+      const applied = await backfillClientRecords(name, "acme", { apply: true });
+      expect(applied.failed).toEqual([]);
+      expect((await checkClientRecordParity(name, "acme")).ok).toBe(true);
+      const record = [...fake.rows].find(([key]) => key.startsWith(`acme|${name}|`))!;
+      record[1].hash = "wrong";
+      expect((await checkClientRecordParity(name, "acme")).mismatched).toHaveLength(1);
+      expect((await backfillClientRecords(name, "acme", { apply: true })).failed).toEqual([]);
+    }
+  });
+
+  it("repair retains the submitted payload after Redis TTL/index loss", async () => {
+    fake.state.fail = true;
+    const record = { recordId: "o-expired", payload: { id: "o-expired", amountCents: 123 }, capturedAt: "2026-10-06T12:00:00Z" };
+    expect((await mirrorClientRecord("orders", "acme", record)).status).toBe("failed");
+    // There is no order index or blob left to re-read; the failure payload is retained.
+    fake.state.fail = false;
+    expect((await repairPendingClientRecords()).repaired).toBe(1);
+    expect(fake.rows.get("acme|orders|o-expired")?.payload.amountCents).toBe(123);
+  });
+
+  it("never copies plaintext provider secrets when the encryption key is absent", async () => {
+    vi.stubEnv("SECRETS_ENC_KEY", "");
+    const result = await mirrorClientRecord("provider_connections", "acme", { recordId: "google", payload: { accessToken: "test-plaintext-token" }, capturedAt: "2026-10-06T12:00:00Z" });
+    expect(result).toEqual({ status: "failed", reason: "provider_connection_encryption_required" });
+    expect(fake.rows.size).toBe(0);
+    const snapshot = await redis.client.get("reb:client-records:pending-payload:provider_connections|acme|google");
+    expect(snapshot).toBeNull();
   });
 
   it("counts order and reward keys without reading a value", async () => {
@@ -242,7 +297,7 @@ describe("client-records move script guard", () => {
     expect(ok.totals.written).toBe(1);
   });
   it("rejects unknown stores and options", () => {
-    expect(() => parseMoveArgs(["backfill", "--store=orders"])).toThrow(/Unknown store/);
+    expect(() => parseMoveArgs(["backfill", "--store=unknown_store"])).toThrow(/Unknown store/);
     expect(() => parseMoveArgs(["parity", "--apply"])).toThrow(/no --apply/);
     expect(() => parseMoveArgs(["delete"])).toThrow(/Usage/);
   });

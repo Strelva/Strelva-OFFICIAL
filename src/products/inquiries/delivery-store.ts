@@ -1,9 +1,7 @@
 /**
- * Internal Redis-backed delivery checkpoint store.
- *
- * This module is deliberately private to the inquiry delivery adapter. Redis
- * remains the operational authority for accepted-write markers, claims and
- * the daily delivery budget. Inquiry records themselves remain in leads Redis.
+ * Internal inquiry delivery store. Accepted checkpoints and routing dual-write
+ * to the shared stable-id client-record home. A parity-gated flip recovers
+ * markers after cache expiry; Redis still owns ephemeral atomic claims/budgets.
  */
 
 import { createHash, randomUUID } from "node:crypto";
@@ -21,8 +19,9 @@ import type {
   InquiryDeliveryStore,
   InquiryDeliveryTimelineInput,
 } from "./delivery-types";
-import { mirrorClientRecord } from "@/platform/client-records/mirror";
-import { FIRST_REPLY_ACTIONS, firstReplyRecord, timelineRecord } from "@/platform/client-records/stores";
+import { mirrorClientRecord, clientRecordDb } from "@/platform/client-records/mirror";
+import { clientRecordReadStores, clientRecordReadSource, readAllClientRecords, readThroughFlag } from "@/platform/client-records/move";
+import { FIRST_REPLY_ACTIONS, firstReplyRecord, timelineRecord, inquiryDeliveryRecord, inquiryDeliveryRecordId, type InquiryDeliveryRecordKind } from "@/platform/client-records/stores";
 import { copyInquiryEvent } from "@/lib/inquiry-records";
 
 const DELIVERY_TTL_SECONDS = 90 * 24 * 60 * 60;
@@ -387,17 +386,48 @@ export function createRedisInquiryDeliveryStore(
   const unavailable = () => {
     throw new Error("inquiry_delivery_persistence_unavailable");
   };
+  const mirrorDelivery = async (kind: InquiryDeliveryRecordKind, tenantId: string, key: string, value: unknown) => {
+    await mirrorClientRecord("inquiry_delivery", tenantId, inquiryDeliveryRecord(kind, key, value));
+  };
+  /** Current atomic transitions use Redis. A lost cache is hydrated under NX,
+   * so recovery never overwrites a concurrent provider outcome or send marker.
+   * Once a read flip was requested, inability to prove marker absence blocks
+   * a new send instead of resending an old accepted message. */
+  const deliveryValue = async (kind: InquiryDeliveryRecordKind, tenantId: string, key: string, redisKey: string, atomic = false): Promise<unknown> => {
+    if (!redis) return unavailable();
+    if (!clientRecordReadStores().has("inquiry_delivery")) return redis.get(redisKey);
+    const cached = await redis.get(redisKey);
+    if (await clientRecordReadSource("inquiry_delivery") !== "postgres") {
+      if (atomic && cached === null) throw new Error("inquiry_delivery_durable_read_unavailable");
+      return cached;
+    }
+    let records;
+    try { records = await readAllClientRecords("inquiry_delivery", tenantId); }
+    catch {
+      if (cached !== null) return cached;
+      throw new Error("inquiry_delivery_durable_read_unavailable");
+    }
+    const stored = records.find(record => record.recordId === inquiryDeliveryRecordId(kind, key))?.payload.value;
+    const value = stored && typeof stored === "object" && !Array.isArray(stored) ? { ...stored as Record<string, unknown>, tenantId } : stored ?? null;
+    if (!atomic) return value ?? cached;
+    if (cached !== null) return cached;
+    if (value !== null) {
+      await redis.set(redisKey, value, { nx: true, ex: DELIVERY_TTL_SECONDS });
+      return redis.get(redisKey);
+    }
+    return null;
+  };
   return {
     durable: Boolean(redis),
     atomicBudget: Boolean(redis?.eval),
     async getCheckpoint(input) {
       if (!redis) return unavailable();
-      return parseCheckpoint(await redis.get(checkpointKey(input.tenantId, input.inquiryId, input.action)), input.tenantId, input.inquiryId, input.action);
+      return parseCheckpoint(await deliveryValue("checkpoint", input.tenantId, `${keyPart(input.inquiryId)}:${input.action}`, checkpointKey(input.tenantId, input.inquiryId, input.action)), input.tenantId, input.inquiryId, input.action);
     },
     async beginAttempt(input) {
       if (!redis) return unavailable();
       const stateKey = checkpointKey(input.tenantId, input.inquiryId, input.action);
-      const existing = parseCheckpoint(await redis.get(stateKey), input.tenantId, input.inquiryId, input.action);
+      const existing = parseCheckpoint(await deliveryValue("checkpoint", input.tenantId, `${keyPart(input.inquiryId)}:${input.action}`, stateKey, true), input.tenantId, input.inquiryId, input.action);
       if (existing) {
         const terminal = ["accepted", "verified", "delivered", "bounced", "deferred", "suppressed", "accepted_unverified"].includes(existing.status)
           || (existing.status === "failed" && existing.retryable !== true);
@@ -433,6 +463,7 @@ export function createRedisInquiryDeliveryStore(
           ...(input.messageDigest ? { messageDigest: input.messageDigest.slice(0, 128) } : {}),
         };
         await redis.set(stateKey, checkpoint, { ex: DELIVERY_TTL_SECONDS });
+        await mirrorDelivery("checkpoint", input.tenantId, `${keyPart(input.inquiryId)}:${input.action}`, checkpoint);
         return { acquired: true, attemptId, checkpoint };
       } catch (error) {
         await redis.del(lockKey).catch(() => {});
@@ -442,7 +473,7 @@ export function createRedisInquiryDeliveryStore(
     async markAccepted(input) {
       if (!redis) return unavailable();
       const stateKey = checkpointKey(input.tenantId, input.inquiryId, input.action);
-      const current = parseCheckpoint(await redis.get(stateKey), input.tenantId, input.inquiryId, input.action);
+      const current = parseCheckpoint(await deliveryValue("checkpoint", input.tenantId, `${keyPart(input.inquiryId)}:${input.action}`, stateKey, true), input.tenantId, input.inquiryId, input.action);
       if (!current || current.attemptId !== input.attemptId || current.status !== "sending") throw new Error("inquiry_delivery_attempt_mismatch");
       const next: InquiryDeliveryCheckpoint = {
         ...current,
@@ -474,6 +505,9 @@ export function createRedisInquiryDeliveryStore(
         ],
         [JSON.stringify(next), target ? JSON.stringify(target) : "", replyTarget ? JSON.stringify(replyTarget) : "", replyTarget ? JSON.stringify(replyTarget) : "", String(DELIVERY_TTL_SECONDS)],
       );
+      await mirrorDelivery("checkpoint", input.tenantId, `${keyPart(input.inquiryId)}:${input.action}`, next);
+      if (target) await mirrorDelivery("provider_target", input.tenantId, keyPart(input.providerMessageId!), target);
+      if (replyTarget) await mirrorDelivery("reply_target", input.tenantId, keyPart(input.replyTo!.toLowerCase()), replyTarget);
       // The first message to the customer is the inquiry's first reply (outcome loop).
       if ((FIRST_REPLY_ACTIONS as readonly string[]).includes(input.action)) {
         await mirrorClientRecord("inquiry_reply", input.tenantId, firstReplyRecord(input.inquiryId, input.acceptedAt, input.action), "keep_first");
@@ -489,7 +523,7 @@ export function createRedisInquiryDeliveryStore(
     async markVerified(input) {
       if (!redis) return unavailable();
       const stateKey = checkpointKey(input.tenantId, input.inquiryId, input.action);
-      const current = parseCheckpoint(await redis.get(stateKey), input.tenantId, input.inquiryId, input.action);
+      const current = parseCheckpoint(await deliveryValue("checkpoint", input.tenantId, `${keyPart(input.inquiryId)}:${input.action}`, stateKey, true), input.tenantId, input.inquiryId, input.action);
       if (!current || current.attemptId !== input.attemptId || (current.status !== "accepted" && current.status !== "accepted_unverified")) throw new Error("inquiry_delivery_attempt_mismatch");
       const next: InquiryDeliveryCheckpoint = { ...current, status: "verified", verificationEvidence: input.evidence?.slice(0, 20) || [] };
       if (!redis.eval) throw new Error("atomic_inquiry_delivery_verification_unavailable");
@@ -500,12 +534,13 @@ export function createRedisInquiryDeliveryStore(
       );
       const parsed = parseCheckpoint(updated, input.tenantId, input.inquiryId, input.action);
       if (!parsed || parsed.attemptId !== input.attemptId || parsed.status !== "verified") throw new Error("inquiry_delivery_attempt_mismatch");
+      await mirrorDelivery("checkpoint", input.tenantId, `${keyPart(input.inquiryId)}:${input.action}`, parsed);
       return parsed;
     },
     async markAcceptedUnverified(input) {
       if (!redis) return unavailable();
       const stateKey = checkpointKey(input.tenantId, input.inquiryId, input.action);
-      const current = parseCheckpoint(await redis.get(stateKey), input.tenantId, input.inquiryId, input.action);
+      const current = parseCheckpoint(await deliveryValue("checkpoint", input.tenantId, `${keyPart(input.inquiryId)}:${input.action}`, stateKey, true), input.tenantId, input.inquiryId, input.action);
       if (!current || current.attemptId !== input.attemptId || (current.status !== "accepted" && current.status !== "accepted_unverified")) throw new Error("inquiry_delivery_attempt_mismatch");
       const next: InquiryDeliveryCheckpoint = { ...current, status: "accepted_unverified", verificationReason: input.reason.slice(0, 240), retryable: false };
       if (!redis.eval) throw new Error("atomic_inquiry_delivery_verification_unavailable");
@@ -516,12 +551,13 @@ export function createRedisInquiryDeliveryStore(
       );
       const parsed = parseCheckpoint(updated, input.tenantId, input.inquiryId, input.action);
       if (!parsed || parsed.attemptId !== input.attemptId || parsed.status !== "accepted_unverified") throw new Error("inquiry_delivery_attempt_mismatch");
+      await mirrorDelivery("checkpoint", input.tenantId, `${keyPart(input.inquiryId)}:${input.action}`, parsed);
       return parsed;
     },
     async markProviderOutcome(input: InquiryDeliveryProviderEventInput) {
       if (!redis) return unavailable();
       const stateKey = checkpointKey(input.tenantId, input.inquiryId, input.action);
-      const current = parseCheckpoint(await redis.get(stateKey), input.tenantId, input.inquiryId, input.action);
+      const current = parseCheckpoint(await deliveryValue("checkpoint", input.tenantId, `${keyPart(input.inquiryId)}:${input.action}`, stateKey, true), input.tenantId, input.inquiryId, input.action);
       if (!current || current.providerMessageId !== input.providerMessageId) throw new Error("inquiry_delivery_provider_message_mismatch");
       if (current.providerEventId === input.providerEventId) return current;
       if (current.status === "sending" || current.status === "unknown") throw new Error("inquiry_delivery_acceptance_required");
@@ -554,11 +590,16 @@ export function createRedisInquiryDeliveryStore(
       );
       const parsed = parseCheckpoint(updated, input.tenantId, input.inquiryId, input.action);
       if (!parsed) throw new Error("inquiry_delivery_provider_outcome_unavailable");
+      await mirrorDelivery("checkpoint", input.tenantId, `${keyPart(input.inquiryId)}:${input.action}`, parsed);
       return parsed;
     },
     async claimProviderEvent(input) {
       if (!redis) return unavailable();
       if (!redis.eval) throw new Error("atomic_inquiry_provider_claim_unavailable");
+      if (clientRecordReadStores().has("inquiry_delivery")) {
+        const completed = await deliveryValue("provider_event", input.tenantId, keyPart(input.providerEventId), providerEventKey(input.tenantId, input.providerEventId), true);
+        if (completed === "completed") return { status: "completed" } satisfies InquiryDeliveryProviderEventClaim;
+      }
       const token = randomUUID();
       const result = await redis.eval<string>(
         CLAIM_PROVIDER_EVENT_SCRIPT,
@@ -572,11 +613,12 @@ export function createRedisInquiryDeliveryStore(
     async completeProviderEvent(input) {
       if (!redis) return unavailable();
       if (!redis.eval) throw new Error("atomic_inquiry_provider_claim_unavailable");
-      await redis.eval(
+      const completed = await redis.eval<number>(
         COMPLETE_PROVIDER_EVENT_SCRIPT,
         [providerEventKey(input.tenantId, input.providerEventId)],
         [input.claimToken, String(DELIVERY_TTL_SECONDS)],
       );
+      if (completed === 1) await mirrorDelivery("provider_event", input.tenantId, keyPart(input.providerEventId), "completed");
     },
     async releaseProviderEvent(input) {
       if (!redis) return unavailable();
@@ -590,7 +632,7 @@ export function createRedisInquiryDeliveryStore(
     async findByProviderMessageId(input) {
       if (!redis) return unavailable();
       const target = parseProviderMessageTarget(
-        await redis.get(providerMessageKey(input.tenantId, input.providerMessageId)),
+        await deliveryValue("provider_target", input.tenantId, keyPart(input.providerMessageId), providerMessageKey(input.tenantId, input.providerMessageId)),
         input.tenantId,
         input.providerMessageId,
       );
@@ -598,7 +640,7 @@ export function createRedisInquiryDeliveryStore(
     },
     async findByReplyAddress(input) {
       if (!redis) return unavailable();
-      let raw: unknown = await redis.get(replyAddressKey(input.tenantId, input.replyTo));
+      let raw: unknown = await deliveryValue("reply_target", input.tenantId, keyPart(input.replyTo.toLowerCase()), replyAddressKey(input.tenantId, input.replyTo));
       if (typeof raw === "string") {
         try {
           raw = JSON.parse(raw);
@@ -613,6 +655,13 @@ export function createRedisInquiryDeliveryStore(
     },
     async findByReplyAddressAny(input) {
       if (!redis) return unavailable();
+      if (await clientRecordReadSource("inquiry_delivery") === "postgres") {
+        const result = await clientRecordDb()?.rpc("find_inquiry_delivery_reply_target", { p_reply_to: input.replyTo.trim().toLowerCase() });
+        if (result && !result.error && result.data && typeof result.data === "object") {
+          const target = result.data as { tenantId?: unknown; inquiryId?: unknown };
+          if (typeof target.tenantId === "string" && typeof target.inquiryId === "string") return { tenantId: target.tenantId, inquiryId: target.inquiryId };
+        }
+      }
       let raw: unknown = await redis.get(replyAddressAnyKey(input.replyTo));
       if (typeof raw === "string") {
         try {
@@ -628,12 +677,12 @@ export function createRedisInquiryDeliveryStore(
     },
     async getReplyState(input) {
       if (!redis) return unavailable();
-      return parseReplyState(await redis.get(replyStateKey(input.tenantId, input.inquiryId)), input.tenantId, input.inquiryId);
+      return parseReplyState(await deliveryValue("reply_state", input.tenantId, keyPart(input.inquiryId), replyStateKey(input.tenantId, input.inquiryId)), input.tenantId, input.inquiryId);
     },
     async markReplyReceived(input) {
       if (!redis) return unavailable();
       const stateKey = replyStateKey(input.tenantId, input.inquiryId);
-      const current = parseReplyState(await redis.get(stateKey), input.tenantId, input.inquiryId);
+      const current = parseReplyState(await deliveryValue("reply_state", input.tenantId, keyPart(input.inquiryId), stateKey, true), input.tenantId, input.inquiryId);
       if (current) return current;
       const next: InquiryDeliveryReplyState = {
         tenantId: input.tenantId,
@@ -643,6 +692,7 @@ export function createRedisInquiryDeliveryStore(
         receivedAt: input.receivedAt,
       };
       await redis.set(stateKey, next, { ex: DELIVERY_TTL_SECONDS });
+      await mirrorDelivery("reply_state", input.tenantId, keyPart(input.inquiryId), next);
       await copyInquiryEvent({
         tenantId: input.tenantId, inquiryId: input.inquiryId, kind: "reply", actor: "system",
         detail: { receivedAt: input.receivedAt }, dedupeKey: `reply:${next.providerEventId}`,
@@ -652,7 +702,7 @@ export function createRedisInquiryDeliveryStore(
     async markFailed(input) {
       if (!redis) return unavailable();
       const stateKey = checkpointKey(input.tenantId, input.inquiryId, input.action);
-      const current = parseCheckpoint(await redis.get(stateKey), input.tenantId, input.inquiryId, input.action);
+      const current = parseCheckpoint(await deliveryValue("checkpoint", input.tenantId, `${keyPart(input.inquiryId)}:${input.action}`, stateKey, true), input.tenantId, input.inquiryId, input.action);
       if (!current || current.attemptId !== input.attemptId || current.status !== "sending") throw new Error("inquiry_delivery_attempt_mismatch");
       const next: InquiryDeliveryCheckpoint = {
         ...current,
@@ -661,6 +711,7 @@ export function createRedisInquiryDeliveryStore(
         retryable: input.retryable && !input.ambiguous,
       };
       await redis.set(stateKey, next, { ex: DELIVERY_TTL_SECONDS });
+      await mirrorDelivery("checkpoint", input.tenantId, `${keyPart(input.inquiryId)}:${input.action}`, next);
       return next;
     },
     async releaseAttempt(input) {
@@ -688,8 +739,11 @@ export function createRedisInquiryDeliveryStore(
     async listTimeline(input) {
       if (!redis) return unavailable();
       const key = timelineKey(input.tenantId, input.inquiryId);
-      const raw = await redis.zrange<string[]>(key, 0, Math.max(0, (input.limit ?? 50) - 1), { rev: true });
-      return (raw || []).map((value) => parseTimeline(value, input.tenantId, input.inquiryId)).filter((event): event is InquiryDeliveryTimelineInput => Boolean(event));
+      return readThroughFlag("inquiry_timeline", input.tenantId, async () => {
+        const raw = await redis.zrange<string[]>(key, 0, Math.max(0, (input.limit ?? 50) - 1), { rev: true });
+        return (raw || []).map(value => parseTimeline(value, input.tenantId, input.inquiryId)).filter((event): event is InquiryDeliveryTimelineInput => Boolean(event));
+      }, rows => rows.map(row => parseTimeline({ ...row.payload, tenantId: input.tenantId }, input.tenantId, input.inquiryId))
+        .filter((event): event is InquiryDeliveryTimelineInput => Boolean(event)).sort((a,b) => Date.parse(b.at ?? "") - Date.parse(a.at ?? "")).slice(0,input.limit ?? 50));
     },
   };
 }

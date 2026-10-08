@@ -1,3 +1,4 @@
+import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 /**
  * Google Reviews Polling Cron
  *
@@ -267,7 +268,7 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
         tenant,
         reviewId: review.reviewId,
         review: { author: review.reviewer.displayName, rating, text: review.comment },
-        reviewsUrl: getTenantDashboardUrl(tenant, "/dashboard/reviews"),
+        reviewsUrl: await ownerNoticeUrl(tenant, "/dashboard/reviews", getTenantDashboardUrl(tenant, "/dashboard/reviews")),
         draftedReply,
         approveUrl,
         notYetUrl,

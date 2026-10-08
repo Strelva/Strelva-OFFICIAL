@@ -17,15 +17,17 @@ import {
   type AgencyLoadedPage,
 } from "./agency-home";
 import { AgencyClientList, AgencyClientsError, AgencyClientsLoading, AgencyQueueList } from "./agency/AgencyViews";
+import { AgencyAuthoring } from "./agency/AgencyAuthoring";
 import { AgencyTeamView } from "./agency/AgencyTeamView";
 import { AgencyLibraryView } from "./agency/AgencyLibraryView";
+import { AgencyVersionCreate } from "./agency/AgencyVersionCreate";
 
 type ClientsState =
   | { status: "loading" }
   | { status: "error" }
   | { status: "ready"; pages: AgencyLoadedPage[]; loadingMore: boolean; moreError: boolean; retrying: ReadonlySet<number> };
 
-type AgencyView = "clients" | "queue" | "library" | "team";
+type AgencyView = "clients" | "queue" | "library" | "team" | "build" | "package";
 
 function workLabel(work: WorkspaceWork, systemsReleased: boolean): string {
   if (work.productId === "applications") return systemsReleased ? "Internal tool" : "Application";
@@ -338,6 +340,7 @@ export function AgencyHome({
           { value: "queue", label: "Queue", ...tab("queue") },
           { value: "library", label: "Library", ...tab("library") },
           { value: "team", label: "Team", ...tab("team") },
+          ...(current?.role === "owner" || current?.role === "admin" ? [{ value: "build", label: "Build", ...tab("build") }, { value: "package", label: "Package", ...tab("package") }] : []),
         ]}
       />
       {clients.status === "ready" ? <button type="button" className="inline-flex min-h-11 items-center gap-2 text-[13px] text-gray-muted underline-offset-4 hover:text-warm-black hover:underline" onClick={retry}><RefreshCw size={14} aria-hidden="true" />Refresh</button> : null}
@@ -350,6 +353,7 @@ export function AgencyHome({
     <TabsPanel id={tab("queue").panelId} tabId={tab("queue").id} active={view === "queue"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
       <p className="mb-4 text-[12px] text-gray-muted">Oldest first. Each item opens the client’s own System or work, never a copy.</p>
       {queueList}
+      {combined?.queueGaps.length ? <div role="alert" className="mt-4 text-sm text-critical"><p>This Queue is incomplete. Some sources could not be read.</p><ul className="mt-2 list-disc pl-5">{combined.queueGaps.map(gap => <li key={gap}>{gap}</li>)}</ul></div> : null}
       <div className="mt-12 space-y-10">
         {serviceRequests}
         {applicationDraftSection}
@@ -360,6 +364,7 @@ export function AgencyHome({
     <TabsPanel id={tab("library").panelId} tabId={tab("library").id} active={view === "library"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
       <p className="mb-6 max-w-2xl text-[12px] leading-relaxed text-gray-muted">Sources {agencyName} keeps, and where each client’s Version stands against the latest revision. Nothing reaches a client until its owner approves.</p>
       {libraryOpened ? <AgencyLibraryView request={request} agencyWorkspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} /> : null}
+      {libraryOpened && (current?.role === "owner" || current?.role === "admin") ? <AgencyVersionCreate request={request} agencyWorkspaceId={snapshot.workspaceId} clients={combined?.clients ?? []} /> : null}
     </TabsPanel>
 
     <TabsPanel id={tab("team").panelId} tabId={tab("team").id} active={view === "team"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
@@ -367,6 +372,7 @@ export function AgencyHome({
       {accessNote}
     </TabsPanel>
 
+    {(view === "build" || view === "package") && (current?.role === "owner" || current?.role === "admin") ? <TabsPanel id={tab(view).panelId} tabId={tab(view).id} active className="mt-6"><AgencyAuthoring request={request} snapshot={snapshot} clients={combined?.clients ?? []} kind={view} onOpenClientWork={onOpenClientWork} /></TabsPanel> : null}
     {privateWork}
     {creditSection}
   </div>;

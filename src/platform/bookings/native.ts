@@ -101,12 +101,18 @@ export async function issueNativeAccess(tenant: string, ref: string) {
   return await nativeRpc("issue_booking_access", { p_tenant_id: tenant, p_ref: ref, p_access: newBookingAccess() }) as Record<string, unknown>;
 }
 
+/** Whether a held request could reach this business's customer for
+ * confirmation: messages, manage page, reminders and this business's email gate. */
+export async function agentConfirmationAvailable(tenant: string): Promise<boolean> {
+  const { bookingCustomerEmailAllowed } = await import("./updates");
+  const { bookingMessagesEnabled, bookingManagePageEnabled, bookingRemindersEnabled } = await import("./flags");
+  return bookingMessagesEnabled() && bookingManagePageEnabled() && bookingRemindersEnabled() && await bookingCustomerEmailAllowed(tenant);
+}
+
 export async function requestAgentBooking(tenant: string, raw: unknown) {
   await requireAgentBookings();
   const input = agentBookingSchema.parse(raw);
-  const { bookingCustomerEmailAllowed } = await import("./updates");
-  const { bookingMessagesEnabled, bookingManagePageEnabled, bookingRemindersEnabled } = await import("./flags");
-  if (!bookingMessagesEnabled() || !bookingManagePageEnabled() || !bookingRemindersEnabled() || !await bookingCustomerEmailAllowed(tenant)) {
+  if (!await agentConfirmationAvailable(tenant)) {
     throw new PublicBookingError("unavailable", "Customer confirmation is not available for this business.");
   }
   const ctx = await context(tenant);
@@ -146,6 +152,14 @@ export async function nativeBookingByToken(hash: string, kind: "manage" | "confi
   const booking = parseStoreBooking(data);
   return booking && data ? { ...booking, siteName: String(data.siteName ?? ""), confirmationRequired: data.confirmationRequired === true,
     confirmUntil: typeof data.confirmUntil === "string" ? data.confirmUntil : null } : null;
+}
+
+/** An assistant's status token answers until 24 hours after the booking ends:
+ * long enough to report the day's outcome, and then a leaked token goes quiet.
+ * Distinct from the 15-minute confirmation deadline. */
+export const STATUS_TOKEN_GRACE_MS = 24 * 3_600_000;
+export function statusAccessLive(booking: { end: string }, now = Date.now()): boolean {
+  return Date.parse(booking.end) + STATUS_TOKEN_GRACE_MS > now;
 }
 
 export async function confirmAgent(hash: string) {

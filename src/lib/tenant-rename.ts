@@ -58,6 +58,45 @@ end
 return {moved, rewritten}
 `;
 
+/** Pending client-record snapshots outlive their source cache. Move the
+ * queue identity and retained snapshot together; a worker holding the old
+ * identity cannot remove the newly renamed retry. */
+export const REKEY_CLIENT_RECORD_PENDING_LUA = `
+local rows = redis.call('ZRANGE', KEYS[1], 0, -1, 'WITHSCORES')
+local moved = 0
+for i = 1, #rows, 2 do
+  local store, tenant, id = string.match(rows[i], '^([^|]+)|([^|]+)|(.+)$')
+  if tenant == ARGV[1] then
+    local nextMember = store .. '|' .. ARGV[2] .. '|' .. id
+    local oldKey = ARGV[3] .. rows[i]
+    local nextKey = ARGV[3] .. nextMember
+    local oldBody = redis.call('GET', oldKey)
+    local nextBody = redis.call('GET', nextKey)
+    local useOld = oldBody and not nextBody
+    if oldBody and nextBody then
+      local oldOk, oldValue = pcall(cjson.decode, oldBody)
+      local nextOk, nextValue = pcall(cjson.decode, nextBody)
+      if oldOk and nextOk and oldValue.capturedAt and nextValue.capturedAt then
+        if store == 'inquiry_reply' then
+          useOld = oldValue.capturedAt < nextValue.capturedAt
+        else
+          useOld = oldValue.capturedAt > nextValue.capturedAt
+        end
+      end
+    end
+    if useOld then redis.call('RENAME', oldKey, nextKey)
+    elseif oldBody then redis.call('DEL', oldKey) end
+    local nextScore = redis.call('ZSCORE', KEYS[1], nextMember)
+    if not nextScore or tonumber(rows[i+1]) < tonumber(nextScore) then
+      redis.call('ZADD', KEYS[1], rows[i+1], nextMember)
+    end
+    redis.call('ZREM', KEYS[1], rows[i])
+    moved = moved + 1
+  end
+end
+return moved
+`;
+
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,40})$/;
 
 /**
@@ -226,6 +265,16 @@ export async function rekeyTenantRedis(oldSlug: string, newSlug: string): Promis
     out.redisErrors.push(`lead-mirror: ${err instanceof Error ? err.message : String(err)}`);
     // Do not move lead payloads without their queue identities. Recovery can
     // rerun the same rename; every other authoritative family still proceeds.
+  }
+
+  // Inert for existing tenants until the durable-store rollout is armed.
+  if (process.env.STRELVA_CLIENT_RECORDS_DUAL_WRITE === "1" && process.env.DUAL_WRITE_PG !== "0") {
+    try {
+      out.movedKeys += Number(await redis.eval(REKEY_CLIENT_RECORD_PENDING_LUA,
+        ["reb:client-records:pending"], [oldSlug, newSlug, "reb:client-records:pending-payload:"]));
+    } catch (err) {
+      out.redisErrors.push(`client-records: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   // 1) Event queue: rename the tenant zset, then rewrite each event blob's tenantId

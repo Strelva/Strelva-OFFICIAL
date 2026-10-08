@@ -11,15 +11,34 @@ const mocks = vi.hoisted(() => ({
   tenantConfig: vi.fn(),
 }));
 
-import { resolveOwnerNoticeRecipient, ownerNoticeEmail, setOwnerRecipientResolver } from "@/lib/owner-recipient";
+import { resolveOwnerNoticeRecipient, ownerNoticeEmail, releasedOwnerNoticeEmail, setOwnerRecipientResolver } from "@/lib/owner-recipient";
 
 const tenant = { id: "gldf", ownerEmail: "Owner@GLDF.example " };
 afterEach(() => {
   setOwnerRecipientResolver(null);
   vi.useRealTimers();
+  vi.unstubAllEnvs();
 });
 
 describe("resolveOwnerNoticeRecipient", () => {
+  it.each([["", ""], ["1", ""], ["", "1"]])("keeps added notices' exact issued recipient with rollout gates %s/%s", async (workspace, reads) => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", workspace);
+    vi.stubEnv("STRELVA_BUSINESS_RECORD_READS", reads);
+    const resolve = vi.fn().mockResolvedValue({ email: "record@example.test", name: null, from: "record", workspaceId: "w1" });
+    setOwnerRecipientResolver(resolve);
+    await expect(releasedOwnerNoticeEmail(tenant)).resolves.toBe(tenant.ownerEmail);
+    expect(resolve).not.toHaveBeenCalled();
+  });
+
+  it("releases added notices through the same resolver and bounded fallback", async () => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    vi.stubEnv("STRELVA_BUSINESS_RECORD_READS", "1");
+    setOwnerRecipientResolver(async () => ({ email: "Record@Example.test ", name: null, from: "record", workspaceId: "w1" }));
+    await expect(releasedOwnerNoticeEmail(tenant)).resolves.toBe("record@example.test");
+    setOwnerRecipientResolver(async () => { throw new Error("resolver unavailable"); });
+    await expect(releasedOwnerNoticeEmail(tenant)).resolves.toBe("owner@gldf.example");
+  });
+
   it("uses the business record's owner contact when the rule names one", async () => {
     setOwnerRecipientResolver(async () => ({ email: "pat@gldf.example", name: "Pat", from: "record", workspaceId: "w1", tenantId: "gldf" }));
     await expect(resolveOwnerNoticeRecipient(tenant)).resolves.toEqual({ email: "pat@gldf.example", name: "Pat", from: "record", workspaceId: "w1" });
@@ -90,7 +109,7 @@ describe("hosted website report recipient", () => {
   });
 
   async function load() {
-    vi.doMock("@/platform/business-record/service", () => ({ resolveOwnerRecipient: mocks.businessRecipient, resolveTenantOwnerRecipient: vi.fn().mockRejectedValue(new Error("unused")) }));
+    vi.doMock("@/platform/business-record/service", async (original) => ({ ...(await original<typeof import("@/platform/business-record/service")>()), resolveOwnerRecipient: mocks.businessRecipient, resolveTenantOwnerRecipient: vi.fn().mockRejectedValue(new Error("unused")) }));
     vi.doMock("@/lib/tenants", () => ({ getTenantConfig: mocks.tenantConfig }));
     return import("@/products/websites/site-report");
   }

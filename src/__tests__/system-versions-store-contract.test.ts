@@ -117,6 +117,33 @@ function contract(name: string, make: () => Harness) {
       await expect(f.versions.createVersion(f.mooneyOwner, { source: f.v1.source, version: f.mooneySystem, context: { kind: "agency_client", label: "Again" } })).rejects.toBeInstanceOf(VersionValidationError);
     });
 
+    it("reserves lineage and data grants for the business owner, including direct database saves", async () => {
+      const h = make();
+      const f = await agencyFixture(h);
+      const admin = await h.actor([{ businessId: f.mooney, role: "admin" }]);
+      let version = await f.versions.createVersion(f.mooneyOwner, { source: f.v1.source, version: f.mooneySystem, context: { kind: "agency_client", label: "Mooney" } });
+      await expect(f.versions.grantAccess(admin, version.id, { granteeBusinessId: f.agency, scope: "lineage_and_data", expectedRowRevision: version.rowRevision })).rejects.toBeInstanceOf(VersionAccessError);
+      if (h.db) {
+        const forged = { ...version, grants: [{ granteeBusinessId: f.agency, scope: "lineage" as const, grantedBy: admin.userId, grantedAt: now() }] };
+        await expect(h.store.updateLineage(admin, forged, version.rowRevision)).rejects.toBeInstanceOf(VersionAccessError);
+      }
+      expect((await f.versions.readVersion(f.mooneyOwner, version.id)).grants).toEqual([]);
+      version = await f.versions.grantAccess(f.mooneyOwner, version.id, { granteeBusinessId: f.agency, scope: "lineage", expectedRowRevision: version.rowRevision });
+      await expect(f.versions.revokeAccess(admin, version.id, { granteeBusinessId: f.agency, expectedRowRevision: version.rowRevision })).rejects.toBeInstanceOf(VersionAccessError);
+      if (h.db) {
+        const revoked = { ...version, grants: version.grants.map(grant => ({ ...grant, revokedAt: now() })) };
+        await expect(h.store.updateLineage(admin, revoked, version.rowRevision)).rejects.toBeInstanceOf(VersionAccessError);
+        expect((await h.db.rpc("save_system_version_owner_grants_core", { p_user_id: admin.userId, p_verified_email: admin.verifiedEmail,
+          p_version_id: version.id, p_expected_row_revision: version.rowRevision, p_lineage: revoked })).error?.message).toContain("permission denied");
+      }
+      // Normal draft edits keep the owner's exact grants and remain permitted.
+      version = await f.versions.setOverride(admin, version.id, { path: "form.title", value: "Client wording", expectedRowRevision: version.rowRevision });
+      expect(version.grants).toHaveLength(1);
+      await expect(f.versions.readVersion(f.agencyOwner, version.id)).resolves.toMatchObject({ access: "lineage" });
+      await f.versions.revokeAccess(f.mooneyOwner, version.id, { granteeBusinessId: f.agency, expectedRowRevision: version.rowRevision });
+      await expect(f.versions.readVersion(f.agencyOwner, version.id)).rejects.toBeInstanceOf(VersionAccessError);
+    }, 30_000);
+
     it("shows lineage to a granted business without bindings, and data only with lineage_and_data", async () => {
       const h = make();
       const f = await agencyFixture(h);
