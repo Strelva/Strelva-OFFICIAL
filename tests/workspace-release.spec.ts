@@ -2,6 +2,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 import { createPreviewInquiryAdapter } from "../src/experience/inquiries/preview-fixture";
 import { createTracker, previewTrackerImport } from "../src/products/tracker";
 import type { WorkspaceHandoffPreview, WorkspaceSnapshot, WorkspaceWork } from "../src/experience/workspace/contracts";
+import { AGENCY_CLIENT_PAGE_SIZE, agencyClientsPageSchema, type AgencyClientsPage } from "../src/experience/workspace/agency-clients";
 
 test.skip(process.env.STRELVA_WORKSPACE_RELEASE !== "1", "Workspace browser checks require the opt-in workspace release server.");
 
@@ -1041,37 +1042,97 @@ test("recovers the same assessment after a lost response and reload", async ({ p
 });
 
 for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
-test(`agency queue pages through all clients and reports unavailable work at ${viewport.width}px`, async ({ page }) => {
+test(`agency queue pages through all clients and reports unavailable work at ${viewport.width}px`, async ({ page }, testInfo) => {
   await page.setViewportSize(viewport);
-  const customers: WorkspaceSnapshot["workspaces"] = Array.from({ length: 10 }, (_, index) => ({
+  const customers: WorkspaceSnapshot["workspaces"] = Array.from({ length: AGENCY_CLIENT_PAGE_SIZE + 2 }, (_, index) => ({
     id: `90000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
     kind: "customer", name: `Page Client ${index + 1}`, access: "delegated_read",
   }));
+  const workId = (index: number) => `91000000-0000-4000-8000-${String(index).padStart(12, "0")}`;
   const workspaces: WorkspaceSnapshot["workspaces"] = [{ id: AGENCY_ID, kind: "agency", name: "North Studio", access: "member" }, ...customers];
   const delegations: WorkspaceSnapshot["delegations"] = customers.map((customer, index) => ({
-    id: `delegation-${index}`, workId: `shared-${index}`, customerWorkspaceId: customer.id,
+    id: `delegation-${index}`, workId: workId(index), customerWorkspaceId: customer.id,
     agencyWorkspaceId: AGENCY_ID, status: "active", canRevoke: false,
   }));
+  const workspaceReads: string[] = [];
+  const clientPages: Array<string | null> = [];
+  const mutations: string[] = [];
+  let recovered = false;
+  const cursor = customers[AGENCY_CLIENT_PAGE_SIZE - 1]!.id;
+  const last = customers.length - 1;
+  page.on("request", request => {
+    if (new URL(request.url()).pathname.startsWith("/api/") && !["GET", "HEAD"].includes(request.method())) mutations.push(request.method());
+  });
   await mockWorkspace(page, route => {
     const selected = new URL(route.request().url()).searchParams.get("workspaceId") || AGENCY_ID;
-    if (selected === customers[9]!.id) return fulfill(route, { error: "Temporarily unavailable" }, 503);
+    // This handler is for workspace navigation; the batched endpoint below
+    // owns client discovery and never fans out through these reads.
+    if (new URL(route.request().url()).pathname === "/api/workspace") workspaceReads.push(selected);
     const index = customers.findIndex(customer => customer.id === selected);
     return fulfill(route, snapshot({ workspaceId: selected, workspaces, delegations,
-      work: index < 0 ? [] : [work({ id: `shared-${index}`, workspaceId: selected, title: `Review client ${index + 1}`, operation: { status: "needs_attention" } })],
+      work: index < 0 ? [] : [work({ id: workId(index), workspaceId: selected, title: `Review client ${index + 1}`, operation: { status: "needs_attention" } })],
     }));
   });
+  await page.route("**/api/workspace/agency-clients?*", route => {
+    const query = new URL(route.request().url()).searchParams;
+    expect(route.request().method()).toBe("GET");
+    expect(query.get("workspaceId")).toBe(AGENCY_ID);
+    expect([...query.keys()].sort()).toEqual(query.has("cursor") ? ["cursor", "workspaceId"] : ["workspaceId"]);
+    const requestedCursor = query.get("cursor");
+    expect([null, cursor]).toContain(requestedCursor);
+    clientPages.push(requestedCursor);
+    const indices = requestedCursor === null ? Array.from({ length: AGENCY_CLIENT_PAGE_SIZE }, (_, index) => index) : [AGENCY_CLIENT_PAGE_SIZE, last];
+    const readyQueue = requestedCursor === null ? [0] : recovered ? [AGENCY_CLIENT_PAGE_SIZE, last] : [AGENCY_CLIENT_PAGE_SIZE];
+    const body: AgencyClientsPage = {
+      agencyWorkspaceId: AGENCY_ID, total: customers.length, nextCursor: requestedCursor === null ? cursor : null, providersRead: true,
+      clients: indices.map(index => ({
+        workspaceId: customers[index]!.id, name: customers[index]!.name, reach: "agency", role: "agency", provider: false,
+        status: index === last && !recovered ? "unavailable" : "ready", systems: [], needsYou: { count: 0, oldestAt: null },
+        openRequests: index === last && !recovered ? 0 : 1, improvementsWaiting: 0, lastReceiptAt: null,
+      })),
+      queue: readyQueue.map(index => ({ id: `review-${index}`, kind: "request", workspaceId: customers[index]!.id,
+        clientName: customers[index]!.name, title: `Review client ${index + 1}`, systemId: null, workId: workId(index), since: "2026-09-20T12:00:00Z" })),
+      team: [],
+    };
+    return fulfill(route, agencyClientsPageSchema.parse(body));
+  });
   await page.goto(`/workspace?workspaceId=${AGENCY_ID}`);
-  await expect(page.getByText("Clients 1–8 of 10", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Next clients", exact: true }).focus();
-  await page.keyboard.press("Enter");
-  await expect(page.getByText("Clients 9–10 of 10", { exact: true })).toBeVisible();
-  await expect(page.getByText("Review client 9", { exact: true })).toBeVisible();
-  await expect(page.getByText("Shared-work check unavailable", { exact: true })).toBeVisible();
-  await page.screenshot({ path: `/tmp/strelva-agency-page-${viewport.width}.png`, fullPage: true });
-  await expect(page.getByRole("button", { name: "Next clients", exact: true })).toBeDisabled();
-  await page.getByRole("button", { name: "Previous clients", exact: true }).click();
-  await expect(page.getByText("Clients 1–8 of 10", { exact: true })).toBeVisible();
+  const clients = page.getByRole("list", { name: "Clients", exact: true });
+  await expect(page.getByText("Showing 100 of 102 clients", { exact: true })).toBeVisible();
+  await expect(clients.getByRole("listitem")).toHaveCount(100);
   await expect(page.getByText("Review client 1", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Show more clients", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("102 clients", { exact: true })).toBeVisible();
+  await expect(clients.getByRole("listitem")).toHaveCount(102);
+  await expect(clients.getByText("Page Client 1", { exact: true })).toBeVisible();
+  await expect(page.getByText("Review client 101", { exact: true })).toBeVisible();
+  await expect(page.getByText("Review client 1", { exact: true })).toBeVisible();
+  await expect(page.getByText("Page Client 102 could not be loaded.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Show more clients", exact: true })).toHaveCount(0);
+  expect(clientPages).toEqual([null, cursor]);
+  expect(workspaceReads).toEqual([AGENCY_ID]);
+
+  recovered = true;
+  await page.getByRole("button", { name: "Retry loading Page Client 102", exact: true }).click();
+  await expect(clients.getByText("Page Client 102", { exact: true })).toBeVisible();
+  await expect(page.getByText("Page Client 102 could not be loaded.", { exact: true })).toHaveCount(0);
+  await expect(clients.getByRole("listitem")).toHaveCount(102);
+  await expect(clients.getByText("Page Client 1", { exact: true })).toBeVisible();
+  await expect(page.getByText("Review client 102", { exact: true })).toBeVisible();
+  expect(clientPages).toEqual([null, cursor, cursor]);
+  expect(workspaceReads).toEqual([AGENCY_ID]);
+  expect(mutations).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await clients.getByText("Page Client 102", { exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath(`agency-batched-clients-${viewport.width}.png`), fullPage: true });
+
+  // A queue action opens its exact client/work; discovery did not fetch it.
+  await page.getByRole("button", { name: /^Review client 101,/ }).click();
+  await expect(page.getByRole("combobox", { name: "Current workspace" })).toHaveValue(customers[100]!.id);
+  await expect(page).toHaveURL(new RegExp(`workspaceId=${customers[100]!.id}.*work=${workId(100)}`));
+  expect(workspaceReads).toEqual([AGENCY_ID, customers[100]!.id]);
+  expect(mutations).toEqual([]);
 });
 }
 

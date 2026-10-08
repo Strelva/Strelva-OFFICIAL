@@ -253,6 +253,18 @@ at `e9ac136f`. The guard fixes profile routing, and the explicit enabled command
 retains its coverage. Actual enabled-profile and full-CI reruns belong to root
 integration; no production gate is changed here.
 
+The agency pagination fixture also follows the current scoped batched API:
+100 clients, then two by the last client UUID cursor. It checks keyboard Show
+more, retained earlier rows and queue items, a named unavailable client and
+page retry, and no client-by-client reads or writes during discovery. Only an
+explicit queue action opens the exact client/work. The September 20 fixture's
+“Clients 1–8 of 10”, Next/Previous and per-client unavailable-work expectations
+remain historical, unqualified expectations of the retired pagination UI; the
+current product is unchanged. Returning WorkspaceSnapshot from the broad
+fixture route to `/api/workspace/agency-clients` caused the October 8 failure:
+the strict page parser correctly refused it. Final desktop/mobile browser proof
+and the complete CI run belong to root integration after this fixture repair.
+
 ### The CI-faithful local sim (use this before trusting a green local run)
 
 Local exports or `.env` may provide Postgres **and** Upstash, which silently masks CI-only
