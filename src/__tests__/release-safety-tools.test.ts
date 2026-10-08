@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
 import { CLIENT_SEND_FLAGS, parseRolloutEnv, silentRolloutEnvStops } from "../../scripts/silent-rollout";
+import { verifyReleaseInventory } from "../../scripts/release-safety/inventory";
 import { RELEASE_BASELINE, RELEASE_BATCHES, stageReleaseBatch } from "../../scripts/stage-release-batch";
 
 const temps: string[] = [];
@@ -39,6 +40,9 @@ describe("silent rollout preflight", () => {
 });
 
 describe("offline batch staging", () => {
+  it("requires every integrated migration to have one pinned packet entry", () => {
+    expect(() => verifyReleaseInventory(process.cwd())).not.toThrow();
+  });
   it.each(RELEASE_BATCHES.map((_, i) => i))("stages precisely the pending batch %i plus its applied prerequisites", (batch) => {
     const prior = [...RELEASE_BASELINE, ...RELEASE_BATCHES.slice(0, batch).flat()];
     const out = join(temp(), "batch");

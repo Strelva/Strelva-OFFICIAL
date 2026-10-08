@@ -331,6 +331,7 @@ export interface SnapshotReport {
     tenants: { total: number | null; active: number | null };
     activeTenants: { id: string; features: string[]; resendDomain: string | null; hasSearchConsoleKey: boolean }[];
     workspaces: { total: number | null; byKind: Record<string, number | null> };
+    agencyReadiness: { providerRows: number | null; providersBySource: Record<string, number | null>; strelvaAgencyDesignationRows: number | null; accountsByPayerKind: Record<string, number | null>; batch7aPresent: boolean };
     workspaceMemberships: number | null;
     tenantMemberships: number | null;
     openTenantInvites: number | null;
@@ -479,6 +480,7 @@ export async function runReadinessSnapshot(options: { jacobsYes: boolean }, deps
     tenants: { total: null, active: null },
     activeTenants: [],
     workspaces: { total: null, byKind: {} },
+    agencyReadiness: { providerRows: null, providersBySource: {}, strelvaAgencyDesignationRows: null, accountsByPayerKind: {}, batch7aPresent: ["20261009151000", "20261009152000", "20261009153000", "20261009154000"].every(version => appliedSet ? appliedSet.has(version) : sentinels[version] === "present") },
     workspaceMemberships: null,
     tenantMemberships: null,
     openTenantInvites: null,
@@ -515,6 +517,14 @@ export async function runReadinessSnapshot(options: { jacobsYes: boolean }, deps
     pg.workspaces.total = countOrNull(await db.count("workspaces"));
     for (const kind of ["personal", "customer", "agency"]) {
       pg.workspaces.byKind[kind] = countOrNull(await db.count("workspaces", [{ column: "kind", op: "eq", value: kind }]));
+    }
+    pg.agencyReadiness.providerRows = countOrNull(await db.count("workspace_providers"));
+    for (const source of ["tenant_conversion", "operator", "business_choice"]) {
+      pg.agencyReadiness.providersBySource[source] = countOrNull(await db.count("workspace_providers", [{ column: "source", op: "eq", value: source }]));
+    }
+    pg.agencyReadiness.strelvaAgencyDesignationRows = countOrNull(await db.count("strelva_agency_workspace"));
+    for (const kind of ["business", "agency"]) {
+      pg.agencyReadiness.accountsByPayerKind[kind] = countOrNull(await db.count("accounts", [{ column: "payer_kind", op: "eq", value: kind }]));
     }
     pg.workspaceMemberships = countOrNull(await db.count("workspace_memberships"));
     pg.tenantMemberships = countOrNull(await db.count("memberships"));
@@ -572,6 +582,9 @@ export async function runReadinessSnapshot(options: { jacobsYes: boolean }, deps
   notes.push("Out of scope: gldf's own Supabase project (paused on Sept 30), Stripe, Vercel logs, Google.");
 
   const stopConditions = silentRolloutEnvStops(deps.env);
+  if ((pg.agencyReadiness.strelvaAgencyDesignationRows ?? 0) > 0 && !pg.agencyReadiness.batch7aPresent) {
+    stopConditions.push("Strelva agency designation exists before batch 7A is verified; stop and reconcile the agency provider model.");
+  }
   if (!activeTenantReadComplete) stopConditions.push("Active tenant inventory is incomplete; silent rollout cannot be verified.");
   if (!redisReport) stopConditions.push("Redis email overrides are unavailable; silent rollout cannot be verified.");
   for (const [id, state] of Object.entries(redisReport?.clientEmailOverrides ?? {})) {
@@ -626,6 +639,9 @@ export function formatReport(report: SnapshotReport): string[] {
     lines.push(`  ${t.id}: features [${t.features.join(", ")}], resend_domain ${t.resendDomain ?? "none"}, search console key ${t.hasSearchConsoleKey ? "yes" : "no"}`);
   }
   lines.push(`Workspaces: ${n(pg.workspaces.total)} (${Object.entries(pg.workspaces.byKind).map(([k, v]) => `${k} ${n(v)}`).join(", ")})`);
+  const agency = pg.agencyReadiness;
+  lines.push(`Agency readiness: ${n(agency.providerRows)} provider rows (${Object.entries(agency.providersBySource).map(([source, count]) => `${source} ${n(count)}`).join(", ")}); Strelva designation rows ${n(agency.strelvaAgencyDesignationRows)}; 7A ${agency.batch7aPresent ? "present" : "unproven"}`);
+  lines.push(`Accounts by payer kind: ${Object.entries(agency.accountsByPayerKind).map(([kind, count]) => `${kind} ${n(count)}`).join(", ")}`);
   lines.push(`Workspace memberships: ${n(pg.workspaceMemberships)}; tenant memberships: ${n(pg.tenantMemberships)}`);
   lines.push(`Open tenant invites: ${n(pg.openTenantInvites)}; pending workspace invitations: ${n(pg.pendingWorkspaceInvitations)}`);
   lines.push(`Workspace-tenant links: ${n(pg.workspaceTenantLinks)}; tenant_leads rows: ${n(pg.tenantLeads)}; account bindings: ${n(pg.workspaceAccountBindings)}`);
