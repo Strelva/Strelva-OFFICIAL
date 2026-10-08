@@ -21,20 +21,29 @@ begin
   if current_state not in ('scoped','enabled') or current_state is null then
     raise exception 'batch8_runtime_recovery_wrong_state';
   end if;
+  -- One binding checkpoint after reviewed corrective tails. Their approved
+  -- catalog may retire an unsafe signature or recreate it under a repaired
+  -- OID. Preserve the original identity; never add a tail's new signatures.
+  if current_state='scoped' then
+    update release_runtime_recovery.batch8_scope set
+      retired=to_regprocedure('public.'||signature) is null,
+      function_oid=coalesce(to_regprocedure('public.'||signature)::oid,introduced_function_oid);
+  end if;
   if exists(select 1 from release_runtime_recovery.batch8_scope s
     left join pg_proc p on p.oid=s.function_oid
-    where p.oid is null or p.oid::regprocedure::text<>s.signature) then
+    where (not s.retired and (p.oid is null or p.oid::regprocedure::text<>s.signature))
+      or (s.retired and to_regprocedure('public.'||s.signature) is not null)) then
     raise exception 'batch8_runtime_recovery_identity_drift';
   end if;
   -- No implicit/browser/inherited grant may bypass the service-role revoke.
   if exists(select 1 from release_runtime_recovery.batch8_scope s join pg_proc p on p.oid=s.function_oid
-    where p.prorettype not in ('trigger'::regtype,'event_trigger'::regtype)
+    where not s.retired and p.prorettype not in ('trigger'::regtype,'event_trigger'::regtype)
       and (has_function_privilege('anon',p.oid,'execute') or has_function_privilege('authenticated',p.oid,'execute'))) then
     raise exception 'batch8_runtime_recovery_browser_exposure';
   end if;
   if exists(select 1 from release_runtime_recovery.batch8_scope s join pg_proc p on p.oid=s.function_oid
     cross join lateral aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a
-    where a.grantee='service_role'::regrole and a.grantor<>p.proowner) then
+    where not s.retired and a.grantee='service_role'::regrole and a.grantor<>p.proowner) then
     raise exception 'batch8_runtime_recovery_unknown_grantor';
   end if;
   delete from release_runtime_recovery.batch8_grants;
@@ -42,7 +51,7 @@ begin
     select s.signature,s.function_oid,a.is_grantable from release_runtime_recovery.batch8_scope s
     join pg_proc p on p.oid=s.function_oid
     cross join lateral aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a
-    where a.grantee='service_role'::regrole and a.privilege_type='EXECUTE';
+    where not s.retired and a.grantee='service_role'::regrole and a.privilege_type='EXECUTE';
   update release_runtime_recovery.batch8_state set forward_catalog=pg_temp.batch8_runtime_catalog() where singleton;
   for rpc in select * from release_runtime_recovery.batch8_grants loop
     execute format('revoke execute on function public.%s from service_role',rpc.signature);
@@ -51,7 +60,7 @@ begin
     end if;
   end loop;
   if exists(select 1 from release_runtime_recovery.batch8_scope s join pg_proc p on p.oid=s.function_oid
-    where p.prorettype not in ('trigger'::regtype,'event_trigger'::regtype)
+    where not s.retired and p.prorettype not in ('trigger'::regtype,'event_trigger'::regtype)
       and has_function_privilege('service_role',p.oid,'execute')) then
     raise exception 'batch8_runtime_recovery_inherited_execute';
   end if;

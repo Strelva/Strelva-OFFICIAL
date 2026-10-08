@@ -20,7 +20,7 @@ create table release_runtime_recovery.batch8_state (
   baseline_fingerprint text not null, forward_catalog jsonb, disabled_fingerprint text, disabled_role_fingerprint text
 );
 create table release_runtime_recovery.batch8_baseline_functions(signature text primary key);
-create table release_runtime_recovery.batch8_scope(signature text primary key, function_oid oid not null);
+create table release_runtime_recovery.batch8_scope(signature text primary key, introduced_function_oid oid not null, function_oid oid not null, retired boolean not null default false);
 create table release_runtime_recovery.batch8_grants(signature text primary key, function_oid oid not null, grant_option boolean not null);
 revoke all on all tables in schema release_runtime_recovery from public,anon,authenticated,service_role;
 insert into release_runtime_recovery.batch8_state values(true,'baseline',pg_temp.batch8_runtime_fingerprint(),null,null,null);

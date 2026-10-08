@@ -19,7 +19,7 @@ do $$ begin
   end if;
 end $$;
 insert into release_runtime_recovery.batch8_scope
-  select p.oid::regprocedure::text,p.oid from pg_proc p
+  select p.oid::regprocedure::text,p.oid,p.oid,false from pg_proc p
   where p.pronamespace='public'::regnamespace and p.prokind='f'
   and not exists(select 1 from release_runtime_recovery.batch8_baseline_functions b where b.signature=p.oid::regprocedure::text);
 update release_runtime_recovery.batch8_state set state='scoped' where singleton;

@@ -45,20 +45,38 @@ requires a separate reviewed archive/dump and compatibility plan.
 
 ```sh
 pnpm check:release-safety:batch8
-# Add corrective migrations in dependency order when qualifying an exact build:
-pnpm exec tsx scripts/check-release-safety-batch8.ts --tail <corrective-migration.sql>
+# Qualify every remaining forward in the actual checked-out build:
+pnpm exec tsx scripts/check-release-safety-batch8.ts --current-tail
+# Selected narrow proofs also accept repeated --tail <forward-migration.sql>.
+# Combining --current-tail with --tail deduplicates the files.
 ```
 
 This private local PostgreSQL rehearsal loads packet-order batches 0–7 and
 7A, captures the pre-batch-8 function identities, applies original batch 8,
-pins its introduced identities, then applies optional corrective tails. It
+pins its introduced identities, then applies optional corrective tails. With
+`--current-tail`, it inventories every timestamped forward file not already
+covered by baseline, batches 0–7, 7A and original batch 8, and applies them in
+filename/dependency order **after** the original RPC scope capture. This includes
+backdated corrections such as the legacy access restriction; they are not
+silently omitted because their timestamps precede batch 8. Missing/duplicate
+versions, already covered explicit tails, source digest changes and inventory
+changes stop. The receipt records SHA256 for every tail and the entire exact
+current forward inventory. This proves that checked-out tuple locally, rather
+than a generic future build. It
 commits fictional accepted/ambiguous/bounced provider evidence. Two rounds
 disable the introduced service RPCs and reactivate only their captured grants.
 Every round proves exact all-public row equality, exact forward catalog
 reproduction, unchanged function bodies/owners/schema during recovery, and the
-legacy content, identity, owner, billing and verified-entry contracts. New
+legacy content, identity, owner, billing and verified-entry contracts. The first disable, after its complete approved final catalog check, binds the
+original signatures to their current repaired OIDs and explicitly marks any
+removed unsafe signatures retired, preserving their original OIDs as evidence.
+Further recovery rounds require exact bound OIDs and absence of retired
+signatures. New
 corrective helper RPCs remain outside the original batch 8 disable scope;
-security-repaired bodies and already revoked grants are never reverted.
+security-repaired bodies and already revoked grants are never reverted. This
+does **not** disable every API added by current tails: those retain their
+reviewed restricted grants, so feature-switch/application recovery configuration
+remains required for the complete build.
 Reactivation restores permissions rather than rerunning non-idempotent CREATE
 TABLE migrations. This is not a schema-downgrade or production claim.
 

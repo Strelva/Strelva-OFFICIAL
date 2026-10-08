@@ -68,16 +68,39 @@ function main() {
   const batch8 = manifest.proposed.find((entry) => entry.batch === "8");
   if (!batch8) throw new Error("Proposed batch 8 is missing from batches.json.");
   const items: Item[] = batch8.items;
-  const args = process.argv.slice(2), tails: string[] = [];
-  for (let i = 0; i < args.length; i += 2) {
-    const file = args[i + 1];
-    if (args[i] !== "--tail" || !file || !/^\d{14}_[a-z0-9_]+\.sql$/.test(file)) throw new Error("Expected --tail <forward-migration.sql>");
-    tails.push(file);
+  const args = process.argv.slice(2), requestedTails: string[] = [];
+  let currentTail = false;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--current-tail") { currentTail = true; continue; }
+    const file = args[++i];
+    if (args[i - 1] !== "--tail" || !file || !/^\d{14}_[a-z0-9_]+\.sql$/.test(file)) throw new Error("Expected --current-tail or --tail <forward-migration.sql>");
+    requestedTails.push(file);
   }
   for (const item of items) if (item.rollback !== "rollback-" + item.file) throw new Error("Rollback companion is not rollback-<file>: " + item.file);
+  const inventory = readdirSync(migrations).filter((name) => /^\d{14}_[a-z0-9_]+\.sql$/.test(name)).sort();
+  if (new Set(inventory.map((file) => file.slice(0, 14))).size !== inventory.length) throw new Error("Duplicate forward migration version in current inventory");
   // 7A has no pinned manifest yet; its four files are taken from disk in order.
-  const batch7a = readdirSync(migrations).filter((name) => /^2026100915[1-4]000_.+\.sql$/.test(name)).sort();
+  const batch7a = inventory.filter((name) => /^2026100915[1-4]000_.+\.sql$/.test(name));
   if (batch7a.length !== 4) throw new Error("Expected the four batch 7A files.");
+  const covered = new Set([...manifest.baseline, ...manifest.batches.flat(), ...items].map((item) => item.file).concat(batch7a));
+  for (const file of covered) if (!inventory.includes(file)) throw new Error("Covered forward missing from current inventory: " + file);
+  for (const file of requestedTails) {
+    if (!inventory.includes(file)) throw new Error("Tail missing from current inventory: " + file);
+    if (covered.has(file)) throw new Error("Tail already covered by packet: " + file);
+  }
+  // Capture ORIGINAL batch8 RPC identities first. Remaining current-tree
+  // forwards run afterward, including backdated late/idempotent corrections.
+  // Supplied tails are deduplicated against this inventory, never replayed.
+  const tails = [...new Set([...(currentTail ? inventory.filter((file) => !covered.has(file)) : []), ...requestedTails])].sort();
+  const tailItems = tails.map((file) => ({ file, sha256: createHash("sha256").update(readFileSync(join(migrations, file))).digest("hex") }));
+  const inventoryReceipt = inventory.map((file) => ({ file, sha256: createHash("sha256").update(readFileSync(join(migrations, file))).digest("hex") }));
+  function assertInventoryUnchanged() {
+    const after = readdirSync(migrations).filter((name) => /^\d{14}_[a-z0-9_]+\.sql$/.test(name)).sort();
+    assertEqual(after, inventory, "Current forward inventory changed during rehearsal");
+    for (const item of inventoryReceipt) {
+      if (createHash("sha256").update(readFileSync(join(migrations, item.file))).digest("hex") !== item.sha256) throw new Error("Forward source digest changed during rehearsal: " + item.file);
+    }
+  }
   const temporary = createTempPostgres();
   const { cluster } = temporary;
   const socket = join(cluster, "socket");
@@ -106,10 +129,13 @@ function main() {
     expectRefusal(admin, () => recover(admin, "capture-batch8-runtime-baseline.sql"), "Overwrite baseline", "already exists");
     for (const item of items) apply(admin, item);
     recover(admin, "capture-batch8-runtime-scope.sql");
-    for (const file of tails) sql(admin, { file: join(migrations, file) });
+    const originalScope = JSON.parse(sql(admin, { text: "select jsonb_build_object('signatures',(select jsonb_agg(signature order by signature) from release_runtime_recovery.batch8_scope),'serviceRpcCount',(select count(*) from release_runtime_recovery.batch8_scope where has_function_privilege('service_role',function_oid,'execute')));" }));
+    for (const item of tailItems) apply(admin, item);
+    assertInventoryUnchanged();
+    console.log(`Applied ${tailItems.length} remaining forward files after original batch8 RPC scope capture (${currentTail ? "complete current inventory" : "selected tails"}).`);
     // Commit a real contract's fictional accepted/ambiguous/bounced provider
     // evidence so row equality proves more than an empty database's counts.
-    command("psql", ["--dbname=" + admin, "-X", "-qAt", "-v", "ON_ERROR_STOP=1", "-f", "-"], readFileSync(join(root, "tests/inquiry-decision-notice-events-schema.sql"), "utf8").replace(/^rollback;$/m, "commit;"));
+    command("psql", ["--dbname=" + admin, "-X", "-qAt", "-v", "ON_ERROR_STOP=1", "-f", "-"], readFileSync(join(root, "tests/release-runtime-recovery-evidence.sql"), "utf8"));
     const forward = catalog(admin, root), rows = data(admin);
     const added = Object.keys(forward.functions ?? {}).filter((key) => !Object.hasOwn(before.functions ?? {}, key));
     expectRefusal(admin, () => recover(admin, "disable-batch8-runtime.sql", "0".repeat(64)), "Wrong approved hash", "batch8_runtime_recovery_catalog_drift");
@@ -161,7 +187,11 @@ function main() {
       legacy();
       console.log(`Runtime recovery round ${round}: ${revoked.length} introduced service RPCs dark; entire forward schema/bodies/owners preserved; exact all-public rows retained; legacy auth/content/billing passed; exact catalog/ACL reproduced.`);
     }
-    const receipt = { scope: "local forward-only batch8 schema; permission recovery only; no hosted/provider effects exercised", files: items.length, correctiveTails: tails,
+    assertInventoryUnchanged();
+    const receipt = { scope: "local forward-only batch8 schema; permission recovery only; no hosted/provider effects exercised", files: items.length, correctiveTails: tails, tailDigests: tailItems,
+      completeCurrentInventory: currentTail, currentInventory: inventoryReceipt, originalScope,
+      retiredSignatures: JSON.parse(sql(admin, { text: "select coalesce(jsonb_agg(signature order by signature),'[]'::jsonb) from release_runtime_recovery.batch8_scope where retired;" })),
+      recoveryBoundary: "Only original batch8-introduced RPCs; later/current-tail APIs retain their reviewed grants and require feature switches/application configuration",
       introducedFunctions: added.length, tables: Object.keys(forward.tables ?? {}).length, runtimeRecoveryRounds: 2,
       exactCatalogReproduced: true, exactPublicRowsPreserved: true, legacyBehavior: true, failClosed: ["baseline overwrite", "wrong approved hash", "wrong state", "catalog drift", "browser privilege bypass", "inherited privilege bypass", "actual denied RPC invocation", "disabled-phase direct/transitive browser inheritance", "disabled-phase superuser drift"] };
     const out = join(root, "output/release-safety", "batch8-" + Date.now());
