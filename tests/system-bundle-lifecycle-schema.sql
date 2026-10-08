@@ -5,7 +5,8 @@ create function pg_temp.b_fail(q text,expected text) returns void language plpgs
 \if :{?bundle_native_input}
 \i :bundle_native_input
 \else
-\i /tmp/bundle-native-input.sql
+\set bundle_native_input /tmp/bundle-native-input.sql
+\i :bundle_native_input
 \endif
 insert into public.users(id,email,verified_at) values ('bb000000-0000-4000-8000-000000000001','bundle-lifecycle-agency@example.test',now()),('bb000000-0000-4000-8000-000000000002','bundle-lifecycle-owner@example.test',now()),('bb000000-0000-4000-8000-000000000003','bundle-lifecycle-reviewer@example.test',now());
 insert into public.workspaces(id,kind,name,created_by) values ('bb000000-0000-4000-8000-000000000010','agency','Independent bundle creator','bb000000-0000-4000-8000-000000000001'),('bb000000-0000-4000-8000-000000000011','customer','Native target business','bb000000-0000-4000-8000-000000000002');
