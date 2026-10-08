@@ -1147,7 +1147,8 @@ psql "${psql_args[@]}" --file="$repo_root/tests/booking-confirmed-facts-schema.s
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-business-context-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-context-notices-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-booking-handoff-schema.sql"
-psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-schema.sql"
+# The hosted facts contract ran forward/rollback/forward above, before
+# website-cutover-undo intentionally removes its shared publication fixture.
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013110000_public_facts_read_confirmed.sql"
 if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011133700_business_facts_owner_decision.sql" >"$cluster_root/booking-facts-rollback-order.log" 2>&1; then

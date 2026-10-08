@@ -10,7 +10,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDevAccessTenant, isDevAccessBypassEnabled } from "@/platform/infra/dev-access";
 import { MARKETING_HOSTS, isMarketingHost } from "./lib/marketing-hosts";
-import { parseTenantHost } from "./lib/tenant-host";
+import { isSeparateSitesHost, parseTenantHost } from "./lib/tenant-host";
 import { APP_ROOT_DOMAIN, CONTROL_PLANE_URL, MARKETING_URL, OPERATOR_URL, isPlatformDomain, tenantSiteHost } from "@/platform/infra/brand";
 // No workspace is known here: the proxy only asks "could the rebuild be on";
 // the per-site decision is getPublishedSiteDocument's (per tenant).
@@ -264,6 +264,35 @@ function buildTenantFallbackUrl(req: NextRequest, tenantId: string, path: string
   return url;
 }
 
+// These tenant surfaces require the app fallback context. Global app routes
+// (including /auth/callback) must keep their canonical path on the app host.
+function isTenantAppPath(path: string): boolean {
+  return /^\/(?:dashboard|sign-in|sign-up|no-access)(?:\/|$)/.test(path);
+}
+
+function isSitesAppPath(path: string): boolean {
+  if (isTenantAppPath(path)) return true;
+  if (PROTECTED_AREA.test(path)) return !/^\/api\/v1\//.test(path);
+  return /^\/(?:auth|workspace|account|client|admin|studio|onboard|access-request|preview|demo|apps|custom-applications|agency-websites|ai-visibility|audit|embed)(?:\/|$)/.test(path);
+}
+
+function sitesAppRedirect(req: NextRequest, tenant: string, path: string): URL {
+  const url = isTenantAppPath(path)
+    ? buildTenantFallbackUrl(req, tenant, path)
+    : new URL(path, process.env.NEXT_PUBLIC_APP_URL || CONTROL_PLANE_URL);
+  url.search = req.nextUrl.search;
+  // A callback is global, while its tenant dashboard destination is contextual.
+  // Only rewrite a relative tenant app path; callback safeNext owns other input.
+  const next = url.searchParams.get("next");
+  if (next?.startsWith("/") && !next.startsWith("//") && !/[\\\u0000-\u001f]/.test(next)) {
+    const target = new URL(next, CONTROL_PLANE_URL);
+    if (isTenantAppPath(target.pathname)) {
+      url.searchParams.set("next", `/client/${tenant}${target.pathname}${target.search}${target.hash}`);
+    }
+  }
+  return url;
+}
+
 export function extractTenantFromClientPath(pathname: string): {
   tenant: string | null;
   targetPath: string;
@@ -514,6 +543,18 @@ export async function requestIsSuperAdmin(req: NextRequest): Promise<boolean> {
 export default async function proxy(req: NextRequest) {
   const host = req.headers.get("host") || "";
   const pathname = req.nextUrl.pathname;
+  // Enforce the public-origin boundary before embeds, dev bypasses, internal
+  // APIs or client/query fallback routing can reach the app or create a session.
+  if (isSeparateSitesHost(host)) {
+    const { tenant } = parseTenantHost(host);
+    const path = normalizePathForMatch(pathname);
+    if (!tenant || path === null) {
+      return applySecurityHeaders(new NextResponse("Not found", { status: 404 }), req);
+    }
+    if (isSitesAppPath(path)) {
+      return applySecurityHeaders(NextResponse.redirect(sitesAppRedirect(req, tenant, path)), req);
+    }
+  }
   // Embeds admit only the enabled agency's configured HTTPS contact origin.
   // Every other surface retains DENY. Query params cannot alter frame authority.
   const agencyEmbed = /^\/embed\/agency\/([a-z0-9][a-z0-9-]{0,63})\/(ai-visibility|audit)$/.exec(pathname);
