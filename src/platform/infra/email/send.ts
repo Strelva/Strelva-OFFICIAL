@@ -114,7 +114,7 @@ async function audiencePolicyEnabled(input: SendEmailInput, strictClientGate: bo
  * API for existing senders.
  */
 export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendEmailResult> {
-  if (!(await audienceEnabled(input))) {
+  if (!(await audiencePolicyEnabled(input, false))) {
     console.warn(`[email] ${input.audience} email disabled — skipped send`);
     return { status: "suppressed", reason: "email_suppressed_or_unconfigured" };
   }

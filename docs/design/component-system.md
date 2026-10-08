@@ -25,6 +25,20 @@ staff adoption is claimed.
 
 ## Start with tokens and atoms
 
+### Website owner consent for agency publication, October 7, local
+
+`RebuildExperience` uses the owned Button and a labelled native checkbox for
+explicit owner consent. The unchecked choice names the current serving agency
+and this website; each new preview still needs exact owner approval, and domain
+authority stays separate. Only a direct customer owner with a current provider
+and active seat receives this consent control. An already approved preview can
+be approved again with consent. Stored permission is shown separately from
+candidate approval. A failed request retains the checkbox and its error without
+claiming permission was saved. The checkbox's submitted agency ID prevents a
+provider change during review from authorizing a different agency. Focused local
+UI tests cover default, opt-in, already-approved, failure and read-only states;
+rendered browser proof belongs in the agency workflow handoff.
+
 September 17 clarification: Jacob wants to inspect the tokens and agreed atoms
 and build from them before returning to page composition. The atmospheric-card
 gallery is one composed example, not the complete foundation or a selected page

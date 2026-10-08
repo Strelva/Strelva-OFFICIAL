@@ -140,6 +140,11 @@ const NOT_SCANNED: ClientSiteScan = { status: "not_requested", seeded: [], name:
 
 /** Create the client business from a URL or a prospect, then (optionally) its owner claim link. */
 export async function addAgencyClient(actor: WorkspaceActor, input: AddAgencyClientInput, deps: AgencyClientDeps = defaultDeps()): Promise<AddAgencyClientResult> {
+  // Refuse an unauthorized agency before spending crawl time or reading its
+  // prospects. The write RPC repeats this check in its own transaction.
+  await call(deps, "agency_client_assert_actor", {
+    ...actorArgs(actor), p_agency_workspace_id: input.agencyWorkspaceId,
+  }, z.enum(["owner", "admin"]), "Your agency access couldn't be checked. Try again.");
   const prospect = input.prospectId ? await readProspect(deps, actor, input.agencyWorkspaceId, input.prospectId) : null;
   const rawUrl = input.url ?? prospect?.url ?? null;
   const url = rawUrl ? publicUrl(rawUrl) : null;
@@ -148,7 +153,10 @@ export async function addAgencyClient(actor: WorkspaceActor, input: AddAgencyCli
   if (!name) throw new AgencyClientError("We couldn't find the business's name on its site. Enter it.", 400, "agency_client_name_required");
   // The digest covers what the agency asked for, not what the scan found, so
   // a retry with the same key replays even if the site changed meanwhile.
-  const digest = createHash("sha256").update(JSON.stringify([input.agencyWorkspaceId, name, url, input.prospectId ?? null])).digest("hex");
+  const digest = createHash("sha256").update(JSON.stringify([
+    input.agencyWorkspaceId, input.name?.trim().slice(0, 120) || null,
+    input.url ? url : null, input.prospectId ?? null,
+  ])).digest("hex");
   const client = await call(deps, "agency_add_client", {
     ...actorArgs(actor),
     p_agency_workspace_id: input.agencyWorkspaceId,

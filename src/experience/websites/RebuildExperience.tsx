@@ -43,6 +43,7 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [allowAgencyPublish, setAllowAgencyPublish] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [descriptionMode, setDescriptionMode] = useState(Boolean(initialRequest));
   const [url, setUrl] = useState("");
@@ -100,6 +101,8 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
   const startReady = descriptionMode ? Boolean(businessName.trim() && description.trim()) : Boolean(url.trim());
   const disabled = busy || readOnly;
   const candidate = record?.candidate;
+  const agencyPermission = record?.agencyPublishPermission;
+  useEffect(() => { setAllowAgencyPublish(false); }, [record?.workId, agencyPermission?.agencyWorkspaceId]);
   const previewHref = candidate?.previewHref;
   const safePreview = Boolean(previewHref?.startsWith("/") && !previewHref.startsWith("//"));
   const previousDocuments = record?.documentRevisions.filter(item => item.revision < (candidate?.revision ?? 0)).sort((a, b) => b.revision - a.revision) ?? [];
@@ -145,9 +148,11 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
             </article>)}
             {candidate.unmappedPages.length ? <div className={styles.fact}><h3>Old pages not carried over</h3><ul>{candidate.unmappedPages.map(path => <li key={path}>{path}</li>)}</ul><p>Review these pages with Strelva before launch.</p></div> : null}
             <div className={styles.approval}><p>{record.status === "published" ? "This revision has been published." : record.approved ? "This exact preview is approved." : decisions.length ? "Resolve the flagged facts before approving." : "Approval applies to this exact revision and its content."}</p>
-              {!record.approved && record.status !== "published" ? <Button disabled={disabled || decisions.length > 0 || !safePreview || previewFailed || !previewLoaded || record.status === "building"} loading={busy} onClick={() => void run(() => transport.mutate(record, "approve"), "This exact preview is approved.")}>Approve this preview</Button> : null}
+              {agencyPermission && !agencyPermission.granted && record.status !== "published" ? <label className="flex min-h-11 cursor-pointer items-start gap-3 text-sm"><input type="checkbox" className="mt-1 h-5 w-5 shrink-0 accent-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" checked={allowAgencyPublish} disabled={disabled} onChange={event => setAllowAgencyPublish(event.target.checked)} /><span>Allow {agencyPermission.agencyName} to publish this website after I approve each change.<span className="mt-1 block text-gray-muted">Each new preview still needs your approval. This does not authorize domain changes.</span></span></label> : null}
+              {agencyPermission?.granted ? <p>{agencyPermission.agencyName} can publish this website after you approve each exact preview.</p> : null}
+              {(!record.approved || (allowAgencyPublish && agencyPermission && !agencyPermission.granted)) && record.status !== "published" ? <Button disabled={disabled || decisions.length > 0 || !safePreview || previewFailed || !previewLoaded || record.status === "building"} loading={busy} onClick={() => void run(() => transport.mutate(record, "approve", allowAgencyPublish && agencyPermission ? { allowAgencyPublish: true, agencyWorkspaceId: agencyPermission.agencyWorkspaceId } : undefined), allowAgencyPublish && agencyPermission ? `This exact preview is approved. ${agencyPermission.agencyName} may publish this website after your approval of each change.` : "This exact preview is approved.")}>{record.approved ? "Approve preview and allow agency publishing" : "Approve this preview"}</Button> : null}
               {record.approved && record.status !== "published" && (!managed || operator) ? <Button disabled={disabled} loading={busy} onClick={() => void run(() => transport.mutate(record, "launch"), "Publish result saved. Check its verification below.")}>Publish approved website</Button> : null}
-              {record.approved && managed && !operator && record.status !== "published" ? <p>Strelva will handle launch and your domain.</p> : null}
+              {record.approved && managed && !operator && record.status !== "published" ? <p>{agencyPermission ? agencyPermission.granted ? `${agencyPermission.agencyName} can publish this approved preview.` : `Authorize ${agencyPermission.agencyName} above if you want them to publish this website.` : "Strelva will handle launch and your domain."}</p> : null}
               <a className={styles.link} href={`/api/websites/${encodeURIComponent(record.workId)}/export?${new URLSearchParams({ workspaceId, revision: String(candidate.revision), contentHash: candidate.contentHash })}`}>Export website and evidence</a>
               {operator ? <a className={styles.link} href={`/workspace?${new URLSearchParams({ workspaceId, view: "websites", work: record.workId })}`}>Owner review link</a> : null}
             </div>

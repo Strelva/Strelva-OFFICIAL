@@ -30,7 +30,7 @@ const claim = { claimId: "a9000000-0000-4000-8000-0000000000f1", customerWorkspa
   expiresAt: "2026-10-21T12:00:00.000Z", createdAt: "2026-10-07T12:00:00.000Z", replacedPending: false };
 
 function deps(responses: Record<string, { data?: unknown; error?: { message: string } }> = {}, seed?: AgencyClientDeps["seed"]) {
-  const rpc = vi.fn(async (name: string, _args: Record<string, unknown>) => ({ data: responses[name]?.data ?? null, error: responses[name]?.error ?? null }));
+  const rpc = vi.fn(async (name: string, _args: Record<string, unknown>) => ({ data: responses[name]?.data ?? (name === "agency_client_assert_actor" ? "owner" : null), error: responses[name]?.error ?? null }));
   const seedFn = vi.fn(seed ?? (async () => ({ scan: { status: "scanned" as const, seeded: ["phone", "email"], name: "Northside Bakery & Cafe", message: null },
     facts: { phone: { value: "(716) 555-0142" }, email: { value: "hello@northside-bakery.example" } } })));
   return { rpc, seed: seedFn, token: () => TOKEN, now: () => new Date("2026-10-07T12:00:00.000Z") } satisfies AgencyClientDeps;
@@ -55,7 +55,7 @@ describe("addAgencyClient", () => {
       ownerEmail: "pat@northside-bakery.example", idempotencyKey: KEY }, d);
 
     expect(d.seed).toHaveBeenCalledWith("https://northside-bakery.example/");
-    const [name, args] = d.rpc.mock.calls[0]!;
+    const [name, args] = d.rpc.mock.calls[1]!;
     expect(name).toBe("agency_add_client");
     expect(args).toMatchObject({
       p_user_id: actor.userId, p_verified_email: "owner@agency.example.test", p_agency_workspace_id: AGENCY, p_command_id: KEY,
@@ -66,7 +66,7 @@ describe("addAgencyClient", () => {
     expect(JSON.stringify(args)).not.toContain("verified\":true");
     expect(args).toHaveProperty("p_command_digest", createHash("sha256").update(JSON.stringify([AGENCY, "Northside Bakery", "https://northside-bakery.example/", null])).digest("hex"));
 
-    const [claimName, claimArgs] = d.rpc.mock.calls[1]!;
+    const [claimName, claimArgs] = d.rpc.mock.calls[2]!;
     expect(claimName).toBe("issue_agency_client_owner_claim");
     expect(claimArgs).toMatchObject({ p_customer_workspace_id: CLIENT, p_recipient_email: "pat@northside-bakery.example",
       p_token_hash: createHash("sha256").update(TOKEN).digest("hex"), p_expires_at: "2026-10-21T12:00:00.000Z" });
@@ -74,15 +74,33 @@ describe("addAgencyClient", () => {
     expect(result.website).toEqual({
       connect: `/workspace/site?workspaceId=${CLIENT}&entry=connect`,
       rebuild: `/workspace/site?workspaceId=${CLIENT}&entry=rebuild`,
-      rebuildOpenToAgency: false,
+      rebuildOpenToAgency: true,
     });
     expect(result.scan.seeded).toEqual(["phone", "email"]);
+  });
+
+  it("refuses an unauthorized actor before reading prospects, crawling or creating a client", async () => {
+    const d = deps({ agency_client_assert_actor: { error: { message: "agency_client_access_denied" } } });
+    await expect(addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, prospectId: PROSPECT,
+      url: "https://example.com", name: "Denied", idempotencyKey: KEY }, d)).rejects.toMatchObject({ status: 403 });
+    expect(d.seed).not.toHaveBeenCalled();
+    expect(d.rpc.mock.calls.map(([name]) => name)).toEqual(["agency_client_assert_actor"]);
+  });
+
+  it("fails closed when agency preflight is unavailable or malformed", async () => {
+    for (const response of [{ error: { message: "storage unavailable" } }, { data: "member" }]) {
+      const d = deps({ agency_client_assert_actor: response });
+      await expect(addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, url: "https://example.com",
+        name: "Denied", idempotencyKey: KEY }, d)).rejects.toMatchObject({ status: 503 });
+      expect(d.seed).not.toHaveBeenCalled();
+      expect(d.rpc.mock.calls.map(([name]) => name)).toEqual(["agency_client_assert_actor"]);
+    }
   });
 
   it("names the business from the site when the agency left the name blank", async () => {
     const d = deps({ agency_add_client: { data: receipt({ name: "Northside Bakery & Cafe" }) } });
     await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, url: "https://northside-bakery.example", idempotencyKey: KEY }, d);
-    expect(d.rpc.mock.calls[0]![1]).toMatchObject({ p_input: { name: "Northside Bakery & Cafe" } });
+    expect(d.rpc.mock.calls[1]![1]).toMatchObject({ p_input: { name: "Northside Bakery & Cafe" } });
   });
 
   it("adds a prospect from the agency's own list, using its business and website", async () => {
@@ -91,16 +109,16 @@ describe("addAgencyClient", () => {
       agency_add_client: { data: receipt({ sourceKind: "prospect", prospectId: PROSPECT, name: "Lakeview Dental" }) },
     });
     await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, prospectId: PROSPECT, idempotencyKey: KEY }, d);
-    expect(d.rpc.mock.calls[0]).toEqual(["agency_prospect_list", { p_workspace_id: AGENCY, p_user_id: actor.userId, p_email: actor.verifiedEmail }]);
+    expect(d.rpc.mock.calls[1]).toEqual(["agency_prospect_list", { p_workspace_id: AGENCY, p_user_id: actor.userId, p_email: actor.verifiedEmail }]);
     expect(d.seed).toHaveBeenCalledWith("https://lakeview-dental.example/");
-    expect(d.rpc.mock.calls[1]![1]).toMatchObject({ p_input: { name: "Lakeview Dental", prospectId: PROSPECT, sourceUrl: "https://lakeview-dental.example/" } });
+    expect(d.rpc.mock.calls[2]![1]).toMatchObject({ p_input: { name: "Lakeview Dental", prospectId: PROSPECT, sourceUrl: "https://lakeview-dental.example/" } });
   });
 
   it("refuses a prospect outside the agency's list before creating anything", async () => {
     const d = deps({ agency_prospect_list: { data: [] } });
     await expect(addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, prospectId: PROSPECT, idempotencyKey: KEY }, d))
       .rejects.toMatchObject({ status: 404, code: "agency_client_prospect_not_found" });
-    expect(d.rpc.mock.calls.map(([name]) => name)).toEqual(["agency_prospect_list"]);
+    expect(d.rpc.mock.calls.map(([name]) => name)).toEqual(["agency_client_assert_actor", "agency_prospect_list"]);
   });
 
   it.each(["http://localhost:3000", "https://127.0.0.1", "https://169.254.169.254/latest", "javascript:alert(1)", "https://user:pass@example.com"])("refuses a non-public URL %s in production without fetching or writing", async (url) => {
@@ -108,7 +126,7 @@ describe("addAgencyClient", () => {
     const d = deps();
     await expect(addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, url, name: "X", idempotencyKey: KEY }, d)).rejects.toMatchObject({ status: 400 });
     expect(d.seed).not.toHaveBeenCalled();
-    expect(d.rpc).not.toHaveBeenCalled();
+    expect(d.rpc.mock.calls.map(([name]) => name)).toEqual(["agency_client_assert_actor"]);
     vi.unstubAllEnvs();
   });
 
@@ -117,7 +135,7 @@ describe("addAgencyClient", () => {
     const result = await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, name: "Corner Barber", idempotencyKey: KEY }, d);
     expect(d.seed).not.toHaveBeenCalled();
     expect(result.scan.status).toBe("not_requested");
-    expect(d.rpc.mock.calls[0]![1]).toMatchObject({ p_input: { name: "Corner Barber", sourceUrl: null, facts: {} } });
+    expect(d.rpc.mock.calls[1]![1]).toMatchObject({ p_input: { name: "Corner Barber", sourceUrl: null, facts: {} } });
   });
 
   it.each([
@@ -134,6 +152,17 @@ describe("addAgencyClient", () => {
     expect(error.status).toBe(status);
   });
 
+  it("pins retry identity to the request when the site's inferred name changes", async () => {
+    const d = deps({ agency_add_client: { data: receipt() } });
+    const input = { action: "add" as const, agencyWorkspaceId: AGENCY, url: "northside-bakery.example", idempotencyKey: KEY };
+    await addAgencyClient(actor, input, d);
+    d.seed.mockResolvedValueOnce({ scan: { status: "scanned", seeded: [], name: "A changed website name", message: null }, facts: {} });
+    await addAgencyClient(actor, input, d);
+    const writes = d.rpc.mock.calls.filter(([name]) => name === "agency_add_client");
+    expect(writes[0]![1].p_command_digest).toEqual(writes[1]![1].p_command_digest);
+    expect(writes[1]![1]).toMatchObject({ p_input: { name: "A changed website name" } });
+  });
+
   it("on replay returns the saved client, seeds nothing new and issues no second link", async () => {
     const d = deps({ agency_add_client: { data: receipt({ replayed: true }) } });
     const result = await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, url: "northside-bakery.example", name: "Northside Bakery",
@@ -141,7 +170,7 @@ describe("addAgencyClient", () => {
     expect(result.client.replayed).toBe(true);
     expect(result.scan.seeded).toEqual([]);
     expect(result.ownerClaim).toBeNull();
-    expect(d.rpc.mock.calls.map(([name]) => name)).toEqual(["agency_add_client"]);
+    expect(d.rpc.mock.calls.map(([name]) => name)).toEqual(["agency_client_assert_actor", "agency_add_client"]);
   });
 
   it("keeps the added client when its owner link fails, and says so", async () => {

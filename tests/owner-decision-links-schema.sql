@@ -7,6 +7,14 @@ begin
   begin execute statement; exception when others then if sqlerrm like '%'||expected||'%' then return; end if; raise; end;
   raise exception 'Expected % for %',expected,statement;
 end $$;
+-- Bind the exact trusted link through the production delivery boundary. This
+-- is a fictional local receipt; no email transport is called by SQL tests.
+create or replace function pg_temp.ol_delivered(ws uuid,item uuid) returns void language plpgsql as $$
+begin
+  if to_regclass('public.owner_decision_link_bindings') is not null then
+    perform public.record_owner_decision_delivery(ws,item,'digest','sent','ol-owner@example.test','ol-fictional-message',null);
+  end if;
+end $$;
 select pg_temp.ol_assert((select relrowsecurity from pg_class where oid='public.owner_decision_link_sessions'::regclass),'RLS on');
 select pg_temp.ol_assert(not has_table_privilege('service_role','public.owner_decision_link_sessions','select'),'no direct table access');
 select pg_temp.ol_assert(has_function_privilege('service_role','public.strelva_owner_decision_link_session(uuid,uuid,text,text)','execute')
@@ -44,8 +52,6 @@ begin
   if to_regprocedure('public.acting_provider(uuid,uuid,text,text,text)') is not null then
     insert into public.provider_seats(customer_workspace_id,agency_workspace_id,granted_by_kind,granted_by)
       values(ws,'b2000000-0000-4000-8000-0000000000a1','conversion',actor);
-    insert into public.agency_verifications(agency_workspace_id,effect,status,evidence,verified_by,verifier_is_agency_member)
-      values('b2000000-0000-4000-8000-0000000000a1','publish','verified','{"note":"fixture"}',actor,false);
     insert into public.client_resource_mandates(customer_workspace_id,agency_workspace_id,effect,resource_kind,resource_ref,
         granted_by_kind,granted_by,granter_is_agency_member,grant_note)
       values(ws,'b2000000-0000-4000-8000-0000000000a1','publish','website',public.system_origin_id(ws,'saved_work',work.id::text)::text,
@@ -71,6 +77,7 @@ begin
   perform pg_temp.ol_assert(link->>'providerWorkspaceId'='b2000000-0000-4000-8000-0000000000a1'
     and (select a.provider_workspace_id from public.strelva_service_actions a where a.id=sid)='b2000000-0000-4000-8000-0000000000a1','session names the agency of record');
   perform pg_temp.ol_expect(format('select public.authorize_owner_decision_link_run(%L,%L,%L,%L,%L)',ws,sid,id,revision_hash,'ol-owner@example.test'),'strelva_service_access_denied');
+  perform pg_temp.ol_delivered(ws,id);
   perform public.claim_owner_decision(ws,id,revision_hash,'approve','owner_link',null,null,'ol-owner@example.test');
   -- A verification revoked after session creation blocks run authorization.
   insert into public.agency_verifications(agency_workspace_id,effect,status,reason,verified_by,verifier_is_agency_member)
@@ -150,6 +157,7 @@ begin
   id:=(item->>'id')::uuid;
   link:=public.strelva_owner_decision_link_session(ws,id,h,'ol-owner@example.test'); sid:=(link->>'sessionId')::uuid;
   perform pg_temp.ol_expect(format('select public.resolve_ask_business_draft_by_owner_link(%L,%L,%L,%L,%L,%L,%L,%L,%L)',ws,actor,'ol-operator@example.test',draft->>'id','approve',sid,id,h,'ol-owner@example.test'),'strelva_service_access_denied');
+  perform pg_temp.ol_delivered(ws,id);
   perform public.claim_owner_decision(ws,id,h,'approve','owner_link',null,null,'ol-owner@example.test');
   perform public.authorize_owner_decision_link_run(ws,sid,id,h,'ol-owner@example.test');
   perform pg_temp.ol_expect(format('select public.resolve_ask_business_draft_by_owner_link(%L,%L,%L,%L,%L,%L,%L,%L,%L)',ws,actor,'ol-operator@example.test',gen_random_uuid(),'approve',sid,id,h,'ol-owner@example.test'),'strelva_service_access_denied');

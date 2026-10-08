@@ -28,6 +28,7 @@
     "check:ontology": "tsx scripts/check-ontology.ts",
     "check:boundaries": "tsx scripts/check-product-boundaries.ts",
     "db:types": "tsx scripts/generate-database-types.ts",
+    "check:agency-workflow": "bash scripts/check-agency-workflow-sql.sh",
     "check:workspace-sql": "bash scripts/check-workspace-sql.sh",
     "check:workspace-upgrade": "bash scripts/check-workspace-upgrade.sh",
     "scrubbed-copy": "tsx scripts/scrubbed-production-copy.ts",

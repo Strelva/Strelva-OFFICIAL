@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import type { WorkspaceDb } from "./schema";
 import {
@@ -199,6 +200,35 @@ async function agencyWorkspaceIds(userId: string): Promise<string[]> {
   return (data ?? []).map((row) => asString((row as DbRow).workspace_id)).filter(Boolean);
 }
 
+const providerActorSchema = z.object({
+  userId: z.string().uuid(),
+  memberships: z.array(z.object({
+    businessId: z.string().uuid(),
+    role: z.enum(["owner", "admin", "member"]),
+    via: z.enum(["membership", "provider_seat"]).optional(),
+  }).strict()),
+}).strict();
+
+/** Only a standing, fully scoped provider seat resolves to a workspace role.
+ * SQL checks the current seat, agency membership and client staff row for this
+ * verified actor. A per-work delegation or assignment never becomes membership.
+ * Do not cache: ending a seat or removing staff closes the next read or write. */
+async function providerMemberships(a: WorkspaceActor, agencyIds?: string[]): Promise<Array<{ businessId: string; role: WorkspaceRole }>> {
+  if (!(agencyIds ?? await agencyWorkspaceIds(a.userId)).length) return [];
+  const { data, error } = await rpc("read_version_actor", { p_user_id: a.userId, p_verified_email: a.verifiedEmail });
+  if (error) workspaceDbFailure(error, "Provider workspace access is unavailable");
+  const parsed = providerActorSchema.safeParse(data);
+  if (!parsed.success || parsed.data.userId !== a.userId) throw new WorkspaceStoreError("Provider workspace access is unreadable");
+  return parsed.data.memberships.filter(membership => membership.via === "provider_seat")
+    .map(({ businessId, role }) => ({ businessId, role }));
+}
+
+async function workRole(a: WorkspaceActor, workspaceId: string): Promise<WorkspaceRole | null> {
+  return await directRole(a.userId, workspaceId)
+    ?? (await providerMemberships(a)).find(membership => membership.businessId === workspaceId)?.role
+    ?? null;
+}
+
 async function requireMember(userId: string, workspaceId: string, roles?: WorkspaceRole[]): Promise<WorkspaceRole> {
   const role = await directRole(userId, workspaceId);
   if (!role || (roles && !roles.includes(role))) throw new WorkspaceAccessError();
@@ -223,11 +253,24 @@ export async function listWorkspaces(input: WorkspaceActor): Promise<Workspace[]
 
   const agencyIds = direct.filter((w) => w.kind === "agency").map((w) => w.id);
   if (!agencyIds.length) return direct;
+  const seats = await providerMemberships(a, agencyIds);
+  const seen = new Set(direct.map((w) => w.id));
+  const seatIds = seats.filter(seat => !seen.has(seat.businessId)).map(seat => seat.businessId);
+  if (seatIds.length) {
+    const { data: customers, error: customerError } = await db().from("workspaces")
+      .select("*").in("id", seatIds).eq("kind", "customer");
+    if (customerError) workspaceDbFailure(customerError, "Provider workspaces are unavailable");
+    for (const customer of customers ?? []) {
+      const row = customer as DbRow;
+      const seat = seats.find(item => item.businessId === asString(row.id));
+      if (seat && !seen.has(seat.businessId)) direct.push(mapWorkspace(row, "member", seat.role));
+      seen.add(asString(row.id));
+    }
+  }
   const { data: delegations, error: delegationError } = await db().from("workspace_delegations")
     .select("customer_workspace_id, workspaces!workspace_delegations_customer_workspace_id_fkey(*)")
     .in("agency_workspace_id", agencyIds).eq("status", "active");
   if (delegationError) workspaceDbFailure(delegationError, "Delegated workspaces are unavailable");
-  const seen = new Set(direct.map((w) => w.id));
   for (const delegation of delegations ?? []) {
     const row = delegation as DbRow;
     const workspace = mapWorkspace(row.workspaces as DbRow, "delegated_read");
@@ -316,7 +359,7 @@ export async function agencyAssignedWorkAccess(input: WorkspaceActor, workspaceI
 
 export async function listWork(input: WorkspaceActor, workspaceId: string): Promise<SavedWork[]> {
   const a = actor(input);
-  const role = await directRole(a.userId, workspaceId);
+  const role = await workRole(a, workspaceId);
   let query = db().from("saved_product_work").select("*").eq("workspace_id", workspaceId);
   if (!role) {
     const ids = await delegatedWorkIds(a.userId, workspaceId);
@@ -334,7 +377,7 @@ export async function getWork(input: WorkspaceActor, id: string): Promise<SavedW
   if (error) workspaceDbFailure(error, "Saved work is unavailable");
   if (!data) return null;
   const work = mapWork(data as DbRow);
-  if (await directRole(a.userId, work.workspaceId)) return work;
+  if (await workRole(a, work.workspaceId)) return work;
   const delegated = await delegatedWorkIds(a.userId, work.workspaceId);
   if (delegated.includes(id) || await assignedAgencyWorkAccess(a.userId, a.verifiedEmail, work.workspaceId, id)) return work;
   throw new WorkspaceAccessError();
@@ -342,17 +385,19 @@ export async function getWork(input: WorkspaceActor, id: string): Promise<SavedW
 
 export async function assertCanSaveWork(input: WorkspaceActor, workspaceId: string): Promise<void> {
   const a = actor(input);
-  await requirePermission(a.userId, workspaceId, "create_work");
+  const role = await workRole(a, workspaceId);
+  if (!role || !rolesAllowing("create_work").includes(role)) throw new WorkspaceAccessError();
   const { count, error } = await db().from("saved_product_work")
     .select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId);
   if (error) workspaceDbFailure(error, "Saved work storage is unavailable");
   if ((count ?? 0) >= MAX_WORK_PER_WORKSPACE) throw new WorkspaceConflictError("Saved work limit reached");
 }
 
-/** Authorize a direct workspace member without consuming the saved-work cap. */
+/** Authorize workspace work access without consuming the saved-work cap.
+ * Standing provider seats carry their SQL-resolved role; narrow grants do not. */
 export async function assertWorkspaceMember(input: WorkspaceActor, workspaceId: string): Promise<void> {
   const a = actor(input);
-  await requireMember(a.userId, workspaceId);
+  if (!await workRole(a, workspaceId)) throw new WorkspaceAccessError();
 }
 
 export async function saveWork(input: WorkspaceActor, workspaceId: string, work: SaveWorkInput): Promise<SavedWork> {

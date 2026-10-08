@@ -1277,7 +1277,10 @@ psql "${psql_args[@]}" --file="$repo_root/tests/ask-confirmed-facts-schema.sql"
 # gates. Forward, the effect matrix, the older contracts these replace, then
 # rollback in reverse order (wrong order refused, catalog restored exactly)
 # and reapply.
-acting_provider=(20261014100000_client_resource_mandates 20261014101000_acting_provider_gates)
+# Rehearse these overlapping definitions in production's timestamp order.
+# The earlier isolated #560 regression is complete and left no sessions.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261014110000_owner_decision_effects.sql"
+acting_provider=(20261014100000_client_resource_mandates 20261014101000_acting_provider_gates 20261014110000_owner_decision_effects)
 check_acting_provider() {
   psql "${psql_args[@]}" --file="$repo_root/tests/acting-provider-gates-schema.sql"
   psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"

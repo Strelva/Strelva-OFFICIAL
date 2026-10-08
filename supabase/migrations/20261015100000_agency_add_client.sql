@@ -505,7 +505,8 @@ begin
     if found then return next created_workspace; return; end if;
   end if;
   if (select count(*) from public.workspaces w where w.created_by = p_user_id
-      and not exists (select 1 from public.agency_client_additions a where a.customer_workspace_id = w.id)) >= 5 then
+      and (not exists (select 1 from public.agency_client_additions a where a.customer_workspace_id = w.id)
+        or exists (select 1 from public.workspace_memberships m where m.workspace_id = w.id and m.user_id = p_user_id and m.role = 'owner'))) >= 5 then
     raise exception 'workspace_limit_reached';
   end if;
 
@@ -546,7 +547,8 @@ begin
   end if;
   if p_business_id is null then
     if (select count(*) from public.workspaces w where w.created_by=p_user_id
-        and not exists (select 1 from public.agency_client_additions a where a.customer_workspace_id=w.id)) >= 5 then
+        and (not exists (select 1 from public.agency_client_additions a where a.customer_workspace_id=w.id)
+          or exists (select 1 from public.workspace_memberships m where m.workspace_id=w.id and m.user_id=p_user_id and m.role='owner'))) >= 5 then
       raise exception 'workspace_limit_reached';
     end if;
     insert into public.workspaces(kind,name,created_by) values('customer',btrim(p_name),p_user_id) returning id into business_id;
@@ -604,6 +606,8 @@ revoke all on function public.create_owned_workspace(uuid, text, text, text) fro
 revoke all on function public.enter_customer_business(uuid, text, text, uuid, text, uuid, text) from public, anon, authenticated;
 revoke all on function public.connected_site_assert_actor(uuid, uuid, text, boolean) from public, anon, authenticated, service_role;
 grant execute on function public.agency_add_client(uuid, text, uuid, jsonb, uuid, text) to service_role;
+-- Server-side preflight before crawling; the write retains its locked recheck.
+grant execute on function public.agency_client_assert_actor(uuid, text, uuid) to service_role;
 grant execute on function public.list_agency_client_additions(uuid, text, uuid) to service_role;
 grant execute on function public.issue_agency_client_owner_claim(uuid, text, uuid, uuid, text, text, timestamptz) to service_role;
 grant execute on function public.read_agency_client_owner_claim(text) to service_role;
