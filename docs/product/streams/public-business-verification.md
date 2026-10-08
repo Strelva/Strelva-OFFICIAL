@@ -30,7 +30,9 @@ The block contains:
   limit, not a refresh job or a website uptime assertion. Hosted `domain_claims.updated_at`
   is a generic save time, so hosted claims without a dedicated proof timestamp
   carry `checkedAt: null` and cannot support a fresh verified verdict. Connected
-  host proofs use the canonical `verified_at`.
+  host proofs use the canonical `verified_at`. Matching admits the equivalent
+  root spellings `https://host` and `https://host/`; unrelated paths, ports,
+  origins and credentials cannot borrow a proof.
 - `googleBusinessProfile`: `linked` from connected canonical Google bindings
   with a location, `checkedAt`, and `stale` using the existing 48-hour Google
   listing health window. `verified` is always `null`: the current store does
@@ -74,7 +76,7 @@ typecheck, boundaries, changed-file ESLint and both SQL runners passed. The
 current-tail packet proved complete coverage of 41 remaining forward files,
 188 introduced RPCs dark during both recovery rounds, and exact restoration
 of public catalog/ACL and legacy auth/content/billing behavior. Local receipt:
-`output/release-safety/batch8-1791466874112`. This is local recovery evidence,
+`output/release-safety/batch8-1791467015804`. This is local recovery evidence,
 not a deployed-target qualification. Custom-repository checks passed 20 cases;
 nine sibling cases were skipped because their paths are absent beside this
 isolated worktree.
@@ -99,8 +101,10 @@ prove the fictional local rendering, not provider truth or deployment.
 
 After reserving the new migration timestamp, the 27 inventory tests, actual
 current-tail recovery gate and standalone ordered SQL/rollback runner passed
-again. Forward and rollback SQL bytes are identical to the earlier commit;
-all predecessor packet entries are unchanged.
+again. The rename preserved SQL bytes. Subsequent review added root-slash
+equivalence and actual SQL regressions for no-slash/slash and non-equivalent
+path/port/origin/credential cases. Only this new reader and its digest changed;
+all predecessor migration bytes and packet entries are unchanged.
 
 The current connected-site verifier is a one-time ownership check: it retains
 `verified_at` once set. Refreshing aged ownership proof is an independent

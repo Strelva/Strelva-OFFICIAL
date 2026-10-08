@@ -30,7 +30,10 @@ begin
   from (select url,max(checked_at) checked_at from (
     select e->>'url' url, max(s.verified_at) checked_at
     from jsonb_array_elements(links) e join public.connected_sites s on s.business_workspace_id=ws
-      and s.site_url=e->>'url' and s.status='active' and s.verified_at is not null
+      -- connectSite normalizes an authority-only root to a trailing slash.
+      -- Admit that single equivalent spelling; keep authority/port/path exact.
+      and (s.site_url=e->>'url' or (e->>'url' ~ '^https://[^/?#@]+$' and s.site_url=(e->>'url')||'/'))
+      and s.status='active' and s.verified_at is not null
     where e->>'kind'='website' and e->>'url' ~ '^https://[^?#]+$' group by e->>'url'
     union
     -- updated_at is a generic row-save time, not a dedicated provider proof.
