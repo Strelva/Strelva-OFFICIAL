@@ -2,7 +2,8 @@
 -- command receipts and commitments are retained unchanged; business members
 -- keep read/export access. Old special-provider writes and inbox calls fail closed.
 -- Agencies use exact active seats/staff; response locks prevent revocation races.
-set local lock_timeout = '3s';
+begin;
+set local lock_timeout = '5s';
 
 create or replace function public.service_request_assert_provider(
   p_provider_kind text, p_agency_workspace_id uuid, p_user_id uuid, p_verified_email text
@@ -934,7 +935,7 @@ end $$;
 create function public.read_business_provider_identity(p_user_id uuid,p_verified_email text,p_business_id uuid)
 returns jsonb language plpgsql stable security definer set search_path=public,pg_temp as $$
 begin
-  perform public.business_record_assert_actor(p_business_id,p_user_id,p_verified_email,false);
+  perform public.business_record_read_actor(p_business_id,p_user_id,p_verified_email,false);
   return (select jsonb_build_object('agencyWorkspaceId',a.id,'name',a.name)
     from public.workspace_providers p join public.workspaces a on a.id=p.provider_workspace_id and a.kind='agency'
     where p.customer_workspace_id=p_business_id and p.status='active');
@@ -1068,3 +1069,5 @@ begin
   insert into public.service_request_commands(business_workspace_id,idempotency_key,command_digest,request_id) values(p_business_id,p_idempotency_key,p_command_digest,created.id);
   return next created;
 end $$;
+
+commit;
