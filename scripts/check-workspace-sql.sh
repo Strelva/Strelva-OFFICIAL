@@ -1158,9 +1158,6 @@ psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-native-rollforward.sq
 # Integration: Postgres lead authority plus receipt retention share one teardown wrapper.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010170000_deprovision_retained_after_inquiry_export.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/deprovision-retained-after-inquiry-export-schema.sql"
-# Expired inquiry leads now remove their visitor data and reply payloads atomically.
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013220000_inquiry_lead_retention.sql"
-psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-lead-retention.sql"
 # Every stream's release flag key survives every redefinition, in any apply order (#253).
 psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 # Policy facts: confirmation/provenance/history/undo on the existing record RPC.
@@ -1498,3 +1495,31 @@ fi
 grep -q 'owner_decision_effects_rollback_requires_data_preservation' "$cluster_root/owner-effects-rollback.log"
 psql "${psql_args[@]}" -Atc "select exists(select 1 from information_schema.columns where table_schema='public' and table_name='owner_decision_link_sessions' and column_name='intended_decision') and exists(select 1 from public.owner_decision_link_sessions) and to_regprocedure('public.owner_decision_provider_holds(uuid,uuid,text[])') is not null" | grep -qx t
 printf 'Owner effect rollback retained sessions and authority gates.\n'
+
+# October 17 retention is last in migration order; deleting its fictional
+# inquiry fixtures has no inverse migration and runs only in this local cluster.
+retention_functions() {
+  psql "${psql_args[@]}" -At <<'SQL'
+select p.proname || ':' || md5(pg_get_functiondef(p.oid)) || ':' || coalesce(p.proacl::text, '')
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public' and p.proname in ('inquiry_events_immutable','purge_expired_tenant_leads')
+  order by p.proname;
+SQL
+}
+retention_functions >"$cluster_root/inquiry-retention-before.txt"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261017110000_inquiry_lead_retention.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-lead-retention.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261017110000_inquiry_lead_retention.sql"
+retention_functions >"$cluster_root/inquiry-retention-after-rollback.txt"
+if ! diff -u "$cluster_root/inquiry-retention-before.txt" "$cluster_root/inquiry-retention-after-rollback.txt"; then
+  printf 'Inquiry retention pre-purge rollback did not restore the prior function definitions and grants.\n' >&2
+  exit 1
+fi
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261017110000_inquiry_lead_retention.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-lead-retention-rollback.sql"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261017110000_inquiry_lead_retention.sql" >"$cluster_root/inquiry-retention-rollback-refusal.log" 2>&1; then
+  printf 'Inquiry retention rollback discarded visitor data after a marked purge.\n' >&2
+  exit 1
+fi
+grep -q 'inquiry_lead_retention_rollback_requires_data_preservation' "$cluster_root/inquiry-retention-rollback-refusal.log"
+printf 'Inquiry retention rollback restores functions before purge and refuses after marked deletion.\n'
