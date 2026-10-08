@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { expect, test } from "@playwright/test";
-import { localEnvironment, signedInContext } from "./support/local-auth";
+import { localEnvironment, seedLocalSuperAdmin, signedInContext } from "./support/local-auth";
 
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local Auth.");
 test.beforeAll(() => { localEnvironment(); });
@@ -71,7 +71,7 @@ for (const width of [1440, 390]) {
       .locator(`a[href="/workspace/delivery/${requestId}"]`);
 
     // Synthetic local operator identity only. No production grants or bypass.
-    expect((await admin.from("super_admins").insert({user_id:operator.userId,email:operator.email})).error).toBeNull();
+    seedLocalSuperAdmin(operator.userId, operator.email);
     const accepted=await operator.context.request.post("/api/service-requests",{headers:{origin:env.app},data:{action:"respond",requestId,expectedRevision:item.revision,decision:"accepted",note:"Local acceptance proof only",idempotencyKey:randomUUID()}});
     expect(accepted.status(),await accepted.text()).toBe(200);item=(await accepted.json()).request;
     expect(item.deliveryCommitment).toBeNull();
