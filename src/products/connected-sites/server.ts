@@ -226,7 +226,7 @@ export { connectedInquiryEmail, notifyConnectedSiteInquiry } from "./notify";
 
 // Server-rendered visibility for AI crawlers (#309, #502): the public
 // business page, its llms.txt and the static JSON-LD paste block.
-export { businessPagesReleaseEnabled, checkSchemaBlock, loadPublishedBusinessPage, readBusinessVisibility, setBusinessPage, type BusinessVisibility, type SchemaBlockCheck, type SchemaBlockTarget } from "./business-pages";
+export { businessPagesReleaseEnabled, checkSchemaBlock, listPublishedBusinessPages, loadPublishedBusinessPage, readBusinessVisibility, setBusinessPage, type BusinessVisibility, type SchemaBlockCheck, type SchemaBlockTarget } from "./business-pages";
 export { BUSINESS_HANDLE_PATTERN, businessFactSheet, businessPageUrl, formatAddress, isBusinessHandle, mapsUrl, suggestBusinessHandle, weeklyHours, type PublishedBusinessPage } from "./business-page";
 export { jsonLdScriptContent, schemaBlock, schemaBlockStatus, type SchemaBlock, type SchemaBlockStatus } from "./schema-block";
 

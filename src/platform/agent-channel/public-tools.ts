@@ -7,18 +7,24 @@
  */
 import { z } from "zod";
 import { PublicBookingError } from "@/platform/bookings/errors";
-import { agentConfirmationAvailable, agentReceipt, nativeBookingByToken, nativeServices, nativeSlots, requestAgentBooking, requireAgentBookings, tokenHash } from "@/platform/bookings/native";
+import { bookingScopeFor } from "@/platform/bookings/booking-scope";
+import { agentConfirmationAvailable, agentReceipt, nativeBookingByToken, nativeServices, nativeSlots, requestAgentBooking, requireAgentBookings, statusAccessLive, tokenHash } from "@/platform/bookings/native";
 import { servicePolicy } from "@/platform/bookings/service-policy";
 import { bookingStoreDb, readBookingContext } from "@/platform/bookings/store";
 import { deliverBookingUpdates } from "@/platform/bookings/updates";
 import { agentCallLimited, agentHoldCall, agentIdentityLimitsEnabled, isDisposableEmail, type AgentCall } from "./limits";
 import type { McpServer, McpTool, ToolOutcome } from "./protocol";
 
-/** A business as the tenant directory lists it (the app edge supplies these). */
+/** A business as the directory lists it (the app edge supplies these): a
+ * website tenant id, or `biz:<handle>` for a business without a website. */
 export interface DirectoryEntry { business: string; name: string; industry: string | null; website: string | null }
-export interface BusinessDirectory { list(): Promise<DirectoryEntry[]> }
+export interface BusinessDirectory {
+  list(): Promise<DirectoryEntry[]>;
+  /** The booking scope a handle names, or null when it is not publicly bookable. */
+  scope(business: string): Promise<string | null>;
+}
 
-const HANDLE = /^[a-z0-9-]{1,100}$/;
+const HANDLE = /^(?:biz:)?[a-z0-9-]{1,100}$/;
 const string = { type: "string" };
 const businessProperty = { type: "string", pattern: HANDLE.source, description: "The business handle from search_business." };
 const schema = (properties: Record<string, unknown>, required: string[]) => ({ type: "object", properties, required, additionalProperties: false });
@@ -70,12 +76,14 @@ function agentCall(tool: string | undefined, args: Record<string, unknown>, busi
 }
 
 /** Listed only when an assistant's request could actually be confirmed. */
-async function acceptsRequests(business: string): Promise<boolean> {
+async function acceptsRequests(directory: BusinessDirectory, business: string): Promise<boolean> {
   try {
-    const ctx = await readBookingContext(business);
+    const scope = await directory.scope(business);
+    if (!scope) return false;
+    const ctx = await readBookingContext(scope);
     if (!ctx?.workspaceId || ctx.paused) return false;
     if (!ctx.services.some(s => s.active && servicePolicy(ctx, s.id).bookable)) return false;
-    return await agentConfirmationAvailable(business);
+    return await agentConfirmationAvailable(scope);
   } catch {
     return false;
   }
@@ -94,40 +102,43 @@ async function searchBusinesses(directory: BusinessDirectory, args: Record<strin
     .sort((a, b) => Number(normal(b.name) === exact || b.business === exact) - Number(normal(a.name) === exact || a.business === exact)
       || a.name.localeCompare(b.name) || a.business.localeCompare(b.business))
     .slice(0, 25);
-  const open = await Promise.all(matches.map(e => acceptsRequests(e.business)));
+  const open = await Promise.all(matches.map(e => acceptsRequests(directory, e.business)));
   return { businesses: matches.filter((_, i) => open[i]).slice(0, limit).map(({ business, name, industry, website }) => ({ business, name, industry, website })) };
 }
 
-async function getBusiness(directory: BusinessDirectory, business: string) {
+async function getBusiness(directory: BusinessDirectory, business: string, scope: string) {
   const entry = (await directory.list()).find(e => e.business === business);
   if (!entry) throw new PublicBookingError("not_found", "This business is unavailable.");
-  const services = await nativeServices(business);
-  const details = await bookingStoreDb()?.rpc("read_booking_business_details", { p_tenant_id: business });
+  const services = await nativeServices(scope);
+  const details = await bookingStoreDb()?.rpc("read_booking_business_details", { p_tenant_id: scope });
   const facts = (details && !details.error ? details.data : null) as { name?: unknown; address?: unknown } | null;
-  const ctx = await readBookingContext(business);
+  const ctx = await readBookingContext(scope);
   return {
     business, name: text(facts?.name) || entry.name, industry: entry.industry, website: entry.website,
     address: text(facts?.address) || null, phone: ctx?.phone ?? null, timeZone: services.timeZone, paused: services.paused,
-    acceptsBookingRequests: !services.paused && services.services.length > 0 && await agentConfirmationAvailable(business),
+    acceptsBookingRequests: !services.paused && services.services.length > 0 && await agentConfirmationAvailable(scope),
     serviceCount: services.services.length,
   };
 }
 
-async function runBookingTool(business: string, name: string, args: Record<string, unknown>): Promise<unknown> {
-  if (name === "list_services") return await nativeServices(business);
-  if (name === "find_slots") return await nativeSlots(business, String(args.serviceId ?? ""), String(args.from ?? ""), String(args.to ?? ""));
+/** `scope` is the resolved booking scope: a tenant id or `workspace:<id>`. */
+async function runBookingTool(scope: string, name: string, args: Record<string, unknown>): Promise<unknown> {
+  if (name === "list_services") return await nativeServices(scope);
+  if (name === "find_slots") return await nativeSlots(scope, String(args.serviceId ?? ""), String(args.from ?? ""), String(args.to ?? ""));
   if (name === "request_booking") {
     const email = text(sub(args.customer).email);
     if (agentIdentityLimitsEnabled() && email && isDisposableEmail(email)) {
       throw new PublicBookingError("invalid", "Use the customer's own email address. The confirmation is sent there.");
     }
-    const held = await requestAgentBooking(business, { ...args, origin: "agent" });
+    // Agent origin is attribution only: hold_agent_booking admits it under the
+    // same business budget and one-email rule as website and inquiry requests.
+    const held = await requestAgentBooking(scope, { ...args, origin: "agent" });
     await deliverBookingUpdates(held.booking.id).catch(() => undefined);
     return agentReceipt(held);
   }
   const token = args.statusToken;
   const booking = typeof token === "string" && /^[A-Za-z0-9_-]{43}$/.test(token) ? await nativeBookingByToken(tokenHash(token), "status") : null;
-  if (!booking || booking.tenantId !== business) throw new PublicBookingError("not_found", "Booking not found.");
+  if (!booking || bookingScopeFor(booking) !== scope || !statusAccessLive(booking)) throw new PublicBookingError("not_found", "Booking not found.");
   return { reservationId: booking.id, status: booking.status, start: booking.start, end: booking.end };
 }
 
@@ -143,6 +154,14 @@ async function outcome(work: () => Promise<unknown>): Promise<ToolOutcome> {
 
 const BOOKING_NAMES = new Set(bookingTools.map(t => t.name));
 const handleOf = (value: unknown) => typeof value === "string" && HANDLE.test(value) ? value : undefined;
+/** Tools that name a business; only these may key a limiter on one. */
+const BUSINESS_SCOPED = new Set([...BOOKING_NAMES, "get_business"]);
+const ARGUMENTS = (tools: readonly McpTool[]) => new Map(tools.map(t => [t.name, new Set(Object.keys((t.inputSchema as { properties: object }).properties))]));
+const PLATFORM_ARGUMENTS = ARGUMENTS(PLATFORM_TOOLS), BUSINESS_ARGUMENTS = ARGUMENTS(BUSINESS_TOOLS);
+/** Every schema says additionalProperties: false; enforce it at the top level. */
+const unexpected = (allowed: Map<string, Set<string>>, name: string, args: Record<string, unknown>) =>
+  Object.keys(args).some(key => !allowed.get(name)?.has(key));
+const UNEXPECTED: ToolOutcome = { ok: false, message: "Check the tool arguments: this tool does not take some of them." };
 
 /** /api/mcp/public: every business, chosen by handle on each call. */
 export function platformMcpServer(directory: BusinessDirectory): McpServer {
@@ -150,18 +169,23 @@ export function platformMcpServer(directory: BusinessDirectory): McpServer {
     name: "strelva", version: "1.0.0", tools: PLATFORM_TOOLS,
     instructions: "Find a business with search_business, then pass its handle to the booking tools. A booking request is a 15-minute hold that only the customer's email confirmation books.",
     ready: requireAgentBookings,
+    // Off: one bucket per caller address, never per caller-supplied argument.
     limited: (request, call) => {
-      const business = handleOf(call.args.business);
-      return agentCallLimited(request, agentCall(call.tool, call.args, business), { legacyPrefix: `mcp-bookings:${business ?? "platform"}` });
+      const business = call.tool && BUSINESS_SCOPED.has(call.tool) ? handleOf(call.args.business) : undefined;
+      return agentCallLimited(request, agentCall(call.tool, call.args, business), { legacyPrefix: "mcp-public" });
     },
     async call(name, args) {
+      if (name !== "search_business" && !BUSINESS_SCOPED.has(name)) return { unknownTool: true };
+      if (unexpected(PLATFORM_ARGUMENTS, name, args)) return UNEXPECTED;
       if (name === "search_business") return outcome(() => searchBusinesses(directory, args));
-      if (!BOOKING_NAMES.has(name) && name !== "get_business") return { unknownTool: true };
       const business = handleOf(args.business);
       if (!business) return { ok: false, message: "Choose a business handle from search_business." };
-      if (name === "get_business") return outcome(() => getBusiness(directory, business));
       const { business: _business, ...rest } = args;
-      return outcome(() => runBookingTool(business, name, rest));
+      return outcome(async () => {
+        const scope = await directory.scope(business);
+        if (!scope) throw new PublicBookingError("not_found", "This business is unavailable.");
+        return name === "get_business" ? await getBusiness(directory, business, scope) : await runBookingTool(scope, name, rest);
+      });
     },
   };
 }
@@ -175,6 +199,7 @@ export function businessMcpServer(business: string): McpServer {
     limited: (request, call) => agentCallLimited(request, agentCall(call.tool, call.args, business), { legacyPrefix: `mcp-bookings:${business}` }),
     async call(name, args) {
       if (!BOOKING_NAMES.has(name)) return { unknownTool: true };
+      if (unexpected(BUSINESS_ARGUMENTS, name, args)) return UNEXPECTED;
       return outcome(() => runBookingTool(business, name, args));
     },
   };

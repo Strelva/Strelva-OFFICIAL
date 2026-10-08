@@ -66,12 +66,20 @@ async function boundedBody(request: Request): Promise<Record<string, unknown> | 
   }
 }
 
-/** Mcp-Name may carry `=?base64?…?=` for values that are not header-safe. */
+/** Mcp-Name may carry `=?base64?…?=` for values that are not header-safe.
+ * Malformed padding, stray characters or invalid UTF-8 decode to null, so the
+ * caller answers with a header mismatch instead of a lenient guess. */
+const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 export function decodeHeaderValue(value: string | null): string | null {
   if (value === null) return null;
-  const encoded = /^=\?base64\?([A-Za-z0-9+/=]*)\?=$/.exec(value);
-  if (!encoded) return /^[\x20-\x7e\t]*$/.test(value) ? value : null;
-  return Buffer.from(encoded[1] ?? "", "base64").toString("utf8");
+  if (!value.startsWith("=?base64?")) return /^[\x20-\x7e\t]*$/.test(value) ? value : null;
+  const encoded = /^=\?base64\?([^?]*)\?=$/.exec(value)?.[1];
+  if (encoded === undefined || !BASE64.test(encoded)) return null;
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(Buffer.from(encoded, "base64"));
+  } catch {
+    return null;
+  }
 }
 
 export function methodNotAllowed(): Response {

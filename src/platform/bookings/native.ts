@@ -154,6 +154,14 @@ export async function nativeBookingByToken(hash: string, kind: "manage" | "confi
     confirmUntil: typeof data.confirmUntil === "string" ? data.confirmUntil : null } : null;
 }
 
+/** An assistant's status token answers until 24 hours after the booking ends:
+ * long enough to report the day's outcome, and then a leaked token goes quiet.
+ * Distinct from the 15-minute confirmation deadline. */
+export const STATUS_TOKEN_GRACE_MS = 24 * 3_600_000;
+export function statusAccessLive(booking: { end: string }, now = Date.now()): boolean {
+  return Date.parse(booking.end) + STATUS_TOKEN_GRACE_MS > now;
+}
+
 export async function confirmAgent(hash: string) {
   const booking = await nativeBookingByToken(hash, "confirm");
   if (!booking || !bookingScopeFor(booking)) throw new PublicBookingError("not_found", "This booking link has expired.");

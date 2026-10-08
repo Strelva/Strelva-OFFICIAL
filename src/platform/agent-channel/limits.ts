@@ -61,6 +61,20 @@ export const AGENT_LIMITS = {
 /** Keys never carry an email, token or free-text name, only a digest. */
 const digest = (value: string) => createHash("sha256").update(value).digest("hex").slice(0, 32);
 const normalEmail = (email: string) => email.trim().toLowerCase();
+const GMAIL = new Set(["gmail.com", "googlemail.com"]);
+/** The mailbox an address reaches, for counting caps only: never stored or
+ * sent to. Plus tags are dropped everywhere (over-merging only tightens a cap);
+ * Gmail also ignores dots and answers on googlemail.com. Matches SQL
+ * public.booking_email_identity. */
+export function emailCapIdentity(email: string): string {
+  const normal = normalEmail(email);
+  const at = normal.lastIndexOf("@");
+  if (at <= 0) return normal;
+  let local = normal.slice(0, at).replace(/\+.*$/, "");
+  let domain = normal.slice(at + 1);
+  if (GMAIL.has(domain)) { local = local.replaceAll(".", ""); domain = "gmail.com"; }
+  return `${local}@${domain}`;
+}
 const normalAgent = (name: string) => name.trim().toLowerCase().replace(/\s+/g, " ").slice(0, 120);
 
 export function agentLimitBuckets(call: AgentCall, source: { ip: string | null }): LimitBucket[] {
@@ -78,7 +92,7 @@ export function agentLimitBuckets(call: AgentCall, source: { ip: string | null }
   if (call.kind === "hold") {
     buckets.push(b("hold", AGENT_LIMITS.globalHolds), b(`biz:${call.business}:hold`, AGENT_LIMITS.businessHolds));
     if (call.email) {
-      const email = digest(normalEmail(call.email));
+      const email = digest(emailCapIdentity(call.email));
       buckets.push(b(`email:${email}`, AGENT_LIMITS.emailHolds), b(`email:${email}:biz:${call.business}`, AGENT_LIMITS.emailBusinessHolds));
     }
     if (call.requestId) buckets.push(b(`request:${call.business}:${digest(call.requestId)}`, AGENT_LIMITS.requestRetries));
