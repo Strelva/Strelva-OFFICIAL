@@ -235,7 +235,12 @@ insert into bo_approvals
   union all select 'other-operator', pg_temp.bo_approval(id, 'bo-second-alias@strelva.example.test') from bo_ws where label = 'bakery'
   union all select 'google-admin-alias', pg_temp.bo_approval(id, 'ab+invite@gmail.com') from bo_ws where label = 'bakery'
   union all select 'pat', pg_temp.bo_approval(id, 'pat-owner@example.test') from bo_ws where label = 'bakery'
-  union all select 'pat-self', pg_temp.bo_approval(id, 'pat-owner@example.test', 'b0000000-0000-4000-8000-000000000001') from bo_ws where label = 'bakery';
+  union all select 'pat-self', pg_temp.bo_approval(id, 'pat-owner@example.test', 'b0000000-0000-4000-8000-000000000001') from bo_ws where label = 'bakery'
+  union all select 'untrusted-self', pg_temp.bo_approval(id, 'someone-else@example.test', 'b0000000-0000-4000-8000-000000000001') from bo_ws where label = 'bakery';
+-- The same operator may approve the exact trusted recipient; the refusal case below must use another address.
+select public.consume_operator_action_approval('b0000000-0000-4000-8000-000000000001',
+  (select id from bo_approvals where label = 'pat-self'), (select id from bo_ws where label = 'bakery'),
+  'owner_invitation.issue', '{"recipientEmail":"pat-owner@example.test","sendEmail":false}'::jsonb);
 select pg_temp.bo_expect(format($$select public.create_operator_owner_invitation_approved('b0000000-0000-4000-8000-000000000001', %L,
   'bo-operator@strelva.example.test', repeat('a', 64), now() + interval '14 days', %L, false, '{"source":"web"}'::jsonb)$$,
   (select id from bo_ws where label = 'bakery'), (select id from bo_approvals where label = 'self')), 'operator_owner_invitation_controlled_recipient');
@@ -252,10 +257,10 @@ select pg_temp.bo_expect(format($$select public.create_operator_owner_invitation
   'ab+invite@gmail.com', repeat('c', 64), now() + interval '14 days', %L, false, '{"source":"web"}'::jsonb)$$,
   (select id from bo_ws where label = 'bakery'), (select id from bo_approvals where label = 'google-admin-alias')), 'operator_owner_invitation_controlled_recipient');
 select pg_temp.bo_expect(format($$select public.create_operator_owner_invitation_approved('b0000000-0000-4000-8000-000000000001', %L,
-  'pat-owner@example.test', repeat('d', 64), now() + interval '14 days', %L, false, '{"source":"web"}'::jsonb)$$,
-  (select id from bo_ws where label = 'bakery'), (select id from bo_approvals where label = 'pat-self')), 'operator_action_approval_not_distinct');
+  'someone-else@example.test', repeat('0', 64), now() + interval '14 days', %L, false, '{"source":"web"}'::jsonb)$$,
+  (select id from bo_ws where label = 'bakery'), (select id from bo_approvals where label = 'untrusted-self')), 'operator_action_approval_not_distinct');
 select pg_temp.bo_expect(format($$select public.create_operator_owner_invitation_approved('b0000000-0000-4000-8000-000000000001', %L,
-  'someone-else@example.test', repeat('d', 64), now() + interval '14 days', %L, false, '{"source":"web"}'::jsonb)$$,
+  'someone-else@example.test', repeat('3', 64), now() + interval '14 days', %L, false, '{"source":"web"}'::jsonb)$$,
   (select id from bo_ws where label = 'bakery'), (select id from bo_approvals where label = 'pat')), 'operator_action_approval_mismatch');
 
 create temporary table bo_invite(label text primary key, value jsonb);
@@ -268,6 +273,8 @@ select pg_temp.bo_assert((select issued_by_kind = 'operator' and created_by = 'b
   from public.workspace_invitations where id = (select (value->>'invitationId')::uuid from bo_invite where label = 'pat')), 'issued by the operator');
 select pg_temp.bo_assert((select consumed_by = 'b0000000-0000-4000-8000-000000000001' and consumed_at is not null
   from public.operator_action_approvals where id = (select id from bo_approvals where label = 'pat')), 'distinct approval was consumed by the issuer');
+select pg_temp.bo_assert((select consumed_by = 'b0000000-0000-4000-8000-000000000001' and consumed_at is not null
+  from public.operator_action_approvals where id = (select id from bo_approvals where label = 'pat-self')), 'trusted recipient self-approval is allowed and consumed by the issuer');
 select pg_temp.bo_assert((select count(*) = 2 from public.audit_logs
   where action = 'workspace.owner-invitation.issued' and target_id = (select value->>'invitationId' from bo_invite where label = 'pat')
     and metadata->>'recipientEmail' = 'pat-owner@example.test' and metadata->>'approvalId' = (select id::text from bo_approvals where label = 'pat')),
