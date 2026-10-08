@@ -149,7 +149,7 @@ describe("improvements and the release gate", () => {
     const possibility = improvementPossibility(mooney, offers[0]!, "Inquiry intake");
     expect(possibility).toMatchObject({ kind: "possibility", system: { businessId: "mooney", systemId: "inquiries" }, status: "exploring",
       makeReal: { kind: "version_release", versionId: mooney.id } });
-    expect(possibility.conflicts).toEqual([{ path: "followUp.message", local: "We'll call you within one business day", upstream: "A new default.", reason: "overlapping_edit" }]);
+    expect(possibility.conflicts).toEqual([{ path: "followUp.message", local: "We'll call you within one business day", upstream: "A new default.", reason: "overlapping_edit", locked: false }]);
     expect(possibility.title).toBe("Inquiry intake got an update. Bring it to The Mooney Firm?");
   });
 

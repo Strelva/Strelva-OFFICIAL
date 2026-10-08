@@ -1621,9 +1621,9 @@
         },
         {
           "file": "20261021110000_enterprise_units.sql",
-          "sha256": "b8072aac9f1b4eb254344877008f2303fa4ef8199cbd8aab875d7ba8c810386b",
+          "sha256": "57a2a5fc940aca0eb69787ad46b233bdba77a8d5f4a82a6c6f18949e77464727",
           "rollback": "rollback-20261021110000_enterprise_units.sql",
-          "rollbackSha256": "59e23ea73e046a8b516c948f5386ededd7df6282eb1183ba07b76e7d0b65f4bb",
+          "rollbackSha256": "4791a3b0de06f7a4c47906dbfc55c121fa7c910ea248f7849ff36a4d437223cf",
           "rollbackStatus": "guarded or forward-only; exact native refusal/reapply and operating recovery remain release gates"
         },
         {
@@ -1635,7 +1635,7 @@
         },
         {
           "file": "20261021112000_home_finder_native.sql",
-          "sha256": "b3feb5f74da3bd6a0d5e5e927ffdb62dc059215ce463063b50e9fb1bf0ac5448",
+          "sha256": "22785657c28bfb5c26ca4c6b35b6123e4ddbd3244cee8aa2de43aa95d6d29aeb",
           "rollback": "rollback-20261021112000_home_finder_native.sql",
           "rollbackSha256": "612eacbe783ddeb68c7f7d030a4f20dcdc314f54fc413bea6fa35117d902fc3d",
           "rollbackStatus": "guarded or forward-only; exact native refusal/reapply and operating recovery remain release gates"

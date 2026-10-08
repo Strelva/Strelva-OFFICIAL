@@ -31,7 +31,7 @@ import { getTenantConfig } from "@/lib/tenants";
 import { siteEditingFor, type SiteEditing } from "@/products/websites/server";
 import { getPublishedSiteDocument, readHostedBusinessFacts } from "@/products/websites";
 import { savedCheckObservations } from "@/products/investigations/system-health";
-import { readHomeFinderSystemObservations } from "@/products/home-finder/runtime-server";
+import { readHomeFinderSystemObservations } from "@/products/home-finder/server";
 import { createSupabaseSystemStore } from "@/platform/systems/supabase-store";
 import { readBusinessVersions } from "@/platform/system-versions/supabase-store";
 import type { System } from "@/platform/systems/contracts";
