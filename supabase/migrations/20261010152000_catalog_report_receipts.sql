@@ -2,13 +2,16 @@
 -- New tables only; no rewrite or change to existing cron schedules/recipients.
 set local lock_timeout = '3s';
 
-create or replace function public.workspace_release_flag_names() returns text[]
-language sql immutable set search_path = public, pg_temp as $$
-  select array['owner_entry', 'inquiries', 'website_rebuild', 'systems',
-    'make_real_live:hosted_website', 'make_real_live:tenant_content', 'make_real_live:inquiry_form',
-    'make_real_live:booking_page', 'make_real_live:internal_app', 'connected_sites',
-    'make_real_owner_link', 'publishing', 'publishing_record_google_policy', 'internal_tool_notices', 'catalog_reports']::text[]
-$$;
+-- Append this stream's keys to the current list; never restate other streams' keys (#253).
+do $migration$
+declare previous text[];
+begin
+  previous := public.workspace_release_flag_names();
+  select array_agg(distinct key order by key) into previous from unnest(previous || array['catalog_reports']) key;
+  execute format('create or replace function public.workspace_release_flag_names() returns text[] language sql immutable set search_path = public, pg_temp as %L',
+    format('select %L::text[]', previous::text));
+end;
+$migration$;
 revoke all on function public.workspace_release_flag_names() from public, anon, authenticated;
 
 create table public.catalog_report_receipts (

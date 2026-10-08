@@ -7,6 +7,8 @@ import { getClientLeadsForOperator, type OperatorClientLeads } from "@/lib/clien
 import { isTenantId } from "@/lib/scaffold-contracts";
 import { AdminEmpty, Chip } from "@/app/admin/console";
 import { ClientLeadList } from "./ClientLeadList";
+import { inquiryRecordsEnabled } from "@/platform/infra/inquiry-records";
+import { operatorNoticeReviewEnabled } from "@/platform/operator-queue";
 
 export const dynamic = "force-dynamic";
 
@@ -85,6 +87,7 @@ export default async function ClientLeadsPage({
       </div>
 
       <StoreStatus data={data} />
+      {(inquiryRecordsEnabled() || operatorNoticeReviewEnabled()) && <Link href="/admin/client-leads/inquiries" className="inline-block text-sm text-warm-white underline focus-visible:outline focus-visible:outline-accent">Review held inquiries and owner notices</Link>}
 
       {unreadable ? (
         <AdminEmpty

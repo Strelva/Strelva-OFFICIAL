@@ -1,6 +1,7 @@
 "use client";
 
 import { ResponsibilityExperience, StandingResponsibilityPicker } from "@/experience/operations/ResponsibilityExperience";
+import { InquiryRunning } from "./InquiryRunning";
 import type { WorkspaceWork } from "./contracts";
 
 export function WorkspaceOngoing({
@@ -13,6 +14,7 @@ export function WorkspaceOngoing({
   readOnly,
   newWorkBlocked = false,
   monthlyRecap = false,
+  inquiriesEnabled = false,
   initialRequest,
   onCreatingStandingChange,
   onOpenStanding,
@@ -29,6 +31,7 @@ export function WorkspaceOngoing({
   newWorkBlocked?: boolean;
   /** Systems projection confirms this business has a managed website. */
   monthlyRecap?: boolean;
+  inquiriesEnabled?: boolean;
   initialRequest?: string;
   onCreatingStandingChange: (creating: boolean) => void;
   onOpenStanding: (id: string) => void;
@@ -48,6 +51,7 @@ export function WorkspaceOngoing({
     </header>}
 
     {!finiteJobOpen && monthlyRecap ? <p className="rounded-2xl border border-gray-border bg-white p-4 text-sm text-warm-black">Strelva sends you a monthly recap. Each send, hold or failure is recorded in Strelva handled.</p> : null}
+    {finiteJobOpen ? null : <InquiryRunning key={workspaceId} workspaceId={workspaceId} enabled={inquiriesEnabled} />}
 
     {finiteJobOpen ? null : <StandingResponsibilityPicker
       workspaceId={workspaceId}

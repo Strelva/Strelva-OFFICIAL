@@ -21,6 +21,7 @@ const TWIN_TREES = "a0000000-0000-4000-8000-000000000003";
 const AGENCY = "a0000000-0000-4000-8000-000000000009";
 const SOURCE_INTAKE = "b0000000-0000-4000-8000-000000000001";
 const MOONEY_INTAKE = "b0000000-0000-4000-8000-000000000002";
+const MOONEY_ARBITRATION = "b0000000-0000-4000-8000-000000000008";
 const MOONEY_SESSIONS = "b0000000-0000-4000-8000-000000000003";
 const MOONEY_REBUILD = "b0000000-0000-4000-8000-000000000004";
 const MOONEY_FACT_REVIEW = "b0000000-0000-4000-8000-000000000005";
@@ -106,13 +107,14 @@ export function createSystemsPreviewRequest(scenario: SystemsPreviewScenario): t
   const current = agency ? AGENCY : twin ? TWIN_TREES : MOONEY;
   const mooneyAccess = scenario === "mooney-shared" || agency ? { access: "delegated_read" as const } : scenario === "mooney-member" ? { access: "member" as const, role: "member" as const } : { role: "owner" as const };
   const workspaces: WorkspaceSnapshot["workspaces"] = [
-    ...(agency ? [{ id: AGENCY, kind: "agency" as const, name: "Strelva Agency" }] : []),
+    ...(agency ? [{ id: AGENCY, kind: "agency" as const, name: "Strelva Agency", role: "owner" as const }] : []),
     ...(twin ? [{ id: TWIN_TREES, kind: "customer" as const, name: "Twin Trees", role: "owner" as const }] : [{ id: MOONEY, kind: "customer" as const, name: "The Mooney Firm", ...mooneyAccess }]),
     ...(agency ? [{ id: HARBOR, kind: "customer" as const, name: "Harbor Dental", access: "delegated_read" as const }] : []),
   ];
   const mooneyWork: WorkspaceWork[] = scenario === "mooney-empty" ? [] : [
     work(MOONEY_FACT_REVIEW, MOONEY, "Confirm 40 flagged facts on the rebuilt site", "operations", "responsibility", { operation: { status: "needs_attention", reason: `${mooneyEvidence.needsReview} credentials, fees and practice claims need your confirmation before the rebuilt site can go live.` } }),
     work(MOONEY_INTAKE, MOONEY, "Mediation intake", "applications", "application", { operation: { status: "installed" }, sourceWorkId: SOURCE_INTAKE }),
+    work(MOONEY_ARBITRATION, MOONEY, "Arbitration intake", "applications", "application", { operation: { status: "installed" }, sourceWorkId: SOURCE_INTAKE }),
     work(MOONEY_SESSIONS, MOONEY, "Mediation sessions", "scheduling", "schedule", { operation: { status: "draft" } }),
     ...(agency ? [] : [work(MOONEY_REBUILD, MOONEY, "attymooney.com rebuild", "websites", "website", { operation: { status: "review" }, input: {
       sourceUrl: "https://www.attymooney.com",
@@ -180,6 +182,7 @@ export function createSystemsPreviewRequest(scenario: SystemsPreviewScenario): t
       const id = url.searchParams.get("workId");
       if (id === MOONEY_SESSIONS) return json({ id, payload: sessionsSchedule() });
       if (id === MOONEY_INTAKE) return json({ id, payload: intakeApplication("Mediation intake", true) });
+      if (id === MOONEY_ARBITRATION) return json({ id, payload: intakeApplication("Arbitration intake", true) });
       if (id === SOURCE_INTAKE) return json({ id, payload: intakeApplication("Intake for professional practices", true) });
       if (id === HARBOR_INTAKE) return json({ id, payload: intakeApplication("New-patient intake", false) });
       return json({ error: "This saved work is unavailable in the local preview." }, 404);
@@ -196,7 +199,7 @@ export function createSystemsPreviewRequest(scenario: SystemsPreviewScenario): t
  * without them the preview would show no Versions at all. Fictional: the
  * Mooney and Harbor intakes are Versions of the agency's intake source.
  */
-export function previewStoredVersions(businessId: string, systems: readonly WorkspaceSystemEntry[]): WorkspaceSystemVersion[] {
+export function previewStoredVersions(businessId: string, systems: readonly WorkspaceSystemEntry[], state: "ready" | "unavailable" | "empty" = "ready"): WorkspaceSystemVersion[] {
   const contexts: Record<string, { workId: string; label: string }> = {
     [MOONEY]: { workId: MOONEY_INTAKE, label: "The Mooney Firm" },
     [HARBOR]: { workId: HARBOR_INTAKE, label: "Harbor Dental" },
@@ -204,11 +207,16 @@ export function previewStoredVersions(businessId: string, systems: readonly Work
   const context = contexts[businessId];
   const system = context ? systems.find((entry) => entry.savedWorkId === context.workId) : undefined;
   if (!context || !system) return [];
+  const sibling = businessId === MOONEY ? systems.find(entry => entry.savedWorkId === MOONEY_ARBITRATION) : undefined;
   return [{
     id: `f0000000-0000-4000-8000-${businessId.slice(-12)}`,
     systemId: system.ref.systemId,
     source: { businessId: AGENCY, systemId: "f1000000-0000-4000-8000-000000000001", name: "Intake for professional practices", hidden: false },
     context: { kind: "agency_client", label: context.label },
-    baselineRevision: 3, latestRevision: 3, currentRelease: 2, declined: [], siblings: [],
+    baselineRevision: 3, latestRevision: 3, currentRelease: 2, declined: [], siblings: sibling ? [{ id: "f0000000-0000-4000-8000-000000000008", systemId: sibling.ref.systemId, context: { kind: "customer_segment", label: "Arbitration" }, comparison: state === "unavailable" ? { state: "unavailable", changes: [] } : { state: "ready", changes: state === "empty" ? [] : [
+      { path: "title", beforePresent: true, afterPresent: true, before: "Intake for professional practices", after: "Arbitration intake" },
+      { path: "followUp.message", beforePresent: true, afterPresent: true, before: "We will get back to you shortly.", after: "We will call within one business day about your arbitration matter." },
+      { path: "optionalConsultation", beforePresent: true, afterPresent: false, before: true, after: null },
+    ] } }] : [],
   }];
 }

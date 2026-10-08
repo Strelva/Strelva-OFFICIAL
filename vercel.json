@@ -5,6 +5,10 @@
   },
   "crons": [
     {
+      "path": "/api/cron/workspace-export-recovery",
+      "schedule": "*/10 * * * *"
+    },
+    {
       "path": "/api/cron/domain-monitor",
       "schedule": "*/30 * * * *"
     },

@@ -23,6 +23,16 @@ export function hasLiveIntent(status: InquiryCapabilityStatus): boolean {
   return status === "live" || status === "live_unverified";
 }
 
+/** Pausing handling must not close the published form. The legacy projection
+ * stays unchanged until the durable inquiry-record rollout is enabled. */
+export function inquiryPausedIntakeEnabled(environment: Partial<Record<string, string | undefined>> = process.env): boolean {
+  return environment.STRELVA_INQUIRY_RECORDS?.trim() === "1" && environment.DUAL_WRITE_PG !== "0";
+}
+
+export function hasInquiryIntakeIntent(status: InquiryCapabilityStatus): boolean {
+  return hasLiveIntent(status) || (status === "paused" && inquiryPausedIntakeEnabled());
+}
+
 export type InquiryCurrentness =
   | { current: true; capability: InquiryCapabilityState; definition: InquiryCapabilityDefinition }
   | {
@@ -65,6 +75,20 @@ export function inquiryCurrentness(
   if (inquiry.status && !isOpenInquiryStatus(inquiry.status)) {
     return { current: false, reason: "inquiry_closed", capturedRevision, liveRevision };
   }
+  return { current: true, capability, definition: capability.live };
+}
+
+/** Record-only authority. Customer messages keep using inquiryCurrentness,
+ * which requires live handling; this seam only retains validated intake. */
+export function inquiryIntakeCurrentness(
+  state: Pick<InquiryEngineState, "capabilities">,
+  businessId: string,
+  inquiry: { capabilityId?: string | null; capabilityVersion?: number | null },
+): InquiryCurrentness {
+  const current = inquiryCurrentness(state, businessId, inquiry);
+  if (current.current || current.reason !== "not_live" || !inquiryPausedIntakeEnabled()) return current;
+  const capability = state.capabilities.find((item) => item.id === inquiry.capabilityId && item.businessId === businessId);
+  if (capability?.status !== "paused" || !capability.live || capability.live.version !== inquiry.capabilityVersion) return current;
   return { current: true, capability, definition: capability.live };
 }
 

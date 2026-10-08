@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createMemoryInquiryDeliveryStore,
@@ -16,10 +16,14 @@ import {
   type InquiryDeliverySubmission,
   type InquiryOutboundTransport,
 } from "@/products/inquiries/delivery";
+import { setOwnerRecipientResolver } from "@/lib/owner-recipient";
+import { setBusinessRecordDb } from "@/platform/business-record/repository";
 import type { ResponsibilityPolicy } from "@/products/inquiries/contracts";
 
 vi.mock("@/lib/tenant-crm", () => ({ addTenantActivity: vi.fn(async () => undefined) }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: vi.fn(async () => ({ siteName: "Harbor Dental", ownerEmail: "owner@harbor.example" })) }));
+
+afterEach(() => { setOwnerRecipientResolver(null); setBusinessRecordDb(null); vi.unstubAllEnvs(); });
 
 const RECEIVED_AT = "2026-09-11T10:00:00.000Z";
 const NOW = new Date("2026-09-11T12:00:00.000Z");
@@ -90,6 +94,17 @@ function deps(
 describe("inquiry delivery connector", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("rollout uses business record name and owner rather than a separate staff destination", async () => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1"); vi.stubEnv("STRELVA_BUSINESS_RECORD_READS", "1");
+    setOwnerRecipientResolver(async () => ({ email: "record-owner@example.test", name: null, from: "record", workspaceId: "w" }));
+    setBusinessRecordDb({ rpc: async () => ({ data: { revision: 1, facts: { display_name: "Current Harbor" }, services: [] }, error: null }) });
+    const selected = await resolveInquiryRoute({ ...inquiry, staffDestination: "old-staff@harbor.example" }, policy());
+    expect(selected).toMatchObject({ businessName: "Current Harbor", ownerEmail: "record-owner@example.test", customerEmail: inquiry.email });
+    vi.stubEnv("STRELVA_BUSINESS_RECORD_READS", "0");
+    const legacy = await resolveInquiryRoute({ ...inquiry, staffDestination: "old-staff@harbor.example" }, policy());
+    expect(legacy).toMatchObject({ businessName: "Harbor Dental", ownerEmail: "old-staff@harbor.example" });
   });
 
   it("prepares the native inquiry actions without duplicating the legacy owner notice", async () => {

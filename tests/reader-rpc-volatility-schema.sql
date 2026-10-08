@@ -90,16 +90,21 @@ select pg_temp.rpc_assert(has_function_privilege('service_role', signature, 'exe
   from rpc_cases;
 
 -- Rehearse the rollback and prove the real defect on each affected path.
-\ir ../supabase/migrations/rollback-reader-rpc-volatility.sql
+\ir ../supabase/migrations/rollback-20261009150000_reader_rpc_volatility.sql
 select pg_temp.rpc_assert(p.provolatile = 's', c.signature || ' rolled back to STABLE')
   from rpc_cases c join pg_proc p on p.oid = c.signature::regprocedure;
 select pg_temp.rpc_assert(to_jsonb(p) - 'provolatile' = b.definition - 'provolatile'
   and (to_jsonb(p) = b.definition or exists(select 1 from rpc_cases c where c.signature::regprocedure = p.oid)),
   p.oid::regprocedure::text || ' only targeted volatility changed')
   from rpc_before b join pg_proc p using (oid);
+-- After w6 business portability (20261010165500) the export RPC is a VOLATILE
+-- wrapper whose own categories take no reader locks, so the old defect cannot
+-- replay through it; its volatility and reapply contract still apply.
 select format('begin isolation level read committed %s; set local role service_role; select pg_temp.rpc_expect(%L, %L); rollback;',
   case when p.provolatile = 'v' then 'read write' else 'read only' end, c.statement, '25006')
   from rpc_cases c join pg_proc p on p.oid = c.signature::regprocedure
+  where not (c.signature like 'public.export_workspace_v3_category(%'
+    and to_regprocedure('public.export_workspace_v3_category_before_w6(uuid,uuid,text,text,integer,integer)') is not null)
 \gexec
 
 -- Reapply the follow-up: each POST-equivalent request must run successfully.

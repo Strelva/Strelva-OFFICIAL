@@ -48,17 +48,17 @@ Assigned additive migrations, each with its rollback under `supabase/migrations/
 
 | Timestamp | Change | Rollback |
 | --- | --- | --- |
-| `20261010150000` | Linked contact/person submit and notice receipts | `rollback-w6-internal-tool-submit-notices.sql` |
-| `20261010150100` | Use-grant linked submit | `rollback-w6-internal-tool-use-links.sql` |
-| `20261010150200` | Notice delivery leases and bounded retries | `rollback-w6-internal-tool-notice-delivery.sql` |
-| `20261010150300` | Contact conflicts and tool evidence | `rollback-w6-catalog-tool-evidence.sql` |
-| `20261010150400` | Use-grant linked corrections | `rollback-w6-internal-tool-use-edits.sql` |
-| `20261010152000` | Report receipts and Search Console reachability | `rollback-catalog-report-receipts.sql` |
-| `20261010153000` | Newsletter contacts and dry-run backfill | `rollback-newsletter-contacts.sql` |
-| `20261010154000` | Maker-only work plans and funding authority | `rollback-w6-system-work-plan-authority.sql` |
-| `20261010155000` | Failed maker plan → pending Request | `rollback-w6-failed-system-plan-request.sql` |
-| `20261010155100` | Atomic linked member submission | `rollback-w6-internal-tool-member-submit.sql` |
-| `20261010155200` | Grant-scoped readable contact/staff labels | `rollback-w6-internal-tool-use-link-labels.sql` |
+| `20261010150000` | Linked contact/person submit and notice receipts | `rollback-20261010150000_internal_tool_submit_notices.sql` |
+| `20261010150100` | Use-grant linked submit | `rollback-20261010150100_internal_tool_use_links.sql` |
+| `20261010150200` | Notice delivery leases and bounded retries | `rollback-20261010150200_internal_tool_notice_delivery.sql` |
+| `20261010150300` | Contact conflicts and tool evidence | `rollback-20261010150300_catalog_tool_evidence.sql` |
+| `20261010150400` | Use-grant linked corrections | `rollback-20261010150400_internal_tool_use_edits.sql` |
+| `20261010152000` | Report receipts and Search Console reachability | `rollback-20261010152000_catalog_report_receipts.sql` |
+| `20261010153000` | Newsletter contacts and dry-run backfill | `rollback-20261010153000_newsletter_contacts.sql` |
+| `20261010154000` | Maker-only work plans and funding authority | `rollback-20261010154000_system_work_plan_authority.sql` |
+| `20261010155000` | Failed maker plan → pending Request | `rollback-20261010155000_failed_system_plan_request.sql` |
+| `20261010155100` | Atomic linked member submission | `rollback-20261010155100_internal_tool_member_submit.sql` |
+| `20261010155200` | Grant-scoped readable contact/staff labels | `rollback-20261010155200_internal_tool_use_link_labels.sql` |
 
 Inherited integration migrations include `20261007190000` document revisions, `20261007190100` onboarding revisions, `20261007190200` application version history, `20261007192000` maker authority, `20261007192100` record link types and `20261007194000` typed analytics/report persistence. None was applied to production by this stream.
 

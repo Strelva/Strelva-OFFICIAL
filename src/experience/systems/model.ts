@@ -100,6 +100,7 @@ export interface SystemVersion {
   title: string;
   /** Lineage sentence. Say "not recorded" rather than inventing one. */
   lineage: string;
+  comparison?: { state: "ready" | "unavailable"; changes: Array<{ path: string; beforePresent: boolean; afterPresent: boolean; before: unknown; after: unknown }> };
   systemId?: string;
   href?: string;
 }
@@ -132,6 +133,8 @@ export interface SystemView {
   connections: SystemConnection[];
   possibilities: SystemPossibility[];
   versions: SystemVersion[];
+  /** Stored lineage in this business; enables its own improvement decision. */
+  storedVersionId?: string;
   /** Views of this System kept on the managed site (a Bookings System's schedule and roster). */
   views?: Array<{ id: string; label: string; href?: string }>;
   /** Issued audits of this website (website audits and AI visibility assessments). Not Systems. */

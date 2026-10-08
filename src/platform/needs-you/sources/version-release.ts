@@ -94,6 +94,7 @@ export function versionReleaseAdapter(ports: VersionReleaseSourcePorts): SourceA
   return {
     lifecycle: "version_release",
     needsMemberActor: true,
+    ownerLinkWithoutAccount: true,
     async propose(ctx) {
       if (!ctx.actor) return { items: [], complete: false };
       try {

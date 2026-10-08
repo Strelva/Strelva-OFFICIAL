@@ -1,7 +1,7 @@
 import type { UnifiedEvent } from "@/lib/types";
 
 import type { InquiryDeliveryCheckpoint } from "./delivery";
-import type { InquiryMessageReviewPreview } from "./delivery-approval-contract";
+import type { InquiryMessageReviewPreview, InquiryMessageReviewApproveInput, InquiryMessageAcceptanceEvidence } from "./delivery-approval-contract";
 import {
   INQUIRY_MESSAGE_REVIEW_KIND,
   INQUIRY_MESSAGE_REVIEW_SCHEMA_VERSION,
@@ -24,7 +24,7 @@ export function metadataFromEvent(event: UnifiedEvent): InquiryMessageReviewEven
   if (!value || value.kind !== INQUIRY_MESSAGE_REVIEW_KIND || value.schemaVersion !== INQUIRY_MESSAGE_REVIEW_SCHEMA_VERSION) return null;
   const row = value as Record<string, unknown>;
   try {
-    if (row.reviewAudience !== "owner") return null;
+    if (row.reviewAudience !== "owner" && row.reviewAudience !== "operator") return null;
     const action = reviewAction(row.action);
     const metadata: InquiryMessageReviewEventMetadata = {
       kind: INQUIRY_MESSAGE_REVIEW_KIND,
@@ -48,7 +48,8 @@ export function metadataFromEvent(event: UnifiedEvent): InquiryMessageReviewEven
       preparedAt: text(row.preparedAt, "Prepared time", 80),
       expiresAt: row.expiresAt === null ? null : text(row.expiresAt, "Expiry", 80),
       reviewTokenHash: text(row.reviewTokenHash, "Review token", 128),
-      reviewAudience: "owner",
+      reviewAudience: row.reviewAudience,
+      ...(row.authoredReply === undefined ? {} : { authoredReply: text(row.authoredReply, "Reply body", 4096) }),
     };
     if (!/^[a-f0-9]{64}$/.test(metadata.messageDigest) || !/^[a-f0-9]{64}$/.test(metadata.reviewTokenHash)) return null;
     return metadata;
@@ -71,6 +72,7 @@ export function previewFromEvent(event: UnifiedEvent, metadata: InquiryMessageRe
   if (hash(token) !== metadata.reviewTokenHash) throwCode("review_revoked", "This message review is no longer valid.");
   return {
     reviewToken: token,
+    ...(metadata.authoredReply === undefined ? {} : { eventId: event.id }),
     inquiryId: metadata.inquiryId,
     action: metadata.action,
     recipient: metadata.recipient,
@@ -96,4 +98,33 @@ export type SentMessageBinding = "same" | "different" | "unknown";
 export function sentMessageBinding(checkpoint: InquiryDeliveryCheckpoint | null, reviewDigest: string): SentMessageBinding {
   if (!checkpoint?.messageDigest) return "unknown";
   return checkpoint.messageDigest.toLowerCase() === reviewDigest.toLowerCase() ? "same" : "different";
+}
+
+export function approvalEventMatches(
+  event: UnifiedEvent,
+  tenantId: string,
+  input: InquiryMessageReviewApproveInput,
+  actorId: string,
+): InquiryMessageReviewEventMetadata | null {
+  const metadata = metadataFromEvent(event);
+  if (!metadata || event.tenantId !== tenantId || metadata.businessId !== input.businessId || metadata.inquiryId !== input.inquiryId || metadata.action !== input.action) return null;
+  if (metadata.requestedBy !== actorId) return metadata;
+  if (metadata.messageDigest !== input.messageDigest) return metadata;
+  if (hash(input.reviewToken) !== metadata.reviewTokenHash) return metadata;
+  return metadata;
+}
+
+
+export function acceptanceEvidenceFromEvent(event: UnifiedEvent): InquiryMessageAcceptanceEvidence | null {
+  const raw = (event.metadata?.execution as { acceptance?: unknown } | undefined)?.acceptance;
+  if (!raw || typeof raw !== "object") return null;
+  const row = raw as Record<string, unknown>;
+  const value = (field: unknown, max: number) => (typeof field === "string" && field.trim() ? field.trim().slice(0, max) : undefined);
+  const acceptedAt = value(row.acceptedAt, 80);
+  if (acceptedAt && !Number.isFinite(Date.parse(acceptedAt))) return null;
+  return {
+    providerMessageId: value(row.providerMessageId, 240),
+    acceptedAt,
+    deliveryAttemptId: value(row.deliveryAttemptId, 240),
+  };
 }
