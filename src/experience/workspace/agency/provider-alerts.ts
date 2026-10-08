@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createHash } from "node:crypto";
-import { getDomainHealth } from "@/lib/domain-monitor-store";
+import { getDomainHealth } from "@/platform/infra/domain-health";
 import { readSiteHealth } from "@/platform/operator-queue/site-health-store";
 import { CRON_MAX_AGE_SECONDS } from "@/platform/infra/heartbeat";
 import { versionsDb, type VersionsDb } from "@/platform/system-versions/supabase-store";

@@ -21,6 +21,8 @@ import { getAllTenants } from "./tenants";
 import { normalizeCustomDomain } from "./domains";
 import type { TenantConfig } from "./types";
 import { checkCertificateExpiry } from "./domain-certificate";
+import type { DomainCheck, DomainKind, DomainState, TenantDomainHealth } from "@/platform/infra/domain-health";
+export type { DomainCheck, DomainKind, DomainState, TenantDomainHealth } from "@/platform/infra/domain-health";
 
 /** Bodies smaller than this that return 200 are treated as broken (parking
  *  stubs, blank shells). Orange Crate's dead page was 114 bytes. */
@@ -34,42 +36,6 @@ const FETCH_TIMEOUT_MS = 12_000;
 /** Signatures of a parked / for-sale / suspended domain page. */
 const PARKING_SIGNATURE =
   /\/lander|window\.location[^;]*lander|domain (is |may be )?for sale|buy this domain|this domain is parked|parked (free|page)|sedoparking|afternic|cashparking|godaddy\.com\/domainsearch|domaincontrol/i;
-
-export type DomainState = "up" | "down" | "parked" | "unreachable" | "unknown";
-
-/** A monitorable hostname belonging to a tenant. */
-export type DomainKind = "custom" | "platform";
-
-export interface DomainCheck {
-  host: string;
-  kind: DomainKind;
-  url: string;
-  httpStatus: number | null;
-  bytes: number | null;
-  state: DomainState;
-  reason?: string;
-  /** Registry expiry (ISO date) from RDAP, or null when unavailable. */
-  expiresAt: string | null;
-  daysToExpiry: number | null;
-  /** Optional so stored scans predating certificate checks remain readable. */
-  sslExpiresAt?: string | null;
-  sslDaysToExpiry?: number | null;
-  checkedAt: string;
-  latencyMs: number | null;
-}
-
-export interface TenantDomainHealth {
-  tenantId: string;
-  siteName: string;
-  ownerName: string;
-  ownerEmail?: string;
-  primaryHost: string | null;
-  checks: DomainCheck[];
-  /** Worst state across the tenant's CUSTOM domains (falls back to platform). */
-  worst: DomainState;
-  /** Nearest expiry (days) across all checks, or null. */
-  nearestExpiryDays: number | null;
-}
 
 const SEVERITY: Record<DomainState, number> = {
   unreachable: 3,

@@ -64,6 +64,30 @@ including payer concurrency and exact rollback/reapply/read-only projection chec
 provider-specific browser journey remain unqualified by this packet. No local result
 establishes deployed routing or provider operation.
 
+The combined issue checkout initially reported 9,091 passing unit tests,
+67 skipped and 15 release-inventory failures: this migration was not classified.
+Its boundary check also rejected the workspace importing the legacy tenant store.
+The repair appends only proposed, unapplied batch 17 to
+`scripts/release-safety/batches.json`; every historical batch, digest and recovery
+scope is unchanged. The forward SHA256 is
+`412550da8b83094487126a1d0b44a883672bf96504aeee6a00ec30d05a6023f6`;
+the rollback SHA256 is
+`0d1fd0971f14ded3e8353836c76fd1d543def76f11ece1a0cded9eca7c4bf6fd`.
+Both SQL files remain byte-identical to the qualified source. Batch 17 is not
+added to the active staging packet and grants no release or flag authority.
+
+`src/platform/infra/domain-health` now owns the existing domain-health store
+and evidence types. The legacy `src/lib/domain-monitor-store.ts` and scanner
+type exports re-export that owner. Redis keys, 30-day TTLs, signatures,
+snapshot shape and required-store behavior are unchanged; a compatibility test
+exercises writes and reads through both paths against the same mocked store.
+The repair passed 151 tests across the three release suites, ten provider-health
+suites and two boundary suites, plus `pnpm check:boundaries`, scoped ESLint,
+`pnpm typecheck` and `git diff --check`. The first repair typecheck caught an
+unchecked mock-call access in the new test; the guarded access was rerun.
+These focused checks do not establish that the coordinator's full combined
+suite has passed; its final combined run remains separately owned.
+
 Next: run a signed-in current-provider queue journey against the local ordered
 schema when the separately owned disposable Auth stack is available.
 Complete a separately specified synthetic form-submit contract that cannot

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { addAgencyProviderAlerts } from "@/experience/workspace/agency/provider-alerts";
 import { agencyClientsPageSchema, type AgencyClientsPage } from "@/experience/workspace/agency-clients";
-import type { DomainHealthSnapshot } from "@/lib/domain-monitor-store";
+import type { DomainHealthSnapshot } from "@/platform/infra/domain-health";
 import type { SiteHealthSnapshot } from "@/platform/operator-queue/site-coverage";
 
 const agency = crypto.randomUUID(), business = crypto.randomUUID(), other = crypto.randomUUID(), system = crypto.randomUUID();
