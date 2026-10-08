@@ -55,7 +55,8 @@ export function toolNoticeObservations(rows: ToolNoticeReceipt[], systems: Array
 
 export async function readToolNoticeFailures(actor: QueueActor): Promise<SourceRead[]> {
   if (!mayBeOn()) return [];
-  const rows = await callReleaseFlagsRpc("read_catalog_tool_notice_failures", {
+  const rows = await callReleaseFlagsRpc("read_audited_platform_operator_source", {
+    p_reader_name: "read_catalog_tool_notice_failures",
     p_user_id: actor.userId, p_verified_email: actor.verifiedEmail,
   }, z.array(z.object({ id: z.string().uuid(), workspaceId: z.string().uuid(), workId: z.string().uuid(), at: z.string(), reason: z.string().nullable() })), "Submission notification failures could not be read.");
   const enabled = await Promise.all(rows.map(async row => await workspaceReleaseFlagEnabled("systems", row.workspaceId, { operator: true, tester: false })

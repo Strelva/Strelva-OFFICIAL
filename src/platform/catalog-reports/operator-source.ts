@@ -8,7 +8,8 @@ const failuresSchema = z.array(z.object({ id: z.string().uuid(), workspaceId: z.
 
 export async function readCatalogReportFailures(actor: QueueActor): Promise<SourceRead[]> {
   if (!catalogReportsMayBeOn()) return [];
-  const failures = await callReleaseFlagsRpc("read_catalog_report_failures", {
+  const failures = await callReleaseFlagsRpc("read_audited_platform_operator_source", {
+    p_reader_name: "read_catalog_report_failures",
     p_user_id: actor.userId, p_verified_email: actor.verifiedEmail,
   }, failuresSchema, "Report failures could not be read.");
   const enabled = await Promise.all(failures.map(row => workspaceReleaseFlagEnabled("catalog_reports", row.workspaceId, { operator: true, tester: false, userId: actor.userId })));

@@ -119,3 +119,6 @@ cmp "$cluster_root/final-functions-before.catalog" "$cluster_root/final-function
 remaining="$(psql "${psql_args[@]}" -Atc "select count(*) from public.users where email like 'aw-%@%.example.test'")"
 [[ "$remaining" == 0 ]] || { printf 'Agency workflow left fictional users behind.\n' >&2; exit 1; }
 printf 'Agency workflow SQL passed on %s ordered migrations: add client, seat-only draft, owner claim/approval, guarded publish, readback receipt, isolation, revocation, stale revisions and replay.\n' "$migration_count"
+
+# #251: bounded platform support reads; pure snapshot APIs remain unchanged.
+source "$repo_root/scripts/platform-operator-read-audit-checks.sh"

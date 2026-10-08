@@ -109,7 +109,7 @@ export async function callReleaseFlagsRpc<T>(name: string, args: Record<string, 
   const { data, error } = await db().rpc(name, args);
   if (error) {
     const detail = `${error.code ?? ""} ${error.message ?? ""}`;
-    if (detail.includes("workspace_release_operator_required") || detail.includes("workspace_access_denied")) throw new WorkspaceAccessError();
+    if (detail.includes("workspace_release_operator_required") || detail.includes("workspace_access_denied") || detail.includes("platform_operator_read_access_denied")) throw new WorkspaceAccessError();
     if (detail.includes("workspace_release_revision_conflict")) throw new ReleaseFlagConflictError();
     for (const [code, message] of Object.entries(VALIDATION)) if (detail.includes(code)) throw new ReleaseFlagValidationError(code, message);
     throw new WorkspaceStoreError(fallback);
