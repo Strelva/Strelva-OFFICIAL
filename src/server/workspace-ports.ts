@@ -47,6 +47,7 @@ export const workspacePortLoaders = {
   businessRecord: async () => ({ ...await import("@/platform/business-record/service"), ...await import("@/platform/owner-entry/email-links") }),
 
   googleBindings: () => import("@/platform/account-bindings/store"),
+  providerDisconnect: () => import("@/platform/provider-connections/receipt-store"),
 
   businessBilling: () => import("@/platform/business-billing"),
 

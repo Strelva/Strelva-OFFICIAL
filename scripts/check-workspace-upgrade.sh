@@ -152,6 +152,17 @@ insert into public.domain_claims(tenant_id,domain,role,status,dns_status,ssl_sta
  values('upgrade-site','domain-registration-legacy.example.test','production','verified','configured','issued','2026-09-01T00:00:00Z','2026-09-01T00:00:00Z');
 SQL
   fi
+  if [[ "$migration_name" == "20261005100000_restrict_legacy_tenant_client_access.sql" ]]; then
+    # #528: forward, rollback, forward. The rollback must restore the exact
+    # policies (including expressions) and table ACLs it replaced.
+    legacy_catalog="select md5(coalesce((select string_agg(format('%s|%s|%s|%s|%s|%s', tablename, policyname, cmd, roles, qual, with_check), E'\n' order by tablename, policyname) from pg_policies where schemaname='public'), '') || coalesce((select string_agg(relname || '=' || coalesce(relacl::text, ''), E'\n' order by relname) from pg_class where relnamespace='public'::regnamespace and relkind='r'), ''));"
+    legacy_before="$(psql "${psql_args[@]}" -Atc "$legacy_catalog")"
+    psql "${psql_args[@]}" --file="$migration" >/dev/null
+    psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-$migration_name" >/dev/null
+    [[ "$(psql "${psql_args[@]}" -Atc "$legacy_catalog")" == "$legacy_before" ]] || {
+      printf 'Legacy tenant access rollback did not restore policies and grants.\n' >&2; exit 1; }
+    printf 'Legacy tenant access forward, rollback and forward restored the catalog.\n'
+  fi
   psql "${psql_args[@]}" --file="$migration" >/dev/null
   if [[ "$migration_name" == "20260920060100_content_version_request_index.sql" ]]; then
     psql "${psql_args[@]}" --file="$migration" > "$cluster_root/index-retry.log" 2>&1
@@ -273,6 +284,8 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011102000_nat
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011101000_business_booking_email.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/native-publishing-targets-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/business-booking-email-schema.sql"
+# #528: no client privilege on legacy tenant tables; every member role and anon refused.
+psql "${psql_args[@]}" --file="$repo_root/tests/legacy-tenant-client-access-schema.sql"
 
 # Tracking signing keys have no browser grants and refuse rollback while a
 # site's verification identity remains configured.

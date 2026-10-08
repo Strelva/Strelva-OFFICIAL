@@ -194,6 +194,27 @@ export interface GoogleBindingsPort {
   AccountBindingStoreError: abstract new (...args: never[]) => Error & { code: string | null };
 }
 
+// ── Tenant provider disconnect receipts (src/platform/provider-connections) ──
+
+export interface ProviderDisconnectPort {
+  recordTenantProviderDisconnect(input: {
+    tenantId: string;
+    provider: "google" | "instagram" | "yelp" | "calendly" | "vegaro";
+    actorUserId: string | null;
+    revocationOutcome: "revoked" | "already_revoked" | "failed" | "partial_failure" | "unsupported" | "consent_remains" | "no_token" | "not_attempted";
+    revocationErrorCode: string | null;
+    localCleanupStatus: "complete" | "partial";
+    clearedStores: string[];
+  }): Promise<{
+    id: string;
+    provider: "google" | "instagram" | "yelp" | "calendly" | "vegaro";
+    revocationOutcome: "revoked" | "already_revoked" | "failed" | "partial_failure" | "unsupported" | "consent_remains" | "no_token" | "not_attempted";
+    revocationErrorCode: string | null;
+    localCleanupStatus: "complete" | "partial";
+    clearedStores: string[];
+  }>;
+}
+
 // ── Business billing (src/platform/business-billing) ───────────────────────────
 
 export interface BusinessBillingPort {
@@ -293,6 +314,7 @@ export interface WorkspacePorts {
   outsideWriteReceipts(): Promise<OutsideWriteReceiptsPort>;
   businessRecord(): Promise<BusinessRecordPort>;
   googleBindings(): Promise<GoogleBindingsPort>;
+  providerDisconnect(): Promise<ProviderDisconnectPort>;
   businessBilling(): Promise<BusinessBillingPort>;
   inquiries(): Promise<InquiriesPort>;
   tenantReviewReplies(): Promise<TenantReviewRepliesPort>;

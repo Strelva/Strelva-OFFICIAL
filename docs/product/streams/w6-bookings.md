@@ -60,7 +60,7 @@ All switches below are off/unset by default; exact `1` opts in. `STRELVA_BOOKING
 - `STRELVA_BOOKING_OWNER_NOTICE`, `STRELVA_BOOKING_REMINDERS`
 - `STRELVA_BOOKING_MANAGE_PAGE`, `STRELVA_BOOKING_MESSAGES`
 - `STRELVA_BOOKING_CALENDAR_BUSY`, `STRELVA_BOOKING_CALENDAR_MIRROR`
-- `STRELVA_BOOKING_CALENDAR_SCOPES`, `STRELVA_BOOKING_CALENDAR_REVOKE`
+- `STRELVA_BOOKING_CALENDAR_SCOPES`
 - `STRELVA_BOOKING_AGENTS`, `STRELVA_BOOKING_INQUIRY_OFFERS`
 - `STRELVA_BOOKING_SETTINGS`, `STRELVA_BOOKING_RECORD_FALLBACK`, `STRELVA_BOOKING_MANUAL`
 
@@ -167,7 +167,7 @@ Each needs Jacob's explicit yes; none was executed here.
 3. Enable dual writes silently, exercise retry queue, keep legacy reads; authorize the daily parity cron rollout. Collect seven consecutive complete passing days across every tenant and 60-day service slots. Preview/local fixtures cannot replace that clock.
 4. Authorize the read flip only after parity. Test both site and public API on tenant zero; verify record-hour changes, manage links, calendarless operation and wellness views. Roll back reads independently if needed.
 5. Authorize each remaining switch, instant standing approvals, owner recipient, client/global email gates and real sends individually. Prove tenant-zero inquiry → proposal → request → signed approval → delivered customer confirmation/reminders/reschedule/cancel, and an outside API/MCP client customer-confirmation gate.
-6. Google consent redirect/granular scopes and verification; Microsoft Entra registration/publisher verification and credentials. Run opted-in disposable-calendar proofs only after separate authorization, then production book/reschedule/cancel with both providers. Google revoke must succeed before local wipe; Microsoft manual consent removal is the explicit exception.
+6. Google consent redirect/granular scopes and verification; Microsoft Entra registration/publisher verification and credentials. Run opted-in disposable-calendar proofs only after separate authorization, then production book/reschedule/cancel with both providers. Disconnect always clears the local credentials and writes a receipt; Google revocation is best-effort, while Microsoft consent remains and requires removal through My Apps.
 7. Review cadence/alerts and operator recovery for failed mirror/read-back, stale record, suppressed/bounced owner notice and lost calendar access. No broader provider permission or external commitment is authorized by this handoff.
 
 ## Current bet, uncertainty and next action
