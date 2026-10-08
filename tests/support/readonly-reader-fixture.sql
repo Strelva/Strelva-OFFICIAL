@@ -36,16 +36,20 @@ create function pg_temp.vn_payload() returns jsonb language sql as $$ select jso
 create temporary table vn_created(value jsonb);
 insert into vn_created select public.create_version_system_command('13230000-0000-4000-8000-000000000001','readonly-owner@example.test',pg_temp.vn_lineage(),'Client intake','internal_app','13230000-0000-4000-8000-000000000030',pg_temp.vn_payload());
 
-insert into public.tenants(id,stable_id,site_name,active) values('readonly-reader-site','1323ffff-0000-4000-8000-000000000010','Read-only inquiry client',true);
+insert into public.tenants(id,stable_id,site_name,active,owner_email) values('readonly-reader-site','1323ffff-0000-4000-8000-000000000010','Read-only inquiry client',true,'readonly-owner@example.test');
 create temporary table handoff_ws as select (public.convert_tenant_to_business('readonly-owner@example.test','readonly-reader-site',
- '{"tenantId":"readonly-reader-site","tenantStableId":"1323ffff-0000-4000-8000-000000000010","workspaceName":"Read-only inquiry client","billing":null,"account":null,"patch":{"facts":{"hours":{"value":{"timezone":"UTC","weekly":[{"day":5,"opens":"09:00","closes":"17:00"}]},"verified":false}},"services":[{"op":"upsert","name":"Consultation","durationMinutes":30,"active":true,"position":0,"externalRef":"consult"}]},"contacts":[]}',
+ '{"tenantId":"readonly-reader-site","tenantStableId":"1323ffff-0000-4000-8000-000000000010","workspaceName":"Read-only inquiry client","agencyWorkspaceId":"13230000-0000-4000-8000-000000000010","agencyStaffEmails":["readonly-owner@example.test"],"agencySelectionBasis":"existing_contract","billing":null,"account":null,"patch":{"facts":{"hours":{"value":{"timezone":"UTC","weekly":[{"day":5,"opens":"09:00","closes":"17:00"}]},"verified":false}},"services":[{"op":"upsert","name":"Consultation","durationMinutes":30,"active":true,"position":0,"externalRef":"consult"}]},"contacts":[]}',
  '1323ffff-0000-4000-8000-000000000020',repeat('a',64))->>'workspaceId')::uuid id;
+-- Conversion grants the explicit agency seat. The trusted tenant owner enters
+-- through the existing invitation command, never through an operator admin grant.
+select public.create_operator_owner_invitation('readonly-owner@example.test', (select id from handoff_ws),
+ 'readonly-owner@example.test',repeat('1323aabb',8),now()+interval '1 day');
+select * from public.accept_workspace_invitation(repeat('1323aabb',8),
+ '13230000-0000-4000-8000-000000000001','readonly-owner@example.test');
 -- The owner has confirmed the imported details (#509).
 \ir confirm-working-record.sql
 select pg_temp.confirm_working_record(id) from handoff_ws;
-insert into public.workspace_memberships(workspace_id,user_id,role,created_by) select id,'13230000-0000-4000-8000-000000000001','owner','13230000-0000-4000-8000-000000000001' from handoff_ws on conflict(workspace_id,user_id) do update set role='owner';
 insert into public.workspace_memberships(workspace_id,user_id,role,created_by) select id,'13230000-0000-4000-8000-000000000002','member','13230000-0000-4000-8000-000000000001' from handoff_ws;
-insert into public.memberships(user_id,tenant_id,tenant_stable_id,role) values('13230000-0000-4000-8000-000000000001','readonly-reader-site','1323ffff-0000-4000-8000-000000000010','owner');
 insert into public.offering_website_bindings(business_workspace_id,tenant_stable_id,tenant_id_at_binding,site_name_at_binding,idempotency_key,command_digest,created_by,updated_by)
  select id,'1323ffff-0000-4000-8000-000000000010','readonly-reader-site','Read-only inquiry client','handoff',repeat('a',64),'13230000-0000-4000-8000-000000000001','13230000-0000-4000-8000-000000000001' from handoff_ws on conflict do nothing;
 insert into public.systems(business_workspace_id,name,kind,command_id,command_digest,created_by,updated_by)
