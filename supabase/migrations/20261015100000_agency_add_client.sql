@@ -185,6 +185,14 @@ begin
 end;
 $$;
 
+-- Server admission before crawling. The write transaction rechecks this actor.
+create function public.authorize_agency_client_add(p_user_id uuid, p_verified_email text, p_agency_workspace_id uuid)
+returns text language sql security definer set search_path=public,pg_temp as $$
+  select public.agency_client_assert_actor(p_user_id,p_verified_email,p_agency_workspace_id)
+$$;
+revoke all on function public.authorize_agency_client_add(uuid,text,uuid) from public,anon,authenticated;
+grant execute on function public.authorize_agency_client_add(uuid,text,uuid) to service_role;
+
 -- A business the agency added and whose owner has not taken it yet.
 create function public.agency_client_waiting_for_owner(p_customer_workspace_id uuid) returns boolean
 language sql stable security definer set search_path = public, pg_temp as $$
@@ -505,7 +513,8 @@ begin
     if found then return next created_workspace; return; end if;
   end if;
   if (select count(*) from public.workspaces w where w.created_by = p_user_id
-      and not exists (select 1 from public.agency_client_additions a where a.customer_workspace_id = w.id)) >= 5 then
+      and (not exists (select 1 from public.agency_client_additions a where a.customer_workspace_id = w.id)
+        or exists (select 1 from public.workspace_memberships m where m.workspace_id=w.id and m.user_id=p_user_id and m.role='owner'))) >= 5 then
     raise exception 'workspace_limit_reached';
   end if;
 
@@ -546,7 +555,8 @@ begin
   end if;
   if p_business_id is null then
     if (select count(*) from public.workspaces w where w.created_by=p_user_id
-        and not exists (select 1 from public.agency_client_additions a where a.customer_workspace_id=w.id)) >= 5 then
+        and (not exists (select 1 from public.agency_client_additions a where a.customer_workspace_id=w.id)
+          or exists (select 1 from public.workspace_memberships m where m.workspace_id=w.id and m.user_id=p_user_id and m.role='owner'))) >= 5 then
       raise exception 'workspace_limit_reached';
     end if;
     insert into public.workspaces(kind,name,created_by) values('customer',btrim(p_name),p_user_id) returning id into business_id;

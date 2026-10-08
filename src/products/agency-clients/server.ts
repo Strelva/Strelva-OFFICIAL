@@ -140,6 +140,11 @@ const NOT_SCANNED: ClientSiteScan = { status: "not_requested", seeded: [], name:
 
 /** Create the client business from a URL or a prospect, then (optionally) its owner claim link. */
 export async function addAgencyClient(actor: WorkspaceActor, input: AddAgencyClientInput, deps: AgencyClientDeps = defaultDeps()): Promise<AddAgencyClientResult> {
+  if (input.url) publicUrl(input.url);
+  await call(deps, "authorize_agency_client_add", {
+    p_user_id: actor.userId, p_verified_email: actor.verifiedEmail.trim().toLowerCase(),
+    p_agency_workspace_id: input.agencyWorkspaceId,
+  }, z.enum(["owner", "admin"]), "Adding clients is temporarily unavailable.");
   const prospect = input.prospectId ? await readProspect(deps, actor, input.agencyWorkspaceId, input.prospectId) : null;
   const rawUrl = input.url ?? prospect?.url ?? null;
   const url = rawUrl ? publicUrl(rawUrl) : null;

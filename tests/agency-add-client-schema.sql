@@ -212,7 +212,7 @@ insert into ac_results values ('plumbing', pg_temp.ac_add('ac000000-0000-4000-80
 select pg_temp.ac_assert(pg_temp.ac_role((select (body->>'customerWorkspaceId')::uuid from ac_results where name = 'plumbing'),
   'ac000000-0000-4000-8000-000000000002', 'ac-a-admin@agency-a.example.test') = 'business_record_access_denied', 'agency A cannot reach B''s client');
 
--- Added clients never use the acting person's five-workspace cap.
+-- Unclaimed agency clients do not use the acting person's workspace cap.
 insert into ac_results select 'extra-' || n, pg_temp.ac_add('ac000000-0000-4000-8000-000000000002', 'ac-a-admin@agency-a.example.test',
   'ac000000-0000-4000-8000-000000000020', jsonb_build_object('name', 'Extra ' || n), gen_random_uuid(), repeat('8', 64))
   from generate_series(1, 5) n;
@@ -292,6 +292,26 @@ select pg_temp.ac_expect($$update public.agency_client_additions set source_url 
 select pg_temp.ac_expect($$delete from public.agency_client_additions$$, 'agency_client_addition_immutable');
 select pg_temp.ac_expect($$update public.agency_client_owner_claims set recipient_email = 'x@example.test'$$, 'agency_client_owner_claim_immutable');
 select pg_temp.ac_expect($$update public.agency_client_owner_claims set status = 'pending' where status = 'accepted'$$, 'agency_client_owner_claim_immutable');
+
+-- A creator who claims these clients owns them directly: both creation
+-- commands must count those businesses toward the existing five-workspace cap.
+do $$
+declare r record; token_hash text;
+begin
+  for r in select name,(body->>'customerWorkspaceId')::uuid as id from ac_results where name in ('extra-1','extra-2','extra-3','extra-4') loop
+    token_hash := md5(r.name)||md5(r.name);
+    perform public.issue_agency_client_owner_claim('ac000000-0000-4000-8000-000000000002','ac-a-admin@agency-a.example.test',
+      'ac000000-0000-4000-8000-000000000020',r.id,'ac-a-admin@agency-a.example.test',token_hash,now()+interval '1 hour');
+    perform public.accept_agency_client_owner_claim(token_hash,'ac000000-0000-4000-8000-000000000002','ac-a-admin@agency-a.example.test');
+  end loop;
+end $$;
+select pg_temp.ac_expect($$select public.create_owned_workspace('ac000000-0000-4000-8000-000000000002','ac-a-admin@agency-a.example.test',
+  'agency','Over claimed owner cap')$$,'workspace_limit_reached');
+select pg_temp.ac_expect($$select public.enter_customer_business('ac000000-0000-4000-8000-000000000002','ac-a-admin@agency-a.example.test',
+  'Over claimed owner cap',null,null,gen_random_uuid(),repeat('b',64))$$,'workspace_limit_reached');
+select pg_temp.ac_assert(has_function_privilege('service_role','public.authorize_agency_client_add(uuid,text,uuid)','execute')
+  and not has_function_privilege('authenticated','public.authorize_agency_client_add(uuid,text,uuid)','execute')
+  and not has_function_privilege('anon','public.authorize_agency_client_add(uuid,text,uuid)','execute'),'admission is service only');
 
 rollback;
 \echo 'Agency add client SQL contract passed.'

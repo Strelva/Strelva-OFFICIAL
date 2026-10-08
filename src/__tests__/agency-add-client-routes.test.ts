@@ -30,7 +30,7 @@ const claim = { claimId: "a9100000-0000-4000-8000-0000000000f1", customerWorkspa
 const add = { action: "add", agencyWorkspaceId: AGENCY, url: "northside-bakery.example", ownerEmail: "pat@northside-bakery.example", idempotencyKey: KEY };
 
 function answer(map: Record<string, { data?: unknown; error?: { message: string } }>) {
-  mocks.rpc.mockImplementation(async (name: string) => ({ data: map[name]?.data ?? null, error: map[name]?.error ?? null }));
+  mocks.rpc.mockImplementation(async (name: string) => ({ data: map[name]?.data ?? (name === "authorize_agency_client_add" ? "owner" : null), error: map[name]?.error ?? null }));
 }
 
 beforeEach(() => {
@@ -78,7 +78,7 @@ describe("POST /api/workspace/agency-clients", () => {
     expect(body.client).toMatchObject({ customerWorkspaceId: CLIENT, name: "Northside Bakery" });
     expect(body.ownerClaim).toMatchObject({ claimPath: expect.stringMatching(/^\/workspace\/claim\/[A-Za-z0-9_-]{43}$/), delivery: { status: "not_sent", reason: "gated" } });
     expect(body.website.connect).toBe(`/workspace/site?workspaceId=${CLIENT}&entry=connect`);
-    expect(mocks.rpc.mock.calls.map(([name]) => name)).toEqual(["agency_add_client", "issue_agency_client_owner_claim"]);
+    expect(mocks.rpc.mock.calls.map(([name]) => name)).toEqual(["authorize_agency_client_add", "agency_add_client", "issue_agency_client_owner_claim"]);
     expect(mocks.rpc.mock.calls[0]![1]).toMatchObject({ p_verified_email: "owner@agency.example.test" });
   });
 

@@ -24,6 +24,7 @@ drop function public.list_agency_client_additions(uuid, text, uuid);
 drop function public.agency_add_client(uuid, text, uuid, jsonb, uuid, text);
 drop function public.agency_client_addition_json(public.agency_client_additions, boolean);
 drop function public.agency_client_waiting_for_owner(uuid);
+drop function public.authorize_agency_client_add(uuid, text, uuid);
 drop function public.agency_client_assert_actor(uuid, text, uuid);
 drop function public.agency_client_add_limits();
 
