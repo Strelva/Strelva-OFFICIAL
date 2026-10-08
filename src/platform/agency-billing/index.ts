@@ -40,6 +40,7 @@ export async function fulfillAgencyInvoice(actor:WorkspaceActor,intentId:string,
   const stripe=deps.stripe??stripeClient();const scope={stripeAccount:merchant.stripe_account_id!};
   const customer=await stripe.customers.create({email:intent.accepted_email,metadata:{agencyInvoiceId:intent.id,businessWorkspaceId:intent.business_workspace_id}},{...scope,idempotencyKey:`agency-invoice:${intent.id}:customer`});
   const price=await stripe.prices.create({currency:intent.currency,unit_amount:intent.amount_cents,recurring:{interval:"month"},product_data:{name:intent.description}},{...scope,idempotencyKey:`agency-invoice:${intent.id}:price`});
+  await rpc("record_agency_billing_terms",{p_intent_id:intent.id,p_account_id:merchant.stripe_account_id,p_customer_id:customer.id,p_price_id:price.id},db);
   const subscription=await createDirectSubscription({workspaceId:intent.agency_workspace_id,idempotencyKey:`agency-invoice:${intent.id}:subscription`,customerId:customer.id,priceId:price.id,purpose:"agency_rebill",businessWorkspaceId:intent.business_workspace_id},{...deps,stripe});
   objectId=subscription.id;
   const invoiceId=typeof subscription.latest_invoice==="string"?subscription.latest_invoice:subscription.latest_invoice?.id;
@@ -49,17 +50,32 @@ export async function fulfillAgencyInvoice(actor:WorkspaceActor,intentId:string,
  return rpc("record_agency_billing_checkout",{p_intent_id:intent.id,p_account_id:merchant.stripe_account_id,p_object_id:objectId,p_url:url},db);
 }
 
-/** Call only after Stripe signature verification. Scoped account + provider id owns attribution. */
+/** Call only after signature/mode verification. The bound intent owns attribution;
+ * whitelisted provider evidence proves payment separately from subscription state. */
 export async function syncAgencyInvoiceFromConnectEvent(event:import("stripe").default.Event,db:RpcDb|null=getSupabase() as unknown as RpcDb|null) {
  if(!event.account||!db)return {ignored:true};
- const object=event.data.object as unknown as {id:string;status?:string;payment_status?:string;subscription?:string|{id?:string};parent?:{subscription_details?:{subscription?:string|{id?:string}}}};
+ type Ref=string|{id?:string}|null;
+ type Price={id?:string;unit_amount?:number|null;currency?:string;recurring?:{interval?:string;interval_count?:number}};
+ type Line={quantity?:number|null;price?:Price|string|null;pricing?:{price_details?:{price?:Ref}}};
+ const object=event.data.object as unknown as {id:string;status?:string;payment_status?:string;amount_total?:number|null;amount_paid?:number;currency?:string|null;customer?:Ref;subscription?:Ref;items?:{data:Array<{quantity?:number;price:Price}>};lines?:{data:Line[]};parent?:{subscription_details?:{subscription?:Ref}}};
+ const ref=(value:Ref|undefined)=>typeof value==="string"?value:value?.id??null;
+ let evidence:Record<string,unknown>={};
  let status:"active"|"paid"|"cancelled"|null=null;let providerId=object.id;
- if(event.type==="checkout.session.completed"&&object.payment_status==="paid")status="paid";
- if(event.type==="customer.subscription.updated"&&object.status==="active")status="active";
- if(event.type==="customer.subscription.deleted")status="cancelled";
- if(event.type==="invoice.paid") {const subscription=object.parent?.subscription_details?.subscription??object.subscription;providerId=typeof subscription==="string"?subscription:subscription?.id??"";status="active";}
+ if(event.type==="checkout.session.completed"&&object.payment_status==="paid") {
+  status="paid";evidence={kind:"checkout",amount_cents:object.amount_total??null,currency:object.currency??null,customer_id:ref(object.customer)};
+ }
+ if(event.type==="customer.subscription.updated"&&object.status==="active") {
+  const item=object.items?.data.length===1?object.items.data[0]:undefined;
+  status="active";evidence={kind:"subscription",customer_id:ref(object.customer),price_id:item?.price.id??null,unit_amount:item?.price.unit_amount??null,currency:item?.price.currency??null,quantity:item?.quantity??null,interval:item?.price.recurring?.interval??null,interval_count:item?.price.recurring?.interval_count??null};
+ }
+ if(event.type==="customer.subscription.deleted") {status="cancelled";evidence={kind:"subscription_cancelled",customer_id:ref(object.customer)};}
+ if(event.type==="invoice.paid") {
+  providerId=ref(object.parent?.subscription_details?.subscription??object.subscription)??"";
+  const line=object.lines?.data.length===1?object.lines.data[0]:undefined;
+  status="active";evidence={kind:"invoice",source_id:object.id,customer_id:ref(object.customer),price_id:ref(line?.pricing?.price_details?.price??line?.price),quantity:line?.quantity??null,amount_cents:object.amount_paid??null,currency:object.currency??null};
+ }
  if(!status||!providerId)return {ignored:true};
- const result=await db.rpc("record_agency_billing_provider_event",{p_account_id:event.account,p_event_id:event.id,p_object_id:providerId,p_created:event.created,p_status:status});
+ const result=await db.rpc("record_agency_billing_provider_event",{p_account_id:event.account,p_event_id:event.id,p_object_id:providerId,p_created:event.created,p_status:status,p_evidence:evidence});
  if(result.error)throw new WorkspaceStoreError("The agency payment receipt could not be recorded.");
  return result.data;
 }

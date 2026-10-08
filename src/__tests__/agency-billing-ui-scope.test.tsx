@@ -54,3 +54,16 @@ it("offers agency names from scoped server options with no workspace UUID textbo
  await act(async()=>{const select=node.querySelector("select")!;select.value="agency";select.dispatchEvent(new Event("change",{bubbles:true}));});
  expect(node.textContent).toContain("Cedar Studio");expect(node.querySelector('input[name="successorAgencyWorkspaceId"]')).toBeNull();expect(node.textContent).not.toContain("agency-id");
 });
+it("shows receipt review without inviting another payment",async()=>{
+ const {node,root}=host();const reviewed={...invoice("review","Reviewed agreement"),status:"active",kind:"rebill",payment_receipt_state:"review",checkout_url:"https://invoice.stripe.com/i/fixture"};
+ const request=vi.fn<typeof fetch>(async()=>Response.json(reviewed));
+ await act(async()=>root.render(createElement(AgencyInvoiceAcceptance,{invoiceId:"review",request})));
+ expect(node.querySelector("[role=alert]")?.textContent).toContain("Payment needs review");
+ expect(node.textContent).not.toContain("Payment is confirmed");expect(node.textContent).not.toContain("Pay this agreement");
+});
+it("separates exact payment confirmation from unconfirmed subscription activity",async()=>{
+ const {node,root}=host();const paid={...invoice("paid","Paid monthly agreement"),kind:"rebill",status:"awaiting_payment",payment_receipt_state:"matched",checkout_url:"https://invoice.stripe.com/i/fixture"};
+ const request=vi.fn<typeof fetch>(async()=>Response.json(paid));
+ await act(async()=>root.render(createElement(AgencyInvoiceAcceptance,{invoiceId:"paid",request})));
+ expect(node.textContent).toContain("Payment is confirmed for these accepted terms");expect(node.textContent).toContain("subscription’s current state still needs reconciliation");expect(node.textContent).not.toContain("Pay this agreement");
+});
