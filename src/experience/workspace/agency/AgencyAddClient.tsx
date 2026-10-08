@@ -31,7 +31,7 @@ async function readJson<T>(response: Response, fallback: string): Promise<T> {
 const FACT_LABELS: Record<string, string> = { phone: "Phone", email: "Email", address: "Address" };
 
 function dateLabel(value: string) {
-  return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+  return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
 function absolute(path: string) {
@@ -79,10 +79,15 @@ export function AgencyAddClient({ agencyWorkspaceId, prospecting, initialProspec
     const controller = new AbortController();
     fetch(`/api/workspace/prospects?workspace=${encodeURIComponent(agencyWorkspaceId)}`, { cache: "no-store", signal: controller.signal })
       .then((response) => readJson<{ prospects: Prospect[] }>(response, "Your prospects couldn’t be loaded."))
-      .then((body) => setProspects(body.prospects))
+      .then((body) => {
+        setProspects(body.prospects);
+        // Arriving from a prospect's "Add as client": its contact is the likely owner.
+        const linked = body.prospects.find((prospect) => prospect.id === initialProspectId);
+        if (linked) setOwnerEmail((current) => current || linked.email);
+      })
       .catch((cause) => { if (!controller.signal.aborted) { setProspects([]); setProspectError(cause instanceof Error ? cause.message : "Your prospects couldn’t be loaded."); } });
     return () => controller.abort();
-  }, [agencyWorkspaceId, prospecting]);
+  }, [agencyWorkspaceId, prospecting, initialProspectId]);
 
   const added = new Set((clients ?? []).map((client) => client.prospectId).filter(Boolean));
   const chosen = prospects?.find((prospect) => prospect.id === prospectId) ?? null;
@@ -121,6 +126,8 @@ export function AgencyAddClient({ agencyWorkspaceId, prospecting, initialProspec
   function another() {
     setResult(null); setUrl(""); setName(""); setOwnerEmail(""); setProspectId(null); setError("");
     setIdempotencyKey(crypto.randomUUID());
+    // The owner may have claimed a client meanwhile; show the list as it is now.
+    setListAttempt((value) => value + 1);
   }
 
   if (signedOut) {
@@ -217,11 +224,16 @@ function AddedClient({ result, agencyWorkspaceId, agencyHref, onAnother, onClaim
             <span className="min-w-0 flex-1"><strong className="block text-[14px] font-medium">Connect the site they have</strong><small className="mt-0.5 block text-[12px] text-gray-muted">One script tag. Their site stays where it is; forms and facts flow into Strelva.</small></span>
             <ArrowRight className="size-4 shrink-0 text-gray-muted" aria-hidden="true" />
           </a></li>
-          <li><a href={result.website.rebuild} className="flex min-h-16 items-center gap-4 px-1 py-4 hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-text">
-            <Hammer className="size-5 shrink-0 text-accent-text" aria-hidden="true" />
-            <span className="min-w-0 flex-1"><strong className="block text-[14px] font-medium">Rebuild it on Strelva</strong><small className="mt-0.5 block text-[12px] text-gray-muted">A new draft from their current pages, for the owner to review.</small></span>
-            <ArrowRight className="size-4 shrink-0 text-gray-muted" aria-hidden="true" />
-          </a></li>
+          <li>{result.website.rebuildOpenToAgency
+            ? <a href={result.website.rebuild} className="flex min-h-16 items-center gap-4 px-1 py-4 hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-text">
+              <Hammer className="size-5 shrink-0 text-accent-text" aria-hidden="true" />
+              <span className="min-w-0 flex-1"><strong className="block text-[14px] font-medium">Rebuild it on Strelva</strong><small className="mt-0.5 block text-[12px] text-gray-muted">A new draft from their current pages, for the owner to review.</small></span>
+              <ArrowRight className="size-4 shrink-0 text-gray-muted" aria-hidden="true" />
+            </a>
+            : <div className="flex min-h-16 items-center gap-4 px-1 py-4">
+              <Hammer className="size-5 shrink-0 text-gray-muted" aria-hidden="true" />
+              <span className="min-w-0 flex-1"><strong className="block text-[14px] font-medium">Rebuild it on Strelva</strong><small className="mt-0.5 block text-[12px] text-gray-muted">The owner can start a rebuild once they claim the business. Agencies get this soon.</small></span>
+            </div>}</li>
         </ul>
 
         <h2 className="mt-10 text-[15px] font-medium">Details from their site</h2>
@@ -290,11 +302,11 @@ function OwnerLink({ result, agencyWorkspaceId, onClaim }: { result: AddAgencyCl
 }
 
 function ClientList({ clients, onRetry }: { clients: AgencyClientListItem[] | null; onRetry: () => void }) {
-  if (clients === null) return <p role="status" className="mt-16 flex items-center gap-2 text-[13px] text-gray-muted"><Loader2 className="size-4 motion-safe:animate-spin" aria-hidden="true" />Loading clients you added</p>;
+  if (clients === null) return <p role="status" className="mt-16 flex items-center gap-2 text-[13px] text-gray-muted"><Loader2 className="size-4 motion-safe:animate-spin" aria-hidden="true" />Loading your agency’s clients</p>;
   if (!clients.length) return null;
   return <section className="mt-16" aria-labelledby="added-clients-title">
     <div className="flex items-center justify-between gap-3">
-      <h2 id="added-clients-title" className="text-[15px] font-medium">Clients you added</h2>
+      <h2 id="added-clients-title" className="text-[15px] font-medium">Clients your agency added</h2>
       <button type="button" onClick={onRetry} className="inline-flex min-h-11 items-center gap-2 text-[13px] text-gray-muted underline-offset-4 hover:text-warm-black hover:underline"><RefreshCw className="size-3.5" aria-hidden="true" />Refresh</button>
     </div>
     <ul className="mt-3 divide-y divide-gray-border border-y border-gray-border">
