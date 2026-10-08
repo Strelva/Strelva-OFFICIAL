@@ -124,10 +124,12 @@ select format('begin isolation level read committed %s; set local role service_r
   from rpc_cases c join pg_proc p on p.oid = c.signature::regprocedure
 \gexec
 
--- Actual read-only paths keep STABLE, including the export authorization helper.
+-- Actual read-only paths keep STABLE. Connect-era writers retain their locking
+-- helper; the additive pure export read helper owns snapshot authorization.
 select pg_temp.rpc_assert(provolatile = 's', oid::regprocedure::text || ' stays STABLE') from pg_proc
   where oid in ('public.read_google_listing_receipt(uuid,uuid)'::regprocedure,
-    'public.workspace_export_v3_role(uuid,uuid,text)'::regprocedure,
+    coalesce(to_regprocedure('public.workspace_export_v3_read_role(uuid,uuid,text)'),
+      'public.workspace_export_v3_role(uuid,uuid,text)'::regprocedure),
     'public.workspace_export_v3_tenant_rows(text,uuid,text,integer,integer)'::regprocedure);
 begin read only;
 set local role service_role;
