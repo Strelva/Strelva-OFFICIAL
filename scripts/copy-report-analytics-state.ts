@@ -5,8 +5,14 @@
  *
  *   npx tsx scripts/copy-report-analytics-state.ts                    # dry run, every tenant (default)
  *   npx tsx scripts/copy-report-analytics-state.ts gldf               # dry run, one tenant
- *   npx tsx scripts/copy-report-analytics-state.ts --apply            # local database only
+ *   npx tsx scripts/copy-report-analytics-state.ts --apply            # both stores local
  *   npx tsx scripts/copy-report-analytics-state.ts --apply --i-have-jacobs-yes   # production, Jacob's call
+ *
+ * Both SUPABASE_URL and UPSTASH_REDIS_REST_URL must be configured. Every
+ * non-loopback target needs --i-have-jacobs-yes, including dry runs. Only
+ * literal localhost, 127.0.0.1 and [::1] HTTP(S) base URLs count as local.
+ * Host aliases need the yes; embedded credentials, paths, queries and
+ * fragments are refused even with it.
  *
  * A dry run reads tenants straight from Postgres, the three Redis keys per
  * tenant (`reb:report-cadence:*`, `reb:report-sent:*`, `analytics:cfg:*`) and
@@ -14,15 +20,14 @@
  *
  * --apply writes only what is missing, through the same RPCs the app uses,
  * marked 'backfill' so the database never replaces a newer value. It refuses
- * unless SUPABASE_URL is a loopback host or --i-have-jacobs-yes is passed.
+ * unless both stores are exact loopback targets or --i-have-jacobs-yes is passed.
  * Needs 20261007194000_tenant_report_and_analytics_state.sql applied first.
  */
 import { getSupabase } from "../src/platform/infra/db/client";
 import { getRedis } from "../src/platform/infra/redis";
-import { getAllTenants } from "../src/lib/tenants";
 import { callRedisMoveRpc, type RedisMoveResult } from "../src/lib/storage/redis-move";
 import {
-  parseCopyArgs,
+  prepareReportAnalyticsCopyOptions,
   runReportAnalyticsCopy,
   type CopyTenant,
   type CopyWriteResult,
@@ -32,7 +37,7 @@ import {
 
 async function tenants(): Promise<CopyTenant[]> {
   const db = getSupabase();
-  if (!db) return (await getAllTenants()).map((t) => ({ id: t.id, siteName: t.siteName }));
+  if (!db) throw new Error("Supabase client unavailable; refusing tenant-cache fallback.");
   const { data, error } = await db.from("tenants").select("id, site_name").order("id");
   if (error) throw new Error(`Tenant read failed: ${error.message}`);
   return (data ?? []).map((row) => ({ id: row.id, siteName: row.site_name }));
@@ -77,8 +82,10 @@ async function postgresState(tenantId: string): Promise<PostgresReportAnalyticsS
 const asWrite = (result: RedisMoveResult): CopyWriteResult => (result.ok ? { ok: true } : { ok: false, reason: `${result.reason}: ${result.message}` });
 
 async function main() {
-  const options = parseCopyArgs(process.argv.slice(2));
-  const outcome = await runReportAnalyticsCopy({ ...options, databaseUrl: process.env.SUPABASE_URL }, {
+  const options = prepareReportAnalyticsCopyOptions(process.argv.slice(2), {
+    SUPABASE_URL: process.env.SUPABASE_URL, UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
+  });
+  const outcome = await runReportAnalyticsCopy(options, {
     tenants,
     redis: redisState,
     postgres: getSupabase() ? postgresState : null,
