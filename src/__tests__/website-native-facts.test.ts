@@ -77,7 +77,8 @@ describe("native website facts review", () => {
   });
   it("never replays an uncertain queue result, even if storing its receipt fails", async () => {
     const { ports, service } = makePorts();ports.apply.mockRejectedValue(Error("queue accepted, response lost"));ports.reviews.record.mockRejectedValue(Error("receipt unavailable"));
-    await service(actor, ws, 3, ["phone"]);await service(actor, ws, 3, ["phone"]);
+    await service(actor, ws, 3, ["phone"]);
+    expect((await service(actor, ws, 3, ["phone"])).needsReview).toEqual([{ tenantId: "gldf", reason: "already_claimed", reported: false }]);
     expect(ports.apply).toHaveBeenCalledOnce();expect(ports.report).toHaveBeenCalledOnce();expect(ports.reviews.record).toHaveBeenCalledWith(expect.any(String), "unconfirmed", null);
   });
   it.each(["permission", "subscription", "inactive", "repo", "template", "manifest", "release", "stale", "queue", "private", "unchanged"])("does not dispatch an unsupported %s path", async reason => {

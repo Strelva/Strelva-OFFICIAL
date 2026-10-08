@@ -148,7 +148,7 @@ const HANDLED = { heading: "Already handled", body: "This was already taken care
 const EXPIRED = { heading: "This link expired", body: "Nothing was done. Open Strelva to see what's waiting." };
 
 async function workspaceConfirm(token: string, claims: WorkspaceApproveLinkClaims): Promise<NextResponse> {
-  const { needsYouAppOrigin, needsYouReleaseEnabled, needsYouStore } = await import("@/platform/needs-you/server");
+  const { needsYouAppOrigin, needsYouReleaseEnabled, needsYouStore, needsYouService } = await import("@/platform/needs-you/server");
   if (!needsYouReleaseEnabled()) return noticePage({ status: 400, ...INVALID.bad });
   const item = await needsYouStore.read(claims.workspaceId, claims.itemId).catch(() => null);
   if (!item) return noticePage({ status: 400, ...INVALID.bad });
@@ -174,7 +174,7 @@ async function workspaceConfirm(token: string, claims: WorkspaceApproveLinkClaim
 }
 
 async function workspaceResolve(claims: WorkspaceApproveLinkClaims): Promise<NextResponse> {
-  const { needsYouAppOrigin, needsYouReleaseEnabled, needsYouService } = await import("@/platform/needs-you/server");
+  const { needsYouAppOrigin, needsYouReleaseEnabled, needsYouService, needsYouStore } = await import("@/platform/needs-you/server");
   if (!needsYouReleaseEnabled()) return noticePage({ status: 400, ...INVALID.bad });
   const origin = needsYouAppOrigin();
   const open = workspaceOpenUrl(origin, claims.workspaceId);

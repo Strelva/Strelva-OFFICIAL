@@ -89,7 +89,7 @@ const live = {
 export type NativeWebsiteFactPorts = typeof live;
 
 /** Why a linked native site's contact review wasn't queued. */
-export type NativeFactsSkip = "record_moved" | "not_allowed" | "queue_unavailable" | "draft_held" | "changed_before_dispatch" | "not_queued" | "failed";
+export type NativeFactsSkip = "record_moved" | "not_allowed" | "queue_unavailable" | "draft_held" | "changed_before_dispatch" | "not_queued" | "failed" | "already_claimed";
 /**
  * What preparation did for the linked native websites. `ready`: queued, or
  * already showing the confirmed details. `needsReview`: still showing older
@@ -129,8 +129,9 @@ export function createNativeWebsiteFactService(ports: NativeWebsiteFactPorts = l
       if (JSON.stringify(next) === JSON.stringify(current)) { outcome.ready.push(tenantId); continue; }
       const token = randomUUID();
       try {
-        // Already claimed: that preparation queued this revision or reported it.
-        if (!(await ports.reviews.claim(actor, workspaceId, tenantId, revision, token))) { outcome.ready.push(tenantId); continue; }
+        // A prior claim can still be blocked or uncertain. It prevents replay,
+        // but does not prove the review reached the queue.
+        if (!(await ports.reviews.claim(actor, workspaceId, tenantId, revision, token))) { outcome.needsReview.push({ tenantId, reason: "already_claimed", reported: false }); continue; }
         // Preserve an existing operator/owner draft instead of overwriting it.
         // The durable claim precedes queue dispatch: uncertain acceptance cannot
         // create a second review when this record revision is observed again.

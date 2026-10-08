@@ -48,7 +48,7 @@ revoke all on function public.business_confirmed_facts(uuid) from public, anon, 
 
 create function public.business_confirmed_services(p_workspace_id uuid)
 returns table(id uuid, name text, description text, duration_minutes integer, price_text text,
-  active boolean, verified boolean, position integer, external_ref text)
+  active boolean, verified boolean, "position" integer, external_ref text)
 language sql stable security definer set search_path = public, pg_temp as $$
   select c.entity_id::uuid, c.state->>'name', c.state->>'description', (c.state->>'durationMinutes')::integer,
     c.state->>'priceText', coalesce((c.state->>'active')::boolean, false), coalesce((c.state->>'verified')::boolean, false),
