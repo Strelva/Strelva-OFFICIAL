@@ -88,7 +88,7 @@ select pg_temp.assert_ok(snapshot->>'availability'='partial' and snapshot->'cove
  and snapshot->'period'->>'endExclusive'='true' and snapshot->>'priced'='false' and snapshot->>'stripeExportEnabled'='false'
  and not(snapshot ? 'hours') and not(snapshot ? 'compute'),'monthly inventory retains observed payer, provider, source and Version without reconstructing period-end state') from rr_history_month;
 select pg_temp.assert_ok(not exists(select 1 from rr_history_month h cross join lateral jsonb_array_elements(h.snapshot->'observations') o
- where o->>'snapshotSha256' is distinct from encode(digest((o->'snapshot')::text,'sha256'),'hex')),'all attached immutable captures have exact hashes');
+ where o->>'snapshotSha256' is distinct from encode(sha256(convert_to((o->'snapshot')::text,'UTF8')),'hex')),'all attached immutable captures have exact hashes');
 -- Today's accepted mandate was revoked above. Historical receipt does not
 -- change, authorize a new mandate or count the current state in a past period.
 select pg_temp.assert_ok((select snapshot from rr_history_month)=public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',month),'exact monthly replay despite changed present acceptance') from rr_history_period;
@@ -107,7 +107,7 @@ update public.users set verified_at=null where id='99100000-0000-4000-8000-00000
 select pg_temp.expect_fail($q$select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',(date_trunc('month',now() at time zone 'UTC')-interval '2 months')::date)$q$,'actor_unverified');
 update public.users set verified_at=now() where id='99100000-0000-4000-8000-000000000001';
 select pg_temp.expect_fail($q$select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',(date_trunc('month',now() at time zone 'UTC')+interval '1 month')::date)$q$,'month_invalid');
-select pg_temp.expect_fail($q$select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',current_date-1)$q$,'month_invalid');
+select pg_temp.expect_fail($q$select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',(date_trunc('month',now() at time zone 'UTC')+interval '1 day')::date)$q$,'month_invalid');
 -- A source row stamped outside its declared month is never silently accepted.
 insert into public.responsibility_meter_periods(business_workspace_id,month,captured_at,capture_day,snapshot)
 select '99100000-0000-4000-8000-000000000011',(h.month-interval '1 month')::date,clock_timestamp(),current_date,m.snapshot from rr_history_period h cross join rr_meter m;

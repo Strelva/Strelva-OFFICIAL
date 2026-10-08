@@ -1426,7 +1426,7 @@
       "items": [
         {
           "file": "20261020090032_responsibility_month_evidence.sql",
-          "sha256": "349012dde0ac83c42d67a3a78ccbfb1bef20af6f0ca4a91c4e5024d5aafbc5f1",
+          "sha256": "bbdd5f90b5aa1768464d982579a49e83ec5369de4168132e8212881fe5db4c50",
           "rollback": "rollback-20261020090032_responsibility_month_evidence.sql",
           "rollbackSha256": "27c603bd225162f1e85d39a0c3e8a11530c632c7bf56b195cf933018ab04f23a"
         }

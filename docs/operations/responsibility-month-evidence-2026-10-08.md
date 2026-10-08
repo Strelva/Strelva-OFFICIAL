@@ -35,7 +35,10 @@ It covers current daily behavior, explicit missing history, synthetic past captu
 with original source identities, exact replay, malformed source rejection, current
 actor/cross-business denial, native READ ONLY retrieval, ACLs, empty rollback and
 reapply, actual populated rollback refusal, and controlled membership/identity
-loss races. Synthetic fixture history is test evidence, not observed customer
+loss races, including qualified-provider capture-first and verification-loss-first
+sessions. Monthly observation hashes use PostgreSQL's built-in SHA-256 function,
+so they do not depend on the pgcrypto extension's schema. Synthetic fixture history
+is test evidence, not observed customer
 history. The full native/upgrade and client contracts remain separate checks.
 
 Local source proof and retained failed runs are stored outside the repository in

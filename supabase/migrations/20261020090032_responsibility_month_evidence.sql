@@ -70,7 +70,7 @@ begin
   select count(*),min(m.captured_at),max(m.captured_at),coalesce(jsonb_agg(jsonb_build_object(
     'observationId',m.id,'capturedAt',m.captured_at,'captureDay',m.capture_day,
     'evidence','responsibility_meter_period:'||m.id,
-    'snapshotSha256',encode(digest(m.snapshot::text,'sha256'),'hex'),'snapshot',m.snapshot)
+    'snapshotSha256',encode(sha256(convert_to(m.snapshot::text,'UTF8')),'hex'),'snapshot',m.snapshot)
     order by m.captured_at,m.id),'[]'::jsonb)
     into observation_count,first_observed,last_observed,observations from public.responsibility_meter_periods m
     where m.business_workspace_id=p_business_id and m.month=p_month;
