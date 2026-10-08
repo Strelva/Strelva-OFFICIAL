@@ -18,6 +18,12 @@ const env = {
 afterEach(() => { auth.getUser.mockReset(); auth.getClaims.mockReset(); });
 
 describe("CLI operator session", () => {
+  it("reads the verified Supabase password authentication time when auth_time is absent", async () => {
+    const timestamp = Math.floor(Date.now() / 1000) - 5;
+    auth.getUser.mockResolvedValue({ data: { user: { id: USER_ID, email: "operator@example.test", email_confirmed_at: "confirmed" } }, error: null });
+    auth.getClaims.mockResolvedValue({ data: { claims: { sub: USER_ID, amr: [{ method: "password", timestamp }] } }, error: null });
+    await expect(readOperatorSessionFromEnv(env)).resolves.toMatchObject({ authTime: timestamp });
+  });
   it("verifies the signed token and records its user plus machine context", async () => {
     auth.getUser.mockResolvedValue({ data: { user: { id: USER_ID, email: "Operator@Example.test", email_confirmed_at: "confirmed" } }, error: null });
     auth.getClaims.mockResolvedValue({ data: { claims: { sub: USER_ID, auth_time: 1_791_388_800 } }, error: null });
