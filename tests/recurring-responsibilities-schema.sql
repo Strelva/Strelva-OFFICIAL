@@ -24,7 +24,19 @@ select pg_temp.assert_ok(public.read_responsibility_bundle_state('99100000-0000-
 select pg_temp.assert_ok((public.create_keep_me_found_bundle('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000021','99100000-0000-4000-8000-000000000012','99100000-0000-4000-8000-000000000001','rr-owner@example.test','bundle:1',investigations,604800,next_at)->>'replayed')='true','idempotent replay') from rr_input;
 select pg_temp.expect_fail(format('select public.create_keep_me_found_bundle(%L,%L,%L,%L,%L,%L,%L::jsonb,60,%L::timestamptz)','99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000021','99100000-0000-4000-8000-000000000012','99100000-0000-4000-8000-000000000001','rr-owner@example.test','bundle:1',investigations,next_at),'idempotency_conflict') from rr_input;
 select pg_temp.expect_fail($q$select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000003','rr-other@example.test',date_trunc('month',now())::date)$q$,'membership_denied');
-select pg_temp.assert_ok(public.snapshot_due_responsibility_meters(1)->>'processed'='1','guarded recurring cron captures current-month immutable preview');
+-- Retained upgrade fixtures may have earlier eligible or unavailable businesses.
+-- Exercise the actual one-business fair sweep until this fixture is captured,
+-- preserving other candidates instead of assuming this database is empty.
+do $$ declare result jsonb; step integer; maximum integer;
+begin
+ select count(*)+1 into maximum from public.workspaces;
+ for step in 1..maximum loop
+  result:=public.snapshot_due_responsibility_meters(1);
+  perform pg_temp.assert_ok((result->>'processed')::integer+(result->>'failed')::integer<=1,'one-business recurring batch remains bounded');
+  exit when exists(select 1 from public.responsibility_meter_periods where business_workspace_id='99100000-0000-4000-8000-000000000011' and capture_day=(clock_timestamp() at time zone 'UTC')::date);
+ end loop;
+ perform pg_temp.assert_ok(exists(select 1 from public.responsibility_meter_periods where business_workspace_id='99100000-0000-4000-8000-000000000011' and capture_day=(clock_timestamp() at time zone 'UTC')::date),'guarded recurring cron captures current-month immutable preview');
+end $$;
 create temp table rr_meter as select public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',date_trunc('month',now() at time zone 'UTC')::date) snapshot;
 select pg_temp.assert_ok(jsonb_array_length(snapshot->'standingResponsibilities')=5 and snapshot->>'stage'='preview' and snapshot->>'priced'='false' and snapshot->>'stripeExportEnabled'='false' and not (snapshot ? 'hours') and not (snapshot ? 'compute'),'unpriced responsibility evidence snapshot') from rr_meter;
 select pg_temp.assert_ok((select snapshot from rr_meter)=public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',date_trunc('month',now() at time zone 'UTC')::date),'immutable replay');
@@ -35,7 +47,8 @@ select pg_temp.assert_ok(public.set_provider_responsibility_cadence('99100000-00
 -- A revoked accepted mandate blocks admission and late claims even if a policy remains active.
 update public.service_requests set provider_acceptance='pending',accepted_by=null,accepted_at=null where id='99100000-0000-4000-8000-000000000021';
 select pg_temp.expect_fail($q$insert into public.standing_responsibility_jobs(standing_responsibility_id,workspace_id,policy_version,trigger_key,finite_work_id,status) select standing_responsibility_id,'99100000-0000-4000-8000-000000000011',1,'fixture:revoked','99100000-0000-4000-8000-000000000101','accepted' from public.responsibility_bundle_members limit 1$q$,'mandate_revoked');
-select pg_temp.assert_ok(public.snapshot_due_responsibility_meters(20)->>'processed'='0','captured day preview is skipped on recurring cron replay');
+select public.snapshot_due_responsibility_meters(20);
+select pg_temp.assert_ok((select count(*)=1 from public.responsibility_meter_periods where business_workspace_id='99100000-0000-4000-8000-000000000011' and capture_day=(clock_timestamp() at time zone 'UTC')::date) and (select snapshot from rr_meter)=public.snapshot_responsibility_meter('99100000-0000-4000-8000-000000000011','99100000-0000-4000-8000-000000000001','rr-owner@example.test',date_trunc('month',now() at time zone 'UTC')::date),'captured day preview is unchanged on recurring cron replay');
 insert into public.workspaces(id,kind,name,created_by) values ('99100000-0000-4000-8000-000000000031','customer','Unqualified first','99100000-0000-4000-8000-000000000001'),('99100000-0000-4000-8000-000000000032','customer','Unqualified second','99100000-0000-4000-8000-000000000001');
 insert into public.workspace_memberships(workspace_id,user_id,role,created_by) select id,'99100000-0000-4000-8000-000000000001','owner','99100000-0000-4000-8000-000000000001' from public.workspaces where id in ('99100000-0000-4000-8000-000000000031','99100000-0000-4000-8000-000000000032');
 insert into public.saved_product_work(workspace_id,product_id,resource_kind,title,payload,created_by) select id,'investigations','investigation','Bounded fixture source','{}','99100000-0000-4000-8000-000000000001' from public.workspaces where id in ('99100000-0000-4000-8000-000000000031','99100000-0000-4000-8000-000000000032');

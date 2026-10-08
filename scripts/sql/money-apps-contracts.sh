@@ -8,7 +8,7 @@ check_money_apps_contracts() {
     money-apps-payer-connect-schema.sql money-export-readonly-schema.sql \
     agent-confirmed-provenance-schema.sql agent-channel-schema.sql agent-channel-abuse-schema.sql agent-booking-admission-schema.sql \
     creator-packages-schema.sql offering-source-versions-schema.sql \
-    system-bundles-schema.sql system-bundles-rollback-schema.sql \
+    system-bundles-schema.sql system-bundles-rollback-schema.sql system-bundle-lifecycle-schema.sql system-bundle-lifecycle-rollback-schema.sql \
     recurring-responsibilities-schema.sql connect-money-schema.sql money-apps-creator-quote-ledger-schema.sql \
     system-package-readonly-schema.sql function-exposure-schema.sql; do
     printf 'Money/apps native contract: %s\n' "$fixture"

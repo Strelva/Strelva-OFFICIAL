@@ -151,6 +151,7 @@ SQL
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260911100000_inquiry_capability_workspace.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260915060000_offering_websites.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/offering-websites-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260921173000_service_delivery_commitments.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260918120000_public_continuation_imports.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/public-continuation-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260918130000_workspace_invitations.sql"

@@ -202,6 +202,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261016120100": "system_package_install_grants",
   "20261016120200": "offering_package_sources",
   "20261016120500": "system_bundle_installations",
+  "20261016120700": "system_bundle_native_bindings",
   "20261016130000": "responsibility_bundles",
   "20261016100700": "split_recovery_payouts",
   "20261016100800": "invoice_money_evidence",
