@@ -50,7 +50,7 @@ begin
 end $$;
 alter function public.system_package_rehearsal(jsonb) rename to system_package_rehearsal_bundle_core;
 create function public.system_package_rehearsal(p_definition jsonb) returns jsonb
-language plpgsql immutable set search_path=public,pg_temp as $$
+language plpgsql volatile set search_path=public,pg_temp as $$
 begin
  if p_definition->>'kind' in ('inquiry_pattern','website_section') then
   perform public.system_package_behavior(p_definition,'{}');
