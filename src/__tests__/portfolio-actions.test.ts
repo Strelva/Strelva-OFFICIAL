@@ -20,6 +20,13 @@ vi.mock("@/lib/events", () => ({
 vi.mock("@/lib/event-actions", () => ({
   resolveEventAction: (...a: unknown[]) => mockResolveEventAction(...a),
 }));
+const mockStillActive = vi.fn();
+const mockAudit = vi.fn();
+vi.mock("@/app/admin/operator-audit", () => ({
+  operatorStillActive: (...a: unknown[]) => mockStillActive(...a),
+  auditOperatorDecision: (...a: unknown[]) => mockAudit(...a),
+}));
+const operator = { userId: "10000000-0000-4000-8000-0000000000aa", verifiedEmail: "operator@example.test", actorId: "operator:10000000-0000-4000-8000-0000000000aa" };
 
 import {
   getPortfolioActions,
@@ -45,6 +52,8 @@ function evt(over: Partial<UnifiedEvent>): UnifiedEvent {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockStillActive.mockResolvedValue(true);
+  mockAudit.mockResolvedValue(undefined);
 });
 
 describe("isPortfolioApprovable", () => {
@@ -224,11 +233,11 @@ describe("bulkResolvePortfolioActions", () => {
     const results = await bulkResolvePortfolioActions([
       { tenantId: "acme", eventId: "a1" },
       { tenantId: "bolt", eventId: "b1" },
-    ]);
+    ], operator);
 
     expect(mockResolveEventAction).toHaveBeenCalledTimes(2);
-    expect(mockResolveEventAction).toHaveBeenNthCalledWith(1, "acme", "a1", "approved");
-    expect(mockResolveEventAction).toHaveBeenNthCalledWith(2, "bolt", "b1", "approved");
+    expect(mockResolveEventAction).toHaveBeenNthCalledWith(1, "acme", "a1", "approved", operator.actorId);
+    expect(mockResolveEventAction).toHaveBeenNthCalledWith(2, "bolt", "b1", "approved", operator.actorId);
     expect(results.every((r) => r.changed)).toBe(true);
   });
 
@@ -243,7 +252,7 @@ describe("bulkResolvePortfolioActions", () => {
       { tenantId: "acme", eventId: "ok" },
       { tenantId: "acme", eventId: "fail" },
       { tenantId: "acme", eventId: "throws" },
-    ]);
+    ], operator);
 
     expect(results).toEqual([
       { tenantId: "acme", eventId: "ok", changed: true, reason: undefined },
@@ -252,5 +261,25 @@ describe("bulkResolvePortfolioActions", () => {
     ]);
     // A throwing item never aborts the rest of the batch.
     expect(mockResolveEventAction).toHaveBeenCalledTimes(3);
+  });
+
+  it("writes an audit row before and after each approval, naming the operator", async () => {
+    mockResolveEventAction.mockResolvedValue({ changed: false, reason: "gbp_post_failed" });
+    await bulkResolvePortfolioActions([{ tenantId: "acme", eventId: "a1" }], operator);
+    expect(mockAudit).toHaveBeenNthCalledWith(1, { operator, tenantId: "acme", eventId: "a1", action: "portfolio.draft.approve", phase: "attempt" });
+    expect(mockAudit).toHaveBeenNthCalledWith(2, { operator, tenantId: "acme", eventId: "a1", action: "portfolio.draft.approve", phase: "result", detail: { changed: false, reason: "gbp_post_failed" } });
+    expect(mockAudit.mock.invocationCallOrder[0]!).toBeLessThan(mockResolveEventAction.mock.invocationCallOrder[0]!);
+  });
+
+  it("approves nothing without an audit row or after the operator is revoked", async () => {
+    mockAudit.mockRejectedValueOnce(new Error("audit down"));
+    mockStillActive.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    const results = await bulkResolvePortfolioActions([
+      { tenantId: "acme", eventId: "a1" },
+      { tenantId: "acme", eventId: "a2" },
+      { tenantId: "acme", eventId: "a3" },
+    ], operator);
+    expect(results.map((r) => r.reason)).toEqual(["audit_unavailable", "operator_access_changed", "operator_access_changed"]);
+    expect(mockResolveEventAction).not.toHaveBeenCalled();
   });
 });

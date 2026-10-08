@@ -162,7 +162,7 @@ export const GBP_OPERATIONS: AgentOperation[] = [
         summary,
         ctaUrl: typeof event.metadata?.ctaUrl === "string" ? event.metadata.ctaUrl : undefined,
         photoUrl: typeof event.metadata?.photoUrl === "string" ? event.metadata.photoUrl : undefined,
-      });
+      }, { commandKey: `approval:${event.id}`, actor: `approved event ${event.id}` });
       if (!result.success) return { ok: false, reason: "gbp_post_failed" };
       return { ok: true, activity: { type: "gbp-post", detail: summary } };
     },
@@ -196,7 +196,7 @@ export const GBP_OPERATIONS: AgentOperation[] = [
       const { updateBusinessHours } = await import("../gbp-management");
       const result = await updateBusinessHours(tenantId, {
         regularHours: { periods } as Parameters<typeof updateBusinessHours>[1]["regularHours"],
-      });
+      }, { commandKey: `approval:${event.id}`, actor: `approved event ${event.id}` });
       if (!result.success) return { ok: false, reason: "gbp_hours_failed" };
       return { ok: true, activity: { type: "gbp-hours", detail: "" } };
     },
@@ -229,6 +229,7 @@ export const GBP_OPERATIONS: AgentOperation[] = [
         tenantId,
         photoUrl,
         category as Parameters<typeof uploadGbpPhoto>[2],
+        { commandKey: `approval:${event.id}`, actor: `approved event ${event.id}` },
       );
       if (!result.success) return { ok: false, reason: "gbp_photo_failed" };
       return { ok: true, activity: { type: "gbp-photo", detail: "" } };

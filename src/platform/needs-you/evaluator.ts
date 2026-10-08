@@ -44,7 +44,9 @@ export interface EvaluationInput {
   signals?: {
     /** Google star rating of the review being answered. 1-2 is critical. */
     reviewRating?: number;
-    /** The inquiry ResponsibilityPolicy's decision for this message. */
+    /** The current inquiry ResponsibilityPolicy's decision for this message.
+     * `allow` means evidenced trust inside its pre-authorized boundary, never
+     * a caller-supplied owner setting or a commitment. */
     inquiryDecision?: "allow" | "approval_required" | "block";
     /** The operator-set approval streak (autoApproveThreshold) on the linked tenant. */
     earnedTrust?: { streak: number; threshold: number };
@@ -137,7 +139,7 @@ export function evaluateRoute(input: EvaluationInput): Evaluation {
   let baseRule: RuleId = base.fromSetting ? "strelva_setting" : "default";
   if (kind === "customer.message" && input.signals?.inquiryDecision) {
     if (input.signals.inquiryDecision === "block") return result(kind, "never", "inquiry:block");
-    base = { route: input.signals.inquiryDecision === "allow" ? "handle" : "owner_decides", fromSetting: true };
+    base = { route: input.signals.inquiryDecision === "allow" ? "handle" : "strelva_reviews", fromSetting: true };
     baseRule = "inquiry:policy";
   }
 
@@ -150,7 +152,11 @@ export function evaluateRoute(input: EvaluationInput): Evaluation {
 
   let route = base.route;
   let rule: RuleId = baseRule;
-  if (routeRank(rules.floor) > routeRank(route)) {
+  // The adopted inquiry policy explicitly permits trusted ordinary replies
+  // to be handled. The fixed customer.message floor still applies to generic
+  // settings and unknown policy; no commitment or owner setting inherits it.
+  const trustedInquiry = kind === "customer.message" && input.signals?.inquiryDecision === "allow";
+  if (!trustedInquiry && routeRank(rules.floor) > routeRank(route)) {
     route = rules.floor;
     rule = "floor";
   }

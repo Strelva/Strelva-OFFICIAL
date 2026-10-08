@@ -1,3 +1,5 @@
+import { readReleasedTenantBusinessContext } from "@/platform/business-record/public-reader";
+import { siteWithBusinessRecord } from "./business-record";
 import { cache } from "react";
 import { headers } from "next/headers";
 import { notFound, permanentRedirect } from "next/navigation";
@@ -17,11 +19,12 @@ export const getHostedSite = cache(async () => {
   if (!document) return null;
   const [config, preview, capabilityTenant] = await Promise.all([getTenantConfig(tenant), isPreviewMode(), publishedCapabilityTenant(tenant, document)]);
   const businessFacts = document.businessRecord && !preview ? await readHostedBusinessFacts(tenant) : null;
-  return { tenant, document, config, preview, capabilityTenant, businessFacts, origin: tenantCanonicalOrigin(tenant, config) };
+  const businessContext = preview || document.businessRecord ? null : await readReleasedTenantBusinessContext(tenant);
+  return { tenant, document, config, preview, capabilityTenant, businessFacts, businessContext, origin: tenantCanonicalOrigin(tenant, config) };
 });
 export async function hostedPageMetadata(path: string) {
   const site = await getHostedSite();
-  return site ? siteDocumentMetadata(site.document, path, site.origin, site.preview) : null;
+  return site ? siteDocumentMetadata(siteWithBusinessRecord(site.document, site.businessContext), path, site.origin, site.preview) : null;
 }
 export async function renderHostedPage(path: string) {
   const site = await getHostedSite();
@@ -29,5 +32,5 @@ export async function renderHostedPage(path: string) {
   const target = hostedRedirectTarget(site.document, path);
   if (target) permanentRedirect(target);
   if (!site.document.pages.some(page => page.path === path)) notFound();
-  return <SiteRenderer document={site.document} path={path} tenant={site.tenant} preview={site.preview} capabilityTenant={site.capabilityTenant} businessFacts={site.businessFacts} />;
+  return <SiteRenderer document={site.document} path={path} tenant={site.tenant} preview={site.preview} capabilityTenant={site.capabilityTenant} businessFacts={site.businessFacts} businessContext={site.businessContext} />;
 }

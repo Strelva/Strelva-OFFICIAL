@@ -1,3 +1,4 @@
+import { mirrorRecord, removeRecord, readSetting } from "./client-records";
 import { getRedis } from "@/platform/infra/redis";
 
 /**
@@ -43,6 +44,9 @@ function isGoal(v: unknown): v is Goal {
 }
 
 export async function getGoal(tenant: string): Promise<Goal | null> {
+  return readSetting(tenant, "goal", () => getRedisGoal(tenant), null);
+}
+async function getRedisGoal(tenant: string): Promise<Goal | null> {
   const redis = getRedis();
   if (!redis) return null;
   try {
@@ -61,6 +65,7 @@ export async function setGoal(tenant: string, metric: GoalMetric, target: number
   if (!GOAL_METRICS.includes(metric) || !Number.isFinite(target) || target <= 0) return null;
   const goal: Goal = { metric, target: Math.round(target), createdAt: new Date().toISOString() };
   await redis.set(goalKey(tenant), JSON.stringify(goal));
+  await mirrorRecord("tenant_settings", tenant, "goal", { value: goal });
   return goal;
 }
 
@@ -68,6 +73,7 @@ export async function clearGoal(tenant: string): Promise<void> {
   const redis = getRedis();
   if (!redis) return;
   await redis.del(goalKey(tenant));
+  await removeRecord("tenant_settings", tenant, "goal");
 }
 
 /** Pull the current weekly value for a goal's metric out of the brief stats. */

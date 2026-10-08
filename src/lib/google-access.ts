@@ -24,6 +24,7 @@ import { getConnection, saveConnection } from "./connections";
 import { publishingWorkspaceId } from "@/platform/infra/publishing-scope";
 import { decryptSecret } from "@/platform/infra/crypto/secrets";
 import { refreshGoogleTokens } from "./google-token";
+import { mirrorRecord, readProviderMetadata } from "./client-records";
 import { getRedis } from "@/platform/infra/redis";
 import type { Connection } from "./types";
 // The business-level binding store (src/platform/account-bindings) through
@@ -159,9 +160,10 @@ export function googleLocationIdFromName(name: string | undefined | null): strin
 export async function getGoogleLocation(tenantId: string, grant?: GoogleGrant | null): Promise<GoogleLocationRef | null> {
   if (grant?.location) return grant.location;
   if (grant?.source === "binding") await noteFallback(tenantId, "no_location");
-  const redis = getRedis();
-  if (!redis) return null;
-  const meta = await redis.get<{ accountId?: unknown; locationId?: unknown }>(`google-meta:${tenantId}`);
+  const meta = await readProviderMetadata<{ accountId?: unknown; locationId?: unknown }>(tenantId, "google", async () => {
+    const redis = getRedis();
+    return redis ? redis.get(`google-meta:${tenantId}`) : null;
+  });
   if (typeof meta?.accountId !== "string" || typeof meta.locationId !== "string" || !meta.accountId || !meta.locationId) return null;
   return { accountId: meta.accountId, locationId: meta.locationId };
 }
@@ -278,7 +280,9 @@ export async function recordGoogleConnection(input: GoogleConnectInput, now = Da
   if (input.accountId || input.locationId) {
     const redis = getRedis();
     if (redis) {
-      await redis.set(`google-meta:${input.tenantId}`, { accountId: input.accountId, locationId: input.locationId }, { ex: META_TTL_SECONDS });
+      const value = { accountId: input.accountId, locationId: input.locationId };
+      await redis.set(`google-meta:${input.tenantId}`, value, { ex: META_TTL_SECONDS });
+      await mirrorRecord("provider_metadata", input.tenantId, "google", { value });
     }
   }
   const binding = await writeBinding(input.tenantId, async (target, store) => {
@@ -302,7 +306,9 @@ export async function recordGoogleConnection(input: GoogleConnectInput, now = Da
 export async function recordGoogleLocationSelection(tenantId: string, location: GoogleLocationRef & { title?: string | null }): Promise<{ binding: BindingWriteOutcome }> {
   const redis = getRedis();
   if (!redis) throw new Error("persistence_unavailable");
-  await redis.set(`google-meta:${tenantId}`, { accountId: location.accountId, locationId: location.locationId }, { ex: META_TTL_SECONDS });
+  const value = { accountId: location.accountId, locationId: location.locationId };
+  await redis.set(`google-meta:${tenantId}`, value, { ex: META_TTL_SECONDS });
+  await mirrorRecord("provider_metadata", tenantId, "google", { value });
   const binding = await writeBinding(tenantId, async (_target, store) => {
     const existing = await store.readGoogleBindingForTenant(tenantId);
     if (!existing) throw new Error("no binding to attach the location to");

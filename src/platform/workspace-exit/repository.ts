@@ -11,6 +11,8 @@ import {
   workspaceExitCommandSchema,
   workspaceExitOptionsSchema,
   workspaceExitResponseSchema,
+  workspaceExitHandoffSchema,
+  workspaceExitHandoffCompletionSchema,
   type WorkspaceExitCommand,
   type WorkspaceExitOptions,
   type WorkspaceExitResponse,
@@ -61,6 +63,12 @@ export async function readWorkspaceExit(actor: WorkspaceActor, workspaceId: stri
   if (error) fail(error, "The workspace exit state could not be loaded.");
   const parsed = workspaceExitOptionsSchema.safeParse(data);
   if (!parsed.success) throw new WorkspaceStoreError("The workspace exit options were malformed.");
+  if (process.env.STRELVA_EXIT_HANDOFF === "1") {
+    const plan = await db().rpc("read_workspace_exit_handoff_plan", { ...identity(actor), p_workspace_id: id });
+    if (plan.error) fail(plan.error, "The site handoff could not be loaded.");
+    const handoff = workspaceExitHandoffSchema.parse(plan.data);
+    return { ...parsed.data, handoff, state: parsed.data.state ? { ...parsed.data.state, handoff } : null };
+  }
   return parsed.data;
 }
 
@@ -76,7 +84,7 @@ export async function readWorkspaceExitCompleted(workspaceId: string): Promise<b
 
 export async function completeWorkspaceExit(actor: WorkspaceActor, raw: unknown): Promise<WorkspaceExitResponse> {
   const command = workspaceExitCommandSchema.parse(raw);
-  const { data, error } = await db().rpc("complete_workspace_exit", {
+  const { data, error } = await db().rpc(process.env.STRELVA_EXIT_HANDOFF === "1" ? "complete_workspace_exit_with_handoff" : "complete_workspace_exit", {
     ...identity(actor),
     p_workspace_id: command.workspaceId,
     p_future_work: command.futureWork,
@@ -88,4 +96,17 @@ export async function completeWorkspaceExit(actor: WorkspaceActor, raw: unknown)
   });
   if (error) fail(error, "The workspace exit could not be confirmed.");
   return response(data);
+}
+
+/** A verified workspace operator records evidence after the owner confirmed exit. */
+export async function recordWorkspaceExitHandoff(actor: WorkspaceActor, raw: unknown) {
+  if (process.env.STRELVA_EXIT_HANDOFF !== "1") throw new WorkspaceStoreError("Site handoff is unavailable.");
+  const command = workspaceExitHandoffCompletionSchema.parse(raw);
+  const result = await db().rpc("record_workspace_exit_handoff", {
+    ...identity(actor), p_workspace_id: command.workspaceId,
+    p_tenant_stable_id: command.tenantStableId, p_kind: command.kind,
+    p_evidence: command.evidence, p_export_build_id: command.exportBuildId ?? null,
+  });
+  if (result.error) fail(result.error, "The handoff evidence could not be recorded.");
+  return workspaceExitHandoffSchema.parse(result.data);
 }

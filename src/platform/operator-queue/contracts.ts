@@ -57,6 +57,10 @@ export interface QueueSystem {
   label: string;
 }
 
+/** Read-only source detail. Source adapters supply this without importing a
+ * tenant record contract into the platform domain. */
+export interface QueueReviewContent { type: string; metadata?: Record<string, unknown> }
+
 /** How the owner was told about an owner's-call item. */
 export type OwnerReach =
   | { status: "told"; via: "email" | "approve_link"; at: string }
@@ -78,9 +82,12 @@ export interface QueueItemRaw {
   facts?: QueueFacts;
   href: string;
   receiptIds?: string[];
+  review?: QueueReviewContent;
 }
 
 export interface QueueFacts {
+  /** Accepted writes and uncertain dispatches must never be confused. */
+  writeAcceptance?: "accepted" | "unknown";
   /** domain_alert: what the monitor saw. */
   domainState?: "down" | "parked" | "unreachable" | "expiring";
   daysToExpiry?: number | null;
@@ -148,6 +155,7 @@ export interface QueueItem {
   receiptIds: string[];
   closed: { state: "done" | "dismissed"; reason: string | null; receiptId: string | null; at: string } | null;
   closedElsewhere: { by: string; at: string } | null;
+  review?: QueueReviewContent;
 }
 
 /** A source that could not be read. The list is then marked incomplete. */
@@ -165,7 +173,11 @@ export interface OperatorQueue {
   /** Count parity: every raw row from every source lands in items or parked. */
   counts: QueueSourceCount[];
   operators: { userId: string; email: string }[];
+  /** Released operator enrichment, containing counts and no lead contents. */
+  businessLeads?: QueueBusinessLeadCount[];
 }
+
+export interface QueueBusinessLeadCount { businessKey: string; businessName: string; lastSevenDays: number | null; failure: string | null }
 
 export interface QueueLink { tenantId: string; tenantStableId: string; workspaceId: string; workspaceName: string; systemId: string | null }
 export interface QueueDelegation { agencyWorkspaceId: string; customerWorkspaceId: string }

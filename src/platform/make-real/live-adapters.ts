@@ -223,6 +223,7 @@ export function createTenantContentAdapter(ports: TenantContentPorts, ctx: LiveC
 // Inquiry form -------------------------------------------------------------------
 
 export const inquiryFormRequestSchema = z.object({
+  followUpAlternative: z.record(z.string(), z.unknown()).optional(),
   tenantId: z.string().min(1).max(120),
   businessId: z.string().min(1).max(160),
   requestId: z.string().min(1).max(200),
@@ -234,6 +235,7 @@ export const inquiryFormRequestSchema = z.object({
 type InquiryClaim = { id: string; status: string; tenantId: string; businessId: string; requestId: string; capabilityId: string; changeId: string; version: number };
 
 export interface InquiryFormPorts {
+  prepareFollowUp?(actor: WorkspaceActor, selection: Record<string, unknown>): Promise<void>;
   queue(input: z.infer<typeof inquiryFormRequestSchema> & { action: "make_live" | "undo"; idempotencyKey: string; actorId: string }): Promise<{ claim: InquiryClaim; acquired: boolean; reason?: string; eventId: string | null }>;
   execute(input: { tenantId: string; eventId: string; claimId: string }): Promise<{ accepted: boolean; verified: boolean; reason?: string }>;
   claim(tenantId: string, claimId: string): Promise<InquiryClaim | null>;
@@ -245,7 +247,9 @@ export function createInquiryFormAdapter(ports: InquiryFormPorts, ctx: LiveChann
   const ref = (tenantId: string, claimId: string) => `${tenantId}|${claimId}`;
   const split = (providerRef: string) => { const [tenantId = "", claimId = ""] = providerRef.split("|"); return { tenantId, claimId }; };
   async function publish(req: z.infer<typeof inquiryFormRequestSchema>, action: "make_live" | "undo", key: string) {
-    const queued = await ports.queue({ ...req, action, idempotencyKey: key, actorId: ctx.actor.userId });
+    const { followUpAlternative: _selection, ...native } = req;
+    void _selection;
+    const queued = await ports.queue({ ...native, action, idempotencyKey: key, actorId: ctx.actor.userId });
     if (ACCEPTED_CLAIM.has(queued.claim.status)) return { accepted: true, claim: queued.claim };
     if (queued.claim.status === "failed") return { accepted: false, claim: queued.claim, reason: "An earlier attempt with this key was refused." };
     if (!queued.eventId) return { accepted: false, claim: queued.claim, reason: queued.reason ?? "The publication could not be queued." };
@@ -257,6 +261,10 @@ export function createInquiryFormAdapter(ports: InquiryFormPorts, ctx: LiveChann
     async perform({ effect, idempotencyKey }) {
       const req = parseRequest(inquiryFormRequestSchema, effect);
       if (!req) return rejected("This effect does not name the inquiry form change it publishes.");
+      if (req.followUpAlternative) {
+        if (!ports.prepareFollowUp) return rejected("The native follow-up approval path is unavailable.");
+        await ports.prepareFollowUp(ctx.actor, req.followUpAlternative);
+      }
       const result = await publish(req, "make_live", idempotencyKey);
       if (!result.accepted) return rejected(result.reason ?? "The inquiry form was not published.");
       return { status: "accepted", providerRef: ref(req.tenantId, result.claim.id), result: { claimId: result.claim.id } };
@@ -266,7 +274,9 @@ export function createInquiryFormAdapter(ports: InquiryFormPorts, ctx: LiveChann
       if (!req) return null;
       // The claim is keyed by the step's idempotency key; asking again creates
       // at most the claim row, never a publication.
-      const queued = await ports.queue({ ...req, action: "make_live", idempotencyKey, actorId: ctx.actor.userId });
+      const { followUpAlternative: _selection, ...native } = req;
+      void _selection;
+      const queued = await ports.queue({ ...native, action: "make_live", idempotencyKey, actorId: ctx.actor.userId });
       return ACCEPTED_CLAIM.has(queued.claim.status) ? { found: true, providerRef: ref(req.tenantId, queued.claim.id) } : { found: false };
     },
     async readBack({ providerRef }) {

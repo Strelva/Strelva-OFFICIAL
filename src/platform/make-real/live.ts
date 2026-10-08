@@ -79,7 +79,7 @@ export function createLiveOperatingChecks(runners: Record<string, (activation: A
     async run({ checkId, activation }) {
       const runner = runners[checkId];
       if (runner) return runner(activation);
-      if (checkId === "site-serves") {
+      if (checkId === "site-serves" || checkId === "inquiry-rule-live") {
         const effects = activation.steps.filter((s) => s.kind === "effect" && s.effect === "accepted");
         if (!effects.length) return { passed: false, detail: "No website change was published to check." };
         const unconfirmed = effects.filter((s) => s.readBack?.status !== "confirmed");

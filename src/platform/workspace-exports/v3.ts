@@ -22,24 +22,27 @@ export const V3_PAGE_SIZE = 1000;
 
 export const V3_CATEGORIES = [
   "business_record", "systems", "linked_sites", "leads", "spam_held", "inquiry_timelines", "inquiry_first_replies",
-  "booking_config", "bookings", "reviews", "content", "billing",
+  "booking_config", "bookings", "reviews", "content", "billing", "orders", "reward_members", "reward_transactions",
+  "threads", "tenant_settings", "provider_metadata", "system_history", "system_connections", "system_outputs", "versions",
+  "saved_system_work", "native_records", "website_documents", "business_bookings", "booking_settings", "inquiry_events", "inquiry_delivery",
 ] as const;
-export type V3Category = (typeof V3_CATEGORIES)[number];
+export type V3Category = (typeof V3_CATEGORIES)[number] | "assets_manifest";
 
 export const V3_OMITTED = [
   { category: "credentials", reason: "Passwords, API keys and OAuth tokens are never exported." },
   { category: "provider_connection_secrets", reason: "Connections are listed by name, direction and status; their secrets stay with Strelva." },
   { category: "card_data", reason: "Card details live only with Stripe; the billing state is exported without them." },
   { category: "booking_management_tokens", reason: "Booking management links are credentials." },
+  { category: "inquiry_delivery_routing", reason: "Reverse routing indices, tracked reply aliases, send attempt IDs and message digests are internal delivery controls; checkpoint and reply evidence are included." },
   { category: "operator_notes", reason: "Strelva's own notes about the client are Strelva's records." },
 ] as const;
 
 export const V3_UNAVAILABLE = [
-  { category: "orders", reason: "Store orders are still held only in Redis (90 days). They move to Postgres before they can be exported in full." },
-  { category: "rewards_members_and_transactions", reason: "Rewards members and points are still held only in Redis." },
-  { category: "assets_manifest", reason: "A list of the site's images and files is not built yet." },
-  { category: "calendly_bookings", reason: "Calendly bookings live in Calendly; only bookings Strelva recorded are included." },
+  { category: "calendly_bookings_not_imported", reason: "Bookings not imported into Strelva must be exported from Calendly." },
 ] as const;
+
+export type V3Assets = (tenantIds: string[]) => Promise<{ items: unknown[]; unavailable: { category: string; reason: string }[] }>;
+
 
 export type V3Rpc = (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message?: string } | null }>;
 
@@ -95,6 +98,8 @@ export async function collectWorkspaceExportV3(
   rpc: V3Rpc,
   snapshot: (actor: WorkspaceActor, workspaceId: string) => Promise<WorkspaceExportSnapshot>,
   now: () => Date = () => new Date(),
+  assets?: V3Assets,
+  includeOperatorSnapshot = false,
 ): Promise<V3Document> {
   const role = await rpc("workspace_export_v3_role", { p_workspace_id: workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail });
   if (role.error) throw rpcError(role.error.message);
@@ -124,8 +129,22 @@ export async function collectWorkspaceExportV3(
     data[category] = items;
     included.push({ category, count: items.length });
   }
+  if (assets) {
+    const tenantIds = (data.linked_sites ?? []).flatMap(row => {
+      const id = row && typeof row === "object" ? (row as { tenantId?: unknown }).tenantId : null;
+      return typeof id === "string" ? [id] : [];
+    });
+    try {
+      const manifest = await assets(tenantIds);
+      data.assets_manifest = manifest.items;
+      included.push({ category: "assets_manifest", count: manifest.items.length });
+      unavailable.push(...manifest.unavailable);
+    } catch {
+      unavailable.push({ category: "assets_manifest", reason: "The media provider could not be read. Request the asset manifest again." });
+    }
+  } else unavailable.push({ category: "assets_manifest", reason: "The asset manifest reader is unavailable." });
   let workspaceSnapshot: WorkspaceExportSnapshot | null = null;
-  if (requesterRole === "owner") {
+  if (requesterRole === "owner" || includeOperatorSnapshot) {
     workspaceSnapshot = await snapshot(actor, workspaceId);
     included.push({ category: "workspace_snapshot_schema_2", count: 1 });
   } else {
@@ -170,16 +189,20 @@ export async function startWorkspaceExportV3(
   deps: {
     rpc: V3Rpc;
     snapshot: (actor: WorkspaceActor, workspaceId: string) => Promise<WorkspaceExportSnapshot>;
+    assets?: V3Assets;
+    /** Production archive collection runs after the accepted build, including native facets. */
+    background?: boolean;
+    includeOperatorSnapshot?: boolean;
     schedule: (task: () => Promise<void>) => void;
     /** Sends the download link to the recipient the database chose. */
-    deliver: (input: { buildId: string; token: string; deliverTo: string; workspaceId: string; manifest: V3Manifest }) => Promise<void>;
+    deliver: (input: { buildId: string; token: string; deliverTo: string; workspaceId: string; tenantIds: string[]; manifest: V3Manifest }) => Promise<void>;
     onFailure?: (input: { buildId: string; reason: string }) => Promise<void> | void;
   },
 ): Promise<V3ExportOutcome> {
-  const document = await collectWorkspaceExportV3(actor, workspaceId, deps.rpc, deps.snapshot);
-  const body = JSON.stringify(document);
-  const byteSize = Buffer.byteLength(body);
-  if (document.manifest.requesterRole === "owner" && byteSize <= V3_INLINE_MAXIMUM_BYTES) {
+  const document = deps.background ? null : await collectWorkspaceExportV3(actor, workspaceId, deps.rpc, deps.snapshot, undefined, deps.assets, deps.includeOperatorSnapshot);
+  const body = document ? JSON.stringify(document) : null;
+  const byteSize = body ? Buffer.byteLength(body) : 0;
+  if (document && body && document.manifest.requesterRole === "owner" && byteSize <= V3_INLINE_MAXIMUM_BYTES) {
     if (findSecretShapes(body).length) throw new WorkspaceExportV3Error("secret_detected", "The export stopped: something that looks like a credential was found. Nothing was sent.");
     return { kind: "inline", body, byteSize, document };
   }
@@ -187,16 +210,33 @@ export async function startWorkspaceExportV3(
   if (started.error) throw rpcError(started.error.message);
   const build = started.data as { buildId: string; deliverTo: string; requesterRole: "owner" | "operator" };
   deps.schedule(async () => {
-    const written = await writeWorkspaceExportBuild(build.buildId, body, deps.rpc);
+    let collected: V3Document;
+    try { collected = document ?? await collectWorkspaceExportV3(actor, workspaceId, deps.rpc, deps.snapshot, undefined, deps.assets, deps.includeOperatorSnapshot); }
+    catch {
+      await deps.rpc("fail_workspace_export_build", { p_build_id: build.buildId, p_failure: "export_collection_failed" }).catch(() => undefined);
+      await deps.onFailure?.({ buildId: build.buildId, reason: "export_collection_failed" });
+      return;
+    }
+    const written = await writeWorkspaceExportBuild(build.buildId, body ?? JSON.stringify(collected), deps.rpc);
     if (written.status === "failed") { await deps.onFailure?.({ buildId: build.buildId, reason: written.reason }); return; }
-    await deps.deliver({ buildId: build.buildId, token: written.token, deliverTo: build.deliverTo, workspaceId, manifest: document.manifest });
+    const tenantIds = (collected.data.linked_sites ?? []).flatMap(row => {
+      const tenantId = row && typeof row === "object" ? (row as { tenantId?: unknown }).tenantId : null;
+      return typeof tenantId === "string" ? [tenantId] : [];
+    });
+    try {
+      await deps.deliver({ buildId: build.buildId, token: written.token, deliverTo: build.deliverTo, workspaceId, tenantIds, manifest: collected.manifest });
+    } catch {
+      // The archive remains ready. A failed email is distinct from a failed
+      // build and must never expose the token through provider error text.
+      await deps.onFailure?.({ buildId: build.buildId, reason: "export_link_delivery_failed" });
+    }
   });
   return { kind: "build", buildId: build.buildId, deliverTo: build.deliverTo, requesterRole: build.requesterRole };
 }
 
 /** Writes the parts and completes the build. Returns the one-time token;
  *  only its sha256 is stored. Any failure fails the build (no partial ready). */
-export async function writeWorkspaceExportBuild(buildId: string, body: string, rpc: V3Rpc): Promise<{ status: "ready"; token: string } | { status: "failed"; reason: string }> {
+export async function writeWorkspaceExportBuild(buildId: string, body: string, rpc: V3Rpc, onToken?: (token: string) => void): Promise<{ status: "ready"; token: string } | { status: "failed"; reason: string }> {
   const fail = async (reason: string) => {
     await rpc("fail_workspace_export_build", { p_build_id: buildId, p_failure: reason }).catch(() => undefined);
     return { status: "failed" as const, reason };
@@ -210,6 +250,7 @@ export async function writeWorkspaceExportBuild(buildId: string, body: string, r
     }
     const document = JSON.parse(body) as V3Document;
     const token = randomBytes(32).toString("base64url");
+    onToken?.(token);
     const counts = Object.fromEntries(document.manifest.included.map((c) => [c.category, c.count]));
     const completed = await rpc("complete_workspace_export_build", {
       p_build_id: buildId, p_manifest: document.manifest, p_token_hash: createHash("sha256").update(token).digest("hex"), p_category_counts: counts,

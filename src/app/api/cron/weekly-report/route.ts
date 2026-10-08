@@ -1,3 +1,4 @@
+import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { mapPool } from "@/lib/concurrency";
@@ -142,13 +143,13 @@ await mapPool(reports, 8, async (report) => {
         heading,
         report.summary,
         report.tenant.siteName,
-        getTenantDashboardUrl(report.tenant, "/dashboard/reports"),
+        await ownerNoticeUrl(report.tenant, "/dashboard/reports", getTenantDashboardUrl(report.tenant, "/dashboard/reports")),
         report.analyticsRows,
       );
       const text = reportToText(
         heading,
         report.summary,
-        getTenantDashboardUrl(report.tenant, "/dashboard/reports"),
+        await ownerNoticeUrl(report.tenant, "/dashboard/reports", getTenantDashboardUrl(report.tenant, "/dashboard/reports")),
         report.analyticsRows,
       );
       await generateWeeklyBrief(report.tenant.id);

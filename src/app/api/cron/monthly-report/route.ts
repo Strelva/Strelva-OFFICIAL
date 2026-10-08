@@ -1,3 +1,4 @@
+import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 import { runWebsiteMonthlyReports } from "@/products/websites/index";
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/platform/infra/heartbeat";
@@ -17,6 +18,7 @@ import { requireCronRequest } from "@/lib/cron-auth";
 import { sendEmail } from "@/platform/infra/email/send";
 import type { WeeklyBrief } from "@/lib/types";
 import { recordCatalogReport } from "@/platform/catalog-reports/receipts";
+import { deliverBusinessOutcomeReport, readBusinessOutcomeReports } from "@/platform/business-outcomes/reports";
 
 // Iterates tenants; matches the platform function ceiling so it can't die
 // mid-batch at scale.
@@ -73,7 +75,10 @@ export async function GET(request: Request) {
     if (email) recipients.set(t.id, email);
     else await receipt(t.id, "suppressed", null, "missing_owner_email");
   });
-  const tenants = candidates.filter((t) => recipients.has(t.id));
+  const outcomes = await readBusinessOutcomeReports(candidates.map(t => t.id), monthKey);
+  const outcomesByTenant = new Map((outcomes ?? []).map(row => [row.primaryTenantId, row]));
+  const groupedSites = new Set((outcomes ?? []).flatMap(row => row.tenantIds.filter(id => id !== row.primaryTenantId)));
+  const tenants = candidates.filter((t) => recipients.has(t.id) && !groupedSites.has(t.id));
 
   const sent: string[] = [];
   const errors: string[] = [...hostedReports.errors];
@@ -86,6 +91,11 @@ export async function GET(request: Request) {
       // Always refresh the recap so the Reports surface is current.
       const recap = await generateMonthlyRecap(tenant.id);
 
+      // Armed grouping failure must never fall back around the durable receipt.
+      if (outcomes === null) {
+        skipped.push({ tenantId: tenant.id, reason: "business_outcome_grouping_unavailable" });
+        return;
+      }
       // Send gates: pause switch, then the once-per-month dedup marker.
       if (paused) {
         skipped.push({ tenantId: tenant.id, reason: "email_paused" });
@@ -103,7 +113,9 @@ export async function GET(request: Request) {
 
       const heading = buildMonthlyHeading(recap);
       const paragraphs = recapParagraphs(recap.summary);
-      const dashboardUrl = getTenantDashboardUrl(tenant, "/dashboard/reports");
+      const outcome = outcomesByTenant.get(tenant.id);
+      if (outcome) paragraphs.push(`Across your business: ${outcome.line.text}`);
+      const dashboardUrl = await ownerNoticeUrl(tenant, "/dashboard/reports", getTenantDashboardUrl(tenant, "/dashboard/reports"));
 
       const html = renderEmailHtml({
         preheader: paragraphs[0],
@@ -119,7 +131,7 @@ export async function GET(request: Request) {
         // Shared transport boundary; keeps the report@ from + per-tenant domain.
         let ok = false;
         try {
-          ok = await sendEmail({
+          const send = async () => await sendEmail({
             audience: "client",
             tenantId: tenant.id,
             to: to,
@@ -129,6 +141,9 @@ export async function GET(request: Request) {
             fromName: sanitizeEmailSubjectText(tenant.siteName),
             fromAddress: `report@${domain}`,
           });
+          ok = outcome
+            ? (await deliverBusinessOutcomeReport(outcome, monthKey, async () => ({ status: await send() ? "accepted" as const : "suppressed" as const }))).status === "accepted"
+            : await send();
         } catch (err) {
           const reason = err instanceof Error ? err.message : "send failed";
           errors.push(`${tenant.id}: ${reason}`);

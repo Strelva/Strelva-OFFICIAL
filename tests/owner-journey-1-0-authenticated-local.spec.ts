@@ -78,7 +78,8 @@ test("operator converts and invites; the owner accepts, lands on the admin host 
     await expect(home).toHaveURL(new RegExp(`^${adminOrigin.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/workspace\\?workspaceId=${businessId}`));
 
     // 6. Home shows the business's Systems and what needs the owner.
-    await expect(home.getByRole("heading", { name: invitation.workspaceName, level: 1 })).toBeVisible();
+    // The Oct 6 redesign greets the owner in the h1; the Systems list names the business.
+    await expect(home.getByRole("heading", { level: 1 })).toBeVisible();
     const systems = home.getByRole("list", { name: `${invitation.workspaceName} systems` });
     await expect(systems.getByRole("link", { name: /Website/ })).toBeVisible();
     const needsYou = home.getByRole("region", { name: "Needs you" });

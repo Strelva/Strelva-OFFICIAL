@@ -1,3 +1,5 @@
+import { getTenantFromHeaders } from "@/lib/tenant";
+import { redirectIfDashboardPageMoved } from "@/platform/owner-entry/server";
 import { requireDashboardFeature } from "@/lib/dashboard-feature-guard";
 import { listMembers } from "@/lib/rewards/memberRepositoryKv";
 import { KvNotConfiguredError } from "@/lib/rewards/kv";
@@ -5,6 +7,8 @@ import { MembersPanel } from "@/components/dashboard/MembersPanel";
 import { InspectPreviewBanner } from "@/components/dashboard/InspectPreviewBanner";
 
 export default async function MembersPage() {
+  await redirectIfDashboardPageMoved(await getTenantFromHeaders(), "/members");
+
   const { tenant, preview } = await requireDashboardFeature("members");
 
   // The members/points backend is KV-gated: listMembers throws

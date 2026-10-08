@@ -96,8 +96,8 @@ function fixtureEvidence(scenario: PreviewScenario, input: Pick<SystemsProjectio
   return observations;
 }
 
-export async function previewSystems(scenario: PreviewScenario, options: { installedStaffRequest?: boolean; seededRequests?: boolean; systems: boolean; publishing?: PreviewPublishing; makeReal?: PreviewMakeReal }, now: number = Date.now()): Promise<PreviewSystems> {
-  const { systems: released, publishing: publishingMode = "off", makeReal: _makeReal, ...fixtureOptions } = options;
+export async function previewSystems(scenario: PreviewScenario, options: { installedStaffRequest?: boolean; seededRequests?: boolean; systems: boolean; publishing?: PreviewPublishing; makeReal?: PreviewMakeReal; sibling?: "ready" | "unavailable" | "empty" }, now: number = Date.now()): Promise<PreviewSystems> {
+  const { systems: released, publishing: publishingMode = "off", makeReal: _makeReal, sibling = "ready", ...fixtureOptions } = options;
   if (!released) return { systems: {}, makeReal: {}, owners: [], released };
   const request = createPreviewRequest(scenario, fixtureOptions);
   const first = await (await request("/api/workspace")).json() as WorkspaceSnapshot;
@@ -127,7 +127,7 @@ export async function previewSystems(scenario: PreviewScenario, options: { insta
     };
     const projected = await projectWorkspaceSystems({ ...base, observations: [...fixtureEvidence(scenario, { listing }, now), ...(published?.observations ?? [])] });
     // Lineage comes only from stored Version rows, as on the route (withVersions).
-    const versions = projected.status === "ready" ? previewStoredVersions(workspace.id, projected.systems) : [];
+    const versions = projected.status === "ready" ? previewStoredVersions(workspace.id, projected.systems, sibling) : [];
     const withLineage = versions.length ? { ...projected, versions } : projected;
     const projection = scenario.startsWith("mooney") ? withPreviewMakeReal(withLineage, options.makeReal ?? "off", now) : withLineage;
     result.systems[workspace.id] = projection;

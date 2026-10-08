@@ -53,9 +53,10 @@ function parse<T>(schema: z.ZodType<T>, value: unknown): T {
 
 export const PostgresBusinessEffortStore: BusinessEffortStore = {
   async record(actor, input): Promise<BusinessEffortEntry> {
-    return parse(businessEffortEntrySchema, await rpc("record_business_effort", {
+    return parse(businessEffortEntrySchema, await rpc(input.queue ? "record_operator_queue_effort" : "record_business_effort", {
       ...identity(actor), p_entry_id: input.entryId, p_business_id: input.businessId, p_minutes: input.minutes,
       p_category: input.category, p_occurred_on: input.occurredOn, p_note: input.note ?? null,
+      ...(input.queue ? { p_queue: input.queue } : {}),
     }));
   },
   async void(actor, input): Promise<BusinessEffortEntry> {

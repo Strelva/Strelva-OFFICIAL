@@ -68,6 +68,35 @@ async function run(deps: AskTurnDeps, actor: WorkspaceActor, body: Record<string
 const roles = (actor: WorkspaceActor, workspaceId: string) => workspaceId !== WS ? null : actor.userId === owner.userId ? "owner" as const : actor.userId === member.userId ? "member" as const : null;
 
 describe("Ask Strelva conversation history in a turn", () => {
+  for (const messages of [
+    [{ role: "user", content: "My password is fictional-secret" }],
+    [{ role: "user", content: "x".repeat(5000) + " my api key is fictional-secret" }],
+    [{ role: "user", content: "My password is fictional-secret" }, { role: "assistant", content: "Okay" }, { role: "user", content: "What are our hours?" }],
+  ]) {
+    it("refuses credentials anywhere in supplied context before storing or calling a provider", async () => {
+      const history = createInMemoryAskHistory({ roleOf: roles });
+      const append = vi.spyOn(history, "append");
+      const { deps, modelCalls } = harness(history);
+      const result = await run(deps, owner, { messages });
+      expect(result.result?.ask).toMatchObject({ kind: "refusal", saved: false, conversationId: null });
+      expect(result.text).not.toContain("fictional-secret");
+      expect(modelCalls).toHaveLength(0);
+      expect(append).not.toHaveBeenCalled();
+      expect(await history.list(owner, { workspaceId: WS, systemId: null })).toEqual([]);
+    });
+  }
+  it("refuses old stored credentials before appending or sending conversation context", async () => {
+    const history = createInMemoryAskHistory({ roleOf: roles });
+    const old = await history.append(owner, { workspaceId: WS, conversationId: null, systemId: null, role: "user", content: "My password is fictional-old-secret" });
+    const append = vi.spyOn(history, "append");
+    const { deps, modelCalls } = harness(history);
+    const result = await run(deps, owner, { conversationId: old.conversationId, messages: [{ role: "user", content: "What are our hours?" }] });
+    expect(result.refused).toMatchObject({ status: 400 });
+    expect(result.refused?.error).not.toContain("fictional-old-secret");
+    expect(append).not.toHaveBeenCalled();
+    expect(modelCalls).toHaveLength(0);
+  });
+
   it("saves the person's words and Strelva's reply with its result, and says so", async () => {
     const history = createInMemoryAskHistory({ roleOf: roles });
     const { deps } = harness(history);

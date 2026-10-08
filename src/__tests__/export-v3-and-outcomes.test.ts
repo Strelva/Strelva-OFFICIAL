@@ -60,7 +60,7 @@ describe("export schema 3", () => {
     const included = doc.manifest.included.map((c) => c.category);
     for (const category of V3_CATEGORIES.filter((c) => c !== "reviews")) expect(included).toContain(category);
     expect(included).toContain("workspace_snapshot_schema_2");
-    expect(doc.manifest.unavailable.map((c) => c.category)).toEqual(expect.arrayContaining(["orders", "rewards_members_and_transactions", "reviews"]));
+    expect(doc.manifest.unavailable.map((c) => c.category)).toEqual(expect.arrayContaining(["calendly_bookings_not_imported", "reviews"]));
     expect(doc.manifest.omitted.map((c) => c.category)).toEqual(expect.arrayContaining(["credentials", "provider_connection_secrets", "card_data"]));
     // Nothing silently dropped: every category is included or unavailable.
     const listed = new Set([...included, ...doc.manifest.unavailable.map((c) => c.category)]);
@@ -104,6 +104,47 @@ describe("export schema 3", () => {
     expect(outcome.kind).toBe("build");
     await tasks[0]!();
     expect(deliver).toHaveBeenCalledWith(expect.objectContaining({ deliverTo: "owner@example.test" }));
+  });
+
+  it("accepts a background build before collecting, and includes all native facets for an operator", async () => {
+    const fake = fakeRpc({ role: "operator" });
+    const rpc = vi.fn(fake.rpc);
+    const tasks: (() => Promise<void>)[] = [];
+    snapshot.mockClear();
+    const deliver = vi.fn(async () => {});
+    const outcome = await startWorkspaceExportV3(actor, "w-1", { rpc, snapshot, background: true, includeOperatorSnapshot: true, schedule: task => tasks.push(task), deliver });
+    expect(outcome.kind).toBe("build");
+    expect(rpc.mock.calls.map(call => call[0])).toEqual(["start_workspace_export_build"]);
+    expect(snapshot).not.toHaveBeenCalled();
+    await tasks[0]!();
+    expect(snapshot).toHaveBeenCalledOnce();
+    expect(fake.state.status).toBe("ready");
+    expect(deliver).toHaveBeenCalledOnce();
+  });
+
+  it("fails a background collection without ready parts or a link when access disappears", async () => {
+    const fake = fakeRpc();
+    const rpc: V3Rpc = async (name, args) => name === "workspace_export_v3_role"
+      ? { data: null, error: { message: "workspace_export_denied" } } : fake.rpc(name, args);
+    const tasks: (() => Promise<void>)[] = [];
+    const deliver = vi.fn(), onFailure = vi.fn();
+    await startWorkspaceExportV3(actor, "w-1", { rpc, snapshot, background: true, schedule: task => tasks.push(task), deliver, onFailure });
+    await tasks[0]!();
+    expect(fake.state.status).toBe("failed");
+    expect(fake.parts.size).toBe(0);
+    expect(deliver).not.toHaveBeenCalled();
+    expect(onFailure).toHaveBeenCalledWith(expect.objectContaining({ reason: "export_collection_failed" }));
+  });
+
+  it("a delivery failure reports attention, keeps the complete archive and never logs the token", async () => {
+    const { rpc, state } = fakeRpc({ role: "operator" });
+    const tasks: (() => Promise<void>)[] = [];
+    const onFailure = vi.fn();
+    const deliver = vi.fn(async ({ token }: { token: string }) => { throw new Error(`provider failed ${token}`); });
+    await startWorkspaceExportV3(actor, "w-1", { rpc, snapshot, schedule: task => tasks.push(task), deliver, onFailure });
+    await expect(tasks[0]!()).resolves.toBeUndefined();
+    expect(state.status).toBe("ready");
+    expect(onFailure).toHaveBeenCalledWith({ buildId: "00000000-0000-4000-8000-000000000001", reason: "export_link_delivery_failed" });
   });
 
   it("a build containing a credential shape is failed, never delivered", async () => {
@@ -173,6 +214,21 @@ describe("outcome line, linked only where joined", () => {
     expect(rpc).toHaveBeenCalledWith("business_outcome_month", expect.objectContaining({ p_month: "2026-09-01" }));
     await expect(readBusinessOutcomeMonth(actor, "w", "Sept", rpc)).rejects.toMatchObject({ code: "invalid" });
     await expect(readBusinessOutcomeMonth(actor, "w", "2026-09", async () => ({ data: null, error: { message: "business_outcome_denied" } }))).rejects.toMatchObject({ code: "denied" });
+  });
+  it("distinguishes unavailable counts from measured zero without claiming joined outcomes", () => {
+    const line = formatOutcomeLine({ ...september,
+      visits: { kind: "counted", value: null }, reviews: { kind: "counted", value: null },
+      inquiries: { kind: "counted", value: null, reason: "Inquiry records could not be read." },
+      bookings: { kind: "counted", value: null, native: 0, legacy: null },
+    });
+    expect(line.text).toBe("Inquiries unavailable: Inquiry records could not be read. Bookings unavailable.");
+    expect(line.figures).toEqual([]); expect(line.text).not.toContain("0 inquiries"); expect(line.text).not.toContain("0 bookings");
+    const zero = formatOutcomeLine({ ...september,
+      visits: { kind: "counted", value: null }, reviews: { kind: "counted", value: null },
+      inquiries: { kind: "counted", value: 0 }, bookings: { kind: "counted", value: 0, native: 0, legacy: 0 },
+    });
+    expect(zero.text).toBe("0 inquiries. 0 bookings.");
+    expect(zero.figures).toEqual([{ label: "inquiries", value: 0, kind: "counted" }, { label: "bookings", value: 0, kind: "counted" }]);
   });
 });
 
