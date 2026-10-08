@@ -19,8 +19,12 @@ assistant's name, never an invented free-text source. The existing spam scorer
 and `held_as_spam` state remain the native truth. Whole-request idempotency returns
 the original encrypted opaque capability. Status expires after 30 days, binds to
 one business and returns no contact details. A quote adds an active native
-service, scope and service area. The reply-by time exists only for a confirmed
-owner/operator response policy. An owner approval creates one immutable
+service, scope and service area. The reply-by time exists only for an
+owner-confirmed published response policy. Pending provider edits preserve the
+last confirmed policy; an unconfirmed policy creates no response promise.
+Public evidence counts and dates read the confirmed fact copy, including
+provider-origin facts approved by the owner, and exclude private recipients.
+An owner approval creates one immutable
 `agent_quote_receipts` record; there is no computed price or automatic email.
 Ordinary receipt/lead deletion is refused; canonical retention and business
 cascades own removal. Tests prove no quote/token orphan after business deletion.
