@@ -95,6 +95,7 @@ export interface ConnectedInquiry {
 // fills into `[data-strelva-fact]` elements, derived from the business record.
 
 export interface PublicFacts {
+  verification?: import("@/platform/agent-channel/contracts").PublicVerification;
   policies?: PublishedPolicies;
   name?: string;
   description?: string;
@@ -194,7 +195,9 @@ export function businessJsonLd(facts: PublicFacts, siteUrl?: string | null): Rec
     const names: Record<string, string> = { mon: "Monday", tue: "Tuesday", wed: "Wednesday", thu: "Thursday", fri: "Friday", sat: "Saturday", sun: "Sunday" };
     ld.openingHoursSpecification = open.map(row => ({ "@type": "OpeningHoursSpecification", dayOfWeek: names[row.day], opens: row.opens, closes: row.closes }));
   }
-  if (facts.social_links?.length) ld.sameAs = facts.social_links;
+  const verifiedLinks = [facts.verification?.domain.verified ? facts.verification.domain.url : null, facts.verification?.googleBusinessProfile.verified ? facts.verification.googleBusinessProfile.url : null].filter((v): v is string => !!v);
+  if (facts.social_links?.length || verifiedLinks.length) ld.sameAs = [...new Set([...(facts.social_links ?? []), ...verifiedLinks])];
+  if (facts.booking_url) ld.potentialAction = { "@type": "ReserveAction", target: facts.booking_url };
   if (facts.service_area?.length) ld.areaServed = facts.service_area;
   if (facts.services?.length) {
     ld.makesOffer = facts.services.map(service => ({ "@type": "Offer", itemOffered: { "@type": "Service", name: service.name, ...(service.description ? { description: service.description } : {}) } }));

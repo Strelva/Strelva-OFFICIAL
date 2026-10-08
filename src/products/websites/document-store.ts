@@ -180,6 +180,7 @@ export function createWebsiteDocumentStore(db?: WebsiteDocumentRpc, ownerLink?: 
     async listPublished() { return (await rpc("read_published_website_documents", { p_tenant_id: null })).map(documentRow); },
     async recordHealth(input) {
       await rpc("record_website_document_health", { ...key(input), p_revision: revision.parse(input.revision), p_content_hash: hash.parse(input.contentHash), p_checked_at: z.string().datetime({ offset: true }).parse(input.checkedAt), p_status: z.enum(["healthy", "unreachable", "hash_mismatch", "hash_missing"]).parse(input.status), p_observed_hash: input.observedHash === undefined ? null : hash.parse(input.observedHash) });
+      if(input.status==="healthy")try{await rpc("reconcile_bundle_native_releases",{p_workspace_id:input.workspaceId,p_work_id:input.workId});}catch{console.warn("[websites] Bundle native release receipt needs reconciliation",{workId:input.workId});}
     },
     async claimRebuild(actor,workspaceId,input) {
       const result = await rpc("claim_website_rebuild", { ...identity(actor), p_workspace_id: id.parse(workspaceId), p_request_id: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]{7,159}$/).parse(input.requestId), p_domain_key: z.string().min(1).max(253).parse(input.domainKey), p_input: input.input, p_payload: input.payload });

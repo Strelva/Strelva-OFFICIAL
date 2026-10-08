@@ -139,6 +139,14 @@
     {
       "path": "/api/cron/newsletter-sender",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/split-payouts",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/payment-holds",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

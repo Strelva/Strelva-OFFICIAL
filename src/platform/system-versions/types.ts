@@ -1,5 +1,6 @@
 import type { JsonObject, JsonValue, ThreeWayChange, ThreeWayConflict } from "./compare";
 import type { SystemRef, SystemRevisionRef } from "./refs";
+import type { PackageDeclaration, RevisionQualification } from "./declaration";
 
 /** Where a Version works differently. Not a point in time. */
 export const VERSION_CONTEXT_KINDS = ["location", "customer_segment", "agency_client", "franchise"] as const;
@@ -25,6 +26,8 @@ export interface VersionActor {
   /** Required by the Postgres store, which rechecks the actor in the database. */
   verifiedEmail?: string;
   memberships: ReadonlyArray<{ businessId: string; role: VersionRole; via?: VersionMembershipVia }>;
+  /** Current delegated work only. Never converted into an owner/admin role. */
+  delegatedSystems?: ReadonlyArray<{ businessId: string; systemId: string; canWrite: boolean }>;
 }
 
 /** The authoring side of lineage. Only its business can publish revisions. */
@@ -33,6 +36,9 @@ export interface SourceSystemRecord {
   /** Businesses that may base Versions on this source and see its improvements. */
   sharedWith: string[];
   createdAt: string;
+  creatorWorkspaceId?: string;
+  listingState?: "private" | "clients" | "listed";
+  availableTo?: string[];
 }
 
 /**
@@ -48,6 +54,9 @@ export interface SourceRevision {
   requires: { bindingKinds: string[] };
   publishedBy: string;
   publishedAt: string;
+  creatorWorkspaceId?: string;
+  declaration?: PackageDeclaration;
+  qualification?: RevisionQualification | null;
 }
 
 /** A path the descendant changed relative to its baseline. Business-owned. */
@@ -77,6 +86,7 @@ export interface VersionRelease {
   definition: JsonObject;
   /** The source revision this release was based on, for traceability only. */
   baselineRevision: number;
+  baselineSourceRevisionId?: string;
   overridePaths: string[];
   releasedBy: string;
   releasedAt: string;
@@ -100,6 +110,11 @@ export interface VersionLineage {
   /** The descendant's own business-owned System identity. */
   version: SystemRef;
   source: SystemRef;
+  creatorWorkspaceId?: string;
+  /** Immutable initial installation revision, including after updates. */
+  sourceRevisionId?: string;
+  sourceComponentKey?: string;
+  bundleId?: string;
   context: VersionContext;
   baseline: { revision: number; definition: JsonObject };
   overrides: VersionOverride[];

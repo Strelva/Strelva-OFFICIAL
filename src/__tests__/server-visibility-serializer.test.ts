@@ -32,6 +32,7 @@ describe("the one JSON-LD serializer", () => {
         { "@type": "OpeningHoursSpecification", dayOfWeek: "Saturday", opens: "10:00", closes: "14:00" },
       ],
       sameAs: ["https://instagram.com/barber"],
+      potentialAction: { "@type": "ReserveAction", target: "https://book.example/barber" },
       areaServed: ["Buffalo", "Amherst"],
       makesOffer: [
         { "@type": "Offer", itemOffered: { "@type": "Service", name: "Beard trim" } },

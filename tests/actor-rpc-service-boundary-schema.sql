@@ -43,7 +43,10 @@ select pg_temp.ars_assert((select count(*)=1 from public.saved_product_work wher
 -- hosted service-role default table grants. Reuse the installed-app fixture,
 -- then exercise its real RPCs as service_role with a fresh accepted delivery.
 reset role;
+select not exists(select 1 from public.saved_product_work where id='a3020000-0000-4000-8000-000000000020') as actor_fixture_needed \gset
+\if :actor_fixture_needed
 \ir agency-application-authoring-schema.sql
+\endif
 set local role service_role;
 do $$
 declare assignment public.operational_assignments%rowtype;

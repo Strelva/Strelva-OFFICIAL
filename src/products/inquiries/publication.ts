@@ -161,7 +161,7 @@ async function verifyPublication(repository: InquiryRepository, claim: Publicati
     if (!observed) throw new Error("readback_unavailable");
     const receipt = observed.state.changes.find((item) => item.providerAcceptanceId === acceptanceId);
     if (!receipt) throw new Error("receipt_readback_missing");
-    if (receipt.verification?.verified) return { accepted: true, verified: true };
+    if (receipt.verification?.verified) { await reconcileNativeBundle(claim); return { accepted: true, verified: true }; }
     const actual = observed.state.capabilities.find((item) => item.id === claim.capabilityId)?.live ?? null;
     const verified = sameDefinition(actual, expected);
     const engine = new InquiryEngine({ businessId: claim.businessId, state: stateForReceive(observed) });
@@ -170,11 +170,16 @@ async function verifyPublication(repository: InquiryRepository, claim: Publicati
     const saved = await repository.compareAndSwap({ tenantId: claim.tenantId, businessId: claim.businessId, expectedRevision: observed.revision, actorId: claim.actorId, state: engine.snapshot() });
     if (!saved.changed) throw new Error("verification_receipt_conflict");
     if (!verified) throw new Error("definition_readback_mismatch");
+    await reconcileNativeBundle(claim);
     return { accepted: true, verified: true };
   } catch {
     await repository.markPublicationFailed({ tenantId: claim.tenantId, claimId: claim.id, claimToken: publicationClaimToken(claim), reason: "Published configuration requires read-back verification.", verificationFailed: true }).catch(() => {});
     return { accepted: true, verified: false, reason: "publication_verification_pending" };
   }
+}
+
+async function reconcileNativeBundle(claim:PublicationClaim){
+  try{await inquiryRecordsRpc("reconcile_bundle_inquiry_releases",{p_workspace_id:claim.businessId,p_capability_id:claim.capabilityId});}catch{console.warn("[inquiries] Bundle native release receipt needs reconciliation");}
 }
 
 function sameDefinition(left: InquiryCapabilityDefinition | null, right: InquiryCapabilityDefinition | null): boolean {

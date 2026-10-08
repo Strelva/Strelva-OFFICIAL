@@ -1263,6 +1263,162 @@
           "rollback": "rollback-20261019100000_actor_rpc_service_boundary.sql"
         }
       ]
+    },
+    {
+      "batch": "12",
+      "status": "private integration #601; not production-authorized",
+      "items": [
+        {
+          "file": "20261020090000_allowance_payer_parties.sql",
+          "sha256": "ae474cd439172585d0af9f144a3789f019f5227eca1cc3778bf5f53d6df4bd7d"
+        },
+        {
+          "file": "20261020090001_payer_transition_controls.sql",
+          "sha256": "4af2999db612493944fe029be56ae155f9ed5694739871963c2e2592986c5126"
+        },
+        {
+          "file": "20261020090002_agency_billing_accounts.sql",
+          "sha256": "b0d45a9302d99a188553782395bea062c98d01ba4b05c4c42f64ac908bc9f206"
+        },
+        {
+          "file": "20261020090003_agency_billing_intents.sql",
+          "sha256": "c4fb379ba7555ff1b7761a3f008ac7a4dbec3feda1f7de6d5a2e7b2222ce1583"
+        },
+        {
+          "file": "20261020090004_agency_billing_receipt_terms.sql",
+          "sha256": "6bba4888c3b7e8d371dcc42220d4f64fa6138d52ab294650a951b4f8931c4848",
+          "rollback": "rollback-20261020090004_agency_billing_receipt_terms.sql",
+          "rollbackSha256": "458bc00e4e07817f137782db21d6627120d83183e35427142a41690ad7c0ac97"
+        },
+        {
+          "file": "20261020090005_allowance_payer_writer_authority.sql",
+          "sha256": "f34654e8e369674ff2fe6e202e10b1b842069334684b9b7ff68b6ead61b0759d",
+          "rollback": "rollback-20261020090005_allowance_payer_writer_authority.sql",
+          "rollbackSha256": "f2203120a64c04eba5e7703346d999053983c096f17bb3561bbd098bb4c4d182"
+        },
+        {
+          "file": "20261020090006_connect_money.sql",
+          "sha256": "d9e27fe6456bf99427725a3b24f554b90a039df240957c50f24e774d6856ae64"
+        },
+        {
+          "file": "20261020090007_revenue_splits.sql",
+          "sha256": "5e503daeb98438db6b97fbad0eba51cd31fa2c4b8dcc7dd83c8baf2e0b8a7209"
+        },
+        {
+          "file": "20261020090008_provider_change_money_export.sql",
+          "sha256": "30eb3b135eb4de4b974ae267d58aae96673b9d3f6f83709b5d44f229e0af764a"
+        },
+        {
+          "file": "20261020090009_payment_requests.sql",
+          "sha256": "400ad7fae32d03214c192bd3989a1a2a42e79fccf0a721401776c0a47ac30357"
+        },
+        {
+          "file": "20261020090010_money_reconciliation.sql",
+          "sha256": "c04011b6f18415e22c6888c9ed3c3220fd454fea5fd373a7db237f7cb1ab1662"
+        },
+        {
+          "file": "20261020090011_collection_and_payout_reservations.sql",
+          "sha256": "70cf7ae18a6fff57c15ebe98bb6c20cdbe9494c92be78f1da044f1aa26639600"
+        },
+        {
+          "file": "20261020090012_invoice_payer_receipts.sql",
+          "sha256": "e3d7ec62837f8716ab2a437581e159c62d8c2d6f59662f15c2b578c52531cf78"
+        },
+        {
+          "file": "20261020090013_recovery_payouts.sql",
+          "sha256": "2580c0c151db4f1f2c36cb0ae2e53e90efe0230d266a1bf190f9ef9b64adf942"
+        },
+        {
+          "file": "20261020090014_reconciliation_reviews.sql",
+          "sha256": "08ffc469013f72ed1703873c1f6b25803fc1f5c8a05040453678cbee948dda26"
+        },
+        {
+          "file": "20261020090015_sandbox_build_evidence.sql",
+          "sha256": "e3cec735b8a6080b2f4840217c94192412eddb605e01367d9de96172eb56f0da",
+          "rollback": "rollback-20261020090015_sandbox_build_evidence.sql",
+          "rollbackSha256": "df011b350c1021b1597cc697f68de6e29cefad2655313e4bc39504d9022966af"
+        },
+        {
+          "file": "20261020090016_agent_inquiries.sql",
+          "sha256": "828e2ce7a20aee107cf9f11d316f7ddc4aa0390562be9a0c665e4b542c62f83a"
+        },
+        {
+          "file": "20261020090017_agent_profile.sql",
+          "sha256": "ac314e53a03e0684689e53fba2e6394c971958088346fbbf7ea7b4b2943e43d8"
+        },
+        {
+          "file": "20261020090018_agent_oauth.sql",
+          "sha256": "80e33fa50e4b5b3bc57783a2cf9701456a41a88f71c0be0a75dc0e19a6402d91"
+        },
+        {
+          "file": "20261020090019_agent_channel_policy.sql",
+          "sha256": "a26708ffb9e62862349fff1d0687b16bbcc24a9786b8b63fa2466ab40d5e3853"
+        },
+        {
+          "file": "20261020090020_agent_confirmed_provenance.sql",
+          "sha256": "9e42e90089a1f10b451e06bb3fdc29872c191af0d3bf9aca6eb5c97c4c31521b"
+        },
+        {
+          "file": "20261020090021_creator_packages.sql",
+          "sha256": "b8d807fe11d0ae41b3e4c25ef58a5a2e10042cfd50eb039abc01153ce8671ff2",
+          "rollback": "rollback-20261020090021_creator_packages.sql",
+          "rollbackSha256": "87e03dd5bd88d7bb133981453b08c7755fae3e1eb1709a003b1261b05c7c96e0"
+        },
+        {
+          "file": "20261020090022_package_install_scope.sql",
+          "sha256": "c0bf83779e6645745e9c9185838a778645b167e2c1cbbba5e75a057be0a55835",
+          "rollback": "rollback-20261020090022_package_install_scope.sql",
+          "rollbackSha256": "3b50dd63f5e8c1d7c2bbe50c57d9896009ecf7e0317fad9411f8de08188ec3dc"
+        },
+        {
+          "file": "20261020090023_offering_source_versions.sql",
+          "sha256": "8768b417904d50bab494ff22c3948fcb8cc57009e0e3bd2ee7e92929901e5875",
+          "rollback": "rollback-20261020090023_offering_source_versions.sql",
+          "rollbackSha256": "8fb7c0281d0f8db08fef8082d13fb91082bf72a26e006f7e487823c70f1de740"
+        },
+        {
+          "file": "20261020090024_package_management.sql",
+          "sha256": "b4fe3c3cde7ba455f6f03205cc98eabb8f909bd7183c28c07022e360a6362003",
+          "rollback": "rollback-20261020090024_package_management.sql",
+          "rollbackSha256": "695f634d9ee3d26cf0dd8cbf4461209dc02eb23eabb51956b5559725ac5b77e6"
+        },
+        {
+          "file": "20261020090025_system_bundles.sql",
+          "sha256": "585dc5a2b7a43a07a9e0e817aa2def6870ce90e1ba32a6571fab07010f49724f",
+          "rollback": "rollback-20261020090025_system_bundles.sql",
+          "rollbackSha256": "10d40c3d4120bd496eed967068edd1ba618e449d976256294679999a02050648"
+        },
+        {
+          "file": "20261020090026_package_readonly_authority.sql",
+          "sha256": "f4a8febe19e21db43717b2fda87abe41f87031a1a5c22c3acbc9097feb5a57ab",
+          "rollback": "rollback-20261020090026_package_readonly_authority.sql",
+          "rollbackSha256": "73a5b745b559fb1a8d235c97a89aa20e4ee0a34022358a3e416ed4129670a692"
+        },
+        {
+          "file": "20261020090027_bundle_native_lifecycle.sql",
+          "sha256": "ea79b045f91fc4c97a6afd4bfc72aada5d3968e8b7d46d7153eadc3edc579b1a",
+          "rollback": "rollback-20261020090027_bundle_native_lifecycle.sql",
+          "rollbackSha256": "650a519bade77acd45f73b98f7ef838098628a720affa42ee8ec0179251e3c26"
+        },
+        {
+          "file": "20261020090028_recurring_responsibilities.sql",
+          "sha256": "5986d5a1f2e77eef059ec553c57cb9d4f8d876e9ddde725f3cdd3b9c89ea8d3c",
+          "rollback": "rollback-20261020090028_recurring_responsibilities.sql",
+          "rollbackSha256": "402c22c7f0a1a40a74ae682816b53317a88789456755f93d24469ef564f21c5f"
+        },
+        {
+          "file": "20261020090029_calendar_revoke_compatibility.sql",
+          "sha256": "dc2c4ef19108c09f8d981a1dc6025d3c2689a68c9f92367e32c175a052917737",
+          "rollback": "rollback-20261020090029_calendar_revoke_compatibility.sql",
+          "rollbackSha256": "6577c6f79ec89f95d1907ac94712f3d2a45848a5a079909aa6da4da39674a6e7"
+        },
+        {
+          "file": "20261020090030_money_export_readonly_authority.sql",
+          "sha256": "9b4955cfeb022a0d655bb6acd29b634382ddf748a8d28b9a7ab1ffd3ec9cbdf6",
+          "rollback": "rollback-20261020090030_money_export_readonly_authority.sql",
+          "rollbackSha256": "d2af49d0cb7008e5b70512c44e3d68b5e06d6efe2667be4325ab5f787b1a4dc1"
+        }
+      ]
     }
   ]
 }

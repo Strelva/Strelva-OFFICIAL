@@ -1,3 +1,5 @@
+import { agentConfirmationEmailAllowed, isolatedAgentConfirmation } from "@/platform/agent-channel/policy";
+import { bookingScopeFor } from "./booking-scope";
 import { businessBookingEmailEnabled } from "./email-enablement";
 import { bookingAgentLabel } from "./agent-source";
 import { bookingAgentVisibilityEnabled } from "./flags";
@@ -70,7 +72,9 @@ export async function deliverBookingUpdates(bookingId: string | null = null, dep
       const business = await deps.business(booking);
       const to = row.audience === "client" ? business?.ownerEmail : booking.customer.email;
       if (!business || !to) { await finish("skipped", null, "no_recipient"); continue; }
-      if (!await (booking.tenantId ? deps.customerAllowed(booking.tenantId) : deps.customerAllowed(null, booking.workspaceId))) { summary.suppressed++; await finish("suppressed", null, "email_gates"); continue; }
+      const confirmation = row.audience === "customer" && booking.origin === "agent" && booking.status === "held" && isolatedAgentConfirmation();
+      const allowed = confirmation ? await agentConfirmationEmailAllowed(bookingScopeFor(booking) ?? "") : await (booking.tenantId ? deps.customerAllowed(booking.tenantId) : deps.customerAllowed(null, booking.workspaceId));
+      if (!allowed) { summary.suppressed++; await finish("suppressed", null, "email_gates"); continue; }
       const agentSource = bookingAgentVisibilityEnabled() ? bookingAgentLabel(booking) : null;
       const when = bookingWhen(booking);
       const state = booking.status;

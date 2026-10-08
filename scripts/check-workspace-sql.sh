@@ -189,6 +189,7 @@ SQL
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260911100000_inquiry_capability_workspace.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260915060000_offering_websites.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/offering-websites-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260921173000_service_delivery_commitments.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260918120000_public_continuation_imports.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/public-continuation-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260918130000_workspace_invitations.sql"
@@ -1316,9 +1317,12 @@ printf 'Tracking key migration passed forward, guarded rollback, empty rollback 
 # rollback while empty, and reapply. Fixtures use fictional credentials only.
 psql "${psql_args[@]}" --command="alter table public.tenants add column if not exists instagram_access_token text, add column if not exists updated_at timestamptz not null default now();"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011180000_provider_disconnect_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261020090029_calendar_revoke_compatibility.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/provider-disconnect-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261020090029_calendar_revoke_compatibility.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011180000_provider_disconnect_receipts.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011180000_provider_disconnect_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261020090029_calendar_revoke_compatibility.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/provider-disconnect-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261014120000_legacy_calendar_revoke_result.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/legacy-calendar-revoke-result-schema.sql"
@@ -1362,6 +1366,12 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013120000_own
 psql "${psql_args[@]}" --file="$repo_root/tests/owner-recipient-trust-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-schema.sql"
+# Recheck the shared caller fixtures under the newer delivery-bound authority.
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-decision-notice-claims-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-decision-notice-events-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-business-facts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-operator-authority-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-operator-review-schema.sql"
 printf 'Owner recipient trust rollback is exact (%s schema objects compared) and reapplies.\n' \
   "$(wc -l <"$cluster_root/owner-trust-before.txt" | tr -d ' ')"
 
@@ -1579,3 +1589,21 @@ fi
 grep -q 'owner_decision_runtime_rollback_requires_data_preservation' "$cluster_root/owner-effects-rollback.log"
 psql "${psql_args[@]}" -Atc "select exists(select 1 from information_schema.columns where table_schema='public' and table_name='owner_decision_link_sessions' and column_name='intended_decision') and exists(select 1 from public.owner_decision_link_sessions) and to_regprocedure('public.owner_decision_provider_holds(uuid,uuid,text[])') is not null" | grep -qx t
 printf 'Owner effect rollback retained sessions and authority gates.\n'
+
+# #601: include the deployed private-helper ACL correction omitted by the
+# historical hand-ordered rehearsal. No existing migration is edited.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260930120000_revoke_public_execute_internal_functions.sql"
+
+# #601: current service-only ACL successor must precede the pending tail.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261019100000_actor_rpc_service_boundary.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/actor-rpc-service-boundary-schema.sql"
+
+# #601: run the unapplied money/apps tail after all deployed security successors.
+for money_apps_migration in "$repo_root"/supabase/migrations/20261020*.sql; do
+  psql "${psql_args[@]}" --file="$money_apps_migration" >/dev/null
+done
+
+# #601: combined contracts preserve current authority after the historical rehearsal.
+source "$repo_root/scripts/sql/money-apps-contracts.sh"
+check_money_apps_contracts
+printf 'Combined money/apps contracts passed after the current security/upgrade proof.\n'

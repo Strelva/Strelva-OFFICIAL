@@ -2,6 +2,7 @@
 
 import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { SourcePackageControls } from "./SourcePackageControls";
 import { Button } from "@/components/ui/Button";
 import { SkeletonLine } from "@/components/ui/Skeleton";
 import { loadAgencyLibrary, type AgencyBulkReviewResult, type AgencyLibrary, type AgencyLibrarySource, type AgencyLibraryVersion } from "../agency-clients";
@@ -79,7 +80,7 @@ export function AgencyLibraryView({
 
   return <><ul aria-label="Sources" className="space-y-12">
     {state.library.sources.map((source) => <li key={source.systemId}>
-      <LibrarySource source={source} review={reviews[source.systemId]} onReview={() => void review(source)} />
+      <LibrarySource request={request} source={source} review={reviews[source.systemId]} onReview={() => void review(source)} />
     </li>)}
   </ul><InquiryLibraryVersions library={state.library} /></>;
 }
@@ -90,10 +91,12 @@ export function InquiryLibraryVersions({ library }: { library: AgencyLibrary }) 
 }
 
 function LibrarySource({
+  request,
   source,
   review,
   onReview,
 }: {
+  request: typeof fetch;
   source: AgencyLibrarySource;
   review: ReviewState | undefined;
   onReview: () => void;
@@ -113,6 +116,7 @@ function LibrarySource({
       {latest ? <p id={`${headingId}-review-note`} className="sr-only">{ready ? `Prepares revision ${latest.number} for the ${ready} ready ${ready === 1 ? "Version" : "Versions"}. Each owner approves their own.` : "No Version is ready for this revision."}</p> : null}
     </div>
 
+    <SourcePackageControls request={request} workspaceId={source.workspaceId} systemId={source.systemId} />
     {review ? <ReviewResult source={source} review={review} /> : null}
 
     {source.versions.length ? <ul aria-label={`Versions of ${source.name}`}>

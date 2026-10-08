@@ -72,6 +72,22 @@ The **dev-access bypass** (`REB_DEV_UNGATED_ACCESS=1` / `SCAFFOLD_DEV_UNGATED_AC
   so it needs no DB/Redis/prod. The owner **Today** page is the exception (its verdict + activity
   feed are backend-driven), so its smoke is a render-check only.
 
+## Focused money and apps SQL
+
+`PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH bash scripts/check-money-apps-sql.sh tests/provider-disconnect-schema.sql`
+creates a disposable local PostgreSQL cluster, applies every ordered migration,
+and runs the explicitly named SQL contracts against the current schema. With no
+arguments it runs the provider-disconnect contract. It never uses hosted stores.
+
+Set `MONEY_APPS_CHECK_READONLY=1` to scan the migrated function catalog for
+STABLE/IMMUTABLE readers that transitively acquire row locks. A migration replay
+can pass while those functions fail in PostgREST read-only transactions.
+
+This fresh-schema check does not replace `pnpm check:workspace-upgrade`, which
+preserves historical caller fixtures, existing rows and rollback fingerprints.
+Passing one named contract proves only that contract, not every money or app
+journey, hosted authentication, provider behavior or production compatibility.
+
 ## Pinned client release checks
 
 `pnpm check:custom-repos` retains its development behavior: executable platform

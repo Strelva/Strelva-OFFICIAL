@@ -9,6 +9,7 @@
  * connected sites release and the business's row are on, and the page is
  * published. Ported from feat/connected-sites `/b/{handle}`.
  */
+import { BusinessEvidence } from "@/products/connected-sites";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -141,6 +142,7 @@ export default async function BusinessPage({ params }: Params) {
         </aside> : null}
       </div>
 
+      {facts.verification ? <Section id="biz-verification" title="Business evidence"><BusinessEvidence verification={facts.verification} /></Section> : null}
       <footer className="grid gap-2 border-t border-gray-border pt-6 text-xs leading-4 text-gray-muted sm:flex sm:flex-wrap sm:items-center sm:justify-between">
         <p>
           Details confirmed by {facts.name}

@@ -7,6 +7,23 @@ The [visual direction map](../../DESIGN.md#visual-direction-and-extension-map) o
 how identity, imagery, composition and component treatment fit together. This
 file owns component contracts, extension and adoption, including gaps in source.
 
+## Party billing, October 7, 2026 (local)
+
+[AgencyBillingView](../../src/experience/workspace/billing/AgencyBillingView.tsx)
+uses Card, links, semantic client lists and the owned Button, TextInput and
+SelectInput through AgencyInvoiceControls. Null wholesale amounts render as
+unpriced, separately from legacy retail amounts. Accepted retail proposals
+retain their terms and owner acceptance; provider receipts distinguish payment
+page creation from confirmed payment. WorkspacePayerTransition offers business,
+agency and named signer proposals and renders acceptance from SQL's current
+party authority. The default request remains fetch; the development-only
+[billing preview](../../src/app/preview/strelva/billing/page.tsx) supplies isolated
+fictional payer replies. Local browser proof covered 1280px and 390px, both
+party acceptance controls, empty/loading/error/read-only states and overflow.
+This does not prove production or live Stripe behavior. The
+[stream contract](../product/streams/a1-payer-billing-completion.md) records the
+remaining policy and provider proof.
+
 ## Agency Team management, October 7, 2026
 
 [AgencyTeamView](../../src/experience/workspace/agency/AgencyTeamView.tsx) composes
@@ -22,6 +39,25 @@ Workspace and Systems flags gate the API and tab. Local browser proof covers
 management actions. Real SQL proof and limitations are in
 [the #261 handoff](../product/streams/a1-agency-team.md); no production or actual
 staff adoption is claimed.
+
+## Creator package library, October 7, 2026
+
+[PackageCatalog](../../src/experience/systems/PackageCatalog.tsx),
+[SourcePackageControls](../../src/experience/workspace/agency/SourcePackageControls.tsx)
+and [PackageInstallDelegation](../../src/experience/systems/PackageInstallDelegation.tsx)
+compose owned Button, TextInput, SelectInput and TextArea with semantic declaration
+lists and native details. Qualified listings show immutable creator and exact source
+revision. Installation saves a private business draft with a stable retry command;
+the existing Version owns business bindings and the separate Needs you release.
+Owners can grant/revoke one exact, expiring installation to an already delegated
+agency. Source managers run exact-revision checks and choose private/clients/listed;
+review authority remains empty until a reviewer policy is configured.
+
+Local 1280px and 390px browser proof covers catalog, declaration, denied controls,
+loading/error/empty states, lost-response retry, source review/listing, and owner
+grant/revoke. Native runtime/authority/upgrade assertions run in disposable SQL.
+These receipts establish prepared implementation, not production rollout, approved
+review policy, provider delivery or customer adoption.
 
 ## Start with tokens and atoms
 
@@ -926,3 +962,41 @@ Public attributed audit/AI-check components and email layouts consume the same
 presentation contract, retaining native identity without agency attribution.
 R23 remains open: this implements brand presentation, not an accepted decision
 to remove platform identity. See [#264 evidence and limits](../product/streams/a1-agency-brand.md).
+
+## Responsibility proof, October 7, 2026 (local)
+
+[ResponsibilityProof](../../src/experience/operations/ResponsibilityProof.tsx)
+composes Card, Button and SelectInput with a semantic list and Did / Verified
+pairs. Running and the agency Clients portfolio use the same receipt projection;
+portfolio proof is loaded only when the assigned provider opens its disclosure.
+Cadence uses the existing tenant report state and report transport. Google action
+receipts distinguish matched read-back, accepted but unverified, held and failed;
+a saved-source check never certifies the maintained responsibility. Review undo
+opens the existing Google receipt and undo review and is shown only for an actual reversible
+write. Loading, unavailable, empty, read-only and provider-only cadence states
+retain native semantics; an unconfirmed mutation requires a reload. The guarded
+`/preview/strelva/responsibilities` fixture exposes five mixed evidence states.
+Local 1280px and 390px observation proves layout and fictional proof only; it
+does not prove provider operation, email delivery or a maintained service promise.
+
+### Public business evidence
+
+`src/products/connected-sites/BusinessEvidence.tsx` renders the shared public
+verification receipt inside the business page's existing Section. Linkage and
+provider verification are separate states; unknown facts remain explicit. It
+uses foundation typography/spacing tokens, with long URLs and agency names
+wrapping. The doubly gated `/preview/strelva/agent-oauth?evidence=1` specimen
+provides fictional populated/empty desktop/mobile proof; the native route and
+JSON-LD contracts are covered by business-page/profile tests.
+
+### October 8 private native Version review follow-through
+
+`SystemVersionImprovements` reuses the owned Button and SelectInput for Inquiry
+pattern and FAQ preparation. Conflicts identify the customer content and local/
+source titles, not storage paths or raw JSON. Choosing content only stages the
+native draft and routes to this business's existing Needs you review; it never
+claims publication. Actual collaborative browser observation at1280px/390px
+confirmed the review link, honest staged state and no mobile horizontal overflow.
+These were fictional local data; native acceptance/readback and current-authority
+checks are separate PostgreSQL proof. Generic native-app approval remains distinct
+from Inquiry/website native publication. No new visual foundation was accepted.

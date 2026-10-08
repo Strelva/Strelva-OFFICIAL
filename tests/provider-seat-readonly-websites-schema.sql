@@ -30,11 +30,19 @@ select pg_temp.pw_expect($$select public.website_document_read_actor('5e181300-0
 select public.website_document_read_actor('5e181300-0000-4000-8000-000000000010',null,'5e181300-0000-4000-8000-000000000003','pw-staff@example.test',true,false);
 rollback;
 select pg_temp.pw_assert(not has_function_privilege(role,'public.website_document_read_actor(uuid,uuid,uuid,text,boolean,boolean)','execute'),'snapshot helper private to '||role) from (values ('anon'),('authenticated'),('service_role')) roles(role);
+-- Rehearse the older tail underneath the new package wrapper, then restore both.
+select to_regprocedure('public.system_read_scope_package_core(uuid,uuid,text,boolean)') is not null as package_reader_tail \gset
+\if :package_reader_tail
+\ir ../supabase/migrations/rollback-20261020090026_package_readonly_authority.sql
+\endif
 -- Rollback restores direct-membership-only snapshot behavior; final reapply is exact.
 \ir ../supabase/migrations/rollback-20261018130000_provider_seat_readonly_website_authority.sql
 select format('begin read only; set local role service_role; select pg_temp.psr_run(%L,true); rollback;',statement) from psr_cases \gexec
 \ir ../supabase/migrations/20261018130000_provider_seat_readonly_website_authority.sql
 \ir ../supabase/migrations/20261018130000_provider_seat_readonly_website_authority.sql
+\if :package_reader_tail
+\ir ../supabase/migrations/20261020090026_package_readonly_authority.sql
+\endif
 select pg_temp.pw_assert(not exists(
  (select * from psr_final except select p.oid::regprocedure::text,pg_get_functiondef(p.oid),p.proacl from pg_proc p where pronamespace='public'::regnamespace and prokind='f') union all
  (select p.oid::regprocedure::text,pg_get_functiondef(p.oid),p.proacl from pg_proc p where pronamespace='public'::regnamespace and prokind='f' except select * from psr_final)

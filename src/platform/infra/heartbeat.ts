@@ -32,6 +32,7 @@ export interface Heartbeat {
  * literal keys so the two stay in sync automatically.
  */
 const _CRON_SCHEDULE = {
+  "split-payouts": 26 * 3600, // daily, dry-run only
   maintenance: 26 * 3600, // daily
   "portfolio-scan": 26 * 3600, // daily
   staleness: 26 * 3600, // daily

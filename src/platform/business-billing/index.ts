@@ -15,6 +15,8 @@
  * STRELVA_BUSINESS_BILLING=1 turns the checkout metadata and webhook mirror
  * on. Off by default. Nothing here changes a price, amount, plan or card.
  */
+import { agencyInvoiceSchema } from "@/platform/agency-billing/types";
+import { workspacePlanByKey } from "@/platform/infra/billing-plans";
 import { z } from "zod";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { WorkspaceAccessError, WorkspaceStoreError } from "@/platform/workspaces/types";
@@ -28,6 +30,7 @@ export type BusinessBillingState = (typeof BUSINESS_BILLING_STATES)[number];
  * tenant checkout plans and charges stay unchanged. */
 export const WORKSPACE_SUBSCRIPTION_PLAN = Object.freeze({
   key: "workspace", billingState: "subscription", monthlyCents: null, stripePriceId: null, purchasable: false,
+  retail: workspacePlanByKey("workspace")!.retail, wholesale: workspacePlanByKey("workspace")!.wholesale,
 } as const);
 
 export function businessBillingEnabled(): boolean {
@@ -162,6 +165,7 @@ export const businessBillingSchema = z.object({
   workspaceId: z.string().uuid(), accountId: z.string().uuid(), state: z.enum(BUSINESS_BILLING_STATES),
   openItem: z.boolean(), paymentStatus: z.string(), monthlyCents: z.number().int().nonnegative(),
   planKey: z.string().nullable(), grandfatheredTerms: z.string().nullable(), paidThrough: z.string().nullable(),
+  payerParty: z.object({ kind: z.enum(["business", "agency"]), workspaceId: z.string().uuid(), name: z.string().nullable() }).optional(),
   payer: z.object({ email: z.string().email(), name: z.string().nullable().optional() }).passthrough().nullable(),
   sites: z.array(z.object({ tenantId: z.string(), siteName: z.string(), amountCents: z.number().int().nonnegative() })),
   sources: z.unknown(), paymentUpdatedAt: z.string().nullable(),
@@ -182,5 +186,26 @@ export async function readBusinessBilling(actor: WorkspaceActor, workspaceId: st
   if (result.data === null) return null;
   const parsed = businessBillingSchema.safeParse(result.data);
   if (!parsed.success) throw new WorkspaceStoreError("Business billing returned an invalid record.");
+  return parsed.data;
+}
+
+export const agencyBillingSchema = z.object({
+  workspaceId: z.string().uuid(), accountId: z.string().uuid(), name: z.string(), paymentStatus: z.string(),
+  clients: z.array(z.object({ workspaceId: z.string().uuid(), name: z.string(), state: z.enum(BUSINESS_BILLING_STATES),
+    paymentStatus: z.string(), lineState: z.enum(["active", "ended"]), monthlyCents: z.number().int().nonnegative().nullable(),
+    planKey: z.string().nullable(), endedAt: z.string().nullable(), invoices: z.array(agencyInvoiceSchema).optional() })),
+});
+export type AgencyBilling = z.infer<typeof agencyBillingSchema>;
+export async function readAgencyBilling(actor: WorkspaceActor, workspaceId: string, client: RpcDb | null = db()): Promise<AgencyBilling | null> {
+  if (!businessBillingEnabled()) return null;
+  if (!client) throw new WorkspaceStoreError("Agency billing is unavailable.");
+  const result = await client.rpc("read_agency_billing", { p_workspace_id: z.string().uuid().parse(workspaceId), p_user_id: actor.userId, p_verified_email: actor.verifiedEmail });
+  if (result.error) {
+    if (result.error.message?.includes("agency_billing_denied")) throw new WorkspaceAccessError();
+    throw new WorkspaceStoreError("Agency billing could not be loaded.");
+  }
+  if (result.data === null) return null;
+  const parsed = agencyBillingSchema.safeParse(result.data);
+  if (!parsed.success) throw new WorkspaceStoreError("Agency billing returned an invalid record.");
   return parsed.data;
 }

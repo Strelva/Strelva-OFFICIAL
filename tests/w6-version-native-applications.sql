@@ -20,6 +20,15 @@ insert into public.workspace_memberships(workspace_id,user_id,role,created_by) v
  ('bc630000-0000-4000-8000-000000000011','bc630000-0000-4000-8000-000000000001','admin','bc630000-0000-4000-8000-000000000002'),
  ('bc630000-0000-4000-8000-000000000011','bc630000-0000-4000-8000-000000000002','owner','bc630000-0000-4000-8000-000000000002');
 insert into public.super_admins(user_id,email) values ('bc630000-0000-4000-8000-000000000001','version-operator@example.test');
+-- On the current schema the platform operator role does not serve a client.
+-- Use the same chosen and staffed agency authority as an ordinary agency.
+do $$ begin
+ if to_regprocedure('public.acting_provider(uuid,uuid,text,text,text)') is not null then
+  perform public.choose_business_provider('bc630000-0000-4000-8000-000000000002','version-owner@example.test','bc630000-0000-4000-8000-000000000011','bc630000-0000-4000-8000-000000000010');
+  perform public.set_agency_client_staff('bc630000-0000-4000-8000-000000000001','version-operator@example.test','bc630000-0000-4000-8000-000000000010','bc630000-0000-4000-8000-000000000011','bc630000-0000-4000-8000-000000000001',true);
+ end if;
+end $$;
+
 create temporary table vn_source(id uuid);
 insert into vn_source select (public.create_system_version_source('bc630000-0000-4000-8000-000000000010','bc630000-0000-4000-8000-000000000001',
  'version-operator@example.test','{"name":"Source","kind":"internal_app"}','bc630000-0000-4000-8000-000000000020',repeat('a',64))->'system'->>'id')::uuid;

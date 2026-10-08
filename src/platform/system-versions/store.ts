@@ -2,6 +2,7 @@ import { cloneJson } from "./compare";
 import { systemKey, type SystemRef } from "./refs";
 import type { SourceRevision, SourceSystemRecord, VersionActor, VersionLineage } from "./types";
 import { VersionStaleError } from "./types";
+import type { RevisionQualification } from "./declaration";
 
 /**
  * Storage port for lineage. Every call names the actor so a Postgres adapter
@@ -28,6 +29,7 @@ export interface VersionStore {
   insertLineage(actor: VersionActor, lineage: VersionLineage): Promise<VersionLineage | void>;
   /** Compare-and-set on `rowRevision`. Returns the stored row when the adapter has it. */
   updateLineage(actor: VersionActor, lineage: VersionLineage, expectedRowRevision: number): Promise<VersionLineage | void>;
+  recordQualification?(actor: VersionActor, qualification: RevisionQualification): Promise<RevisionQualification>;
 }
 
 /** Who owns a live connection. Lane-owned elsewhere; this is the port. */
@@ -39,12 +41,15 @@ export function createInMemoryVersionStore(): VersionStore {
   const sources = new Map<string, SourceSystemRecord>();
   const revisions = new Map<string, SourceRevision[]>();
   const lineages = new Map<string, VersionLineage>();
+  const qualifications = new Map<string, RevisionQualification>();
+  function qualified(revision: SourceRevision): SourceRevision { return { ...cloneJson(revision), ...(qualifications.has(revision.source.revisionId) ? { qualification: cloneJson(qualifications.get(revision.source.revisionId)!) } : {}) }; }
   return {
     getSource: async (_actor, source) => cloneJson(sources.get(systemKey(source)) ?? null),
     putSource: async (_actor, record) => void sources.set(systemKey(record.source), cloneJson(record)),
     getRevision: async (_actor, source, revision) =>
-      cloneJson((revisions.get(systemKey(source)) ?? []).find((item) => item.source.number === revision) ?? null),
-    listRevisions: async (_actor, source) => cloneJson(revisions.get(systemKey(source)) ?? []),
+      ((item) => item ? qualified(item) : null)((revisions.get(systemKey(source)) ?? []).find((item) => item.source.number === revision)),
+    listRevisions: async (_actor, source) => (revisions.get(systemKey(source)) ?? []).map(qualified),
+    recordQualification: async (_actor, qualification) => { qualifications.set(qualification.revisionId, cloneJson(qualification)); return cloneJson(qualification); },
     async insertRevision(_actor, revision) {
       const list = revisions.get(systemKey(revision.source)) ?? [];
       if (list.some((item) => item.source.number === revision.source.number)) {

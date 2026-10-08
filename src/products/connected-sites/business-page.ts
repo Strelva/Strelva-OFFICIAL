@@ -108,5 +108,13 @@ export function businessFactSheet(facts: PublicFacts, pageUrl: string): string {
     lines.push("", "## Elsewhere", "");
     for (const link of facts.social_links) lines.push(`- ${link}`);
   }
+  if (facts.verification) {
+    lines.push("", "## Business evidence", "");
+    add("Domain control", facts.verification.domain.verified ? `Confirmed: ${facts.verification.domain.url}` : "Not confirmed");
+    add("Google Business Profile", facts.verification.googleBusinessProfile.linked ? "Linked; provider verification status unknown" : "No confirmed linked profile");
+    add("Owner-confirmed facts", String(facts.verification.ownerConfirmedFactCount));
+    if (facts.verification.lastConfirmedAt) add("Last confirmed", facts.verification.lastConfirmedAt);
+    if (facts.verification.operatingAgencies.length) add("Operating agency", facts.verification.operatingAgencies.map(a=>a.name).join(", "));
+  }
   return `${lines.join("\n")}\n`;
 }

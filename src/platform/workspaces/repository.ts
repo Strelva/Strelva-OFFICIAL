@@ -343,7 +343,17 @@ async function assignedAgencyWorkAccess(userId: string, verifiedEmail: string, w
     p_work_id: workId,
   });
   if (error) workspaceDbFailure(error, "Assigned work access is unavailable");
-  return data === true;
+  if (data === true) return true;
+  // An owner-selected package grant permits only its exact installed work;
+  // this read does not create customer membership or native write authority.
+  const packageRead = await rpc.rpc("agency_can_read_package_work", {
+    p_workspace_id: workspaceId,
+    p_user_id: userId,
+    p_verified_email: verifiedEmail,
+    p_work_id: workId,
+  });
+  if (packageRead.error) workspaceDbFailure(packageRead.error, "Package work access is unavailable");
+  return packageRead.data === true;
 }
 
 /**

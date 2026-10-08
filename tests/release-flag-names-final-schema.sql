@@ -14,6 +14,9 @@ declare
     'publishing_record_google_policy', 'systems', 'website_rebuild'];
   actual text[] := (select array_agg(key order by key) from unnest(public.workspace_release_flag_names()) key);
 begin
+  if to_regclass('public.agent_channel_consents') is not null then
+    select array_agg(key order by key) into expected from unnest(expected||array['agent_channel']) key;
+  end if;
   if actual is distinct from expected then
     raise exception 'release flag allowlist drifted: expected %, got %', expected, actual;
   end if;

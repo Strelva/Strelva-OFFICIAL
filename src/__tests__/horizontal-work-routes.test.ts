@@ -28,6 +28,7 @@ function databaseBoundary() {
     acting_provider_staff: [{ user_id: owner.id, revoked_at: null }],
     saved_product_work: [], workspace_delegations: [], operational_assignments: [], offering_provider_deliveries: [], offering_installations: [], standing_responsibility_jobs: [], standing_responsibility_runs: [], application_states: [], application_releases: [], application_records: [], job_economics: [], job_economics_usage: [], job_economics_reservations: [], job_economics_executions: [],
   };
+  const packageReads = new Set<string>();
   let rpcError: string | null = null;
   let lostCommitResponse: string | null = null;
   function touchApplication(workId: string, actorId: string, kind: string, patch: Row) {
@@ -91,6 +92,8 @@ function databaseBoundary() {
   }
   return {
     tables,
+    allowPackageRead(userId: string, workId: string) { packageReads.add(`${userId}:${workId}`); },
+    revokePackageRead(userId: string, workId: string) { packageReads.delete(`${userId}:${workId}`); },
     loseResponseAfterCommit(name: string) { lostCommitResponse = name; },
     failNextCommit(message: string) { rpcError = message; },
     from,
@@ -172,6 +175,7 @@ function databaseBoundary() {
         touchApplication(String(args.p_work_id), String(args.p_user_id), "retire", { status: "retired" });
         return { data: [structuredClone(state)], error: null };
       }
+      if (name === "agency_can_read_package_work") return { data: args.p_workspace_id === workspaceId && packageReads.has(`${String(args.p_user_id)}:${String(args.p_work_id)}`), error: null };
       if (name === "agency_can_read_assigned_work") {
         const assignment = tables.operational_assignments!.find((row) => row.workspace_id === args.p_workspace_id
           && row.assignee_user_id === args.p_user_id && row.assignee_kind === "agency" && row.status === "accepted");
@@ -315,6 +319,19 @@ describe("horizontal work HTTP authority and execution", () => {
     expect((await getOperations(read("operations", work.id))).status).toBe(403);
     expect((await postBounded(post("bounded-work", { action: "command", productId: "applications", workId: app.id, command: { kind: "retire", expectedRevision: 0 } }))).status).toBe(403);
     expect((await postOperations(post("operations", { action: "run", workId: work.id }))).status).toBe(403);
+  });
+
+  it("reads only a package's named installed draft while keeping native writes denied", async () => {
+    const app = await createApplication();
+    const other = await createApplication();
+    database.allowPackageRead(agency.id, app.id);
+    boundary.session.mockResolvedValue(agency);
+    expect((await getBounded(read("bounded-work", app.id))).status).toBe(200);
+    expect((await getBounded(read("bounded-work", other.id))).status).toBe(403);
+    expect((await postBounded(post("bounded-work", { action: "command", productId: "applications", workId: app.id, command: { kind: "retire", expectedRevision: 0 } }))).status).toBe(403);
+    expect(database.tables.workspace_memberships.some(row => row.user_id === agency.id && row.workspace_id === workspaceId)).toBe(false);
+    database.revokePackageRead(agency.id, app.id);
+    expect((await getBounded(read("bounded-work", app.id))).status).toBe(403);
   });
 
   it("requires a live exact agency assignment for native work reads", async () => {

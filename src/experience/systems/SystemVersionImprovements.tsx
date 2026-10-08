@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
+import {versionPreparationResultReceiptSchema,nativeVersionConflictSchema} from "@/platform/system-versions/native-preparation-contracts";
 import { Button } from "@/components/ui/Button";
 import { SelectInput, TextArea } from "@/components/ui/TextInput";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
@@ -21,12 +22,20 @@ const pendingReleaseSchema = z.object({ id: z.string(), system: systemRef, title
   makeReal: z.object({ kind: z.literal("version_release"), versionId: uuid }),
 });
 const viewSchema = z.object({ workspaceId: uuid, systemId: uuid, versionId: uuid, rowRevision: z.number().int().positive(),
+  nativeRuntime:z.object({kind:z.enum(["inquiry_pattern","website_section"])}).passthrough().nullable().optional(),
   canManage: z.boolean(), canMakeReal: z.boolean(), possibilities: z.array(possibilitySchema), pendingRelease: pendingReleaseSchema.nullable() }).passthrough();
-const receiptSchema = z.object({ receiptId: uuid, decisionId: uuid, workspaceId: uuid, versionId: uuid, rowRevision: z.number().int().positive() }).strict();
-const resultSchema = z.object({ outcome: z.enum(["prepared", "declined"]), rowRevision: z.number().int().positive(), receipt: receiptSchema.nullable() }).strict();
+const receiptSchema=versionPreparationResultReceiptSchema;
+const resultSchema = z.object({ outcome: z.enum(["prepared", "declined","conflicted"]), rowRevision: z.number().int().positive(), receipt: receiptSchema.nullable(),conflict:nativeVersionConflictSchema.optional() }).strict();
 type View = z.infer<typeof viewSchema>;
 function errorMessage(value: unknown, fallback: string) { return value && typeof value === "object" && "error" in value && typeof value.error === "string" ? value.error : fallback; }
 function valueLabel(value: unknown) { return value === undefined ? "Removed" : typeof value === "string" ? value : JSON.stringify(value); }
+function nativeValueLabel(value: unknown) {
+  if (value === null || value === undefined) return "Removed";
+  if (typeof value === "string") return value;
+  if (typeof value === "object" && "title" in value && typeof value.title === "string") return value.title;
+  if (typeof value === "object" && "name" in value && typeof value.name === "string") return value.name;
+  return "Changed content";
+}
 
 /** Reuses the real app renderer with component-local records only. A source
  * definition never supplies a maintenance owner, records or network transport. */
@@ -40,10 +49,11 @@ function VersionAlternative({ definition, label }: { definition: Record<string, 
 /** These are Version candidates in the normal Possibilities panel. Make real
  * uses the same pinned Needs you item; it never publishes or creates a second
  * approval, activation, release path or message. */
-export function SystemVersionImprovements({ workspaceId, systemId, versionId, readOnly, canMakeReal = true, onCount }: {
+function ScopedSystemVersionImprovements({ workspaceId, systemId, versionId, readOnly, canMakeReal = true, onCount }: {
   workspaceId: string; systemId: string; versionId: string; readOnly: boolean; canMakeReal?: boolean; onCount?: (count: number) => void;
 }) {
   const request = useWorkspaceRequest();
+  const [nativeConflict,setNativeConflict]=useState<z.infer<typeof nativeVersionConflictSchema>|null>(null),[nativeChoices,setNativeChoices]=useState<Record<string,"local"|"source">>({});
   const [attempt, setAttempt] = useState(0);
   const [view, setView] = useState<View | null>(null);
   const [error, setError] = useState("");
@@ -80,9 +90,10 @@ export function SystemVersionImprovements({ workspaceId, systemId, versionId, re
   async function prepare(action: "adopt" | "decline" | "prepare_release") {
     if (!view || readOnly || !view.canManage || inFlight.current || success) return;
     const resolutions = offer?.conflicts.map(conflict => ({ path: conflict.path, choice: choices[conflict.path] })) ?? [];
+    if(nativeConflict&&action==="prepare_release"&&nativeConflict.conflicts.some(c=>!nativeChoices[c.path]))return;
     if (!pending.current && (action === "adopt" ? !offer || offer.missingAccounts.length > 0 || resolutions.some(item => !item.choice) : action === "decline" ? !reason.trim() : !view.pendingRelease)) return;
     pending.current ??= { action, expectedRevision: view.rowRevision + (action === "prepare_release" ? 0 : 1), body: JSON.stringify({ workspaceId, systemId, versionId, rowRevision: view.rowRevision, action,
-      ...(action === "prepare_release" ? {} : { revision: offer!.sourceRevision, ...(action === "adopt" ? { resolutions } : { reason: reason.trim() }) }) }) };
+      ...(action === "prepare_release" ? nativeConflict ? {nativeResolutions:nativeConflict.conflicts.map(c=>({path:c.path,choice:nativeChoices[c.path]}))} : {} : { revision: offer!.sourceRevision, ...(action === "adopt" ? { resolutions } : { reason: reason.trim() }) }) }) };
     inFlight.current = true; setBusy(true); setError("");
     try {
       const response = await request(pending.current.action === "prepare_release" ? "/api/workspace/versions/manage" : "/api/workspace/versions", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: pending.current.body });
@@ -91,8 +102,11 @@ export function SystemVersionImprovements({ workspaceId, systemId, versionId, re
       const checked = resultSchema.safeParse(data);
       if (!checked.success) throw new Error("The decision receipt could not be confirmed. Retry the same choice.");
       const result = checked.data;
-      if (result.outcome !== (pending.current.action === "decline" ? "declined" : "prepared") || result.rowRevision !== pending.current.expectedRevision
+      if ((result.outcome !== (pending.current.action === "decline" ? "declined" : "prepared")&&!(pending.current.action!=="decline"&&result.outcome==="conflicted")) || (result.rowRevision !== pending.current.expectedRevision&&!(result.receipt&&"kind" in result.receipt&&result.rowRevision===pending.current.expectedRevision+1))
         || (result.receipt && (result.receipt.workspaceId !== workspaceId || result.receipt.versionId !== versionId || result.receipt.rowRevision !== result.rowRevision))) throw new Error("The decision receipt could not be confirmed. Retry the same choice.");
+      if(result.conflict&&(result.conflict.workspaceId!==workspaceId||result.conflict.versionId!==versionId||result.conflict.rowRevision!==result.rowRevision))throw new Error("Native conflicts returned for another Version.");
+      setNativeConflict(result.conflict??null);setNativeChoices({});
+      if(result.conflict){pending.current=null;setSuccess("");setAttempt(v=>v+1);return;}
       setPrepared(result.receipt);
       setSuccess(result.outcome === "declined" ? "This improvement was declined. The current release stays in place."
         : result.receipt ? "Ready for review. Nothing went live." : "The draft already matches the current release. No release decision was needed.");
@@ -102,7 +116,7 @@ export function SystemVersionImprovements({ workspaceId, systemId, versionId, re
   }
 
   async function makeReal() {
-    if (!view || !allowed || inFlight.current || released || (!prepared && !view.pendingRelease)) return;
+    if (!view || !allowed || inFlight.current || released || (!prepared && !view.pendingRelease) || (prepared && "kind" in prepared)) return;
     inFlight.current = true; setBusy(true); setError("");
     try {
       if (!approval.current) {
@@ -114,7 +128,7 @@ export function SystemVersionImprovements({ workspaceId, systemId, versionId, re
         const needs = checked.data;
         if (needs.role !== "owner" || needs.items.some(item => item.workspaceId !== workspaceId)) throw new Error("Only this business's owner can make this Version real.");
         const item = needs.items.find(item => item.systemId === systemId && item.sourceLifecycle === "version_release" && item.sourceId === versionId && item.state === "open"
-          && (prepared ? item.id === prepared.decisionId : item.revisionHash === view.pendingRelease!.decisionRevision));
+          && (prepared ? item.id === ("decisionId" in prepared ? prepared.decisionId : "") : item.revisionHash === view.pendingRelease!.decisionRevision));
         if (!item) throw new Error("This release decision is no longer open for this draft. Reload before making it real.");
         approval.current = { itemId: item.id, revision: item.revisionHash };
       }
@@ -151,10 +165,13 @@ export function SystemVersionImprovements({ workspaceId, systemId, versionId, re
       <p><strong>{prepared ? "Prepared Version improvement" : view?.pendingRelease?.title}</strong> · Ready</p>
       {view?.pendingRelease && (!prepared || prepared.rowRevision === view.pendingRelease.rowRevision) ? <details><summary>Compare the release and alternative</summary><p className="my-3">Current release</p><VersionAlternative definition={view.pendingRelease.current} label="Current release preview" /><p className="my-3">Alternative</p><VersionAlternative definition={view.pendingRelease.preview} label="Prepared alternative preview" /></details> : prepared ? <p role="status">Reading the prepared alternative…</p> : null}
       <p>This changes only this business&apos;s System. Records and accounts stay here.</p>
-      {!readOnly && view?.canManage && !prepared ? <Button size="lg" variant="secondary" disabled={busy || Boolean(pending.current) || Boolean(success)} onClick={() => void prepare("prepare_release")}>Prepare this alternative for review</Button> : null}
-      <Button size="lg" disabled={!allowed || busy} loading={busy} onClick={() => void makeReal()}>{approval.current ? "Retry Make real" : "Make real"}</Button>
+      {!readOnly && view?.canManage && !prepared && !view.nativeRuntime ? <Button size="lg" variant="secondary" disabled={busy || Boolean(pending.current) || Boolean(success)} onClick={() => void prepare("prepare_release")}>Prepare this alternative for review</Button> : null}
+      {prepared && "kind" in prepared ? <a className="inline-flex min-h-11 items-center text-brand underline" href={prepared.reviewHref}>Review in this business’s Needs you</a> : <Button size="lg" disabled={!allowed || busy} loading={busy} onClick={() => void (view?.nativeRuntime ? prepare("prepare_release") : makeReal())}>{view?.nativeRuntime ? "Prepare native draft for review" : approval.current ? "Retry Make real" : "Make real"}</Button>}
       {!allowed ? <p className="text-gray-muted">Only this business&apos;s owner can make it real. An admin can prepare it for review.</p> : null}
     </div> : null}
+    {nativeConflict ? <div className="space-y-3"><p>Local work overlaps this source update. Choose what to keep; nothing went live.</p>{nativeConflict.conflicts.map(c=><div key={c.path}><p className="break-words">{nativeConflict.nativeKind === "website_section" ? "FAQ section" : "Inquiry pattern"}</p><p className="break-words">Local: {nativeValueLabel(c.local)} · Source: {nativeValueLabel(c.source)}</p><SelectInput label="Choose which content to keep" value={nativeChoices[c.path]??""} options={[{value:"",label:"Choose what to keep"},{value:"local",label:"Keep local"},{value:"source",label:"Use source"}]} onChange={e=>setNativeChoices(current=>({...current,[c.path]:e.target.value as "local"|"source"}))}/></div>)}<Button size="lg" disabled={busy||nativeConflict.conflicts.some(c=>!nativeChoices[c.path])} onClick={()=>void prepare("prepare_release")}>Stage the chosen native draft</Button></div>:null}
     {success ? <p role="status">{success}</p> : null}
   </div>;
 }
+
+export function SystemVersionImprovements(props:Parameters<typeof ScopedSystemVersionImprovements>[0]){return <ScopedSystemVersionImprovements key={`${props.workspaceId}:${props.systemId}:${props.versionId}`} {...props}/>;}

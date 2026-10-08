@@ -1,0 +1,3 @@
+import {connectEnabled,moneyRpc,type RpcDb,connectDb} from "./index";
+import type {WorkspaceActor} from "@/platform/workspaces/types";
+export async function readBusinessMoney(actor:WorkspaceActor,workspaceId:string,db:RpcDb|null=connectDb()){if(!connectEnabled())return null;return moneyRpc<{account:{state:string}|null;payments:Array<{id:string;amount_cents:number;currency:string;purpose:string}>;events:Array<{payment_id:string;kind:string;amount_cents:number}>;splits:unknown[];payouts:unknown[]}>("read_business_money",{p_workspace_id:workspaceId,p_user_id:actor.userId,p_verified_email:actor.verifiedEmail},db);}

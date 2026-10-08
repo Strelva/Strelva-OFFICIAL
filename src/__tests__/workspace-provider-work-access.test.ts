@@ -44,6 +44,7 @@ vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ from: query
         && staff.customer_workspace_id === seat.customer_workspace_id && staff.user_id === args.p_user_id && staff.status === "active"));
     return { data: { userId: args.p_user_id, memberships: seats.map(seat => ({ businessId: seat.customer_workspace_id, role: "admin", via: "provider_seat" })) }, error: null };
   }
+  if (name === "agency_can_read_package_work") return { data: false, error: null };
   if (name === "agency_can_read_assigned_work") return { data: false, error: null };
   if (name === "save_workspace_work") {
     if (fixture.revokedBeforeWrite) return { data: null, error: { message: "workspace_membership_required" } };

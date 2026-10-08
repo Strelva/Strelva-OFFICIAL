@@ -504,3 +504,6 @@ export async function rehearseApplicationCandidateForAssignment(
   }, "The application candidate could not be rehearsed.");
   return readWorkspaceApplication(actor, workId);
 }
+
+/** Pure isolated adapter used by creator source qualification. */
+export { rehearseApplicationPackage } from "./package-rehearsal";

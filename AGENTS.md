@@ -176,6 +176,13 @@ source-site transport. A passing local run is never proof of hosted delivery.
 [docs/operations/testing-and-ci.md](./docs/operations/testing-and-ci.md) explains when Redis,
 Postgres, or bypass mode changes what a green run means.
 
+The private money/apps integration adds native contracts to both SQL runners via
+`scripts/sql/money-apps-contracts.sh`; keep its ordered payer/Connect/native
+fixtures and public-key/read-only checks. See
+[the prepared handoff](./docs/operations/money-apps-prepared-2026-10-07.md) for
+current gates. The optional Sandbox adapter does not authorize installing its SDK,
+changing resource limits, enabling custom apps or using a paid provider.
+
 ## Done means proven
 
 - Code: the test that covers the change, plus `pnpm typecheck`.

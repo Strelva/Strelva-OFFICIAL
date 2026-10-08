@@ -72,6 +72,7 @@ tail_started=0
 early_lead_migration="20261005090000_tenant_leads.sql"
 for migration in $(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sql' | sort); do
   migration_name="$(basename "$migration")"
+  if [[ "$migration_name" == 20261020* ]]; then continue; fi
   if [[ "$tail_started" -eq 0 ]]; then
     if [[ "$migration_name" != "$upgrade_migration" ]]; then
       continue
@@ -181,6 +182,15 @@ SQL
     printf 'Valid index retry passed; incompatible index was rejected.\n'
   fi
 done
+# Focused money contracts use the exact complete upgrade path before historical tests.
+if [[ "${STRELVA_CONNECT_SQL_ONLY:-0}" == "1" ]]; then
+  for money_apps_migration in "$repo_root"/supabase/migrations/20261020*.sql; do psql "${psql_args[@]}" --file="$money_apps_migration" >/dev/null; done
+  psql "${psql_args[@]}" --file="$repo_root/tests/connect-money-schema.sql"
+  source "$repo_root/scripts/connect-money-concurrency.sh"
+  printf 'Connect money contracts passed against the complete historical upgrade.\n'
+  exit 0
+fi
+
 
 if [[ "$tail_started" -ne 1 ]]; then
   printf 'Workspace/recovery migration boundary was not found.\n' >&2
@@ -470,3 +480,11 @@ node --test "$repo_root/scripts/tests/readonly-rpcs.node-test.mjs"
 # Legacy calendar row-existence compatibility and receipt-preserving rollback.
 psql "${psql_args[@]}" --file="$repo_root/tests/legacy-calendar-revoke-result-schema.sql"
 bash "$repo_root/scripts/check-reader-writer-locks.sh" "postgresql:///postgres?host=$cluster_socket&port=$cluster_port"
+
+# #601: combined contracts preserve current authority after the historical rehearsal.
+for money_apps_migration in "$repo_root"/supabase/migrations/20261020*.sql; do
+  psql "${psql_args[@]}" --file="$money_apps_migration" >/dev/null
+done
+source "$repo_root/scripts/sql/money-apps-contracts.sh"
+check_money_apps_contracts
+printf 'Combined money/apps contracts passed after the current security/upgrade proof.\n'

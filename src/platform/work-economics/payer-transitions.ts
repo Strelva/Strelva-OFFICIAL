@@ -12,6 +12,7 @@ export type PayerTransition = {
   id: string;
   workspaceId: string;
   successorKind: PayerSuccessorKind;
+  canRespond: boolean;
   /** Empty unless the successor is a person. */
   successorUserId: string;
   successorEmail: string;
@@ -69,7 +70,7 @@ function map(row: Record<string, unknown>): PayerTransition {
   const string = (name: string) => typeof row[name] === "string" ? row[name] as string : "";
   const kind = string("successor_kind");
   return {
-    id: string("id"), workspaceId: string("workspace_id"),
+    id: string("id"), workspaceId: string("workspace_id"), canRespond: row.can_respond === true,
     successorKind: kind === "agency" || kind === "business" ? kind : "user",
     successorUserId: string("successor_user_id"), successorEmail: string("successor_email"),
     successorWorkspaceId: typeof row.successor_workspace_id === "string" ? row.successor_workspace_id : null,

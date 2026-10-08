@@ -89,6 +89,9 @@ const PUBLIC_EXACT = new Set([
   // The public agent channel: reads and confirmation-gated holds only, behind
   // STRELVA_BOOKING_AGENTS. Owner/agency MCP paths stay session-gated (#302).
   "/api/mcp/public",
+  "/api/mcp/oauth/token",
+  "/api/mcp/oauth/authorize",
+  "/api/mcp/oauth/revoke",
 ]);
 // Prefix public paths (the old `/foo(.*)` patterns — literal-prefix match, so
 // `/sign-in`, `/sign-in/x`, `/sign-integration` are all public, matching Clerk).

@@ -10,6 +10,7 @@ import {
   type JsonValue,
 } from "./compare";
 import { sameSystem, type SystemRef, type SystemRevisionRef } from "./refs";
+import { assertPackageDeclaration, automatedRevisionQualification, effectivePackageBehavior, isRevisionQualified, type PackageDeclaration, type PackageRehearsalReceipt } from "./declaration";
 import type { ConnectionOwnership, VersionStore } from "./store";
 import {
   VERSION_CONTEXT_KINDS,
@@ -35,6 +36,7 @@ export interface SystemVersionsDeps {
   connections: ConnectionOwnership;
   now?: () => string;
   id?: (prefix: string) => string;
+  rehearsePackage?: (revision: SourceRevision) => PackageRehearsalReceipt;
 }
 
 function overlaps(left: string, right: string): boolean {
@@ -74,26 +76,27 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
     return actor.memberships.find((membership) => membership.businessId === businessId)?.role ?? null;
   }
 
-  function requireManage(actor: VersionActor, businessId: string): void {
+  function requireManage(actor: VersionActor, businessId: string, systemId?: string): void {
     const role = roleIn(actor, businessId);
-    if (role !== "owner" && role !== "admin") throw new VersionAccessError();
+    if (role !== "owner" && role !== "admin" && !actor.delegatedSystems?.some(scope => scope.businessId === businessId && scope.systemId === systemId && scope.canWrite)) throw new VersionAccessError();
   }
 
-  function requireMember(actor: VersionActor, businessId: string): void {
-    if (!roleIn(actor, businessId)) throw new VersionAccessError();
+  function requireMember(actor: VersionActor, businessId: string, systemId?: string): void {
+    if (!roleIn(actor, businessId) && !actor.delegatedSystems?.some(scope => scope.businessId === businessId && scope.systemId === systemId)) throw new VersionAccessError();
   }
 
   async function sourceVisibleTo(actor: VersionActor, source: SystemRef, businessId: string): Promise<boolean> {
     if (source.businessId === businessId) return true;
-    return (await store.getSource(actor, source))?.sharedWith.includes(businessId) ?? false;
+    const record = await store.getSource(actor, source);
+    return record?.listingState === "listed" || record?.availableTo?.includes(businessId) || record?.sharedWith.includes(businessId) || false;
   }
 
   async function loadOwned(actor: VersionActor, versionId: string, manage: boolean): Promise<VersionLineage> {
     const lineage = await store.getLineage(actor, versionId);
     // Same error for missing and forbidden so IDs cannot be probed.
     if (!lineage) throw new VersionAccessError();
-    if (manage) requireManage(actor, lineage.version.businessId);
-    else requireMember(actor, lineage.version.businessId);
+    if (manage) requireManage(actor, lineage.version.businessId, lineage.version.systemId);
+    else requireMember(actor, lineage.version.businessId, lineage.version.systemId);
     return lineage;
   }
 
@@ -107,7 +110,15 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
     return applyOverrides(lineage.baseline.definition, lineage.overrides);
   }
 
+  function componentRevision(lineage:VersionLineage,revision:SourceRevision):SourceRevision {
+    if(!lineage.sourceComponentKey)return revision;
+    const definition=revision.definition.systems;
+    const part=Array.isArray(definition)?definition.find(item=>item&&typeof item==="object"&&!Array.isArray(item)&&item.key===lineage.sourceComponentKey):undefined;
+    if(!part||typeof part!=="object"||Array.isArray(part)||!part.definition||typeof part.definition!=="object"||Array.isArray(part.definition))throw new VersionValidationError("This bundle component was removed from the source. Keep the current draft and review the source.");
+    return {...revision,definition:part.definition};
+  }
   function compareWith(lineage: VersionLineage, revision: SourceRevision): ImprovementComparison & { upstreamPaths: string[] } {
+    revision=componentRevision(lineage,revision);
     const local = working(lineage);
     if (revision.source.number <= lineage.baseline.revision) {
       return {
@@ -152,14 +163,15 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
     if (!(await sourceVisibleTo(actor, lineage.source, lineage.version.businessId))) throw new VersionAccessError("The source of this Version is no longer shared with this business.");
     const revision = await store.getRevision(actor, lineage.source, revisionNumber);
     if (!revision) throw new VersionValidationError("That source revision does not exist.");
-    return revision;
+    if (revision.declaration && !isRevisionQualified(revision)) throw new VersionValidationError("That exact source revision has not passed qualification and human review.");
+    return componentRevision(lineage,revision);
   }
 
   return {
     /** Author side: publish an immutable shareable revision of a source System. */
     async publishSourceRevision(
       actor: VersionActor,
-      input: { source: SystemRef; definition: JsonObject; requires?: { bindingKinds: string[] }; summary: string; label?: string },
+      input: { source: SystemRef; definition: JsonObject; requires?: { bindingKinds: string[] }; summary: string; label?: string; declaration?: PackageDeclaration },
     ): Promise<SourceRevision> {
       requireManage(actor, input.source.businessId);
       assertShareableDefinition(input.definition);
@@ -178,8 +190,12 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
         requires: { bindingKinds: [...new Set(input.requires?.bindingKinds ?? [])].sort() },
         publishedBy: actor.userId,
         publishedAt: now(),
+        creatorWorkspaceId: input.source.businessId,
+        ...(input.definition.kind === "internal_app" || input.definition.kind === "bundle" ? { declaration: input.declaration ?? effectivePackageBehavior(input.definition, input.requires?.bindingKinds) } : {}),
       };
+      if (revision.declaration) assertPackageDeclaration(revision.definition, revision.declaration, revision.requires.bindingKinds);
       const stored = await store.insertRevision(actor, revision);
+      if (revision.declaration && store.recordQualification) await store.recordQualification(actor, automatedRevisionQualification(stored ?? revision, previous, deps.rehearsePackage?.(stored ?? revision)));
       return cloneJson(stored ?? revision);
     },
 
@@ -206,7 +222,7 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
      * people start empty and are chosen locally.
      */
     async createVersion(actor: VersionActor, input: { source: SystemRevisionRef; version: SystemRef; context: VersionContext }): Promise<VersionLineage> {
-      requireManage(actor, input.version.businessId);
+      requireManage(actor, input.version.businessId, input.version.systemId);
       if (sameSystem(input.source, input.version)) throw new VersionValidationError("A Version needs its own System identity.");
       if (!VERSION_CONTEXT_KINDS.includes(input.context.kind)) throw new VersionValidationError("Choose a supported Version context.");
       if (!(await sourceVisibleTo(actor, input.source, input.version.businessId))) throw new VersionAccessError("That source is not shared with this business.");
@@ -214,12 +230,15 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
       if (!revision || revision.source.revisionId !== input.source.revisionId) {
         throw new VersionValidationError("That source revision does not exist.");
       }
+      if (input.source.businessId !== input.version.businessId && revision.declaration && !isRevisionQualified(revision)) throw new VersionValidationError("This revision needs qualification and human review before another business can install it.");
       if (await store.findLineageByVersion(actor, input.version)) throw new VersionValidationError("That System is already a Version of a source.");
       const at = now();
       const lineage: VersionLineage = {
         id: id("version"),
         version: { businessId: input.version.businessId, systemId: input.version.systemId },
         source: { businessId: input.source.businessId, systemId: input.source.systemId },
+        creatorWorkspaceId: revision.creatorWorkspaceId ?? input.source.businessId,
+        sourceRevisionId: revision.source.revisionId,
         context: { kind: input.context.kind, label: text(input.context.label, "context label") },
         baseline: { revision: revision.source.number, definition: cloneJson(revision.definition) },
         overrides: [],
@@ -330,7 +349,7 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
       const lineage = await loadOwned(actor, versionId, false);
       if (!(await sourceVisibleTo(actor, lineage.source, lineage.version.businessId))) return [];
       return (await store.listRevisions(actor, lineage.source))
-        .filter((revision) => revision.source.number > lineage.baseline.revision)
+        .filter((revision) => revision.source.number > lineage.baseline.revision && (!revision.declaration || isRevisionQualified(revision)))
         .map((revision) => {
           const { upstreamPaths: _paths, ...comparison } = compareWith(lineage, revision);
           return comparison;
@@ -424,6 +443,11 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
       const lineage = await loadOwned(actor, versionId, true);
       if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
       const definition = working(lineage);
+      const baseline = await store.getRevision(actor, lineage.source, lineage.baseline.revision);
+      if (baseline?.declaration) {
+        if (!isRevisionQualified(baseline)) throw new VersionValidationError("This exact revision needs qualification and human review before release.");
+        assertPackageDeclaration(definition, baseline.declaration, baseline.requires.bindingKinds);
+      }
       const latest = lineage.releases.at(-1);
       if (latest && jsonEqual(latest.definition, definition)) throw new VersionValidationError("Nothing changed since the current release.");
       const number = (latest?.number ?? 0) + 1;
@@ -481,7 +505,7 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
         currentRelease: lineage.currentRelease,
         decisions: lineage.decisions,
       };
-      if (roleIn(actor, lineage.version.businessId)) {
+      if (roleIn(actor, lineage.version.businessId) || actor.delegatedSystems?.some(scope => scope.businessId === lineage.version.businessId && scope.systemId === lineage.version.systemId)) {
         return cloneJson({ ...base, access: "owner" as const, bindings: lineage.bindings, localData: lineage.localData, grants: lineage.grants });
       }
       const mine = new Set(actor.memberships.map((membership) => membership.businessId));

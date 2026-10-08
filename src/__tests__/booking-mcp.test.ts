@@ -40,8 +40,8 @@ describe("bounded booking MCP transport", () => {
     const response = await call("tools/list");
     expect(response.headers.get("cache-control")).toBe("no-store");
     const body = await response.json();
-    expect(body.result.tools.map((tool: { name: string }) => tool.name)).toEqual(["list_services", "find_slots", "request_booking", "get_booking_status"]);
-    expect(body.result.tools[2].description).toContain("Only the customer email can confirm");
+    expect(body.result.tools.map((tool: { name: string }) => tool.name)).toEqual(["get_policies", "send_inquiry", "request_quote", "get_status", "list_services", "find_slots", "request_booking", "get_booking_status"]);
+    expect(body.result.tools.find((t: { name: string }) => t.name === "request_booking").description).toContain("Only the customer email can confirm");
     expect(ports.request).not.toHaveBeenCalled();
   });
 

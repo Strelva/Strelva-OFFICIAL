@@ -80,7 +80,7 @@ select pg_temp.bb_assert(pg_temp.bb_billing('bb-gldf')->>'state' = 'grandfathere
 select pg_temp.bb_assert(pg_temp.bb_billing('bb-none')->>'state' = 'none' and (pg_temp.bb_billing('bb-none')->>'openItem')::boolean, 'none is the open item');
 select pg_temp.bb_assert(pg_temp.bb_billing('bb-null')->>'state' = 'none', 'no billing recorded -> none');
 select pg_temp.bb_assert(not (pg_temp.bb_billing('bb-tier')->>'openItem')::boolean, 'configured billing is not an open item');
-select pg_temp.bb_assert((select count(*) from public.accounts where workspace_id is not null) = 7, 'one billing row per business');
+select pg_temp.bb_assert((select count(*) from public.accounts a join public.workspaces w on w.id=a.workspace_id and w.kind='customer' where a.workspace_id in (select l.workspace_id from public.tenant_workspace_links l join public.tenants t on t.stable_id=l.tenant_stable_id where t.id like 'bb-%')) = 7, 'one billing row per business');
 
 -- The payer is the owner recipient, never a user: owners who never signed in still have one.
 select pg_temp.bb_assert(pg_temp.bb_billing('bb-tier')#>>'{payer,email}' = 'tier-owner@example.test'

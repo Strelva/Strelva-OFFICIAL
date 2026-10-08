@@ -49,12 +49,12 @@ export function AccountPayerInbox() {
     {!pending.length && !accepted.length && !jobs.length ? <p className="text-sm text-gray-muted">No payer requests or job limits are addressed to this account.</p> : null}
     {pending.map(item => <article key={item.id} className="rounded-xl border border-gray-border p-4">
       <h3 className="text-sm font-medium text-warm-black">Future jobs for {item.workspaceName}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-gray-muted">{item.proposerEmail} asked this exact account to become payer for jobs created after acceptance. This does not grant access to the business or its saved work. Each job limit still requires separate acceptance.</p>
+      <p className="mt-2 text-sm leading-relaxed text-gray-muted">{item.proposerEmail} asked {item.successorKind === "agency" ? item.successorWorkspaceName ?? "your agency" : item.successorKind === "business" ? "this business" : "this account"} to become payer for jobs created after acceptance. This does not grant access to the business or its saved work. Each job limit still requires separate acceptance.</p>
       <div className="mt-4 flex flex-wrap gap-2"><Button disabled={busy === item.id} onClick={() => void transition("accept", item.id)}>Accept future payer role</Button><Button variant="secondary" disabled={busy === item.id} onClick={() => void transition("reject", item.id)}>Decline</Button></div>
     </article>)}
     {accepted.map(item => <article key={item.id} className="rounded-xl border border-gray-border p-4">
       <h3 className="text-sm font-medium text-warm-black">Accepted future payer role for {item.workspaceName}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-gray-muted">Accepted by this verified account. Only jobs created after this acceptance can name this account, and each job limit remains separate.</p>
+      <p className="mt-2 text-sm leading-relaxed text-gray-muted">Accepted for {item.successorKind === "agency" ? item.successorWorkspaceName ?? "the agency" : "the business"}. Only jobs created after this acceptance can name this account, and each job limit remains separate.</p>
     </article>)}
     {jobs.map(job => <article key={job.id} className="rounded-xl border border-gray-border p-4">
       <h3 className="text-sm font-medium text-warm-black">{job.workspaceName} · {job.productId.replaceAll("_", " ")}</h3>

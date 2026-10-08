@@ -52,7 +52,7 @@ async function pendingVersionReleases(actor: WorkspaceActor, workspaceId: string
     const view = await versions.readVersion(versionActor, item.id);
     const latest = row.releases.at(-1);
     if (latest && jsonEqual(latest.definition, view.workingDefinition)) continue;
-    if (!(await readVersionRuntime(actor, row, versionsDb()))) continue;
+    if ((await readVersionRuntime(actor, row, versionsDb()))?.kind!=="internal_app") continue;
     pending.push({
       versionId: item.id,
       systemId: item.systemId,

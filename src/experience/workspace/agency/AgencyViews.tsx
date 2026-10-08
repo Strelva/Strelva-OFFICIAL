@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { ResponsibilityProof } from "@/experience/operations/ResponsibilityProof";
 import { ArrowRight, CircleAlert, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { SkeletonLine } from "@/components/ui/Skeleton";
@@ -72,7 +74,7 @@ export function AgencyClientList({
             <p className="flex items-center gap-2 text-[13px] text-warm-black"><CircleAlert className="shrink-0 text-warning" size={16} aria-hidden="true" />{client.name} could not be loaded.</p>
             <Button variant="ghost" size="sm" loading={retrying.has(client.pageIndex)} onClick={() => onRetryPage(client.pageIndex)} aria-label={`Retry loading ${client.name}`}>Retry</Button>
           </li>
-        : <li key={client.workspaceId} className={row}><ClientRowButton client={client} agencyName={agencyName} now={now} onOpen={onOpen} />{client.agentBookings ? <a href={`/workspace/bookings?${new URLSearchParams({ workspaceId: client.workspaceId, view: "week", source: "agent" })}`} className="mx-2 mb-3 inline-flex min-h-11 items-center text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2">Booked through agents · {client.name}</a> : null}</li>)}
+        : <li key={client.workspaceId} className={row}><ClientRowButton client={client} agencyName={agencyName} now={now} onOpen={onOpen} />{client.agentBookings ? <a href={`/workspace/bookings?${new URLSearchParams({ workspaceId: client.workspaceId, view: "week", source: "agent" })}`} className="mx-2 mb-3 inline-flex min-h-11 items-center text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2">Booked through agents · {client.name}</a> : null}{client.provider ? <ClientResponsibilityProof workspaceId={client.workspaceId} /> : null}</li>)}
     </ul>
     <div className="flex flex-wrap items-center justify-between gap-3 pt-4">
       <p className={meta} aria-live="polite">{clients.length < total ? `Showing ${clients.length} of ${total} clients` : `${total} ${total === 1 ? "client" : "clients"}`}</p>
@@ -80,6 +82,11 @@ export function AgencyClientList({
     </div>
     {moreError ? <p role="alert" className="mt-2 text-[12px] text-critical">More clients could not be loaded. Access has not changed. Try again.</p> : null}
   </div>;
+}
+
+function ClientResponsibilityProof({ workspaceId }: { workspaceId: string }) {
+  const [open, setOpen] = useState(false);
+  return <details className="mx-2 mb-4" onToggle={event => setOpen(event.currentTarget.open)}><summary className="flex min-h-11 cursor-pointer items-center text-sm text-accent-text underline focus-visible:outline-2 focus-visible:outline-offset-2">Responsibility receipts and report cadence</summary>{open ? <div className="py-4"><ResponsibilityProof workspaceId={workspaceId} readOnly={false} /></div> : null}</details>;
 }
 
 function ClientRowButton({ client, agencyName, now, onOpen }: { client: ClientRow; agencyName: string; now: number; onOpen: (workspaceId: string) => void }) {

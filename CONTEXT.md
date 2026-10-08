@@ -1,5 +1,17 @@
 # Strelva interface and Managed Websites context
 
+## October 8 private integration #601
+
+`prepare/launch-integration-601-20261008` reconciles prepared `1902c15c` onto
+`e9ac136f`, preserving every existing deployed migration byte. Its unapplied tail
+is rebased after the deployed 266-file history; no production migration or flag
+changed. [Integration proof](docs/operations/launch-integration601-proof.md) records
+all 42 retained acceptances, current-authority/native/rollback/upgrade checks,
+8,693 passing units with 46 skips, 196 client contracts and remaining review/provider
+limits. The wholesale eligibility repair selects no rate or commercial policy.
+This private candidate does not include the parallel October 8 website/recent-auth
+changes; final convergence and authenticated release proof remain gates.
+
 ## October 7 security/runtime and bounded agency release (deployed)
 
 The four requested repairs are deployed at `https://app.strelva.com`: snapshot
@@ -37,6 +49,18 @@ model area by area. The earlier
 [strelvav2](./docs/product/strelvav2.md) release shipped the workspace on Sept 30.
 Broader Reborn work remains internal and unapproved for production beyond the
 explicit bounded October 7 security/agency rollout above.
+
+## Money and agents/apps private preparation, October 7–8, 2026
+
+Private `build/money-apps-combined-20261007` implements the two money and
+agents/apps issue chains from pinned `cdf5c31a`. It is unmerged; local native
+command/rollback/authority tests and browser fixtures do not establish provider
+operation, adopted pricing, demand or commercial responsibility. The
+[prepared implementation record](./docs/operations/money-apps-prepared-2026-10-07.md)
+owns proof commands and stop points; the workspace `.scratch/agency-1.0/money-apps-2026-10-07/`
+owns exact42 issue acceptances and final receipts. Main-workspace
+`PRODUCT_MODEL.md` remains canonical. Reserved decisions, directory/legal facts,
+Sandbox dependency/resource consent and real provider proof remain explicit.
 
 ## Product model
 

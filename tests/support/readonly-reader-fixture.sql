@@ -23,10 +23,25 @@ select public.set_agency_client_staff('13230000-0000-4000-8000-000000000001','re
 create temporary table vn_source(id uuid);
 insert into vn_source select (public.create_system_version_source('13230000-0000-4000-8000-000000000010','13230000-0000-4000-8000-000000000001',
  'readonly-owner@example.test','{"name":"Source","kind":"internal_app"}','13230000-0000-4000-8000-000000000020',repeat('a',64))->'system'->>'id')::uuid;
+create function pg_temp.vn_declaration() returns jsonb language plpgsql as $$ begin
+ if to_regprocedure('public.system_package_behavior(jsonb,text[])') is null then return '{}'::jsonb; end if;
+ return jsonb_build_object('declaration',public.system_package_behavior('{"kind":"internal_app","title":"Client intake","fields":[{"id":"problem","label":"Problem","type":"text","required":true}],"components":[{"kind":"form","fields":["problem"]},{"kind":"list","fields":["problem"]}]}'::jsonb,'{}'::text[]));
+end $$;
 select public.publish_system_version_source_revision('13230000-0000-4000-8000-000000000001','readonly-owner@example.test',jsonb_build_object(
  'source',jsonb_build_object('businessId','13230000-0000-4000-8000-000000000010','systemId',(select id from vn_source),'revisionId','13230000-0000-4000-8000-000000000021','number',1),
  'definition','{"kind":"internal_app","title":"Client intake","fields":[{"id":"problem","label":"Problem","type":"text","required":true}],"components":[{"kind":"form","fields":["problem"]},{"kind":"list","fields":["problem"]}]}'::jsonb,'summary','First','requires','{"bindingKinds":[]}'::jsonb,
- 'publishedBy','13230000-0000-4000-8000-000000000001','publishedAt',now()));
+ 'publishedBy','13230000-0000-4000-8000-000000000001','publishedAt',now()) || pg_temp.vn_declaration());
+-- The current package contract requires a real exact-revision qualification.
+-- Historical phases predate that contract and retain their original behavior.
+do $$ begin
+ if to_regprocedure('public.record_system_revision_qualification(uuid,text,uuid)') is not null then
+  insert into public.system_revision_reviewers(user_id,policy_version)
+   values('13230000-0000-4000-8000-000000000003','fictional-readonly-proof-policy');
+  perform public.record_system_revision_qualification('13230000-0000-4000-8000-000000000001','readonly-owner@example.test','13230000-0000-4000-8000-000000000021');
+  perform public.review_system_revision_qualification('13230000-0000-4000-8000-000000000003','readonly-outsider@example.test','13230000-0000-4000-8000-000000000021',true,'Fictional local exact revision review');
+ end if;
+end $$;
+select public.put_system_version_source('13230000-0000-4000-8000-000000000010','13230000-0000-4000-8000-000000000001','readonly-owner@example.test',(select id from vn_source),array['13230000-0000-4000-8000-000000000011'::uuid]);
 create function pg_temp.vn_lineage() returns jsonb language sql as $$ select jsonb_build_object(
  'id',gen_random_uuid(),'version',jsonb_build_object('businessId','13230000-0000-4000-8000-000000000011','systemId','13230000-0000-4000-8000-000000000030'),
  'source',jsonb_build_object('businessId','13230000-0000-4000-8000-000000000010','systemId',(select id from vn_source)),

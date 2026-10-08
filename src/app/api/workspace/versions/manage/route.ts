@@ -1,4 +1,5 @@
 import { z } from "zod";
+import {nativeVersionResolutionSchema} from "@/platform/system-versions/native-preparation-contracts";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { systemsReleaseMayBeOn, systemsReleasedFor } from "@/platform/systems-release";
 import { VersionAccessError, VersionConflictError, VersionIncompatibleError, VersionStaleError, VersionValidationError, VERSION_CONTEXT_KINDS } from "@/platform/system-versions";
@@ -16,7 +17,7 @@ const command = z.discriminatedUnion("action", [
   ref.extend({ action: z.literal("override"), path: z.string().min(1).max(300), value: z.json().optional(), clear: z.boolean().optional() }).strict(),
   ref.extend({ action: z.literal("bind"), kind: z.string().trim().min(1).max(80), connectionId: z.string().regex(/^(calendar|tenant):[0-9a-f-]{36}$/i) }).strict(),
   ref.extend({ action: z.literal("restore"), releaseNumber: z.number().int().positive() }).strict(),
-  ref.extend({ action: z.literal("prepare_release") }).strict(),
+  ref.extend({ action: z.literal("prepare_release"),nativeResolutions:z.array(nativeVersionResolutionSchema).max(100).optional() }).strict(),
 ]);
 function failure(error: unknown) {
   if (error instanceof VersionAccessError) return workspaceJson({ error: error.message }, 403);

@@ -5,7 +5,10 @@
  * hold; the customer's email confirmation is what books it, and the assistant
  * only ever receives a status token. Owner and agency tools are not here (#302).
  */
+import { oauthEnabled } from "./oauth";
 import { z } from "zod";
+import { receiveAgentInquiry, agentInquiryStatus } from "./inquiries";
+import { publicBusinessProfile, unknownVerification } from "./profile";
 import { PublicBookingError } from "@/platform/bookings/errors";
 import { bookingScopeFor } from "@/platform/bookings/booking-scope";
 import { agentConfirmationAvailable, agentReceipt, nativeBookingByToken, nativeServices, nativeSlots, requestAgentBooking, requireAgentBookings, statusAccessLive, tokenHash } from "@/platform/bookings/native";
@@ -42,6 +45,10 @@ const directoryTools: McpTool[] = [
 ];
 
 const bookingTools: McpTool[] = [
+  { name: "get_policies", title: "Business policies", annotations: read, description: "Only owner-confirmed published policy facts. Missing policies are unknown.", inputSchema: schema({}, []) },
+  { name: "send_inquiry", title: "Send an inquiry", annotations: hold, description: "Record the customer inquiry. No job, price or delivery commitment is accepted.", inputSchema: schema({ requestId: string, agent: schema({ name: string }, ["name"]), customer: schema({ name: string, email: string }, ["name", "email"]), message: string }, ["requestId", "agent", "customer", "message"]) },
+  { name: "request_quote", title: "Request an owner quote", annotations: hold, description: "Record scope and service area for an owner-priced quote. The reply-by clock exists only when the owner confirmed a response policy.", inputSchema: schema({ requestId: string, agent: schema({ name: string }, ["name"]), customer: schema({ name: string, email: string }, ["name", "email"]), message: string, serviceId: string, fields: schema({ scope: string, area: string }, ["scope", "area"]) }, ["requestId", "agent", "customer", "message", "serviceId", "fields"]) },
+  { name: "get_status", title: "Inquiry or quote status", annotations: read, description: "Read status or the owner-approved quote using the opaque status token. Never returns contact details.", inputSchema: schema({ statusToken: string }, ["statusToken"]) },
   { name: "list_services", title: "List services", annotations: read,
     description: "Services, lengths, modes and time zone. No customer data.", inputSchema: schema({}, []) },
   { name: "find_slots", title: "Find open times", annotations: read,
@@ -70,8 +77,8 @@ const text = (value: unknown) => typeof value === "string" ? value : undefined;
 const sub = (value: unknown) => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 
 function agentCall(tool: string | undefined, args: Record<string, unknown>, business: string | undefined): AgentCall {
-  if (tool === "request_booking" && business) return agentHoldCall(business, args);
-  if (tool === "get_booking_status") return { kind: "status", business, statusToken: text(args.statusToken) };
+  if (["request_booking", "send_inquiry", "request_quote"].includes(tool ?? "") && business) return agentHoldCall(business, args);
+  if (tool === "get_booking_status" || tool === "get_status") return { kind: "status", business, statusToken: text(args.statusToken) };
   return { kind: "read", business };
 }
 
@@ -81,7 +88,9 @@ async function acceptsRequests(directory: BusinessDirectory, business: string): 
     const scope = await directory.scope(business);
     if (!scope) return false;
     const ctx = await readBookingContext(scope);
-    if (!ctx?.workspaceId || ctx.paused) return false;
+    if (!ctx?.workspaceId) return false;
+    if (process.env.STRELVA_AGENT_INQUIRIES === "1") return true;
+    if (ctx.paused) return false;
     if (!ctx.services.some(s => s.active && servicePolicy(ctx, s.id).bookable)) return false;
     return await agentConfirmationAvailable(scope);
   } catch {
@@ -118,11 +127,15 @@ async function getBusiness(directory: BusinessDirectory, business: string, scope
     address: text(facts?.address) || null, phone: ctx?.phone ?? null, timeZone: services.timeZone, paused: services.paused,
     acceptsBookingRequests: !services.paused && services.services.length > 0 && await agentConfirmationAvailable(scope),
     serviceCount: services.services.length,
+    verification: await publicBusinessProfile(scope).then(p => p.verification).catch(() => unknownVerification),
   };
 }
 
 /** `scope` is the resolved booking scope: a tenant id or `workspace:<id>`. */
 async function runBookingTool(scope: string, name: string, args: Record<string, unknown>): Promise<unknown> {
+  if (name === "get_policies") return (await publicBusinessProfile(scope)).policies;
+  if (name === "send_inquiry" || name === "request_quote") return receiveAgentInquiry(scope, args, name === "request_quote");
+  if (name === "get_status") return agentInquiryStatus(scope, args.statusToken);
   if (name === "list_services") return await nativeServices(scope);
   if (name === "find_slots") return await nativeSlots(scope, String(args.serviceId ?? ""), String(args.from ?? ""), String(args.to ?? ""));
   if (name === "request_booking") {
@@ -167,8 +180,11 @@ const UNEXPECTED: ToolOutcome = { ok: false, message: "Check the tool arguments:
 export function platformMcpServer(directory: BusinessDirectory): McpServer {
   return {
     name: "strelva", version: "1.0.0", tools: PLATFORM_TOOLS,
-    instructions: "Find a business with search_business, then pass its handle to the booking tools. A booking request is a 15-minute hold that only the customer's email confirmation books.",
-    ready: requireAgentBookings,
+    instructions: "Find a business with search_business, then pass its handle to the business tools. Inquiries and quote requests are receipts for owner review. A booking request is a 15-minute hold that only the customer's email confirmation books.",
+    ready: async () => {
+      if (process.env.STRELVA_WORKSPACE_RELEASE === "1" && (oauthEnabled() || process.env.STRELVA_AGENT_INQUIRIES === "1")) return;
+      await requireAgentBookings();
+    },
     // Off: one bucket per caller address, never per caller-supplied argument.
     limited: (request, call) => {
       const business = call.tool && BUSINESS_SCOPED.has(call.tool) ? handleOf(call.args.business) : undefined;
@@ -195,7 +211,10 @@ export function businessMcpServer(business: string): McpServer {
   return {
     name: "strelva-bookings", version: "1.0.0", tools: BUSINESS_TOOLS,
     instructions: "Bookings require customer confirmation. Holds expire in 15 minutes.",
-    ready: requireAgentBookings,
+    ready: async () => {
+      if (process.env.STRELVA_WORKSPACE_RELEASE === "1" && (oauthEnabled() || process.env.STRELVA_AGENT_INQUIRIES === "1")) return;
+      await requireAgentBookings();
+    },
     limited: (request, call) => agentCallLimited(request, agentCall(call.tool, call.args, business), { legacyPrefix: `mcp-bookings:${business}` }),
     async call(name, args) {
       if (!BOOKING_NAMES.has(name)) return { unknownTool: true };

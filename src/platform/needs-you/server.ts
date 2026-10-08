@@ -32,6 +32,7 @@ import { bookingRequestAdapter, bookingRequestItem } from "@/platform/bookings/n
 import { decideBookingRequest, readWorkspaceBooking, readWorkspaceBookingRequests, readNativeBookingWorkspaces } from "@/platform/bookings/store";
 import { bookingStoreWriteEnabled, bookingOwnerNoticeEnabled, bookingReadSource } from "@/platform/bookings/flags";
 import { updateBooking as updateLegacyBookingStatus } from "@/platform/bookings/legacy-store";
+import { businessPaymentAdapter } from "./sources/business-payment";
 import { inquiryFactAdapter } from "./sources/inquiry-fact";
 
 import { needsYouReleaseEnabled } from "./release";
@@ -98,6 +99,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, ef
       ...productSourceAdapters(),
       bookingSettingsAdapter(),
       inquiryFactAdapter(),
+      businessPaymentAdapter(),
       // Provider and operator edits to business details wait for the owner (#509).
       businessFactsAdapter({ read: facts.read, confirm: facts.confirm, ...(effects.businessFactsConfirmed ? { confirmed: effects.businessFactsConfirmed } : {}) }),
       // Booking requests in the one booking store (empty until request mode is used).

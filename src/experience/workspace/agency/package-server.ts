@@ -1,0 +1,64 @@
+import { installSystemBundle, qualifyNativePackage } from "./bundle-server";
+import type { BundleTargets } from "@/platform/system-versions/bundle-contracts";
+import { z } from "zod";
+import { VersionAccessError, VersionValidationError, isRevisionQualified } from "@/platform/system-versions";
+import { packageCatalogSchema, packageCreatorSchema } from "@/platform/system-versions/listing-contracts";
+import { revisionQualificationSchema } from "@/platform/system-versions/declaration";
+import { mapVersionsError, versionsDb, type VersionsDb } from "@/platform/system-versions/supabase-store";
+import { WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
+import { installBusinessPackage } from "./version-server";
+import type { SystemRevisionRef } from "@/platform/system-versions";
+
+function args(actor: WorkspaceActor) { return { p_user_id: actor.userId, p_verified_email: actor.verifiedEmail }; }
+async function rpc(actor: WorkspaceActor, name: string, input: Record<string, unknown>, db: VersionsDb) {
+  const result = await db.rpc(name, { ...args(actor), ...input });
+  if (result.error) mapVersionsError(result.error, "This package request could not be confirmed.");
+  return result.data;
+}
+export async function readPackageCatalog(actor: WorkspaceActor, workspaceId: string, db: VersionsDb = versionsDb()) {
+  const listings = await rpc(actor, "read_system_package_listings", { p_workspace_id: workspaceId }, db);
+  const parsed = packageCatalogSchema.safeParse({ workspaceId, listings });
+  if (!parsed.success) throw new WorkspaceStoreError("The qualified package list could not be verified.");
+  // Independent defence against a malformed or stale adapter response.
+  if (parsed.data.listings.some(item => !isRevisionQualified(item.revision))) throw new WorkspaceStoreError("The list included a revision without exact qualification.");
+  return parsed.data;
+}
+export async function installPackageFromListing(actor: WorkspaceActor, input: { workspaceId: string; source: SystemRevisionRef; commandId: string; name: string; targets?: BundleTargets }, db: VersionsDb = versionsDb()) {
+  const catalog = await readPackageCatalog(actor, input.workspaceId, db);
+  const listing = catalog.listings.find(item => item.revision.source.revisionId === input.source.revisionId && item.revision.source.systemId === input.source.systemId && item.revision.source.businessId === input.source.businessId && item.revision.source.number === input.source.number);
+  if (!listing) throw new VersionAccessError();
+  if (listing.revision.definition.kind === "bundle") return installSystemBundle(actor,input,listing.revision.definition,db);
+  if (listing.revision.definition.kind !== "internal_app") throw new VersionValidationError("This package has no automatic native install adapter yet.");
+  return installBusinessPackage(actor, { ...input, context: { kind: "agency_client", label: input.name } }, db);
+}
+export async function readPackageCreator(actor: WorkspaceActor, workspaceId: string, systemId: string, db: VersionsDb = versionsDb()) {
+  const result = await rpc(actor, "read_system_package_creator", { p_workspace_id: workspaceId, p_system_id: systemId }, db);
+  const parsed = packageCreatorSchema.safeParse(result);
+  if (!parsed.success) throw new WorkspaceStoreError("Creator lineage could not be verified.");
+  return parsed.data;
+}
+export async function managePackage(actor: WorkspaceActor, workspaceId: string, input: { action: "qualify"; revisionId: string } | { action: "review"; revisionId: string; approve: boolean; note: string } | { action: "listing"; systemId: string; state: "private" | "clients" | "listed" }, db: VersionsDb = versionsDb()) {
+  if (input.action === "listing") {
+    const result = await rpc(actor, "set_system_package_listing", { p_workspace_id: workspaceId, p_system_id: input.systemId, p_state: input.state }, db);
+    return z.object({ source: z.object({ businessId: z.literal(workspaceId), systemId: z.literal(input.systemId) }), listingState: z.literal(input.state) }).passthrough().parse(result);
+  }
+  await rpc(actor, "require_system_package_revision_scope", { p_workspace_id: workspaceId, p_revision_id: input.revisionId, p_review: input.action === "review" }, db);
+  const native = input.action === "qualify" ? await qualifyNativePackage(actor, workspaceId, input.revisionId, db) : null;
+  const result = native ?? await rpc(actor, input.action === "qualify" ? "record_system_revision_qualification" : "review_system_revision_qualification", { p_revision_id: input.revisionId, ...(input.action === "review" ? { p_approve: input.approve, p_note: input.note } : {}) }, db);
+  const parsed = revisionQualificationSchema.parse(result);
+  if (parsed.revisionId !== input.revisionId) throw new WorkspaceStoreError("Qualification returned for another revision.");
+  return parsed;
+}
+
+export async function readPackageSource(actor: WorkspaceActor, workspaceId: string, systemId: string, db: VersionsDb = versionsDb()) {
+ const result = await rpc(actor, "read_system_package_source", { p_workspace_id: workspaceId, p_system_id: systemId }, db);
+ if (!result) throw new VersionAccessError();
+ return z.object({ workspaceId: z.literal(workspaceId), systemId: z.literal(systemId), source: z.object({ listingState: z.enum(["private","clients","listed"]) }).passthrough(), revision: z.object({ source: z.object({ revisionId: z.string().uuid(), number: z.number().int().positive() }).passthrough(), declaration: z.unknown().optional(), qualification: revisionQualificationSchema.nullable().optional() }).passthrough().nullable(), canReview: z.boolean() }).passthrough().parse(result);
+}
+export async function readInstallGrants(actor: WorkspaceActor, workspaceId: string, revisionId: string, db: VersionsDb = versionsDb()) {
+ const grants = await rpc(actor, "read_system_package_install_grants", { p_workspace_id: workspaceId, p_revision_id: revisionId }, db);
+ return z.array(z.object({ grantId: z.string().uuid(), workspaceId: z.literal(workspaceId), commandId: z.string().uuid(), agencyWorkspaceId: z.string().uuid(), revisionId: z.literal(revisionId), expiresAt: z.string(), status: z.enum(["active","revoked"]) }).strict()).parse(grants);
+}
+export async function manageInstallGrant(actor: WorkspaceActor, input: { action: "grant_install"; workspaceId: string; agencyWorkspaceId: string; revisionId: string; commandId: string; expiresAt: string } | { action: "revoke_install"; workspaceId: string; grantId: string }, db: VersionsDb = versionsDb()) {
+ return rpc(actor, input.action === "grant_install" ? "grant_system_package_install" : "revoke_system_package_install", { p_workspace_id: input.workspaceId, ...(input.action === "grant_install" ? { p_agency_workspace_id: input.agencyWorkspaceId, p_revision_id: input.revisionId, p_command_id: input.commandId, p_expires_at: input.expiresAt } : { p_grant_id: input.grantId }) }, db);
+}

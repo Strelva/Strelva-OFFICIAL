@@ -31,9 +31,9 @@ import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { ProposedItem } from "../contracts";
 import type { SourceAdapter } from "../adapters";
 
-export interface MoneyAllowanceView { id: string; workspaceId: string; payerId: string; status: string; spendingCapCents: number; periodStart: string; periodEnd: string }
+export interface MoneyAllowanceView { id: string; workspaceId: string; payerId: string; payerKind?: "business" | "agency"; payerWorkspaceId?: string; canAccept?: boolean; status: string; spendingCapCents: number; periodStart: string; periodEnd: string }
 export interface MoneyJobView { id: string; workspaceId: string; status: string; productId: string; estimateCents: number | null; maxAuthorizedCents: number }
-export interface MoneyPayerChangeView { id: string; workspaceId: string; successorUserId: string; proposerEmail: string; status: string }
+export interface MoneyPayerChangeView { id: string; workspaceId: string; successorUserId: string; successorKind?: string; successorWorkspaceId?: string | null; canRespond?: boolean; proposerEmail: string; status: string }
 
 export interface MoneyBillingView { workspaceId: string; paymentStatus: string; paymentUpdatedAt: string | null; monthlyCents: number }
 const billingRevision = (row: MoneyBillingView) => hash(["billing", row.workspaceId, row.paymentStatus, row.paymentUpdatedAt]);
@@ -62,9 +62,9 @@ function hash(parts: unknown[]): string {
   return createHash("sha256").update(JSON.stringify(parts)).digest("hex");
 }
 
-const allowanceRevision = (row: MoneyAllowanceView) => hash(["allowance", row.id, row.status, row.payerId, row.spendingCapCents, row.periodStart, row.periodEnd]);
+const allowanceRevision = (row: MoneyAllowanceView) => hash(["allowance", row.id, row.status, row.payerKind, row.payerWorkspaceId, row.payerId, row.spendingCapCents, row.periodStart, row.periodEnd]);
 const jobRevision = (row: MoneyJobView) => hash(["job", row.id, row.status, row.estimateCents, row.maxAuthorizedCents]);
-const payerRevision = (row: MoneyPayerChangeView) => hash(["payer", row.id, row.status, row.successorUserId]);
+const payerRevision = (row: MoneyPayerChangeView) => hash(["payer", row.id, row.status, row.successorKind, row.successorWorkspaceId, row.successorUserId]);
 
 const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
@@ -86,7 +86,7 @@ function moneyItem(input: { sourceId: string; revisionHash: string; title: strin
 }
 
 export function allowanceItem(row: MoneyAllowanceView, actor: WorkspaceActor): ProposedItem | null {
-  if (row.status !== "pending_cap_acceptance" || row.payerId !== actor.userId) return null;
+  if (row.status !== "pending_cap_acceptance" || !(row.canAccept ?? row.payerId === actor.userId)) return null;
   return moneyItem({
     sourceId: `allowance:${row.id}`, revisionHash: allowanceRevision(row), workspaceId: row.workspaceId,
     title: `Accept a spending cap of ${dollars(row.spendingCapCents)}`,
@@ -106,7 +106,7 @@ export function jobItem(row: MoneyJobView): ProposedItem | null {
 }
 
 export function payerChangeItem(row: MoneyPayerChangeView, actor: WorkspaceActor): ProposedItem | null {
-  if (row.status !== "pending" || row.successorUserId !== actor.userId) return null;
+  if (row.status !== "pending" || !(row.canRespond ?? row.successorUserId === actor.userId)) return null;
   return moneyItem({
     sourceId: `payer:${row.id}`, revisionHash: payerRevision(row), workspaceId: row.workspaceId,
     title: "Become the payer for this business",

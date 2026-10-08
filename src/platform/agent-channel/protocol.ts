@@ -44,6 +44,8 @@ export interface McpServer {
   ready(): Promise<void>;
   /** True refuses the call with 429. Runs after validation, before work. */
   limited(request: Request, call: { method: string; tool?: string; args: Record<string, unknown> }): Promise<boolean>;
+  /** Mixed authorization is evaluated per call; public discovery never requires a token. */
+  authorize?(request: Request, call: { method: string; tool?: string; args: Record<string, unknown> }): Promise<Response | null>;
   call(name: string, args: Record<string, unknown>): Promise<ToolOutcome>;
 }
 
@@ -138,6 +140,10 @@ export async function serveMcp(request: Request, server: McpServer): Promise<Res
   }
   const args = record(params.arguments) ?? {};
   try {
+    if (server.authorize) {
+      const refusal = await server.authorize(request, { method, ...(toolName ? { tool: toolName } : {}), args });
+      if (refusal) return refusal;
+    }
     if (await server.limited(request, { method, ...(toolName ? { tool: toolName } : {}), args })) {
       return failure(id, app(MCP_ERRORS.rateLimited), "Too many requests.", 429);
     }
