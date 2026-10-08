@@ -3,7 +3,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const siblingPackage = resolve(repoRoot, "../strelva-marketing/package.json");
+const marketingRoot = process.env.STRELVA_MARKETING_ROOT
+  ? resolve(process.env.STRELVA_MARKETING_ROOT)
+  : resolve(repoRoot, "../strelva-marketing");
+const siblingPackage = resolve(marketingRoot, "package.json");
 
 const [app, marketing] = await Promise.all(
   [resolve(repoRoot, "package.json"), siblingPackage].map(async (path) =>
