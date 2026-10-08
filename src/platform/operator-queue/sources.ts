@@ -19,7 +19,6 @@ import { readToolNoticeFailures } from "@/platform/catalog-reports/tool-notices"
 import { readToolContactConflicts } from "@/platform/catalog-reports/tool-history";
 import { isCustomChangeRequestMetadata } from "@/lib/custom-repos";
 import { listOperationalExceptions } from "@/products/operations/inbox";
-import { PostgresServiceRequestStore } from "@/platform/service-requests";
 import type { UnifiedEvent } from "@/lib/types";
 import type { QueueActor, QueueContext, QueueItemRaw, QueueKind } from "./contracts";
 import type { SourceRead } from "./project";
@@ -315,22 +314,6 @@ export async function readSiteHealthItems(context: QueueContext | null, tenants:
   return { kind: "site_health", source, ok: true, rows };
 }
 
-export async function readServiceRequests(actor: QueueActor): Promise<SourceRead> {
-  try {
-    const requests = await PostgresServiceRequestStore.list(actor, { providerKind: "strelva" });
-    return {
-      kind: "service_request", source: "Service requests", ok: true,
-      rows: requests.filter((request) => request.status === "requested" && request.providerAcceptance.status === "pending").map((request) => ({
-        kind: "service_request" as const, sourceRef: request.id, tenantId: null, workspaceId: request.businessId,
-        title: request.outcome.length > 120 ? `${request.outcome.slice(0, 119)}…` : request.outcome,
-        openedAt: request.createdAt, href: `/admin/work?workspaceId=${encodeURIComponent(request.businessId)}`,
-      })),
-    };
-  } catch (error) {
-    return failure("service_request", "Service requests", error);
-  }
-}
-
 export async function readOperationalExceptions(): Promise<SourceRead> {
   try {
     const exceptions = await listOperationalExceptions(operatorQueueReleaseEnabled() ? { all: true } : undefined);
@@ -506,7 +489,6 @@ export async function readAllSources(input: { tenants: QueueTenant[]; context: Q
     guard("domain_alert", "Domain monitor", readDomainAlerts),
     guard("domain_unverified", "Domain claims", () => readUnverifiedDomains(tenants, now)),
     guard("site_health", "Site health", () => readSiteHealthItems(context, byId, now)),
-    guard("service_request", "Service requests", () => readServiceRequests(actor)),
     guard("operational_exception", "Operational exceptions", readOperationalExceptions),
     guard("assignment_offer", "Assignment offers", () => readAssignmentOffers(now)),
     guard("lead_unkept", "Client lead copies", readUnkeptLeads),

@@ -33,7 +33,7 @@ Jacob's yes. No price, payout rate or client agreement is set here.
 | 5. Agencies as distribution | Partner agencies onboard, run portfolios, publish items; attribution and royalties recorded under the partner charter | Agency surface local; no partner, no rates | Signed partner agreement; rates are Jacob's decision |
 | 6. Operating the business | Internal tools, onboarding, trackers and checks as Systems | Local engines | None |
 | 7. Enterprise and multi-location | Units, pushed standards, access review, audit; Home Finder for a brokerage | Versions local; Home Finder pilot candidate | Participating brokerage plus MLS IDX three-party data license |
-| 8. Transactions | Businesses take payment from their own customers; agent-routed bookings and payments | No end-customer payment primitive | Stripe Connect platform account and per-business onboarding (KYC); billing needs Jacob's explicit authorization |
+| 8. Transactions | Businesses take payment from their own customers; agent-routed bookings and payments | Connect checkout, payment requests and money reconciliation are implemented privately; the supported shared-token adapter is being qualified in the full-model source. Actual account access, settlement and hosted journeys remain unproved | Stripe Connect platform account and per-business onboarding (KYC); billing needs Jacob's explicit authorization |
 
 Outside applications are long poles; code does not establish approval. The
 platform must apply for all agencies equally, including Strelva's own agency.
@@ -182,8 +182,7 @@ From the audit and the Reborn page, pending Jacob's confirmation where marked:
 - **Out:** new pricing tiers and `/api/v2`. Home Finder, enterprise, owner
   self-serve website building and partner agencies are in scope under the
   October 7 whole-ladder decision above.
-- **Cut (audit, needs yes):** custom-application builds (need Docker; Vercel has
-  none), `src/experience/delivery`, product learning, the Customers page.
+- **Replacement work:** custom applications remain included behind qualified runtime, reviewer, resource and commercial gates. The prepared Sandbox adapter is not provider qualification. Retire `src/experience/delivery`, old Customers management routing and duplicated learning or creation paths only when their new-model replacements and compatibility journeys pass.
 - **Merged (audit, needs yes):** tracker into internal tools, saved checks into
   System health, assessment into the website audit, agency website drafts into
   the website System as Possibilities.
@@ -198,7 +197,7 @@ From the audit and the Reborn page, pending Jacob's confirmation where marked:
 3. **Website entry for new businesses.** On Oct 2 the paste-URL rebuild was
    ruled out for new businesses in favor of connected sites, but the rebuild is
    still the strongest Possibility in the code. Which one ships?
-4. **The word "Systems" on screen**, and ADR 0011 accepted or not.
+4. **Model record reconciliation.** Systems, Connections, Possibilities and Versions are the selected implementation model. ADR 0011 still needs its formal decision record reconciled; that paperwork does not reopen the selected model.
 5. **The plan price.**
 6. **Owners who never sign in.** This is a requirement, not an open scope
    choice. Notification routing and signed Make real links are implemented
@@ -210,3 +209,9 @@ From the audit and the Reborn page, pending Jacob's confirmation where marked:
 production, proven on a Strelva-owned test business and on converted clients,
 and Jacob says it is
 something Strelva would stand behind for any new customer.
+
+## October 8 full-model convergence
+
+The active completion source is `codex/full-model-integration-20261008`, composed from candidate `3ecb25f1` and explicitly reconciled cleanup, assistant, money, agency and access-review followups. Runtime, neutral directory, Units/standards, Home Finder and Sandbox additions are parallel preparations. Lane tests prove their bounded local behavior, not the final combined source or production. All eight rungs, owners who never sign in, actual provider paths, every active-tenant conversion, recovery, accepted commercial policies and public release remain required. No pilot or smaller release substitutes for this commitment.
+
+Platform support remains separate from agency serving. The released platform Queue no longer reads a privileged Strelva service-request inbox; ordinary agency workspace grants and queues own that work. Historical row contracts stay until compatibility retirement is proven.
