@@ -1,4 +1,4 @@
-import { getCurrentUserEmail, isSuperAdmin } from "@/platform/infra/auth";
+import { getAuthenticatedOperatorContext } from "@/platform/infra/auth";
 import { releaseWorkspaceForTenant } from "@/platform/release-flags/store";
 import { readOwnerInvitationState, type OwnerInvitationState } from "@/platform/workspaces/business-ownership";
 import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";
@@ -14,16 +14,16 @@ export type OwnerInvitationsLoad =
   | { kind: "unconverted" | "denied" | "unavailable" };
 
 /** The state RPC rechecks active super-admin AND explicit workspace admin membership. */
-export async function operatorOwnerInvitationContext(tenantId: string): Promise<{ operator: string; state: OwnerInvitationState }> {
+export async function operatorOwnerInvitationContext(tenantId: string): Promise<{ operator: string; actor: { userId: string; verifiedEmail: string }; authTime: number | null; state: OwnerInvitationState }> {
   if (!ownerInvitationsReleaseEnabled()) throw new WorkspaceAccessError();
-  if (!(await isSuperAdmin())) throw new WorkspaceAccessError();
-  const operator = await getCurrentUserEmail();
-  if (!operator) throw new WorkspaceAccessError();
+  const context = await getAuthenticatedOperatorContext();
+  if (!context) throw new WorkspaceAccessError();
+  const { operator, actor, authTime } = { operator: context.email, actor: context.actor, authTime: context.authTime };
   const workspaceId = await releaseWorkspaceForTenant(tenantId);
   if (!workspaceId) throw new WorkspaceConflictError("Convert this site to a business before inviting its owner.");
   const state = await readOwnerInvitationState(operator, workspaceId);
   if (!state.tenants.some((tenant) => tenant.tenantId === tenantId)) throw new WorkspaceAccessError();
-  return { operator, state };
+  return { operator, actor, authTime, state };
 }
 
 /** Flags off: no auth or workspace reads, and no added page element. */
