@@ -203,7 +203,7 @@ disagree, the checklist's stop conditions win.
 | [4](https://github.com/Strelva/Strelva-OFFICIAL/issues/347) | Lead backfill · done Oct 7 | data | 3 · S1 |
 | [5](https://github.com/Strelva/Strelva-OFFICIAL/issues/348) | Preview environment (optional, recommended before batch 2) | new env | 5 |
 | [6](https://github.com/Strelva/Strelva-OFFICIAL/issues/349) | Batches 1 to 7 (unchanged, after release-safety's rehearsal) | migration ×7 | 1 |
-| 6b | Batch 8 (proposed, not rehearsed): readers fix and w6 migrations; order against 7A open | migration | 1 |
+| 6b | Batch 8 (proposed; companions run, catalog not restored): readers fix and w6 migrations, after 7A | migration | 1 |
 | [6a](https://github.com/Strelva/Strelva-OFFICIAL/issues/350) | Batch 7A: agency-neutral amendments, dated before w6 migrations | migration | 1 |
 | [7](https://github.com/Strelva/Strelva-OFFICIAL/issues/351) | Deploy the 1.0 candidate with every new flag unset | deploy | 2 |
 | [8](https://github.com/Strelva/Strelva-OFFICIAL/issues/352) | Copy report and analytics state; client-records dual-write, backfill, parity | data | 3 · S2–S3 |
@@ -414,7 +414,7 @@ After each batch:
 | 5 | `20261008110000`, `20261008111000`, `20261008123000`, `20261008124000`, `20261008130000`, `20261008131000`, `20261008140000` | No Sept 30 objects. Triggers on batch 1–2 tables (`systems`, `tenant_workspace_links`), wraps `tenant_unlink_plan`, replaces `workspace_release_flag_names` | Ask history, website change receipts, listing read-back queue, Needs you policy imports, Possibilities, Make real live, lead reads |
 | 6 | `20261008141000`, `20261008150000`, `20261008150100`, `20261008151000`, `20261009100000`, `20261009110000`, `20261009113000` | Yes: `btree_gist` extension, a column + FK and an index on live `public_website_bookings`; checks, columns and indexes on `tenant_leads` (written since `0.2.1`); a column + trigger on `owner_decisions`; replaces batch 1–5 functions | Booking store and lifecycle, linked-tenant publishing, domain approvals, connected sites, the Strelva service actor, inquiry records |
 | 7 | `20261009130000`, `20261009131000`, `20261009140000` | Yes, small: replaces two batch 3/6 functions (`read_strelva_handled`, `record_strelva_service_action`) with the same signatures, swaps the `purpose` check on `strelva_service_actions` (batch 6, append-only), and replaces `workspace_release_flag_names()` (batch 6) with one more key | Strelva handled lists decided Needs you items; Make real by signed link for an owner with no account, behind its own `make_real_owner_link` flag |
-| 8 (proposed, not rehearsed) | `20261009150000` and 83 w6 files (`20261010100000`–`20261010170000`); see "Batch 8 · proposed" | Not classified yet: live-object and lock impact unreviewed | Nothing until rehearsed; listed for review only |
+| 8 (proposed; rehearsal fails catalog restore) | `20261009150000` and 83 w6 files (`20261010100000`–`20261010170000`); see "Batch 8 · proposed" | Not classified yet: live-object and lock impact unreviewed | Nothing until rehearsed; listed for review only |
 
 Batches 5 and 6 are in filename order; batch 6 depends on batch 5
 (`20261009100000` keeps every flag name `20261008131000` adds;
@@ -435,9 +435,9 @@ treating this older filename-order check as equivalent. Preview (section 5)
 is the place to qualify the batches against the old app on hosted Postgres 17.
 
 <!-- proposed-batch-8:start -->
-### Batch 8 · proposed, not rehearsed: readers fix and w6
+### Batch 8 · proposed, rehearsal fails catalog restore: readers fix and w6
 
-Status: **proposed, not rehearsed.** Integrated on `a1/integrate-w6-r2`
+Status: **proposed; forward and every companion run, catalog not restored.** Integrated on `a1/integrate-w6-r2`
 (#455): the readers fix (#252) and every w6 stream (release-safety, website,
 publishing, catalog, bookings, journeys, inquiries, owner-ask,
 agency-operator), plus one integration wrapper (`20261010170000`). 84
@@ -465,6 +465,16 @@ staged, pushed or approved.
 - **Ordering.** 7A applies before this batch (packet order); two files now
   depend on 7A objects. `20261009150000` (readers fix) is dated inside 7A's
   window but has no 7A dependency.
+- Rehearsal, Oct 7 local (`pnpm check:release-safety:batch8`, opt-in): after
+  baseline, batches 0–7 and 7A, all 84 files apply and all 84 companions run
+  in reverse (one defect fixed: `rollback-20261010135955_booking_exit_admission.sql`
+  restored `booking_tenant` with three columns for a four-column type). The
+  catalog is **not** restored: 20 tables, 168 columns, 6 indexes, 6 triggers,
+  60 functions and 111 constraints remain, because the w6 companions keep
+  evidence tables and entry points in place instead of archiving them the way
+  batches 0–7 do. Batch 8 cannot join `batches` until each companion either
+  archives and drops (release-safety's contract) or the rehearsal accepts a
+  named retained-object list.
 - Who says yes: Jacob, per file set, after release-safety supplies rehearsal
   evidence. This entry authorizes nothing.
 
