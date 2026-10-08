@@ -17,13 +17,13 @@ create schema release_runtime_recovery;
 revoke all on schema release_runtime_recovery from public,anon,authenticated,service_role;
 create table release_runtime_recovery.batch8_state (
   singleton boolean primary key check(singleton), state text not null,
-  baseline_fingerprint text not null, forward_catalog jsonb, disabled_fingerprint text
+  baseline_fingerprint text not null, forward_catalog jsonb, disabled_fingerprint text, disabled_role_fingerprint text
 );
 create table release_runtime_recovery.batch8_baseline_functions(signature text primary key);
 create table release_runtime_recovery.batch8_scope(signature text primary key, function_oid oid not null);
 create table release_runtime_recovery.batch8_grants(signature text primary key, function_oid oid not null, grant_option boolean not null);
 revoke all on all tables in schema release_runtime_recovery from public,anon,authenticated,service_role;
-insert into release_runtime_recovery.batch8_state values(true,'baseline',pg_temp.batch8_runtime_fingerprint(),null,null);
+insert into release_runtime_recovery.batch8_state values(true,'baseline',pg_temp.batch8_runtime_fingerprint(),null,null,null);
 insert into release_runtime_recovery.batch8_baseline_functions
   select p.oid::regprocedure::text from pg_proc p where p.pronamespace='public'::regnamespace and p.prokind='f';
 commit;

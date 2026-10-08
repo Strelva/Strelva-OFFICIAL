@@ -94,7 +94,12 @@ differ from the migration-only fixture, so a local fixture digest is not an
 approved hosted-target fingerprint.
 
 Protected `release_runtime_recovery` metadata stores the baseline, pinned RPC
-identities and exact grant/catalog recovery state. Browser and service roles
+identities and exact grant/catalog recovery state. Disable also pins all role
+OIDs, security attributes and the complete membership graph. Re-enable refuses
+any disabled-phase role drift, checks pinned function OIDs/identities, and checks
+effective browser EXECUTE again after restoring grants inside its transaction.
+Even unrelated role changes require a reviewed recovery; role changes must be
+serialized with this administrative procedure. Passwords are never captured. Browser and service roles
 have no schema or table access. Wrong order, reused captures, catalog or
 identity drift, unknown grantors, browser exposure and inherited EXECUTE bypass
 refuse atomically. Each file is transactional with 3-second lock and 120-second

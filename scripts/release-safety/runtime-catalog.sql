@@ -14,3 +14,16 @@ select jsonb_build_object(
 $catalog$;
 create or replace function pg_temp.batch8_runtime_fingerprint() returns text
 language sql as $$ select encode(sha256(convert_to(pg_temp.batch8_runtime_catalog()::text,'UTF8')),'hex') $$;
+-- Role security is outside public object ACLs. Pin the whole role identity,
+-- attribute and membership graph (no passwords or other credential fields).
+-- Conservative: even an unrelated role change requires a reviewed recovery.
+create or replace function pg_temp.batch8_runtime_role_fingerprint() returns text
+language sql as $$
+  select encode(sha256(convert_to(jsonb_build_object(
+    'roles',(select coalesce(jsonb_agg(jsonb_build_object(
+      'oid',r.oid,'name',r.rolname,'superuser',r.rolsuper,'inherit',r.rolinherit,
+      'createRole',r.rolcreaterole,'createDb',r.rolcreatedb,'login',r.rolcanlogin,
+      'replication',r.rolreplication,'bypassRls',r.rolbypassrls) order by r.oid),'[]'::jsonb) from pg_roles r),
+    'memberships',(select coalesce(jsonb_agg(to_jsonb(m) order by m.roleid,m.member,m.grantor),'[]'::jsonb) from pg_auth_members m)
+  )::text,'UTF8')),'hex')
+$$;

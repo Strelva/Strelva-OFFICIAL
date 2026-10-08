@@ -121,6 +121,7 @@ function main() {
     sql(admin, { text: "create role batch8_inherited noinherit; grant execute on function public.read_owner_decision_website_preview(uuid,uuid,text,text) to batch8_inherited; grant batch8_inherited to service_role;" });
     expectRefusal(admin, () => recover(admin, "disable-batch8-runtime.sql"), "Inherited privilege bypass", "batch8_runtime_recovery_inherited_execute");
     sql(admin, { text: "revoke batch8_inherited from service_role; revoke execute on function public.read_owner_decision_website_preview(uuid,uuid,text,text) from batch8_inherited; drop role batch8_inherited;" });
+    sql(admin, { text: "create role batch8_browser_bridge inherit;" });
     for (let round = 1; round <= 2; round++) {
       recover(admin, "disable-batch8-runtime.sql");
       const disabled = catalog(admin, root);
@@ -142,6 +143,18 @@ function main() {
       sql(admin, { text: "create function public.runtime_recovery_drift_probe() returns boolean language sql as $$ select true $$;" });
       expectRefusal(admin, () => recover(admin, "enable-batch8-runtime.sql"), "Unreviewed catalog drift", "batch8_runtime_recovery_catalog_drift");
       sql(admin, { text: "drop function public.runtime_recovery_drift_probe();" });
+      // Role memberships/attributes are outside the public object catalog.
+      // Refusals must leave service grants dark and protected recovery disabled.
+      for (const drift of [
+        { label: "Direct disabled-phase browser inheritance", apply: "grant service_role to authenticated;", undo: "revoke service_role from authenticated;" },
+        { label: "Transitive disabled-phase browser inheritance", apply: "grant service_role to batch8_browser_bridge; grant batch8_browser_bridge to authenticated;", undo: "revoke batch8_browser_bridge from authenticated; revoke service_role from batch8_browser_bridge;" },
+        { label: "Disabled-phase browser superuser", apply: "alter role anon superuser;", undo: "alter role anon nosuperuser;" },
+      ]) {
+        sql(admin, { text: drift.apply });
+        expectRefusal(admin, () => recover(admin, "enable-batch8-runtime.sql"), drift.label, "batch8_runtime_recovery_role_drift");
+        if (sql(admin, { text: "select (select state='disabled' from release_runtime_recovery.batch8_state where singleton) and not exists(select 1 from release_runtime_recovery.batch8_grants where has_function_privilege('service_role',function_oid,'execute'));" }) !== "t") throw new Error(drift.label + " reopened service execution");
+        sql(admin, { text: drift.undo });
+      }
       recover(admin, "enable-batch8-runtime.sql");
       assertEqual(catalog(admin, root), forward, "Reactivation did not reproduce entire secured catalog");
       assertEqual(data(admin), rows, "Reactivation changed retained evidence");
@@ -150,7 +163,7 @@ function main() {
     }
     const receipt = { scope: "local forward-only batch8 schema; permission recovery only; no hosted/provider effects exercised", files: items.length, correctiveTails: tails,
       introducedFunctions: added.length, tables: Object.keys(forward.tables ?? {}).length, runtimeRecoveryRounds: 2,
-      exactCatalogReproduced: true, exactPublicRowsPreserved: true, legacyBehavior: true, failClosed: ["baseline overwrite", "wrong approved hash", "wrong state", "catalog drift", "browser privilege bypass", "inherited privilege bypass", "actual denied RPC invocation"] };
+      exactCatalogReproduced: true, exactPublicRowsPreserved: true, legacyBehavior: true, failClosed: ["baseline overwrite", "wrong approved hash", "wrong state", "catalog drift", "browser privilege bypass", "inherited privilege bypass", "actual denied RPC invocation", "disabled-phase direct/transitive browser inheritance", "disabled-phase superuser drift"] };
     const out = join(root, "output/release-safety", "batch8-" + Date.now());
     mkdirSync(out, { recursive: true, mode: 0o700 });
     writeFileSync(join(out, "runtime-recovery-receipt.json"), JSON.stringify(receipt, null, 2) + "\n", { mode: 0o600 });

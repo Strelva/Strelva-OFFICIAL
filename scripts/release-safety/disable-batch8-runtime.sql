@@ -55,6 +55,7 @@ begin
       and has_function_privilege('service_role',p.oid,'execute')) then
     raise exception 'batch8_runtime_recovery_inherited_execute';
   end if;
-  update release_runtime_recovery.batch8_state set state='disabled',disabled_fingerprint=pg_temp.batch8_runtime_fingerprint() where singleton;
+  update release_runtime_recovery.batch8_state set state='disabled',disabled_fingerprint=pg_temp.batch8_runtime_fingerprint(),
+    disabled_role_fingerprint=pg_temp.batch8_runtime_role_fingerprint() where singleton;
 end $$;
 commit;
