@@ -1,4 +1,4 @@
-import { createSystemVersions, VersionAccessError, VersionStaleError, VersionValidationError, type VersionConflictResolution, type JsonValue, type SystemRevisionRef, type VersionContext } from "@/platform/system-versions";
+import { createSystemVersions, isRevisionQualified, VersionAccessError, VersionStaleError, VersionValidationError, type VersionConflictResolution, type JsonValue, type SystemRevisionRef, type VersionContext } from "@/platform/system-versions";
 import { createSupabaseConnectionOwnership, createSupabaseVersionStore, readVersionActor, versionsDb, type VersionsDb } from "@/platform/system-versions/supabase-store";
 import { prepareVersionRelease } from "@/platform/system-versions/preparation";
 import { projectVersionPossibilities } from "@/platform/system-versions/possibilities";
@@ -35,7 +35,7 @@ export async function readVersionCreationChoices(actor: WorkspaceActor, agencyWo
   const library = await readAgencyLibrary(actor, agencyWorkspaceId, db);
   const versionActor = await readVersionActor(actor, db), store = createSupabaseVersionStore(db);
   return { workspaceId: agencyWorkspaceId, sources: await Promise.all(library.sources.map(async source => ({ systemId: source.systemId, name: source.name,
-    revisions: (await store.listRevisions(versionActor, { businessId: agencyWorkspaceId, systemId: source.systemId })).map(revision => ({ source: revision.source, summary: revision.summary })) }))) };
+    revisions: (await store.listRevisions(versionActor, { businessId: agencyWorkspaceId, systemId: source.systemId })).filter(isRevisionQualified).map(revision => ({ source: revision.source, summary: revision.summary })) }))) };
 }
 
 export async function readVersionManagement(actor: WorkspaceActor, workspaceId: string, systemId: string, db: VersionsDb = versionsDb()) {

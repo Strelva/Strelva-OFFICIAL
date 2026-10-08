@@ -42,6 +42,8 @@ export interface SystemPageProps {
   appBase?: string;
   /** No management or requests for changes (shared read-only, member, or stopped workspace). */
   readOnly: boolean;
+  /** Version endpoints return exact installation authority; stopped work still blocks it. */
+  versionReadOnly?: boolean;
   /** Runtime use can remain available to members who cannot manage the System. */
   useReadOnly?: boolean;
   rebuildEnabled?: boolean;
@@ -143,11 +145,11 @@ export function SystemPage(props: SystemPageProps) {
         {filesRequests && askingChange ? <WebsiteChangeAsk workspaceId={props.workspaceId} systemId={system.id} siteName={system.name} onFiled={() => setDetailVersion(version => version + 1)} onClose={() => setAskingChange(false)} /> : null}
         {system.kind === "website" && websiteDetail ? <WebsiteSystemPanels workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} onAsk={onAsk} onAskChange={filesRequests ? () => setAskingChange(true) : undefined} readOnly={readOnly} includeHistory={false} /> : null}
         {system.activations?.length ? <ActivationsPanel system={system} /> : null}
-        {system.possibilities.length || system.storedVersionId ? <PossibilitiesPanel system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={comparing && mode !== "current" ? comparing.id : null} onCompare={system.surface.kind === "website" ? compare : undefined} onAsk={onAsk} /> : null}
+        {system.possibilities.length || system.storedVersionId ? <PossibilitiesPanel versionReadOnly={props.versionReadOnly} system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={comparing && mode !== "current" ? comparing.id : null} onCompare={system.surface.kind === "website" ? compare : undefined} onAsk={onAsk} /> : null}
         {system.connections.length || system.offers?.length || siteHref || (websiteDetail?.status === "ready" && websiteDetail.detail.domains.length) ? <ConnectionsPanel system={system.kind === "website" && websiteDetail?.status === "ready" ? { ...system, connections: [...system.connections, ...websiteDomainConnections(websiteDetail.detail)] } : system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} siteHref={siteHref} /> : null}
         <PartsPanel system={system} />
         {system.versions.length ? <VersionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} /> : null}
-        {system.storedVersionId ? <Panel id={`${system.id}-version-draft`} title="Version draft" count={1} intro="Local changes, accounts and earlier releases belong to this business."><SystemVersionManagement key={`${props.workspaceId}:${system.id}`} workspaceId={props.workspaceId} systemId={system.id} versionId={system.storedVersionId} readOnly={readOnly} /></Panel> : null}
+        {system.storedVersionId ? <Panel id={`${system.id}-version-draft`} title="Version draft" count={1} intro="Local changes, accounts and earlier releases belong to this business."><SystemVersionManagement key={`${props.workspaceId}:${system.id}`} workspaceId={props.workspaceId} systemId={system.id} versionId={system.storedVersionId} readOnly={props.versionReadOnly ?? readOnly} /></Panel> : null}
         {system.kind === "website" && websiteDetail?.status === "ready" ? <WebsiteHistoryPanel workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} systemHistory={system.history} canRestore={!readOnly && (props.operator || (props.canMakeReal ?? true))} appBase={props.appBase} onPrepared={() => setDetailVersion(version => version + 1)} onAskRestore={filesRequests ? () => setAskingChange(true) : undefined} />
           : system.history?.length ? <HistoryPanel system={system} /> : null}
         {system.audits?.length ? <AuditsPanel system={system} workspaceId={props.workspaceId} appBase={props.appBase || ""} /> : null}
@@ -311,7 +313,7 @@ function MakeRealState({ outcome, onAsk, title }: { outcome: MakeRealOutcome; on
   </div>;
 }
 
-function PossibilitiesPanel({ system, systems, workspaceId, readOnly, readOnlyReason, canMakeReal, makeRealReason, appBase, comparingId, onCompare, onAsk }: { system: SystemView; systems: readonly SystemView[]; workspaceId: string; readOnly: boolean; readOnlyReason?: string; canMakeReal: boolean; makeRealReason?: string; appBase: string; comparingId: string | null; onCompare?: (possibility: SystemPossibility) => void; onAsk: (request: string) => void }) {
+function PossibilitiesPanel({ versionReadOnly, system, systems, workspaceId, readOnly, readOnlyReason, canMakeReal, makeRealReason, appBase, comparingId, onCompare, onAsk }: { versionReadOnly?: boolean; system: SystemView; systems: readonly SystemView[]; workspaceId: string; readOnly: boolean; readOnlyReason?: string; canMakeReal: boolean; makeRealReason?: string; appBase: string; comparingId: string | null; onCompare?: (possibility: SystemPossibility) => void; onAsk: (request: string) => void }) {
   const request = useWorkspaceRequest();
   const [outcome, setOutcome] = useState<{ id: string; outcome: MakeRealOutcome } | null>(null);
   const [running, setRunning] = useState<string | null>(null);
@@ -342,7 +344,7 @@ function PossibilitiesPanel({ system, systems, workspaceId, readOnly, readOnlyRe
         {outcome?.id === possibility.id ? <MakeRealState outcome={outcome.outcome} onAsk={onAsk} title={possibility.title} /> : null}
       </li>;
     })}</ul> : system.storedVersionId ? null : <p className="mt-3">No alternatives are being explored. <button type="button" className="underline" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={() => onAsk(`What else could ${system.name} become? `)}>Ask what else it could become</button></p>}
-    {system.storedVersionId ? <SystemVersionImprovements key={`${workspaceId}:${system.id}:${system.storedVersionId}`} workspaceId={workspaceId} systemId={system.id} versionId={system.storedVersionId} readOnly={readOnly} canMakeReal={canMakeReal} onCount={setVersionCount} /> : null}
+    {system.storedVersionId ? <SystemVersionImprovements key={`${workspaceId}:${system.id}:${system.storedVersionId}`} workspaceId={workspaceId} systemId={system.id} versionId={system.storedVersionId} readOnly={versionReadOnly ?? readOnly} canMakeReal={canMakeReal} onCount={setVersionCount} /> : null}
   </Panel>;
 }
 

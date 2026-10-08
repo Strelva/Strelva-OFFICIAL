@@ -5,23 +5,9 @@
  * no release-manifest key. They exist so lineage can be adopted object by
  * object without renaming anything that is already deployed.
  */
-import type { JsonObject } from "./compare";
 import { projectedRevisionRef, type SystemRef, type SystemRevisionRef } from "./refs";
 import type { VersionContext } from "./types";
-import type { OfferingDefinitionView, OfferingInstallationRecord } from "@/platform/offerings/types";
 import type { AgencyManagedWebsiteDraftGrant } from "@/platform/offerings/agency-website-draft-contracts";
-
-/**
- * Platform-authored definitions are owned by Strelva's own agency workspace,
- * a real workspace id read from `platform_workspaces` (role
- * `strelva_agency`, set by an operator) through `resolveStrelvaAgencyWorkspaceId`
- * in ./supabase-store.ts. There is no string stand-in: until an operator
- * names the workspace, Strelva-authored sources do not project at all.
- */
-export interface StrelvaAuthor {
-  /** Strelva's agency workspace id. */
-  businessId: string;
-}
 
 /**
  * Offering versions are semver strings; lineage revisions are integers.
@@ -35,36 +21,6 @@ export function revisionFromSemver(version: string): number {
 
 export function semverFromRevision(revision: number): string {
   return `${Math.floor(revision / 1_000_000)}.${Math.floor(revision / 1_000) % 1_000}.${revision % 1_000}`;
-}
-
-export interface SourceRevisionProjection {
-  source: SystemRevisionRef;
-  label: string;
-  definition: JsonObject;
-  requires: { bindingKinds: string[] };
-}
-
-/** An offering definition is a Strelva-authored source System revision. */
-export function offeringDefinitionAsSource(definition: OfferingDefinitionView, author: StrelvaAuthor): SourceRevisionProjection {
-  return {
-    source: projectedRevisionRef(
-      { businessId: author.businessId, systemId: `offering:${definition.id}` },
-      revisionFromSemver(definition.version),
-    ),
-    label: definition.version,
-    // The shareable part only: copy, scopes, surfaces and configuration shape.
-    definition: JSON.parse(JSON.stringify({
-      name: definition.name,
-      description: definition.description,
-      scopes: definition.scopes,
-      surfaces: definition.surfaces,
-      configurationFields: definition.configurationFields,
-      requiredResources: definition.requiredResources,
-    })) as JsonObject,
-    requires: {
-      bindingKinds: [...new Set(definition.requiredResources.filter((item) => item.minimum > 0).map((item) => item.kind))].sort(),
-    },
-  };
 }
 
 export interface VersionProjection {
@@ -82,31 +38,9 @@ export interface VersionProjection {
   lifecycle: "candidate" | "released" | "retired";
 }
 
-/**
- * An offering installation is a Version of the offering source owned by the
- * installing business. Configuration is the override set; native resources are
- * local bindings. Context is not recorded today, so it is null.
- */
-export function offeringInstallationAsVersion(installation: OfferingInstallationRecord, author: StrelvaAuthor): VersionProjection {
-  return {
-    version: { businessId: installation.businessId, systemId: `offering-installation:${installation.id}` },
-    source: projectedRevisionRef(
-      { businessId: author.businessId, systemId: `offering:${installation.definitionId}` },
-      revisionFromSemver(installation.definitionVersion),
-    ),
-    context: null,
-    overridePaths: Object.keys(installation.configuration).sort().map((key) => `configuration.${key}`),
-    bindings: installation.nativeResources.map((resource) => ({
-      kind: resource.kind,
-      connectionId: resource.id,
-      ownerBusinessId: installation.businessId,
-    })),
-    // Activation is the only release an installation has today: one release.
-    currentRelease: installation.status === "draft" ? null : 1,
-    rowRevision: installation.revision,
-    lifecycle: installation.status === "draft" ? "candidate" : installation.status === "active" ? "released" : "retired",
-  };
-}
+/** Native offerings now use offering_package_sources and persisted system_versions.
+ * Historical adoption is an explicit operator command; an installation without
+ * those durable IDs has no creator lineage. Never fabricate one from semver. */
 
 /**
  * Structural copy of the inquiry PatternInstallation fields lineage needs.

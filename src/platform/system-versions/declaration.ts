@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { assertShareableDefinition, changedPaths, type JsonObject } from "./compare";
+import { listOfferingDefinitions } from "../offerings/definitions";
+import { assertShareableDefinition, jsonEqual, changedPaths, type JsonObject } from "./compare";
 import { VersionValidationError, type SourceRevision } from "./types";
 
 const names = z.array(z.string().trim().min(1).max(160)).max(100).refine(values => new Set(values).size === values.length, "Declaration entries must be unique.");
@@ -28,6 +29,12 @@ export function effectivePackageBehavior(definition: JsonObject, bindingKinds: r
     });
     if (new Set(definition.systems.map(item => (item as JsonObject).key)).size !== definition.systems.length) throw new VersionValidationError("Bundle System keys must be unique.");
     return packageDeclarationSchema.parse(Object.fromEntries(Object.keys(parts[0]!).map(key => [key, [...new Set(parts.flatMap(part => part[key as keyof PackageDeclaration]))].sort()])));
+  }
+  if (definition.kind === "offering") {
+    const fixed = listOfferingDefinitions().find(item => item.id === definition.offeringId && item.version === definition.offeringVersion);
+    if (!fixed || !jsonEqual(definition, { kind: "offering", offeringId: fixed.id, offeringVersion: fixed.version, name: fixed.name, description: fixed.description, requiredResources: JSON.parse(JSON.stringify(fixed.requiredResources)), scopes: JSON.parse(JSON.stringify(fixed.scopes)), surfaces: JSON.parse(JSON.stringify(fixed.surfaces)), configurationFields: JSON.parse(JSON.stringify(fixed.configurationFields)) })) throw new VersionValidationError("This offering has no exact native definition adapter.");
+    const staff = fixed.id === "private_staff_requests", inquiry = fixed.id === "customer_inquiry_intake";
+    return packageDeclarationSchema.parse({ recordsRead: staff ? ["application.records"] : inquiry ? ["inquiries"] : ["website.content","website.requests"], recordsWritten: staff ? ["application.records"] : inquiry ? ["inquiries","inquiry.actions"] : ["website.requests"], businessRecordFields: staff ? ["contacts.id","contacts.name","people.id","people.name"] : [], outsideEffects: inquiry ? ["email"] : staff ? [] : ["publish"], bindingKinds: [fixed.requiredResources[0]!.kind], dataLeavingBusiness: inquiry ? ["approved email recipients"] : staff ? [] : ["approved public website content"] });
   }
   if (definition.kind !== "internal_app" || Object.keys(definition).some(key => !["kind", "title", "fields", "components"].includes(key)) || !Array.isArray(definition.fields) || !Array.isArray(definition.components)) throw new VersionValidationError("This runtime has no verified package declaration adapter.");
   const fields = definition.fields as JsonObject[];

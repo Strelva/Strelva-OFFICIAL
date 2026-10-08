@@ -1,24 +1,20 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { listOfferingDefinitions, getOfferingDefinition } from "@/platform/offerings/definitions";
-import type { OfferingInstallationRecord } from "@/platform/offerings/types";
+import { listOfferingDefinitions } from "@/platform/offerings/definitions";
 import type { AgencyManagedWebsiteDraftGrant } from "@/platform/offerings/agency-website-draft-contracts";
 import {
   RELEASE_AXIS_FIELDS,
   agencyWebsiteDraftAsPossibility,
   assertShareableDefinition,
-  offeringDefinitionAsSource,
+  effectivePackageBehavior,
   multiSiteAccountAsVersions,
-  offeringInstallationAsVersion,
   patternInstallationAsVersion,
   revisionFromSemver,
   semverFromRevision,
   threeWayCompare,
 } from "@/platform/system-versions";
 
-/** Strelva's agency workspace, as read from platform_workspaces (fictional id). */
-const STRELVA = { businessId: "9e000000-0000-4000-8000-000000000020" };
 
 describe("three-way compare", () => {
   const base = { a: { x: 1, y: 2 }, list: [1, 2], keep: "same" };
@@ -50,42 +46,14 @@ describe("three-way compare", () => {
 });
 
 describe("existing objects as source Systems and Versions", () => {
-  it("projects every offering definition as a shareable source revision", () => {
+  it("declares all three exact native offering wrappers; source identity comes from stored SQL", () => {
     for (const definition of listOfferingDefinitions()) {
-      const source = offeringDefinitionAsSource(definition, STRELVA);
-      expect(source.source.businessId).toBe(STRELVA.businessId);
-      expect(semverFromRevision(source.source.number)).toBe(definition.version);
-      expect(() => assertShareableDefinition(source.definition)).not.toThrow();
-      expect(source.requires.bindingKinds.length).toBeGreaterThan(0);
+      const closed = JSON.parse(JSON.stringify({ kind: "offering", offeringId: definition.id, offeringVersion: definition.version, name: definition.name, description: definition.description, requiredResources: definition.requiredResources, scopes: definition.scopes, surfaces: definition.surfaces, configurationFields: definition.configurationFields }));
+      expect(() => assertShareableDefinition(closed)).not.toThrow();
+      expect(effectivePackageBehavior(closed).bindingKinds).toEqual([definition.requiredResources[0]!.kind]);
+      expect(() => effectivePackageBehavior({ ...closed, offeringVersion: "99.0.0" })).toThrow();
     }
-    expect(revisionFromSemver("1.2.3")).toBeLessThan(revisionFromSemver("1.10.0"));
-  });
-
-  it("projects an offering installation as a business-owned Version pinned to the definition", () => {
-    const definition = getOfferingDefinition("private_staff_requests")!;
-    const installation: OfferingInstallationRecord = {
-      id: "inst_1",
-      businessId: "biz_mooney",
-      definitionId: definition.id,
-      definitionVersion: definition.version,
-      status: "active",
-      revision: 4,
-      configuration: { displayName: "Paralegal requests" },
-      nativeResources: [{ kind: "application", id: "app_1" }],
-      responsibility: { kind: "customer_operated", providerName: "The Mooney Firm" },
-      acceptedScope: ["submit_requests", "review_requests"],
-      surfaceIds: ["staff_app"],
-      installedBy: "u1",
-      installedAt: "2026-10-01T00:00:00.000Z",
-      updatedBy: "u1",
-      updatedAt: "2026-10-01T00:00:00.000Z",
-    };
-    const version = offeringInstallationAsVersion(installation, STRELVA);
-    expect(version.version).toEqual({ businessId: "biz_mooney", systemId: "offering-installation:inst_1" });
-    expect(version.source).toEqual(offeringDefinitionAsSource(definition, STRELVA).source);
-    expect(version.overridePaths).toEqual(["configuration.displayName"]);
-    expect(version.bindings).toEqual([{ kind: "application", connectionId: "app_1", ownerBusinessId: "biz_mooney" }]);
-    expect(version).toMatchObject({ currentRelease: 1, rowRevision: 4, lifecycle: "released" });
+    expect(semverFromRevision(revisionFromSemver("1.2.3"))).toBe("1.2.3");
   });
 
   it("projects an inquiry pattern installation as cross-business lineage", () => {

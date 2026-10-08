@@ -2,7 +2,7 @@
  * stores. No provider write, message, client grant or owner decision is implied. */
 import { z } from "zod";
 import { applicationSchema } from "@/products/applications/contracts";
-import { rehearseApplicationPackage } from "@/products/applications/package-rehearsal";
+import { rehearseApplicationPackage } from "@/products/applications/server";
 import { createWorkPlan, executeWorkPlanOutput, presentWorkPlan, type CreateWorkPlanRequest, type ExecuteWorkPlanOutputRequest } from "@/products/work-plans";
 import { getWork, WorkspaceAccessError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces";
 import { createSupabaseSystemStore, listBusinessSystems, type SystemStore } from "@/platform/systems";
