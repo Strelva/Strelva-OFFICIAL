@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createInMemoryConnectionOwnership, createInMemoryVersionStore, createSystemVersions } from "@/platform/system-versions";
+import { createInMemoryConnectionOwnership, createInMemoryVersionStore, createSystemVersions, declareApplicationPackage } from "@/platform/system-versions";
 import { prepareVersionRelease } from "@/platform/system-versions/preparation";
 import { readVersionRuntime } from "@/platform/system-versions/native-runtime";
 import type { VersionsDb } from "@/platform/system-versions/supabase-store";
@@ -9,7 +9,7 @@ async function fixture() {
   const businessId = crypto.randomUUID(), systemId = crypto.randomUUID();
   const versionActor = { userId: actor.userId, memberships: [{ businessId, role: "owner" as const }] };
   const versions = createSystemVersions({ store: createInMemoryVersionStore(), connections: createInMemoryConnectionOwnership() });
-  const revision = await versions.publishSourceRevision(versionActor, { source: { businessId, systemId }, definition: { kind: "internal_app", title: "Intake" }, summary: "First" });
+  const revision = await versions.publishSourceRevision(versionActor, { source: { businessId, systemId }, definition: declareApplicationPackage({ kind: "internal_app", title: "Intake", fields: [{ id: "problem", label: "Problem", type: "text", required: true }], components: [{ kind: "form", fields: ["problem"] }] }), summary: "First" });
   const lineage = await versions.createVersion(versionActor, { source: revision.source, version: { businessId, systemId: crypto.randomUUID() }, context: { kind: "location", label: "Local" } });
   return { lineage, versions, versionActor };
 }

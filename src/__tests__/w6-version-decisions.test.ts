@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createInMemoryVersionStore, createInMemoryConnectionOwnership, createSystemVersions, VersionAccessError, VersionStaleError, VersionConflictError, type VersionActor, type VersionStore } from "@/platform/system-versions";
+import { createInMemoryVersionStore, createInMemoryConnectionOwnership, createSystemVersions, declareApplicationPackage, VersionAccessError, VersionStaleError, VersionConflictError, type VersionActor, type VersionStore } from "@/platform/system-versions";
 const deps = vi.hoisted(() => ({ store: null as VersionStore | null, actor: null as VersionActor | null, prepare: vi.fn(), enabled: true, systems: true }));
 vi.mock("@/platform/system-versions/supabase-store", () => ({ createSupabaseVersionStore: () => deps.store, createSupabaseConnectionOwnership: () => createInMemoryConnectionOwnership(), readVersionActor: async () => deps.actor, versionsDb: () => ({}) }));
 vi.mock("@/platform/system-versions/preparation", () => ({ prepareVersionRelease: deps.prepare }));
@@ -10,32 +10,41 @@ import { decideSystemImprovement, readSystemVersion, manageBusinessVersion } fro
 const workspaceId = crypto.randomUUID(), systemId = crypto.randomUUID(), agencyId = crypto.randomUUID();
 const actor = { userId: crypto.randomUUID(), verifiedEmail: "operator@example.test" };
 const versionActor: VersionActor = { ...actor, memberships: [{ businessId: workspaceId, role: "admin" }, { businessId: agencyId, role: "owner" }] };
-async function setup(conflict = false) {
+function applicationDefinition(title: string, added = false) {
+  return declareApplicationPackage({ kind: "internal_app", title,
+    fields: [{ id: "problem", label: "Problem", type: "text", required: true },
+      ...(added ? [{ id: "added", label: "Later field", type: "text", required: false }] : [])],
+    components: [{ kind: "form", fields: ["problem"] }],
+  });
+}
+async function setup(conflict = false, native = false) {
   const store = createInMemoryVersionStore(); deps.store = store; deps.actor = versionActor;
   const versions = createSystemVersions({ store, connections: createInMemoryConnectionOwnership() });
   const source = { businessId: agencyId, systemId: crypto.randomUUID() };
-  const first = await versions.publishSourceRevision(versionActor, { source, definition: { text: "Old" }, summary: "First" });
+  const first = await versions.publishSourceRevision(versionActor, { source, definition: native ? applicationDefinition("Old") : { text: "Old" }, summary: "First" });
   await versions.shareSource(versionActor, source, workspaceId);
   let lineage = await versions.createVersion(versionActor, { source: first.source, version: { businessId: workspaceId, systemId }, context: { kind: "agency_client", label: "Harbor" } });
   if (conflict) lineage = await versions.setOverride(versionActor, lineage.id, { path: "text", value: "Local", expectedRowRevision: lineage.rowRevision });
-  await versions.publishSourceRevision(versionActor, { source, definition: { text: "New" }, summary: "Second" });
+  await versions.publishSourceRevision(versionActor, { source, definition: native ? applicationDefinition("New", true) : { text: "New" }, summary: "Second" });
   const input = { workspaceId, systemId, versionId: lineage.id, rowRevision: lineage.rowRevision, revision: 2, action: "adopt" as const };
   return { versions, lineage, input, source };
 }
 beforeEach(() => { deps.enabled = true; deps.systems = true; deps.prepare.mockReset().mockImplementation(async (_actor, lineage) => ({ receiptId: crypto.randomUUID(), decisionId: crypto.randomUUID(), workspaceId, versionId: lineage.id, rowRevision: lineage.rowRevision })); });
 describe("Version improvement decisions", () => {
   it("restores an earlier release into a draft, removing new fields without moving the baseline or Live backward", async () => {
-    const { versions, input, source } = await setup();
+    const { versions, input, source } = await setup(false, true);
     let current = (await versions.readVersion(versionActor, input.versionId));
     const first = await versions.release(versionActor, input.versionId, { expectedRowRevision: input.rowRevision });
     const adopted = await versions.adoptImprovement(versionActor, input.versionId, { revision: 2, expectedRowRevision: first.rowRevision });
-    const added = await versions.setOverride(versionActor, input.versionId, { path: "added", value: "Later field", expectedRowRevision: adopted.rowRevision });
+    const added = await versions.setOverride(versionActor, input.versionId, { path: "title", value: "Locally adapted", expectedRowRevision: adopted.rowRevision });
     const second = await versions.release(versionActor, input.versionId, { expectedRowRevision: added.rowRevision });
     const restored = await manageBusinessVersion(actor, { ...input, action: "restore", releaseNumber: 1, rowRevision: second.rowRevision });
     current = await versions.readVersion(versionActor, input.versionId);
     expect(restored.outcome).toBe("saved");
-    expect(current).toMatchObject({ currentRelease: 2, baselineRevision: 2, workingDefinition: { text: "Old" } });
-    expect(current.workingDefinition).not.toHaveProperty("added");
+    const restoredDefinition = { ...applicationDefinition("Old"), declaration: applicationDefinition("New", true).declaration };
+    expect(current).toMatchObject({ currentRelease: 2, baselineRevision: 2, workingDefinition: restoredDefinition });
+    expect(current.workingDefinition.fields).toEqual(applicationDefinition("Old").fields);
+    expect(second.releases[1]!.definition.fields).toHaveLength(2);
     expect(current.releases).toEqual(second.releases);
     expect(deps.prepare).not.toHaveBeenCalled();
     deps.enabled = false;
@@ -43,10 +52,10 @@ describe("Version improvement decisions", () => {
     deps.enabled = true;
     expect(await manageBusinessVersion(actor, { ...input, action: "prepare_release", rowRevision: restored.rowRevision })).toMatchObject({ outcome: "prepared", rowRevision: restored.rowRevision });
     expect((await versions.readVersion(versionActor, input.versionId)).currentRelease).toBe(2);
-    await versions.publishSourceRevision(versionActor, { source, definition: { text: "Third", added: "Upstream field" }, summary: "Third" });
-    expect((await versions.compareImprovement(versionActor, input.versionId, 3)).conflicts).toMatchObject([{ path: "*", local: { text: "Old" } }]);
+    await versions.publishSourceRevision(versionActor, { source, definition: applicationDefinition("Third", true), summary: "Third" });
+    expect((await versions.compareImprovement(versionActor, input.versionId, 3)).conflicts).toMatchObject([{ path: "*", local: { title: "Old" } }]);
     const kept = await versions.adoptImprovement(versionActor, input.versionId, { revision: 3, expectedRowRevision: restored.rowRevision, resolutions: [{ path: "*", choice: "keep_local" }] });
-    expect((await versions.readVersion(versionActor, kept.id)).workingDefinition).toEqual({ text: "Old" });
+    expect((await versions.readVersion(versionActor, kept.id)).workingDefinition).toEqual(restoredDefinition);
   });
   it("checks stale, foreign, missing History, permission and account ownership before changing a Version", async () => {
     const { input, versions } = await setup();

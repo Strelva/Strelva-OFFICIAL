@@ -211,6 +211,9 @@ export function threeWayCompare(input: ThreeWayInput): ThreeWayResult {
 
 const SECRET_LIKE = /(?:-----BEGIN [^-]+ KEY-----|\b(?:sk|pk|ghp|xox[baprs])-[-_A-Za-z0-9]+|\b(?:api[_-]?key|secret|password|token|authorization)\s*[:=])/i;
 const SENSITIVE_KEYS = new Set([
+  "__proto__",
+  "constructor",
+  "prototype",
   "accessToken",
   "apiKey",
   "bindings",

@@ -10,11 +10,13 @@ import {
   type JsonValue,
 } from "./compare";
 import { sameSystem, type SystemRef, type SystemRevisionRef } from "./refs";
+import { assertDeclaredPackageBehavior } from "./declarations";
 import type { ConnectionOwnership, VersionStore } from "./store";
 import {
   VERSION_CONTEXT_KINDS,
   VersionAccessError,
   VersionConflictError,
+  VersionDeclarationError,
   VersionIncompatibleError,
   VersionStaleError,
   VersionValidationError,
@@ -43,7 +45,8 @@ function overlaps(left: string, right: string): boolean {
 
 function validPath(path: string): string {
   if (path === "*") return path;
-  if (typeof path !== "string" || !/^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$/.test(path) || path.length > 300) {
+  if (typeof path !== "string" || !/^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$/.test(path) || path.length > 300
+    || path.split(".").some(part => ["__proto__", "constructor", "prototype"].includes(part))) {
     throw new VersionValidationError("The override path is invalid.");
   }
   return path;
@@ -163,6 +166,12 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
     ): Promise<SourceRevision> {
       requireManage(actor, input.source.businessId);
       assertShareableDefinition(input.definition);
+      // Non-native sources also serve product-specific draft planners (for
+      // example Google listing copy). They cannot use this release path.
+      // Native packages and every supplied declaration must be inspected.
+      if (input.definition.kind === "internal_app" || input.definition.declaration !== undefined) {
+        assertDeclaredPackageBehavior(input.definition, input.definition.declaration, input.requires?.bindingKinds ?? []);
+      }
       if (!(await store.getSource(actor, input.source))) await store.putSource(actor, { source: input.source, sharedWith: [], createdAt: now() });
       const previous = (await store.listRevisions(actor, input.source)).at(-1);
       const revision: SourceRevision = {
@@ -243,6 +252,9 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
       const lineage = await loadOwned(actor, versionId, true);
       if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
       const path = validPath(input.path);
+      if (path === "declaration" || path.startsWith("declaration.")) {
+        throw new VersionDeclarationError("Declarations belong to the immutable source revision. Publish and adopt a new revision to change one.");
+      }
       const at = now();
       const restored = lineage.overrides.find(override => override.path === "*");
       if (path === "*" || restored) {
@@ -315,7 +327,11 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
       const release = lineage.releases.find(item => item.number === input.releaseNumber);
       if (!release) throw new VersionValidationError("That release is not in this Version's History.");
       assertShareableDefinition(release.definition);
-      return save(actor, { ...lineage, overrides: [{ path: "*", value: cloneJson(release.definition), setBy: actor.userId, setAt: now() }] }, input.expectedRowRevision);
+      const definition = cloneJson(release.definition);
+      // Restoring old behavior never restores an old permission ceiling.
+      if (lineage.baseline.definition.declaration !== undefined) definition.declaration = cloneJson(lineage.baseline.definition.declaration);
+      else delete definition.declaration;
+      return save(actor, { ...lineage, overrides: [{ path: "*", value: definition, setBy: actor.userId, setAt: now() }] }, input.expectedRowRevision);
     },
 
     async putLocalData(actor: VersionActor, versionId: string, input: { key: string; value: JsonValue; expectedRowRevision: number }): Promise<VersionLineage> {
@@ -405,6 +421,14 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
       if (!jsonEqual(working(next), expectedResult)) {
         throw new VersionValidationError("Adopting this revision would change local edits beyond the preview. Nothing was changed.");
       }
+      // A whole-definition local edit may retain behavior, but never old or
+      // caller-expanded declaration metadata after adopting new authority.
+      for (const override of next.overrides) {
+        if (override.path !== "*") continue;
+        const definition = override.value as JsonObject;
+        if (revision.definition.declaration !== undefined) definition.declaration = cloneJson(revision.definition.declaration);
+        else delete definition.declaration;
+      }
       return save(actor, next, input.expectedRowRevision);
     },
 
@@ -424,6 +448,19 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
       const lineage = await loadOwned(actor, versionId, true);
       if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
       const definition = working(lineage);
+      const source = await store.getPinnedRevision(actor, lineage.id);
+      if (!source || source.source.number !== lineage.baseline.revision || !sameSystem(source.source, lineage.source)
+        || !jsonEqual(source.definition, lineage.baseline.definition)) throw new VersionDeclarationError("The immutable source revision could not be confirmed. Nothing was released.");
+      assertDeclaredPackageBehavior(definition, source.definition.declaration, source.requires.bindingKinds);
+      if (!jsonEqual(definition.declaration, source.definition.declaration)) throw new VersionDeclarationError("Local edits cannot change the source revision's declaration.");
+      const missing: string[] = [];
+      for (const kind of source.requires.bindingKinds) {
+        const binding = lineage.bindings.find(item => item.kind === kind);
+        if (!binding || binding.ownerBusinessId !== lineage.version.businessId
+          || await connections.ownerOf(actor, binding.connectionId) !== lineage.version.businessId
+          || await store.connectionHolder(actor, binding.connectionId) !== lineage.id) missing.push(kind);
+      }
+      if (missing.length) throw new VersionIncompatibleError(missing);
       const latest = lineage.releases.at(-1);
       if (latest && jsonEqual(latest.definition, definition)) throw new VersionValidationError("Nothing changed since the current release.");
       const number = (latest?.number ?? 0) + 1;

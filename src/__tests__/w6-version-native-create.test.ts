@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { declareApplicationPackage, VersionDeclarationError } from "@/platform/system-versions";
 import type { VersionsDb } from "@/platform/system-versions/supabase-store";
 const deps = vi.hoisted(() => ({ kind: "internal_app", scope: vi.fn() }));
 vi.mock("@/experience/workspace/agency/authoring-server", () => ({ requireAgencyAuthoring: deps.scope }));
@@ -8,7 +9,7 @@ const actor = { userId: crypto.randomUUID(), verifiedEmail: "native-maker@exampl
 const agencyWorkspaceId = crypto.randomUUID(), workspaceId = crypto.randomUUID(), canonicalSystemId = crypto.randomUUID();
 const source = { businessId: agencyWorkspaceId, systemId: crypto.randomUUID(), revisionId: crypto.randomUUID(), number: 1 };
 const input = { agencyWorkspaceId, workspaceId, source, context: { kind: "agency_client" as const, label: "Local client" }, name: "Client intake", commandId: crypto.randomUUID() };
-function database(definition: Record<string, unknown> = { kind: "internal_app", title: "Intake", fields: [{ id: "problem", label: "Problem", type: "text", required: true }], components: [{ kind: "form", fields: ["problem"] }] }) {
+function database(definition: Record<string, unknown> = declareApplicationPackage({ kind: "internal_app", title: "Intake", fields: [{ id: "problem", label: "Problem", type: "text", required: true }], components: [{ kind: "form", fields: ["problem"] }] })) {
   const rpc = vi.fn<VersionsDb["rpc"]>(async (name, args) => {
     if (name === "read_version_actor") return { data: { userId: actor.userId, memberships: [{ businessId: agencyWorkspaceId, role: "owner" }, { businessId: workspaceId, role: "admin" }] }, error: null };
     if (name === "read_system_version_source_revisions") return { data: [{ source, definition, summary: "First", requires: { bindingKinds: [] }, publishedBy: actor.userId, publishedAt: new Date().toISOString() }], error: null };
@@ -26,8 +27,17 @@ describe("public Version creation uses native artifacts", () => {
     expect(await createBusinessVersion(actor, input, db)).toMatchObject({ outcome: "created", systemId: canonicalSystemId });
     const args = db.rpc.mock.calls.find(([name]) => name === "create_version_system_command")![1];
     expect(args).toMatchObject({ p_command_id: input.commandId, p_native_payload: { status: "draft", revision: 0, records: [], history: [], rehearsal: null, createdBy: actor.userId, spec: { maintenanceOwner: actor.userId } } });
+    expect((args.p_native_payload as { spec: unknown }).spec).not.toHaveProperty("declaration");
     expect(db.rpc.mock.calls.filter(([name]) => name === "create_version_system_command")).toHaveLength(1);
     expect(db.rpc.mock.calls.some(([name]) => name === "put_system_version_source" || name === "create_system_version")).toBe(false);
+  });
+  it("refuses an undeclared native source before any create or share write", async () => {
+    const db = database({ kind: "internal_app", title: "Intake",
+      fields: [{ id: "problem", label: "Problem", type: "text", required: true }],
+      components: [{ kind: "form", fields: ["problem"] }],
+    });
+    await expect(createBusinessVersion(actor, input, db)).rejects.toBeInstanceOf(VersionDeclarationError);
+    expect(db.rpc.mock.calls.some(([name]) => name.startsWith("create_") || name.startsWith("put_"))).toBe(false);
   });
   it("refuses unsupported packaged shapes before any create or share write", async () => {
     for (const kind of ["website", "proposal", "booking"]) {

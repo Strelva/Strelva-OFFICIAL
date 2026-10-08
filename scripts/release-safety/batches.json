@@ -1268,8 +1268,14 @@
       "batch": "12",
       "status": "prepared locally; unapplied; qualification required",
       "description": "October 8 prepared backlog successors; no production authority",
-      "note": "Local qualification only. Preserve existing baseline and original batch-8 RPC recovery scope. Audit raw server mutations remain restricted during forward-only application recovery; established lifecycle cleanup remains unchanged.",
+      "note": "Local qualification only. Preserve existing baseline and original batch-8 RPC recovery scope. Audit raw server mutations remain restricted during forward-only application recovery; established lifecycle cleanup remains unchanged. Includes revision declarations from PR 587 before later owner-authority successors in chronological replay; all original five successor pins are preserved.",
       "items": [
+        {
+          "file": "20261019110000_package_declarations.sql",
+          "sha256": "7bc067853cfd285d9654e1bf8fe7b2a7e2293acec0ebd47fd60682eae0cff07c",
+          "rollback": "rollback-20261019110000_package_declarations.sql",
+          "rollbackSha256": "52ffc0e29de2864c363dbd6d0fc5879f14777901f74a81e8ca088dba22ac2d82"
+        },
         {
           "file": "20261020110000_content_publication_authority.sql",
           "sha256": "7ede6209f1c40f785a5a4934fb6ffedc9643676f5c7795f19fc12925222a4078",

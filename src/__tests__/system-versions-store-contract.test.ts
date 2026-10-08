@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   VersionAccessError,
   VersionConflictError,
+  VersionDeclarationError,
   VersionIncompatibleError,
   VersionStaleError,
   VersionValidationError,
   createSystemVersions,
+  declareApplicationPackage,
   type JsonObject,
 } from "@/platform/system-versions";
 import { memoryHarness, postgresHarness, type Harness } from "./support/versions-postgres";
@@ -27,23 +29,40 @@ const intakeV1: JsonObject = {
 };
 const withFollowUp = (message: string): JsonObject => ({ ...intakeV1, followUp: { afterMinutes: 1440, messageTemplate: message } });
 
+function applicationDefinition(title = "Request a consultation", bindingKinds: string[] = []): JsonObject {
+  const definition = declareApplicationPackage({
+    kind: "internal_app", title,
+    fields: [{ id: "problem", label: "Problem", type: "text", required: true }],
+    components: [{ kind: "form", fields: ["problem"] }],
+  });
+  (definition.declaration as JsonObject).bindingKinds = bindingKinds;
+  return definition;
+}
+
 let clock = 0;
 const now = () => new Date(Date.UTC(2026, 9, 7, 12, 0, 0, clock++)).toISOString();
 
-async function agencyFixture(h: Harness) {
+async function agencyFixture(h: Harness, definition: JsonObject = intakeV1, bindingKinds = ["booking_calendar"]) {
   const agency = await h.business("Northside Studio", "agency");
   const mooney = await h.business("The Mooney Firm");
   const lakeside = await h.business("Lakeside Dental");
-  const agencyOwner = await h.actor([{ businessId: agency, role: "owner" }]);
+  const native = definition.kind === "internal_app";
+  const agencyOwner = await h.actor([{ businessId: agency, role: "owner" },
+    ...(native ? [{ businessId: mooney, role: "admin" as const }, { businessId: lakeside, role: "admin" as const }] : []),
+  ]);
   const mooneyOwner = await h.actor([{ businessId: mooney, role: "owner" }]);
   const mooneyMember = await h.actor([{ businessId: mooney, role: "member" }]);
   const lakesideOwner = await h.actor([{ businessId: lakeside, role: "owner" }]);
   const stranger = await h.actor([]);
-  const source = await h.system(agency, "Inquiry intake");
+  if (native) {
+    await h.authorizeNativeBuilder?.(agency, mooney, agencyOwner, mooneyOwner);
+    await h.authorizeNativeBuilder?.(agency, lakeside, agencyOwner, lakesideOwner);
+  }
+  const source = await h.system(agency, "Inquiry intake", native ? "internal_app" : "inquiry");
   const mooneySystem = await h.system(mooney, "Inquiries");
   const lakesideSystem = await h.system(lakeside, "Inquiries");
-  const versions = createSystemVersions({ store: h.store, connections: h.connections, now });
-  const v1 = await versions.publishSourceRevision(agencyOwner, { source, definition: intakeV1, requires: { bindingKinds: ["booking_calendar"] }, summary: "Consultation intake", label: "1.0.0" });
+  const versions = createSystemVersions({ store: native && h.nativeStore ? h.nativeStore : h.store, connections: h.connections, now });
+  const v1 = await versions.publishSourceRevision(agencyOwner, { source, definition, requires: { bindingKinds }, summary: "Consultation intake", label: "1.0.0" });
   await versions.shareSource(agencyOwner, source, mooney);
   await versions.shareSource(agencyOwner, source, lakeside);
   return { agency, mooney, lakeside, agencyOwner, mooneyOwner, mooneyMember, lakesideOwner, stranger, source, mooneySystem, lakesideSystem, versions, v1 };
@@ -53,27 +72,48 @@ function contract(name: string, make: () => Harness) {
   describe(`Version store contract: ${name}`, () => {
     it("creates a Version owned by its business, copying only the definition, and releases it", async () => {
       const h = make();
-      const f = await agencyFixture(h);
-      let mooney = await f.versions.createVersion(f.mooneyOwner, { source: f.v1.source, version: f.mooneySystem, context: { kind: "agency_client", label: "The Mooney Firm, Buffalo" } });
-      expect(mooney).toMatchObject({ version: f.mooneySystem, source: f.source, baseline: { revision: 1, definition: intakeV1 }, overrides: [], bindings: [], grants: [], localData: {}, rowRevision: 1 });
-      mooney = await f.versions.setOverride(f.mooneyOwner, mooney.id, { path: "branding.accent", value: "#0b3d2e", expectedRowRevision: mooney.rowRevision });
+      const definition = applicationDefinition("Request a consultation", ["booking_calendar"]);
+      const f = await agencyFixture(h, definition);
+      let mooney = await f.versions.createVersion(f.agencyOwner, { source: f.v1.source, version: f.mooneySystem, context: { kind: "agency_client", label: "The Mooney Firm, Buffalo" } });
+      f.mooneySystem = mooney.version;
+      expect(mooney.version.businessId).toBe(f.mooney);
+      expect(mooney.version.systemId).not.toBe(f.source.systemId);
+      expect(mooney).toMatchObject({ version: f.mooneySystem, source: f.source, baseline: { revision: 1, definition }, overrides: [], bindings: [], grants: [], localData: {}, rowRevision: 1 });
+      mooney = await f.versions.setOverride(f.mooneyOwner, mooney.id, { path: "title", value: "Talk to a Buffalo attorney", expectedRowRevision: mooney.rowRevision });
       const calendar = await h.connection(f.mooney, "google");
       mooney = await f.versions.bindAccount(f.mooneyOwner, mooney.id, { kind: "booking_calendar", connectionId: calendar, expectedRowRevision: mooney.rowRevision });
       mooney = await f.versions.putLocalData(f.mooneyMember, mooney.id, { key: "practiceAreas", value: ["estate planning"], expectedRowRevision: mooney.rowRevision });
+      await h.approveRelease?.(f.mooneyOwner, mooney);
       mooney = await f.versions.release(f.mooneyOwner, mooney.id, { expectedRowRevision: mooney.rowRevision });
       const view = await f.versions.readVersion(f.mooneyOwner, mooney.id);
       expect(view.access).toBe("owner");
-      expect(view.overrides.map((item) => item.path)).toEqual(["branding.accent"]);
+      expect(view.overrides.map((item) => item.path)).toEqual(["title"]);
       expect(view.bindings).toEqual([expect.objectContaining({ kind: "booking_calendar", connectionId: calendar, ownerBusinessId: f.mooney })]);
       expect(view.localData).toEqual({ practiceAreas: ["estate planning"] });
       expect(view.currentRelease).toBe(1);
-      expect(view.releases[0]!.definition).toEqual({ ...intakeV1, branding: { accent: "#0b3d2e" } });
+      expect(view.releases[0]!.definition).toEqual({ ...definition, title: "Talk to a Buffalo attorney" });
       expect(mooney.rowRevision).toBe(5);
+      if (h.db) {
+        const runtime = await h.db.rpc("read_version_native_runtime", { p_workspace_id: f.mooney,
+          p_user_id: f.mooneyOwner.userId, p_verified_email: f.mooneyOwner.verifiedEmail, p_version_id: mooney.id });
+        expect(runtime.error).toBeNull();
+        expect(runtime.data).toMatchObject({ kind: "internal_app", workId: expect.any(String), releaseNumber: 1 });
+      }
       if (h.spineRevisions) {
         // History and the spine agree: the release is a system_revisions row and the current pointer.
         expect(await h.spineRevisions(f.mooneySystem.systemId)).toEqual([{ number: 1, kind: "system_version_release" }]);
         expect(await h.currentRevision!(f.mooneySystem.systemId)).toBe(1);
       }
+    });
+
+    it("keeps legacy definitions as readable drafts and refuses a new undeclared release", async () => {
+      const h = make();
+      const f = await agencyFixture(h);
+      const mooney = await f.versions.createVersion(f.mooneyOwner, { source: f.v1.source, version: f.mooneySystem, context: { kind: "agency_client", label: "Mooney" } });
+      await expect(f.versions.release(f.mooneyOwner, mooney.id, { expectedRowRevision: mooney.rowRevision })).rejects.toBeInstanceOf(VersionDeclarationError);
+      expect(await f.versions.readVersion(f.mooneyOwner, mooney.id)).toMatchObject({ workingDefinition: intakeV1, releases: [], currentRelease: null });
+      expect((await h.store.getLineage(f.mooneyOwner, mooney.id))!.rowRevision).toBe(mooney.rowRevision);
+      if (h.spineRevisions) expect(await h.spineRevisions(f.mooneySystem.systemId)).toEqual([]);
     });
 
     it("keeps published revisions append-only and numbered", async () => {
@@ -216,17 +256,19 @@ function contract(name: string, make: () => Harness) {
 
     it("records a decline, re-offers the change with the next revision, and stops offering after unshare", async () => {
       const h = make();
-      const f = await agencyFixture(h);
-      let lakeside = await f.versions.createVersion(f.lakesideOwner, { source: f.v1.source, version: f.lakesideSystem, context: { kind: "agency_client", label: "Lakeside" } });
+      const f = await agencyFixture(h, applicationDefinition(), []);
+      let lakeside = await f.versions.createVersion(f.agencyOwner, { source: f.v1.source, version: f.lakesideSystem, context: { kind: "agency_client", label: "Lakeside" } });
+      f.lakesideSystem = lakeside.version;
       lakeside = await f.versions.bindAccount(f.lakesideOwner, lakeside.id, { kind: "booking_calendar", connectionId: await h.connection(f.lakeside, "google"), expectedRowRevision: lakeside.rowRevision });
+      await h.approveRelease?.(f.lakesideOwner, lakeside);
       lakeside = await f.versions.release(f.lakesideOwner, lakeside.id, { expectedRowRevision: lakeside.rowRevision });
-      await f.versions.publishSourceRevision(f.agencyOwner, { source: f.source, definition: withFollowUp("Two."), summary: "Two" });
+      await f.versions.publishSourceRevision(f.agencyOwner, { source: f.source, definition: applicationDefinition("Two."), summary: "Two" });
       lakeside = await f.versions.declineImprovement(f.lakesideOwner, lakeside.id, { revision: 2, reason: "We call every lead ourselves.", expectedRowRevision: lakeside.rowRevision });
       expect(lakeside.decisions).toEqual([expect.objectContaining({ sourceRevision: 2, choice: "declined", reason: "We call every lead ourselves." })]);
-      await f.versions.publishSourceRevision(f.agencyOwner, { source: f.source, definition: withFollowUp("Three."), summary: "Three" });
+      await f.versions.publishSourceRevision(f.agencyOwner, { source: f.source, definition: applicationDefinition("Three."), summary: "Three" });
       const offers = await f.versions.listAvailableImprovements(f.lakesideOwner, lakeside.id);
       expect(offers.map((item) => item.sourceRevision)).toEqual([2, 3]);
-      expect(offers[1]!.changes.map((change) => change.path)).toContain("followUp.messageTemplate");
+      expect(offers[1]!.changes.map((change) => change.path)).toContain("title");
       await f.versions.unshareSource(f.agencyOwner, f.source, f.lakeside);
       expect(await f.versions.listAvailableImprovements(f.lakesideOwner, lakeside.id)).toEqual([]);
       // The Version keeps its definition and releases.
@@ -237,11 +279,14 @@ function contract(name: string, make: () => Harness) {
 
     it("refuses a release when nothing changed and numbers releases per Version", async () => {
       const h = make();
-      const f = await agencyFixture(h);
-      let mooney = await f.versions.createVersion(f.mooneyOwner, { source: f.v1.source, version: f.mooneySystem, context: { kind: "agency_client", label: "Mooney" } });
+      const f = await agencyFixture(h, applicationDefinition(), []);
+      let mooney = await f.versions.createVersion(f.agencyOwner, { source: f.v1.source, version: f.mooneySystem, context: { kind: "agency_client", label: "Mooney" } });
+      f.mooneySystem = mooney.version;
+      await h.approveRelease?.(f.mooneyOwner, mooney);
       mooney = await f.versions.release(f.mooneyOwner, mooney.id, { expectedRowRevision: mooney.rowRevision });
       await expect(f.versions.release(f.mooneyOwner, mooney.id, { expectedRowRevision: mooney.rowRevision })).rejects.toBeInstanceOf(VersionValidationError);
-      mooney = await f.versions.setOverride(f.mooneyOwner, mooney.id, { path: "routing.withinMinutes", value: 5, expectedRowRevision: mooney.rowRevision });
+      mooney = await f.versions.setOverride(f.mooneyOwner, mooney.id, { path: "title", value: "New consultation title", expectedRowRevision: mooney.rowRevision });
+      await h.approveRelease?.(f.mooneyOwner, mooney);
       mooney = await f.versions.release(f.mooneyOwner, mooney.id, { expectedRowRevision: mooney.rowRevision });
       expect(mooney.releases.map((item) => item.number)).toEqual([1, 2]);
       await expect(f.versions.release(f.mooneyMember, mooney.id, { expectedRowRevision: mooney.rowRevision })).rejects.toBeInstanceOf(VersionAccessError);
@@ -258,8 +303,10 @@ describe.runIf(Boolean(PSQL))("Postgres", () => {
 
   it("refuses history edits the service would never send", async () => {
     const h = postgresHarness(PSQL!);
-    const f = await agencyFixture(h);
-    let mooney = await f.versions.createVersion(f.mooneyOwner, { source: f.v1.source, version: f.mooneySystem, context: { kind: "agency_client", label: "Mooney" } });
+    const f = await agencyFixture(h, applicationDefinition(), []);
+    let mooney = await f.versions.createVersion(f.agencyOwner, { source: f.v1.source, version: f.mooneySystem, context: { kind: "agency_client", label: "Mooney" } });
+    f.mooneySystem = mooney.version;
+    await h.approveRelease?.(f.mooneyOwner, mooney);
     mooney = await f.versions.release(f.mooneyOwner, mooney.id, { expectedRowRevision: mooney.rowRevision });
     // Rewriting a past release, dropping a decision or forging a baseline is refused by the database itself.
     await expect(h.store.updateLineage(f.mooneyOwner, { ...mooney, releases: [] }, mooney.rowRevision)).rejects.toBeInstanceOf(VersionValidationError);

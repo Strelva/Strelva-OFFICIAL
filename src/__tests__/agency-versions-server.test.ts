@@ -6,6 +6,7 @@ import {
   createInMemoryVersionStore,
   createSystemVersions,
   createVersionReleaseGate,
+  declareApplicationPackage,
   improvementPossibility,
   improvementState,
   type JsonObject,
@@ -154,7 +155,14 @@ describe("improvements and the release gate", () => {
   });
 
   it("releases only with an approval for the exact row revision, and changes nothing without one", async () => {
-    const { versions, owner, mooney } = await setup();
+    const versions = createSystemVersions({ store: createInMemoryVersionStore(), connections: createInMemoryConnectionOwnership() });
+    const owner: VersionActor = { userId: crypto.randomUUID(), memberships: [{ businessId: "mooney", role: "owner" }] };
+    const source = { businessId: "mooney", systemId: "native-intake-source" };
+    const declared = declareApplicationPackage({ kind: "internal_app", title: "Client intake",
+      fields: [{ id: "subject", label: "Subject", type: "text", required: true }], components: [{ kind: "form", fields: ["subject"] }] });
+    const revision = await versions.publishSourceRevision(owner, { source, definition: declared, summary: "Declared intake" });
+    const mooney = await versions.createVersion(owner, { source: revision.source, version: { businessId: "mooney", systemId: "native-intake" },
+      context: { kind: "agency_client", label: "The Mooney Firm" } });
     const approvals = { approved: vi.fn(async () => null as { approvalId: string } | null) };
     const gate = createVersionReleaseGate({ versions, approvals });
     await expect(gate.release(owner, mooney.id, { expectedRowRevision: mooney.rowRevision })).rejects.toBeInstanceOf(VersionReleaseNeedsApprovalError);

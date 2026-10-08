@@ -5,7 +5,7 @@ import { applicationSchema } from "@/products/applications/contracts";
 import { createWorkPlan, executeWorkPlanOutput, presentWorkPlan, type CreateWorkPlanRequest, type ExecuteWorkPlanOutputRequest } from "@/products/work-plans";
 import { getWork, WorkspaceAccessError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces";
 import { createSupabaseSystemStore, listBusinessSystems, type SystemStore } from "@/platform/systems";
-import { assertShareableDefinition, createSystemVersions, type JsonObject, type VersionStore } from "@/platform/system-versions";
+import { assertShareableDefinition, createSystemVersions, declareApplicationPackage, type JsonObject, type VersionStore } from "@/platform/system-versions";
 import { createSupabaseConnectionOwnership, createSupabaseVersionStore, mapVersionsError, readVersionActor, versionsDb, type VersionsDb } from "@/platform/system-versions/supabase-store";
 
 export async function requireAgencyAuthoring(actor: WorkspaceActor, agencyWorkspaceId: string, workspaceId: string, db: VersionsDb = versionsDb()): Promise<void> {
@@ -42,7 +42,7 @@ export function applicationPackageDefinition(payload: unknown): JsonObject {
   const spec = application.candidate?.spec ?? application.spec;
   const definition = { kind: "internal_app", title: spec.title, fields: spec.fields, components: spec.components } as unknown as JsonObject;
   assertShareableDefinition(definition);
-  return definition;
+  return declareApplicationPackage(definition);
 }
 
 export interface PackageChoice { systemId: string; name: string; revision: number; fingerprint: string; definition: JsonObject; requires: { bindingKinds: string[] } }
@@ -61,7 +61,7 @@ async function packageChoice(actor: WorkspaceActor, agencyWorkspaceId: string, s
   let requires = { bindingKinds: [] as string[] };
   if (lineage) {
     const view = await createSystemVersions({ store, connections: createSupabaseConnectionOwnership(db) }).readVersion(versionActor, lineage.id);
-    const baseline = await store.getRevision(versionActor, lineage.source, lineage.baseline.revision);
+    const baseline = await store.getPinnedRevision(versionActor, lineage.id);
     if (!baseline) throw new WorkspaceStoreError("The source requirements could not be read.");
     requires = baseline.requires;
     definition = view.workingDefinition; fingerprint = `version:${lineage.rowRevision}`;
@@ -74,7 +74,9 @@ async function packageChoice(actor: WorkspaceActor, agencyWorkspaceId: string, s
     if (!latest) throw new WorkspaceStoreError("This System has no reusable definition yet.");
     definition = latest.definition; requires = latest.requires; fingerprint = `source:${latest.source.revisionId}`;
   }
-  assertShareableDefinition(definition);
+  definition = declareApplicationPackage(definition);
+  // Requirements are metadata from this source, never locally copied accounts.
+  (definition.declaration as JsonObject).bindingKinds = [...new Set(requires.bindingKinds)].sort();
   return { systemId, name: row.system.name, revision: revisions.at(-1)?.source.number ?? 0, fingerprint, definition, requires };
 }
 
