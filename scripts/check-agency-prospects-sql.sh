@@ -1,24 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cluster_root="$(mktemp -d "${TMPDIR:-/tmp}/strelva-agency-prospects.XXXXXX")"
-cluster_data="$cluster_root/data"
-cluster_socket="$cluster_root/socket"
+source "$repo_root/scripts/temp-postgres.sh"
+create_temp_postgres strelva-agency-prospects
 cluster_port="$((61000 + ($$ % 3000)))"
-cluster_started=0
-cleanup() {
-  local status=$?
-  trap - EXIT INT TERM
-  if [[ "$cluster_started" -eq 1 ]]; then pg_ctl -D "$cluster_data" -m fast -w stop >/dev/null 2>&1 || true; fi
-  printf 'Agency prospects SQL cluster preserved at: %s\n' "$cluster_root"
-  exit "$status"
-}
-trap cleanup EXIT INT TERM
 for command_name in initdb pg_ctl psql; do command -v "$command_name" >/dev/null || { printf 'Missing %s\n' "$command_name" >&2; exit 1; }; done
 mkdir -p "$cluster_socket"
 initdb -D "$cluster_data" --locale=C --encoding=UTF8 --auth=trust --no-instructions >/dev/null
-pg_ctl -D "$cluster_data" -l "$cluster_root/postgres.log" -o "-F -k '$cluster_socket' -c listen_addresses='' -p $cluster_port" -w start >/dev/null
-cluster_started=1
+pg_ctl -D "$cluster_data" -l "$cluster_log" -o "-F -k '$cluster_socket' -c listen_addresses='' -p $cluster_port" -w start >/dev/null
+read -r cluster_postmaster_pid < "$cluster_data/postmaster.pid"
 psql_args=(--host="$cluster_socket" --port="$cluster_port" --username="$(id -un)" --dbname=postgres --set=ON_ERROR_STOP=1 --no-psqlrc)
 psql "${psql_args[@]}" <<'SQL'
 create role service_role nologin bypassrls;

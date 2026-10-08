@@ -162,7 +162,7 @@ It never connects to a hosted or production database.
 Both commands require PostgreSQL server binaries. The SQL check scripts and
 release-safety rehearsal set `LC_ALL=C` internally, including for `initdb` and
 `pg_ctl`; callers do not need to export a locale on macOS/PostgreSQL 18.
-The workspace, upgrade, inquiry and customer-mapping checks remove only the
+The workspace, upgrade, inquiry, customer-mapping and nested agency-prospects checks remove only the
 cluster/socket directories they create on success, failure, SIGINT or SIGTERM.
 They record the postmaster PID and stop that cluster before deleting its files,
 including when startup fails after launching Postgres. If both shutdown attempts
