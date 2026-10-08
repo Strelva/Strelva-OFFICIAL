@@ -1,7 +1,7 @@
 # Rollback and recovery
 
 Status: **current**
-Updated: 2026-10-07
+Updated: 2026-10-08
 
 Supabase Auth and Postgres are the only identity/data backbone. Sanity and Clerk
 rollback paths no longer exist. Data recovery is forward-only: restore an
@@ -63,6 +63,29 @@ Before batch 4, separately approve and run the private
 [billing grant capture](../../scripts/release-safety/capture-billing-grants.sql).
 Its rollback requires that pre-revoke snapshot; migration-only default grants
 do not reproduce the permissions in the restored production dump.
+
+## Current batch 8 runtime recovery
+
+Batch 8 and its corrective tails are forward-only schema on the current runtime.
+The [October 7 bounded release receipt](./security-runtime-production-2026-10-07.md)
+records exact 266-version hosted history and actual-PUBLIC restored-copy
+qualification. Preserve accepted customer work and later security repairs; do
+not run the historical companions as a whole populated batch, reverse batches
+0–7 beneath it, or restore an old whole database over newly accepted work.
+
+The [release-safety contract](../../scripts/release-safety/README.md#batch-8-runtime-recovery)
+owns pre-upgrade capture, original RPC scope capture, approved final catalog
+fingerprints, permission disablement, and separately approved reactivation.
+It retains all schema and rows. Feature switches/application configuration
+remain required: the SQL disables original-scope service RPCs, not direct table
+access or every later API. Accepted outside effects require their own recovery.
+
+`pnpm check:release-safety:batch8 --current-tail` proves the exact checked-out
+inventory in a disposable local PostgreSQL cluster, including two recovery
+rounds and atomic drift/authority refusals. It does not prove hosted Auth,
+storage, backups/PITR, a real provider undo, or full 1.0 rollout. Historical
+empty-only helpers are outside the current qualification and require a new
+reviewed preservation/compatibility plan before use.
 
 ## Redis recovery
 
