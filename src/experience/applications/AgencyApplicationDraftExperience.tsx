@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { BoundedWorkExperience } from "@/experience/operations/BoundedWorkExperience";
-import { agencyApplicationDraftGrantSchema, type AgencyApplicationDraftGrant } from "@/platform/offerings";
+import { agencyApplicationDraftGrantSchema, type AgencyApplicationDraftGrant } from "@/platform/offerings/agency-application-draft-contracts";
 
 function message(body: unknown): string {
   if (body && typeof body === "object" && "error" in body && typeof body.error === "string") return body.error;

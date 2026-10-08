@@ -3,12 +3,12 @@ export { ProviderDeliveryService, providerDeliveryCommandSchema, providerDeliver
 export type { ProviderAssignmentGateway, ProviderDelivery, ProviderDeliveryCommand, ProviderDeliveryStore, ProviderOfferingGateway } from "./provider-delivery";
 export { postgresProviderDeliveries } from "./provider-delivery-repository";
 export {
-  agencyApplicationDraftGrantSchema,
-  agencyApplicationDraftWorkSchema,
   createAgencyApplicationDraftAccessService,
   postgresAgencyApplicationDraftAccess,
 } from "./agency-draft-access";
-export type { AgencyApplicationDraftGrant, AgencyApplicationDraftWork, AgencyApplicationDraftAccessService } from "./agency-draft-access";
+export { agencyApplicationDraftGrantSchema, agencyApplicationDraftWorkSchema } from "./agency-application-draft-contracts";
+export type { AgencyApplicationDraftGrant, AgencyApplicationDraftWork } from "./agency-application-draft-contracts";
+export type { AgencyApplicationDraftAccessService } from "./agency-draft-access";
 export {
   agencyManagedWebsiteDraftGrantSchema,
   agencyManagedWebsiteDraftPreparationSchema,
