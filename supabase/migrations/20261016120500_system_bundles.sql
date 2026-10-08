@@ -176,11 +176,26 @@ begin
 end $$;
 revoke all on function public.system_bundle_read_scope(uuid,uuid,text,uuid,uuid,jsonb) from public,anon,authenticated,service_role;
 
+create function public.read_system_bundle_install_receipt(p_workspace_id uuid,p_user_id uuid,p_verified_email text,p_revision_id uuid,p_command_id uuid,p_name text,p_targets jsonb) returns jsonb
+language plpgsql stable security definer set search_path=public,pg_temp as $$
+declare installed public.system_bundle_installations; expected text;
+begin
+ perform public.system_bundle_read_scope(p_workspace_id,p_user_id,p_verified_email,p_revision_id,p_command_id,p_targets);
+ select * into installed from public.system_bundle_installations where business_workspace_id=p_workspace_id and command_id=p_command_id;
+ if not found then return null; end if;
+ expected:=encode(sha256(convert_to(jsonb_build_object('revision',p_revision_id,'name',p_name,'targets',p_targets)::text,'UTF8')),'hex');
+ if installed.created_by<>p_user_id or installed.source_revision_id<>p_revision_id or installed.command_digest<>expected or installed.receipt is null then raise exception 'system_command_conflict'; end if;
+ return installed.receipt;
+end $$;
+revoke all on function public.read_system_bundle_install_receipt(uuid,uuid,text,uuid,uuid,text,jsonb) from public,anon,authenticated;
+grant execute on function public.read_system_bundle_install_receipt(uuid,uuid,text,uuid,uuid,text,jsonb) to service_role;
+
 create function public.read_system_bundle_targets(p_workspace_id uuid,p_user_id uuid,p_verified_email text,p_revision_id uuid,p_command_id uuid,p_targets jsonb) returns jsonb
 language plpgsql security definer set search_path=public,pg_temp as $$
 declare permission uuid; inquiry jsonb:='null'; website jsonb:='null'; t public.tenants; w public.saved_product_work; h public.website_document_heads;
 begin
  permission:=public.system_bundle_read_scope(p_workspace_id,p_user_id,p_verified_email,p_revision_id,p_command_id,p_targets);
+ if permission is not null and exists(select 1 from public.system_bundle_installations where business_workspace_id=p_workspace_id and command_id=p_command_id and receipt is not null) then raise exception 'business_record_access_denied'; end if;
  if p_targets ? 'inquiryTenantId' then
   select t0.* into t from public.tenants t0 join public.tenant_workspace_links l on l.tenant_stable_id=t0.stable_id where l.workspace_id=p_workspace_id and t0.id=p_targets->>'inquiryTenantId' and t0.active;
   if not found then raise exception 'business_record_access_denied'; end if;

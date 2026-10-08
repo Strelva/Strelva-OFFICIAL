@@ -10,6 +10,10 @@ import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { InquiryEngineState } from "@/products/inquiries/contracts";
 export async function installSystemBundle(actor:WorkspaceActor,input:{workspaceId:string;source:SystemRevisionRef;commandId:string;name:string;targets?:BundleTargets},definition:JsonObject,db:VersionsDb) {
  const targets=bundleTargetsSchema.parse(input.targets??{});
+ const existing=await db.rpc("read_system_bundle_install_receipt",{p_workspace_id:input.workspaceId,p_user_id:actor.userId,p_verified_email:actor.verifiedEmail,p_revision_id:input.source.revisionId,p_command_id:input.commandId,p_name:input.name,p_targets:targets});
+ if(existing.error)mapVersionsError(existing.error,"The bundle installation receipt could not be confirmed.");
+ if(existing.data!==null){const receipt=bundleInstallReceiptSchema.parse(existing.data);if(receipt.workspaceId!==input.workspaceId||receipt.sourceRevisionId!==input.source.revisionId)throw new VersionValidationError("Bundle receipt returned for another business or source revision.");return receipt;}
+
  const result=await db.rpc("read_system_bundle_targets",{p_workspace_id:input.workspaceId,p_user_id:actor.userId,p_verified_email:actor.verifiedEmail,p_revision_id:input.source.revisionId,p_command_id:input.commandId,p_targets:targets});
  if(result.error)mapVersionsError(result.error,"The bundle's own target resources could not be read.");
  const snapshot=z.object({inquiry:z.object({tenantId:z.string(),revision:z.number().int().positive().nullable(),state:z.unknown().nullable()}).nullable(),website:z.object({workId:z.string().uuid(),workRevision:z.number().int().nonnegative(),documentRevision:z.number().int().positive(),payload:z.unknown()}).nullable()}).strict().parse(result.data);
