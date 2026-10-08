@@ -258,6 +258,16 @@ nothing that wasn't theirs did.
     decide becomes an `owner_decides` item, with the operator's note. This is
     today's `escalateEventToOwner`, generalized. An operator can never decide
     an `owner_decides` item.
+
+    An active platform operator or member of the business's provider agency
+    cannot use a direct admin seat to decide an owner item, even if the item
+    permits ordinary admins. A verified owner who is also an operator still
+    decides through their owner session. The additive
+    `20261017120000_owner_decision_operator_refusal` restores this refusal after
+    neutral provider predicates, preserving recipient trust and owner-link
+    execution effects. Native SQL tests cover both refusal branches, ordinary
+    admins, revoked operators and the real-owner exception. This is prepared
+    integration code; production execution remains separate.
 13. **Home.** Needs you is first when non-empty, oldest first, with the same
     Approve and Not yet as the email. Kinds that need the owner to edit first
     open their System page. An owner who signs in sees exactly what the last
@@ -285,15 +295,7 @@ nothing that wasn't theirs did.
     write a receipt with the old and new route. Only routes in force when the
     change was proposed apply to it.
 
-    An active platform operator or member of the business's provider agency
-    cannot use a direct admin seat to decide an owner item, even if the item
-    permits ordinary admins. A verified owner who is also an operator still
-    decides through their owner session. The additive
-    `20261017120000_owner_decision_operator_refusal` restores this refusal after
-    neutral provider predicates, preserving recipient trust and owner-link
-    execution effects. Native SQL tests cover both refusal branches, ordinary
-    admins, revoked operators and the real-owner exception. This is prepared
-    integration code; production execution remains separate.
+
 
 ### Change kinds and their routes
 

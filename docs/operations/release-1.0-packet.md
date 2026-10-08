@@ -650,6 +650,7 @@ staged for production or approved.
 | `20261015100000_agency_add_client` | `d280795634bb` | `rollback-20261015100000_agency_add_client.sql` |
 | `20261016110000_operator_action_approvals` | `e9e4a204e497` | `rollback-20261016110000_operator_action_approvals.sql` |
 | `20261017110000_inquiry_lead_retention` | `d0199c345492` | `rollback-20261017110000_inquiry_lead_retention.sql` |
+| `20261017120000_owner_decision_operator_refusal` | `616c861132f5` | `rollback-20261017120000_owner_decision_operator_refusal.sql` |
 | `20261018110000_provider_seat_website_access` | `b108d67d2d96` | `rollback-20261018110000_provider_seat_website_access.sql` |
 <!-- proposed-batch-8:end -->
 
