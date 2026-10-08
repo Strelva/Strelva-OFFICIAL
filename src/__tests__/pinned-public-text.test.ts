@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   lookup: vi.fn(),
@@ -10,7 +10,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("node:dns", () => ({ promises: { lookup: mocks.lookup } }));
 vi.mock("node:https", () => ({ request: mocks.request }));
 
-import { fetchPinnedPublicText } from "@/lib/pinned-public-text";
+import { fetchPinnedPublicText } from "@/platform/infra/pinned-public-text";
+import { fetchPinnedPublicText as legacyFetchPinnedPublicText } from "@/lib/pinned-public-text";
 
 type RequestCallback = (response: PassThrough & {
   statusCode: number;
@@ -38,11 +39,46 @@ function respond(statusCode: number, headers: Record<string, string>, body = "")
 }
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
   mocks.lookup.mockResolvedValue({ address: "93.184.216.34", family: 4 });
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("pinned public text transport", () => {
+  it("keeps the tenant compatibility path on the same shared transport", () => {
+    expect(legacyFetchPinnedPublicText).toBe(fetchPinnedPublicText);
+  });
+
+  it.each([
+    "https://user:password@example.com/",
+    "https://user@example.com/",
+    "file:///etc/passwd",
+    "ftp://example.com/",
+    "not a URL",
+  ])("refuses unsafe input before DNS or a socket: %s", async (url) => {
+    await expect(fetchPinnedPublicText(url)).resolves.toBeNull();
+    expect(mocks.lookup).not.toHaveBeenCalled();
+    expect(mocks.request).not.toHaveBeenCalled();
+  });
+
+  it.each(["0.0.0.0", "10.0.0.1", "100.64.0.1", "127.0.0.1", "169.254.169.254", "172.16.0.1", "192.168.0.1", "198.18.0.1"])(
+    "refuses a public hostname resolving to restricted address %s", async (address) => {
+      mocks.lookup.mockResolvedValueOnce({ address, family: 4 });
+      await expect(fetchPinnedPublicText("https://example.com/")).resolves.toBeNull();
+      expect(mocks.lookup).toHaveBeenCalledWith("example.com", { family: 4 });
+      expect(mocks.request).not.toHaveBeenCalled();
+    },
+  );
+
+  it("fails closed when DNS is unavailable", async () => {
+    mocks.lookup.mockRejectedValueOnce(new Error("ENOTFOUND"));
+    await expect(fetchPinnedPublicText("https://example.com/")).resolves.toBeNull();
+    expect(mocks.request).not.toHaveBeenCalled();
+  });
+
   it("pins the request lookup to the address that passed validation", async () => {
     respond(200, { "content-type": "text/html" }, "<p>safe</p>");
 
@@ -81,6 +117,29 @@ describe("pinned public text transport", () => {
 
     respond(200, { "content-type": "text/plain" }, "12345");
     await expect(fetchPinnedPublicText("https://example.com", { maxBytes: 4 })).resolves.toBeNull();
+  });
+
+  it("rejects non-text responses and unsuccessful HTTP responses", async () => {
+    respond(200, { "content-type": "application/octet-stream" }, "binary");
+    await expect(fetchPinnedPublicText("https://example.com/")).resolves.toBeNull();
+    respond(503, { "content-type": "text/html" }, "unavailable");
+    await expect(fetchPinnedPublicText("https://example.com/")).resolves.toBeNull();
+  });
+
+  it("validates each relative redirect and stops at the redirect limit", async () => {
+    respond(302, { location: "/second" });
+    respond(302, { location: "/third" });
+    await expect(fetchPinnedPublicText("https://example.com/first", { maxRedirects: 1 })).resolves.toBeNull();
+    expect(mocks.lookup).toHaveBeenCalledTimes(2);
+    expect(mocks.request).toHaveBeenCalledTimes(2);
+    expect((mocks.request.mock.calls[1]?.[0] as URL).pathname).toBe("/second");
+  });
+
+  it("refuses credentials on a redirect without opening its socket", async () => {
+    respond(302, { location: "https://user:password@example.com/private" });
+    await expect(fetchPinnedPublicText("https://example.com/")).resolves.toBeNull();
+    expect(mocks.lookup).toHaveBeenCalledOnce();
+    expect(mocks.request).toHaveBeenCalledOnce();
   });
 
   it("includes DNS resolution in one overall deadline", async () => {

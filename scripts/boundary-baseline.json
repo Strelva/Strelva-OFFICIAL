@@ -187,10 +187,6 @@
       "src/lib/scan-store",
       "src/lib/types"
     ],
-    "src/products/ai-visibility/score.ts": [
-      "src/lib/audit/checks",
-      "src/lib/pinned-public-text"
-    ],
     "src/products/assessment/contracts.ts": [
       "src/lib/audit/types"
     ],
@@ -201,8 +197,7 @@
       "src/lib/types"
     ],
     "src/products/connected-sites/server.ts": [
-      "src/lib/lead-spam",
-      "src/lib/pinned-public-text"
+      "src/lib/lead-spam"
     ],
     "src/products/domain-monitor/server.ts": [
       "src/lib/delivery-email"
@@ -257,9 +252,6 @@
     ],
     "src/products/inquiries/message-review-event.ts": [
       "src/lib/types"
-    ],
-    "src/products/inquiries/onboarding.ts": [
-      "src/lib/pinned-public-text"
     ],
     "src/products/inquiries/portfolio.ts": [
       "src/lib/tenants"
@@ -365,9 +357,6 @@
     ],
     "src/products/websites/rebuild-service.ts": [
       "src/lib/domains"
-    ],
-    "src/products/websites/site-health.ts": [
-      "src/lib/pinned-public-text"
     ],
     "src/products/websites/site-media.ts": [
       "src/lib/audit/checks",

@@ -22,7 +22,7 @@ vi.mock("node:dns", () => ({ promises: { lookup: vi.fn(async () => ({ address: "
 // Mock global fetch so scoreAiVisibility does no real network IO.
 const mockFetch = vi.hoisted(() => vi.fn());
 vi.stubGlobal("fetch", mockFetch);
-vi.mock("@/lib/pinned-public-text", () => ({
+vi.mock("@/platform/infra/pinned-public-text", () => ({
   fetchPinnedPublicText: async (url: string) => {
     const response = await mockFetch(url);
     return response.ok ? response.text() : null;
