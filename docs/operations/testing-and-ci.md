@@ -324,6 +324,16 @@ case refusal. Logs: `/tmp/journeys-expanded-gate-{red,green}.log`. Root must
 validate its retained full14-on/8-off JSON with this updated gate after the
 active browser run stops; no current-browser source or product changes occur.
 
+The final combined candidate at `753edc93` passes the complete CI-faithful local
+sim: 8,614 tests/50 skips, coverage, build, public94/332 profile skips,
+workspace39 and surface20. Fresh real loopback Auth at `72e28786` passes all14
+enabled/eight disabled journeys without retries; the expanded validator at
+`753edc93` passes both retained reports. Runtime/SQL are unchanged between these
+checkpoints. Separate preview UI50 and focused agency2 also pass without retries.
+These results supersede the pending reruns above without erasing their failed
+logs. [The combined candidate record](backlog-candidate-2026-10-08.md) owns exact
+sources, retained evidence and hosted/provider limits; no deployment is implied.
+
 ### The CI-faithful local sim (use this before trusting a green local run)
 
 Local exports or `.env` may provide Postgres **and** Upstash, which silently masks CI-only

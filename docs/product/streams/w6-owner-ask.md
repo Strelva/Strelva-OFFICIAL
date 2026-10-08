@@ -261,7 +261,20 @@ Do not invent a financial return. Next test: compare complete runs on the
 integrated snapshot with recorded load/free space; retire any heavier factory
 proposal if it adds maintenance without reducing failures or attention.
 
-## Merge hazards and ADR 0012 call sites
+## Historical merge hazards and ADR 0012 call sites
+
+October 8 reconciliation at `753edc93`: the following describes earlier stream
+bodies, not the effective runtime. The baseline already replaces the tenant-link
+shortcut with `platform_provider_runs_business`, requiring an active provider
+verified for the specific effect; `strelva_runs_business` is its email alias.
+`20261018131000_owner_decision_runtime_authority.sql` requires current provider,
+execution effects and verified session/identity for owner links. Creating a
+tenant/link names no provider and grants no such authority. Existing
+platform-service-actor and acting-provider SQL fixtures pass in the current
+ordered workspace SQL/upgrade. #510 needs no duplicate migration. This is local
+source/SQL proof; no new production verification or issue closure was performed.
+The prepared Ask successor and combined evidence are recorded in
+[the October 8 candidate](../../operations/backlog-candidate-2026-10-08.md).
 
 **`workspace_release_flag_names()` (issue #253, not fixed here).** Both
 streams `create or replace` it from the same 11-name list in
@@ -294,7 +307,7 @@ publish entry points (`20261010102100`) and the fact-draft decision RPC
 would swap this check for "an agency with a delegation runs this business" in
 those three functions; the callers needn't change.
 
-## Exact next action
+## Historical next action
 
 Coordinator reviews the PR and decides two things: the #253 flag-name union
 migration, and whether to reopen the new-booking-service attempt at
