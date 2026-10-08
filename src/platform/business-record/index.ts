@@ -7,6 +7,7 @@ export {
   readBusinessRecord,
   readBusinessPolicies,
   readBusinessRecordHistory,
+  readConfirmedBusinessFacts,
   readTenantWorkspaceLink,
   repathConvertedTenantProvider,
   resolveOwnerRecipient,

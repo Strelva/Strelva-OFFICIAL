@@ -144,7 +144,7 @@ pnpm typecheck
 pnpm test                    # Vitest
 pnpm lint
 pnpm build
-pnpm check                   # lint + typecheck + test + build
+pnpm check                   # hosted-domain config + lint + typecheck + test + build
 pnpm check:ci                # what CI runs
 pnpm smoke                   # public Playwright smoke
 pnpm smoke:surfaces          # owner + operator surfaces with local fixtures

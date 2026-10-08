@@ -41,7 +41,7 @@ Strelva never edits the pages. The site is a website System with origin
 
 | Route | Purpose |
 | --- | --- |
-| `GET /api/v1/connect/{siteKey}/context` | Confirmed facts from the business record (verified, or stated by the owner or a Strelva operator). Public, cached 60 s |
+| `GET /api/v1/connect/{siteKey}/context` | Confirmed facts from the business record (what the owner wrote or decided, #509). Public, cached 60 s |
 | `POST /api/v1/connect/{siteKey}/events` | Visits and taps, deduplicated. Verified site, own Origin only |
 | `POST /api/v1/connect/{siteKey}/inquiries` | An inquiry into `tenant_leads`; spam held in the spam pit; honeypots dropped. Verified site, own Origin only; limiter fails closed |
 | `GET/POST /api/workspace/connected-sites` | List, connect, verify, update, disconnect |
@@ -107,18 +107,24 @@ bytes and a 16-hex SHA-256 hash).
   live page (pinned fetch) and reports `current`, `outdated` (facts changed),
   `edited` (changed by hand) or `missing`. connect.js already skips injecting
   when the page has its own business JSON-LD, so the two never double up.
-- **Confirmed** here means verified, or stated by the owner. Unverified
-  operator, agency, import and model values are not served.
-  `read_connected_site_context` (connect.js) now uses the same SQL read.
-  Published policies (including service area) additionally require explicit
-  owner/operator verification under `selectPublishedBusinessPolicies`;
-  owner-stated but unverified terms stay unknown. No agency-confirmation
-  authority is added.
+- **Confirmed** here means the owner decided it (#509): the owner's own
+  write or an owner Needs you decision, read from `business_record_confirmed`
+  (`20261013110000_public_facts_read_confirmed.sql`). Operator, agency,
+  import and model values wait for that decision, even when an operator
+  marked them verified; an unconfirmed edit to a confirmed fact keeps
+  serving the confirmed value. `read_connected_site_context` (connect.js)
+  uses the same SQL read. Published policies (including service area)
+  additionally require owner/operator verification under
+  `selectPublishedBusinessPolicies`; owner-stated but unverified terms stay
+  unknown. No agency-confirmation authority is added.
 - Storage: `20261012110000_business_pages.sql` (`business_pages`: handle and
   publish state; `business_confirmed_public_facts`; service-role RPCs).
   Contract: `tests/business-pages-schema.sql`. Rollback:
+  `rollback-20261013110000_public_facts_read_confirmed.sql` first (restores
+  the working-record read), then
   `rollback-20261012110000_business_pages.sql` restores the prior connected-site
-  reader and removes the page schema before adoption. It refuses any saved
+  reader (#509's confirmed-copy reader while #509 is applied) and removes the
+  page schema before adoption. It refuses any saved
   page settings rather than discard handles/publication consent. SQL checks
   prove rollback/reapply and refusal after adoption.
 - **Business policies** appear in the page, llms.txt, connected-site JSON-LD

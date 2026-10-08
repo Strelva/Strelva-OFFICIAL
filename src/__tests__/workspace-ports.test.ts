@@ -42,6 +42,7 @@ describe("workspace ports", () => {
       outsideWriteReceipts: ["recordReviewReply", "recordDomainAdd", "recordDomainClaimRemoval"],
       businessRecord: ["resolveTenantOwnerRecipient"],
       googleBindings: ["googleBindingsEnabled", "readBindingTarget", "readGoogleBindingForTenant", "setGoogleBindingStatus", "updateGoogleBindingTokens", "upsertGoogleBinding", "upsertGoogleLocation", "BindingEncryptionRefused", "AccountBindingStoreError"],
+      providerDisconnect: ["recordTenantProviderDisconnect"],
       businessBilling: ["businessBillingCheckoutMetadata"],
       inquiries: ["isInquiryMessageReviewEvent", "authorizeInquiryMessageReviewActor", "executeInquiryMessageReview", "reconcileInquiryMessageReview", "authorizeInquiryPublicationActor", "executeInquiryPublication"],
       tenantReviewReplies: ["defaultTenantReplyDeps", "routeTenantReviewReply", "postTenantReviewReply"],

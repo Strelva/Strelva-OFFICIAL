@@ -16,9 +16,11 @@ export function CalendarDisconnectPreview({ state }: { state: string }) {
     if (!String(input).startsWith("/api/workspace/calendar-connections")) throw new Error("Outside fixture requests are blocked.");
     if (state === "loading") return new Promise<Response>(() => {});
     if (init?.method === "POST") {
-      if (state === "google-error") return Response.json({ error: "Google could not revoke calendar consent. Try disconnecting again." }, { status: 503 });
       disconnected.current = true;
-    return Response.json({ disconnected: true, ...(state === "off" ? {} : { providerConsentAction: outlookCalendarConsentAction }) });
+      return Response.json({ disconnected: true,
+        ...(state === "google-error" ? { revocationOutcome: "failed" } : {}),
+        ...(state === "google-error" ? {} : { providerConsentAction: outlookCalendarConsentAction }),
+      });
     }
     if (disconnected.current && state === "reload-error") return Response.json({ error: "Connections could not be reloaded. Strelva disconnected successfully." }, { status: 503 });
     return Response.json({ connections: [{ ...connection, status: disconnected.current ? "revoked" : "connected" }] });

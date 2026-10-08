@@ -168,6 +168,28 @@ nothing that wasn't theirs did.
    each. A fact Strelva inferred or extracted routes to `owner_decides` until
    the owner confirms it. This moves the "high-risk facts" review from every
    copy of a fact to the one place it lives.
+   *Built for client sites (#509, ADR 0012):* a fact or service written by
+   anyone but a verified owner (a Strelva operator, any agency including
+   Strelva's, an admin, an import or a model) stays out of the confirmed copy
+   (`business_record_confirmed`) that hosted and connected sites read. All of
+   a business's pending changes form one `business_facts` item
+   (`fact.inferred`, `owner_decides`, admins never decide).
+   `confirm_business_facts` applies it only for the owner's session or a
+   signed link to a trusted recipient: the confirmed `owner_recipient`, else
+   the imported one, else `tenants.owner_email`. A recipient a provider wrote
+   is itself pending and never approves. Delivery and the link claim resolve
+   that same trusted owner (`resolve_business_owner_recipient`), and the item
+   is never emailed to an address only a provider wrote. The owner approves
+   only where every value is shown in full (the signed-link confirm page and
+   the Needs you card, from `SourceAdapter.review` bound to the item's
+   revision); the 1,000-character item detail is whole lines plus a count,
+   never a cut value. The hourly chase also finds businesses with pending
+   facts and no tenant or bookings. The migration rebuilds the confirmed copy
+   from the owner's own history, so an earlier provider overwrite or deletion
+   stays pending. Confirmed contact facts reach a native website as after the
+   owner's own save: signed in, the owner's contact review is prepared at once;
+   by link, Strelva's review queue gets it and the decision reads
+   done_unverified until then.
 6. **Needs you items are one shape.** Each item has the business, System,
    change kind, a plain title, what happens on Approve, what happens on Not
    yet, its source lifecycle and source id, a revision hash, when it opened,

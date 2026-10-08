@@ -97,6 +97,12 @@ for migration in $(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -na
     psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/$early_lead_migration" >/dev/null
     psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
   fi
+  if [[ "$migration_name" == "20261013110000_public_facts_read_confirmed.sql" \
+    || "$migration_name" == "20261013115000_booking_reads_confirmed_facts.sql" ]]; then
+    # The exact readers its rollback must restore (rehearsed at the end).
+    psql "${psql_args[@]}" --tuples-only --no-align --file="$repo_root/tests/support/public-catalog-fingerprint.sql" \
+      >"$cluster_root/catalog-before-${migration_name%.sql}.txt"
+  fi
   printf 'Applying ordered workspace/recovery migration: %s\n' "$migration_name"
   if [[ "$migration_name" == "20260920060000_content_version_request_id.sql" ]]; then
     # A reader must make the metadata change fail immediately, not queue an
@@ -151,6 +157,17 @@ for migration in $(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -na
 insert into public.domain_claims(tenant_id,domain,role,status,dns_status,ssl_status,created_at,updated_at)
  values('upgrade-site','domain-registration-legacy.example.test','production','verified','configured','issued','2026-09-01T00:00:00Z','2026-09-01T00:00:00Z');
 SQL
+  fi
+  if [[ "$migration_name" == "20261005100000_restrict_legacy_tenant_client_access.sql" ]]; then
+    # #528: forward, rollback, forward. The rollback must restore the exact
+    # policies (including expressions) and table ACLs it replaced.
+    legacy_catalog="select md5(coalesce((select string_agg(format('%s|%s|%s|%s|%s|%s', tablename, policyname, cmd, roles, qual, with_check), E'\n' order by tablename, policyname) from pg_policies where schemaname='public'), '') || coalesce((select string_agg(relname || '=' || coalesce(relacl::text, ''), E'\n' order by relname) from pg_class where relnamespace='public'::regnamespace and relkind='r'), ''));"
+    legacy_before="$(psql "${psql_args[@]}" -Atc "$legacy_catalog")"
+    psql "${psql_args[@]}" --file="$migration" >/dev/null
+    psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-$migration_name" >/dev/null
+    [[ "$(psql "${psql_args[@]}" -Atc "$legacy_catalog")" == "$legacy_before" ]] || {
+      printf 'Legacy tenant access rollback did not restore policies and grants.\n' >&2; exit 1; }
+    printf 'Legacy tenant access forward, rollback and forward restored the catalog.\n'
   fi
   psql "${psql_args[@]}" --file="$migration" >/dev/null
   if [[ "$migration_name" == "20260920060100_content_version_request_index.sql" ]]; then
@@ -246,6 +263,9 @@ psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-handled-decisions-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
+# 20261011153000 replaces claim_owner_decision: an operator's admin seat never
+# decides an owner item (#530).
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-owner-decisions-schema.sql"
 # 20261009140000 replaces workspace_release_flag_names() with the full list
 # plus make_real_owner_link.
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-flag-schema.sql"
@@ -270,6 +290,8 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011102000_nat
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011101000_business_booking_email.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/native-publishing-targets-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/business-booking-email-schema.sql"
+# #528: no client privilege on legacy tenant tables; every member role and anon refused.
+psql "${psql_args[@]}" --file="$repo_root/tests/legacy-tenant-client-access-schema.sql"
 
 # Tracking signing keys have no browser grants and refuse rollback while a
 # site's verification identity remains configured.
@@ -299,9 +321,62 @@ fi
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012010000_tenant_track_signing_keys.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012120000_track_signing_key_rotation.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-track-signing-keys-schema.sql"
-
-
-
+# The booking readers (20261013115000) and the public-facts reader roll back
+# in reverse order on the full ordered schema, then #509. Each rollback
+# restores exactly the readers it replaced, as they were before its forward
+# migration, and moves nothing else; #509's then hands connect.js back to the
+# 20261012110000 reader; reapplying all of them returns the exact full
+# catalog, and their contracts hold again.
+catalog_fingerprint() {
+  psql "${psql_args[@]}" --tuples-only --no-align --file="$repo_root/tests/support/public-catalog-fingerprint.sql"
+}
+# The functions each forward migration replaces or adds.
+rollback_readers() {
+  case "$1" in
+    20261013115000_booking_reads_confirmed_facts) printf '%s' 'business_confirmed_facts|business_confirmed_services|read_tenant_booking_context_before_service_policy|read_booking_business_details|read_inquiry_workspace_booking_context|inquiry_booking_offer_json|prepare_inquiry_booking_offer|read_tenant_business_context|read_inquiry_business_context' ;;
+    20261013110000_public_facts_read_confirmed) printf '%s' 'business_confirmed_public_facts|read_connected_site_context' ;;
+  esac
+}
+catalog_fingerprint >"$cluster_root/catalog-full.txt"
+# Newest first; the public-facts reader is last.
+public_facts_rollbacks=(20261013115000_booking_reads_confirmed_facts 20261013110000_public_facts_read_confirmed)
+for name in "${public_facts_rollbacks[@]}"; do
+  catalog_fingerprint >"$cluster_root/catalog-before-rollback-$name.txt"
+  psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-$name.sql"
+  catalog_fingerprint >"$cluster_root/catalog-after-rollback-$name.txt"
+  if [[ -n "$(rollback_readers "$name")" ]]; then
+    # Fixtures above add unrelated objects after the forward migration, so
+    # compare its readers with their exact pre-migration definitions, and
+    # require that nothing else in the catalog moved.
+    readers="^f ($(rollback_readers "$name"))\\("
+    if ! diff -u <(grep -E "$readers" "$cluster_root/catalog-before-$name.txt") \
+        <(grep -E "$readers" "$cluster_root/catalog-after-rollback-$name.txt") \
+      || ! diff -u <(grep -vE "$readers" "$cluster_root/catalog-before-rollback-$name.txt") \
+        <(grep -vE "$readers" "$cluster_root/catalog-after-rollback-$name.txt"); then
+      printf 'Rollback %s did not restore the public catalog exactly.\n' "$name" >&2
+      exit 1
+    fi
+  fi
+done
+[[ "$(grep -cE '^f (business_confirmed_public_facts|read_connected_site_context)\(' "$cluster_root/catalog-before-20261013110000_public_facts_read_confirmed.txt")" == 2 ]]
+[[ "$(grep -cE "^f ($(rollback_readers 20261013115000_booking_reads_confirmed_facts))\\(" "$cluster_root/catalog-before-20261013115000_booking_reads_confirmed_facts.txt")" == 7 ]]
+[[ "$(grep -cE "^f ($(rollback_readers 20261013115000_booking_reads_confirmed_facts))\\(" "$cluster_root/catalog-full.txt")" == 9 ]]
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011133700_business_facts_owner_decision.sql"
+psql "${psql_args[@]}" -Atc "select to_regclass('public.business_record_confirmed') is null
+  and (select prosrc like '%business_confirmed_public_facts%' from pg_proc where oid='public.read_connected_site_context(text)'::regprocedure)" | grep -qx t
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011133700_business_facts_owner_decision.sql"
+for (( index=${#public_facts_rollbacks[@]}-1; index>=0; index-- )); do
+  psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/${public_facts_rollbacks[$index]}.sql"
+done
+catalog_fingerprint >"$cluster_root/catalog-full-reapplied.txt"
+if ! diff -u "$cluster_root/catalog-full.txt" "$cluster_root/catalog-full-reapplied.txt"; then
+  printf 'Reapplying #509, the public-facts and booking readers did not restore the full catalog.\n' >&2
+  exit 1
+fi
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-pages-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-confirmed-facts-schema.sql"
+printf 'Booking-reader, public-facts and #509 rollbacks restored the exact catalog in reverse order.\n'
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 
