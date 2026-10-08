@@ -241,6 +241,18 @@ boundaries → ontology invariants → isolated workspace SQL → vitest+coverag
 and never touches prod. Browser steps are conditional on a non-draft pull request; the
 workflow explicitly includes `ready_for_review` so a draft becoming reviewable runs them.
 
+`pnpm smoke:workspace` enables only the workspace shell release and explicitly
+runs both `workspace-release.spec.ts` and `provider-seat-workspace.spec.ts`.
+The provider fixture keeps its assertions for assigned client work, disabled
+general Ask and an enabled saved rebuild retry. Every API response is fictional;
+this proves rendered controls, not authenticated provider authority. Public smoke
+keeps the workspace gate closed and skips that release-dependent fixture. The
+October 8 CI failure rendered the intended closed workspace page in the first
+two attempts; the later ENOSPC retry was separate. The fixture existed unchanged
+at `e9ac136f`. The guard fixes profile routing, and the explicit enabled command
+retains its coverage. Actual enabled-profile and full-CI reruns belong to root
+integration; no production gate is changed here.
+
 ### The CI-faithful local sim (use this before trusting a green local run)
 
 Local exports or `.env` may provide Postgres **and** Upstash, which silently masks CI-only
