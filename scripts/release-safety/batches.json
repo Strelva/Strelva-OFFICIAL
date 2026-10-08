@@ -1432,6 +1432,19 @@
           "rollbackSha256": "a50e7bce64d47f2d193e9d29c7ada027178d97cff7d8c5fe8ed0b2ba86cf147d"
         }
       ]
+    },
+    {
+      "batch": "16",
+      "status": "private #285 preparation; unmerged; not production-authorized",
+      "note": "Freeze exact explicit owner-confirmed original-bringer evidence for new verified invoice sources; preserve legacy rows, wholesale exclusions, zero-without-approved-rate, creator and loss receipts. Crossing paid-period attribution boundaries requires unselected policy; no source guessing, rates, tail, retroactive backfill or Stripe export activation. Empty-only exact guarded inverse.",
+      "items": [
+        {
+          "file": "20261020090034_split_attribution_receipts.sql",
+          "sha256": "74cb766abab674f2b600b36e5597838db41da00f527f76e154bf9fd5acc0a2f6",
+          "rollback": "rollback-20261020090034_split_attribution_receipts.sql",
+          "rollbackSha256": "4fa4783f38fd7437f68382c85c527c5b2b971e4bc09f62ab6a3b008a31b3cc9e"
+        }
+      ]
     }
   ]
 }

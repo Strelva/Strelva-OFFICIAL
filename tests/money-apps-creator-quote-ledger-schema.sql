@@ -67,6 +67,9 @@ select pg_temp.mcq_assert((select o.source_revision_id=i.revision_id and o.versi
 -- #285: same agency can be provider and creator, but wholesale earns no agency
 -- attribution. Direct business billing still does; refunds preserve creator loss.
 select public.choose_business_provider('cd161600-0000-4000-8000-000000000001','mcq-owner@example.test','cd161600-0000-4000-8000-000000000010','cd161600-0000-4000-8000-000000000020');
+-- Explicit fictional original-bringer statement; provider operation alone no
+-- longer establishes agency split eligibility. No policy or real referral implied.
+select public.record_business_attribution('cd161600-0000-4000-8000-000000000010','cd161600-0000-4000-8000-000000000001','mcq-owner@example.test','cd161600-0000-4000-8000-000000000020','referral','{"kind":"owner_statement","reference":"Fictional creator/agency dual role"}','cd161600-0000-4000-8000-000000000040',(select id from public.workspace_providers where customer_workspace_id='cd161600-0000-4000-8000-000000000010' and status='active'));
 insert into public.money_agreements(beneficiary_workspace_id,kind,version,rate_reference,rate_bps,effective_from,approved_by,approved_at) values('cd161600-0000-4000-8000-000000000020','agency','fictional-agency-eligibility','fictional-agency-rate',1000,'2020-01-01','cd161600-0000-4000-8000-000000000003',now());
 update public.accounts set stripe_customer_id='cus_SeamWholesale' where workspace_id='cd161600-0000-4000-8000-000000000020';
 update public.subscriptions set stripe_subscription_id='sub_SeamWholesale',stripe_customer_id='cus_SeamWholesale',amount_cents=10000,currency='cad',status='active' where account_id=(select id from public.accounts where workspace_id='cd161600-0000-4000-8000-000000000020');

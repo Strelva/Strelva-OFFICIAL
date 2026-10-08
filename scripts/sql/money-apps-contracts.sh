@@ -9,7 +9,7 @@ check_money_apps_contracts() {
     agent-confirmed-provenance-schema.sql agent-channel-schema.sql agent-channel-abuse-schema.sql agent-booking-admission-schema.sql \
     creator-packages-schema.sql offering-source-versions-schema.sql \
     system-bundles-schema.sql system-bundles-rollback-schema.sql system-bundle-lifecycle-schema.sql system-bundle-lifecycle-rollback-schema.sql \
-    recurring-responsibilities-schema.sql connect-money-schema.sql money-apps-creator-quote-ledger-schema.sql \
+    recurring-responsibilities-schema.sql connect-money-schema.sql money-apps-creator-quote-ledger-schema.sql ledger-attribution-schema.sql \
     system-package-readonly-schema.sql function-exposure-schema.sql payer-authority-reader-integration-schema.sql; do
     printf 'Money/apps native contract: %s\n' "$fixture"
     psql "${psql_args[@]}" --set="bundle_native_input=$bundle_input" --file="$repo_root/tests/$fixture"
