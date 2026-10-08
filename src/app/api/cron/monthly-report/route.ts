@@ -1,3 +1,4 @@
+import { resolveTenantBrand } from "@/platform/agency-brand/server";
 import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 import { runWebsiteMonthlyReports } from "@/products/websites/index";
 import { NextResponse } from "next/server";
@@ -8,8 +9,7 @@ import { alertOnce } from "@/platform/infra/monitoring";
 import { getAllTenants } from "@/lib/tenants";
 import { generateMonthlyRecap } from "@/lib/weekly-brief";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
-import { EMAIL_DOMAIN } from "@/platform/infra/brand";
-import { sanitizeEmailSubjectText } from "@/lib/invite-email";
+import { CONTROL_PLANE_URL, EMAIL_DOMAIN } from "@/platform/infra/brand";
 import { emailSendingPaused } from "@/platform/infra/email/enabled";
 import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
 import { getRedis } from "@/platform/infra/redis";
@@ -115,19 +115,21 @@ export async function GET(request: Request) {
       const paragraphs = recapParagraphs(recap.summary);
       const outcome = outcomesByTenant.get(tenant.id);
       if (outcome) paragraphs.push(`Across your business: ${outcome.line.text}`);
-      const dashboardUrl = await ownerNoticeUrl(tenant, "/dashboard/reports", getTenantDashboardUrl(tenant, "/dashboard/reports"));
+      const brand = await resolveTenantBrand(tenant.id);
+      const dashboardUrl = brand.agencyId ? `${CONTROL_PLANE_URL}/client/${encodeURIComponent(tenant.id)}/dashboard/reports` : await ownerNoticeUrl(tenant, "/dashboard/reports", getTenantDashboardUrl(tenant, "/dashboard/reports"));
 
       const html = renderEmailHtml({
+        brand,
         preheader: paragraphs[0],
         heading,
         paragraphs,
         button: { label: "See your full recap", url: dashboardUrl },
         footerNote: `Your ${monthName} recap for ${tenant.siteName}`,
       });
-      const text = renderEmailText({ heading, paragraphs, button: { label: "See your full recap", url: dashboardUrl } });
+      const text = renderEmailText({ brand, heading, paragraphs, button: { label: "See your full recap", url: dashboardUrl } });
 
       if (process.env.RESEND_API_KEY) {
-        const domain = tenant.resendDomain || process.env.RESEND_DOMAIN || EMAIL_DOMAIN;
+        const domain = brand.agencyId ? EMAIL_DOMAIN : tenant.resendDomain || process.env.RESEND_DOMAIN || EMAIL_DOMAIN;
         // Shared transport boundary; keeps the report@ from + per-tenant domain.
         let ok = false;
         try {
@@ -138,7 +140,8 @@ export async function GET(request: Request) {
             subject: `Your ${monthName} recap`,
             html,
             text,
-            fromName: sanitizeEmailSubjectText(tenant.siteName),
+            brand,
+            fromName: tenant.siteName,
             fromAddress: `report@${domain}`,
           });
           ok = outcome

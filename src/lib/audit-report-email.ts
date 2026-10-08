@@ -1,3 +1,4 @@
+import { STRELVA_BRAND } from "@/platform/infra/agency-brand";
 /**
  * Prospect-facing "your site health report is ready" email. Sent when someone
  * runs the gated full audit on the marketing site. This is a PROSPECT send (no
@@ -58,7 +59,7 @@ export function buildAuditReportEmailOptions(
   const bullets = findings.slice(0, 3).map((f) => ({ title: f.name, text: bulletText(f.impact, f.issue) }));
 
   return {
-    ...(result.agency ? { preparedBy: result.agency.name, secondaryButton: { label: `Contact ${result.agency.name}`, url: result.agency.contactUrl } } : {}),
+    ...(result.agency ? { preparedBy: result.agency.name, brand: { ...STRELVA_BRAND, agencyId: result.agency.workspaceId, name: result.agency.name, logoUrl: result.agency.brand.logoUrl, accentColor: result.agency.brand.accentColor ?? STRELVA_BRAND.accentColor, replyTo: result.agency.replyTo ?? null }, secondaryButton: { label: `Contact ${result.agency.name}`, url: result.agency.contactUrl } } : {}),
     preheader: `${result.grade} · ${result.overallScore}/100 for ${host}`,
     heading: "Your site health report is ready",
     paragraphs: [

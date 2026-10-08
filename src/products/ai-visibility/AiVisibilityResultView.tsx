@@ -1,4 +1,6 @@
 "use client";
+import { OwnerBrandIdentity } from "@/components/brand/OwnerBrandIdentity";
+import { STRELVA_BRAND } from "@/platform/infra/agency-brand";
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
@@ -83,7 +85,7 @@ export function AiVisibilityResultView({ result: raw, scanId, shareUrl, workspac
 
   return (
     <div className="motion-rise">
-      {agency && <p data-agency-brand={agency.slug} className="mb-6 text-center text-sm text-m-text-2">Prepared by {agency.name} on Strelva</p>}
+      {agency && <OwnerBrandIdentity brand={{ ...STRELVA_BRAND, agencyId: agency.workspaceId, name: agency.name, logoUrl: agency.brand.logoUrl, accentColor: agency.brand.accentColor ?? STRELVA_BRAND.accentColor, replyTo: agency.replyTo ?? null }} />}
       <div className="flex flex-col items-center text-center">
         <div className="flex size-28 items-center justify-center rounded-full border-4 sm:size-32" style={{ borderColor: measured ? gradeColor(result.grade) : "var(--m-rule)", background: measured ? `color-mix(in oklch, ${gradeColor(result.grade)} 10%, transparent)` : "var(--m-panel)" }}>
           <div>

@@ -18,6 +18,8 @@ import {
   Download,
 } from "lucide-react";
 import type { AgencyAttribution } from "@/platform/infra/agency-attribution";
+import { OwnerBrandIdentity } from "@/components/brand/OwnerBrandIdentity";
+import { STRELVA_BRAND } from "@/platform/infra/agency-brand";
 import type { AuditResult, CheckStatus, CategoryResult } from "@/lib/audit/types";
 import { topFixes } from "@/lib/audit/impact";
 
@@ -246,7 +248,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
   return (
     <div className={saved ? "product-surface py-8" : "product-surface px-6 py-8 md:px-12"}>
       <div className="relative z-10 mx-auto max-w-[960px] pb-16">
-        {agency && <p data-agency-brand={agency.slug} className="mb-6 text-sm text-m-text-2">{agency.name} on Strelva</p>}
+        {agency && <div className="mb-6"><OwnerBrandIdentity brand={{ ...STRELVA_BRAND, agencyId: agency.workspaceId, name: agency.name, logoUrl: agency.brand.logoUrl, accentColor: agency.brand.accentColor ?? STRELVA_BRAND.accentColor, replyTo: agency.replyTo ?? null }} /></div>}
         {/* Input form */}
         {(state === "idle" || state === "error") && (
           <div className="motion-rise">
