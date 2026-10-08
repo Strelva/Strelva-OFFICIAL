@@ -1,3 +1,4 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireTenantAccess, requireTenantPermission } from "@/platform/infra/auth";
@@ -10,6 +11,7 @@ export async function GET() {
   const tenant = await getTenantFromHeaders();
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
+  await authorizeTenantOperatorRead(tenant);
   return NextResponse.json({ mode: await getContentAutonomy(tenant) });
 }
 

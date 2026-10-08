@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { redirect } from "next/navigation";
 import { isSuperAdmin } from "@/platform/infra/auth";
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
@@ -16,6 +17,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminAccountsPage() {
   // Defense in depth — the /admin layout already gates super-admin, mirror it.
   if (!(await isSuperAdmin())) redirect("/");
+  await authorizeAdminOperatorRead("admin.accounts.read");
 
   const [accounts, allTenants] = await Promise.all([getAllAccounts(), getAllTenants()]);
   const active = allTenants.filter(isActiveTenant);

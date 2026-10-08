@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUserEmail, isSuperAdmin } from "@/platform/infra/auth";
@@ -31,6 +32,7 @@ export async function GET(request: Request) {
   const parsed = z.object(ids).safeParse({ workspaceId: url.searchParams.get("workspaceId"), activationId: url.searchParams.get("activationId") });
   if (!parsed.success) return NextResponse.json({ error: "Check the request." }, { status: 400, headers: noStore });
   try {
+    await authorizeAdminOperatorRead("admin.make-real.read");
     const { activationStarter, activationRunner, liveMakeReal } = await import("@/platform/make-real/live-server");
     // The starter reads it; once the starter has left, Strelva (system) does (a logged session).
     const actor = await activationStarter(parsed.data.workspaceId, parsed.data.activationId)

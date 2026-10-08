@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { getAllAuditEvents } from "@/lib/storage";
 import { getScanSummaries, type ScanSummary } from "@/lib/scan-store";
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
@@ -8,6 +9,7 @@ import { SiteAuditsBoard, type AuditRow } from "./SiteAuditsBoard";
 export const dynamic = "force-dynamic";
 
 export default async function AuditPage() {
+  await authorizeAdminOperatorRead("admin.audit.read");
   const activeTenants = (await getAllTenants()).filter(isActiveTenant);
   const summaries = await getScanSummaries(activeTenants.map((t) => t.id)).catch(
     () => ({}) as Record<string, ScanSummary | null>,

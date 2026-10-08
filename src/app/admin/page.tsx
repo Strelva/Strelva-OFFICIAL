@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import Link from "next/link";
 import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
 import QueuePage from "./queue/page";
@@ -65,6 +66,7 @@ function countUnworkedLeads(
 
 export default async function AdminPage() {
   if (operatorQueueReleaseEnabled()) return QueuePage();
+  await authorizeAdminOperatorRead("admin.clients.read");
   const ALL_TENANTS = await getAllTenants();
   const TENANTS = ALL_TENANTS.filter(isActiveTenant);
   const archivedTenantCount = ALL_TENANTS.length - TENANTS.length;

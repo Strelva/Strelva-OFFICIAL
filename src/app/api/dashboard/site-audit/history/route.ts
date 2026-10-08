@@ -1,3 +1,4 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 /**
  * GET /api/dashboard/site-audit/history
  *
@@ -27,6 +28,7 @@ export async function GET() {
   const tenant = await getTenantFromHeaders();
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
+  await authorizeTenantOperatorRead(tenant);
 
   try {
     // scan-store keeps points oldest-to-newest; the card wants newest-first.

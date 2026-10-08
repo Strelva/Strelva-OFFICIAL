@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 /**
  * Operator agent — the portfolio-level AI the founders chat with in Mission
  * Control to run the business. Modeled on src/app/api/agent/route.ts (the
@@ -128,6 +129,8 @@ export async function POST(req: Request) {
       headers: { "Content-Type": "application/json" },
     });
   }
+
+  await authorizeAdminOperatorRead("admin.clients.read");
 
   const body = (await req.json().catch(() => null)) as { messages?: unknown } | null;
   if (!body || !isIncomingMessages(body.messages)) {

@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { isSuperAdmin, getActorContext, getTenantOwnerUserIds, LastOwnerError } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
@@ -15,6 +16,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!(await isSuperAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  await authorizeAdminOperatorRead("admin.tenant-controls.read");
   const { id } = await params;
   if (!(await getTenantConfig(id))) {
     return NextResponse.json({ error: "Tenant not found" }, { status: 404 });

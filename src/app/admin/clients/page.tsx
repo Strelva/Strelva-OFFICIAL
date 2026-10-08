@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { isPlatformDomain } from "@/platform/infra/brand";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -34,6 +35,7 @@ export default async function AdminClientsPage() {
   // super-admin, but mirror the guard here so this page never renders client
   // data for a non-admin even if the layout chain changes.
   if (!(await isSuperAdmin())) redirect("/");
+  await authorizeAdminOperatorRead("admin.clients.read");
 
   const tenants = await getAllTenants();
 
