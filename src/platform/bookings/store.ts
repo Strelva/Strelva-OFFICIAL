@@ -148,6 +148,40 @@ export function bookingStoreDb(): BookingStoreDb | null {
   }
 }
 
+const ratioCount = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
+const agentHoldRatioCohortSchema = z.object({
+  businessId: z.uuid(),
+  workspaceId: z.uuid().nullable(),
+  tenantId: z.string().min(1).max(120).nullable(),
+  matureHolds: ratioCount,
+  customerConfirmed: ratioCount,
+  unconfirmed: ratioCount,
+  firstMaturedAt: z.iso.datetime({ offset: true }),
+  latestUnconfirmedMaturedAt: z.iso.datetime({ offset: true }).nullable(),
+}).strict().refine(row => row.matureHolds > 0 && row.customerConfirmed + row.unconfirmed === row.matureHolds
+  && (row.workspaceId === null || row.workspaceId === row.businessId)
+  && (row.unconfirmed === 0) === (row.latestUnconfirmedMaturedAt === null));
+
+export type AgentHoldRatioCohort = z.infer<typeof agentHoldRatioCohortSchema>;
+
+/** Operator-only aggregate. The RPC never returns individual bookings or access records. */
+export async function readAgentHoldRatioCohorts(actor: { userId: string; verifiedEmail: string }, now: number): Promise<AgentHoldRatioCohort[]> {
+  if (!Number.isFinite(now)) throw new BookingStoreError("invalid");
+  const raw = await call<unknown>("read_agent_hold_ratio", { p_user_id: actor.userId, p_verified_email: actor.verifiedEmail, p_now: new Date(now).toISOString() });
+  const parsed = z.array(agentHoldRatioCohortSchema).max(1000).safeParse(raw);
+  if (!parsed.success) throw new BookingStoreError("failed", "Agent hold ratio evidence unavailable");
+  const seen = new Set<string>();
+  for (const row of parsed.data) {
+    const first = Date.parse(row.firstMaturedAt);
+    const latest = row.latestUnconfirmedMaturedAt ? Date.parse(row.latestUnconfirmedMaturedAt) : null;
+    if (seen.has(row.businessId) || first > now || (latest !== null && (latest > now || latest < first))) {
+      throw new BookingStoreError("failed", "Agent hold ratio evidence unavailable");
+    }
+    seen.add(row.businessId);
+  }
+  return parsed.data;
+}
+
 async function call<T>(name: string, args: Record<string, unknown>, db: BookingStoreDb | null = bookingStoreDb()): Promise<T> {
   if (!db) throw new BookingStoreError("unconfigured");
   const controller = new AbortController();

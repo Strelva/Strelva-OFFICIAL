@@ -5,10 +5,10 @@ import { projectQueue, type SourceRead } from "@/platform/operator-queue/project
  * Local visual fixture for the operator queue. Fictional businesses only; it
  * runs the real projection so ordering, clocks and labels are the real rules.
  */
-export type QueuePreviewScenario = "full" | "incomplete" | "empty";
+export type QueuePreviewScenario = "full" | "incomplete" | "empty" | "agent-ratio" | "agent-ratio-unavailable";
 
 export function queuePreviewScenario(value: string | undefined): QueuePreviewScenario {
-  return value === "incomplete" || value === "empty" ? value : "full";
+  return value === "incomplete" || value === "empty" || value === "agent-ratio" || value === "agent-ratio-unavailable" ? value : "full";
 }
 
 const HOUR = 3600_000;
@@ -81,8 +81,14 @@ const tenants = [
 
 export function queuePreview(scenario: QueuePreviewScenario, now = Date.now()): OperatorQueue {
   const data = rows(now);
+  if (scenario.startsWith("agent-ratio")) for (const kind of QUEUE_KINDS) data[kind] = [];
+  if (scenario === "agent-ratio") data.ops_alert.push({
+    kind: "ops_alert", sourceRef: `agent-hold-ratio:workspace:${HARBOR}`, tenantId: "harbor-bakery", workspaceId: HARBOR,
+    title: "Agent holds: 3 of 20 mature requests customer-confirmed in the past 24 hours",
+    openedAt: new Date(now - HOUR).toISOString(), facts: { severity: "medium", agentHoldRatio: true }, href: "/admin",
+  });
   if (scenario === "empty") for (const kind of QUEUE_KINDS) data[kind] = [];
-  data.maintenance_digest.push(...(scenario === "empty" ? [] : [{
+  data.maintenance_digest.push(...(scenario === "empty" || scenario.startsWith("agent-ratio") ? [] : [{
     kind: "maintenance_digest" as const, sourceRef: "willow-pilates:2026-09-28", tenantId: "willow-pilates", workspaceId: null,
     title: "Maintenance digest for the week of 2026-09-28", openedAt: new Date(now - 8 * DAY).toISOString(), href: "/admin/digests",
   }]));
@@ -90,6 +96,7 @@ export function queuePreview(scenario: QueuePreviewScenario, now = Date.now()): 
   const reads: SourceRead[] = QUEUE_KINDS.map((kind) => down.includes(kind)
     ? { kind, source: kind === "change_request" ? "Change requests" : "Domain monitor", ok: false as const, reason: kind === "change_request" ? "Redis unavailable" : "No domain scan on record" }
     : { kind, source: kind, ok: true as const, rows: data[kind] });
+  if (scenario === "agent-ratio-unavailable") reads.push({ kind: "ops_alert", source: "Agent hold confirmations", ok: false, reason: "Agent hold confirmation evidence unavailable" });
   return { ...projectQueue({ reads, context: context(now), tenants, emailPaused: true, now }), businessLeads: [
     { businessKey: `w:${HARBOR}`, businessName: "Harbor Bakery", lastSevenDays: scenario === "empty" ? 0 : 7, failure: null },
     { businessKey: `w:${ALDER}`, businessName: "Alder Tile", lastSevenDays: scenario === "empty" ? 0 : 3, failure: null },
