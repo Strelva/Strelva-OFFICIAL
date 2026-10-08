@@ -177,7 +177,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
       .filter((workspace) => workspace.kind === "agency" && workspace.access !== "delegated_read")
       .map((workspace) => ({ label: workspace.name, provider: { kind: "agency" as const, agencyWorkspaceId: workspace.id } })),
   ] : undefined;
-  const readOnly = current?.access === "delegated_read";
+  const readOnly = current?.access === "delegated_read" || current?.access === "provider_seat";
   const workspaceMutationReadOnly = readOnly || workspaceExitBlocks;
   const offeringUnavailableReason = current?.kind !== "customer"
     ? `Choose a customer business workspace to view its ${systemsReleased ? "systems" : "installations"}. Personal and agency workspaces remain separate.`

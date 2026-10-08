@@ -231,6 +231,7 @@ export async function GET(request: Request) {
     z.string().uuid().parse(selectedId);
     const selected = workspaces.find((workspace) => workspace.id === selectedId);
     if (!selected) return json({ error: "Workspace unavailable." }, 404);
+    const providerSeat = selected.access === "provider_seat";
     let workspaceExitState = null;
     let workspaceExitReadStatus: "available" | "completed" | "not_owner" | "unavailable" = selected.role === "owner" ? "available" : "not_owner";
     if (selected.role === "owner") {
@@ -279,11 +280,13 @@ export async function GET(request: Request) {
     // Off (STRELVA_SYSTEMS_RELEASE, per workspace when the env says `workspace`),
     // no projection is built and the browser renders the pre-Systems workspace.
     const releaseViewer = { operator: await isSuperAdminUser(current.userId), tester: false, userId: current.userId };
-    const [systemsReleased, inquiriesReleased, websiteRebuildReleased] = await Promise.all([
+    const [systemsReleased, inquiryRelease, websiteRebuildReleased] = await Promise.all([
       systemsReleaseEnabledForWorkspace(selected.id, releaseViewer),
       inquiryReleaseEnabledForWorkspace(selected.id, releaseViewer),
       websiteRebuildReleaseEnabledForWorkspace(selected.id, releaseViewer),
     ]);
+    // #241 remains undecided: a seat alone adds no inquiry entry or inbox grant.
+    const inquiriesReleased = inquiryRelease && !providerSeat;
     const systems = systemsReleased && selected.kind === "customer" ? await readWorkspaceSystems({
       actor: current, businessId: selected.id, savedWork: work,
       canWrite: selected.access === "member" && (selected.role === "owner" || selected.role === "admin"),
@@ -321,7 +324,7 @@ export async function GET(request: Request) {
       ...(providedClients ? { providedClients } : {}),
       products,
       ...(systems ? { systems } : {}),
-      releases: { ...(agencyProspectingEnabled() ? { agencyProspecting: true } : {}), systems: systemsReleased, needsYou: needsYouReleaseEnabled(), ...(agencySignupReleaseEnabled() ? { agencySetup: true } : {}), ...(agencyAddClientReleaseEnabled() ? { agencyAddClient: true } : {}), ask: askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, ...(inquiriesReleased && inquiryRecordsEnabled() ? { inquiryInbox: true } : {}), websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}) },
+      releases: { ...(agencyProspectingEnabled() ? { agencyProspecting: true } : {}), systems: systemsReleased, needsYou: !providerSeat && needsYouReleaseEnabled(), ...(agencySignupReleaseEnabled() ? { agencySetup: true } : {}), ...(agencyAddClientReleaseEnabled() ? { agencyAddClient: true } : {}), ask: !providerSeat && askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, ...(inquiriesReleased && inquiryRecordsEnabled() ? { inquiryInbox: true } : {}), websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}) },
     };
     return json(snapshot);
   } catch (error) { return failed(error); }

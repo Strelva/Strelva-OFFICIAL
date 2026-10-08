@@ -67,7 +67,7 @@ export function WorkspaceBusinessSettings({
   /** STRELVA_NEEDS_YOU_RELEASE: off renders this page exactly as before. */
   needsYouReleased?: boolean;
 }) {
-  const readOnly = workspace?.access === "delegated_read";
+  const readOnly = workspace?.access === "delegated_read" || workspace?.access === "provider_seat";
   const business = workspace?.kind === "customer";
   const assignmentState: WorkspaceOfferingState = offerings ?? {
     status: "unavailable",
