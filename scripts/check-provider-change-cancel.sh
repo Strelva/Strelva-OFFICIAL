@@ -21,6 +21,10 @@ query(){ psql "${psql_args[@]}" -Atq -c "$1"; }
 wait_sql(){ for ((attempt=0;attempt<200;attempt++));do if [[ "$(query "$1")" == t ]];then return;fi;sleep 0.02;done;printf 'Barrier not reached: %s\n' "$1" >&2;exit 1; }
 for migration in "$repo_root"/supabase/migrations/20*.sql; do
  name="$(basename "$migration")"
+ # Rehearse this packet's inverse at its actual ordered prefix. Later37 wraps
+ # cancellation and must be retired first; complete current-source contracts
+ # run separately in check-workspace-sql / check-workspace-upgrade.
+ if [[ "$name" > "20261020090031_provider_change_cancel.sql" ]];then continue;fi
  if [[ "$name" == 20261005090000_tenant_leads.sql || "$migration" == "$forward" ]];then continue;fi
  if [[ "$name" == 20261001120000_website_documents.sql ]];then psql "${psql_args[@]}" -f "$repo_root/supabase/migrations/20261005090000_tenant_leads.sql" >/dev/null;fi
  psql "${psql_args[@]}" -f "$migration" >/dev/null

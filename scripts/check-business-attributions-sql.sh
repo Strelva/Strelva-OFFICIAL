@@ -17,6 +17,9 @@ forward="$repo_root/supabase/migrations/20261020090033_business_attributions.sql
 rollback="$repo_root/supabase/migrations/rollback-20261020090033_business_attributions.sql"
 for migration in "$repo_root"/supabase/migrations/20*.sql;do
  name="$(basename "$migration")"
+ # The exact33 inverse owns its ordered prefix, before34/37 depend on it.
+ # Complete current-source runtime contracts are registered separately.
+ if [[ "$name" > "20261020090033_business_attributions.sql" ]];then continue;fi
  if [[ "$name" == 20261005090000_tenant_leads.sql || "$migration" == "$forward" ]];then continue;fi
  if [[ "$name" == 20261001120000_website_documents.sql ]];then psql "${psql_args[@]}" -f "$repo_root/supabase/migrations/20261005090000_tenant_leads.sql" >/dev/null;fi
  psql "${psql_args[@]}" -f "$migration" >/dev/null

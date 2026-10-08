@@ -13,6 +13,8 @@ wait_sql(){ for ((attempt=0;attempt<250;attempt++));do if [[ "$(query "$1")" == 
 psql "${psql_args[@]}" -f "$repo_root/scripts/sql/local-supabase-shim.sql" >/dev/null
 for migration in "$repo_root"/supabase/migrations/20*.sql;do
  name="$(basename "$migration")"
+ # Retire only this empty prefix; later34/37 must be retired before33.
+ if [[ "$name" > "20261020090033_business_attributions.sql" ]];then continue;fi
  if [[ "$name" == 20261005090000_tenant_leads.sql ]];then continue;fi
  if [[ "$name" == 20261001120000_website_documents.sql ]];then psql "${psql_args[@]}" -f "$repo_root/supabase/migrations/20261005090000_tenant_leads.sql" >/dev/null;fi
  psql "${psql_args[@]}" -f "$migration" >/dev/null
