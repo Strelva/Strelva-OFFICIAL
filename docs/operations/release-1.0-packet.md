@@ -567,6 +567,92 @@ staged, pushed or approved.
 
 <!-- proposed-batch-8:end -->
 
+<!-- proposed-batch-9:start -->
+### Batch 9 · proposed: audited super-admin grants
+
+Status: **proposed, not released or rehearsed against the restored production
+copy.** This migration follows batch 8 and contains the audited grant/revoke
+RPCs, the access-review view, the zero-active break-glass bootstrap, and the
+retirement of the unused bootstrap email table. The manifest entry is in
+`scripts/release-safety/batches.json` under `proposed`; it is not an approved
+production batch.
+
+| Forward file | SHA-256 | Rollback companion |
+| --- | --- | --- |
+| `20261015110000_super_admin_grants.sql` | `2804c89c47c905d12bb8a2b598207c31e16c1081a5983393257ca11966b94349` | `rollback-20261015110000_super_admin_grants.sql` |
+
+The migration is **one-way after the first successful grant, revoke, or
+bootstrap**. Every one of those appends an audit event; rollback refuses to
+discard even one event. Before any event, rollback restores the prior table
+grants, auth trigger and original bootstrap seed set. The forward migration
+stops if `super_admin_bootstrap` contains rows beyond its original Jacob and
+Noah seeds. It then drops the table because no runtime code reads it. The old
+email list is not an active grant and does not carry Noah's access forward.
+
+### Jacob's super-admin migration checks
+
+1. **Before migrating**, run:
+
+   ```sql
+   select user_id, email, revoked_at from public.super_admins;
+   ```
+
+   Confirm Jacob's exact current account row is present and `revoked_at` is
+   `null`. Also confirm his mirrored identity is verified:
+
+   ```sql
+   select id, email, verified_at
+   from public.users
+   where lower(email) = lower('<Jacob account email>');
+   ```
+
+   Stop if either check is missing, unverified, or revoked; do not rely on the
+   legacy bootstrap list as evidence of active access.
+
+2. **After migrating**, run:
+
+   ```sql
+   select * from public.super_admin_access_review;
+   ```
+
+   Confirm Jacob appears. The view intentionally includes only verified active
+   operators. The CLI also requires a non-null `public.users.verified_at`; this
+   is intentional because every grant and actor check has the same verified
+   identity gate. If it is null, complete Supabase Auth email verification and
+   confirm the auth-provisioning trigger has populated `users.verified_at`
+   before using the CLI. Do not update that column directly.
+
+3. **Confirm Noah retains access**, using:
+
+   ```sql
+   select user_id, email, revoked_at
+   from public.super_admins
+   where lower(email) = lower('noahowsh@gmail.com');
+   ```
+
+   Confirm one active row. If Noah was only present in the pre-migration
+   `super_admin_bootstrap` list, grant him after migration through the audited
+   CLI while Jacob is an active verified operator:
+
+   Replace the email placeholder with Jacob's exact verified account email.
+
+   ```sh
+   JACOB_VERIFIED_EMAIL='<Jacob verified account email>'
+   pnpm exec tsx scripts/manage-super-admin.ts grant noahowsh@gmail.com \
+     --actor "$JACOB_VERIFIED_EMAIL" \
+     --reason "Retain Noah's active operator access" --apply
+   ```
+
+For a fresh local, preview, or disaster-recovery database with **zero active
+super-admins**, follow [the first-operator runbook](./super-admin-access.md).
+Bootstrap uses the service-role key, accepts only a verified target, succeeds
+only while the active roster is empty, and appends `break_glass = true`.
+Ordinary grants and revokes remain separately attributed as service-role-key
+or signed-in-session actions. No production grant, revocation, migration, or
+deployment is authorized by this packet.
+
+<!-- proposed-batch-9:end -->
+
 ### Step 6a · Batch 7A, before w6
 
 [Step issue #350](https://github.com/Strelva/Strelva-OFFICIAL/issues/350).

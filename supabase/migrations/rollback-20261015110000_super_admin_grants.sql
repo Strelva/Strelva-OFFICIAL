@@ -14,7 +14,9 @@ $$;
 drop view public.super_admin_access_review;
 drop function public.grant_super_admin(uuid, text, uuid);
 drop function public.revoke_super_admin(uuid, text, uuid);
+drop function public.bootstrap_super_admin(uuid, text);
 drop function public.super_admin_manager_actor(uuid);
+drop trigger super_admin_access_events_no_truncate on public.super_admin_access_events;
 drop trigger super_admin_access_events_immutable on public.super_admin_access_events;
 drop function public.super_admin_access_event_immutable();
 drop table public.super_admin_access_events;
@@ -22,6 +24,15 @@ drop table public.super_admin_access_events;
 -- Restore the prior table grants and auth bootstrap behavior if this migration
 -- is rolled back before it has recorded any grants or revocations.
 grant all on table public.super_admins to anon, authenticated, service_role;
+
+create table public.super_admin_bootstrap (
+  email text primary key
+);
+insert into public.super_admin_bootstrap (email) values
+  ('rhinehart514@gmail.com'),
+  ('noahowsh@gmail.com');
+alter table public.super_admin_bootstrap enable row level security;
+grant select, insert, update, delete on table public.super_admin_bootstrap to service_role;
 
 create or replace function public.handle_new_user()
 returns trigger

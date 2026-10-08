@@ -7,6 +7,8 @@ set local statement_timeout = '60s';
 create table public.super_admin_access_events (
   id bigint generated always as identity primary key,
   action text not null check (action in ('granted', 'revoked')),
+  via text not null check (via in ('authenticated_session', 'service_role_key')),
+  break_glass boolean not null default false,
   actor_user_id uuid not null,
   actor_email text not null,
   target_user_id uuid not null,
@@ -14,12 +16,14 @@ create table public.super_admin_access_events (
   reason text not null check (
     char_length(btrim(reason)) between 3 and 500 and reason ~ '[^[:space:]]'
   ),
-  occurred_at timestamptz not null default clock_timestamp()
+  occurred_at timestamptz not null default clock_timestamp(),
+  constraint super_admin_access_events_break_glass_source
+    check (not break_glass or (action = 'granted' and via = 'service_role_key'))
 );
 create index super_admin_access_events_actor_time_idx
   on public.super_admin_access_events (actor_user_id, occurred_at desc);
 comment on table public.super_admin_access_events is
-  'Append-only record of every super-admin grant and revocation, including its operator and reason.';
+  'Append-only record of every super-admin grant and revocation, including its operator, reason, caller channel, and break-glass marker.';
 
 alter table public.super_admin_access_events enable row level security;
 revoke all on table public.super_admin_access_events from public, anon, authenticated, service_role;
@@ -42,6 +46,9 @@ revoke all on function public.super_admin_access_event_immutable() from public, 
 create trigger super_admin_access_events_immutable
   before update or delete on public.super_admin_access_events
   for each row execute function public.super_admin_access_event_immutable();
+create trigger super_admin_access_events_no_truncate
+  before truncate on public.super_admin_access_events
+  for each statement execute function public.super_admin_access_event_immutable();
 
 -- A service-role caller must name an existing, verified operator as the human
 -- actor. An authenticated caller is always attributed to their own session.
@@ -52,7 +59,7 @@ security definer
 set search_path = ''
 as $$
 declare
-  caller_role text := nullif(current_setting('request.jwt.claim.role', true), '');
+  caller_role text := auth.role();
   actor_id uuid;
 begin
   if caller_role = 'authenticated' then
@@ -99,10 +106,18 @@ declare
   actor_id uuid;
   actor_email text;
   target_email text;
+  action_via text;
   now_at timestamptz := clock_timestamp();
   existing_revoked_at timestamptz;
 begin
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('super-admin:operations', 0)
+  );
   actor_id := public.super_admin_manager_actor(p_actor_user_id);
+  action_via := case auth.role()
+    when 'authenticated' then 'authenticated_session'
+    when 'service_role' then 'service_role_key'
+  end;
   if p_user_id is null then
     raise exception 'super_admin_target_required';
   end if;
@@ -142,13 +157,80 @@ begin
         granted_by = excluded.granted_by,
         revoked_at = null;
   insert into public.super_admin_access_events (
-    action, actor_user_id, actor_email, target_user_id, target_email, reason, occurred_at
-  ) values ('granted', actor_id, actor_email, p_user_id, target_email, btrim(p_reason), now_at);
+    action, via, break_glass, actor_user_id, actor_email, target_user_id, target_email, reason, occurred_at
+  ) values ('granted', action_via, false, actor_id, actor_email, p_user_id, target_email, btrim(p_reason), now_at);
   return p_user_id;
 end;
 $$;
 revoke all on function public.grant_super_admin(uuid, text, uuid) from public, anon, authenticated, service_role;
 grant execute on function public.grant_super_admin(uuid, text, uuid) to authenticated, service_role;
+
+-- A service-role key may establish the first operator only when no active
+-- operator remains. The verified target is also the named human actor.
+create function public.bootstrap_super_admin(
+  p_user_id uuid,
+  p_reason text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  actor_email text;
+  now_at timestamptz := clock_timestamp();
+  existing_revoked_at timestamptz;
+begin
+  if coalesce(auth.role(), '') <> 'service_role' then
+    raise exception 'super_admin_bootstrap_service_role_required' using errcode = '42501';
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('super-admin:operations', 0)
+  );
+
+  if p_user_id is null then
+    raise exception 'super_admin_target_required';
+  end if;
+  if p_reason is null or char_length(btrim(p_reason)) not between 3 and 500
+    or p_reason !~ '[^[:space:]]' then
+    raise exception 'super_admin_reason_required';
+  end if;
+  if exists (select 1 from public.super_admins where revoked_at is null) then
+    raise exception 'super_admin_bootstrap_not_empty';
+  end if;
+
+  select target.email into actor_email
+  from public.users as target
+  where target.id = p_user_id and target.verified_at is not null
+  for key share;
+  if not found then
+    raise exception 'super_admin_verified_user_required';
+  end if;
+
+  select grant_row.revoked_at into existing_revoked_at
+  from public.super_admins as grant_row
+  where grant_row.user_id = p_user_id
+  for update;
+  if found and existing_revoked_at is null then
+    raise exception 'super_admin_already_active';
+  end if;
+
+  insert into public.super_admins (user_id, email, granted_at, granted_by, revoked_at)
+  values (p_user_id, actor_email, now_at, p_user_id, null)
+  on conflict (user_id) do update
+    set email = excluded.email,
+        granted_at = excluded.granted_at,
+        granted_by = excluded.granted_by,
+        revoked_at = null;
+  insert into public.super_admin_access_events (
+    action, via, break_glass, actor_user_id, actor_email, target_user_id, target_email, reason, occurred_at
+  ) values ('granted', 'service_role_key', true, p_user_id, actor_email, p_user_id, actor_email, btrim(p_reason), now_at);
+  return p_user_id;
+end;
+$$;
+revoke all on function public.bootstrap_super_admin(uuid, text) from public, anon, authenticated, service_role;
+grant execute on function public.bootstrap_super_admin(uuid, text) to service_role;
 
 create function public.revoke_super_admin(
   p_user_id uuid,
@@ -164,15 +246,33 @@ declare
   actor_id uuid;
   actor_email text;
   target_email text;
+  active_operator_count bigint;
+  action_via text;
   now_at timestamptz := clock_timestamp();
 begin
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('super-admin:operations', 0)
+  );
   actor_id := public.super_admin_manager_actor(p_actor_user_id);
+  action_via := case auth.role()
+    when 'authenticated' then 'authenticated_session'
+    when 'service_role' then 'service_role_key'
+  end;
   if p_user_id is null then
     raise exception 'super_admin_target_required';
   end if;
   if p_reason is null or char_length(btrim(p_reason)) not between 3 and 500
     or p_reason !~ '[^[:space:]]' then
     raise exception 'super_admin_reason_required';
+  end if;
+  select count(*) into active_operator_count
+  from public.super_admins
+  where revoked_at is null;
+  if active_operator_count <= 1 then
+    raise exception 'super_admin_last_active_refused';
+  end if;
+  if actor_id = p_user_id then
+    raise exception 'super_admin_self_revoke_refused';
   end if;
 
   perform pg_catalog.pg_advisory_xact_lock(
@@ -196,8 +296,8 @@ begin
   select operator.email into actor_email
   from public.users as operator where operator.id = actor_id;
   insert into public.super_admin_access_events (
-    action, actor_user_id, actor_email, target_user_id, target_email, reason, occurred_at
-  ) values ('revoked', actor_id, actor_email, p_user_id, target_email, btrim(p_reason), now_at);
+    action, via, break_glass, actor_user_id, actor_email, target_user_id, target_email, reason, occurred_at
+  ) values ('revoked', action_via, false, actor_id, actor_email, p_user_id, target_email, btrim(p_reason), now_at);
   return p_user_id;
 end;
 $$;
@@ -270,6 +370,20 @@ begin
   return new;
 end;
 $$;
+
+-- No live reader uses the old bootstrap allowlist after the trigger is replaced.
+-- Require its original seed set so the empty-audit rollback can restore it exactly.
+lock table public.super_admin_bootstrap in access exclusive mode;
+do $$
+begin
+  if (select count(*) from public.super_admin_bootstrap) <> 2
+    or not exists (select 1 from public.super_admin_bootstrap where email = 'rhinehart514@gmail.com')
+    or not exists (select 1 from public.super_admin_bootstrap where email = 'noahowsh@gmail.com') then
+    raise exception 'super_admin_bootstrap_not_seed_only';
+  end if;
+end;
+$$;
+drop table public.super_admin_bootstrap;
 
 -- Direct writes, including service-role PostgREST writes, must use the audited
 -- security-definer functions. RLS still limits authenticated reads.
