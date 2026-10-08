@@ -551,7 +551,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
       ? systems.map(system => ({ id: `site-${system.id}`, title: system.name, detail: "System", href: systemLink(system.id), onOpen: () => openSystem(system.id) }))
       : assignedSites.map(site => ({ id: `site-${site.id}`, title: site.title, detail: "Managed website", href: site.href }))),
   ];
-  return <WorkspaceIntent request={requestText} current={requestCurrent} route={requestRoute} draftKey={draftKey} onSpent={spendRequest}><StrelvaShell appBase={appBase} signOut={signOut}
+  return <WorkspaceIntent request={requestText} current={requestCurrent} route={requestRoute} draftKey={draftKey} onSpent={spendRequest}><StrelvaShell ownerBrand={snapshot.ownerBrand} appBase={appBase} signOut={signOut}
     workspaceId={snapshot.workspaceId} searchItems={searchItems} searchScopeName={current?.name || "Your work"} recentWork={systemsReleased ? searchItems.filter(item => files.some(file => file.id === item.id)) : searchItems.filter(item => !item.id.startsWith("site-"))} pinned={pinnedSites} systemsReleased={systemsReleased} needsYou={needsYouPlace ? { count: null } : undefined}
     active={agency ? "access" : home ? startOpen ? undefined : section : workingSection}
     title={home && section === "system" ? systems.find(item => item.id === systemId)?.name || "System" : !home ? inquiry ? "Inquiry work" : tracker !== undefined ? "Internal tool" : plan !== undefined ? "Work plan" : document !== undefined ? "Document" : agency ? sectionTitle("access") : workingTitle || (selectedWork ? "Your work" : "New assessment") : startOpen ? "New" : sectionTitle(section)}

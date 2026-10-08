@@ -1,4 +1,6 @@
 "use client";
+import { OwnerBrandIdentity } from "@/components/brand/OwnerBrandIdentity";
+import { STRELVA_BRAND } from "@/platform/infra/agency-brand";
 
 import { useState, type FormEvent } from "react";
 import { ArrowRight, Loader2 } from "lucide-react";
@@ -122,7 +124,7 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
   return (
     <div className="product-surface px-6 py-8 md:px-12">
       <div className="relative z-10 mx-auto max-w-[760px] pb-16">
-        {agency && state !== "done" && <p data-agency-brand={agency.slug} className="mb-6 text-sm font-medium text-m-text-2">{agency.name} on Strelva</p>}
+        {agency && state !== "done" && <OwnerBrandIdentity brand={{ ...STRELVA_BRAND, agencyId: agency.workspaceId, name: agency.name, logoUrl: agency.brand.logoUrl, accentColor: agency.brand.accentColor ?? STRELVA_BRAND.accentColor, replyTo: agency.replyTo ?? null }} />}
         {(state === "idle" || state === "error") && (
           <div className="motion-rise">
             <p className="text-[14px] font-medium text-m-text-3">Free AI visibility audit</p>
