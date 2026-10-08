@@ -103,4 +103,13 @@ select pg_temp.pd_assert((select count(*)=1 and bool_and(revocation_outcome='not
   'compatibility RPC records that revocation was not attempted');
 select pg_temp.pd_expect($$select public.disconnect_workspace_calendar_connection('fd000000-0000-4000-8000-000000000010',
   'fd000000-0000-4000-8000-000000000002','outlook','revoked',null)$$,'workspace_membership_required');
+delete from public.workspace_calendar_connections
+where workspace_id='fd000000-0000-4000-8000-000000000010' and provider='outlook';
+select pg_temp.pd_assert(not public.revoke_workspace_calendar_connection(
+  'fd000000-0000-4000-8000-000000000010', 'fd000000-0000-4000-8000-000000000001', 'outlook'),
+  'compatibility RPC returns false when no local connection exists');
+select pg_temp.pd_assert((select count(*)=2 and bool_and(local_cleanup_status='complete')
+  from public.provider_disconnect_receipts
+  where workspace_id='fd000000-0000-4000-8000-000000000010' and provider='outlook'),
+  'missing local connection still records the authorized disconnect attempt');
 rollback;
