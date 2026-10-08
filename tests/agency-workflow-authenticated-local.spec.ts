@@ -5,18 +5,21 @@ import { expect as baseExpect, test, type APIRequestContext, type Page } from "@
 import { buildWorkspaceApproveUrl } from "@/lib/approve-link";
 import { unresolvedSiteFacts } from "@/products/websites/site-document";
 import type { WebsiteRebuildRecord } from "@/products/websites/rebuild-contracts";
+import type { ClientAiCheck } from "@/products/agency-clients/contracts";
 import { localEnvironment, signedInContext } from "./support/local-auth";
 
 // Real Auth/Postgres and production routes, including the rules-only website
 // pipeline. Nothing mocks app responses or calls a paid model/email provider.
-// Setup fixtures are an agency-owned prospect, a fictional delivered approval
-// email and a reviewed publish verification. Delivery transport is simulated
-// only in the disposable database; no email leaves and nobody gains platform
-// operator privileges.
+// Both variants use a reviewed publish-verification fixture. The broader
+// variant also uses a prospect and a fictional delivered approval email in the
+// disposable database. The minimum variant uses signed-in owner approval and
+// a runner-owned fictional source-site transport. No email leaves and nobody
+// gains platform operator privileges.
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local Supabase Auth and Postgres.");
 test.setTimeout(360_000);
 test.use({ actionTimeout: 120_000, navigationTimeout: 120_000 });
 const expect = baseExpect.configure({ timeout: 60_000 });
+const minimumFlags = process.env.STRELVA_AGENCY_MINIMUM_PROOF === "1";
 
 function sql(query: string): string {
   const url = process.env.STRELVA_LOCAL_DB_URL || "";
@@ -54,6 +57,10 @@ async function fits(page: Page) {
 
 test("ordinary agency adds a client, gets the owner's exact approval, publishes, and reads the receipt", async ({ browser }, testInfo) => {
   const env = localEnvironment();
+  if (minimumFlags) {
+    for (const flag of ["STRELVA_WORKSPACE_RELEASE", "STRELVA_AGENCY_ADD_CLIENT_RELEASE", "STRELVA_WEBSITE_REBUILD_RELEASE"]) expect(process.env[flag], flag).toBe("1");
+    for (const flag of ["STRELVA_SYSTEMS_RELEASE", "STRELVA_NEEDS_YOU_RELEASE", "STRELVA_OWNER_ENTRY", "STRELVA_OWNER_DECISION_LINKS_RELEASE", "STRELVA_MAKE_REAL_OWNER_LINK_RELEASE", "STRELVA_AGENCY_PROSPECTING_RELEASE", "STRELVA_AGENCY_SIGNUP_RELEASE", "STRELVA_WEBSITE_MODEL_CALLS_ENABLED"]) expect(process.env[flag] ?? "0", flag).toBe("0");
+  }
   if (!process.env.APPROVE_LINK_SECRET) throw new Error("Set the same local APPROVE_LINK_SECRET on the app server and runner.");
   const admin = createClient(env.url, env.service, { auth: { persistSession: false, autoRefreshToken: false } });
   const agency = await signedInContext(browser, admin, "workflow-agency");
@@ -71,21 +78,44 @@ test("ordinary agency adds a client, gets the owner's exact approval, publishes,
     }
     const agencyId = workspaceIds[0]!;
     const prospectId = randomUUID();
-    sql(`insert into public.agency_prospecting_profiles(workspace_id,slug,contact_url,contact_email,enabled) values ('${agencyId}','workflow-${agencyId.slice(0,8)}','https://northside.example/contact','hello@northside.example',true);
+    if (!minimumFlags) sql(`insert into public.agency_prospecting_profiles(workspace_id,slug,contact_url,contact_email,enabled) values ('${agencyId}','workflow-${agencyId.slice(0,8)}','https://northside.example/contact','hello@northside.example',true);
       insert into public.prospects(id,agency_workspace_id,source,result_id,name,email,url,business,score,grade) values ('${prospectId}','${agencyId}','audit','workflow-${prospectId}','Dana Ruiz','${owner.email}',null,'Elmwood Bakery',58,'C');`);
     expect(sql(`select count(*) from public.super_admins where user_id in ('${agency.userId}','${other.userId}','${owner.userId}')`)).toBe("0");
 
-    // Agency adds a prospect through the product form, with no website fetch.
+    // The minimal release uses the real URL form and a runner-owned fictional
+    // source-site transport. The broader proof uses a prospect with no crawl.
     const agencyPage = await agency.context.newPage();
     await agencyPage.setViewportSize({ width: 1440, height: 1000 });
-    await agencyPage.goto(`/workspace/agency/clients/new?workspaceId=${agencyId}&prospect=${prospectId}`);
-    await agencyPage.getByRole("radio", { name: /Elmwood Bakery/ }).check();
-    await expect(agencyPage.getByLabel("Owner’s email")).toHaveValue(owner.email);
+    await agencyPage.goto(`/workspace/agency/clients/new?workspaceId=${agencyId}${minimumFlags ? "" : `&prospect=${prospectId}`}`);
+    if (minimumFlags) {
+      await agencyPage.getByLabel("Their website", { exact: true }).fill("http://elmwood-source.example/");
+      await agencyPage.getByLabel("Business name", { exact: true }).fill("Elmwood Bakery");
+      await agencyPage.getByLabel("Owner’s email").fill(owner.email);
+    } else {
+      await agencyPage.getByRole("radio", { name: /Elmwood Bakery/ }).check();
+      await expect(agencyPage.getByLabel("Owner’s email")).toHaveValue(owner.email);
+    }
     const addedResponse = agencyPage.waitForResponse(r => new URL(r.url()).pathname === "/api/workspace/agency-clients" && r.request().method() === "POST");
     await agencyPage.getByRole("button", { name: "Add client", exact: true }).click();
     const added = await addedResponse;
     expect(added.status(), await added.text()).toBe(201);
-    const result = await added.json() as { client: { customerWorkspaceId: string }; ownerClaim: { claimPath: string; delivery: { status: string } } };
+    const result = await added.json() as { client: { customerWorkspaceId: string }; scan: { status: string }; ownerClaim: { claimPath: string; delivery: { status: string } }; aiCheck: ClientAiCheck };
+    if (minimumFlags) {
+      expect(result.scan.status).toBe("scanned");
+      const check = agencyPage.getByRole("region", { name: "AI Visibility check" });
+      await expect(check).toBeVisible();
+      expect(["ready", "unavailable"]).toContain(result.aiCheck.status);
+      if (result.aiCheck.status === "ready") {
+        expect(["partial", "unavailable"]).toContain(result.aiCheck.result.measurementStatus);
+        expect(result.aiCheck.result.citation.probed).toBe(false);
+        await expect(check.getByText(result.aiCheck.result.measurementNote!, { exact: true })).toBeVisible();
+        await expect(check.getByText(/Probe not completed\./)).toBeVisible();
+        if (result.aiCheck.result.measurementStatus === "unavailable") await expect(check.getByText(/\/100/)).toHaveCount(0);
+      } else if (result.aiCheck.status === "unavailable") {
+        await expect(check.getByText(result.aiCheck.message, { exact: true })).toBeVisible();
+        await expect(check.getByText(/\/100/)).toHaveCount(0);
+      }
+    }
     const businessId = result.client.customerWorkspaceId;
     workspaceIds.push(businessId);
     await expect(agencyPage.getByRole("heading", { name: "Elmwood Bakery", exact: true })).toBeVisible();
@@ -142,45 +172,61 @@ test("ordinary agency adds a client, gets the owner's exact approval, publishes,
       record = await confirmed.json();
     }
     expect(Object.values(record.rebuild.candidate!.document.nodes).some(node => node.verification?.needsReview)).toBe(false);
-    const needs = await owner.context.request.get(`/api/workspace/needs-you?workspaceId=${businessId}`);
-    expect(needs.status(), await needs.text()).toBe(200);
-    type Item = { id: string; workspaceId: string; revisionHash: string; sourceLifecycle: string; sourceId: string };
-    const approval = (await needs.json() as { items: Item[] }).items.find(item => item.sourceLifecycle === "website_document" && item.sourceId === `${workId}:approve`)!;
-    expect(approval).toBeTruthy();
-    // The isolated stack never sends email. Record suppression first; a
-    // hand-made signed URL correctly grants nothing until delivery is bound.
-    const suppressed = await admin.rpc("record_owner_decision_delivery", { p_workspace_id: businessId, p_decision_id: approval.id, p_kind: "digest", p_status: "suppressed", p_recipient: owner.email, p_provider_message_id: null, p_reason: "isolated_local_email_disabled" });
-    expect(suppressed.error).toBeNull();
-    expect(sql(`select count(*) from public.owner_decision_deliveries where decision_id='${approval.id}' and status='sent'`)).toBe("0");
-    const link = (recipient: string) => buildWorkspaceApproveUrl(env.app, { workspaceId: businessId, itemId: approval.id, action: "approve", recipient, revision: approval.revisionHash });
-    const anonymous = await browser.newContext({ viewport: { width: 390, height: 844 } });
-    try {
-      const review = await anonymous.newPage();
-      await review.goto(link(owner.email));
-      await expect(review.getByRole("button", { name: "Confirm — approve", exact: true })).toBeVisible();
-      expect(sql(`select state from public.owner_decisions where id='${approval.id}'`)).toBe("open");
-      await review.getByRole("button", { name: "Confirm — approve", exact: true }).click();
-      await expect(review.getByRole("heading", { name: "This link isn't for this account", exact: true })).toBeVisible();
-      expect(sql(`select state from public.owner_decisions where id='${approval.id}'`)).toBe("open");
-      await review.goto(link(other.email));
-      await review.getByRole("button", { name: "Confirm — approve", exact: true }).click();
-      await expect(review.getByRole("heading", { name: "This link isn't for this account", exact: true })).toBeVisible();
-      expect(sql(`select state from public.owner_decisions where id='${approval.id}'`)).toBe("open");
-      // Simulate one accepted local test email through the production receipt
-      // RPC, which atomically binds the recipient. This proves decision/link
-      // authority; it is not proof of email transport or owner notification.
-      const delivered = await admin.rpc("record_owner_decision_delivery", { p_workspace_id: businessId, p_decision_id: approval.id, p_kind: "digest", p_status: "sent", p_recipient: owner.email, p_provider_message_id: `fictional-local-${approval.id}`, p_reason: "SIMULATED delivery; no provider called or email sent" });
-      expect(delivered.error).toBeNull();
-      await review.goto(link(owner.email));
-      await review.getByRole("button", { name: "Confirm — approve", exact: true }).click();
-      await expect(review.getByRole("heading", { name: "Approved", exact: true })).toBeVisible();
-      await fits(review);
-      await review.screenshot({ path: testInfo.outputPath("owner-link-approved-390.png"), fullPage: true });
-    } finally { await anonymous.close(); }
-    record = await read(agency.context.request, workId);
-    expect(record.rebuild.status).toBe("approved");
-    expect(sql(`select approved_by from public.website_document_heads where website_work_id='${workId}'`)).toBe(owner.userId);
-    expect(sql(`select decided_by_kind || '|' || outcome from public.owner_decisions where id='${approval.id}'`)).toBe("owner_link|done");
+    if (!minimumFlags) {
+      const needs = await owner.context.request.get(`/api/workspace/needs-you?workspaceId=${businessId}`);
+      expect(needs.status(), await needs.text()).toBe(200);
+      type Item = { id: string; workspaceId: string; revisionHash: string; sourceLifecycle: string; sourceId: string };
+      const approval = (await needs.json() as { items: Item[] }).items.find(item => item.sourceLifecycle === "website_document" && item.sourceId === `${workId}:approve`)!;
+      expect(approval).toBeTruthy();
+      // The isolated stack never sends email. Record suppression first; a
+      // hand-made signed URL correctly grants nothing until delivery is bound.
+      const suppressed = await admin.rpc("record_owner_decision_delivery", { p_workspace_id: businessId, p_decision_id: approval.id, p_kind: "digest", p_status: "suppressed", p_recipient: owner.email, p_provider_message_id: null, p_reason: "isolated_local_email_disabled" });
+      expect(suppressed.error).toBeNull();
+      expect(sql(`select count(*) from public.owner_decision_deliveries where decision_id='${approval.id}' and status='sent'`)).toBe("0");
+      const link = (recipient: string) => buildWorkspaceApproveUrl(env.app, { workspaceId: businessId, itemId: approval.id, action: "approve", recipient, revision: approval.revisionHash });
+      const anonymous = await browser.newContext({ viewport: { width: 390, height: 844 } });
+      try {
+        const review = await anonymous.newPage();
+        await review.goto(link(owner.email));
+        await expect(review.getByRole("button", { name: "Confirm — approve", exact: true })).toBeVisible();
+        expect(sql(`select state from public.owner_decisions where id='${approval.id}'`)).toBe("open");
+        await review.getByRole("button", { name: "Confirm — approve", exact: true }).click();
+        await expect(review.getByRole("heading", { name: "This link isn't for this account", exact: true })).toBeVisible();
+        expect(sql(`select state from public.owner_decisions where id='${approval.id}'`)).toBe("open");
+        await review.goto(link(other.email));
+        await review.getByRole("button", { name: "Confirm — approve", exact: true }).click();
+        await expect(review.getByRole("heading", { name: "This link isn't for this account", exact: true })).toBeVisible();
+        expect(sql(`select state from public.owner_decisions where id='${approval.id}'`)).toBe("open");
+        // Simulate one accepted local test email through the production receipt
+        // RPC, which atomically binds the recipient. This proves decision/link
+        // authority; it is not proof of email transport or owner notification.
+        const delivered = await admin.rpc("record_owner_decision_delivery", { p_workspace_id: businessId, p_decision_id: approval.id, p_kind: "digest", p_status: "sent", p_recipient: owner.email, p_provider_message_id: `fictional-local-${approval.id}`, p_reason: "SIMULATED delivery; no provider called or email sent" });
+        expect(delivered.error).toBeNull();
+        await review.goto(link(owner.email));
+        await review.getByRole("button", { name: "Confirm — approve", exact: true }).click();
+        await expect(review.getByRole("heading", { name: "Approved", exact: true })).toBeVisible();
+        await fits(review);
+        await review.screenshot({ path: testInfo.outputPath("owner-link-approved-390.png"), fullPage: true });
+      } finally { await anonymous.close(); }
+      record = await read(agency.context.request, workId);
+      expect(record.rebuild.status).toBe("approved");
+      expect(sql(`select approved_by from public.website_document_heads where website_work_id='${workId}'`)).toBe(owner.userId);
+      expect(sql(`select decided_by_kind || '|' || outcome from public.owner_decisions where id='${approval.id}'`)).toBe("owner_link|done");
+    } else {
+      expect((await owner.context.request.get(`/api/workspace/needs-you?workspaceId=${businessId}`)).status()).toBe(503);
+      await claim.goto(`/workspace/site?workspaceId=${businessId}&entry=rebuild&workId=${workId}`);
+      const signedApproval = claim.waitForResponse(response => new URL(response.url()).pathname === `/api/websites/${workId}/approve` && response.request().method() === "POST");
+      await claim.getByRole("button", { name: "Approve this preview", exact: true }).click();
+      const approvedResponse = await signedApproval;
+      expect(approvedResponse.status(), await approvedResponse.text()).toBe(200);
+      expect(approvedResponse.request().postDataJSON()).toMatchObject(selection(record));
+      await expect(claim.getByText("This exact preview is approved.", { exact: true })).toBeVisible();
+      record = await read(agency.context.request, workId);
+      expect(record.rebuild.status).toBe("approved");
+      expect(sql(`select approved_by from public.website_document_heads where website_work_id='${workId}'`)).toBe(owner.userId);
+      expect(sql(`select count(*) from public.owner_decision_deliveries where workspace_id='${businessId}'`)).toBe("0");
+      await claim.screenshot({ path: testInfo.outputPath("owner-signed-in-approved-390.png"), fullPage: true });
+    }
 
     // An agency needs both independent publish verification and the owner's
     // resource-specific mandate. Approval alone grants neither.

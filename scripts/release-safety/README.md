@@ -73,6 +73,50 @@ refuses any retained `tenant_workspace_links` rows. The July rollback refuses
 history or reverses accepted provider effects. Forward corrective migrations
 remain the preferred live recovery path.
 
+## Batch 8: retained evidence and empty-only structural recovery
+
+`pnpm check:release-safety:batch8` applies all pinned batch-8 files, runs their
+existing receipt-preserving companions, then proves optional structural
+completion on its private local database. The full pre-batch public catalog and
+ACL comparison remains exact; the second forward must reproduce the first.
+Legacy client content, routing, billing and access probes run throughout.
+
+The companions intentionally retain sessions, send purposes, receipts, native
+records and exit history. Disabling a feature does not authorize deleting this
+evidence. The separate `rollback-batch8-empty-schema.sql` can complete structural
+reversal only when all 20 registered evidence tables are empty, all four added
+fields on existing tables are NULL, and added release-flag values have no state
+or immutable history. It locks affected tables, checks captured or explicitly
+audited object fingerprints, restores predecessor definitions and constraints,
+and uses ordinary non-cascading drops. Populated evidence, unknown dependencies,
+drift, or rows incompatible with the old constraints stop the whole transaction.
+No customer row is deleted, rewritten, archived or replayed.
+
+Prepare this target's privileged metadata with
+`capture-batch8-structural-baseline.sql` **before** batch 8, then run the same
+capture file with `--set=batch8_capture_forward=true` immediately after forward
+and before any recovery companion. The captures contain catalog definitions,
+fingerprints and flag names, with no customer rows or credentials. Browser and
+service roles cannot access them. Capture reuse and missing metadata refuse;
+do not reconstruct a predecessor capture from an already upgraded target.
+
+Live structural recovery requires separate explicit recovery authorization and
+all batch-8 callers/gates disabled. A release or deployment authorization does
+not grant rollback authority. After the ordinary companions, the reviewed
+manual invocation must include both
+`--set=batch8_empty_recovery_authorized=true` and
+`--set=batch8_callers_disabled=true`. These are explicit operator attestations;
+the SQL cannot inspect application environment switches. The local proof sets
+them only for its disposable database. Nothing invokes this helper on a hosted
+target automatically.
+
+On a populated target, retain the additive schema and use feature disablement
+plus a reviewed forward correction. Moving accepted-send evidence away and
+reapplying empty tables can reopen consumed send purposes; archive/replay
+recovery needs its own plan. The local proof checks atomic refusal for accepted
+send evidence, every new field, flag state and immutable history, function
+drift, missing authorization, and incompatibility with an old constraint.
+
 ## Dump and restore
 
 ```sh
@@ -130,12 +174,17 @@ pnpm exec tsx scripts/stage-release-batch.ts --batch 0 \
 ```
 
 The history file is a JSON array of 14-digit versions from a freshly reviewed
-snapshot. It must match the 85-file baseline plus every earlier batch exactly.
+snapshot. It must match the 85-file baseline plus the exact preceding packet
+entries in order `0, H, 1–7, 7A, 8, 9`; H is mandatory before batch 1.
 Unknown, missing, duplicate, or partially applied history stops. Staging
 rehashes every required forward file before creating a fresh output directory,
 copies only the baseline/earlier/current batch plus `config.toml`, and writes
-an exact pending-file receipt. It performs no network calls, subprocesses,
-Supabase link, dry run, push, or history repair. Keep credentials out of it.
+an exact pending-file receipt. It verifies the complete pinned inventory before any filesystem write and
+performs no network calls, subprocesses, Supabase link, dry run, push, or history
+repair. Proposed-step receipts retain that status and explicitly grant no
+deployment authority. Keep credentials out of it.
+The receipt identifies prepared/proposed tails and records
+`deploymentAuthorized: false`; creating a stage grants no deployment authority.
 
 For the separately approved CLI step, use the staged directory as `--workdir`
 and `db push --include-all`; inspect the linked dry run and require exactly the

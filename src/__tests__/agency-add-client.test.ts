@@ -12,6 +12,7 @@ import {
 } from "@/products/agency-clients/server";
 import { seedFromSite } from "@/products/agency-clients/seed";
 import { WebsiteCrawlError } from "@/products/websites/server";
+import type { SavedWork } from "@/platform/workspaces/types";
 
 const AGENCY = "a9000000-0000-4000-8000-000000000020";
 const CLIENT = "a9000000-0000-4000-8000-000000000010";
@@ -19,6 +20,13 @@ const PROSPECT = "a9000000-0000-4000-8000-0000000000a1";
 const KEY = "a9000000-0000-4000-8000-0000000000c1";
 const actor = { userId: "a9000000-0000-4000-8000-000000000001", verifiedEmail: "Owner@Agency.example.test " };
 const TOKEN = "t".repeat(43);
+const WORK = "a9000000-0000-4000-8000-0000000000b1";
+const scored = { business: "Northside Bakery", url: "https://northside-bakery.example/", score: 70, grade: "C" as const,
+  verdict: "Website readiness was measured.", topFix: "Add business schema", signals: [], measurementStatus: "partial" as const,
+  citation: { probed: false, mentioned: false, recommended: false, note: "Not available." } };
+const assessment: SavedWork = { id: WORK, workspaceId: AGENCY, productId: "ai_visibility", resourceKind: "private_ai_visibility_work",
+  title: "Northside Bakery", payload: { ...scored, privateSecret: "must-not-return" }, input: {}, createdBy: actor.userId,
+  createdAt: "2026-10-07T12:00:00.000Z", updatedAt: "2026-10-07T12:00:00.000Z" };
 
 const receipt = (overrides: Record<string, unknown> = {}) => ({
   additionId: "a9000000-0000-4000-8000-0000000000d1", agencyWorkspaceId: AGENCY, customerWorkspaceId: CLIENT, name: "Northside Bakery",
@@ -33,7 +41,7 @@ function deps(responses: Record<string, { data?: unknown; error?: { message: str
   const rpc = vi.fn(async (name: string, _args: Record<string, unknown>) => ({ data: responses[name]?.data ?? (name === "authorize_agency_client_add" ? "owner" : null), error: responses[name]?.error ?? null }));
   const seedFn = vi.fn(seed ?? (async () => ({ scan: { status: "scanned" as const, seeded: ["phone", "email"], name: "Northside Bakery & Cafe", message: null },
     facts: { phone: { value: "(716) 555-0142" }, email: { value: "hello@northside-bakery.example" } } })));
-  return { rpc, seed: seedFn, token: () => TOKEN, now: () => new Date("2026-10-07T12:00:00.000Z") } satisfies AgencyClientDeps;
+  return { rpc, seed: seedFn, token: () => TOKEN, now: () => new Date("2026-10-07T12:00:00.000Z"), assess: vi.fn(async () => assessment) } satisfies AgencyClientDeps;
 }
 
 describe("agency add client release", () => {
@@ -90,6 +98,10 @@ describe("addAgencyClient", () => {
       rebuildOpenToAgency: true,
     });
     expect(result.scan.seeded).toEqual(["phone", "email"]);
+    expect(d.assess).toHaveBeenCalledWith({ actor, workspaceId: AGENCY, input: { business: "Northside Bakery", url: receipt().sourceUrl }, requestId: KEY });
+    expect(result.aiCheck).toEqual({ status: "ready", workId: WORK, href: `/workspace?workspaceId=${AGENCY}&work=${WORK}`, result: scored });
+    expect(JSON.stringify(result.aiCheck)).not.toContain("must-not-return");
+    expect(d.assess.mock.invocationCallOrder[0]).toBeGreaterThan(d.rpc.mock.invocationCallOrder[2]!);
   });
 
   it("names the business from the site when the agency left the name blank", async () => {
@@ -130,6 +142,8 @@ describe("addAgencyClient", () => {
     const result = await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, name: "Corner Barber", idempotencyKey: KEY }, d);
     expect(d.seed).not.toHaveBeenCalled();
     expect(result.scan.status).toBe("not_requested");
+    expect(result.aiCheck).toEqual({ status: "not_requested" });
+    expect(d.assess).not.toHaveBeenCalled();
     expect(d.rpc.mock.calls[1]![1]).toMatchObject({ p_input: { name: "Corner Barber", sourceUrl: null, facts: {} } });
   });
 
@@ -180,6 +194,30 @@ describe("addAgencyClient", () => {
   it("rejects a malformed database answer instead of trusting it", async () => {
     const d = deps({ agency_add_client: { data: { customerWorkspaceId: CLIENT } } });
     await expect(addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, name: "X", idempotencyKey: KEY }, d)).rejects.toMatchObject({ status: 503, code: "malformed" });
+  });
+
+  it.each(["provider unavailable", "daily budget", "storage failed", "workspace access denied"])("retains the added client and owner link when its check fails: %s", async (reason) => {
+    const d = deps({ agency_add_client: { data: receipt() }, issue_agency_client_owner_claim: { data: claim } });
+    d.assess.mockRejectedValue(new Error(reason));
+    const result = await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, name: "Northside Bakery", url: "northside-bakery.example", ownerEmail: claim.recipientEmail, idempotencyKey: KEY }, d);
+    expect(result.client.customerWorkspaceId).toBe(CLIENT);
+    expect(result.ownerClaim?.claimPath).toBe(`/workspace/claim/${TOKEN}`);
+    expect(result.aiCheck).toMatchObject({ status: "unavailable", href: `/workspace?workspaceId=${AGENCY}&view=work` });
+    expect(JSON.stringify(result.aiCheck)).not.toContain(reason);
+  });
+
+  it("uses the saved name and URL on a replay, and reuses the same assessment operation", async () => {
+    const d = deps({ agency_add_client: { data: receipt({ replayed: true }) } });
+    await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, name: "Changed name", url: "changed.example", idempotencyKey: KEY }, d);
+    expect(d.assess).toHaveBeenCalledWith({ actor, workspaceId: AGENCY, input: { business: "Northside Bakery", url: receipt().sourceUrl }, requestId: KEY });
+  });
+
+  it("refuses assessment rows from another workspace without exposing them", async () => {
+    const d = deps({ agency_add_client: { data: receipt() } });
+    d.assess.mockResolvedValue({ ...assessment, workspaceId: CLIENT });
+    const result = await addAgencyClient(actor, { action: "add", agencyWorkspaceId: AGENCY, name: "Northside Bakery", idempotencyKey: KEY }, d);
+    expect(result.aiCheck.status).toBe("unavailable");
+    expect(JSON.stringify(result.aiCheck)).not.toContain(WORK);
   });
 });
 

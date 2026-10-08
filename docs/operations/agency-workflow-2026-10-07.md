@@ -1,5 +1,82 @@
 # Ordinary agency workflow — October 7, 2026
 
+## Deployment qualification update
+
+Jacob authorized deployment and issue closure in this session. This replaces the
+older local-only inventory and failure status below; that earlier record remains
+as historical evidence. Production deployment is still pending, not claimed.
+
+The candidate now includes integration `f3097dd6`, merged as `f3483091`.
+Provider access remains website-only. Incoming
+`20261018110000_provider_seat_website_access` supersedes the private saved-work
+migration, and `20261017120000_owner_decision_operator_refusal` supersedes the
+private operator-exclusion migration. Those two unshipped private pairs were
+removed. Inquiry retention now has its own `20261017110000` identity; conversion
+uses the canonical `20261013220000_provider_seat_tenant_conversion`. Hosted
+migration history was not changed. There are **260** unique ordered migrations.
+
+The add-client URL path now also runs the existing private AI Visibility
+assessment in the agency workspace, keyed by the same add command. Completed
+and checkpointed retries avoid another probe or assessment-budget debit. Results
+use the existing private work page; provider/capacity failure retains the client
+and owner claim, and unmeasured results show no score. Local proof: 85 focused
+tests, 260-migration agency checkpoint/replay/count assertions, and desktop/mobile
+UI states with mocked HTTP/provider responses. No paid provider call was made.
+Live Gemini success remains unproven.
+
+Current local evidence:
+
+- Full unit suite: **8,465 passed, 42 skipped**, 897 passing files / two skipped.
+  `/tmp/strelva-agency-deploy-final-tests.log`.
+- Ordered agency SQL job: **260 migrations, passed**.
+  `/tmp/strelva-agency-deploy-workflow.log`.
+- Complete workspace upgrade: **passed**, including actual staffed-provider
+  owner-only refusals and verified-owner recipient trust.
+  `/tmp/strelva-owner-recipient-upgrade-20261007.log`.
+- Production build: **Next 16.3.8 passed**. Existing dependencies were patched;
+  production dependency audit reports no known vulnerabilities.
+  `/tmp/strelva-agency-deploy-build.log`,
+  `/tmp/strelva-agency-deploy-audit-patched.log`.
+- Current authenticated agency browser journey: **one passed, 26.8 seconds**
+  against a fresh 260-migration disposable Auth stack. Same explicit delivery
+  and verification fixtures described below. Evidence:
+  `.scratch/agency-workflow-proof/2026-10-07/release-candidate-260/`.
+- Compatibility: **196/196 custom-repository checks passed**.
+- Batch 8: **118 forward files**, receipt-preserving companions followed by
+  separately authorized empty-only structural completion restore the exact
+  catalog/ACL; a second forward reproduces the first. Populated evidence,
+  all four retained fields, new flags/history, incompatible old constraints,
+  missing authority and function drift refuse atomically. This is local proof,
+  not authorization or proof of recovery on a populated production database.
+  `/tmp/strelva-batch8-empty-completion.log`.
+
+The broader flags-off browser suite remains unqualified: five private-app cases
+expect owners to create/design/publish apps, which current authority refuses.
+These are retained failures; no agency app grant or owner permission was added
+to make them pass. The separate conversion fixture now passes with an explicit ordinary agency,
+named staff and existing-contract basis, zero agency/operator client memberships,
+and the actual owner reading the owner feed. The focused website job is not proof
+of the whole 1.0 launch, grouped activation, apps, or existing-client conversion.
+
+Read-only production checks identify the actual app project as `strelva-admin`
+(`prj_AzaQBS8jM9E5RVgHuMWnQju0GIxb`). Existing live deployment remains
+`dpl_9ViM5iWeCepPiio8k3AZ5NFwKFPx`. Production has **86 applied migrations**,
+so the complete candidate inventory has **174 pending**; approved packet order
+and fresh restored-copy qualification remain prerequisites to a database write.
+Fresh private schema/data dumps are retained under
+`~/.strelva-prod-ops/dumps/agency-workflow-20261007/`; these separate dumps are
+not one exported consistent snapshot. Baseline storefront capture returned
+**60/60 HTTP 200** across all 12 active tenant slugs, with only hashes retained.
+
+Sensitive production variables are not exportable as plaintext by Vercel env
+pull. The identical short exported placeholders for the encryption key and three
+sensitive flags are **not their deployed values**. Do not overwrite them or infer
+current effective flag states from those placeholders. The native production
+artifact must inherit the existing provider configuration and be observed.
+
+# Earlier local preparation record
+
+
 Objective: an ordinary agency adds a client, prepares a website, receives the
 owner's exact approval, publishes with explicit business authority, and reads a
 retained receipt. No agency client membership or platform operator role is a

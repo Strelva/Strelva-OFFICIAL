@@ -192,7 +192,6 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261012110000": "business_pages",
   "20261015100000": "agency_client_additions",
   "20261013120000": "business_owner_recipient_trust",
-  "20261014112000": "acting_provider_gate_predecessors",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */
@@ -214,7 +213,7 @@ export const SECRET_ENV = [
   "ANTHROPIC_API_KEY",
 ] as const;
 
-/** Flag names from src at 30dcba1b (release packet section 2). Values are printed when short and plain. */
+/** Flag names from src at 30dcba1b (release packet section 2). Only known enum values are printed. */
 export const FLAG_ENV = [
   "EMAIL_SENDING_ENABLED",
   "CUSTOMER_EMAIL_ENABLED",
@@ -317,7 +316,7 @@ const SCAN_KEY_LIMIT = 200_000;
 
 /* ---------------------------------------------------------------- report -- */
 
-/** on/off for boolean-like values, the value itself when short and plain (e.g. "workspace"), else "set". */
+/** on/off for boolean-like values, a known release enum (e.g. "workspace"), else "set". */
 export type Tri = string;
 
 export interface SnapshotReport {
@@ -382,10 +381,21 @@ export function requireJacobsYes(options: { jacobsYes: boolean }): void {
 const EMAIL = /[^\s"'@]+@[^\s"'@]+\.[a-z]{2,}/i;
 const TOKENISH = /\b(?:sk_(?:live|test)_|rk_(?:live|test)_|whsec_|eyJ)[A-Za-z0-9_\-.]{8,}|\b[A-Za-z0-9+/_-]{40,}={0,2}/;
 
-/** Throws if the text would print an email address or something token-shaped. */
-export function assertNoSensitiveOutput(text: string): void {
+/**
+ * Only exact compiled identifiers and the caller's trusted repository migration
+ * inventory may resemble opaque tokens. Do not pass names from a report or a
+ * remote response: those are the values this guard must check.
+ */
+export function assertNoSensitiveOutput(text: string, repoMigrations: readonly string[] = []): void {
   if (EMAIL.test(text)) throw new Error("Refusing to print: the snapshot output contains an email address.");
-  if (TOKENISH.test(text)) throw new Error("Refusing to print: the snapshot output contains a token-shaped value.");
+  const identifiers = new Set<string>([...SECRET_ENV, ...FLAG_ENV, ...Object.values(MIGRATION_SENTINELS), ...repoMigrations]);
+  for (const match of text.matchAll(/[A-Za-z0-9+/_=.-]+/g)) {
+    // Check the whole lexeme, so adding a prefix, suffix or token punctuation
+    // cannot turn a supplied value into an allowed identifier substring.
+    if (TOKENISH.test(match[0]) && !identifiers.has(match[0])) {
+      throw new Error("Refusing to print: the snapshot output contains a token-shaped value.");
+    }
+  }
 }
 
 /* ------------------------------------------------------------------ core -- */
@@ -395,7 +405,7 @@ function flagState(value: string | undefined): Tri {
   const v = value.trim().toLowerCase();
   if (["1", "true", "on", "yes"].includes(v)) return "on";
   if (["0", "false", "off", "no"].includes(v)) return "off";
-  return /^[a-z0-9_,-]{1,64}$/i.test(v) ? `value: ${v}` : "set (value hidden)";
+  return ["workspace", "operators", "legacy", "compare", "postgres"].includes(v) ? `value: ${v}` : "set (value hidden)";
 }
 
 function versionOf(migration: string): string {

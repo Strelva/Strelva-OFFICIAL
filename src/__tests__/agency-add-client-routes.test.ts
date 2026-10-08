@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NextRequest } from "next/server";
 
-const mocks = vi.hoisted(() => ({ rpc: vi.fn(), session: vi.fn(), rate: vi.fn(), seed: vi.fn() }));
+const mocks = vi.hoisted(() => ({ rpc: vi.fn(), session: vi.fn(), rate: vi.fn(), seed: vi.fn(), assess: vi.fn() }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mocks.rpc }) }));
 vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.session }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate }));
 vi.mock("@/products/agency-clients/seed", () => ({ seedFromSite: mocks.seed }));
+vi.mock("@/products/ai-visibility/usecase", () => ({ runPrivateAiVisibilityAssessment: mocks.assess }));
 
 import { POST as agencyClients } from "@/app/api/workspace/agency-clients/route";
 import { GET as added } from "@/app/api/workspace/agency-clients/added/route";
@@ -40,6 +41,9 @@ beforeEach(() => {
   mocks.session.mockResolvedValue({ id: "a9100000-0000-4000-8000-000000000001", email: "Owner@Agency.example.test", email_confirmed_at: "2026-10-07" });
   mocks.rate.mockResolvedValue(false);
   mocks.seed.mockResolvedValue({ scan: { status: "scanned", seeded: ["phone"], name: "Northside Bakery", message: null }, facts: { phone: { value: "(716) 555-0142" } } });
+  mocks.assess.mockResolvedValue({ id: KEY, workspaceId: AGENCY, productId: "ai_visibility", resourceKind: "private_ai_visibility_work",
+    payload: { business: "Northside Bakery", score: 70, grade: "C", verdict: "Readiness measured", topFix: "Add schema", signals: [],
+      citation: { probed: false, mentioned: false, recommended: false, note: "Not run" }, privateSecret: "must-not-return" } });
   answer({ agency_add_client: { data: receipt }, issue_agency_client_owner_claim: { data: claim } });
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -78,6 +82,8 @@ describe("POST /api/workspace/agency-clients", () => {
     expect(body.client).toMatchObject({ customerWorkspaceId: CLIENT, name: "Northside Bakery" });
     expect(body.ownerClaim).toMatchObject({ claimPath: expect.stringMatching(/^\/workspace\/claim\/[A-Za-z0-9_-]{43}$/), delivery: { status: "not_sent", reason: "gated" } });
     expect(body.website.connect).toBe(`/workspace/site?workspaceId=${CLIENT}&entry=connect`);
+    expect(body.aiCheck).toMatchObject({ status: "ready", workId: KEY, href: `/workspace?workspaceId=${AGENCY}&work=${KEY}` });
+    expect(JSON.stringify(body.aiCheck)).not.toContain("must-not-return");
     expect(mocks.rpc.mock.calls.map(([name]) => name)).toEqual(["authorize_agency_client_add", "agency_add_client", "issue_agency_client_owner_claim"]);
     expect(mocks.rpc.mock.calls[0]![1]).toMatchObject({ p_verified_email: "owner@agency.example.test" });
   });

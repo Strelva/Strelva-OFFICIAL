@@ -68,7 +68,7 @@
     "isomorphic-dompurify": "2.36.0",
     "lucide-react": "0.577.0",
     "motion": "^13.3.0",
-    "next": "16.3.6",
+    "next": "16.3.8",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-markdown": "10.1.0",
@@ -84,7 +84,7 @@
     "@types/react-dom": "^19",
     "@vitest/coverage-v8": "4.1.11",
     "eslint": "^9.39.4",
-    "eslint-config-next": "16.3.6",
+    "eslint-config-next": "16.3.8",
     "tailwindcss": "4.2.4",
     "tsx": "4.21.0",
     "typescript": "^5.9.3",
@@ -105,7 +105,6 @@
       "flatted": "3.4.2",
       "js-yaml@<4": "3.15.0",
       "js-yaml@>=4 <4.3.2": "4.3.2",
-      "sharp@<0.35.4": "0.35.4",
       "linkify-it@<=5.0.0": "5.0.1",
       "nanoid@<3.3.18": "3.3.18",
       "lodash": "4.18.1",
@@ -125,7 +124,14 @@
       "@ai-sdk/provider-utils": "4.0.33",
       "undici@>=6 <6.28.1": "6.28.1",
       "undici@>=7 <7.29.1": "7.29.1",
-      "source-map-js@<1.2.2": "1.2.2"
+      "source-map-js@<1.2.2": "1.2.2",
+      "sharp@<0.35.5": "0.35.5",
+      "@opentelemetry/instrumentation-pg@<0.73.0": "0.73.0",
+      "@opentelemetry/instrumentation-mysql2@<0.67.0": "0.67.0",
+      "@opentelemetry/instrumentation-knex@<0.65.0": "0.65.0",
+      "@opentelemetry/instrumentation-mysql@<0.67.0": "0.67.0",
+      "@opentelemetry/instrumentation-mongoose@<0.67.0": "0.67.0",
+      "@opentelemetry/instrumentation-tedious@<0.40.0": "0.40.0"
     },
     "auditConfig": {
       "ignoreGhsas": [

@@ -494,7 +494,7 @@ The ledger below is authoritative; graphs and research reports are derived views
     {
       "id": "SRC_A1_SEAT_CONVERSION",
       "kind": "test",
-      "locator": "a1/seat-conversion: supabase/migrations/20261013221000_provider_seat_tenant_conversion.sql; rollback-20261013221000_provider_seat_tenant_conversion.sql; tests/provider-seat-tenant-conversion-schema.sql; scripts/check-workspace-upgrade.sh; scripts/check-workspace-sql.sh",
+      "locator": "a1/seat-conversion: supabase/migrations/20261013220000_provider_seat_tenant_conversion.sql; rollback-20261013220000_provider_seat_tenant_conversion.sql; tests/provider-seat-tenant-conversion-schema.sql; scripts/check-workspace-upgrade.sh; scripts/check-workspace-sql.sh",
       "observed_at": "2026-10-07",
       "claim": "Local isolated PostgreSQL contracts cover explicit-agency conversion through a provider seat and named staff, no conversion operator membership, denial for an agency member without a staff row, seat-end access removal, owner invitation separation and acceptance, idempotent legacy re-route, and timestamped rollback/reapply. Synthetic scrubbed-copy rehearsal is local only. No production migration or client conversion was run."
     }

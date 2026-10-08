@@ -70,11 +70,15 @@ beforeEach(() => {
 });
 
 describe("ordinary provider-seat workspace work", () => {
-  it("opens a staffed client and all its work without direct customer membership or super_admin", async () => {
-    expect(await listWorkspaces(actor)).toMatchObject([{ id: AGENCY, role: "member" }, { id: CLIENT, role: "admin", access: "member" }]);
-    expect((await listWork(actor, CLIENT)).map(work => work.id)).toEqual([WORK, OTHER_WORK]);
+  it("opens a staffed client's websites without direct customer membership or private tracker access", async () => {
+    expect(await listWorkspaces(actor)).toMatchObject([{ id: AGENCY, role: "member" }, { id: CLIENT, role: undefined, access: "provider_seat" }]);
+    expect((await listWork(actor, CLIENT)).map(work => work.id)).toEqual([WORK]);
     await expect(getWork(actor, WORK)).resolves.toMatchObject({ workspaceId: CLIENT });
-    await expect(assertWorkspaceMember(actor, CLIENT)).resolves.toBeUndefined();
+    await expect(getWork(actor, OTHER_WORK)).rejects.toBeInstanceOf(WorkspaceAccessError);
+    await expect(assertWorkspaceMember(actor, CLIENT)).rejects.toBeInstanceOf(WorkspaceAccessError);
+    await expect(assertCanSaveWork(actor, CLIENT)).rejects.toBeInstanceOf(WorkspaceAccessError);
+    await expect(assertCanSaveWork(actor, CLIENT, { productId: "websites", resourceKind: "website" })).resolves.toBeUndefined();
+    await expect(saveWork(actor, CLIENT, { productId: "tracker", resourceKind: "tracker", payload: {} })).rejects.toBeInstanceOf(WorkspaceAccessError);
     await expect(saveWork(actor, CLIENT, { productId: "websites", resourceKind: "website", payload: {} })).resolves.toMatchObject({ workspaceId: CLIENT });
     expect(fixture.calls).toContainEqual({ name: "read_version_actor", args: { p_user_id: ACTOR, p_verified_email: actor.verifiedEmail } });
   });
@@ -97,12 +101,13 @@ describe("ordinary provider-seat workspace work", () => {
 
   it.each(["seat", "staff", "membership"])("rechecks access after the %s ends without caching", async revoked => {
     await expect(getWork(actor, WORK)).resolves.toMatchObject({ id: WORK });
+    await expect(assertCanSaveWork(actor, CLIENT, { productId: "websites", resourceKind: "website" })).resolves.toBeUndefined();
     if (revoked === "seat") fixture.tables.provider_seats![0]!.status = "ended";
     if (revoked === "staff") fixture.tables.agency_client_staff![0]!.status = "ended";
     if (revoked === "membership") fixture.tables.workspace_memberships = [];
     await expect(getWork(actor, WORK)).rejects.toBeInstanceOf(WorkspaceAccessError);
     await expect(listWork(actor, CLIENT)).rejects.toBeInstanceOf(WorkspaceAccessError);
-    await expect(assertCanSaveWork(actor, CLIENT)).rejects.toBeInstanceOf(WorkspaceAccessError);
+    await expect(assertCanSaveWork(actor, CLIENT, { productId: "websites", resourceKind: "website" })).rejects.toBeInstanceOf(WorkspaceAccessError);
     expect((await listWorkspaces(actor)).some(workspace => workspace.id === CLIENT)).toBe(false);
   });
 

@@ -6,8 +6,10 @@
  * member, and seeds the business record from the agency's input and a small
  * scan of the client's site. Every seeded fact is the agency's and
  * unconfirmed; only the owner confirms. The agency is then offered the two
- * website entries (connect the existing site, or rebuild) and, when it names
- * the owner's address, an owner claim link.
+ * website entries (connect the existing site, or rebuild), an AI Visibility
+ * assessment saved privately in its agency workspace, and, when it names the
+ * owner's address, an owner claim link. A failed assessment leaves the added
+ * client and owner link intact; a repeated add recovers the same assessment.
  *
  * Nothing here sends anything. Client notifications are off during the silent
  * rollout, and whether an agency may email a client's owner is the open
@@ -45,6 +47,9 @@ import {
   type OwnerClaimPreview,
 } from "./contracts";
 import { seedFromSite, type SiteSeed } from "./seed";
+import { runPrivateAiVisibilityAssessment, parseAiVisibilityAssessmentPayload, isAiVisibilityWorkResourceKind } from "@/products/ai-visibility/server";
+import type { SavedWork } from "@/platform/workspaces/types";
+import type { ClientAiCheck } from "./contracts";
 
 export * from "./index";
 
@@ -61,6 +66,7 @@ export interface AgencyClientDeps {
   seed(url: string): Promise<SiteSeed>;
   token(): string;
   now(): Date;
+  assess: typeof runPrivateAiVisibilityAssessment;
 }
 
 function defaultDeps(): AgencyClientDeps {
@@ -72,6 +78,7 @@ function defaultDeps(): AgencyClientDeps {
     seed: (url) => seedFromSite(url),
     token: () => randomBytes(32).toString("base64url"),
     now: () => new Date(),
+    assess: runPrivateAiVisibilityAssessment,
   };
 }
 
@@ -138,6 +145,31 @@ function publicUrl(raw: string): string {
 
 const NOT_SCANNED: ClientSiteScan = { status: "not_requested", seeded: [], name: null, message: null };
 
+async function checkClientSite(actor: WorkspaceActor, client: AgencyClientAddition, requestId: string, deps: AgencyClientDeps): Promise<ClientAiCheck> {
+  if (!client.sourceUrl) return { status: "not_requested" };
+  const base = `/workspace?${new URLSearchParams({ workspaceId: client.agencyWorkspaceId })}`;
+  try {
+    // The agency owns this assessment of public information. No direct client
+    // membership or public bearer report is created. The existing operation
+    // checkpoint/replay prevents a repeated add from re-running the probe.
+    const saved: SavedWork = await deps.assess({ actor, workspaceId: client.agencyWorkspaceId,
+      input: { business: client.name, url: client.sourceUrl }, requestId });
+    const result = parseAiVisibilityAssessmentPayload(saved.payload);
+    if (!uuidWorkId.safeParse(saved.id).success || saved.workspaceId !== client.agencyWorkspaceId
+      || saved.productId !== "ai_visibility" || !isAiVisibilityWorkResourceKind(saved.resourceKind) || !result) {
+      throw new Error("Invalid private assessment");
+    }
+    return { status: "ready", workId: saved.id, href: `${base}&work=${encodeURIComponent(saved.id)}`, result };
+  } catch (error) {
+    const pending = error instanceof Error && error.name === "WorkspaceOperationPendingError";
+    return { status: pending ? "pending" : "unavailable", href: `${base}&view=work`,
+      message: pending ? "The AI check is still running. Open your agency's saved work to recover it."
+        : "The client was added, but its AI check couldn't be completed. Open your agency's saved work to retry it." };
+  }
+}
+
+const uuidWorkId = z.string().uuid();
+
 /** Create the client business from a URL or a prospect, then (optionally) its owner claim link. */
 export async function addAgencyClient(actor: WorkspaceActor, input: AddAgencyClientInput, deps: AgencyClientDeps = defaultDeps()): Promise<AddAgencyClientResult> {
   if (input.url) publicUrl(input.url);
@@ -174,7 +206,8 @@ export async function addAgencyClient(actor: WorkspaceActor, input: AddAgencyCli
       ownerClaimError = error instanceof AgencyClientError ? error.message : "The owner link couldn't be created. Try again.";
     }
   }
-  return { client, scan, ownerClaim, ownerClaimError, website: clientWebsiteEntries(client.customerWorkspaceId) };
+  const aiCheck = await checkClientSite(actor, client, input.idempotencyKey, deps);
+  return { client, scan, ownerClaim, ownerClaimError, website: clientWebsiteEntries(client.customerWorkspaceId), aiCheck };
 }
 
 /**

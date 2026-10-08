@@ -206,7 +206,7 @@ disagree, the checklist's stop conditions win.
 | [4](https://github.com/Strelva/Strelva-OFFICIAL/issues/347) | Lead backfill · done Oct 7 | data | 3 · S1 |
 | [5](https://github.com/Strelva/Strelva-OFFICIAL/issues/348) | Preview environment (optional, recommended before batch 2) | new env | 5 |
 | [6](https://github.com/Strelva/Strelva-OFFICIAL/issues/349) | Batches 1 to 7 (unchanged, after release-safety's rehearsal) | migration ×7 | 1 |
-| 6b | Batch 8 (proposed; companions run, catalog not restored): readers fix and w6 migrations, after 7A | migration | 1 |
+| 6b | Batch 8 (prepared; empty-only recovery proven locally): readers fix and w6 migrations, after 7A | migration | 1 |
 | [6a](https://github.com/Strelva/Strelva-OFFICIAL/issues/350) | Batch 7A: agency-neutral amendments, dated before w6 migrations | migration | 1 |
 | [7](https://github.com/Strelva/Strelva-OFFICIAL/issues/351) | Deploy the 1.0 candidate with every new flag unset | deploy | 2 |
 | [8](https://github.com/Strelva/Strelva-OFFICIAL/issues/352) | Copy report and analytics state; client-records dual-write, backfill, parity | data | 3 · S2–S3 |
@@ -417,7 +417,7 @@ After each batch:
 | 5 | `20261008110000`, `20261008111000`, `20261008123000`, `20261008124000`, `20261008130000`, `20261008131000`, `20261008140000` | No Sept 30 objects. Triggers on batch 1–2 tables (`systems`, `tenant_workspace_links`), wraps `tenant_unlink_plan`, replaces `workspace_release_flag_names` | Ask history, website change receipts, listing read-back queue, Needs you policy imports, Possibilities, Make real live, lead reads |
 | 6 | `20261008141000`, `20261008150000`, `20261008150100`, `20261008151000`, `20261009100000`, `20261009110000`, `20261009113000` | Yes: `btree_gist` extension, a column + FK and an index on live `public_website_bookings`; checks, columns and indexes on `tenant_leads` (written since `0.2.1`); a column + trigger on `owner_decisions`; replaces batch 1–5 functions | Booking store and lifecycle, linked-tenant publishing, domain approvals, connected sites, the Strelva service actor, inquiry records |
 | 7 | `20261009130000`, `20261009131000`, `20261009140000` | Yes, small: replaces two batch 3/6 functions (`read_strelva_handled`, `record_strelva_service_action`) with the same signatures, swaps the `purpose` check on `strelva_service_actions` (batch 6, append-only), and replaces `workspace_release_flag_names()` (batch 6) with one more key | Strelva handled lists decided Needs you items; Make real by signed link for an owner with no account, behind its own `make_real_owner_link` flag |
-| 8 (proposed; rehearsal fails catalog restore) | Complete filename-sorted prepared inventory in "Batch 8 · proposed", including integrated amendments after w6 | Not classified yet: live-object and lock impact unreviewed | Nothing until rehearsed; listed for review only |
+| 8 (prepared; empty-only recovery proven locally) | Complete filename-sorted prepared inventory in "Batch 8 · proposed", including integrated amendments after w6 | Not classified yet: live-object and lock impact unreviewed | Nothing until rehearsed; listed for review only |
 
 Batches 5 and 6 are in filename order; batch 6 depends on batch 5
 (`20261009100000` keeps every flag name `20261008131000` adds;
@@ -466,10 +466,16 @@ receipt adoption without a separate preservation plan. Retention rollback serial
 only before its first marked purge; after that it refuses. Expired inquiry data
 cannot be recreated by rolling back its function implementation.
 
-Current local rehearsal at `d8604ce0`: all 114 batch-8 forward files applied
-and every rollback companion ran without refusal. The catalog was not restored
-(tables (20), columns (168), indexes (6), triggers (6), functions (60), constraints (111)). Batch 8 stays proposed; no second forward or
-production qualification is claimed.
+Historical rehearsal at `d8604ce0` ran 114 forwards and every companion,
+but retained 20 evidence tables and 60 functions instead of restoring the
+catalog. The current 118-file rehearsal now preserves those companions and
+adds an **optional, explicitly authorized empty-only structural completion**.
+It proves full public catalog/ACL equality and an identical second forward;
+accepted evidence, four added fields, flag state/history, incompatible old rows,
+missing authority and function drift all refuse atomically. Independent review
+and repeat rehearsal pass. See `scripts/release-safety/README.md` for the exact
+capture/recovery contract. This does not qualify a populated rollback or
+production migration. Restored production-copy qualification remains pending.
 
 RL-14 readiness output now reports agency workspace counts, provider rows by
 source, Strelva designation row count, and accounts by `payer_kind`. An existing
@@ -479,61 +485,32 @@ cannot prove the payer or service-function amendments. This code was tested
 with local fixtures; no production readiness snapshot was taken.
 
 <!-- proposed-batch-8:start -->
-### Batch 8 · proposed, rehearsal fails catalog restore: readers fix and w6
+### Batch 8 · prepared, empty-only recovery qualified locally
 
-Historical w6 status: **forward and every companion run, catalog not restored.**
-The expanded current inventory below remains proposed and needs its own complete
-rehearsal. Original integration on `a1/integrate-w6-r2`
-(#455): the readers fix (#252) and every w6 stream (release-safety, website,
-publishing, catalog, bookings, journeys, inquiries, owner-ask,
-agency-operator), plus one integration wrapper (`20261010170000`). 84
-files at that historical rehearsal. The reconciled current inventory is listed in `scripts/release-safety/batches.json` under
-`proposed`, which `check:release-safety` does not read. Nothing here is
-staged for production or approved.
+Current inventory: **118** pinned forwards, after H, batches 1–7 and 7A.
+`check:release-safety:batch8` verifies whole-inventory coverage and hashes before
+creating its isolated cluster. All 118 forwards and receipt-preserving companions
+pass. The optional empty-only helper restores the complete catalog/ACL inside one
+transaction, then 118 reapplications reproduce the original forward catalog.
+Legacy content/routing/billing/owner-access probes pass throughout. Independent
+review and an independent repeat rehearsal also pass.
 
-- Original w6 proof: forward replay of every migration in filename order on a
-  fresh cluster, `check:workspace-sql` (per-stream forward and rollback
-  fixtures) and `check:workspace-upgrade`. Not proven: release-safety's
-  forward, reverse, forward with catalog/ACL comparison, the restored Oct 7
-  copy, hosted Postgres 17.
-- Original w6 companions use `rollback-<forward-file>` (#527); the shared
-  owner-link companion is split per file. The expanded inventory also pins
-  the three explicitly mapped manual helpers described above.
-- Applies after batch 7A. Round 3 made two w6 files 7A-aware: owner decision
-  link sessions (`20261010102000`) are served and rechecked through the
-  verified agency of record like every other service session, and
-  `system_actor_scope` (`20261010163100`) keeps 7A's provider-seat read.
-  Their companions restore 7A's bodies byte-for-byte so 7A's own rollback
-  guards still match.
-- Release flag names (#253): every w6 file now appends or removes only its own
-  keys in `workspace_release_flag_names()`, so apply order cannot drop a
-  stream's flag. `tests/release-flag-names-final-schema.sql` pins the final
-  union (19 keys).
-- **Ordering.** 7A applies before this batch (packet order); two files now
-  depend on 7A objects. `20261009150000` (readers fix) is dated inside 7A's
-  window but has no 7A dependency.
-- Rehearsal, Oct 7 local (`pnpm check:release-safety:batch8`, opt-in): after
-  baseline, batches 0–7 and 7A, all 84 files apply and all 84 companions run
-  in reverse (one defect fixed: `rollback-20261010135955_booking_exit_admission.sql`
-  restored `booking_tenant` with three columns for a four-column type). The
-  catalog is **not** restored: 20 tables, 168 columns, 6 indexes, 6 triggers,
-  60 functions and 111 constraints remain, because the w6 companions keep
-  evidence tables and entry points in place instead of archiving them the way
-  batches 0–7 do. Batch 8 cannot join `batches` until each companion either
-  archives and drops (release-safety's contract) or the rehearsal accepts a
-  named retained-object list.
-- **Added after the rehearsal (#530, PR #549, not rehearsed):**
-  `20261011153000_operator_owner_decisions` replaces batch 3's
-  `claim_owner_decision` (same signature and grants) so a super admin or a
-  member of the business's provider agency holding an admin seat is refused
-  an owner item, and adds two service-role lookups (`business_agency_seat`,
-  `tenant_agency_seat`). No tables, no data changes. Depends on batch 1
-  (`tenant_workspace_links`), batch 3 (`needs_you`) and 7A (`provider_seats`).
-  Its companion restores batch 3's body and drops the lookups. Proven locally
-  in `check:workspace-sql` (forward, rollback, forward); not in the batch 8
-  rehearsal.
-- Who says yes: Jacob, per file set, after release-safety supplies rehearsal
-  evidence. This entry authorizes nothing.
+This preserves historical companion behavior: receipt/history tables remain
+until the separately authorized empty-only completion proves they contain no
+evidence. The helper requires target-specific before/forward catalog captures,
+exact body/ACL fingerprints, disabled callers and explicit recovery authority.
+It takes deterministic exclusive locks, refuses every populated retained table,
+non-null added field, new flag/history and incompatible old constraint, and uses
+no CASCADE or customer-row deletion. Populated production recovery remains a
+retention/forward-correction job; this proof grants no live rollback authority.
+
+Execution contract: [release-safety tools](../../scripts/release-safety/README.md).
+The prepared batch remains under `proposed`; offline staging and this local proof
+do not establish hosted application, delivered effects or broader 1.0 acceptance.
+Migration/source drift requires a fresh qualification. Newsletter delivery
+companions remain unsafe after receipt adoption without a preservation plan;
+inquiry retention refuses reversal after its first marked purge. Neither restores
+accepted provider effects or expired data.
 
 | Forward file | SHA-256 prefix | Rollback companion |
 | --- | --- | --- |
@@ -648,11 +625,14 @@ staged for production or approved.
 | `20261014110000_owner_decision_effects` | `3f9864a58acc` | `rollback-20261014110000_owner_decision_effects.sql` |
 | `20261014112000_acting_provider_gates` | `399a95b0673d` | `rollback-20261014112000_acting_provider_gates.sql` |
 | `20261015100000_agency_add_client` | `d280795634bb` | `rollback-20261015100000_agency_add_client.sql` |
+| `20261015111000_website_owner_agency_publish` | `578e3fed1454` | `rollback-20261015111000_website_owner_agency_publish.sql` |
+| `20261015120000_owner_link_provider_identity` | `356023cc9e4b` | `rollback-20261015120000_owner_link_provider_identity.sql` |
 | `20261016110000_operator_action_approvals` | `e9e4a204e497` | `rollback-20261016110000_operator_action_approvals.sql` |
 | `20261017110000_inquiry_lead_retention` | `d0199c345492` | `rollback-20261017110000_inquiry_lead_retention.sql` |
 | `20261017120000_owner_decision_operator_refusal` | `616c861132f5` | `rollback-20261017120000_owner_decision_operator_refusal.sql` |
 | `20261018110000_provider_seat_website_access` | `b108d67d2d96` | `rollback-20261018110000_provider_seat_website_access.sql` |
-| `20261018120000_connected_site_schema_conflicts` | `c636ee4328ba` | `rollback-20261018120000_connected_site_schema_conflicts.sql` (refuses once source decisions exist) |
+| `20261018120000_connected_site_schema_conflicts` | `c636ee4328ba` | `rollback-20261018120000_connected_site_schema_conflicts.sql` |
+
 <!-- proposed-batch-8:end -->
 
 <!-- proposed-batch-9:start -->

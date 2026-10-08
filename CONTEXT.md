@@ -112,7 +112,7 @@ limits, touched shared files and the next integration action.
 
 Private branch `agency/workflow-proof-20261007` composes add-client, provider
 verification/resource gates and exact owner effects against integration
-`82bb8e66`. Staff on the current provider seat can prepare and retain website
+`f3097dd6` (private merge `f3483091`). Staff on the current provider seat can prepare and retain website
 work without a direct client membership. A verified business owner can explicitly
 authorize their named current agency to publish this website after each exact
 approval; anonymous approval alone grants no publishing mandate. Seat, staff,
@@ -122,7 +122,11 @@ The [workflow handoff](./docs/operations/agency-workflow-2026-10-07.md) owns
 local Auth/Postgres/browser proof, migration order, failure evidence and next
 actions. Fictional delivery receipts and platform verification are fixtures.
 Loopback rendering is observed; public HTTPS delivery, sent email, production
-integration, adoption and economics are unproven. The branch is not deployed.
+integration, adoption and economics are unproven. The branch is not deployed. Current qualification uses 260 ordered migrations;
+8,465 unit tests pass (42 skipped), the full workspace upgrade and native agency
+SQL job pass, and the fresh authenticated website journey passes. The broader
+flags-off app journey remains failed under current app creation authority.
+Deployment is authorized in this session and underway; no promotion is claimed.
 Canonical model reconciliation remains pending because main revision 8 and
 integration revision 7 contain independent evidence; the handoff preserves the
 proposed delta and exact merge action without replacing the main checkout.

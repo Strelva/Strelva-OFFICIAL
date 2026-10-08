@@ -40,6 +40,9 @@ declare
   added jsonb; claim jsonb; item jsonb; result jsonb; next_payload jsonb; recipient jsonb; system_id uuid;
   doc jsonb:='{"version":2,"siteName":"Workflow Bakery","theme":{},"assets":{},"redirects":[],"pages":[],"nodes":{},"facts":{}}';
   h text:=repeat('a',64); h2 text:=repeat('b',64); decision_hash text:=repeat('c',64); rev bigint;
+  assessment public.workspace_operations; assessed_work uuid;
+  assessment_input jsonb:='{"business":"Workflow Bakery","url":"https://workflow-bakery.example.test"}';
+  assessment_lease uuid:='af010000-0000-4000-8000-000000000021';
 begin
   perform pg_temp.aw_assert(current_user='service_role','commands actually execute as service_role');
   added:=public.agency_add_client(actor,'aw-agency@a.example.test',agency,
@@ -50,6 +53,26 @@ begin
   perform pg_temp.aw_assert(result->>'customerWorkspaceId'=ws::text and (result->>'replayed')::boolean,'add replay returns same business');
   perform pg_temp.aw_assert(public.read_business_record(ws,actor,'aw-agency@a.example.test')->>'access'='admin','ordinary staffed provider seat reaches business');
   perform pg_temp.aw_expect(format('select public.read_business_record(%L,%L,%L)',ws,other_id,'aw-other@b.example.test'),'business_record_access_denied');
+
+  -- Add-client runs the existing private assessment operation in the agency,
+  -- using the add command identity. Its payload is a simulated scorer result:
+  -- this exercises storage/recovery authority without an external probe.
+  select * into assessment from public.workspace_operation('claim',command_id,agency,actor,'aw-agency@a.example.test',
+    'ai_visibility',assessment_input,assessment_lease);
+  perform pg_temp.aw_assert(assessment.status='running','ordinary agency owns its assessment operation');
+  perform pg_temp.aw_expect(format('select public.workspace_operation(%L,%L,%L,%L,%L)',
+    'read',command_id,agency,other_id,'aw-other@b.example.test'),'workspace_access_denied');
+  perform public.workspace_operation('checkpoint',command_id,agency,actor,'aw-agency@a.example.test',
+    p_lease_id=>assessment_lease,p_result=>'{"business":"Workflow Bakery","score":70,"measurementStatus":"partial","citation":{"probed":false}}');
+  select * into assessment from public.workspace_operation('claim',command_id,agency,actor,'aw-agency@a.example.test',
+    'ai_visibility',assessment_input,gen_random_uuid());
+  perform pg_temp.aw_assert(assessment.status='ready','ready checkpoint does not restart a probe');
+  select * into assessment from public.workspace_operation('complete',command_id,agency,actor,'aw-agency@a.example.test',
+    p_resource_kind=>'private_ai_visibility_work',p_title=>'Workflow Bakery');
+  assessed_work:=assessment.work_id;
+  select * into assessment from public.workspace_operation('claim',command_id,agency,actor,'aw-agency@a.example.test',
+    'ai_visibility',assessment_input,gen_random_uuid());
+  perform pg_temp.aw_assert(assessment.status='completed' and assessment.work_id=assessed_work,'assessment replay retains one completed private result');
 
   select * into work from public.claim_website_rebuild(ws,actor,'aw-agency@a.example.test','aw-request-one','workflow-bakery.example.test',
     '{"url":"https://workflow-bakery.example.test"}',jsonb_build_object('version',2,'revision',0,'title','Workflow Bakery','status','building',
@@ -172,6 +195,8 @@ select pg_temp.aw_assert((select approved_by='af010000-0000-4000-8000-0000000000
 select pg_temp.aw_assert((select count(*) from public.website_documents)=2 and (select count(*) from public.website_document_receipts)=1
   and (select count(*) from public.website_document_health where status='healthy')=1,'draft history, publish receipt and local readback retained');
 select pg_temp.aw_assert((select additions from public.agency_client_add_quota)=1 and (select count(*) from public.agency_client_additions)=1,'replay consumes no extra client quota');
+select pg_temp.aw_assert((select count(*) from public.saved_product_work where workspace_id='af010000-0000-4000-8000-000000000010'
+  and product_id='ai_visibility' and resource_kind='private_ai_visibility_work')=1,'assessment replay saves exactly one private agency result');
 select pg_temp.aw_expect('delete from public.website_document_receipts','website_document_immutable');
 select pg_temp.aw_expect('update public.website_documents set document=''{}''','website_document_immutable');
 rollback;
