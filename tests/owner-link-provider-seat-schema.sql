@@ -71,7 +71,7 @@ declare s jsonb:=(select body from ols_state); ws uuid:=(s->>'workspaceId')::uui
 begin
  link:=public.strelva_owner_decision_link_session(ws,(s->>'decisionId')::uuid,s->>'decisionHash','aw-noaccount@owner.example.test');
  perform pg_temp.ols_assert(link->>'userId'=actor::text and link->>'role'='admin'
-  and link->>'providerWorkspaceId'='af020000-0000-4000-8000-000000000010','session uses this provider seated identity');
+  and link->>'providerWorkspaceId'='af020000-0000-4000-8000-000000000010','session uses this provider seated identity: '||coalesce(link::text,'null'));
  sid:=(link->>'sessionId')::uuid;
  perform public.claim_owner_decision(ws,(s->>'decisionId')::uuid,s->>'decisionHash','approve','owner_link',null,null,'aw-noaccount@owner.example.test');
  perform public.authorize_owner_decision_link_run(ws,sid,(s->>'decisionId')::uuid,s->>'decisionHash','aw-noaccount@owner.example.test');

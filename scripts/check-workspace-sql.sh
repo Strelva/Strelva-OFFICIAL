@@ -1371,9 +1371,10 @@ printf 'Owner recipient trust rollback is exact (%s schema objects compared) and
 # gates. Forward, the effect matrix, the older contracts these replace, then
 # rollback in reverse order (wrong order refused, catalog restored exactly)
 # and reapply.
-acting_provider=(20261014100000_client_resource_mandates 20261014112000_acting_provider_gates 20261015120000_owner_link_provider_identity)
+acting_provider=(20261014100000_client_resource_mandates 20261014112000_acting_provider_gates 20261015120000_owner_link_provider_identity 20261015121000_owner_decision_operator_exclusion)
 check_acting_provider() {
   psql "${psql_args[@]}" --file="$repo_root/tests/acting-provider-gates-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/operator-owner-decisions-schema.sql"
   psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
   psql "${psql_args[@]}" --file="$repo_root/tests/platform-service-actor-schema.sql"
   psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-links-schema.sql"

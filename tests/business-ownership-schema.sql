@@ -235,7 +235,7 @@ insert into bo_approvals
   union all select 'other-operator', pg_temp.bo_approval(id, 'bo-second-alias@strelva.example.test') from bo_ws where label = 'bakery'
   union all select 'google-admin-alias', pg_temp.bo_approval(id, 'ab+invite@gmail.com') from bo_ws where label = 'bakery'
   union all select 'pat', pg_temp.bo_approval(id, 'pat-owner@example.test') from bo_ws where label = 'bakery'
-  union all select 'pat-self', pg_temp.bo_approval(id, 'pat-owner@example.test', 'b0000000-0000-4000-8000-000000000001') from bo_ws where label = 'bakery';
+  union all select 'unknown-self', pg_temp.bo_approval(id, 'unknown-owner@example.test', 'b0000000-0000-4000-8000-000000000001') from bo_ws where label = 'bakery';
 select pg_temp.bo_expect(format($$select public.create_operator_owner_invitation_approved('b0000000-0000-4000-8000-000000000001', %L,
   'bo-operator@strelva.example.test', repeat('a', 64), now() + interval '14 days', %L, false, '{"source":"web"}'::jsonb)$$,
   (select id from bo_ws where label = 'bakery'), (select id from bo_approvals where label = 'self')), 'operator_owner_invitation_controlled_recipient');
@@ -251,9 +251,11 @@ select pg_temp.bo_expect(format($$select public.create_operator_owner_invitation
 select pg_temp.bo_expect(format($$select public.create_operator_owner_invitation_approved('b0000000-0000-4000-8000-000000000001', %L,
   'ab+invite@gmail.com', repeat('c', 64), now() + interval '14 days', %L, false, '{"source":"web"}'::jsonb)$$,
   (select id from bo_ws where label = 'bakery'), (select id from bo_approvals where label = 'google-admin-alias')), 'operator_owner_invitation_controlled_recipient');
+-- A same-operator approval cannot select an untrusted owner recipient.
+-- The accepted no-email path for the existing trusted recipient is separate.
 select pg_temp.bo_expect(format($$select public.create_operator_owner_invitation_approved('b0000000-0000-4000-8000-000000000001', %L,
-  'pat-owner@example.test', repeat('d', 64), now() + interval '14 days', %L, false, '{"source":"web"}'::jsonb)$$,
-  (select id from bo_ws where label = 'bakery'), (select id from bo_approvals where label = 'pat-self')), 'operator_action_approval_not_distinct');
+  'unknown-owner@example.test', repeat('e', 64), now() + interval '14 days', %L, false, '{"source":"web"}'::jsonb)$$,
+  (select id from bo_ws where label = 'bakery'), (select id from bo_approvals where label = 'unknown-self')), 'operator_action_approval_not_distinct');
 select pg_temp.bo_expect(format($$select public.create_operator_owner_invitation_approved('b0000000-0000-4000-8000-000000000001', %L,
   'someone-else@example.test', repeat('d', 64), now() + interval '14 days', %L, false, '{"source":"web"}'::jsonb)$$,
   (select id from bo_ws where label = 'bakery'), (select id from bo_approvals where label = 'pat')), 'operator_action_approval_mismatch');

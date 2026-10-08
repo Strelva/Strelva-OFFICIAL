@@ -57,6 +57,12 @@ describe("owner consent at website approval", () => {
     expect((container.querySelector('input[type="checkbox"]') as HTMLInputElement).checked).toBe(true);
     expect(container.textContent).not.toContain("may publish this website after your approval");
   });
+  it("routes the published agency client's domain question to the serving agency", async () => {
+    const record = ownerRecord(true); record.publishedUrl = "https://website.example.test/";
+    await mount(record);
+    expect(container.textContent).toContain("Ask Workflow Agency about domain setup and verification.");
+    expect(container.textContent).not.toContain("Strelva handles your domain setup and verification.");
+  });
   it("hides consent for a provider and disables it in read-only owner views", async () => {
     const record = ownerRecord(); record.agencyPublishPermission = null;
     await mount(record);

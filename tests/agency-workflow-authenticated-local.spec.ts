@@ -36,7 +36,20 @@ async function read(request: APIRequestContext, workId: string): Promise<Website
 }
 
 async function fits(page: Page) {
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(await page.evaluate(() => innerWidth));
+  await expect.poll(() => page.evaluate(() => {
+    const main = document.getElementById("strelva-main");
+    const width = innerWidth;
+    if (document.documentElement.scrollWidth > width + 1) return false;
+    if (!main) return true;
+    const bounds = main.getBoundingClientRect();
+    // Hidden outer overflow can conceal an offscreen main or a nested
+    // horizontal scroller. Check their actual geometry, not just the document.
+    if (bounds.right > width + 1 || (width <= 1023 && (Math.abs(bounds.left) > 1 || bounds.width < width - 1))) return false;
+    return [main, ...main.querySelectorAll<HTMLElement>("*")].every(element => {
+      const overflow = getComputedStyle(element).overflowX;
+      return !["auto", "scroll", "hidden"].includes(overflow) || element.clientWidth === 0 || element.scrollWidth <= element.clientWidth + 1;
+    });
+  })).toBe(true);
 }
 
 test("ordinary agency adds a client, gets the owner's exact approval, publishes, and reads the receipt", async ({ browser }, testInfo) => {
@@ -229,11 +242,23 @@ test("ordinary agency adds a client, gets the owner's exact approval, publishes,
     await claim.setViewportSize({ width: 1440, height: 1000 });
     await claim.goto(`/workspace/site?workspaceId=${businessId}&entry=rebuild&workId=${workId}`);
     await expect(claim.getByText("This revision has been published.", { exact: true })).toBeVisible();
-    await expect(claim.getByText(/Published, but we could not confirm it yet/)).toBeVisible();
-    await expect(claim.getByText(/Published receipt recorded/).first()).toBeVisible();
+    const publicReadBack = claim.getByText(/Published, but we could not confirm it yet/);
+    await expect(claim.getByText("Ask Northside Web Care about domain setup and verification.", { exact: true })).toBeVisible();
+    const receipt = claim.getByText(/Published receipt recorded/).first();
+    await publicReadBack.scrollIntoViewIfNeeded();
+    await expect(publicReadBack).toBeInViewport();
+    await receipt.scrollIntoViewIfNeeded();
+    await expect(receipt).toBeInViewport();
+    await fits(claim);
     await claim.screenshot({ path: testInfo.outputPath("owner-published-receipt-desktop.png"), fullPage: true });
     await claim.setViewportSize({ width: 390, height: 844 });
     await fits(claim);
+    const mobileHeading = claim.getByRole("heading", { name: "Elmwood Bakery", exact: true });
+    await mobileHeading.scrollIntoViewIfNeeded();
+    await expect(mobileHeading).toBeInViewport();
+    await claim.screenshot({ path: testInfo.outputPath("owner-published-layout-390.png"), fullPage: true });
+    await receipt.scrollIntoViewIfNeeded();
+    await expect(receipt).toBeInViewport();
     await claim.screenshot({ path: testInfo.outputPath("owner-published-receipt-390.png"), fullPage: true });
     expect((await owner.context.request.get(`/api/websites/${workId}/history`)).status()).toBe(200);
     expect((await other.context.request.get(`/api/websites/${workId}/history`)).status()).toBe(403);
