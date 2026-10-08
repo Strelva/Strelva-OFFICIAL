@@ -1,5 +1,20 @@
 # Strelva interface and Managed Websites context
 
+## October 7 security/runtime checkpoint (local)
+
+The isolated `fix/security-runtime-20261007-combined-bk_2dx` branch closes the
+requested reader, owner-link authority, inquiry retention and runtime recovery
+issues at implementation/local-behavior scope. Full SQL/upgrade gates, actual
+PostgREST reads/denials, concurrency, 8,368 unit tests and 196 client contract
+checks pass. Signed-link native/custom application and Version releases require
+sign-in until their mutations can enforce session authority atomically.
+
+Runtime recovery preserves forward schema and evidence; it is not destructive
+schema reversal. Production, actual cron operation and real provider undo remain
+unproven and require separate authority. The existing dirty model checkout was
+preserved. [Evidence, limits, unapplied model delta and exact next action](docs/operations/security-runtime-closure-2026-10-07.md)
+own this dated checkpoint; do not turn it into a shipped capability claim.
+
 Reviewed: 2026-09-17
 
 Component checkpoint reviewed on this date; earlier product evidence retains its
