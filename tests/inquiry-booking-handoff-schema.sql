@@ -55,12 +55,21 @@ insert into public.workspace_exit_requests(workspace_id,requested_by,idempotency
 select pg_temp.ibh_expect(format('select public.choose_inquiry_booking_slot(%L,0)',(select offer->>'id' from handoff_offer)),'inquiry_booking_unavailable');
 rollback to savepoint handoff_exit;
 create temporary table handoff_booking as select public.choose_inquiry_booking_slot((select offer->>'id' from handoff_offer)::uuid,0) booking;
-select pg_temp.ibh_assert((select booking->>'status'='requested' and booking->>'origin'='inquiry' and booking->>'inquiryId'='lead_handoff' and booking->>'contactId' is not null from handoff_booking),'same store request with contact and inquiry');
+-- Before #529 the choice is a request; after it, an expiring hold awaiting the customer's email confirmation.
+select pg_temp.ibh_assert((select booking->>'status'=case when to_regclass('public.public_booking_requests') is null then 'requested' else 'held' end and booking->>'origin'='inquiry' and booking->>'inquiryId'='lead_handoff' and booking->>'contactId' is not null from handoff_booking),'same store request with contact and inquiry');
 select pg_temp.ibh_assert((select booking->>'contactId'=(select id::text from public.business_contacts where workspace_id=(select id from handoff_ws) and email='dana@example.test') and booking->>'businessServiceId'=(select id::text from public.business_services where workspace_id=(select id from handoff_ws)) from handoff_booking),'one shared contact and service');
 select pg_temp.ibh_assert((select count(*)=1 from public.business_booking_history where booking_id=(select (booking->>'id')::uuid from handoff_booking)),'one booking history');
 select pg_temp.ibh_assert((select public.choose_inquiry_booking_slot((offer->>'id')::uuid,1)->>'id'=(select booking->>'id' from handoff_booking) from handoff_offer),'second selection cannot create another booking');
-select public.set_tenant_booking_status('handoff-site',(select booking->>'id' from handoff_booking),'confirmed','owner',null);
-select pg_temp.ibh_assert((select public.choose_inquiry_booking_slot((offer->>'id')::uuid,0)->>'status'='confirmed' from handoff_offer),'retry cannot reset confirmation');
+do $$ begin
+  if to_regclass('public.public_booking_requests') is null then
+    perform public.set_tenant_booking_status('handoff-site',(select booking->>'id' from handoff_booking),'confirmed','owner',null);
+    perform pg_temp.ibh_assert((select public.choose_inquiry_booking_slot((offer->>'id')::uuid,0)->>'status'='confirmed' from handoff_offer),'retry cannot reset confirmation');
+  else
+    -- #529: the owner cannot confirm an inquiry hold the customer never confirmed by email.
+    perform pg_temp.ibh_expect(format('select public.set_tenant_booking_status(%L,%L,%L,%L,null)','handoff-site',(select booking->>'id' from handoff_booking),'confirmed','owner'),'booking_email_confirmation_required');
+    perform pg_temp.ibh_assert((select public.choose_inquiry_booking_slot((offer->>'id')::uuid,0)->>'status'='held' from handoff_offer),'retry keeps the unconfirmed hold');
+  end if;
+end $$;
 select pg_temp.ibh_assert(not has_table_privilege('service_role','public.inquiry_booking_offers','select') and not has_function_privilege('authenticated','public.choose_inquiry_booking_slot(uuid,integer)','execute'),'RPC boundary');
 -- A business without any managed website can hand an inquiry to its own booking System.
 do $$
@@ -88,9 +97,10 @@ begin
   o:=public.prepare_inquiry_booking_offer(null,lead::text,w->'witness',svc,slots,own,'handoff-owner@example.test');
   perform pg_temp.ibh_assert(public.read_inquiry_booking_offer((o->>'id')::uuid)->>'workspaceId'=ws::text,'native public choice bound to business');
   b:=public.choose_inquiry_booking_slot((o->>'id')::uuid,0);
-  perform pg_temp.ibh_assert(b->>'status'='requested' and b->>'tenantStableId' is null and b->>'calendarKey'=ws::text and b->>'inquiryId'=lead::text,'one native booking store request');
+  perform pg_temp.ibh_assert(b->>'status'=case when to_regclass('public.public_booking_requests') is null then 'requested' else 'held' end and b->>'tenantStableId' is null and b->>'calendarKey'=ws::text and b->>'inquiryId'=lead::text,'one native booking store request');
   perform pg_temp.ibh_assert(b->>'contactId'=(select contact_id::text from public.tenant_leads where id=lead),'native inquiry and booking share original contact');
-  perform pg_temp.ibh_assert(jsonb_array_length(public.read_workspace_booking_requests(ws))=1,'native request reaches existing Needs you seam');
+  -- #529: an unconfirmed hold reaches the owner only after the customer's email confirmation.
+  perform pg_temp.ibh_assert(jsonb_array_length(public.read_workspace_booking_requests(ws))=case when to_regclass('public.public_booking_requests') is null then 1 else 0 end,'native request reaches existing Needs you seam only once requested');
   perform pg_temp.ibh_assert(jsonb_array_length(public.read_inquiry_workspace_bookings(ws,null,null))=1,'native request holds time');
   perform pg_temp.ibh_assert(public.choose_inquiry_booking_slot((o->>'id')::uuid,0)->>'id'=b->>'id','native retry stable');
   -- Same exclusion covers every native inquiry; held appointment refuses the other source.
