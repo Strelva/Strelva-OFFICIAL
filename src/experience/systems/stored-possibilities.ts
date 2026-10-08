@@ -142,7 +142,9 @@ export async function syncRebuildPossibilities(deps: {
         await deps.repo.save(revised, existing.revision);
         await prepare(revised, target.candidate.ready, deps);
         wrote = true;
-      } else if (existing.status === "exploring" && target.candidate.ready && !existing.rehearsal) {
+      } else if (existing.status === "exploring" && target.candidate.ready) {
+        // A prior rehearsal may have saved before Ready failed. Recheck the
+        // reviewed candidate and live pins before retrying that transition.
         await prepare(existing, true, deps);
         wrote = true;
       }

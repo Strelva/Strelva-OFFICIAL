@@ -99,6 +99,53 @@ describe("stored rebuild possibilities", () => {
     expect(repo.writes).toBe(writes);
   });
 
+  it("recovers when rehearsal persisted but a concurrent Ready save failed", async () => {
+    const { live, target, revisions } = fixture();
+    const repo = memoryRepo();
+    const save = repo.save;
+    let interrupted = false;
+    repo.save = async (value, expected) => {
+      if (value.status === "ready" && !interrupted) {
+        interrupted = true;
+        throw new Error("Synthetic concurrent Ready-write failure");
+      }
+      return save(value, expected);
+    };
+    const deps = { repo, live: live.port, businessId: BIZ, targets: [target], revisions, actorId: ACTOR, at: AT, canWrite: true };
+    await syncRebuildPossibilities(deps);
+    const first = await repo.listWithSources(BIZ);
+    expect(first[0]!.possibility).toMatchObject({ status: "exploring", rehearsal: { ok: true } });
+    const recovered = await syncRebuildPossibilities(deps);
+    expect(recovered[0]!.possibility).toMatchObject({ id: first[0]!.possibility.id, status: "ready", rehearsal: { ok: true } });
+    const writes = repo.writes;
+    expect((await syncRebuildPossibilities(deps))[0]!.possibility.status).toBe("ready");
+    expect(repo.writes).toBe(writes);
+  });
+
+  it.each(["live moved", "review withdrawn", "member"] as const)("does not recover partial readiness when %s", async (reason) => {
+    const { live, ref, target, revisions } = fixture();
+    const repo = memoryRepo();
+    const save = repo.save;
+    repo.save = async (value, expected) => {
+      if (value.status === "ready") throw new Error("Synthetic interrupted Ready save");
+      return save(value, expected);
+    };
+    const deps = { repo, live: live.port, businessId: BIZ, targets: [target], revisions, actorId: ACTOR, at: AT, canWrite: true };
+    await syncRebuildPossibilities(deps);
+    repo.save = save;
+    const before = (await repo.listWithSources(BIZ))[0]!.possibility;
+    const writes = repo.writes;
+    if (reason === "live moved") live.edit(ref, { pointer: "tenant_content@changed-after-rehearsal" });
+    const [retried] = await syncRebuildPossibilities({
+      ...deps,
+      targets: reason === "review withdrawn" ? [{ ...target, candidate: candidate({ ready: false }) }] : deps.targets,
+      canWrite: reason !== "member",
+    });
+    expect(retried!.possibility).toMatchObject({ id: before.id, status: "exploring" });
+    if (reason === "live moved") expect(retried!.possibility.rehearsal!.ok).toBe(false);
+    else expect(repo.writes).toBe(writes);
+  });
+
   it("refreshes the candidate when the rebuild or the live site moved, and asks again", async () => {
     const { live, ref, target, revisions } = fixture();
     const repo = memoryRepo();
