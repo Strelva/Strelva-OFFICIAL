@@ -1252,6 +1252,17 @@
           "rollbackStatus": "guarded; runtime recovery preserves accepted work"
         }
       ]
+    },
+    {
+      "batch": "11",
+      "description": "Explicit service-only supplied-actor RPC boundary",
+      "items": [
+        {
+          "file": "20261019100000_actor_rpc_service_boundary.sql",
+          "sha256": "f119daf3e4fa5529caf39995c9c2d329dab947c63f5384c1f31b9b66183eb5d1",
+          "rollback": "rollback-20261019100000_actor_rpc_service_boundary.sql"
+        }
+      ]
     }
   ]
 }
