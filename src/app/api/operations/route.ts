@@ -1,3 +1,4 @@
+import { prepareBundleMaintenance } from "@/products/operations/server";
 import { z } from "zod";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { workspaceJson as json, workspaceHttpActor, workspaceWriteGuard, readWorkspaceBody, workspaceHttpFailure } from "@/platform/workspaces/http";
@@ -47,6 +48,7 @@ export async function POST(request: Request) {
   try {
     const actor = await workspaceHttpActor(); if (!actor) return json({ error: "Sign in to change your work." }, 401);
     const input = z.discriminatedUnion("action", [
+      z.object({action:z.literal("maintenance_prepare"),input:z.unknown()}).strict(),
       z.object({ action: z.literal("keep_me_found"), input: z.unknown() }).strict(),
       z.object({ action: z.literal("responsibility_meter"), workspaceId: z.string().uuid(), month: z.string() }).strict(),
       z.object({ action: z.literal("responsibility_cadence"), workspaceId: z.string().uuid(), cadence: z.enum(["weekly", "monthly"]) }).strict(),
@@ -60,6 +62,7 @@ export async function POST(request: Request) {
       z.object({ action: z.literal("standing_cancel"), runId: z.string().uuid() }).strict(),
       z.object({ action: z.literal("standing_reconcile"), runId: z.string().uuid(), command: z.unknown() }).strict(),
     ]).parse(await readWorkspaceBody(request));
+    if(input.action==="maintenance_prepare") return json(await prepareBundleMaintenance(actor,input.input));
     if (input.action === "keep_me_found") return json(await createKeepMeFoundBundle(actor, input.input), 201);
     if (input.action === "responsibility_meter") return json(await snapshotResponsibilityMeter(actor, input.workspaceId, input.month));
     if (input.action === "responsibility_cadence") return json(await setProviderResponsibilityCadence(actor, input.workspaceId, input.cadence));

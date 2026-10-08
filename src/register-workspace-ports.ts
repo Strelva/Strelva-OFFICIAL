@@ -12,6 +12,11 @@ const ports: WorkspacePorts = workspacePortLoaders;
 registerWorkspacePorts(ports);
 
 registerTenantPublishingPorts(async () => ({
+  reviewPreparation: {
+    mode: async tenant => (await (await import("@/lib/reviews/reply-voice")).getReplyVoice(tenant)).mode,
+    declined: async (tenant,review) => (await import("@/lib/review-replies")).isReviewReplyDeclined(tenant,review,true),
+    draft: async (...args) => (await import("@/lib/review-replies")).draftReviewReply(...args),
+  },
   markExecutionExternalAccepted: async (...args) => (await import("@/lib/events")).markExecutionExternalAccepted(...args),
   markExecutionExternalUnconfirmed: async (...args) => (await import("@/lib/events")).markExecutionExternalUnconfirmed(...args),
   addEvent: async (...args) => (await import("@/lib/events")).addEvent(...args),

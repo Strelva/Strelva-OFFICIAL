@@ -1483,6 +1483,18 @@
       ]
     },
     {
+      "batch": "18",
+      "status": "Private #297 maintenance preparation only; runtime OFF; not production-authorized",
+      "items": [
+        {
+          "file": "20261020090036_bundle_maintenance.sql",
+          "sha256": "99700e78f8e30ff611c7925ddb8973996cc4fd04e36137aa44b975a9cc03dff3",
+          "rollback": "rollback-20261020090036_bundle_maintenance.sql",
+          "rollbackSha256": "fa3ae1ff71eb3cf45d29ccb70445c07d02ee8e6cbe66e5cf56bbf35fafc49abc"
+        }
+      ]
+    },
+    {
       "batch": "19",
       "status": "private literal #293 AG11 preparation; unmerged; not production-authorized",
       "note": "Exact outgoing grant/assignment cleanup, explicit owner exit-revoke provider/AOR ending with genuine exit receipt, consistent same-business provider command serialization. Applies after original33 and combined independent34\u201336 tails at final convergence. No notice policy, financial rate, external delivery, site state or matching activation selected. Empty-only guarded inverse preserves all accepted cleanup/ending receipts.",

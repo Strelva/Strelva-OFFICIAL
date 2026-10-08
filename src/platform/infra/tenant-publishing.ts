@@ -4,6 +4,13 @@ import type { CollectionType } from "./collection-types";
 /** The app edge supplies the existing tenant stores. Workspace code depends
  * on this contract, never imports the tenant model or creates a second store. */
 export interface TenantPublishingPorts {
+  /** Existing tenant policy/drafter, supplied at the app edge. Missing is
+   * unavailable; workspace maintenance must never guess a policy or reply. */
+  reviewPreparation?: {
+    mode(tenantId: string): Promise<string>;
+    declined(tenantId: string, reviewId: string): Promise<boolean>;
+    draft(review: { reviewId: string; reviewerName: string; rating: number; comment?: string }, business: { id: string; siteName: string }): Promise<string>;
+  };
   markExecutionExternalAccepted(eventId: string): Promise<void>;
   markExecutionExternalUnconfirmed(eventId: string): Promise<void>;
   addEvent(event: Omit<UnifiedEvent, "id" | "createdAt">, options?: { requirePersistence?: boolean }): Promise<UnifiedEvent>;

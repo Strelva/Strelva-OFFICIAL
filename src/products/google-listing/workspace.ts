@@ -1,3 +1,4 @@
+import { maintenancePinSchema, checkBundleMaintenanceEvent } from "./maintenance";
 import { googleVersionPinSchema, googleVersionDraftCurrent, type GoogleVersionPin } from "./versions";
 import { systemsReleasedFor, systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";
 import { publishingWorkspaceId, workspacePublishingScope } from "@/platform/infra/publishing-scope";
@@ -28,8 +29,9 @@ const draftSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("hours"), hours: factValueSchemas.hours.nullable() }),
   z.object({ action: z.literal("info"), record: infoSchema }),
   z.object({ action: z.literal("post"), post: postInputSchema }),
+  z.object({ action: z.literal("reply"), reviewId: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), text: z.string().min(1).max(4096) }),
 ]);
-const metadataSchema = z.object({ kind: z.literal("workspace_google_listing_draft"), workspaceId: z.string().uuid(), locationId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/), draft: draftSchema, version: googleVersionPinSchema.optional() });
+const metadataSchema = z.object({ kind: z.literal("workspace_google_listing_draft"), workspaceId: z.string().uuid(), locationId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/), draft: draftSchema, version: googleVersionPinSchema.optional(), maintenance: maintenancePinSchema.optional() });
 
 /** Existing approval events own the exact frozen copy, never a separate approval store. */
 export async function prepareGoogleListingDraft(actor: WorkspaceActor, raw: z.infer<typeof googleDraftInputSchema>, version?: { pin: GoogleVersionPin; hours?: z.infer<typeof factValueSchemas.hours> | null }): Promise<UnifiedEvent> {
@@ -58,7 +60,7 @@ export async function prepareGoogleListingDraft(actor: WorkspaceActor, raw: z.in
     draft = { action: "info", record: info };
   }
   if (version && !(await googleVersionDraftCurrent({ workspaceId: input.workspaceId, locationId: input.locationId, bindingId: binding.id, pin: version.pin, draft }))) throw new Error("This Google Version changed. Prepare a fresh draft.");
-  const display = draft.action === "hours" ? draft.hours ? hoursToGoogle(draft.hours) : { regularHours: null, specialHours: null } : draft.action === "info" ? infoToGoogle(draft.record).body : draft.post;
+  const display = draft.action === "hours" ? draft.hours ? hoursToGoogle(draft.hours) : { regularHours: null, specialHours: null } : draft.action === "info" ? infoToGoogle(draft.record).body : draft.action === "post" ? draft.post : draft;
   const digest = sha256(canonicalJson({ tenantId: input.tenantId, locationId: input.locationId, draft, revision: version ? null : record.revision, ...(version ? { version: version.pin } : {}) }));
   const redis = input.commandId ? getRedis() : null;
   const commandKey = input.commandId ? `google-listing-draft:${input.workspaceId}:${input.commandId}:${input.locationId}:${input.kind}` : null;
@@ -112,36 +114,52 @@ export async function tenantListingContext(tenantId: string, workspaceId: string
 
 export type GoogleExecutionResult = { accepted: boolean; verified?: boolean; receiptId?: string; reason?: string };
 /** The event action claims/settles the shared event. This executor owns only the Google effect. */
-export async function executeGoogleListingEvent(input: { tenantId: string; event: UnifiedEvent; actorId: string; attemptId: string }): Promise<GoogleExecutionResult | null> {
+export interface GoogleListingExecutionDeps {
+ authorize: typeof authorizePublishingEvent; context: typeof tenantListingContext; maintenance: typeof checkBundleMaintenanceEvent;
+ events:typeof tenantPublishingPorts; noteAccess:typeof noteListingAccess;
+}
+export async function executeGoogleListingEvent(input: { tenantId: string; event: UnifiedEvent; actorId: string; attemptId: string }, deps:GoogleListingExecutionDeps={authorize:authorizePublishingEvent,context:tenantListingContext,maintenance:checkBundleMaintenanceEvent,events:tenantPublishingPorts,noteAccess:noteListingAccess}): Promise<GoogleExecutionResult | null> {
   if (!isGoogleListingEvent(input.event)) return null;
   const metadata = metadataSchema.parse(input.event.metadata);
   if (input.event.tenantId !== input.tenantId || input.actorId === "auto-reply-policy") return { accepted: false, reason: "permission_denied" };
-  const authorization = await authorizePublishingEvent({ ...input, event: { ...input.event, metadata: { ...input.event.metadata, businessId: metadata.workspaceId } } });
+  const authorization = await deps.authorize({ ...input, event: { ...input.event, metadata: { ...input.event.metadata, businessId: metadata.workspaceId } } });
   if (!authorization.allowed) return { accepted: false, reason: authorization.reason };
-  if (metadata.draft.action !== "post" && !metadata.version) {
+  if (metadata.draft.action !== "post" && !metadata.version && !metadata.maintenance) {
     const { getSupabase } = await import("@/platform/infra/db/client");
     const db = getSupabase();
     if (!db) return { accepted: false, reason: "record_unavailable" };
     const { data, error } = await (db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> }).rpc("check_google_listing_record_revision", { p_workspace_id: metadata.workspaceId, p_revision: input.event.metadata?.recordRevision });
     if (error || data !== true) return { accepted: false, reason: "Your business details changed. Prepare a fresh Google draft." };
   }
-  const ctx = await tenantListingContext(input.tenantId, metadata.workspaceId, metadata.locationId);
+  if (metadata.draft.action === "reply" && !metadata.maintenance) return { accepted:false, reason:"maintenance_pin_required" };
+  if(metadata.maintenance) {
+    if(process.env.STRELVA_BUNDLE_MAINTENANCE_RELEASE!=="1")return {accepted:false,reason:"maintenance_release_off"};
+    // Fail closed before token refresh or any provider read, not only before the write.
+    await deps.maintenance({preparationId:metadata.maintenance.preparationId,eventId:input.event.id,workspaceId:metadata.workspaceId,bindingId:metadata.maintenance.bindingId,locationId:metadata.locationId,draft:metadata.draft});
+  }
+  const ctx = await deps.context(input.tenantId, metadata.workspaceId, metadata.locationId);
   if (metadata.version && (!(await systemsReleaseEnabledForWorkspace(metadata.workspaceId, authorization.viewer)) || !(await googleVersionDraftCurrent({ workspaceId: metadata.workspaceId, locationId: metadata.locationId, bindingId: ctx.bindingId, pin: metadata.version, draft: metadata.draft })))) return { accepted: false, reason: "This Google Version changed. Prepare a fresh draft." };
-  ctx.onWriteAccepted = async () => (await tenantPublishingPorts()).markExecutionExternalAccepted(input.event.id);
-  ctx.onWriteUnconfirmed = async () => (await tenantPublishingPorts()).markExecutionExternalUnconfirmed(input.event.id);
+  if (metadata.maintenance) {
+    const recheck = () => deps.maintenance({preparationId:metadata.maintenance!.preparationId,eventId:input.event.id,workspaceId:metadata.workspaceId,bindingId:ctx.bindingId,locationId:metadata.locationId,draft:metadata.draft});
+    await recheck();
+    const original = ctx.client;
+    ctx.client = {...original,patchLocation:async (...args) => {await recheck();return original.patchLocation(...args);},updateReply:async (...args)=>{await recheck();return original.updateReply(...args);}};
+  }
+  ctx.onWriteAccepted = async () => (await deps.events()).markExecutionExternalAccepted(input.event.id);
+  ctx.onWriteUnconfirmed = async () => (await deps.events()).markExecutionExternalUnconfirmed(input.event.id);
   let accepted = false;
   const base = ctx.client;
-  ctx.client = { ...base, patchLocation: async (...args) => { const result = await base.patchLocation(...args); if (result.ok) accepted = true; return result; }, createPost: async (...args) => { const result = await base.createPost(...args); if (result.ok) accepted = true; return result; } };
+  ctx.client = { ...base, patchLocation: async (...args) => { const result = await base.patchLocation(...args); if (result.ok) accepted = true; return result; }, createPost: async (...args) => { const result = await base.createPost(...args); if (result.ok) accepted = true; return result; }, updateReply: async (...args) => { const result = await base.updateReply(...args); if(result.ok) accepted=true; return result; } };
   try {
     const authority = { kind: "owner_approval" as const, actor: input.actorId, approvalRef: input.event.id };
     // The approval owns the write, even if saving the event marker fails.
     // A durable rejection permits a retry; uncertainty always blocks it.
     const idempotencyKey = `google-draft:${input.event.id}`;
     const draft = metadata.draft;
-    const outcome = draft.action === "hours" ? await syncHoursFromRecord(ctx, { hours: draft.hours, authority, idempotencyKey, retryFailed: true }) : draft.action === "info" ? await syncInfoFromRecord(ctx, { record: draft.record, authority, idempotencyKey, retryFailed: true }) : await createListingPost(ctx, { post: draft.post, authority, idempotencyKey, retryFailed: true });
+    const outcome = draft.action === "hours" ? await syncHoursFromRecord(ctx, { hours: draft.hours, authority, idempotencyKey, retryFailed: true }) : draft.action === "info" ? await syncInfoFromRecord(ctx, { record: draft.record, authority, idempotencyKey, retryFailed: true }) : draft.action === "reply" ? await postReviewReply(ctx, {reviewId:draft.reviewId,text:draft.text,authority,idempotencyKey,retryFailed:true}) : await createListingPost(ctx, { post: draft.post, authority, idempotencyKey, retryFailed: true });
     if (outcome.status === "write_unconfirmed") return { accepted: false, reason: "google_write_unconfirmed", receiptId: outcome.receipt.id };
     if (outcome.status === "refused" && outcome.reason === "nothing_to_change") return { accepted: true, verified: true, reason: "already_on_google" };
-    await noteListingAccess(ctx.workspaceId, ctx.location.locationId, outcome.status === "failed" ? outcome.accessPending : outcome.status === "refused" && outcome.reason === "api_access_pending");
+    await deps.noteAccess(ctx.workspaceId, ctx.location.locationId, outcome.status === "failed" ? outcome.accessPending : outcome.status === "refused" && outcome.reason === "api_access_pending");
     if (outcome.status === "refused") return { accepted: false, reason: outcome.reason };
     return { accepted: outcome.status !== "failed", verified: outcome.status === "posted", receiptId: outcome.receipt.id, reason: outcome.status === "failed" ? outcome.message : undefined };
   } catch (error) {
