@@ -60,6 +60,18 @@ export interface SourceAdapter {
    * (owner-entry decision 6). Never for access, money or exit.
    */
   ownerLinkWithoutAccount?: boolean;
+  /**
+   * Link decisions only at the business's trusted owner recipient
+   * (resolve_business_owner_recipient `trusted`): any other address gets no
+   * email for this source, since the source would refuse its approval.
+   */
+  trustedRecipientOnly?: boolean;
+  /**
+   * The complete review an owner must see before deciding, when the item's
+   * detail can't hold every value. Null when the source no longer matches the
+   * item's revision: nothing may be approved from it.
+   */
+  review?(ctx: AdapterContext, item: OwnerDecision): Promise<string[] | null>;
   /** Pending asks for this business. `complete: false` means some sources could not be read. */
   propose(ctx: AdapterContext): Promise<{ items: ProposedItem[]; complete: boolean }>;
   /** The source's current revision, or null when it is no longer waiting on anyone. */

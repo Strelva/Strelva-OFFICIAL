@@ -1,3 +1,4 @@
+import { brandColors } from "@/platform/infra/agency-brand";
 import { attributedAiVisibility } from "./attribution";
 /**
  * HTML artifact renderer for the AI Visibility Score.
@@ -84,6 +85,8 @@ function probeStatusLabel(citation: CitationProbe): string {
  */
 export function renderAiVisibilityHtml(raw: AiVisibilityResult): string {
   const result = attributedAiVisibility(raw, raw.agency);
+  const agencyColors = brandColors(result.agency?.brand.accentColor ?? "#447a4f");
+  const agencyLogo = result.agency?.brand.logoUrl ? `<img src="${escapeHtml(result.agency.brand.logoUrl)}" alt="" width="132" style="max-height:64px;object-fit:contain;">` : "";
   const agencyName = result.agency ? escapeHtml(result.agency.name) : null;
   const measured = result.readinessMeasured ?? result.measurementStatus !== "unavailable";
   const accent = measured ? GRADE_HEX[result.grade] : "#6b7280";
@@ -232,7 +235,8 @@ export function renderAiVisibilityHtml(raw: AiVisibilityResult): string {
 </head>
 <body>
   <main class="page">
-    <p class="eyebrow">${agencyName ? `${agencyName} on Strelva` : "Strelva"} · AI Visibility Score</p>
+    <div style="color:${agencyColors.onWhite};">${agencyLogo}</div>
+    <p class="eyebrow" style="color:${agencyColors.onWhite};">${agencyName ? `${agencyName} on Strelva` : "Strelva"} · AI Visibility Score</p>
     <h1>${business}</h1>
     ${url ? `<div class="url">${url}</div>` : ""}
 

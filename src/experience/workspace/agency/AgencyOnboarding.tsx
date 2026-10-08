@@ -3,6 +3,7 @@
 import { ArrowLeft, ArrowRight, Check, Loader2, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
+import { AgencyBrandEditor } from "./AgencyBrandEditor";
 import { Button } from "@/components/ui/Button";
 import { TextInput } from "@/components/ui/TextInput";
 import type { AgencyEffect, AgencyOnboarding as Onboarding, AgencyOnboardingStep, AgencySummary } from "@/platform/workspaces/agency-onboarding";
@@ -172,7 +173,7 @@ function initials(name: string): string {
   return (words.length > 1 ? `${words[0]![0]}${words[1]![0]}` : (words[0] ?? "A").slice(0, 2)).toUpperCase();
 }
 
-/** Stands in for the agency's logo until the brand layer (#264) stores one. */
+/** Compact agency initials for the chooser; the profile editor owns the public brand. */
 function Monogram({ name, size }: { name: string; size: "sm" | "lg" }) {
   return <span aria-hidden="true" className={`flex shrink-0 items-center justify-center rounded-xl border border-dashed border-gray-border bg-surface font-medium text-gray-muted ${size === "lg" ? "size-16 text-[18px]" : "size-10 text-[13px]"}`}>{initials(name)}</span>;
 }
@@ -206,8 +207,9 @@ function Checklist({ onboarding, workspaceHref, addClient }: { onboarding: Onboa
 
   const body: Record<AgencyOnboardingStep["id"], React.ReactNode> = {
     profile: <>
+      {agency.role === "owner" ? <AgencyBrandEditor workspaceId={agency.id} /> : null}
       <p>{agency.name} is your agency’s name on Strelva.</p>
-      <p className="mt-1">Your logo and brand will appear here once agency branding is available.</p>
+      <p className="mt-1">Your agency’s brand appears on owners’ emails, reports and workspace.</p>
     </>,
     team: <>
       <p>{onboarding.members === 1 && !onboarding.pendingInvitations ? "Just you so far." : `${people}${pending}.`} Teammates join your agency, never a client’s business directly.</p>

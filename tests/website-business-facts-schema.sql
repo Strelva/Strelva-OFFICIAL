@@ -12,6 +12,14 @@ begin
  insert into public.business_records(workspace_id,created_by,updated_by) values(ws,owner_id,owner_id) on conflict(workspace_id) do nothing;
  insert into public.business_record_facts(workspace_id,fact_key,value,source,updated_by) values(ws,'phone','"7165550123"','owner',owner_id) on conflict(workspace_id,fact_key) do update set value=excluded.value,source=excluded.source;
  insert into public.business_record_facts(workspace_id,fact_key,value,source,updated_by) values(ws,'email','"unconfirmed@example.test"','agent',owner_id) on conflict(workspace_id,fact_key) do update set value=excluded.value,source=excluded.source,verified=false;
+ -- After 20261011133700 (#509) only the confirmed copy is read; this direct
+ -- owner row stands in for the owner's own write, which confirms.
+ if to_regclass('public.business_record_confirmed') is not null then
+   insert into public.business_record_confirmed(workspace_id,entity,entity_id,state,confirmed_by_kind)
+     values(ws,'fact','phone',public.business_record_entity_state(ws,'fact','phone'),'owner_write')
+     on conflict(workspace_id,entity,entity_id) do update set state=excluded.state;
+   delete from public.business_record_confirmed where workspace_id=ws and entity='fact' and entity_id='email';
+ end if;
  result:=public.read_hosted_website_business_facts(tenant);
  perform pg_temp.wbf_assert(result->'facts'->>'phone'='7165550123','reads confirmed own record');
  perform pg_temp.wbf_assert(not(result->'facts' ? 'email') and not(result->'facts' ? 'owner_recipient'),'unconfirmed and private facts excluded');

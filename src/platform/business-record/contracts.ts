@@ -259,6 +259,15 @@ export const businessRecordSchema = z.object({
 });
 export type BusinessRecord = z.infer<typeof businessRecordSchema>;
 
+/** The copy client sites read: only what the owner wrote or decided (#509).
+ * Values are as stored; callers parse each with factValueSchemas. */
+export const confirmedBusinessFactsSchema = z.object({
+  revision: z.number().int().min(0),
+  facts: z.partialRecord(factKeySchema, z.unknown()),
+  services: z.array(z.object({ name: z.string(), description: nullableString, priceText: nullableString }).strict()).max(40),
+}).strict();
+export type ConfirmedBusinessFacts = z.infer<typeof confirmedBusinessFactsSchema>;
+
 export const businessContactSchema = z.object({
   id: uuid, name: nullableString, email: nullableString, phone: nullableString,
   sources: z.array(contactSourceSchema).min(1), firstSeenAt: timestamp, lastSeenAt: timestamp,
@@ -307,8 +316,8 @@ export const ownerRecipientSchema = z.object({
 export type OwnerRecipient = z.infer<typeof ownerRecipientSchema>;
 
 /** The one owner-recipient rule keyed by tenant (resolve_tenant_owner_recipient):
- * the linked record's owner contact, else this tenant's owner_email, else the
- * business's earliest linked tenant's owner_email. */
+ * the business's trusted owner address when the record holds it, else this
+ * tenant's owner_email, else the address the business trusted at conversion. */
 export const tenantOwnerRecipientSchema = z.object({
   email: z.string().email(),
   name: nullableString,

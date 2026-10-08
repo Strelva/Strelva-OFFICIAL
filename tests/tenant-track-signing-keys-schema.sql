@@ -41,3 +41,16 @@ begin
   end if;
 end
 $$;
+
+-- The atomic teardown owns the tenant delete; its FK must remove the keys.
+begin;
+insert into public.tenants(id,site_name) values ('track-teardown-fixture','Signing key teardown');
+insert into public.tenant_track_signing_keys(tenant_id,public_key)
+values ('track-teardown-fixture',repeat('k',100));
+select public.deprovision_tenant_rows('track-teardown-fixture');
+do $$ begin
+  if exists (select 1 from public.tenant_track_signing_keys where tenant_id='track-teardown-fixture') then
+    raise exception 'atomic teardown retained tenant signing keys';
+  end if;
+end $$;
+rollback;

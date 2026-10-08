@@ -282,6 +282,27 @@ export async function getMembershipRole(userId: string, tenantId: string): Promi
   }, null);
 }
 
+/**
+ * The agency this user decides for on a tenant: an agency with an active
+ * provider seat on the business the tenant is linked to, that the user is a
+ * member of (20261011153000). Null for the business's owner and everyone
+ * else. Throws when it can't be read, so a caller never mistakes agency staff
+ * for the owner.
+ */
+export async function getTenantAgencySeat(userId: string, tenantId: string): Promise<string | null> {
+  const db = getSupabase();
+  if (!db) return null;
+  return required(`getTenantAgencySeat ${userId}/${tenantId}`, async () => {
+    // Additive RPC, outside generated types until they are regenerated.
+    const rpc = db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> };
+    const { data, error } = await rpc.rpc("tenant_agency_seat", { p_tenant_id: tenantId, p_user_id: userId });
+    if (error) throw error;
+    if (data === null) return null;
+    if (typeof data !== "string") throw new Error("tenant_agency_seat returned a malformed agency");
+    return data;
+  });
+}
+
 /** User ids that are OWNER of a tenant, resolved in one indexed membership query. */
 export async function listTenantOwnerIds(tenantId: string): Promise<string[]> {
   const db = getSupabase();
