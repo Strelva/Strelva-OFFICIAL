@@ -13,6 +13,17 @@ provider write, payment mutation, commercial commitment or human qualification
 was performed. The independently frozen launch candidate remains a separate
 comparison. Do not apply either candidate's prepared migrations implicitly.
 
+## Merge result
+
+#603 merged October 8 at `7552a1339423b734d727318fdf9efbc0142c437f`.
+GitHub marked #585–590 and #597 merged through their preserved commit ancestry.
+The nine #602 components and #583 were closed as superseded with replacement
+links; #205 was also closed as already integrated. Issues #496, #326, #482 and
+#501 were closed after the passing merge. Seven historic PRs remain parked,
+blocked or awaiting selective reconciliation, as detailed below. All owned
+verification servers and disposable stacks were stopped; the isolated review
+checkout is clean. Production and the frozen launch candidate remain untouched.
+
 ## Integration repairs
 
 - Preserve platform-owned booking/operator delivery from #598 while retaining

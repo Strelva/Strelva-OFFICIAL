@@ -2,11 +2,12 @@
 
 ## October 8 reviewed engineering backlog (source only)
 
-The recent backlog is being integrated into `release/security-runtime-20261007`:
-#602 merged; follow-up #603 combines the reviewed billing, email, declaration,
+The recent backlog is merged into `release/security-runtime-20261007` at `7552a133`
+through #602 and #603. It combines the reviewed billing, email, declaration,
 pending qualification, native mapping, hold-alarm and payer-proposal work. The
 [merge review](docs/operations/pr-merge-review-2026-10-08.md) records integration
-repairs, local evidence, remaining issue scope and the exact next action. These
+repairs, local evidence, remaining issue scope and the exact next action. Issues
+#496, #326, #482 and #501 are closed for their bounded implementation criteria. These
 source merges do not change the deployed October 7 release or authorize pending
 migrations, external writes, flag activation or commercial qualification. The
 independent frozen launch candidate still needs a separate comparison.
