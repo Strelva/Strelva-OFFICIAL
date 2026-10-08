@@ -3,6 +3,7 @@ import type { VersionsDb } from "@/platform/system-versions/supabase-store";
 const deps = vi.hoisted(() => ({ kind: "internal_app", scope: vi.fn() }));
 vi.mock("@/experience/workspace/agency/authoring-server", () => ({ requireAgencyAuthoring: deps.scope }));
 vi.mock("@/platform/systems", async original => ({ ...(await original<typeof import("@/platform/systems")>()), createSupabaseSystemStore: () => ({ readSystem: async () => ({ system: { kind: deps.kind } }) }) }));
+import { effectivePackageBehavior } from "@/platform/system-versions/declaration";
 import { createBusinessVersion } from "@/experience/workspace/agency/version-server";
 const actor = { userId: crypto.randomUUID(), verifiedEmail: "native-maker@example.test" };
 const agencyWorkspaceId = crypto.randomUUID(), workspaceId = crypto.randomUUID(), canonicalSystemId = crypto.randomUUID();
@@ -10,8 +11,9 @@ const source = { businessId: agencyWorkspaceId, systemId: crypto.randomUUID(), r
 const input = { agencyWorkspaceId, workspaceId, source, context: { kind: "agency_client" as const, label: "Local client" }, name: "Client intake", commandId: crypto.randomUUID() };
 function database(definition: Record<string, unknown> = { kind: "internal_app", title: "Intake", fields: [{ id: "problem", label: "Problem", type: "text", required: true }], components: [{ kind: "form", fields: ["problem"] }] }) {
   const rpc = vi.fn<VersionsDb["rpc"]>(async (name, args) => {
+    if (name === "require_system_package_install_scope") return { data: true, error: null };
     if (name === "read_version_actor") return { data: { userId: actor.userId, memberships: [{ businessId: agencyWorkspaceId, role: "owner" }, { businessId: workspaceId, role: "admin" }] }, error: null };
-    if (name === "read_system_version_source_revisions") return { data: [{ source, definition, summary: "First", requires: { bindingKinds: [] }, publishedBy: actor.userId, publishedAt: new Date().toISOString() }], error: null };
+    if (name === "read_system_version_source_revisions") return { data: [{ source, definition, summary: "First", ...(definition.kind === "internal_app" && !("records" in definition) ? { declaration: effectivePackageBehavior(definition), qualification: { revisionId: source.revisionId, status: "qualified", evidence: ["shareable_definition","declaration_match","rehearsal","prior_revision_compare"].map(check => ({revisionId:source.revisionId,check,status:"passed",note:"Fictional exact native receipt"})),humanReview:{state:"approved",reviewerId:actor.userId,reviewedAt:new Date().toISOString(),note:"Fixture review"} } } : {}), requires: { bindingKinds: [] }, publishedBy: actor.userId, publishedAt: new Date().toISOString() }], error: null };
     if (name === "read_system_version_source") return { data: { source: { businessId: agencyWorkspaceId, systemId: source.systemId }, hidden: false, sharedWith: [], createdAt: new Date().toISOString() }, error: null };
     if (name === "read_system_version_for_system") return { data: null, error: null };
     if (name === "create_version_system_command") return { data: { ...(args.p_lineage as Record<string, unknown>), version: { businessId: workspaceId, systemId: canonicalSystemId } }, error: null };

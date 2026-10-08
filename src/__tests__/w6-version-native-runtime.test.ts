@@ -8,8 +8,10 @@ const actor = { userId: crypto.randomUUID(), verifiedEmail: "native-owner@exampl
 async function fixture() {
   const businessId = crypto.randomUUID(), systemId = crypto.randomUUID();
   const versionActor = { userId: actor.userId, memberships: [{ businessId, role: "owner" as const }] };
-  const versions = createSystemVersions({ store: createInMemoryVersionStore(), connections: createInMemoryConnectionOwnership() });
-  const revision = await versions.publishSourceRevision(versionActor, { source: { businessId, systemId }, definition: { kind: "internal_app", title: "Intake" }, summary: "First" });
+  const store = createInMemoryVersionStore();
+  const versions = createSystemVersions({ store, connections: createInMemoryConnectionOwnership() });
+  const revision = await versions.publishSourceRevision(versionActor, { source: { businessId, systemId }, definition: { kind: "internal_app", title: "Intake", fields: [{id:"problem",label:"Problem",type:"text",required:true}],components:[{kind:"form",fields:["problem"]}] }, summary: "First" });
+  await store.recordQualification(versionActor, {revisionId:revision.source.revisionId,status:"qualified",evidence:["shareable_definition","declaration_match","rehearsal","prior_revision_compare"].map(check=>({revisionId:revision.source.revisionId,check:check as "shareable_definition"|"declaration_match"|"rehearsal"|"prior_revision_compare",status:"passed" as const,note:"Fictional exact native receipt"})),humanReview:{state:"approved",reviewerId:actor.userId,reviewedAt:new Date().toISOString(),note:"Fixture review"}});
   const lineage = await versions.createVersion(versionActor, { source: revision.source, version: { businessId, systemId: crypto.randomUUID() }, context: { kind: "location", label: "Local" } });
   return { lineage, versions, versionActor };
 }
