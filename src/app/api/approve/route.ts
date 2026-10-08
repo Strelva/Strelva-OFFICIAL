@@ -102,7 +102,13 @@ function confirmPage(params: {
   confirmLabel: string;
   dashboardUrl?: string;
   previewUrl?: string;
+  /** Every value the confirm applies, in full (Needs you sources with a review). */
+  lines?: readonly string[];
 }): NextResponse {
+  const review = params.lines?.length
+    ? `<ul style="margin:22px 0 0;padding:0 0 0 18px;text-align:left;font-size:14px;line-height:1.55;color:${INK};">${params.lines
+      .map(line => `<li style="margin:0 0 8px;white-space:pre-wrap;overflow-wrap:anywhere;">${escapeHtml(line)}</li>`).join("")}</ul>`
+    : "";
   const secondary = params.dashboardUrl
     ? `<div style="margin-top:14px;"><a href="${escapeHtml(params.dashboardUrl)}" style="font-size:13px;color:${MUTED};text-decoration:underline;">Open your dashboard instead</a></div>`
     : "";
@@ -113,7 +119,7 @@ function confirmPage(params: {
   const preview = params.previewUrl
     ? `<p style="margin-top:22px;"><a href="${escapeHtml(params.previewUrl)}" style="color:${INK};text-decoration:underline;">Review the complete website preview before deciding</a></p>`
     : "";
-  return shell(200, headingBody(params.heading, params.body) + preview + form);
+  return shell(200, headingBody(params.heading, params.body) + preview + review + form);
 }
 
 const INVALID = {
@@ -142,7 +148,7 @@ const HANDLED = { heading: "Already handled", body: "This was already taken care
 const EXPIRED = { heading: "This link expired", body: "Nothing was done. Open Strelva to see what's waiting." };
 
 async function workspaceConfirm(token: string, claims: WorkspaceApproveLinkClaims): Promise<NextResponse> {
-  const { needsYouAppOrigin, needsYouReleaseEnabled, needsYouStore } = await import("@/platform/needs-you/server");
+  const { needsYouAppOrigin, needsYouReleaseEnabled, needsYouStore, needsYouService } = await import("@/platform/needs-you/server");
   if (!needsYouReleaseEnabled()) return noticePage({ status: 400, ...INVALID.bad });
   const item = await needsYouStore.read(claims.workspaceId, claims.itemId).catch(() => null);
   if (!item) return noticePage({ status: 400, ...INVALID.bad });
@@ -151,6 +157,10 @@ async function workspaceConfirm(token: string, claims: WorkspaceApproveLinkClaim
   if (item.state !== "open") return noticePage({ status: 200, ...HANDLED, dashboardUrl: open, buttonLabel: "Open" });
   if (Date.parse(item.expiresAt) <= Date.now()) return noticePage({ status: 200, ...EXPIRED, dashboardUrl: open, buttonLabel: "Open" });
   if (item.signInRequired) return noticePage({ status: 200, heading: "Sign in to decide this", body: "Decisions about access, money or leaving Strelva need you signed in. Nothing was done.", dashboardUrl: open, buttonLabel: "Sign in and open" });
+  // A source whose detail can't hold every value shows the complete review
+  // here, read for this exact revision; without it nothing is offered.
+  const lines = await needsYouService().review(item).catch(() => null);
+  if (lines === null) return noticePage({ status: 200, ...CHANGED, dashboardUrl: open, buttonLabel: "Open" });
   const isApprove = claims.action === "approve";
   return confirmPage({
     token,
@@ -159,17 +169,20 @@ async function workspaceConfirm(token: string, claims: WorkspaceApproveLinkClaim
     confirmLabel: isApprove ? "Confirm — approve" : "Confirm — not yet",
     dashboardUrl: open,
     ...(item.sourceLifecycle === "website_document" && ownerWebsitePreviewMayBeOn() ? { previewUrl: ownerWebsitePreviewHref(token) } : {}),
+    ...(lines ? { lines } : {}),
   });
 }
 
 async function workspaceResolve(claims: WorkspaceApproveLinkClaims): Promise<NextResponse> {
-  const { needsYouAppOrigin, needsYouReleaseEnabled, needsYouService } = await import("@/platform/needs-you/server");
+  const { needsYouAppOrigin, needsYouReleaseEnabled, needsYouService, needsYouStore } = await import("@/platform/needs-you/server");
   if (!needsYouReleaseEnabled()) return noticePage({ status: 400, ...INVALID.bad });
   const origin = needsYouAppOrigin();
   const open = workspaceOpenUrl(origin, claims.workspaceId);
   let result;
   try {
-    result = await needsYouService().decide({
+    // Confirmed business facts carry on to native websites (#509).
+    const { createConfirmedNativeFactsEffect } = await import("@/app/workspace/business-details/native-website-facts");
+    result = await needsYouService(needsYouStore, { businessFactsConfirmed: createConfirmedNativeFactsEffect() }).decide({
       workspaceId: claims.workspaceId,
       itemId: claims.itemId,
       revision: claims.revision,

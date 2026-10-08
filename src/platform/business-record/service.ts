@@ -9,6 +9,7 @@ import {
   businessRecordSchema,
   businessRecordWriteResultSchema,
   businessRecordWriteSourceSchema,
+  confirmedBusinessFactsSchema,
   contactBatchSchema,
   conversionReceiptSchema,
   ownerRecipientSchema,
@@ -22,6 +23,7 @@ import {
   type BusinessRecord,
   type BusinessRecordRevision,
   type BusinessRecordWriteResult,
+  type ConfirmedBusinessFacts,
   type ConversionReceipt,
   type OwnerRecipient,
   type TenantOwnerRecipient,
@@ -54,6 +56,12 @@ function command(options: WriteOptions, body: unknown) {
 export async function readBusinessRecord(actor: WorkspaceActor, workspace: string): Promise<BusinessRecord> {
   return callBusinessRecord("read_business_record", { p_workspace_id: workspaceId.parse(workspace), ...actorArgs(actor) },
     businessRecordSchema, "The business record could not be loaded.");
+}
+
+/** What client sites may show: the owner's own writes and owner-decided changes only. */
+export async function readConfirmedBusinessFacts(actor: WorkspaceActor, workspace: string): Promise<ConfirmedBusinessFacts> {
+  return callBusinessRecord("read_confirmed_business_facts", { p_workspace_id: workspaceId.parse(workspace), ...actorArgs(actor) },
+    confirmedBusinessFactsSchema, "The confirmed business details could not be loaded.");
 }
 
 /** Exact same membership/agency read boundary as the business record. */

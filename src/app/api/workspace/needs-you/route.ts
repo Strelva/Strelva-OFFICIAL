@@ -3,7 +3,7 @@ import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { listWorkspaces } from "@/platform/workspaces";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
-import { needsYouReleaseEnabled, needsYouService, readStrelvaHandled } from "@/platform/needs-you/server";
+import { needsYouReleaseEnabled, needsYouService, needsYouStore, readStrelvaHandled } from "@/platform/needs-you/server";
 
 export const dynamic = "force-dynamic";
 
@@ -60,7 +60,9 @@ export async function POST(request: Request) {
     const body = decideInput.parse(await readWorkspaceBody(request, 2_000));
     if (await isRateLimitedWindowedAsync(`workspace:needs-you:${actor.userId}`, 30, 60_000)) return workspaceJson({ error: "Please wait before trying again." }, 429);
     if (!(await memberWorkspace(actor, body.workspaceId))) return workspaceJson({ error: "This business is unavailable to your account." }, 403);
-    const result = await needsYouService().decide({ ...body, by: { kind: "session", actor } });
+    // Confirmed business facts carry on to native websites (#509).
+    const { createConfirmedNativeFactsEffect } = await import("@/app/workspace/business-details/native-website-facts");
+    const result = await needsYouService(needsYouStore, { businessFactsConfirmed: createConfirmedNativeFactsEffect() }).decide({ ...body, by: { kind: "session", actor } });
     const status = result.status === "forbidden" || result.status === "not_owner" ? 403
       : result.status === "not_found" ? 404
       : result.status === "changed" || result.status === "already_handled" || result.status === "expired" ? 409
