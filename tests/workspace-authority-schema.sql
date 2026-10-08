@@ -263,6 +263,24 @@ select pg_temp.assert_true(
   and not public.revoke_workspace_calendar_connection('c9000000-0000-4000-8000-000000000010', 'c9000000-0000-4000-8000-000000000002', 'outlook'),
   'revoke reports whether a connection existed'
 );
+-- Full ordered upgrades also retain receipts for both outcomes. Historical
+-- authority-only schemas precede this additive receipt store.
+do $$
+begin
+  if to_regclass('public.provider_disconnect_receipts') is not null then
+    perform pg_temp.assert_true(exists(select 1 from public.provider_disconnect_receipts
+      where workspace_id='c9000000-0000-4000-8000-000000000010' and provider='google'
+        and connection_source='calendar_connection' and actor_user_id='c9000000-0000-4000-8000-000000000002'
+        and revocation_outcome='not_attempted' and revocation_error_code='revocation_not_requested'
+        and local_cleanup_status='complete' and cleared_stores=array['workspace_calendar_connections']),
+      'legacy positive revoke preserves receipt and cleared calendar store');
+    perform pg_temp.assert_true(exists(select 1 from public.provider_disconnect_receipts
+      where workspace_id='c9000000-0000-4000-8000-000000000010' and provider='outlook'
+        and connection_source='calendar_connection' and actor_user_id='c9000000-0000-4000-8000-000000000002'
+        and revocation_outcome='not_attempted' and local_cleanup_status='complete' and cleared_stores='{}'::text[]),
+      'legacy missing calendar returns false and still preserves cleanup receipt');
+  end if;
+end $$;
 select pg_temp.assert_true(
   (select status = 'revoked' and access_token_ciphertext is null and refresh_token_ciphertext is null
      and created_by = 'c9000000-0000-4000-8000-000000000001'
