@@ -1,9 +1,11 @@
 # W6 stream: journeys
 
 October 8 follow-up on `e9ac136f`: issue #501's anonymous booking and released
-inquiry checks pass locally; all eight flags-off journeys pass after current
-agency-maker fixture qualification. The original account-free acceptance and
-generic Versions proof remain unqualified. See the [dated repair and proof
+inquiry checks pass locally; the qualified stable-baseline profile passes all
+12 flags-on journeys and native Version owner releases. All eight flags-off
+journeys passed after current agency-maker fixture qualification. The original
+account-free acceptance and generic Versions proof remain unqualified; the
+website reconciliation/refresh discrepancy is a separate unresolved follow-up. See the [dated repair and proof
 matrix](evidence/journey-501-2026-10-08.md) for current contracts, failures and
 safe reproduction. The October 7 baseline below is historical.
 
