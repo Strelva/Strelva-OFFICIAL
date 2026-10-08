@@ -1,5 +1,49 @@
 # Ordinary agency workflow — October 7, 2026
 
+## October 8 release coordination checkpoint
+
+The minimum three-flag browser job passes on a fresh 260-migration Auth stack:
+**one passed, 20.6 seconds, no skips or flaky retries**. Only workspace,
+agency add-client and website rebuild are enabled. Systems, Needs You, owner
+entry, anonymous decision links, signup, prospecting and model/provider keys
+remain off. The actual signed-in owner claims the business, approves the exact
+candidate and explicitly consents to its named agency publishing. Native
+verification, missing-mandate and wrong-agency denials precede publish and
+receipt replay. Desktop and 390px receipts were inspected. The source URL uses
+fictional local transport; AI readiness is partial, and public HTTPS readback is
+unconfirmed. Evidence is private under
+`.scratch/agency-workflow-proof/2026-10-07/minimum-three-flags/`.
+
+That proof caught an extra Systems prerequisite in the website entry page.
+Rebuild now follows its own release resolver; connected sites retain their
+Systems prerequisite. Membership, staffed-seat and native website authority
+remain enforced. The focused route/page suite passes 21 tests.
+
+The staged production artifact from `33716cec` is READY:
+`dpl_6z1ftBTSJSdcW1qS9tBWQLT4LRVa`. It inherits existing production secrets;
+health returned 200 and all **60/60** legacy storefront reads match the live
+baseline byte for byte through existing Vercel protection bypass. It lacks the
+subsequent website entry fix and must not be promoted as the final agency build.
+No alias, environment or production database was changed by this thread.
+
+A faithful isolated PostgreSQL 17.11 PUBLIC restore accepted the earlier
+174-pending packet and preserved all original 114 table row projections before
+and after four native agency/owner/publish/link probes. Qualification also
+reproduced unintended hosted browser EXECUTE grants on supplied-actor
+`workspace_operation`, `grant_agency_application_draft_edit` and
+`update_application_candidate`. An additive server-only grant correction is
+being tested; the retained receipt is failed until that boundary is repaired.
+
+The Current Workspace State thread now owns the single production writer and
+final promotion. Its pinned 264-file packet shares 258 identical migration hashes
+with this branch and adds six qualified security/runtime migrations. Agency adds
+its two retained owner-publication/owner-link files and the new actor-RPC repair;
+the intended combined inventory is 267. The earlier 86-applied/174-pending count
+below is historical. Do not start another writer or promote a competing artifact.
+Next: commit the grant correction, integrate these changes with the release
+owner, rerun the complete agency job against the combined candidate, then observe
+its single promoted artifact before closing completed issues.
+
 ## Deployment qualification update
 
 Jacob authorized deployment and issue closure in this session. This replaces the

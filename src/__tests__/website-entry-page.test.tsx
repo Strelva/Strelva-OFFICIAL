@@ -44,9 +44,23 @@ describe("website entry page authorization and release boundaries", () => {
     f.rebuild.mockResolvedValue(false);
     await expect(render()).rejects.toThrow(`redirect:/workspace?workspaceId=${WS}`);
   });
-  it("requires Systems, active membership, and verified sign-in before reading either path", async () => {
-    f.systems.mockResolvedValue(false); await expect(render({ entry: "rebuild" })).rejects.toThrow("redirect:/workspace?");
-    f.systems.mockResolvedValue(true); f.workspace.mockResolvedValue([]); expect(await render({ entry: "connect" })).toContain("isn&#x27;t available to your account");
+  it("opens independently released rebuilds with Systems off and retains the connected-sites resolver gate", async () => {
+    f.systems.mockResolvedValue(false);
+    // The connected-sites resolver includes the Systems prerequisite; rebuild does not.
+    f.connected.mockResolvedValue(false);
+    expect(await render({ entry: "rebuild" })).toContain("Your current website");
+    expect(f.rebuild).toHaveBeenCalledWith({userId:"actor",verifiedEmail:"owner@example.test"},WS);
+    expect(f.records).toHaveBeenCalledTimes(1);
+    expect(f.sites).not.toHaveBeenCalled();
+    expect(f.systems).not.toHaveBeenCalled();
+    expect(await render({ entry: "connect" })).not.toContain("Get my two lines");
+    expect(f.sites).not.toHaveBeenCalled();
+    f.rebuild.mockResolvedValue(false);
+    await expect(render({entry:"rebuild"})).rejects.toThrow(`redirect:/workspace?workspaceId=${WS}`);
+    expect(f.records).toHaveBeenCalledTimes(1);
+  });
+  it("requires active business authority and verified sign-in before reading either path", async () => {
+    f.workspace.mockResolvedValue([]); expect(await render({ entry: "connect" })).toContain("isn&#x27;t available to your account");
     f.session.mockResolvedValue(null); await expect(render({ entry: "rebuild", workId: SYSTEM })).rejects.toThrow(`redirect:/sign-in?next=${encodeURIComponent(`/workspace/site?workspaceId=${WS}&entry=rebuild&workId=${SYSTEM}`)}`);
     expect(f.sites).not.toHaveBeenCalled(); expect(f.records).not.toHaveBeenCalled();
   });
@@ -57,6 +71,30 @@ describe("website entry page authorization and release boundaries", () => {
     expect(f.seat).toHaveBeenCalledWith({ userId: "actor", verifiedEmail: "owner@example.test" }, WS);
     f.seat.mockResolvedValue(null); expect(await render({ entry: "connect" })).toContain("isn&#x27;t available to your account");
     f.seat.mockRejectedValue(new Error("down")); expect(await render({ entry: "connect" })).toContain("isn&#x27;t available to your account");
+  });
+  it("keeps independently released rebuilds restricted to current customer membership or staffed seats", async () => {
+    f.systems.mockResolvedValue(false);f.connected.mockResolvedValue(false);
+    f.workspace.mockResolvedValue([{id:WS,kind:"agency",access:"member",role:"owner",name:"Agency"}]);
+    expect(await render({entry:"rebuild"})).toContain("isn&#x27;t available to your account");
+    expect(f.records).not.toHaveBeenCalled();expect(f.rebuild).not.toHaveBeenCalled();
+    f.seat.mockResolvedValue({id:WS,name:"Staffed customer",role:"admin"});
+    expect(await render({entry:"rebuild"})).toContain("Your current website");
+    expect(f.records).toHaveBeenCalledTimes(1);
+    f.seat.mockResolvedValue(null);
+    expect(await render({entry:"rebuild"})).toContain("isn&#x27;t available to your account");
+    expect(f.records).toHaveBeenCalledTimes(1);
+  });
+  it("keeps customer members read-only and refuses native website work that storage denies", async () => {
+    f.systems.mockResolvedValue(false);f.connected.mockResolvedValue(false);
+    f.workspace.mockResolvedValue([{id:WS,kind:"customer",access:"member",role:"member",name:"Business"}]);
+    const html=await render({entry:"rebuild"});
+    expect(html).toContain("You have read-only access");
+    expect(html).toContain('disabled=""');
+    const {WorkspaceAccessError}=await import("@/platform/workspaces/types");
+    f.records.mockRejectedValue(new WorkspaceAccessError());
+    const denied=await render({entry:"rebuild",workId:SYSTEM});
+    expect(denied).toContain("isn&#x27;t available to your account");
+    expect(denied).not.toContain("Build a private preview");
   });
   it("shows a retryable read failure without offering creation from a failed list", async () => {
     f.records.mockRejectedValue(new Error("Database unavailable"));

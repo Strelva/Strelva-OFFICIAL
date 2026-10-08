@@ -133,6 +133,9 @@ reset role;
 select pg_temp.ols_assert(not exists(select 1 from public.workspace_memberships where workspace_id=(select (body->>'workspaceId')::uuid from ols_state)
  and user_id in ('af020000-0000-4000-8000-000000000001','af020000-0000-4000-8000-000000000003')),'no agency business membership synthesized');
 select pg_temp.ols_assert(not exists(select 1 from public.memberships where user_id='af020000-0000-4000-8000-000000000001'),'no native tenant ownership synthesized');
-select pg_temp.ols_assert(not exists(select 1 from public.super_admins),'no platform powers used by serving actors');
+select pg_temp.ols_assert(not exists(select 1 from public.super_admins where user_id in (
+ 'af020000-0000-4000-8000-000000000001','af020000-0000-4000-8000-000000000002',
+ 'af020000-0000-4000-8000-000000000003','af020000-0000-4000-8000-000000000004')),
+ 'no platform powers used by serving actors');
 rollback;
 \echo 'Owner link seated-provider contract passed (trusted fixture recipient; no email or deployment).'

@@ -187,7 +187,10 @@ begin
 end $$;
 reset role;
 
-select pg_temp.aw_assert(not exists(select 1 from public.super_admins),'no platform operator powers used by any workflow actor');
+select pg_temp.aw_assert(not exists(select 1 from public.super_admins where user_id in (
+  'af010000-0000-4000-8000-000000000001','af010000-0000-4000-8000-000000000002',
+  'af010000-0000-4000-8000-000000000003','af010000-0000-4000-8000-000000000004')),
+  'no platform operator powers used by any workflow actor');
 select pg_temp.aw_assert(not exists(select 1 from public.workspace_memberships where workspace_id=(select (body->>'workspaceId')::uuid from aw_state)
   and user_id in ('af010000-0000-4000-8000-000000000001','af010000-0000-4000-8000-000000000003')),'agencies never become business members');
 select pg_temp.aw_assert(not exists(select 1 from public.memberships where user_id='af010000-0000-4000-8000-000000000001'),'agency never becomes native tenant owner');

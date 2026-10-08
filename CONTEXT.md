@@ -126,7 +126,7 @@ integration, adoption and economics are unproven. The branch is not deployed. Cu
 8,480 unit tests pass (42 skipped), the full workspace upgrade and native agency
 SQL job pass, and the fresh authenticated website journey passes. The broader
 flags-off app journey remains failed under current app creation authority.
-Deployment is authorized in this session and underway; no promotion is claimed.
+Deployment is authorized in this session and underway; no promotion is claimed. The minimum three-flag signed-in-owner browser journey passes; the staged artifact preserves all 60 legacy reads. Final delivery is coordinated with the Current Workspace State thread as the sole production writer. A confirmed hosted supplied-actor RPC grant gap requires an additive repair before the combined artifact can be promoted.
 Canonical model reconciliation remains pending because main revision 8 and
 integration revision 7 contain independent evidence; the handoff preserves the
 proposed delta and exact merge action without replacing the main checkout.

@@ -138,14 +138,17 @@ test("ordinary agency adds a client, gets the owner's exact approval, publishes,
     await expect(claim.getByRole("heading", { name: "Elmwood Bakery is yours.", exact: true })).toBeVisible();
     expect(sql(`select user_id || '|' || role from public.workspace_memberships where workspace_id='${businessId}'`)).toBe(`${owner.userId}|owner`);
 
-    // The confirmed owner names the trusted approval recipient. Merely naming
-    // an email while adding a client never confers owner decision authority.
-    await claim.goto(`/workspace/business-details?workspaceId=${businessId}`);
-    await claim.getByLabel("Send Strelva's emails to", { exact: true }).fill(owner.email);
-    await claim.getByRole("button", { name: "Save details", exact: true }).click();
-    await expect(claim).toHaveURL(/result=saved/);
-    expect(sql(`select public.resolve_business_owner_recipient('${businessId}')->>'email'`)).toBe(owner.email);
-    expect(sql(`select public.resolve_business_owner_recipient('${businessId}')->>'trusted'`)).toBe("true");
+    // Anonymous links additionally require a confirmed owner-named recipient.
+    // Signed-in approval uses the claimed owner's membership directly and does
+    // not require the separately gated business-details/email surface.
+    if (!minimumFlags) {
+      await claim.goto(`/workspace/business-details?workspaceId=${businessId}`);
+      await claim.getByLabel("Send Strelva's emails to", { exact: true }).fill(owner.email);
+      await claim.getByRole("button", { name: "Save details", exact: true }).click();
+      await expect(claim).toHaveURL(/result=saved/);
+      expect(sql(`select public.resolve_business_owner_recipient('${businessId}')->>'email'`)).toBe(owner.email);
+      expect(sql(`select public.resolve_business_owner_recipient('${businessId}')->>'trusted'`)).toBe("true");
+    }
 
     // An ordinary staffed seat reaches and creates the private rebuild. No
     // member row is ever added to the client for either agency identity.
@@ -220,7 +223,7 @@ test("ordinary agency adds a client, gets the owner's exact approval, publishes,
       const approvedResponse = await signedApproval;
       expect(approvedResponse.status(), await approvedResponse.text()).toBe(200);
       expect(approvedResponse.request().postDataJSON()).toMatchObject(selection(record));
-      await expect(claim.getByText("This exact preview is approved.", { exact: true })).toBeVisible();
+      await expect(claim.getByRole("status").filter({ hasText: "This exact preview is approved." })).toBeVisible();
       record = await read(agency.context.request, workId);
       expect(record.rebuild.status).toBe("approved");
       expect(sql(`select approved_by from public.website_document_heads where website_work_id='${workId}'`)).toBe(owner.userId);
