@@ -72,7 +72,7 @@ tail_started=0
 early_lead_migration="20261005090000_tenant_leads.sql"
 for migration in $(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sql' | sort); do
   migration_name="$(basename "$migration")"
-  if [[ "$migration_name" == 20261020* ]]; then continue; fi
+  if [[ "$migration_name" == 20261020* || "$migration_name" == 20261021* || "$migration_name" == 20261022* ]]; then continue; fi
   if [[ "$tail_started" -eq 0 ]]; then
     if [[ "$migration_name" != "$upgrade_migration" ]]; then
       continue
@@ -488,3 +488,12 @@ done
 source "$repo_root/scripts/sql/money-apps-contracts.sh"
 check_money_apps_contracts
 printf 'Combined money/apps contracts passed after the current security/upgrade proof.\n'
+
+# #256: pending permissions follow the complete ordered money/apps tail.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021093000_agency_release_flag_ceiling.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-release-flags-schema.sql"
+
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021094000_provider_client_queue.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021096000_agency_release_flag_lock_order.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022090000_guarded_tenant_teardown.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/guarded-tenant-teardown-schema.sql"

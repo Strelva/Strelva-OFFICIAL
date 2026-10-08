@@ -18,6 +18,7 @@ import {
 } from "./agency-home";
 import { AgencyClientList, AgencyClientsError, AgencyClientsLoading, AgencyQueueList } from "./agency/AgencyViews";
 import { AgencyAuthoring } from "./agency/AgencyAuthoring";
+import { ProviderClientQueue } from "./agency/ProviderClientQueue";
 import { AgencyTeamView } from "./agency/AgencyTeamView";
 import { AgencyLibraryView } from "./agency/AgencyLibraryView";
 import { AgencyVersionCreate } from "./agency/AgencyVersionCreate";
@@ -206,6 +207,8 @@ export function AgencyHome({
     : clients.status === "error" ? <AgencyClientsError onRetry={retry} />
     : <AgencyClientList
         clients={combined!.clients}
+        agencyWorkspaceId={snapshot.workspaceId}
+        request={request}
         total={combined!.total}
         agencyName={agencyName}
         hasMore={Boolean(combined!.nextCursor)}
@@ -306,6 +309,7 @@ export function AgencyHome({
           {clients.status === "ready" ? <button type="button" className="inline-flex min-h-11 items-center gap-2 text-[13px] text-gray-muted underline-offset-4 hover:text-warm-black hover:underline" onClick={retry}><RefreshCw size={14} aria-hidden="true" />Refresh</button> : null}
         </div>
         {queueList}
+        <ProviderClientQueue workspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} />
       </section>
       <section className="mt-12" aria-labelledby={`${id}-clients`}>
         <div className="pb-3"><h2 id={`${id}-clients`} className={sectionTitle}>Clients</h2><p className={sectionNote}>Opening a client keeps you inside the access that customer granted.</p></div>
@@ -353,6 +357,7 @@ export function AgencyHome({
     <TabsPanel id={tab("queue").panelId} tabId={tab("queue").id} active={view === "queue"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
       <p className="mb-4 text-[12px] text-gray-muted">Oldest first. Each item opens the client’s own System or work, never a copy.</p>
       {queueList}
+        <ProviderClientQueue workspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} />
       {combined?.queueGaps.length ? <div role="alert" className="mt-4 text-sm text-critical"><p>This Queue is incomplete. Some sources could not be read.</p><ul className="mt-2 list-disc pl-5">{combined.queueGaps.map(gap => <li key={gap}>{gap}</li>)}</ul></div> : null}
       <div className="mt-12 space-y-10">
         {serviceRequests}

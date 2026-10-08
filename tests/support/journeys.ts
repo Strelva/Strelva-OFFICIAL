@@ -12,6 +12,8 @@
  */
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
+import { readFileSync, realpathSync } from "node:fs";
+import { assertKnownParityTenants, assertOwnedParityRuntime, type ParityTenant } from "./journey-parity-scope";
 import { createServerClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
@@ -172,15 +174,39 @@ export function localSql<T>(sql: string, ...values: string[]): T {
 /** Simulate the historical read-cutover precondition on this disposable DB.
  * Current readers require coverage of every current tenant. Never describe
  * these backdated fixture rows as observed seven-day parity. */
-function seedSyntheticJourneyParity() {
-  localSql(`do $$ begin
-    if exists (select 1 from public.tenants where id <> 'journeys-parity' and id !~ '^j10-[a-f0-9]{8}$')
-    then raise exception 'Unexpected tenant in disposable journey parity setup'; end if;
-  end $$;
-  insert into public.tenant_client_record_parity(store, tenant_stable_id, checked_on, ok, redis_count, postgres_count, missing, mismatched)
+export function syntheticJourneyParityTenantIds(): string[] {
+  const env = localEnvironment();
+  const stackDirectory = realpathSync(process.env.STRELVA_AUTH_STACK_DIR || "");
+  assertOwnedParityRuntime({ proofMode: process.env.STRELVA_LOCAL_AUTH_PROOF, authUrl: env.url, appUrl: env.app,
+    databaseUrl: process.env.STRELVA_LOCAL_DB_URL || "", stackDirectory,
+    stackConfig: readFileSync(`${stackDirectory}/supabase/config.toml`, "utf8") });
+  const tenants = localSql<ParityTenant[]>(`select coalesce(json_agg(json_build_object('id',t.id,'stableId',t.stable_id,
+    'native',case when r.website_work_id is null or a.id is null then null else json_build_object(
+      'tenantId',r.tenant_id,'tenantStableId',r.tenant_stable_id,
+      'workspaceMatches',s.workspace_id=r.workspace_id and a.customer_workspace_id=r.workspace_id,
+      'actorMatches',r.created_by=a.added_by and agency.created_by=a.added_by,
+      'verifiedActor',u.verified_at is not null,
+      'agencyOwner',exists(select 1 from public.workspace_memberships m where m.workspace_id=a.agency_workspace_id and m.user_id=a.added_by and m.role='owner'),
+      'actorEmail',u.email,'agencyName',agency.name,'agencyKind',agency.kind,'businessName',business.name,'businessKind',business.kind,
+      'sourceKind',a.source_kind,'sourceUrl',a.source_url,'productId',s.product_id,'resourceKind',s.resource_kind) end) order by t.id),'[]'::json)
+    from public.tenants t left join public.website_hosted_tenant_reservations r on r.tenant_stable_id=t.stable_id and r.tenant_id=t.id
+    left join public.saved_product_work s on s.id=r.website_work_id
+    left join public.agency_client_additions a on a.customer_workspace_id=r.workspace_id
+    left join public.workspaces agency on agency.id=a.agency_workspace_id
+    left join public.workspaces business on business.id=a.customer_workspace_id
+    left join public.users u on u.id=a.added_by`);
+  return assertKnownParityTenants(tenants);
+}
+
+export function seedSyntheticJourneyParity() {
+  const stableIds = syntheticJourneyParityTenantIds();
+  // Insert only the exact verified fixture identities. A tenant introduced
+  // after this guard gets no synthetic coverage; the cutover then fails closed.
+  localSql(`insert into public.tenant_client_record_parity(store, tenant_stable_id, checked_on, ok, redis_count, postgres_count, missing, mismatched)
     select s.store, t.stable_id, (clock_timestamp() at time zone 'UTC')::date - d, true, 0, 0, 0, 0
     from public.tenants t cross join generate_series(0, 7) d cross join (values ('bookings'), ('tenant_leads')) s(store)
-    on conflict do nothing;`);
+    where t.stable_id in (select value::uuid from jsonb_array_elements_text(:'v1'::jsonb))
+    on conflict do nothing;`, JSON.stringify(stableIds));
 }
 
 /**

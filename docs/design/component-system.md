@@ -1028,3 +1028,14 @@ display. Native SQL rechecks current owner and immutable history independently
 of this presentation hint. The provider-change flag remains disabled by default.
 The gated local provider-change preview uses fictional transport for interface
 proof; it establishes no provider operation or hosted launch evidence.
+### Agency client capability availability (October 8 local preparation)
+
+`AgencyClientAvailability` composes the owned `SelectInput`, `TextInput` and
+`Button` inside the existing client-row disclosure. The current ceiling,
+verification requirement and System are shown before edits. Platform pause,
+withdrawn permission, absent permission and failed current-access reads stay
+visible; saves carry both revisions, retain errors, and provide an explicit
+refresh. The development-only agency-release-flags fixture covers permitted,
+empty, paused, unverified, ceiling withdrawal, conflict and read-error states.
+No atom API or accepted material/type decision changed. Source/render evidence
+is local preparation, not Jacob's visual acceptance or a deployed capability.

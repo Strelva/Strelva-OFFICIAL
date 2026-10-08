@@ -71,6 +71,7 @@ const button = (node: HTMLElement, name: string | RegExp) => [...node.querySelec
 function router(handlers: { clients?: () => Response | Promise<Response>; library?: () => Response; team?: () => Response; review?: (body: unknown) => Response }) {
   return vi.fn<typeof fetch>(async (input, init) => {
     const url = String(input);
+    if (url.startsWith("/api/workspace/provider-client-queue")) return Response.json({ agencyWorkspaceId: AGENCY, items: [], nextCursor: null });
     if (url.startsWith("/api/workspace/agency-team")) return handlers.team ? handlers.team() : Response.json(agencyTeamFixture(AGENCY));
     if (url.startsWith("/api/workspace/agency-clients")) return handlers.clients ? handlers.clients() : Response.json(page([]));
     if (url.startsWith("/api/workspace/agency-library") && (init?.method || "GET") === "POST") return handlers.review!(JSON.parse(String(init!.body)));

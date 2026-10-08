@@ -2,13 +2,14 @@ import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { expect, test } from "@playwright/test";
 import { localEnvironment, seedLocalSuperAdmin, signedInContext } from "./support/local-auth";
+import { ordinaryAgencyMaker } from "./support/ordinary-agency-maker";
 
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local Auth.");
 test.beforeAll(() => { localEnvironment(); });
 test.setTimeout(240_000);
 
 for (const width of [1440, 390]) {
- test(`fresh business, native work, and agency delivery retain one owner at ${width}px`, async ({browser}, testInfo) => {
+ test(`fresh business, agency-built native work, and delivery retain one owner at ${width}px`, async ({browser}, testInfo) => {
   const env=localEnvironment();
   const admin=createClient(env.url,env.service,{auth:{persistSession:false,autoRefreshToken:false}});
   const owner=await signedInContext(browser,admin,`launch-owner-${width}`);
@@ -18,6 +19,7 @@ for (const width of [1440, 390]) {
   page.setDefaultTimeout(30_000);
   await page.setViewportSize({width,height:900});
   let businessId="";
+  let maker: Awaited<ReturnType<typeof ordinaryAgencyMaker>> | undefined;
   const tenantId=`launch-${randomUUID().slice(0,8)}`;
   try {
     // Observe the browser command before navigation. A full-page continuation
@@ -39,23 +41,40 @@ for (const width of [1440, 390]) {
     expect(strangerWorkspace.status()).toBe(404);
     expect(await strangerWorkspace.json()).toEqual({error:"Workspace unavailable."});
 
-    // The customer creates and publishes the first app through its real UI.
-    // Do not seed the result with an API call and call that first-use proof.
-    await page.getByRole("form", { name: "Application setup" }).getByLabel("App name",{exact:true}).fill("Team requests");
-    await page.getByLabel("Field 1",{exact:true}).fill("Request");
-    const appCreation=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/bounded-work"&&r.request().method()==="POST");
-    await page.getByRole("button",{name:"Create private tool",exact:true}).click();
+    // Ordinary ownership cannot create internal tools. A separate genuine
+    // agency actor builds via the actual UI; no owner receives maker privileges.
+    const refused = await owner.context.request.post("/api/bounded-work", { headers: { origin: env.app }, data: {
+      action: "create", productId: "applications", workspaceId: businessId,
+      input: { title: "Customer cannot build", fields: [{ id: "request", label: "Request", type: "text", required: true }], components: [{ kind: "form", fields: ["request"] }] },
+    } });
+    expect(refused.status(), await refused.text()).toBe(403);
+    expect((await refused.json()).code).toBe("make_systems_required");
+    maker = await ordinaryAgencyMaker(browser, admin, owner, businessId);
+    const makerPage = await maker.context.newPage();
+    makerPage.setDefaultTimeout(30_000);
+    await makerPage.setViewportSize({ width, height: 900 });
+    await makerPage.goto(`/workspace?workspaceId=${businessId}&view=applications`);
+    await makerPage.getByRole("form", { name: "Application setup" }).getByLabel("App name",{exact:true}).fill("Team requests");
+    await makerPage.getByLabel("Field 1",{exact:true}).fill("Request");
+    const appCreation=makerPage.waitForResponse(r=>new URL(r.url()).pathname==="/api/bounded-work"&&r.request().method()==="POST");
+    await makerPage.getByRole("button",{name:"Create private tool",exact:true}).click();
     const appResponse=await appCreation;
     expect(appResponse.status(),await appResponse.text()).toBe(201);
     const app=await appResponse.json();
-    await expect(page.getByRole("heading",{name:"Team requests",exact:true,level:1})).toBeVisible();
-    await page.getByRole("button",{name:"Review and publish",exact:true}).click();
-    await page.getByRole("button",{name:"Check proposed change",exact:true}).click();
-    await expect(page.getByRole("button",{name:"Publish",exact:true})).toBeEnabled();
-    await page.getByRole("button",{name:"Publish",exact:true}).click();
-    await expect(page.getByText(/Version 1 is live/)).toBeVisible();
-    await page.reload();
-    await expect(page.getByRole("heading",{name:"Team requests",exact:true,level:1})).toBeVisible();
+    await expect(makerPage.getByRole("heading",{name:"Team requests",exact:true,level:1})).toBeVisible();
+    await makerPage.getByRole("button",{name:"Review and publish",exact:true}).click();
+    await makerPage.getByRole("button",{name:"Check proposed change",exact:true}).click();
+    await expect(makerPage.getByRole("button",{name:"Publish",exact:true})).toBeEnabled();
+    await makerPage.getByRole("button",{name:"Publish",exact:true}).click();
+    await expect(makerPage.getByText(/Version 1 is live/)).toBeVisible();
+    await makerPage.reload();
+    await expect(makerPage.getByRole("heading",{name:"Team requests",exact:true,level:1})).toBeVisible();
+    await expect(makerPage.getByText(/Version 1 is live/)).toBeVisible();
+
+    await makerPage.close();
+    // Continue as the original customer, who operates the agency-built app.
+    await page.goto(`/workspace?workspaceId=${businessId}&work=${app.id}`);
+    await expect(page.getByRole("heading", { name: "Team requests", exact: true, level: 1 })).toBeVisible();
     await expect(page.getByText(/Version 1 is live/)).toBeVisible();
 
     await page.goto(`/workspace?workspaceId=${businessId}&view=help`);
@@ -67,7 +86,7 @@ for (const width of [1440, 390]) {
     let item=(await requested.json()).request;
     expect(item.businessId).toBe(businessId);expect(item.deliveryCommitment).toBeNull();
     const requestId=item.id;
-    const deliveryCard=page.getByRole("region",{name:"Needs you",exact:true})
+    const deliveryCard=page.getByRole("region",{name:/^Needs you/})
       .locator(`a[href="/workspace/delivery/${requestId}"]`);
 
     // Synthetic local operator identity only. No production grants or bypass.
@@ -84,7 +103,7 @@ for (const width of [1440, 390]) {
     await operatorPage.getByRole("button",{name:"Propose 24-hour delivery",exact:true}).click();
     await expect(operatorPage.getByText("Scope and terms need your acceptance",{exact:true})).toBeVisible();
     await page.goto(`/workspace?workspaceId=${businessId}`);
-    await expect(page.getByRole("heading",{name:"Needs you",exact:true})).toBeVisible();
+    await expect(page.getByRole("heading",{name:/^Needs you/})).toBeVisible();
     await expect(deliveryCard).toBeVisible();
     await page.goto(`/workspace/delivery/${requestId}`);
     await expect(page.getByRole("button",{name:"Propose 24-hour delivery",exact:true})).toHaveCount(0);
@@ -133,7 +152,7 @@ for (const width of [1440, 390]) {
     await page.screenshot({path:testInfo.outputPath(`delivery-${width}.png`),fullPage:true});
     await page.goto(`/workspace?workspaceId=${businessId}`);
     // Accepted work leaves "Needs you" and is listed as done under "Strelva handled".
-    const handledCard=page.getByRole("region",{name:"Strelva handled",exact:true})
+    const handledCard=page.getByRole("region",{name:/^Strelva handled/})
       .locator(`a[href="/workspace/delivery/${requestId}"]`);
     await expect(handledCard.getByText(/^Done/)).toBeVisible();
     await expect(deliveryCard).toHaveCount(0);
@@ -145,6 +164,7 @@ for (const width of [1440, 390]) {
     await operatorPage.close();
   } finally {
     await page.close();
+    await maker?.context.close();
     if(businessId) await admin.from("workspaces").delete().eq("id",businessId);
     await admin.from("tenants").delete().eq("id",tenantId);
     for(const identity of [owner,operator,stranger]) {await identity.context.close();await admin.auth.admin.deleteUser(identity.userId).catch(()=>{});}

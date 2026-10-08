@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ResponsibilityProof } from "@/experience/operations/ResponsibilityProof";
+import { AgencyClientAvailability } from "./AgencyClientAvailability";
 import { ArrowRight, CircleAlert, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { SkeletonLine } from "@/components/ui/Skeleton";
@@ -51,6 +52,8 @@ export function AgencyClientList({
   onOpen,
   onRetryPage,
   onMore,
+  agencyWorkspaceId,
+  request,
 }: {
   clients: ClientRow[];
   total: number;
@@ -63,6 +66,8 @@ export function AgencyClientList({
   onOpen: (workspaceId: string) => void;
   onRetryPage: (pageIndex: number) => void;
   onMore: () => void;
+  agencyWorkspaceId?: string;
+  request?: typeof fetch;
 }) {
   if (!clients.length) {
     return <p className="border-y border-gray-border py-5 text-[13px] leading-relaxed text-gray-muted">No client businesses yet. A business appears here once it shares work with {agencyName}.</p>;
@@ -74,7 +79,7 @@ export function AgencyClientList({
             <p className="flex items-center gap-2 text-[13px] text-warm-black"><CircleAlert className="shrink-0 text-warning" size={16} aria-hidden="true" />{client.name} could not be loaded.</p>
             <Button variant="ghost" size="sm" loading={retrying.has(client.pageIndex)} onClick={() => onRetryPage(client.pageIndex)} aria-label={`Retry loading ${client.name}`}>Retry</Button>
           </li>
-        : <li key={client.workspaceId} className={row}><ClientRowButton client={client} agencyName={agencyName} now={now} onOpen={onOpen} />{client.agentBookings ? <a href={`/workspace/bookings?${new URLSearchParams({ workspaceId: client.workspaceId, view: "week", source: "agent" })}`} className="mx-2 mb-3 inline-flex min-h-11 items-center text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2">Booked through agents · {client.name}</a> : null}{client.provider ? <ClientResponsibilityProof workspaceId={client.workspaceId} /> : null}</li>)}
+        : <li key={client.workspaceId} className={row}><ClientRowButton client={client} agencyName={agencyName} now={now} onOpen={onOpen} />{client.agentBookings ? <a href={`/workspace/bookings?${new URLSearchParams({ workspaceId: client.workspaceId, view: "week", source: "agent" })}`} className="mx-2 mb-3 inline-flex min-h-11 items-center text-sm underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2">Booked through agents · {client.name}</a> : null}{client.provider ? <><ClientResponsibilityProof workspaceId={client.workspaceId} />{agencyWorkspaceId ? <AgencyClientAvailability agencyWorkspaceId={agencyWorkspaceId} workspaceId={client.workspaceId} request={request} /> : null}</> : null}</li>)}
     </ul>
     <div className="flex flex-wrap items-center justify-between gap-3 pt-4">
       <p className={meta} aria-live="polite">{clients.length < total ? `Showing ${clients.length} of ${total} clients` : `${total} ${total === 1 ? "client" : "clients"}`}</p>

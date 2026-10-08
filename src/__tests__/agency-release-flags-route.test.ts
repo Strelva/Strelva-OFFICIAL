@@ -1,0 +1,20 @@
+import { beforeEach, expect, it, vi } from "vitest";
+const m=vi.hoisted(()=>({ actor:vi.fn(),operator:vi.fn(),released:vi.fn(()=>true),read:vi.fn(),set:vi.fn(),ceiling:vi.fn(),readOperator:vi.fn() }));
+vi.mock("@/platform/workspace-release",()=>({workspaceReleaseEnabled:m.released}));
+vi.mock("@/platform/infra/auth",()=>({getAuthenticatedOperatorContext:m.operator}));
+vi.mock("@/platform/workspaces/http",async()=>({...await vi.importActual<typeof import("@/platform/workspaces/http")>("@/platform/workspaces/http"),workspaceHttpActor:m.actor}));
+vi.mock("@/platform/release-flags/agency",async()=>({...await vi.importActual<typeof import("@/platform/release-flags/agency")>("@/platform/release-flags/agency"),readAgencyReleaseFlags:m.read,setAgencyReleaseFlag:m.set,setAgencyReleaseFlagCeiling:m.ceiling,readOperatorAgencyReleaseFlags:m.readOperator}));
+import { GET, POST } from "@/app/api/workspace/agency-release-flags/route";
+import { POST as ceilingPost } from "@/app/api/admin/workspaces/[id]/agency-release-flags/route";
+import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";
+const actor={userId:"25600000-0000-4000-8000-000000000003",verifiedEmail:"staff@example.test"};
+const scope={workspaceId:"25600000-0000-4000-8000-000000000010",agencyWorkspaceId:"25600000-0000-4000-8000-000000000020"};
+const body={...scope,flag:"systems",state:"operators",expectedRevision:2,ceilingRevision:3,reason:"Client review"};
+const url="http://localhost:3000/api/workspace/agency-release-flags";
+function req(value:unknown,origin="http://localhost:3000"){return new Request(url,{method:"POST",headers:{origin,"content-type":"application/json"},body:JSON.stringify(value)});}
+beforeEach(()=>{vi.clearAllMocks();m.released.mockReturnValue(true);m.actor.mockResolvedValue(actor);m.operator.mockResolvedValue({actor});m.read.mockResolvedValue({...scope,flags:[]});m.set.mockResolvedValue({...scope,flags:[]});});
+it("requires release and verified session before any client read",async()=>{m.released.mockReturnValue(false);expect((await GET(new Request(url))).status).toBe(503);m.released.mockReturnValue(true);m.actor.mockResolvedValue(null);expect((await GET(new Request(url))).status).toBe(401);expect(m.read).not.toHaveBeenCalled();});
+it("passes only the session actor and exact scope to the native reader",async()=>{const response=await GET(new Request(`${url}?${new URLSearchParams(scope)}`));expect(response.status).toBe(200);expect(response.headers.get("cache-control")).toBe("private, no-store");expect(m.read).toHaveBeenCalledWith(actor,scope);});
+it("rejects cross origin and actor injection",async()=>{expect((await POST(req(body,"https://untrusted.example"))).status).toBe(403);expect((await POST(req({...body,actorId:"other"}))).status).toBe(400);expect(m.set).not.toHaveBeenCalled();});
+it("does not swallow revocation or ceiling revision conflict",async()=>{m.set.mockRejectedValue(new WorkspaceAccessError());expect((await POST(req(body))).status).toBe(403);m.set.mockRejectedValue(new WorkspaceConflictError("Ceiling changed"));expect((await POST(req(body))).status).toBe(409);});
+it("operators alone set the explicit ceiling and URL scope must match",async()=>{const value={...scope,flag:"systems",systemId:"25600000-0000-4000-8000-000000000040",verificationEffect:"publish",maxState:"operators",expectedRevision:0,reason:"Platform review"};m.operator.mockResolvedValue(null);expect((await ceilingPost(req(value),{params:Promise.resolve({id:scope.workspaceId})})).status).toBe(403);m.operator.mockResolvedValue({actor});expect((await ceilingPost(req(value),{params:Promise.resolve({id:scope.agencyWorkspaceId})})).status).toBe(400);expect(m.ceiling).not.toHaveBeenCalled();});

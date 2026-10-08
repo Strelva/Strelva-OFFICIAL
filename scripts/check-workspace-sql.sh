@@ -1607,3 +1607,28 @@ done
 source "$repo_root/scripts/sql/money-apps-contracts.sh"
 check_money_apps_contracts
 printf 'Combined money/apps contracts passed after the current security/upgrade proof.\n'
+
+# #256: explicit, scoped agency release permission on the final current schema.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021093000_agency_release_flag_ceiling.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-release-flags-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261021093000_agency_release_flag_ceiling.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021093000_agency_release_flag_ceiling.sql"
+psql "${psql_args[@]}" --set=keep_fixture=true --file="$repo_root/tests/agency-release-flags-schema.sql"
+psql "${psql_args[@]}" --command="begin read only; set local role service_role; select public.read_agency_release_flags('25600000-0000-4000-8000-000000000020','25600000-0000-4000-8000-000000000010','25600000-0000-4000-8000-000000000003','flags-agency@example.test'); rollback;"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261021093000_agency_release_flag_ceiling.sql" >"$cluster_root/agency-flags-rollback.log" 2>&1; then
+  printf 'Agency flag rollback discarded retained permissions/history.\n' >&2; exit 1
+fi
+rg -q 'agency_release_flag_rollback_requires_data_preservation' "$cluster_root/agency-flags-rollback.log"
+# #257: keep the projection in the composed schema. Its native authority,
+# rollback and race fixtures run on a fresh ordered schema: the money tests
+# above commit a global fictional notice policy, which correctly prevents
+# direct provider removal. Keep that policy and its refusal proof intact.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021094000_provider_client_queue.sql"
+bash "$repo_root/scripts/check-provider-client-queue-sql.sh"
+
+
+# Composed flag lock correction follows its exact #256 predecessor.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021096000_agency_release_flag_lock_order.sql"
+# Saved-main guarded teardown composes final export/retention owners.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022090000_guarded_tenant_teardown.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/guarded-tenant-teardown-schema.sql"

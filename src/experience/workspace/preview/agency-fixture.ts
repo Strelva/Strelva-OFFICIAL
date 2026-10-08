@@ -17,7 +17,7 @@ import { withAgencyTeamPreview } from "./agency-team-fixture";
  */
 import type { AgencyBulkReviewResult, AgencyClientRow, AgencyClientsPage, AgencyLibrary, AgencyQueueItem, AgencyTeamMember } from "../agency-clients";
 
-export const AGENCY_PREVIEW_STATES = ["full", "many", "loading", "empty", "error", "delegated", "library-empty", "library-error"] as const;
+export const AGENCY_PREVIEW_STATES = ["full", "many", "loading", "empty", "error", "delegated", "library-empty", "library-error", "queue-permission"] as const;
 export type AgencyPreviewState = typeof AGENCY_PREVIEW_STATES[number];
 export function agencyPreviewState(value: string | null | undefined): AgencyPreviewState {
   return AGENCY_PREVIEW_STATES.includes(value as AgencyPreviewState) ? value as AgencyPreviewState : "full";
@@ -177,6 +177,19 @@ export function withAgencyPreview(base: typeof fetch, scenario: string, state: A
     const url = new URL(raw, "http://preview.invalid");
     const method = init?.method || "GET";
     const agencyWorkspaceId = url.searchParams.get("workspaceId") || "";
+
+    if (url.pathname === "/api/workspace/provider-client-queue" && method === "GET") {
+      if (state === "loading") return new Promise<Response>(() => undefined);
+      if (state === "error") return json({ error: "Delivery checks could not be loaded." }, 503);
+      if (state === "queue-permission") return json({ error: "Your agency membership changed." }, 403);
+      const cursor = url.searchParams.get("cursor");
+      const rows = state === "empty" ? [] : cursor ? [{ key: `outside:${hex("d7000000", 4)}`, workspaceId: MOONEY, workspaceName: "The Mooney Firm", systemId: null, kind: "readback", title: "Website change", status: "differs", openedAt: at(0, now) }] : [
+        { key: `listing:${hex("d7000000", 1)}`, workspaceId: TWIN_TREES, workspaceName: "Twin Trees", systemId: null, kind: "readback", title: "Google listing change", status: "failed", openedAt: at(4, now) },
+        { key: `website:${hex("d7000000", 2)}`, workspaceId: MOONEY, workspaceName: "The Mooney Firm", systemId: systemId(2, 1), kind: "readback", title: "Website deployment", status: "not_confirmed", openedAt: at(3, now) },
+        { key: `decision:${hex("d7000000", 3)}`, workspaceId: ELMWOOD, workspaceName: "Elmwood Physical Therapy", systemId: null, kind: "owner_not_told", title: "Review the revised website hours before publishing", status: "bounced", openedAt: at(2, now) },
+      ];
+      return json({ agencyWorkspaceId, items: rows, nextCursor: !cursor && rows.length ? { at: rows[rows.length - 1]!.openedAt, key: rows[rows.length - 1]!.key } : null });
+    }
 
     if (url.pathname === "/api/workspace/agency-clients" && method === "GET") {
       if (state === "loading") await new Promise((resolve) => setTimeout(resolve, 600_000));

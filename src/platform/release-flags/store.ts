@@ -84,6 +84,11 @@ export class ReleaseFlagValidationError extends Error {
 }
 
 const VALIDATION: Record<string, string> = {
+  agency_release_flag_not_permitted: "The platform has not permitted your agency to change this capability for this business.",
+  agency_release_flag_above_ceiling: "This change exceeds the platform's current permission. Nothing changed.",
+  agency_release_flag_unverified: "Your agency is not currently verified for the required effect. Nothing changed.",
+  agency_release_flag_system_mismatch: "This capability requires a different kind of System.",
+  agency_release_flag_operator_only: "This owner-consent policy remains controlled by a platform operator.",
   workspace_release_flag_unknown: "That is not a release flag.",
   workspace_release_state_invalid: "Choose off, operators, on or unset.",
   workspace_release_reason_required: "Give a reason of 3 to 500 characters.",

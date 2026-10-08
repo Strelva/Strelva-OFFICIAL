@@ -11,6 +11,8 @@ const core = [
 // pnpm check:journeys: the 1.0 journeys with flags on, then today's journeys and the dark 1.0 surfaces with flags off.
 const profiles = {
   core,
+  "neutral-on": [["agency-neutral-authenticated-local.spec.ts", 1]],
+  "neutral-off": [["agency-neutral-authenticated-local.spec.ts", 1]],
   marketing: [["marketing-launch-authenticated-local.spec.ts", 6]],
   "journeys-on": [
     ["owner-journey-1-0-authenticated-local.spec.ts", 2],
@@ -20,9 +22,11 @@ const profiles = {
     ["email-only-owner-authenticated-local.spec.ts", 2],
     ["versions-authenticated-local.spec.ts", 1],
     ["inquiries-1-0-authenticated-local.spec.ts", 1],
+    ["agency-neutral-authenticated-local.spec.ts", 1],
   ],
   "journeys-off": [
     ["release-1-0-flags-off-authenticated-local.spec.ts", 1],
+    ["agency-neutral-authenticated-local.spec.ts", 1],
     ["launch-business-authenticated-local.spec.ts", 2],
     ["application-use-authenticated-local.spec.ts", 3],
     ["onboarding-authenticated-local.spec.ts", 1],

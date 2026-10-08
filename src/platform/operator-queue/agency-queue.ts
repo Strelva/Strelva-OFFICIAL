@@ -9,7 +9,8 @@ import { groupByBusiness } from "./project";
  *
  * Never shown to an agency: Strelva's own sales leads, items with no
  * business, and kinds that expose Strelva-internal state (receipts' read-back
- * ledger, the lead copy).
+ * ledger, the lead copy). Provider-visible receipt checks and owner delivery
+ * use the separate current-seat/staff scoped provider-client-queue read.
  */
 const STRELVA_ONLY: ReadonlySet<QueueKind> = new Set(["prospect_lead", "readback_failed", "lead_unkept", "ops_alert"]);
 

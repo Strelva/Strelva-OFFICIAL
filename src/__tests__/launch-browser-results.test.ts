@@ -13,6 +13,8 @@ const core = [
 ] as const;
 const profiles = {
   core,
+  "neutral-on": [["agency-neutral-authenticated-local.spec.ts", 1]],
+  "neutral-off": [["agency-neutral-authenticated-local.spec.ts", 1]],
   marketing: [["marketing-launch-authenticated-local.spec.ts", 6]],
   "journeys-on": [
     ["owner-journey-1-0-authenticated-local.spec.ts", 2],
@@ -22,9 +24,11 @@ const profiles = {
     ["email-only-owner-authenticated-local.spec.ts", 2],
     ["versions-authenticated-local.spec.ts", 1],
     ["inquiries-1-0-authenticated-local.spec.ts", 1],
+    ["agency-neutral-authenticated-local.spec.ts", 1],
   ],
   "journeys-off": [
     ["release-1-0-flags-off-authenticated-local.spec.ts", 1],
+    ["agency-neutral-authenticated-local.spec.ts", 1],
     ["launch-business-authenticated-local.spec.ts", 2],
     ["application-use-authenticated-local.spec.ts", 3],
     ["onboarding-authenticated-local.spec.ts", 1],
@@ -79,10 +83,10 @@ describe("critical browser proof gate", () => {
     const value = report("marketing"); value.suites[0]!.specs.pop();
     expect(run(value, "marketing").status).toBe(1);
   });
-  it.each(["journeys-on", "journeys-off"] as const)("accepts a complete %s run", profile => {
+  it.each(["journeys-on", "journeys-off", "neutral-on", "neutral-off"] as const)("accepts a complete %s run", profile => {
     expect(run(report(profile), profile).status).toBe(0);
   });
-  for (const profile of ["journeys-on", "journeys-off"] as const) {
+  for (const profile of ["journeys-on", "journeys-off", "neutral-on", "neutral-off"] as const) {
     it.each(profiles[profile].map(([file]) => file))(`rejects an omitted %s test in ${profile} even with green summary counts`, file => {
       const value = report(profile);
       const index = value.suites[0]!.specs.findIndex(spec => spec.file === file);

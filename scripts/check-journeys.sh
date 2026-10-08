@@ -2,6 +2,7 @@
 # The 1.0 signed-in journeys, end to end, on a disposable loopback stack.
 #
 #   pnpm check:journeys                 # fresh stack, flags-on then flags-off, stack stopped after
+#   pnpm check:journeys --neutral       # complete #317 neutral matrix only
 #   pnpm check:journeys --keep-stack    # leave the stack up and print how to reuse it
 #   pnpm check:journeys --reuse <dir>   # reuse a kept stack (its env file), stop nothing
 #   pnpm check:journeys --only on|off   # one phase only
@@ -24,9 +25,10 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 
-keep=0 reuse="" only="" fixes=0 extra=()
+keep=0 reuse="" only="" fixes=0 neutral=0 extra=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --neutral) neutral=1 ;;
     --keep-stack) keep=1 ;;
     --reuse) reuse="$2"; shift ;;
     --only) only="$2"; shift ;;
@@ -54,6 +56,7 @@ ON_SPECS=(
   tests/email-only-owner-authenticated-local.spec.ts
   tests/versions-authenticated-local.spec.ts
   tests/inquiries-1-0-authenticated-local.spec.ts
+  tests/agency-neutral-authenticated-local.spec.ts
 )
 # With every 1.0 flag off: the journeys live clients and owners use today
 # (the launch-verification CI set), plus the proof that 1.0 surfaces stay dark.
@@ -63,12 +66,18 @@ OFF_SPECS=(
   tests/application-use-authenticated-local.spec.ts
   tests/onboarding-authenticated-local.spec.ts
   tests/service-request-authenticated-local.spec.ts
+  tests/agency-neutral-authenticated-local.spec.ts
 )
-ON_FLAGS=(STRELVA_SYSTEMS_RELEASE STRELVA_NEEDS_YOU_RELEASE STRELVA_OWNER_ENTRY STRELVA_BOOKING_STORE_WRITE STRELVA_MAKE_REAL_OWNER_LINK_RELEASE STRELVA_INQUIRY_RECORDS)
+ON_FLAGS=(STRELVA_SYSTEMS_RELEASE STRELVA_NEEDS_YOU_RELEASE STRELVA_OWNER_ENTRY STRELVA_BOOKING_STORE_WRITE STRELVA_MAKE_REAL_OWNER_LINK_RELEASE STRELVA_INQUIRY_RECORDS STRELVA_AGENCY_ADD_CLIENT_RELEASE STRELVA_WEBSITE_REBUILD_RELEASE)
 # Production's data sources, and the 1.0 read and authority switches for the
 # two client stores (bookings and leads). Read switches take effect only after
 # seven clean parity days (seed_parity).
 ON_SOURCES=(CONTENT_SOURCE=postgres TENANTS_SOURCE=postgres DATA_SOURCE=postgres STRELVA_BOOKING_STORE_READ=postgres STRELVA_LEADS_READ=postgres STRELVA_LEADS_AUTHORITY=postgres)
+
+if [[ "$neutral" == 1 ]]; then
+  ON_SPECS=(tests/agency-neutral-authenticated-local.spec.ts)
+  OFF_SPECS=(tests/agency-neutral-authenticated-local.spec.ts)
+fi
 
 if [[ -n "$reuse" ]]; then
   work="$(cd "$reuse" && pwd)"
@@ -77,6 +86,7 @@ if [[ -n "$reuse" ]]; then
 else
   work="$(mktemp -d "${TMPDIR:-/tmp}/strelva-journeys.XXXXXX")"
 fi
+read -r -a supabase_cli <<< "${SUPABASE_CLI:-npx --yes supabase@2.117.0}"
 app_pid="" redis_pid=""
 stop_redis() {
   if [[ -n "$redis_pid" ]]; then
@@ -113,11 +123,11 @@ cleanup() {
   stop_app
   stop_redis
   if [[ "$keep" == 0 && -n "${STRELVA_AUTH_STACK_DIR:-}" && -f "$STRELVA_AUTH_STACK_DIR/supabase/config.toml" ]]; then
-    npx --yes supabase@2.117.0 stop --workdir "$STRELVA_AUTH_STACK_DIR" --no-backup >/dev/null 2>&1 || true
+    "${supabase_cli[@]}" stop --workdir "$STRELVA_AUTH_STACK_DIR" --no-backup >/dev/null 2>&1 || true
     echo 'Disposable stack stopped.'
   elif [[ "$keep" == 1 ]]; then
     echo "Stack kept. Rerun with: pnpm check:journeys --reuse $work"
-    echo "Stop it with: npx --yes supabase@2.117.0 stop --workdir \"\$(sed -n 's/^STRELVA_AUTH_STACK_DIR=//p' $work/env)\" --no-backup"
+    echo "Stop it with: ${supabase_cli[*]} stop --workdir \"\$(sed -n 's/^STRELVA_AUTH_STACK_DIR=//p' $work/env)\" --no-backup"
   fi
   echo "Logs and reports: $work"
   exit "$code"
@@ -128,7 +138,7 @@ if [[ -z "$reuse" ]]; then
   # A unique project id, so a parallel checkout's stack is never reused or stopped.
   env -u SUPABASE_ACCESS_TOKEN -u SUPABASE_SERVICE_ROLE_KEY -u NEXT_PUBLIC_SUPABASE_URL -u VERCEL_ENV \
     CI=true STRELVA_LOCAL_AUTH_PROOF=1 RUNNER_TEMP="$work" GITHUB_ENV="$work/env" \
-    GITHUB_RUN_ID="journeys-$(date +%s)" GITHUB_RUN_ATTEMPT="$$" SUPABASE_CLI="npx --yes supabase@2.117.0" \
+    GITHUB_RUN_ID="journeys-$(date +%s)" GITHUB_RUN_ATTEMPT="$$" SUPABASE_CLI="${SUPABASE_CLI:-npx --yes supabase@2.117.0}" \
     bash scripts/prepare-launch-auth-stack.sh
 fi
 set -a; source "$work/env"; set +a
@@ -170,25 +180,19 @@ run_phase() {
   PLAYWRIGHT_JSON_OUTPUT_FILE="$work/results-$phase.json" pnpm exec playwright test "${specs[@]}" \
     --workers=1 --retries=0 --reporter=line,json --output="test-results/journeys-$phase" ${extra[@]+"${extra[@]}"} || status=$?
   stop_app
-  node scripts/check-launch-browser-results.mjs "$work/results-$phase.json" "journeys-$phase" || status=1
+  local profile="journeys-$phase"
+  [[ "$neutral" == 0 ]] || profile="neutral-$phase"
+  node scripts/check-launch-browser-results.mjs "$work/results-$phase.json" "$profile" || status=1
   return "$status"
 }
 
 # The flags-on world is the one after the bookings move: seven clean parity days.
-# The streak is global and the app caches it for five minutes, and parity rows
-# cascade away with a test's tenant, so one fixture tenant that no spec deletes
-# holds the streak for the whole run, whatever order the specs run in.
+# Current cutover checks every tenant. All these backdated rows are synthetic
+# disposable preconditions, not evidence of observed seven-day parity.
 seed_parity() {
-  [[ "$(python3 -c 'import sys,urllib.parse;print(urllib.parse.urlparse(sys.argv[1]).hostname)' "$STRELVA_LOCAL_DB_URL")" == 127.0.0.1 ]] \
-    || { echo 'STRELVA_LOCAL_DB_URL is not the loopback stack.' >&2; return 1; }
-  psql "$STRELVA_LOCAL_DB_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
-insert into public.tenants(id, site_name, active) values ('journeys-parity', 'Journeys parity fixture', false) on conflict (id) do nothing;
-insert into public.tenant_client_record_parity(store, tenant_stable_id, checked_on, ok, redis_count, postgres_count, missing, mismatched)
-  select s.store, t.stable_id, (clock_timestamp() at time zone 'UTC')::date - d, true, 0, 0, 0, 0
-  from public.tenants t, generate_series(0, 7) d, (values ('bookings'), ('tenant_leads')) s(store)
-  where t.id = 'journeys-parity'
-  on conflict do nothing;
-SQL
+  # The same owned Auth/runtime and exact native fixture provenance guard runs
+  # before any backdated coverage. Unrelated tenants remain a hard failure.
+  pnpm exec tsx scripts/seed-journey-parity.ts
 }
 
 overall=0
