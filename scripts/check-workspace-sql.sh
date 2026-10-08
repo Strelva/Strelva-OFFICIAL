@@ -1302,3 +1302,6 @@ fi
 grep -q 'agency_brand_rollback_requires_data_preservation' "$cluster_root/brand-rollback-refusal.log"
 psql "${psql_args[@]}" -c "update public.workspaces set agency_brand=null where agency_brand is not null"
 printf 'Agency brand SQL passed: resolution, revocation, exposure, rollback/reapply and preservation.\n'
+# Agencies add clients (#259): seat not membership, isolation, limits, owner
+# claim link, and the rollback stop point, on the full ordered schema.
+bash "$repo_root/scripts/check-agency-add-client-sql.sh"
