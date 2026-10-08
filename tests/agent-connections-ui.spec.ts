@@ -52,7 +52,7 @@ for (const [mode, message] of [
   ["permission", "Only a business owner can manage assistant connections."],
   ["loading", "Loading assistant access…"],
   ["error", "Assistant access could not be loaded."],
-]) {
+] as const) {
   test(`assistant ${mode} state`, async ({ page }) => {
     await page.goto(`${preview}?connections=${mode}`);
     await expect(page.getByText(message, { exact: false })).toBeVisible();
