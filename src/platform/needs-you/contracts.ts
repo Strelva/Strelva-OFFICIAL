@@ -168,6 +168,7 @@ export const SOURCE_LIFECYCLES = [
   "inquiry_fact",
   "business_record_draft",
   "business_facts",
+  "business_payment",
 ] as const;
 export type SourceLifecycle = (typeof SOURCE_LIFECYCLES)[number];
 

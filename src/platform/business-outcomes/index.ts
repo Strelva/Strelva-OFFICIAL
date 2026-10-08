@@ -20,6 +20,7 @@ export interface BusinessOutcomeMonth {
   bookings: OutcomeFigure & { native: number; legacy: number | null };
   bookingsFromInquiry: OutcomeFigure & { joins: string[] };
   reviews: OutcomeFigure;
+  payments?: {quotesPaid:number;depositsPaid:number;bookedFromPaidDeposit:number};
 }
 
 export type OutcomeRpc = (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message?: string } | null }>;
@@ -30,7 +31,7 @@ export class BusinessOutcomeError extends Error {
 
 export async function readBusinessOutcomeMonth(actor: WorkspaceActor, workspaceId: string, month: string, rpc: OutcomeRpc): Promise<BusinessOutcomeMonth> {
   if (!/^\d{4}-\d{2}$/.test(month)) throw new BusinessOutcomeError("invalid");
-  const { data, error } = await rpc(process.env.STRELVA_INQUIRY_OUTCOMES === "1" ? "business_outcome_month_inquiries" : "business_outcome_month", { p_workspace_id: workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail, p_month: `${month}-01` });
+  const { data, error } = await rpc(process.env.STRELVA_CONNECT === "1" ? "business_payment_outcome_month" : process.env.STRELVA_INQUIRY_OUTCOMES === "1" ? "business_outcome_month_inquiries" : "business_outcome_month", { p_workspace_id: workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail, p_month: `${month}-01`, ...(process.env.STRELVA_CONNECT === "1" ? {p_include_inquiries:process.env.STRELVA_INQUIRY_OUTCOMES === "1"} : {}) });
   if (error) throw new BusinessOutcomeError(error.message?.includes("business_outcome_denied") ? "denied" : error.message?.includes("invalid") ? "invalid" : "unavailable");
   return data as BusinessOutcomeMonth;
 }
@@ -87,6 +88,10 @@ export function formatOutcomeLine(outcome: BusinessOutcomeMonth): OutcomeLine {
     sentences.push(`${booking}.`);
   } else {
     sentences.push(outcome.bookings.reason ? `Bookings unavailable: ${outcome.bookings.reason}` : "Bookings unavailable.");
+  }
+  if (outcome.payments) {
+    sentences.push(`${plural(outcome.payments.quotesPaid, "quote paid", "quotes paid")}; ${plural(outcome.payments.bookedFromPaidDeposit, "booking linked to a paid deposit", "bookings linked to paid deposits")}.`);
+    figures.push({label:"quotes paid",value:outcome.payments.quotesPaid,kind:"linked"},{label:"bookings linked to paid deposits",value:outcome.payments.bookedFromPaidDeposit,kind:"linked"});
   }
   if (outcome.reviews.value !== null) {
     sentences.push(`${plural(outcome.reviews.value, "new review", "new reviews")}.`);

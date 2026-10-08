@@ -181,6 +181,13 @@ SQL
     printf 'Valid index retry passed; incompatible index was rejected.\n'
   fi
 done
+# Focused money contracts use the exact complete upgrade path before historical tests.
+if [[ "${STRELVA_CONNECT_SQL_ONLY:-0}" == "1" ]]; then
+  psql "${psql_args[@]}" --file="$repo_root/tests/connect-money-schema.sql"
+  printf 'Connect money contracts passed against the complete historical upgrade.\n'
+  exit 0
+fi
+
 
 if [[ "$tail_started" -ne 1 ]]; then
   printf 'Workspace/recovery migration boundary was not found.\n' >&2

@@ -1,3 +1,4 @@
+import { ingestRevenueEvent } from "@/platform/connect/revenue";
 import { releasedOwnerNoticeEmail } from "@/lib/owner-recipient";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
@@ -530,6 +531,7 @@ export async function POST(req: Request) {
   const tenantId = extractTenantId(event.data.object);
 
   try {
+    await ingestRevenueEvent(event, {stripe});
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
