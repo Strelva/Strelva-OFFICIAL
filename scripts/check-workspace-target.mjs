@@ -176,6 +176,8 @@ export function readCandidateMigrations(directory) {
     "rollback-20261009131000_make_real_owner_link.sql",
     "rollback-20261009140000_make_real_owner_link_flag.sql",
     "rollback-20261011120000_business_policies.sql",
+    "rollback-20261014100000_client_resource_mandates.sql",
+    "rollback-20261014101000_acting_provider_gates.sql",
     "rollback-20261011101000_business_booking_email.sql",
     "rollback-business-effort-coverage.sql",
     "rollback-catalog-report-receipts.sql",

@@ -258,5 +258,9 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011102000_nat
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011101000_business_booking_email.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/native-publishing-targets-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/business-booking-email-schema.sql"
+# 20261014100000-20261014101000 (#255/#534) replace every client-serving
+# super_admins gate with the acting provider; the effect matrix holds after
+# the full ordered upgrade, and the replaced contracts above ran against it.
+psql "${psql_args[@]}" --file="$repo_root/tests/acting-provider-gates-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
