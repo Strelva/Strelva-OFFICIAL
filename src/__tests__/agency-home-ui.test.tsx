@@ -6,6 +6,7 @@ import { AgencyHome } from "@/experience/workspace/AgencyHome";
 import { WorkspaceRequestContext } from "@/experience/workspace/WorkspaceRequest";
 import type { AgencyClientRow, AgencyClientsPage, AgencyLibrary } from "@/experience/workspace/agency-clients";
 import type { WorkspaceSnapshot } from "@/experience/workspace/contracts";
+import { agencyTeamFixture } from "@/experience/workspace/preview/agency-team-fixture";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => undefined, replace: () => undefined, refresh: () => undefined }), usePathname: () => "/workspace", useSearchParams: () => new URLSearchParams() }));
 
@@ -67,9 +68,10 @@ async function settle() { await act(async () => { await new Promise((resolve) =>
 const clientCalls = (request: ReturnType<typeof vi.fn>) => request.mock.calls.filter(([input]) => String(input).startsWith("/api/workspace/agency-clients"));
 const button = (node: HTMLElement, name: string | RegExp) => [...node.querySelectorAll("button")].find((item) => typeof name === "string" ? item.textContent?.trim() === name || item.getAttribute("aria-label") === name : name.test(item.textContent || ""))!;
 
-function router(handlers: { clients?: () => Response | Promise<Response>; library?: () => Response; review?: (body: unknown) => Response }) {
+function router(handlers: { clients?: () => Response | Promise<Response>; library?: () => Response; team?: () => Response; review?: (body: unknown) => Response }) {
   return vi.fn<typeof fetch>(async (input, init) => {
     const url = String(input);
+    if (url.startsWith("/api/workspace/agency-team")) return handlers.team ? handlers.team() : Response.json(agencyTeamFixture(AGENCY));
     if (url.startsWith("/api/workspace/agency-clients")) return handlers.clients ? handlers.clients() : Response.json(page([]));
     if (url.startsWith("/api/workspace/agency-library") && (init?.method || "GET") === "POST") return handlers.review!(JSON.parse(String(init!.body)));
     if (url.startsWith("/api/workspace/agency-library")) return handlers.library ? handlers.library() : Response.json({ agencyWorkspaceId: AGENCY, sources: [] });
@@ -90,6 +92,15 @@ describe("agency home on the batched read", () => {
     expect(node.textContent).toContain("Owner email bounced: new booking flow");
     expect(node.querySelector('[role="alert"]')?.textContent).toContain("This Queue is incomplete");
     expect(node.querySelector('[role="alert"]')?.textContent).toContain("Owner approvals: unavailable");
+  });
+  it("opens Team independently of failed client overview reads and loads it only on demand", async () => {
+    const request = router({ clients: () => Response.json({ error: "Unavailable" }, { status: 503 }) });
+    const { node } = await render(request);
+    expect(request.mock.calls.some(([url]) => String(url).includes("agency-team"))).toBe(false);
+    await act(async () => { button(node, "Team").click(); });
+    expect(node.textContent).toContain("sam@agency.example.test");
+    expect(node.textContent).toContain("Create invitation");
+    expect(request.mock.calls.filter(([url]) => String(url).includes("agency-team"))).toHaveLength(1);
   });
   it("loads 50 clients with one request and renders every row", async () => {
     const request = router({ clients: () => Response.json(page(Array.from({ length: 50 }, (_, index) => row(index + 1)))) });

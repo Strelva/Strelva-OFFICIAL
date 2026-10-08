@@ -16,8 +16,9 @@ import {
   type AgencyCreditPeriod,
   type AgencyLoadedPage,
 } from "./agency-home";
-import { AgencyClientList, AgencyClientsError, AgencyClientsLoading, AgencyQueueList, AgencyTeamList } from "./agency/AgencyViews";
+import { AgencyClientList, AgencyClientsError, AgencyClientsLoading, AgencyQueueList } from "./agency/AgencyViews";
 import { AgencyAuthoring } from "./agency/AgencyAuthoring";
+import { AgencyTeamView } from "./agency/AgencyTeamView";
 import { AgencyLibraryView } from "./agency/AgencyLibraryView";
 import { AgencyVersionCreate } from "./agency/AgencyVersionCreate";
 
@@ -364,7 +365,7 @@ export function AgencyHome({
     </TabsPanel>
 
     <TabsPanel id={tab("team").panelId} tabId={tab("team").id} active={view === "team"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
-      {clients.status === "loading" ? <AgencyClientsLoading /> : clients.status === "error" ? <AgencyClientsError onRetry={retry} /> : <AgencyTeamList members={combined!.team} partial={Boolean(combined!.nextCursor)} />}
+      {view === "team" ? <AgencyTeamView key={snapshot.workspaceId} workspaceId={snapshot.workspaceId} /> : null}
       {accessNote}
     </TabsPanel>
 
