@@ -26,6 +26,21 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261014110000_own
 for fixture in owner-decision-links-schema owner-decision-effects-schema; do
  psql "${psql_args[@]}" --file="$repo_root/tests/$fixture.sql"
 done
+# An admission transaction holds ROW EXCLUSIVE when inserting its binding.
+# Rollback must wait for it before checking emptiness, with a bounded timeout.
+PGAPPNAME=strelva-owner-rollback-admission psql "${psql_args[@]}" -c 'begin; lock table public.owner_decision_link_sessions in row exclusive mode; select pg_sleep(4); rollback;' >"$cluster_root/rollback-holder.log" 2>&1 &
+rollback_holder_pid=$!
+ready=0
+for attempt in $(seq 1 80); do
+ if [[ "$(psql "${psql_args[@]}" -Atc "select exists(select 1 from pg_stat_activity where application_name='strelva-owner-rollback-admission' and wait_event='PgSleep')")" == t ]]; then ready=1; break; fi
+ sleep 0.025
+done
+[[ "$ready" == 1 ]] || { echo 'Rollback admission holder did not acquire table authority.' >&2; exit 1; }
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261014110000_owner_decision_effects.sql" >"$cluster_root/rollback-contention.log" 2>&1; then
+ echo 'Owner rollback did not serialize a concurrent session insert.' >&2; exit 1
+fi
+rg -q 'lock timeout' "$cluster_root/rollback-contention.log"
+wait "$rollback_holder_pid"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261014110000_owner_decision_effects.sql"
 psql "${psql_args[@]}" -At --file="$repo_root/tests/support/public-catalog-fingerprint.sql" >"$cluster_root/catalog-after-effects-rollback.txt"
 diff -u "$cluster_root/catalog-before-effects.txt" "$cluster_root/catalog-after-effects-rollback.txt"

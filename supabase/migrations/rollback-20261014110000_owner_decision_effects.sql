@@ -1,5 +1,9 @@
 -- Restore the previous owner-link implementation before adoption.
 begin;
+set local lock_timeout = '3s';
+set local statement_timeout = '120s';
+-- Pre-adoption only: serialize concurrent admission before inspecting sessions.
+lock table public.owner_decision_link_sessions in access exclusive mode;
 do $$ begin
   if exists(select 1 from public.owner_decision_link_sessions) then
     raise exception 'owner_decision_effects_rollback_requires_data_preservation';

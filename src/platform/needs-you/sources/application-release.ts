@@ -137,7 +137,8 @@ export function applicationReleaseAdapter(ports: ApplicationReleasePorts): Sourc
   return {
     lifecycle: "application_release",
     needsMemberActor: true,
-    ownerLinkWithoutAccount: true,
+    ownerLinkWithoutAccount: false,
+    ownerLinkApprovalRequiresSignIn: true,
     async propose(ctx) {
       if (!ctx.actor) return { items: [], complete: false };
       const items: ProposedItem[] = [];
@@ -159,6 +160,9 @@ export function applicationReleaseAdapter(ports: ApplicationReleasePorts): Sourc
     async resolve(ctx, item, decision, by) {
       if (by.kind === "expiry") return { outcome: "done", reason: "Expired, nothing changed" };
       if (decision === "not_yet") return { outcome: "done", reason: "Not yet" };
+      // Existing service sessions also refuse: the ordinary member mutation
+      // cannot atomically recheck the owner-link agency assignment/effect.
+      if (by.kind === "owner_link") return { outcome: "failed", reason: "sign_in_required" };
       const actor = by.actor;
       if (!actor) return { outcome: "failed", reason: "owner_not_member" };
       try {

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { serviceRequestAdapter, type SourceAdapter } from "@/platform/needs-you/adapters";
 import { createNeedsYouService } from "@/platform/needs-you/service";
+import { applicationReleaseAdapter, type NativeAppView, type CustomAppView } from "@/platform/needs-you/sources/application-release";
+import { versionReleaseAdapter } from "@/platform/needs-you/sources/version-release";
 import type { ServiceSession } from "@/platform/needs-you/service-actor";
 import { providerDeliveryAdapter } from "@/platform/needs-you/sources/provider-delivery";
 import { standingResponsibilityAdapter } from "@/platform/needs-you/sources/standing-responsibility";
@@ -136,5 +138,34 @@ describe.each(cases)("%s account-free source resolution", (_lifecycle, fixture) 
     const service = await accountFreeService(source.adapter);
     expect(await service.decide("not_yet")).toMatchObject({ status: "done", item: { state: "declined", decidedByKind: "owner_link" } });
     expect(source.write).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("release adapters with a formerly admitted owner-link session", () => {
+  it.each(["native", "custom", "version"] as const)("%s refuses when authority changes after run admission", async kind => {
+    const native: NativeAppView = { id: WORK, workspaceId: WS, title: "Intake", candidate: {
+      designRevision: 1, specVersion: 1, spec: {}, rehearsal: { specVersion: 1, checks: [{ passed: true }] },
+    }, release: null };
+    const custom: CustomAppView = { workId: WORK, workspaceId: WS, title: "Intake", status: "draft", candidate: {
+      revision: 1, version: 1, artifact: { artifactDigest: "a".repeat(64), review: { artifactDigest: "a".repeat(64) } },
+    }, currentReleaseVersion: null, releases: [] };
+    const write = vi.fn();
+    const actual = kind === "version" ? versionReleaseAdapter({ enabled: async () => true, policies: async () => [],
+      pending: async () => [{ versionId: WORK, systemId: WORK, label: "Intake", rowRevision: 1, nextRelease: 1, changedPaths: [] }],
+      read: async () => null, release: write,
+    }) : applicationReleaseAdapter({ listNative: async () => kind === "native" ? [native] : [], listCustom: async () => kind === "custom" ? [custom] : [],
+      readNative: async () => native, readCustom: async () => custom, publishNative: write, releaseCustom: write,
+    });
+    // Emulate admission before the support boundary was tightened. The actual
+    // resolver must still reject that old session after authorization returns.
+    let authorized = true;
+    const formerlyAdmitted = { ...actual, ownerLinkWithoutAccount: true, ownerLinkApprovalRequiresSignIn: false };
+    const runtime = await accountFreeService(formerlyAdmitted, () => { authorized = false; });
+    const result = await runtime.decide();
+    expect(runtime.authorize).toHaveBeenCalledOnce();
+    expect(authorized).toBe(false);
+    expect(result).toMatchObject({ status: "failed", item: { outcomeReason: "sign_in_required" } });
+    expect(write).not.toHaveBeenCalled();
   });
 });

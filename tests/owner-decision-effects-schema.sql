@@ -114,6 +114,13 @@ begin
   perform pg_temp.oe_delivered(ws,id);
   perform public.claim_owner_decision(ws,id,h,'approve','owner_link',null,null,'oe-owner@example.test');
   perform pg_temp.oe_expect(format('select public.authorize_owner_decision_link_run(%L,%L,%L,%L,%L)',ws,sid,id,h,'oe-owner@example.test'),'strelva_service_access_denied');
+  -- Releases without a session-aware atomic native write require sign-in.
+  foreach kind in array array['application_release','version_release'] loop
+    item:=public.open_owner_decision(ws,jsonb_build_object('kind','system.go_live','route','owner_decides','title','Unsupported release',
+      'approveEffect','Publishes.','notYetEffect','Nothing changes.','sourceLifecycle',kind,
+      'sourceId',case kind when 'application_release' then 'native:'||id::text else id::text end,'revisionHash',h));
+    perform pg_temp.oe_expect(format('select public.strelva_owner_decision_link_session(%L,%L,%L,%L)',ws,item->>'id',h,'oe-owner@example.test'),'strelva_service_access_denied');
+  end loop;
   -- An exact, active assignment is required. Another agency's verification
   -- cannot authorize this provider, nor can ending and granting it again
   -- resurrect a session admitted on the former relationship.

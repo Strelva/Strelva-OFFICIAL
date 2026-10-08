@@ -60,6 +60,8 @@ export interface SourceAdapter {
    * (owner-entry decision 6). Never for access, money or exit.
    */
   ownerLinkWithoutAccount?: boolean;
+  /** Approval waits for sign-in until its native write can atomically recheck a link session. */
+  ownerLinkApprovalRequiresSignIn?: boolean;
   /**
    * Link decisions only at the business's trusted owner recipient
    * (resolve_business_owner_recipient `trusted`): any other address gets no

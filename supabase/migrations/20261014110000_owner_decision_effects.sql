@@ -100,6 +100,7 @@ begin
     for share of m,u;
   if not found then return false; end if;
   if item.revision_hash is distinct from link.revision_hash or item.sign_in_required
+    or item.source_lifecycle in ('application_release','version_release')
     or item.state not in ('open','approved','declined') or item.outcome is not null
     or (item.state<>'open' and item.state is distinct from (case link.intended_decision when 'approve' then 'approved' else 'declined' end)) then return false; end if;
   effects:=public.owner_decision_execution_effects(item.change_kind,item.source_lifecycle,item.source_id);
@@ -119,6 +120,7 @@ begin
   select * into item from public.owner_decisions where workspace_id=p_workspace_id and id=p_decision_id for update;
   if p_decision is null or p_decision not in ('approve','not_yet') or not found or item.state<>'open' or item.expires_at<=clock_timestamp() or item.route<>'owner_decides'
     or item.sign_in_required or item.change_kind in ('access.grant','money','exit')
+    or item.source_lifecycle in ('application_release','version_release')
     or item.revision_hash is distinct from p_revision_hash
     or item.source_lifecycle not in ('service_request','website_document','provider_delivery','standing_responsibility',
       'work_responsibility','application_release','work_plan','version_release','business_record_draft') then

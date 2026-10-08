@@ -212,11 +212,17 @@ describe("an owner who never signs in", () => {
     const decisions = sent[0]!.options!.decisions!;
     expect(decisions).toHaveLength(WORKSPACE_SOURCES.length);
     for (const item of opened) expect(decisions.map(d => d.title)).toContain(item.title);
-    // Money and access need a sign-in; everything else carries one-tap links.
+    // Money, access and release lifecycles without atomic link gates need sign-in.
     const signIn = opened.filter(item => item.signInRequired);
     expect(signIn.map(item => item.sourceLifecycle).sort()).toEqual(["agency_grant", "work_money"]);
     for (const item of signIn) expect(decisions.find(d => d.title === item.title)).toMatchObject({ note: "This one needs you signed in. Open it to decide." });
-    expect(decisions.filter(d => d.approve).length).toBe(WORKSPACE_SOURCES.length - signIn.length);
+    expect(decisions.filter(d => d.approve).length).toBe(WORKSPACE_SOURCES.length - signIn.length - 2);
+    for (const lifecycle of ["application_release", "version_release"]) {
+      const item = [...mem.items.values()].find(row => row.sourceLifecycle === lifecycle);
+      expect(item).toBeDefined();
+      expect(decisions.find(d => d.title === item!.title)).toMatchObject({ note: "This one needs you signed in. Open it to decide." });
+      expect(decisions.find(d => d.title === item!.title)?.approve).toBeUndefined();
+    }
     // Read and open only: no resolver ran.
     for (const resolver of Object.values(src.resolvers)) expect(resolver).not.toHaveBeenCalled();
   });

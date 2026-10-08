@@ -94,7 +94,8 @@ export function versionReleaseAdapter(ports: VersionReleaseSourcePorts): SourceA
   return {
     lifecycle: "version_release",
     needsMemberActor: true,
-    ownerLinkWithoutAccount: true,
+    ownerLinkWithoutAccount: false,
+    ownerLinkApprovalRequiresSignIn: true,
     async propose(ctx) {
       if (!ctx.actor) return { items: [], complete: false };
       try {
@@ -114,6 +115,9 @@ export function versionReleaseAdapter(ports: VersionReleaseSourcePorts): SourceA
     async resolve(ctx, item, decision, by) {
       if (by.kind === "expiry") return { outcome: "done", reason: "Expired, nothing changed" };
       if (decision === "not_yet") return { outcome: "done", reason: "Not yet: nothing went live." };
+      // Existing service sessions also refuse: the ordinary member mutation
+      // cannot atomically recheck the owner-link agency assignment/effect.
+      if (by.kind === "owner_link") return { outcome: "failed", reason: "sign_in_required" };
       const actor = by.actor;
       if (!actor) return { outcome: "failed", reason: "owner_not_member" };
       const row = (await pending(actor, ctx.workspaceId).catch(() => null))?.find((entry) => entry.versionId === item.sourceId);

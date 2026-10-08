@@ -45,7 +45,12 @@ production stop points are in [the stream handoff](../streams/w6-owner-ask.md).
   never supplies the business-member identity used by this service executor.
   Existing unbound sessions fail closed. The focused local proof command is
   `PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH bash scripts/check-owner-decision-effects-sql.sh`.
-  Rollback refuses retained owner-link sessions. This is local implementation, with activation still off.
+  Application and Version release approvals require sign-in until their native
+  mutations accept and atomically recheck a bound service session; ordinary
+  authenticated releases remain available. Old owner-link sessions cannot invoke
+  those resolvers. Email points to sign-in instead of offering an unsafe approval.
+  Rollback is pre-adoption only, refuses retained owner-link sessions and takes a
+  bounded exclusive table lock before checking that none exist. This is local implementation, with activation still off.
 
 Not proven here: authenticated admin-host entry and rollback on an isolated
 Supabase Auth stack, actual mail delivery, production migrations, live

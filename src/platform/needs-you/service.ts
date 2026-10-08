@@ -186,7 +186,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     let linkService: ServiceSession | null = null;
     if (input.by.kind === "owner_link") {
       // A link never performs access, money or exit.
-      if (item.signInRequired) return { status: "sign_in", item };
+      if (item.signInRequired || (input.decision === "approve" && adapter.ownerLinkApprovalRequiresSignIn)) return { status: "sign_in", item };
       if (adapter.needsMemberActor) {
         memberActor = await deps.store.ownerActor(input.workspaceId, input.by.recipient).catch(() => null);
         // An owner with no account (owner-entry decision 6): Strelva (system)
@@ -255,7 +255,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
 
   function links(row: OwnerDecision, recipient: string): EmailDecision {
     const open = { label: "Open", url: `${deps.appOrigin.replace(/\/+$/, "")}${row.openHref ?? `/workspace?workspaceId=${encodeURIComponent(row.workspaceId)}`}` };
-    if (row.signInRequired) return { title: row.title, detail: row.detail ?? undefined, note: "This one needs you signed in. Open it to decide.", open };
+    if (row.signInRequired || adapterFor(row.sourceLifecycle)?.ownerLinkApprovalRequiresSignIn) return { title: row.title, detail: row.detail ?? undefined, note: "This one needs you signed in. Open it to decide.", open };
     const claims = (action: WorkspaceApproveLinkClaims["action"]) => ({ workspaceId: row.workspaceId, itemId: row.id, action, recipient, revision: row.revisionHash });
     return {
       title: row.title,
