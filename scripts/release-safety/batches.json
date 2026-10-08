@@ -1305,6 +1305,19 @@
           "rollback": "rollback-20261020114000_public_business_verification.sql"
         }
       ]
+    },
+    {
+      "batch": "13",
+      "status": "prepared locally; unapplied; human qualification policy remains pending",
+      "description": "Append-only source revision evidence; depends on package declarations and exposes no qualified release gate",
+      "items": [
+        {
+          "file": "20261019111000_system_revision_qualifications.sql",
+          "sha256": "b4fb95e1442eaec5d612406502a78f7aba9be856e5def87bed8995f99d299c46",
+          "rollback": "rollback-20261019111000_system_revision_qualifications.sql",
+          "rollbackSha256": "8a76eb86940a2bd387ea05948357456a9d4be8838750ac03686e1b9c897fc447"
+        }
+      ]
     }
   ]
 }
