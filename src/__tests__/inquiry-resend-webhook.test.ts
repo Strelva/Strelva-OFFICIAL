@@ -24,7 +24,8 @@ vi.mock("@/products/connected-sites/server", () => ({ reconcileConnectedInquiryO
 vi.mock("@/platform/needs-you", () => ({ reconcileInquiryDecisionNotice: mocks.decision }));
 
 import { POST } from "@/app/api/webhooks/resend/route";
-import { MAX_RESEND_WEBHOOK_BODY_BYTES } from "@/app/api/webhooks/resend/route";
+// The signed webhook contract accepts at most one MiB, independent of route exports.
+const MAX_RESEND_WEBHOOK_BODY_BYTES = 1024 * 1024;
 
 beforeEach(() => {
   vi.clearAllMocks();

@@ -4,7 +4,7 @@ import { reconcileConnectedInquiryOwnerNotice } from "@/products/connected-sites
 import { reconcileInquiryDecisionNotice } from "@/platform/needs-you";
 
 export const dynamic = "force-dynamic";
-export const MAX_RESEND_WEBHOOK_BODY_BYTES = 1024 * 1024;
+const MAX_RESEND_WEBHOOK_BODY_BYTES = 1024 * 1024;
 
 /** Read a signed callback without allowing an unbounded body into memory. */
 async function readBoundedBody(request: Request): Promise<string | null> {
