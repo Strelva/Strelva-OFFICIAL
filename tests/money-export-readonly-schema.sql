@@ -51,6 +51,14 @@ insert into mer_cases values
  ('build status',$q$select public.read_workspace_export_build('@build','@actor','@email')->>'status'='ready'$q$,true,false),
  ('owner status',$q$select public.read_workspace_export_owner_status('@build','@actor','@email')->>'status'='ready'$q$,true,true),
  ('owner part',$q$select public.read_workspace_export_owner_part('@build','@actor','@email',0)->>'body'='{"schemaVersion":3,"workspaceId":"e4010000-0000-4000-8000-000000000010","privateFixture":"Fictional owner archive"}'$q$,true,true);
+-- Native category assembly traverses every retained wrapper, including money
+-- and recovery exports. Private historical wrappers remain private.
+insert into mer_cases
+select p.proname,format('select public.%I(''e4010000-0000-4000-8000-000000000010'',''@actor'',''@email'',''business_record'',0,10)->>''category''=''business_record''',p.proname),p.proname='export_workspace_v3_category',false
+from pg_proc p where p.pronamespace='public'::regnamespace and p.proname like 'export_workspace_v3_category%%';
+insert into mer_cases
+select 'public category '||category,format('select public.export_workspace_v3_category(''e4010000-0000-4000-8000-000000000010'',''@actor'',''@email'',%L,0,10)->>''category''=%L',category,category),true,false
+from unnest(public.workspace_export_v3_categories()) category;
 update mer_cases set statement=replace(statement,'@build',(select body->>'buildId' from mer_build));
 grant select on mer_cases,mer_build to service_role;
 commit;
@@ -68,6 +76,7 @@ set local role service_role;
 select pg_temp.mer_assert(not(public.read_workspace_export_build((select (body->>'buildId')::uuid from mer_build),'e4010000-0000-4000-8000-000000000003','export-agency-staff@example.test') ?| array['downloadToken','download_token_hash','downloadUrl','body']),'provider status does not disclose owner download credentials/body');
 select pg_temp.mer_probe(format('select public.read_workspace_export_build_part(%L,%L,0) is not null',(select body->>'buildId' from mer_build),repeat('0',64)),'P0001','workspace_export_link_invalid');
 select pg_temp.mer_assert(not has_function_privilege('service_role','public.workspace_export_v3_read_role(uuid,uuid,text)','EXECUTE') and not has_function_privilege('service_role','public.read_workspace_exit_handoff_plan_before_evidence(uuid,uuid,text)','EXECUTE'),'pure authorization and plan core remain private');
+select pg_temp.mer_assert(not exists(select 1 from pg_proc p where p.pronamespace='public'::regnamespace and p.proname like 'export_workspace_v3_category_%%' and has_function_privilege('service_role',p.oid,'EXECUTE')),'historical category wrappers remain private');
 rollback;
 -- A foreign business owner and an unassigned member of the same agency have
 -- no authority. Wrong identity never succeeds or masks a READ ONLY failure.
