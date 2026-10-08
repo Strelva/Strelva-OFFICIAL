@@ -993,8 +993,6 @@ psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-visibility-schema.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011140000_agent_booking_visibility.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011140000_agent_booking_visibility.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-visibility-schema.sql"
-# Every stream's release flag key survives the last literal redefinition (#253).
-psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 
 # #529: anonymous booking caps, email-only placement, and reversible schema.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011150000_public_booking_admission.sql"
