@@ -55,7 +55,7 @@ describe("offline batch staging", () => {
     expect(() => verifyReleaseInventory(process.cwd())).not.toThrow();
   });
   it("pins H between 0 and 1 and the proposed tail after 7", () => {
-    expect(RELEASE_PACKET.map(step => step.batch)).toEqual([0,"H",1,2,3,4,5,6,7,"7A","8","9","10","11","12","13","14","17"]);
+    expect(RELEASE_PACKET.map(step => step.batch)).toEqual([0,"H",1,2,3,4,5,6,7,"7A","8","9","10","11","12","13","14","15","17"]);
   });
   it.each(RELEASE_PACKET)("stages precisely pending batch $batch plus its packet prerequisites", (step) => {
     const batch = step.batch;
