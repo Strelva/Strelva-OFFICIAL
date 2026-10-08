@@ -38,7 +38,9 @@ returns boolean language plpgsql security definer set search_path=public,pg_temp
 declare w public.saved_product_work%rowtype;s public.custom_application_states%rowtype;
 begin
  w:=public.custom_application_assert_identity(p_work,p_user,p_email,true);
- select * into s from public.custom_application_states where work_id=p_work for share;
+ -- Admission/start lock and recheck this state in the existing provider RPC.
+ -- Do not take a shared state lock and then upgrade it in parallel preparers.
+ select * into s from public.custom_application_states where work_id=p_work;
  if s.work_id is null or s.lifecycle_status='retired' or s.candidate_version<>p_version or s.candidate_revision<>p_revision or s.candidate_source_digest<>p_digest
  or public.workspace_exit_resources_stopped(w.workspace_id) then raise exception 'sandbox_runtime_source_changed';end if;
  if not exists(select 1 from public.custom_sandbox_runtime_qualifications q join public.users u on u.id=q.reviewed_by join public.super_admins a on a.user_id=q.reviewed_by and a.revoked_at is null
