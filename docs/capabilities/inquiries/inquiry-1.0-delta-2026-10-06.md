@@ -5,6 +5,23 @@ recommendation as the working default on October 6
 ([product model](../../product/product-model.md#decisions-the-specs-need)).
 No production step is authorized by this page.
 
+**Wave 6 round 5, October 7 — current local implementation:** every retained
+acceptance criterion and C1–16 item has claim-specific evidence in the
+[wave 6 verification record](./inquiry-wave6-verification-2026-10-07.md), with
+flags, all 19 prepared migrations and rollout steps in the
+[stream handoff](../../product/streams/w6-inquiries.md). This includes durable
+held spam/operator repair, exact owner and assigned-member replies, current
+policy/facts, signed account-free decisions, System/Library/Running projections,
+booking handoff, complete answer/reply-time cohorts and the read cutover gate.
+The older wave 2/3 notes below are historical. Their “not built” lines are
+superseded by the evidence record, not removed from history.
+
+**Production state supplied by Jacob:** 0.2.1 is live, every lead dual-writes
+to `tenant_leads`, and 43 leads were backfilled. Step 0 is complete. This stream
+made no production calls. Seven real production parity days, the read and
+authority flips, live recipient/provider proof and deployment remain separately
+authorized rollout steps. Code and test doubles cannot provide those clocks.
+
 **Built locally October 6 (wave 2, branch `w2/bookings-inquiries`, not
 applied or deployed):** section 6 steps 1 to 4. `src/lib/leads.ts` keeps the
 signatures of `getLeads`, `getLeadById` and `getLeadSummary` and reads through
@@ -350,8 +367,7 @@ reversible until the last.
 
 **Step 0. Every lead is in Postgres (0.2.1).** Dual-write, backfill
 (`scripts/backfill-tenant-leads.ts --apply --i-have-jacobs-yes`) and hourly
-reconcile. Built locally, waits on Jacob's yes for the migration, backfill
-and deploy.
+reconcile. Complete in production per Jacob's round-5 brief: 0.2.1 dual-writes every lead and 43 were backfilled. This thread did not read production. Do not repeat the backfill; the later read and authority steps remain separate.
 
 **Step 1. One read path.** Every reader goes through `src/lib/leads.ts`.
 `getLeads`, `getLeadById` and `getLeadSummary` keep their signatures and gain

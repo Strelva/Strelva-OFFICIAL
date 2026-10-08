@@ -15,7 +15,7 @@ export function placeHomeHref(workspaceId: string): string {
   return `/workspace?workspaceId=${encodeURIComponent(workspaceId)}`;
 }
 
-export function WorkspacePlace({ workspaceId, eyebrow, title, intro, state, errorTitle, errorBody, denied = [], wide = false, children }: {
+export function WorkspacePlace({ workspaceId, eyebrow, title, intro, state, errorTitle, errorBody, denied = [], wide = false, embedded = false, children }: {
   workspaceId: string;
   eyebrow: string;
   title: string;
@@ -26,12 +26,14 @@ export function WorkspacePlace({ workspaceId, eyebrow, title, intro, state, erro
   /** Linked sites this person has no access to; named, never read. */
   denied?: readonly string[];
   wide?: boolean;
+  embedded?: boolean;
   children?: ReactNode;
 }) {
+  const Frame = embedded ? "section" : "main";
   return (
-    <main className="min-h-dvh bg-canvas px-4 py-10 text-warm-black sm:px-6 md:px-8 md:py-12 lg:px-12">
+    <Frame className={embedded ? "p-6 text-warm-black" : "min-h-dvh bg-canvas px-4 py-10 text-warm-black sm:px-6 md:px-8 md:py-12 lg:px-12"}>
       <div className={`mx-auto ${wide ? "max-w-[960px]" : "max-w-[760px]"}`}>
-        <a className="text-sm text-gray-muted underline-offset-4 hover:underline focus-visible:underline" href={placeHomeHref(workspaceId)}>Back to Home</a>
+        {!embedded ? <a className="text-sm text-gray-muted underline-offset-4 hover:underline focus-visible:underline" href={placeHomeHref(workspaceId)}>Back to Home</a> : null}
         <p className="mt-10 text-xs font-medium uppercase tracking-[0.14em] text-gray-muted">{eyebrow}</p>
         <h1 className="mt-3 font-display text-[34px] font-medium leading-tight sm:text-[40px]">{title}</h1>
         <p className="mt-3 max-w-2xl text-base leading-7 text-gray-muted">{intro}</p>
@@ -60,7 +62,7 @@ export function WorkspacePlace({ workspaceId, eyebrow, title, intro, state, erro
           </>
         )}
       </div>
-    </main>
+    </Frame>
   );
 }
 

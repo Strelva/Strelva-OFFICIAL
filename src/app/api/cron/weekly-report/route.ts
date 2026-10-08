@@ -1,5 +1,6 @@
 import { resolveTenantBrand } from "@/platform/agency-brand/server";
 import type { OwnerBrand } from "@/platform/infra/agency-brand";
+import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { mapPool } from "@/lib/concurrency";
@@ -142,7 +143,7 @@ await mapPool(reports, 8, async (report) => {
       const heading = buildReportHeading(report);
 
       const brand = await resolveTenantBrand(report.tenant.id);
-      const dashboardUrl = brand.agencyId ? `${CONTROL_PLANE_URL}/client/${encodeURIComponent(report.tenant.id)}/dashboard/reports` : getTenantDashboardUrl(report.tenant, "/dashboard/reports");
+      const dashboardUrl = brand.agencyId ? `${CONTROL_PLANE_URL}/client/${encodeURIComponent(report.tenant.id)}/dashboard/reports` : await ownerNoticeUrl(report.tenant, "/dashboard/reports", getTenantDashboardUrl(report.tenant, "/dashboard/reports"));
       const html = reportToHtml(
         heading,
         report.summary,

@@ -13,6 +13,9 @@ vi.mock("@/platform/agency-brand/server", () => ({ resolveTenantBrand: mockBrand
 const mockGetTenantConfig = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/event-actions", () => ({ resolveEventAction: mockResolveEventAction }));
+// Existing tenant links must not load the unreleased workspace decision runtime.
+vi.mock("@/platform/needs-you/server", () => { throw new Error("Legacy approval loaded workspace runtime"); });
+vi.mock("@/app/api/owner-website-preview/preview", () => { throw new Error("Legacy approval loaded website renderer"); });
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mockGetTenantConfig }));
 vi.mock("@/lib/tenant-urls", () => ({
   getTenantDashboardUrl: (t: { id: string }, path: string) => `https://admin.${t.id}.strelva.com${path}`,

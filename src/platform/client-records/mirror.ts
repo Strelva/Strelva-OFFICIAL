@@ -17,6 +17,7 @@
  *
  * Redis keys keep their frozen names and stay as the cache.
  */
+import { encryptSecret } from "@/platform/infra/crypto/secrets";
 import { createHash } from "node:crypto";
 import { getSupabase } from "@/platform/infra/db/client";
 import { dualWritePgEnabled } from "@/platform/infra/db/dual-write";
@@ -26,8 +27,11 @@ export const CLIENT_RECORD_STORES = [
   "spam_held",
   "inquiry_timeline",
   "inquiry_reply",
+  "inquiry_delivery",
   "booking_config",
   "account_grouping",
+  "orders", "provider_connections", "provider_metadata",
+  "reward_members", "reward_transactions", "threads", "tenant_settings",
 ] as const;
 export type ClientRecordStore = (typeof CLIENT_RECORD_STORES)[number];
 export type ClientRecordMode = "replace" | "keep_first";
@@ -41,7 +45,9 @@ export interface ClientRecord {
 
 export const CLIENT_RECORD_PENDING_KEY = "reb:client-records:pending";
 export const CLIENT_RECORD_TIMEOUT_MS = 1500;
-const PENDING_KEEP = 5000;
+/** No TTL: repair must still work after the source expires or is trimmed. */
+export function pendingPayloadKey(member: string): string { return `reb:client-records:pending-payload:${member}`; }
+export type PendingRecord = ClientRecord | { recordId: string; remove: true; capturedAt?: string };
 
 type RpcResult = { data: unknown; error: { message?: string; code?: string } | null };
 type RpcCall = PromiseLike<RpcResult> & { abortSignal?: (signal: AbortSignal) => PromiseLike<RpcResult> };
@@ -116,13 +122,23 @@ export async function writeClientRecord(
   if (!db) return { status: "skipped", reason: "unconfigured" };
   const removal = "remove" in record;
   try {
-    const payload = removal ? null : record.payload;
+    const payload = removal ? null : { ...record.payload };
+    const hash = payload ? clientRecordHash(payload) : null;
+    if (store === "provider_connections" && payload) {
+      for (const field of ["accessToken", "refreshToken", "apiKey"]) {
+        const value = payload[field];
+        if (typeof value !== "string" || !value) continue;
+        const ciphertext = encryptSecret(value);
+        if (!ciphertext.startsWith("enc:v1:")) return { status: "failed", reason: "provider_connection_encryption_required" };
+        payload[field] = ciphertext;
+      }
+    }
     const { data, error } = await call("record_tenant_client_record", {
       p_tenant_id: tenant,
       p_store: store,
       p_record_id: record.recordId,
       p_payload: payload,
-      p_payload_hash: payload ? clientRecordHash(payload) : null,
+      p_payload_hash: hash,
       p_captured_at: record.capturedAt ?? new Date().toISOString(),
       p_via: via,
       p_mode: removal ? "remove" : mode,
@@ -151,16 +167,67 @@ export function parsePendingMember(member: string): { store: ClientRecordStore; 
   return { store, tenant: member.slice(first + 1, second), recordId: member.slice(second + 1) };
 }
 
-async function rememberPending(store: ClientRecordStore, tenant: string, recordId: string, reason: string): Promise<void> {
+/** Failure callbacks can finish out of order. Retain the latest value (or
+ * earliest first reply) atomically instead of overwriting a newer retry. */
+export const QUEUE_CLIENT_RECORD_REPAIR_LUA = `
+local current = redis.call('GET', KEYS[2])
+local replace = ARGV[2] ~= ''
+if current and replace then
+  local ok, value = pcall(cjson.decode, current)
+  local incoming = cjson.decode(ARGV[2])
+  if ok and value.capturedAt and incoming.capturedAt then
+    if ARGV[4] == 'keep_first' then replace = incoming.capturedAt < value.capturedAt
+    else replace = incoming.capturedAt >= value.capturedAt end
+  end
+end
+if replace then redis.call('SET', KEYS[2], ARGV[2]) end
+redis.call('ZADD', KEYS[1], ARGV[3], ARGV[1])
+return 1
+`;
+export const CLEAR_CLIENT_RECORD_REPAIR_LUA = `
+local current = redis.call('GET', KEYS[2])
+if (not current and ARGV[2] == '') or current == ARGV[2] then
+  redis.call('ZREM', KEYS[1], ARGV[1])
+  redis.call('DEL', KEYS[2])
+  return 1
+end
+return 0
+`;
+export async function clearPendingClientRecord(member: string, snapshot: PendingRecord | null, redis: {
+  eval(script: string, keys: string[], args: string[]): Promise<unknown>;
+}): Promise<boolean> {
+  return Number(await redis.eval(CLEAR_CLIENT_RECORD_REPAIR_LUA, [CLIENT_RECORD_PENDING_KEY, pendingPayloadKey(member)], [member, snapshot ? JSON.stringify(snapshot) : ""])) === 1;
+}
+
+async function rememberPending(store: ClientRecordStore, tenant: string, record: PendingRecord, reason: string, mode: ClientRecordMode = "replace"): Promise<void> {
+  const recordId = record.recordId;
   console.error("[client-records] record not copied to Postgres", { store, tenant, recordId, reason });
   const redis = getRedis();
   if (!redis) return;
   try {
-    await redis.zadd(CLIENT_RECORD_PENDING_KEY, { score: Date.now(), member: pendingMember(store, tenant, recordId) });
-    await redis.zremrangebyrank(CLIENT_RECORD_PENDING_KEY, 0, -(PENDING_KEEP + 1));
+    const member = pendingMember(store, tenant, recordId);
+    // Never place legacy plaintext OAuth secrets into the retry payload.
+    const safe = store !== "provider_connections" || "remove" in record || ["accessToken", "refreshToken", "apiKey"].every((field) => !record.payload[field] || String(record.payload[field]).startsWith("enc:v1:"));
+    const normalized = { ...record, ...(record.capturedAt ? { capturedAt: new Date(record.capturedAt).toISOString() } : {}) };
+    await redis.eval(QUEUE_CLIENT_RECORD_REPAIR_LUA, [CLIENT_RECORD_PENDING_KEY, pendingPayloadKey(member)],
+      [member, safe ? JSON.stringify(normalized) : "", String(Date.now()), mode]);
   } catch {
     // The Redis copy still exists; backfill and parity find it.
   }
+}
+
+async function forgetOlderPending(store: ClientRecordStore, tenant: string, record: PendingRecord, mode: ClientRecordMode = "replace"): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+  try {
+    const member = pendingMember(store, tenant, record.recordId);
+    const pending = await redis.get<PendingRecord>(pendingPayloadKey(member));
+    if (pending && pending.capturedAt && record.capturedAt) {
+      const pendingAt = Date.parse(pending.capturedAt), writtenAt = Date.parse(record.capturedAt);
+      if (mode === "keep_first" ? pendingAt < writtenAt : pendingAt > writtenAt) return;
+    }
+    await clearPendingClientRecord(member, pending, redis);
+  } catch { /* Backfill/parity still repair failures without affecting the request. */ }
 }
 
 /**
@@ -175,14 +242,17 @@ export async function mirrorClientRecord(
 ): Promise<ClientRecordWriteResult> {
   if (!clientRecordDualWriteEnabled()) return { status: "skipped", reason: "disabled" };
   const result = await writeClientRecord(store, tenant, record, "dual_write", mode);
-  if (result.status === "failed") await rememberPending(store, tenant, record.recordId, result.reason);
+  if (result.status === "failed" || result.status === "skipped") await rememberPending(store, tenant, record, result.reason, mode);
+  else await forgetOlderPending(store, tenant, record, mode);
   return result;
 }
 
 /** Dual-write a removal (the record left Redis on purpose). Never throws. */
 export async function mirrorClientRecordRemoval(store: ClientRecordStore, tenant: string, recordId: string): Promise<ClientRecordWriteResult> {
   if (!clientRecordDualWriteEnabled()) return { status: "skipped", reason: "disabled" };
-  const result = await writeClientRecord(store, tenant, { recordId, remove: true }, "dual_write");
-  if (result.status === "failed") await rememberPending(store, tenant, recordId, result.reason);
+  const record = { recordId, remove: true as const, capturedAt: new Date().toISOString() };
+  const result = await writeClientRecord(store, tenant, record, "dual_write");
+  if (result.status === "failed" || result.status === "skipped") await rememberPending(store, tenant, record, result.reason);
+  else await forgetOlderPending(store, tenant, record);
   return result;
 }

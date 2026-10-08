@@ -3,7 +3,7 @@ import { PostgresOfferingStore } from "@/platform/offerings/store";
 import { listWorkspaces } from "@/platform/workspaces/repository";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { readInquiryWorkspace, projectPublishedInquiry } from "@/products/inquiries/server";
-import { listPublicWebsiteBookingGrants, readWorkspaceSchedule, scheduleSchema } from "@/products/scheduling/server";
+import { listPublicWebsiteBookingGrants, readWorkspaceSchedule, scheduleSchema, listWorkspaceCalendarConnections } from "@/products/scheduling/server";
 import {
   websiteCapabilityOptionsSchema,
   websiteCapabilitySelectionSchema,
@@ -137,6 +137,7 @@ export async function resolvePublishedWebsiteCapabilities(
   workspaceId: string,
   websiteWorkId: string,
   selection?: WebsiteCapabilitySelection,
+  checks: { requireConnectedCalendar?: boolean } = {},
 ): Promise<WebsitePublishedCapabilities | undefined> {
   if (!selection) return undefined;
   const parsedSelection = websiteCapabilitySelectionSchema.parse(selection);
@@ -150,6 +151,7 @@ export async function resolvePublishedWebsiteCapabilities(
     ? tenant.booking.find((candidate) => candidate.grantId === parsedSelection.bookingGrantId)
     : undefined;
   if ((parsedSelection.inquiryCapabilityId && !inquiry) || (parsedSelection.bookingGrantId && !booking)) return undefined;
+  if (checks.requireConnectedCalendar && booking && !(await listWorkspaceCalendarConnections(actor, workspaceId)).some(connection => connection.provider === booking.provider && connection.status === "connected")) return undefined;
   const baseUrl = configuredBaseUrl();
   if (!baseUrl) return undefined;
   const result = websitePublishedCapabilitiesSchema.safeParse({

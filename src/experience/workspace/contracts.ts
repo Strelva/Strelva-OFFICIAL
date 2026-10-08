@@ -175,6 +175,8 @@ export interface WorkspaceReleases {
   ask?: boolean;
   /** STRELVA_INQUIRIES_RELEASE for this workspace (per-workspace row under `workspace`). */
   inquiries?: boolean;
+  /** Durable customer inbox instead of the internal inquiry builder. */
+  inquiryInbox?: boolean;
   /** STRELVA_WEBSITE_REBUILD_RELEASE for this workspace. Absent: the page's env value decides. */
   websiteRebuild?: boolean;
   /** Connected sites on for this business (its `connected_sites` row, and Systems): Home links to /workspace/site. */
@@ -260,7 +262,9 @@ export interface WorkspaceSystemVersion {
   /** Source revisions this business declined. */
   declined: number[];
   /** Other Versions of the same source in this business (another location). */
-  siblings: Array<{ id: string; systemId: string; context: { kind: string; label: string } }>;
+  siblings: Array<{ id: string; systemId: string; context: { kind: string; label: string };
+    comparison?: { state: "ready" | "unavailable"; changes: Array<{ path: string; beforePresent: boolean; afterPresent: boolean; before: unknown; after: unknown }> };
+  }>;
 }
 
 export interface WorkspacePublishing {
@@ -324,6 +328,8 @@ export interface WorkspaceSystemPossibility {
   evidence: string | null;
   /** Same-origin rendering of the candidate. */
   previewHref: string | null;
+  /** Signed isolated Try for a prepared native candidate. */
+  tryHref?: string;
   /** The saved work the candidate came from. */
   workId: string;
   /** Stored in Postgres: it survives deploys and restarts. Additive. */

@@ -1,0 +1,12 @@
+\set ON_ERROR_STOP on
+do $$ declare native uuid; snapshot jsonb; begin
+ select work_id into native from public.system_version_native_applications n join public.system_versions v on v.id=n.version_id
+   where v.business_workspace_id='bc630000-0000-4000-8000-000000000011';
+ if native is null then raise exception 'rollforward lost native mapping'; end if;
+ snapshot:=public.application_runtime_snapshot(native);
+ if snapshot->>'release_version'<>'2' or jsonb_array_length(snapshot->'records')<>1 then raise exception 'rollforward lost live interface or destination records'; end if;
+ if (select count(*) from public.system_version_preparations where business_workspace_id='bc630000-0000-4000-8000-000000000011')<>3 then raise exception 'rollforward lost preparation receipts'; end if;
+ if to_regprocedure('public.read_version_native_runtime(uuid,uuid,text,uuid)') is null or to_regprocedure('public.create_version_system_command(uuid,text,jsonb,text,text,uuid,jsonb)') is null or to_regprocedure('public.save_system_version(uuid,text,uuid,bigint,jsonb)') is null then raise exception 'rollforward did not restore checked runtime wrappers'; end if;
+ if has_function_privilege('service_role','public.save_system_version_native_core(uuid,text,uuid,bigint,jsonb)','EXECUTE') or has_function_privilege('service_role','public.save_system_version_owner_grants_core(uuid,text,uuid,bigint,jsonb)','EXECUTE') then raise exception 'rollforward exposed private release/grant core'; end if;
+ if has_function_privilege('authenticated','public.read_version_native_runtime(uuid,uuid,text,uuid)','EXECUTE') or has_table_privilege('service_role','public.system_version_native_applications','INSERT') then raise exception 'rollforward bypassed checked runtime access'; end if;
+end $$;

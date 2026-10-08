@@ -13,9 +13,9 @@ import { previewMakeRealMode } from "@/experience/workspace/preview/make-real-fi
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Strelva · Local interface preview", robots: { index: false, follow: false } };
 
-export default async function StrelvaPreviewPage({ searchParams }: { searchParams: Promise<{ scenario?: string; previewSetup?: string; systems?: string; needsYou?: string; publishing?: string; ask?: string; makeReal?: string; outcomes?: string }> }) {
+export default async function StrelvaPreviewPage({ searchParams }: { searchParams: Promise<{ scenario?: string; previewSetup?: string; systems?: string; needsYou?: string; publishing?: string; ask?: string; makeReal?: string; sibling?: string; outcomes?: string }> }) {
   if (!strelvaUiPreviewEnabled()) notFound();
-  const { scenario, previewSetup, systems: systemsParam, needsYou, publishing: publishingParam, ask, makeReal, outcomes } = await searchParams;
+  const { scenario, previewSetup, systems: systemsParam, needsYou, publishing: publishingParam, ask, makeReal, sibling, outcomes } = await searchParams;
   const selected = previewScenario(scenario);
   // STRELVA_SYSTEMS_RELEASE decides, as on the workspace route. This
   // fixture-only page may override it with `systems=on|off` so both states
@@ -26,7 +26,7 @@ export default async function StrelvaPreviewPage({ searchParams }: { searchParam
     // STRELVA_PUBLISHING_RELEASE decides; `publishing=on|off|pending|disconnected|none` overrides here only.
     publishing: previewPublishingMode(publishingParam, publishingReleaseEnabled()),
     // Fixture-only: `makeReal=partly|live` shows the spec's walk-through (Make real in progress, History, Strelva handled).
-    makeReal: previewMakeRealMode(makeReal) });
+    makeReal: previewMakeRealMode(makeReal), sibling: sibling === "empty" || sibling === "unavailable" ? sibling : "ready" });
   // Needs you on Home is fixture-only here: `needsYou=on` shows the policy model's Home.
   // Ask Strelva is fixture-only here: `ask=on|off|error|forbidden|unsaved` picks the state.
   // The outcome loop ribbon on Home is fixture-only here: `outcomes=on` shows it.

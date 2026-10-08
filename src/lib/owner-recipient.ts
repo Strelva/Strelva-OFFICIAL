@@ -73,3 +73,12 @@ export async function resolveOwnerNoticeRecipient(
 export async function ownerNoticeEmail(tenant: { id: string; ownerEmail?: string | null }): Promise<string | null> {
   return (await resolveOwnerNoticeRecipient(tenant))?.email ?? null;
 }
+
+/** Added notice paths retain their exact legacy recipient until rollout. */
+export function businessRecordReadsEnabled(): boolean {
+  return process.env.STRELVA_WORKSPACE_RELEASE === "1" && process.env.STRELVA_BUSINESS_RECORD_READS === "1";
+}
+
+export async function releasedOwnerNoticeEmail(tenant: { id: string; ownerEmail?: string | null }): Promise<string | null> {
+  return businessRecordReadsEnabled() ? ownerNoticeEmail(tenant) : tenant.ownerEmail || null;
+}

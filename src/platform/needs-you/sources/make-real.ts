@@ -1,3 +1,5 @@
+import { approvalRecord } from "@/platform/approval-store";
+import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 /**
  * Make real (systems-experience spec 21): the owner decides once per plan.
  *
@@ -205,5 +207,11 @@ export function makeRealAdapter(ports: MakeRealSourcePorts): SourceAdapter {
  * only while that item is `approved` and its outcome isn't `failed`.
  */
 export function needsYouMakeRealApprovals(read: (workspaceId: string, itemId: string) => Promise<OwnerDecision | null>): ApprovalRecordsPort {
-  return createNeedsYouApprovalRecords({ read: async (workspaceId, itemId) => read(workspaceId, itemId).catch(() => null) });
+  return createNeedsYouApprovalRecords({ read: async (workspaceId, itemId) => {
+    const row = await read(workspaceId, itemId).catch(() => null);
+    if (!row || !(await workspaceReleaseFlagEnabled("approval_store", workspaceId))) return row;
+    const record = approvalRecord(row, { businessId: workspaceId, lifecycle: "make_real", sourceId: row.sourceId, revision: row.revisionHash });
+    // The shared authority rejects system approval or missing human attribution.
+    return record?.status === "approved" || row.state !== "approved" ? row : null;
+  } });
 }

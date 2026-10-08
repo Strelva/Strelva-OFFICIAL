@@ -274,7 +274,9 @@ const businessVersionsSchema = z.object({
     latestRevision: z.number().int().positive().nullable(),
     currentRelease: z.number().int().positive().nullable(),
     declined: z.array(z.number().int().positive()),
-    siblings: z.array(z.object({ id: uuid, systemId: uuid, context: z.object({ kind: z.string(), label: z.string() }).strict() }).strict()),
+    siblings: z.array(z.object({ id: uuid, systemId: uuid, context: z.object({ kind: z.string(), label: z.string() }).strict(),
+      comparison: z.object({ state: z.enum(["ready", "unavailable"]), changes: z.array(z.object({ path: z.string(), beforePresent: z.boolean(), afterPresent: z.boolean(), before: json, after: json }).strict()) }).strict().optional(),
+    }).strict()),
   }).strict()),
 }).strict();
 export type BusinessVersions = z.infer<typeof businessVersionsSchema>;

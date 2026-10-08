@@ -27,4 +27,12 @@ export interface InquiryPortfolio {
   attention: InquiryAttentionSummary[];
   patterns: InquiryPatternSummary[];
   unavailableTenantIds: string[];
+  versions?: InquiryLibraryVersionSummary[];
+}
+
+/** Read-only lineage over the existing accepted pattern installation. */
+export interface InquiryLibraryVersionSummary {
+  id: string; tenantId: string; businessName: string; name: string;
+  sourceBusinessId: string; sourceSystemId: string; sourceRevision: number;
+  currentRelease: number; improvement: "none" | "auto_applicable" | "blocked";
 }

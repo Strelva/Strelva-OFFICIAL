@@ -35,7 +35,17 @@ export interface MoneyAllowanceView { id: string; workspaceId: string; payerId: 
 export interface MoneyJobView { id: string; workspaceId: string; status: string; productId: string; estimateCents: number | null; maxAuthorizedCents: number }
 export interface MoneyPayerChangeView { id: string; workspaceId: string; successorUserId: string; proposerEmail: string; status: string }
 
+export interface MoneyBillingView { workspaceId: string; paymentStatus: string; paymentUpdatedAt: string | null; monthlyCents: number }
+const billingRevision = (row: MoneyBillingView) => hash(["billing", row.workspaceId, row.paymentStatus, row.paymentUpdatedAt]);
+export function billingPaymentItem(row: MoneyBillingView): ProposedItem | null {
+  if (row.paymentStatus !== "past_due") return null;
+  return moneyItem({ sourceId: `billing:${row.workspaceId}`, revisionHash: billingRevision(row), workspaceId: row.workspaceId,
+    title: "Your payment needs attention", detail: "Your sites and inquiry capture keep working. Review your payment in billing settings.",
+    approveEffect: "The payment must be fixed in billing settings. This decision never charges a card or changes your plan." });
+}
+
 export interface WorkMoneyPorts {
+  billing?(actor: WorkspaceActor, workspaceId: string): Promise<MoneyBillingView | null>;
   /** Allowances of one business, as the actor may read them. */
   allowances(actor: WorkspaceActor, workspaceId: string): Promise<MoneyAllowanceView[]>;
   /** The actor's payer inbox: job budgets and payer changes addressed to them. */
@@ -105,9 +115,9 @@ export function payerChangeItem(row: MoneyPayerChangeView, actor: WorkspaceActor
   });
 }
 
-function split(sourceId: string): { kind: "allowance" | "job" | "payer"; id: string } | null {
+function split(sourceId: string): { kind: "allowance" | "job" | "payer" | "billing"; id: string } | null {
   const [kind, id] = sourceId.split(":");
-  if ((kind !== "allowance" && kind !== "job" && kind !== "payer") || !id) return null;
+  if ((kind !== "allowance" && kind !== "job" && kind !== "payer" && kind !== "billing") || !id) return null;
   return { kind, id };
 }
 
@@ -116,6 +126,11 @@ export function workMoneyAdapter(ports: WorkMoneyPorts): SourceAdapter {
   async function current(actor: WorkspaceActor, workspaceId: string, sourceId: string): Promise<string | null> {
     const source = split(sourceId);
     if (!source) return null;
+    if (source.kind === "billing") {
+      if (source.id !== workspaceId) throw new Error("billing_wrong_business");
+      const row = await ports.billing?.(actor, workspaceId);
+      return row?.paymentStatus === "past_due" ? billingRevision(row) : null;
+    }
     if (source.kind === "allowance") {
       const row = (await ports.allowances(actor, workspaceId)).find(item => item.id === source.id && item.workspaceId === workspaceId);
       if (!row) throw new Error("allowance_not_visible");
@@ -146,6 +161,15 @@ export function workMoneyAdapter(ports: WorkMoneyPorts): SourceAdapter {
         items.push(...inbox.jobs.filter(row => row.workspaceId === ctx.workspaceId).flatMap(row => jobItem(row) ?? []));
         items.push(...inbox.transitions.filter(row => row.workspaceId === ctx.workspaceId).flatMap(row => payerChangeItem(row, actor) ?? []));
       } catch { complete = false; }
+      if (ports.billing) {
+        try {
+          const row = await ports.billing(actor, ctx.workspaceId);
+          if (row) {
+            const item = billingPaymentItem(row);
+            if (item) items.push({ ...item, openHref: `/workspace/billing?workspaceId=${encodeURIComponent(ctx.workspaceId)}` });
+          }
+        } catch { complete = false; }
+      }
       return { items, complete };
     },
     async currentRevision(ctx, sourceId) {
@@ -163,6 +187,7 @@ export function workMoneyAdapter(ports: WorkMoneyPorts): SourceAdapter {
         const revision = await current(by.actor, ctx.workspaceId, item.sourceId);
         if (revision === null) return { outcome: "done", reason: "already_resolved" };
         if (revision !== item.revisionHash) return { outcome: "failed", reason: "changed_since_decision" };
+        if (source.kind === "billing") return { outcome: "failed", reason: "Fix the payment in billing settings; Strelva has not charged or changed anything." };
         if (source.kind === "allowance") await ports.acceptAllowanceCap(by.actor, source.id);
         else if (source.kind === "job") await ports.acceptJob(by.actor, source.id);
         else await ports.acceptPayerChange(by.actor, source.id);

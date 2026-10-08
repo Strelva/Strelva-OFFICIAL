@@ -1,2 +1,2 @@
-// Shared raster validation; legacy compatibility path.
-export * from "@/platform/infra/image-signature";
+/** Compatibility export; shared media parsing lives in platform infra. */
+export * from "@/platform/infra/media/image-signature";

@@ -95,6 +95,12 @@ describe("operator queue projection", () => {
     expect(queue.items.some((item) => item.kind === "change_request")).toBe(false);
   });
 
+  it("a missing source is an explicit gap even if every attempted read succeeded", () => {
+    const queue = projectQueue({ reads: reads().filter((read) => read.kind !== "assignment_offer"), context: context(), tenants, emailPaused: false, now: NOW });
+    expect(queue.complete).toBe(false);
+    expect(queue.gaps).toEqual([{ kind: "assignment_offer", source: "assignment offer", reason: "Source was not read" }]);
+  });
+
   it("without Postgres the marks are unknown, so the list is incomplete", () => {
     const queue = projectQueue({ reads: reads(), context: null, contextFailure: "Queue storage is unavailable.", tenants, emailPaused: false, now: NOW });
     expect(queue.complete).toBe(false);
@@ -166,6 +172,9 @@ describe("operator queue projection", () => {
 });
 
 describe("priority and clocks", () => {
+  it("does not describe an uncertain provider dispatch as accepted", () => {
+    expect(priorityFor(raw("readback_failed", { facts: { writeAcceptance: "unknown" } }), NOW)).toMatchObject({ priority: "P1", reason: "The provider's acceptance is uncertain. Never re-sent automatically." });
+  });
   it("raises a draft older than 80 days to P2 with days left", () => {
     const opened = NOW - 85 * DAY;
     const result = priorityFor(raw("draft_review", { openedAt: iso(opened), facts: { expiresAt: iso(opened + 90 * DAY) } }), NOW);

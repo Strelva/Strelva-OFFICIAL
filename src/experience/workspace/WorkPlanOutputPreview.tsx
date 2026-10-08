@@ -11,6 +11,7 @@ import { workPlanOutputExecutionSchema, type WorkPlan, type WorkPlanOutputExecut
 import { useWorkspaceRequest } from "./WorkspaceRequest";
 
 type Props = {
+  executionUrl?: string;
   onOpenWork?: (workId: string, productId?: string) => void;
   workspaceId: string;
   planWorkId: string;
@@ -21,7 +22,7 @@ type Props = {
 };
 
 /** Inspectable native output. A failed attempt retries the same immutable input. */
-export function WorkPlanOutputPreview({ onOpenWork, workspaceId, planWorkId, plan, output, disabled, completed }: Props) {
+export function WorkPlanOutputPreview({ executionUrl = "/api/work-plans/execute", onOpenWork, workspaceId, planWorkId, plan, output, disabled, completed }: Props) {
   const request = useWorkspaceRequest();
   const draft = output.draft;
   const [title, setTitle] = useState(draft?.title ?? output.title);
@@ -50,7 +51,7 @@ export function WorkPlanOutputPreview({ onOpenWork, workspaceId, planWorkId, pla
       inputs: draft.kind === "document" ? { title, text } : draft.kind === "application" ? application : { title, templateId },
     });
     try {
-      const response = await request("/api/work-plans/execute", { method: "POST", headers: { "Content-Type": "application/json" }, body: attempt.current });
+      const response = await request(executionUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: attempt.current });
       const body: unknown = await response.json().catch(() => null);
       if (!response.ok) {
         const message = body && typeof body === "object" && "error" in body && typeof body.error === "string" ? body.error : "The output could not be confirmed. Retry to check the same request.";

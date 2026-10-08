@@ -23,7 +23,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/platform/infra/redis", () => ({ getRedis: mocks.redis }));
-vi.mock("@/lib/leads", () => ({ getLeads: mocks.leads }));
+vi.mock("@/lib/leads", () => ({ getLeads: mocks.leads, leadReadStoreReady: async () => Boolean(mocks.redis()) }));
 vi.mock("@/platform/infra/auth", () => ({ getTenantRole: mocks.role, roleHasPermission: mocks.hasPermission }));
 vi.mock("@/products/inquiries/delivery-store", () => ({ createRedisInquiryDeliveryStore: () => mocks.deliveryStore }));
 vi.mock("@/products/inquiries/workspace-exit", () => ({

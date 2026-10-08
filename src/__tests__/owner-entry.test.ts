@@ -69,10 +69,10 @@ describe("dashboard disposition map", () => {
     }
   });
 
-  it("follows the systems catalog: store and members are frozen, schedule and roster belong to Bookings", () => {
+  it("follows the systems catalog: store and members reuse frozen evidence, schedule and roster belong to Bookings", () => {
     const state = (route: string) => DASHBOARD_DISPOSITIONS.find((entry) => entry.route === route)!;
-    expect(state("/store").state).toBe("frozen");
-    expect(state("/members").state).toBe("frozen");
+    expect(state("/store").state).toBe("ready");
+    expect(state("/members").state).toBe("ready");
     expect(state("/schedule").home).toMatch(/Bookings/);
     expect(state("/roster").home).toMatch(/Bookings/);
   });
@@ -103,14 +103,14 @@ describe("dashboard disposition map", () => {
     expect(routeForDashboardPath("/dashboard/reports")).toBe("/reports");
     expect(routeForDashboardPath("/dashboard/sources/google")).toBe("/sources/[id]");
     expect(routeForDashboardPath("/dashboard/nope/deeper")).toBe("/[...notFound]");
-    expect(effectiveDisposition("/content").route).toBe("/site");
-    expect(effectiveDisposition("/health").route).toBe("/analytics");
-    expect(effectiveDisposition("/ownership").route).toBe("/settings");
+    expect(effectiveDisposition("/content").route).toBe("/content");
+    expect(effectiveDisposition("/health").route).toBe("/health");
+    expect(effectiveDisposition("/ownership").route).toBe("/ownership");
   });
 
   it("blocks owner entry on while any used page still stays, and ignores frozen and unused pages", () => {
     const blocking = pagesBlockingOwnerEntry(new Set(["always"])).map((entry) => entry.route);
-    expect(blocking).toContain("/settings");
+    expect(blocking).not.toContain("/settings");
     expect(blocking).not.toContain("/site");
     expect(blocking).not.toContain("/");
     expect(blocking).not.toContain("/store");
@@ -188,9 +188,9 @@ describe("routing a /dashboard request", () => {
     }
   });
 
-  it("renders frozen pages with the way back", () => {
-    expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/store" })).toMatchObject({ kind: "render-with-back", state: "frozen" });
-    expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/members" })).toMatchObject({ kind: "render-with-back", state: "frozen" });
+  it("keeps the connection panels on dashboard while Systems is off", () => {
+    expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/store" })).toMatchObject({ kind: "render-with-back", state: "ready" });
+    expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/members" })).toMatchObject({ kind: "render-with-back", state: "ready" });
   });
 
   it("lets an operator, and only an operator, keep the old page with ?legacy=1", () => {
@@ -220,5 +220,35 @@ describe("sign-in and sign-up next on a client admin host", () => {
     expect(tenantSignInNext("", ON)).toBe("/auth/entry");
     expect(tenantSignInNext("/client/rohlax", ON)).toBe("/client/rohlax/auth/entry");
     expect(tenantSignInNext("/not-a-root", ON)).toBe("/auth/entry");
+  });
+});
+
+// Every remaining legacy alias keeps its precise meaning once owner entry is on.
+describe("wave 6 exact owner destinations", () => {
+  const moved: OwnerEntryDecision = { kind: "workspace", workspaceId: WS, tenantStableId: STABLE, operator: false, tester: false };
+  for (const [path, expected] of [["content", "edit"], ["sources", "connections"], ["store", "store"], ["members", "members"]]) {
+    it(`opens ${path} on its exact tab and stays unchanged with entry off`, () => {
+      const result = routeDashboardRequest({ decision: moved, pathWithSearch: `/dashboard/${path}`, flagOn: () => true });
+      expect(result.kind).toBe("redirect");
+      if (result.kind === "redirect") {
+        const url = new URL(result.location, "https://fixture.test");
+        expect(url.pathname).toBe("/workspace/site");
+        expect(url.searchParams.get("tab") ?? "edit").toBe(expected);
+        expect(url.searchParams.get("system")).toBe(systemOriginId(WS, { kind: "tenant", ref: STABLE }));
+      }
+      expect(routeDashboardRequest({ decision: { kind: "dashboard", reason: "entry_off" }, pathWithSearch: `/dashboard/${path}` })).toEqual({ kind: "render" });
+    });
+  }
+  it("preserves the health and ownership sections, including sign-in return", () => {
+    for (const [path, anchor] of [["health", "site-health"], ["ownership", "ownership"]]) {
+      const result = routeDashboardRequest({ decision: moved, pathWithSearch: `/dashboard/${path}?range=week`, flagOn: () => true });
+      expect(result.kind).toBe("redirect");
+      if (result.kind === "redirect") { expect(result.location.endsWith(`#${anchor}`)).toBe(true); expect(workspaceReturnTarget(result.location)).toBe(result.location); }
+    }
+  });
+  it("has 24 exact homes and one intentionally retained Settings page", () => {
+    expect(DASHBOARD_DISPOSITIONS.filter(item => item.state === "ready")).toHaveLength(24);
+    expect(DASHBOARD_DISPOSITIONS.filter(item => item.state === "stay").map(item => item.route)).toEqual(["/settings"]);
+    expect(pagesBlockingOwnerEntry(new Set(["always", "store", "wellness", "local"]))).toEqual([]);
   });
 });

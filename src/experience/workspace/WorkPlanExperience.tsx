@@ -9,6 +9,7 @@ import type { BudgetExecution } from "@/platform/work-economics/runtime";
 import type { JobEconomicsRecord } from "@/platform/work-economics/types";
 import type { WorkPlan, WorkPlanOutputExecution } from "@/products/work-plans/contracts";
 import type { WorkspaceWork } from "./contracts";
+import { useWorkspaceRequest } from "./WorkspaceRequest";
 import { WorkPlanOutputPreview } from "./WorkPlanOutputPreview";
 
 type PlanningEconomicsInput = { fundingWorkspaceId?: string; jobId: string; executionKey: string; maximumCents: number };
@@ -82,6 +83,9 @@ function storeExecution(workspaceId: string, jobId: string, value: StoredPlannin
 }
 export type WorkPlanExperienceProps = {
   presentation?: "document";
+  /** Agency authoring supplies guarded adapters; default native paths stay unchanged. */
+  prepareUrl?: string;
+  outputUrl?: string;
   workspaceId: string;
   workId?: string;
   initialRequest?: string;
@@ -103,7 +107,8 @@ export function WorkPlanExperience(props: WorkPlanExperienceProps) {
   return <PlanSession key={`${props.workspaceId}:${props.workId ?? "new"}`} {...props} onSaved={onSaved} initialRequest={props.initialRequest || (!props.workId ? intentRequestFor(intent, "plan") : undefined)} />;
 }
 
-function PlanSession({ presentation, workspaceId, systemsRelease, onRequest, workId, initialRequest = "", planningEconomics: providedPlanningEconomics, sources, readOnly, localPreview, onSaved, onOpenWork }: WorkPlanExperienceProps) {
+function PlanSession({ presentation, prepareUrl = "/api/work-plans", outputUrl, workspaceId, systemsRelease, onRequest, workId, initialRequest = "", planningEconomics: providedPlanningEconomics, sources, readOnly, localPreview, onSaved, onOpenWork }: WorkPlanExperienceProps) {
+  const transport = useWorkspaceRequest();
   const [request, setRequest] = useState(initialRequest);
   const [sourceIds, setSourceIds] = useState<string[]>([]);
   const [result, setResult] = useState<PlanResponse | null>(null);
@@ -189,7 +194,7 @@ function PlanSession({ presentation, workspaceId, systemsRelease, onRequest, wor
         productId: PLANNING_PRODUCT_ID,
         resourceKind: PLANNING_RESOURCE_KIND,
       });
-      const response = await fetch(`/api/work-economics?${query.toString()}`, { credentials: "same-origin", cache: "no-store" });
+      const response = await transport(`/api/work-economics?${query.toString()}`, { credentials: "same-origin", cache: "no-store" });
       const body: unknown = await response.json().catch(() => null);
       if (!response.ok) throw new Error(responseError(body, "The planning budget could not be checked."));
       applyBudget(body as PlanningBudgetResponse);
@@ -198,7 +203,7 @@ function PlanSession({ presentation, workspaceId, systemsRelease, onRequest, wor
     } finally {
       setBudgetLoading(false);
     }
-  }, [applyBudget, localPreview, workspaceId, systemsRelease]);
+  }, [applyBudget, localPreview, transport, workspaceId, systemsRelease]);
 
   useEffect(() => { void loadPlanningBudget(); }, [loadPlanningBudget]);
 
@@ -209,7 +214,7 @@ function PlanSession({ presentation, workspaceId, systemsRelease, onRequest, wor
     setBudgetRetry(null);
     let retryable = true;
     try {
-      const response = await fetch("/api/work-economics", {
+      const response = await transport("/api/work-economics", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -227,19 +232,19 @@ function PlanSession({ presentation, workspaceId, systemsRelease, onRequest, wor
     } finally {
       setBudgetBusy(false);
     }
-  }, [applyBudget, budgetBusy, localPreview, readOnly]);
+  }, [applyBudget, budgetBusy, localPreview, readOnly, transport]);
 
   useEffect(() => {
     if (!workId || localPreview) return;
     const controller = new AbortController();
-    fetch(`/api/work-plans?workspaceId=${encodeURIComponent(workspaceId)}&workId=${encodeURIComponent(workId)}`, { signal: controller.signal, cache: "no-store" })
+    transport(`/api/work-plans?workspaceId=${encodeURIComponent(workspaceId)}&workId=${encodeURIComponent(workId)}`, { signal: controller.signal, cache: "no-store" })
       .then(async response => {
         const body = await response.json();
         if (!response.ok) throw new Error(body.error ?? "Your plan could not be loaded.");
         if (!controller.signal.aborted) { setResult(body); setRequest(body.plan.userGoal); }
       }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Your plan could not be loaded."); });
     return () => controller.abort();
-  }, [workspaceId, workId, localPreview]);
+  }, [workspaceId, workId, localPreview, transport]);
 
   async function prepare() {
     if (busy || readOnly || localPreview || !request.trim()) return;
@@ -276,7 +281,7 @@ function PlanSession({ presentation, workspaceId, systemsRelease, onRequest, wor
     storeExecution(workspaceId, accepted.jobId, { executionKey: nextExecutionKey, fingerprint });
     setBusy(true); setError("");
     try {
-      const response = await fetch("/api/work-plans", {
+      const response = await transport(prepareUrl, {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -347,7 +352,7 @@ function PlanSession({ presentation, workspaceId, systemsRelease, onRequest, wor
     {plan ? <>
       <details className="text-sm"><summary className="cursor-pointer py-2">Original request</summary><p className="whitespace-pre-wrap">{plan.userGoal}</p></details>
       {plan.context?.sources.length ? <details className="text-sm"><summary className="cursor-pointer">What Strelva looked at</summary><ul className="mt-3 space-y-3">{plan.context.sources.map(source => <li key={source.workId}><a className="underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&work=${encodeURIComponent(source.workId)}`}>{source.title}</a><p className="text-gray-muted">{source.revision === null ? "Saved version" : `Revision ${source.revision}`} · Last changed {new Date(source.updatedAt).toLocaleString()}</p></li>)}</ul><p className="mt-3 text-gray-muted">These are the versions used to prepare this proposal. Later source edits do not update the saved plan.</p></details> : null}
-      <section className="space-y-3 border-t border-gray-border pt-4"><h2 className="font-display text-xl">Ready to review</h2><p className="text-sm">{plan.summary}</p><ul className="space-y-6">{plan.proposedOutputs.map(output => <li key={`${result?.work.id}:${output.id}`}><h3 className="font-medium">{output.title}</h3><p className="text-sm text-gray-muted">{output.description}</p>{result ? <WorkPlanOutputPreview onOpenWork={onOpenWork} workspaceId={workspaceId} planWorkId={result.work.id} plan={plan} output={output} disabled={readOnly || localPreview} completed={result.executions?.find(execution => execution.outputId === output.id)} /> : null}</li>)}</ul></section>
+      <section className="space-y-3 border-t border-gray-border pt-4"><h2 className="font-display text-xl">Ready to review</h2><p className="text-sm">{plan.summary}</p><ul className="space-y-6">{plan.proposedOutputs.map(output => <li key={`${result?.work.id}:${output.id}`}><h3 className="font-medium">{output.title}</h3><p className="text-sm text-gray-muted">{output.description}</p>{result ? <WorkPlanOutputPreview executionUrl={outputUrl} onOpenWork={onOpenWork} workspaceId={workspaceId} planWorkId={result.work.id} plan={plan} output={output} disabled={readOnly || localPreview} completed={result.executions?.find(execution => execution.outputId === output.id)} /> : null}</li>)}</ul></section>
       {plan.steps.length ? <details className="space-y-3 border-t border-gray-border pt-4"><summary className="cursor-pointer text-sm">How this will be done</summary><ol className="list-decimal space-y-3 pl-5">{plan.steps.map(step => <li key={step.id}><h3 className="font-medium">{step.title}</h3><p className="text-sm text-gray-muted">{step.description}</p></li>)}</ol></details> : null}
       {plan.neededInputs.length || plan.requiredDecisions.length ? <section className="space-y-3 border-t border-gray-border pt-4"><h2 className="font-display text-xl">Needs you</h2><ul className="space-y-3">{plan.neededInputs.map(input => <li key={`input-${input.id}`}><p className="font-medium">{input.label}{input.required ? "" : " (optional)"}</p><p className="text-sm text-gray-muted">{input.reason}</p></li>)}{plan.requiredDecisions.map(decision => <li key={`decision-${decision.id}`}><p className="font-medium">{decision.question}</p><p className="text-sm text-gray-muted">{decision.reason}</p></li>)}</ul></section> : null}
       <p className="text-sm text-gray-muted">Cost has not been estimated. Each output needs its own explicit action. Creating private work does not start an ongoing job.</p>

@@ -9,6 +9,7 @@
  *
  * Idempotent on the provider order id so a retried beacon can't double-count.
  */
+import { mirrorRecord, readRecords } from "./client-records";
 import { getRedis } from "@/platform/infra/redis";
 
 const ORDER_TTL_SECONDS = 90 * 24 * 60 * 60;
@@ -118,11 +119,16 @@ export async function recordOrder(
     await redis.del(dedupKey).catch(() => {});
     throw err;
   }
+  await mirrorRecord("orders", tenant, order.id, order, order.createdAt);
   return order;
 }
 
 /** Most recent orders, newest first. */
 export async function getOrders(tenant: string, limit = 50): Promise<OrderRecord[]> {
+  return readRecords("orders", tenant, () => getRedisOrders(tenant, limit), limit);
+}
+
+async function getRedisOrders(tenant: string, limit: number): Promise<OrderRecord[]> {
   const redis = getRedis();
   if (!redis) return [];
   const ids = await redis.zrange<string[]>(ordersKey(tenant), 0, limit - 1, { rev: true });

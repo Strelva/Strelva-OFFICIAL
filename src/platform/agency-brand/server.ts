@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { getSupabase } from "@/platform/infra/db/client";
 import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
-import { readImageDimensions, sniffImageType } from "@/platform/infra/image-signature";
+import { readImageDimensions, sniffImageType } from "@/platform/infra/media/image-signature";
 import { releaseWorkspaceForTenant } from "@/platform/release-flags/store";
 import { WorkspaceAccessError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { agencyNameSchema, brandInputSchema, STRELVA_BRAND, type AgencyBrandInput, type OwnerBrand } from "@/platform/infra/agency-brand";

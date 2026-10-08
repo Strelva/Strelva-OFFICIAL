@@ -668,6 +668,13 @@ export async function reconcileInquiryProviderEvent(input: {
   if (claim.status === "processing") return { status: "unavailable", tenantId: target.tenantId, inquiryId: target.inquiryId, action: target.action, reason: "provider_outcome_processing" };
   try {
     if (checkpoint.providerEventId === eventId) {
+      if (target.action === "owner_notification" && process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1") {
+        const { copyInquiryEvent } = await import("@/platform/infra/inquiry-records");
+        const copied = await copyInquiryEvent({ tenantId: target.tenantId, inquiryId: target.inquiryId.replace(/_notice_repair_[a-f0-9]{32}$/, ""), kind: "delivery", actor: "system",
+          detail: { ownerNotice: true, action: target.action, status: checkpoint.status, reason: providerReason(type, data),
+            acceptedAt: checkpoint.acceptedAt ?? null, providerMessageId }, dedupeKey: `owner-notice-provider:${eventId}` });
+        if (copied === "failed") throw new Error("owner_notice_receipt_unavailable");
+      }
       // Repair a timeline or receipt write interrupted after the checkpoint.
       // The current claim token proves the prior lease expired before this
       // repair began.
@@ -701,6 +708,13 @@ export async function reconcileInquiryProviderEvent(input: {
       reason: providerReason(type, data),
       evidence: [`Resend event ${eventId} reported ${type}.`],
     });
+    if (target.action === "owner_notification" && process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1") {
+      const { copyInquiryEvent } = await import("@/platform/infra/inquiry-records");
+      const copied = await copyInquiryEvent({ tenantId: target.tenantId, inquiryId: target.inquiryId.replace(/_notice_repair_[a-f0-9]{32}$/, ""), kind: "delivery", actor: "system",
+        detail: { ownerNotice: true, action: target.action, status: updated.status, reason: providerReason(type, data),
+          acceptedAt: updated.acceptedAt ?? null, providerMessageId }, dedupeKey: `owner-notice-provider:${eventId}` });
+      if (copied === "failed") throw new Error("owner_notice_receipt_unavailable");
+    }
     // Before the timeline, so a retry after a receipt failure takes the
     // repair branch above and appends the timeline entry only once.
     if (!(await messageReceiptAvailable(receiptWriter, target.tenantId, updated))) {
