@@ -26,6 +26,7 @@ for fixture in connected-inquiry-owner-notices inquiry-decision-notice-events in
   printf 'Retaining fictional rollback fixture: %s\n' "$fixture"
   sed -e 's/^rollback;$/commit;/' -e "s/repeat('n',24)/'$fixture_key'/g" \
     -e "s/repeat('n',32)/'$fixture_token'/g" -e 's/ir-/rollback-ir-/g' \
+    -e "s@support/confirm-working-record.sql@$repo_root/tests/support/confirm-working-record.sql@" \
     -e "s/'lead_/'lead_rollback_/g" -e 's/"lead_/"lead_rollback_/g' "$repo_root/tests/$fixture-schema.sql" |
     psql "${psql_args[@]}" --dbname=inquiry_rollback_template >/dev/null
 done

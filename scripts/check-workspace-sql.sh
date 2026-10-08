@@ -1147,7 +1147,8 @@ psql "${psql_args[@]}" --file="$repo_root/tests/booking-confirmed-facts-schema.s
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-business-context-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-context-notices-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-booking-handoff-schema.sql"
-psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-schema.sql"
+# The hosted facts contract ran forward/rollback/forward above, before
+# website-cutover-undo intentionally removes its shared publication fixture.
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013110000_public_facts_read_confirmed.sql"
 if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011133700_business_facts_owner_decision.sql" >"$cluster_root/booking-facts-rollback-order.log" 2>&1; then
@@ -1208,6 +1209,48 @@ psql "${psql_args[@]}" --file="$repo_root/tests/provider-disconnect-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011180000_provider_disconnect_receipts.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011180000_provider_disconnect_receipts.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/provider-disconnect-schema.sql"
+# #524: owner links go only to a trusted owner address. The rollback must
+# restore every public function body and privilege, trigger, relation, column
+# and constraint exactly; then the migration reapplies.
+owner_trust_snapshot() {
+  psql "${psql_args[@]}" -At <<'SQL'
+select 'fn ' || p.oid::regprocedure::text || ' ' || md5(pg_get_functiondef(p.oid)) || ' ' || coalesce(p.proacl::text, '')
+  from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind in ('f', 'p')
+union all
+select 'tg ' || t.tgrelid::regclass::text || ' ' || t.tgname || ' ' || t.tgenabled::text || ' ' || md5(pg_get_triggerdef(t.oid))
+  from pg_trigger t join pg_class c on c.oid = t.tgrelid where c.relnamespace = 'public'::regnamespace and not t.tgisinternal
+union all
+select 'rel ' || c.relname || ' ' || c.relkind::text || ' ' || c.relrowsecurity::text || ' ' || coalesce(c.relacl::text, '')
+  from pg_class c where c.relnamespace = 'public'::regnamespace
+union all
+select 'col ' || a.attrelid::regclass::text || '.' || a.attname || ' ' || format_type(a.atttypid, a.atttypmod) || ' ' || a.attnotnull::text
+  from pg_attribute a join pg_class c on c.oid = a.attrelid
+  where c.relnamespace = 'public'::regnamespace and c.relkind = 'r' and a.attnum > 0 and not a.attisdropped
+union all
+select 'con ' || conrelid::regclass::text || ' ' || conname || ' ' || md5(pg_get_constraintdef(oid))
+  from pg_constraint where connamespace = 'public'::regnamespace
+order by 1;
+SQL
+}
+owner_trust_snapshot >"$cluster_root/owner-trust-before.txt"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013120000_owner_recipient_trust.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-recipient-trust-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013120000_owner_recipient_trust.sql"
+owner_trust_snapshot >"$cluster_root/owner-trust-after-rollback.txt"
+if ! diff -u "$cluster_root/owner-trust-before.txt" "$cluster_root/owner-trust-after-rollback.txt"; then
+  printf 'Owner recipient trust rollback did not restore the schema exactly.\n' >&2
+  exit 1
+fi
+# The Needs you and Make real link contracts hold on the restored functions
+# and again on the reapplied ones.
+psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013120000_owner_recipient_trust.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-recipient-trust-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-schema.sql"
+printf 'Owner recipient trust rollback is exact (%s schema objects compared) and reapplies.\n' \
+  "$(wc -l <"$cluster_root/owner-trust-before.txt" | tr -d ' ')"
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

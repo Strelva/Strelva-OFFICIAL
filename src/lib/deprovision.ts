@@ -57,6 +57,10 @@ export const WORKSPACE_OWNED_TENANT_TABLES = [
   "website_document_publications", "website_hosted_tenant_reservations",
 ] as const;
 
+// The tenant delete removes these through ON DELETE CASCADE. Count them for
+// dry runs and receipts without changing the atomic teardown's explicit sweep.
+export const CASCADED_TENANT_TABLES = ["tenant_track_signing_keys"] as const;
+
 // Finding 19 resolved in Wave 6: preserve the five tables as historical
 // receipts. STRELVA_TENANT_RECEIPT_RETENTION=1 selects the atomic adapter
 // that records counts and expires draft grants; off uses the original RPC.
@@ -337,7 +341,7 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
   // transaction. A failure throws here, before Redis or Vercel are touched.
   let pgTotal = 0;
   const found: Array<[string, number]> = [];
-  for (const table of [...TENANT_SCOPED_TABLES, "tenants"]) {
+  for (const table of [...TENANT_SCOPED_TABLES, ...CASCADED_TENANT_TABLES, "tenants"]) {
     const n = await countRows(table, tenantId);
     pgTotal += n;
     if (n > 0) found.push([table, n]);
@@ -360,7 +364,8 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
   }
   const removed = executed ? await deleteTenantRowsAtomically(tenantId) : {};
   for (const [table, n] of found) {
-    summary.postgres!.push({ target: table, found: n, deleted: executed && (removed[table] ?? 0) > 0 });
+    const cascaded = CASCADED_TENANT_TABLES.some(candidate => candidate === table) && (removed.tenants ?? 0) > 0;
+    summary.postgres!.push({ target: table, found: n, deleted: executed && ((removed[table] ?? 0) > 0 || cascaded) });
   }
 
   // Redis: per-tenant keys (pinned patterns) + global cache busts.
