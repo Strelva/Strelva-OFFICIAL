@@ -20,7 +20,7 @@ import { setOwnerRecipientResolver } from "@/lib/owner-recipient";
 import { setBusinessRecordDb } from "@/platform/business-record/repository";
 import type { ResponsibilityPolicy } from "@/products/inquiries/contracts";
 
-vi.mock("@/lib/tenant-crm", () => ({ addTenantActivity: vi.fn(async () => undefined) }));
+vi.mock("@/platform/infra/tenant-crm", () => ({ addTenantActivity: vi.fn(async () => undefined) }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: vi.fn(async () => ({ siteName: "Harbor Dental", ownerEmail: "owner@harbor.example" })) }));
 
 afterEach(() => { setOwnerRecipientResolver(null); setBusinessRecordDb(null); vi.unstubAllEnvs(); });

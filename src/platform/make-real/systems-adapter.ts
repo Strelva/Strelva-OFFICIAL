@@ -120,10 +120,12 @@ export function createSystemStoreLiveSystems(options: SystemStoreLiveSystemsOpti
     async introduceSystem(businessId, intro, key) {
       const nativeWebsite = intro.candidate.content.kind === "ask-website-pages"
         ? z.string().uuid().safeParse(intro.candidate.content.rebuildWorkId) : null;
+      const nativeBooking = intro.candidate.content.kind === "ask-new-service-setup" ? z.string().uuid().safeParse(intro.candidate.content.workId) : null;
+      const native = nativeWebsite?.success ? nativeWebsite : nativeBooking?.success ? nativeBooking : null;
       const system = await store.createSystem(actor, businessId, {
         name: intro.name, purpose: intro.purpose,
-        kind: nativeWebsite?.success ? "website" : introducedKind,
-        ...(nativeWebsite?.success ? { origin: { kind: "saved_work" as const, ref: nativeWebsite.data } } : {}),
+        kind: nativeWebsite?.success ? "website" : nativeBooking?.success ? "booking" : introducedKind,
+        ...(native?.success ? { origin: { kind: "saved_work" as const, ref: native.data } } : {}),
       }, commandId(key, "create"));
       const implementation = await content.put(businessId, intro.candidate.content);
       const { revision } = await store.recordRevision(

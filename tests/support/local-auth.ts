@@ -36,6 +36,30 @@ export function removeLocalSuperAdmin(userId: string): void {
   localSql(`delete from public.super_admins where user_id = ${sqlLiteral(userId)}::uuid;`);
 }
 
+/**
+ * Native-tool fixtures explicitly give their builder a second, agency role.
+ * Customer ownership and super-admin status alone never grant make_systems.
+ * This is synthetic authority in the disposable database, not owner self-service.
+ */
+export function seedLocalNativeMaker(workspaceId: string, userId: string): () => void {
+  const agencyId = randomUUID();
+  const workspace = `${sqlLiteral(workspaceId)}::uuid`;
+  const user = `${sqlLiteral(userId)}::uuid`;
+  const agency = `${sqlLiteral(agencyId)}::uuid`;
+  const authority = localSql(`select public.workspace_make_systems_authority(${workspace}, ${user});`);
+  if (authority !== "member") throw new Error("The native fixture must start as an ordinary customer member.");
+  localSql(`begin;
+    insert into public.workspaces(id, kind, name, created_by) values (${agency}, 'agency', 'Local native-tool maker', ${user});
+    insert into public.workspace_memberships(workspace_id, user_id, role, created_by) values (${agency}, ${user}, 'owner', ${user});
+    insert into public.provider_seats(customer_workspace_id, agency_workspace_id, granted_by_kind, granted_by) values (${workspace}, ${agency}, 'owner', ${user});
+    insert into public.agency_client_staff(customer_workspace_id, agency_workspace_id, user_id, assigned_by) values (${workspace}, ${agency}, ${user}, ${user});
+    commit;`);
+  if (localSql(`select public.workspace_make_systems_authority(${workspace}, ${user});`) !== "provider") {
+    throw new Error("The explicit staffed provider seat did not grant maker authority.");
+  }
+  return () => { localSql(`delete from public.workspaces where id = ${agency};`); };
+}
+
 export async function signedInContext(browser: Browser, admin: Pick<SupabaseClient, "auth">, role: string) {
   const env = localEnvironment();
   const email = `local-${role}-${randomUUID()}@example.test`;

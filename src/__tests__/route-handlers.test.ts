@@ -118,7 +118,8 @@ vi.mock("@/components/templates/registry", () => ({
   ),
 }));
 
-vi.mock("@/lib/storage", () => ({
+vi.mock("@/lib/storage", async () => ({
+  nativeBusinessServiceReference: (await vi.importActual<typeof import("@/lib/business-record-reader")>("@/lib/business-record-reader")).nativeBusinessServiceReference,
   trackClick: vi.fn(() => Promise.resolve()),
   loadChatMessages: vi.fn(() => Promise.resolve([])),
   saveChatMessages: (...args: unknown[]) => mockSaveChatMessages(...args),

@@ -4,7 +4,7 @@ import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import { WorkspaceInquirySystem } from "@/experience/places/WorkspaceInquirySystem";
 import Link from "next/link";
 import { ContentWorkspace } from "@/experience/publishing/ContentWorkspace";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowUpRight, MessageSquareText } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { InquiryServerWorkspaceExperience } from "@/experience/inquiries/InquiryServerExperience";
@@ -63,6 +63,8 @@ export interface SystemPageProps {
   inquiryAdapter?: { tenantId: string; adapter?: InquirySurfaceAdapter };
   systemHref: (id: string) => string;
   onHome: () => void;
+  /** Re-read this current System after detail reconciliation, without writing candidate state. */
+  onRefreshSystems?: (workspaceId: string, systemId: string, observedRevisionId: string | null, signal: AbortSignal) => Promise<void>;
   onOpenSystem?: (id: string) => void;
   onAsk: (request: string) => void;
 }
@@ -77,6 +79,27 @@ export function SystemPage(props: SystemPageProps) {
   const [detailVersion, setDetailVersion] = useState(0);
   const fetchedDetail = useWebsiteSystemDetail(props.workspaceId, system?.id ?? "", Boolean(system && system.kind === "website" && !props.websiteDetail), detailVersion);
   const websiteDetail = props.websiteDetail ?? fetchedDetail;
+  const revisionKnown = system?.currentRevisionId !== undefined;
+  const currentDetail = websiteDetail?.status === "ready" && websiteDetail.detail.workspaceId === props.workspaceId && websiteDetail.detail.systemId === system?.id ? websiteDetail.detail : null;
+  const revisionChanged = Boolean(revisionKnown && currentDetail?.currentRevisionId !== undefined && currentDetail.currentRevisionId !== system?.currentRevisionId);
+  const revisionUnavailable = Boolean(revisionKnown && system?.kind === "website" && (!currentDetail || currentDetail.currentRevisionId === undefined));
+  const [refreshAttempt, setRefreshAttempt] = useState(0);
+  const [refreshError, setRefreshError] = useState(false);
+  const refreshSystems = props.onRefreshSystems;
+  const currentSystemId = system?.id;
+  const observedRevisionId = currentDetail?.currentRevisionId;
+  useEffect(() => {
+    if (!revisionChanged || !currentSystemId || observedRevisionId === undefined || !refreshSystems) return;
+    const controller = new AbortController();
+    void refreshSystems(props.workspaceId, currentSystemId, observedRevisionId, controller.signal).catch(() => {
+      if (!controller.signal.aborted) setRefreshError(true);
+    });
+    return () => controller.abort();
+  }, [revisionChanged, observedRevisionId, system?.currentRevisionId, currentSystemId, props.workspaceId, refreshSystems, refreshAttempt]);
+  const revisionBlocked = revisionChanged || revisionUnavailable;
+  const revisionReason = revisionUnavailable ? websiteDetail?.status === "loading" ? "Checking the website's current state before you decide." : "The current website could not be confirmed. Reload before deciding."
+    : refreshError ? "The website changed and its current state could not be loaded. Retry before deciding."
+    : "The website changed. Checking its current state before you decide.";
   const siteHref = props.operator && system && system.surface.kind === "website" && system.surface.editing ? (tab: "connections" | "google") => workspaceSiteHref({ workspaceId: props.workspaceId, systemId: system.id, tab }, props.appBase || "") : undefined;
   const back = <button type="button" className={styles.back} onClick={onHome}><ArrowLeft size={16} aria-hidden="true" />Home</button>;
   if (loading && !system) return <div className={styles.page}>{back}<p role="status" className="mt-6 text-sm text-gray-muted">Opening this system…</p></div>;
@@ -141,7 +164,8 @@ export function SystemPage(props: SystemPageProps) {
         {filesRequests && askingChange ? <WebsiteChangeAsk workspaceId={props.workspaceId} systemId={system.id} siteName={system.name} onFiled={() => setDetailVersion(version => version + 1)} onClose={() => setAskingChange(false)} /> : null}
         {system.kind === "website" && websiteDetail ? <WebsiteSystemPanels workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} onAsk={onAsk} onAskChange={filesRequests ? () => setAskingChange(true) : undefined} readOnly={readOnly} includeHistory={false} /> : null}
         {system.activations?.length ? <ActivationsPanel system={system} /> : null}
-        {system.possibilities.length || system.storedVersionId ? <PossibilitiesPanel system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={comparing && mode !== "current" ? comparing.id : null} onCompare={system.surface.kind === "website" ? compare : undefined} onAsk={onAsk} /> : null}
+        {revisionBlocked ? <p role={refreshError || revisionUnavailable ? "alert" : "status"}>{revisionReason}{revisionChanged && refreshError ? <> <button type="button" className="underline" onClick={() => { setRefreshError(false); setRefreshAttempt(attempt => attempt + 1); setDetailVersion(version => version + 1); }}>Retry current state</button></> : null}</p> : null}
+        {system.possibilities.length || system.storedVersionId ? <PossibilitiesPanel system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={!revisionBlocked && (props.canMakeReal ?? !readOnly)} makeRealReason={revisionBlocked ? revisionReason : props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={comparing && mode !== "current" ? comparing.id : null} onCompare={system.surface.kind === "website" ? compare : undefined} onAsk={onAsk} /> : null}
         {system.connections.length || system.offers?.length || siteHref || (websiteDetail?.status === "ready" && websiteDetail.detail.domains.length) ? <ConnectionsPanel system={system.kind === "website" && websiteDetail?.status === "ready" ? { ...system, connections: [...system.connections, ...websiteDomainConnections(websiteDetail.detail)] } : system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} siteHref={siteHref} /> : null}
         <PartsPanel system={system} />
         {system.versions.length ? <VersionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} /> : null}
@@ -328,7 +352,7 @@ function PossibilitiesPanel({ system, systems, workspaceId, readOnly, readOnlyRe
       return <li key={possibility.id}>
         <span className={styles.possibilityHead}><strong>{possibility.title}</strong><span className={styles.lifecycle} data-lifecycle={possibility.status === "ready" ? "live" : "draft"}>{POSSIBILITY_STATUS_LABEL[possibility.status]}</span></span>
         <small>{possibility.summary}</small>
-        {possibility.staleReason ? <small role="note">{possibility.staleReason} Strelva is refreshing it.</small> : null}
+        {possibility.staleReason ? <small role="note">{possibility.staleReason}</small> : null}
         {possibility.evidence ? <small>{possibility.evidence}</small> : null}
         <small>Changes: {scope.join(", ")}</small>
         <span className={styles.possibilityActions}>

@@ -1,3 +1,4 @@
+import { prepareAskServiceSetup } from "./service-setup-possibility-server";
 import { createPossibilityAdapter, AskPossibilityUnsupportedError } from "@/platform/ask/ports";
 import { createSupabasePossibilityRepository } from "@/platform/possibilities/supabase-repository";
 import { prepareAskPageSet, websiteRebuildReleasedFor } from "@/products/websites/index";
@@ -14,10 +15,12 @@ export function createAskPossibilityPort(actor: WorkspaceActor, dependencies: {
   booking?: typeof prepareExistingAskBookingPage;
   existingWebsite?: typeof prepareExistingAskWebsitePages;
   inquiryFollowUp?: typeof prepareAskInquiryFollowUp;
+  serviceSetup?: typeof prepareAskServiceSetup;
 } = {}) {
   const port = createPossibilityAdapter(dependencies.repository ?? createSupabasePossibilityRepository(actor), {
     durable: true,
     async prepare(currentActor, input, id) {
+      if (input.candidate?.kind === "new-booking-service") return (dependencies.serviceSetup ?? prepareAskServiceSetup)(currentActor, input, id);
       if (input.candidate?.kind === "inquiry-follow-up-rule") return (dependencies.inquiryFollowUp ?? prepareAskInquiryFollowUp)(currentActor, input, id);
       if (!input.candidate) throw new AskPossibilityUnsupportedError("This alternative has no supported page-set candidate.");
       if (!await (dependencies.released ?? websiteRebuildReleasedFor)(currentActor, input.workspaceId)) throw new AskPossibilityUnsupportedError("Working page-set preparation is not enabled for this business.");

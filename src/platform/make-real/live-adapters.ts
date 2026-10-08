@@ -1,3 +1,4 @@
+import { askServiceSetupSelectionSchema, askServiceSetupIds, type AskServiceSetupSelection } from "@/platform/ask/new-service";
 import { z } from "zod";
 import type { DeclaredEffect, MakeRealChannel, Reversibility } from "@/platform/possibilities/contracts";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
@@ -312,10 +313,14 @@ export const bookingPageRequestSchema = z.object({
   provider: z.enum(["outlook", "google"]),
   displayName: z.string().min(1).max(160),
   timeZone: z.string().min(1).max(128),
+  setupAlternative: askServiceSetupSelectionSchema.optional(),
 }).strict();
 
 type GrantRow = Record<string, unknown>;
 export interface BookingPagePorts {
+  publishSetup?(actor: WorkspaceActor, selection: AskServiceSetupSelection): Promise<GrantRow>;
+  verifySetup?(actor: WorkspaceActor, businessId: string, grantId: string): Promise<{ok:boolean;detail:string}>;
+  revokeSetup?(actor: WorkspaceActor, input: { businessId: string; grantId: string; reason: string }): Promise<unknown>;
   publish(actor: WorkspaceActor, input: z.infer<typeof bookingPageRequestSchema>): Promise<GrantRow>;
   list(actor: WorkspaceActor, businessId: string): Promise<GrantRow | GrantRow[]>;
   revoke(actor: WorkspaceActor, input: { businessId: string; grantId: string; reason: string }): Promise<unknown>;
@@ -324,34 +329,44 @@ export interface BookingPagePorts {
 export function createBookingPageAdapter(ports: BookingPagePorts, ctx: LiveChannelContext): EffectAdapter {
   const rows = async (businessId: string) => { const value = await ports.list(ctx.actor, businessId); return Array.isArray(value) ? value : [value]; };
   const ref = (businessId: string, grantId: string) => `${businessId}|${grantId}`;
-  const split = (providerRef: string) => { const [businessId = "", grantId = ""] = providerRef.split("|"); return { businessId, grantId }; };
+  const split = (providerRef: string) => { const parts = providerRef.split("|"); const setup = parts[0] === "setup"; if (setup) parts.shift(); const [businessId = "", grantId = ""] = parts; return { businessId, grantId, setup }; };
   return {
     // The grant is unique per (site, capability), so a replay cannot add a second.
     ...base("booking_page", ctx, "compensable", true),
     async perform({ businessId, effect }) {
       const req = parseRequest(bookingPageRequestSchema, effect);
       if (!req || req.businessId !== businessId) return rejected("This effect does not name a booking page of this business.");
-      const grant = await ports.publish(ctx.actor, req);
+      const selection = req.setupAlternative;
+      if (selection) {
+        const ids = askServiceSetupIds(selection);
+        if (!ports.publishSetup || selection.workspaceId !== businessId || selection.service.tenantId !== req.tenantId || ids.workId !== req.workId
+          || ids.capabilityId !== req.capabilityId || ids.inquiryId !== req.inquiryCapabilityId || req.capabilityVersion !== 1 || req.inquiryVersion !== 1
+          || selection.service.provider !== req.provider || selection.service.serviceName !== req.displayName || selection.service.timeZone !== req.timeZone) return rejected("This setup no longer matches its exact reviewed service.");
+      }
+      const { setupAlternative: _setup, ...ordinary } = req;
+      const grant = selection ? await ports.publishSetup!(ctx.actor, selection) : await ports.publish(ctx.actor, ordinary);
       const id = typeof grant.id === "string" ? grant.id : null;
       if (!id || grant.status !== "published") return rejected("The booking page was not published.");
-      return { status: "accepted", providerRef: ref(businessId, id), result: { grantId: id } };
+      return { status: "accepted", providerRef: `${selection ? "setup|" : ""}${ref(businessId, id)}`, result: { grantId: id } };
     },
     async find({ businessId, effect }) {
       const req = parseRequest(bookingPageRequestSchema, effect);
       if (!req) return null;
       const grant = (await rows(businessId)).find((row) => row.capability_id === req.capabilityId && row.capability_version === req.capabilityVersion
         && row.work_id === req.workId && row.status === "published");
-      return grant && typeof grant.id === "string" ? { found: true, providerRef: ref(businessId, grant.id) } : { found: false };
+      return grant && typeof grant.id === "string" ? { found: true, providerRef: `${req.setupAlternative ? "setup|" : ""}${ref(businessId, grant.id)}` } : { found: false };
     },
     async readBack({ providerRef }) {
-      const { businessId, grantId } = split(providerRef);
+      const { businessId, grantId, setup } = split(providerRef);
+      if (setup) return ports.verifySetup ? ports.verifySetup(ctx.actor, businessId, grantId) : {ok:false,detail:"Native setup read-back is unavailable."};
       const grant = (await rows(businessId)).find((row) => row.id === grantId);
       return grant?.status === "published" ? { ok: true, detail: "The booking page is published." } : { ok: false, detail: grant ? `The booking page reads ${String(grant.status)}.` : "The booking page could not be found." };
     },
     async compensate({ providerRef }) {
-      const { businessId, grantId } = split(providerRef);
+      const { businessId, grantId, setup } = split(providerRef);
       try {
-        await ports.revoke(ctx.actor, { businessId, grantId, reason: "Make real was rolled back." });
+        if (setup && !ports.revokeSetup) return {ok:false,detail:"Native setup stop is unavailable."};
+        await (setup ? ports.revokeSetup! : ports.revoke)(ctx.actor, { businessId, grantId, reason: "Make real was rolled back." });
         return { ok: true, detail: "The booking page is off. Bookings already made are kept." };
       } catch (error) {
         return { ok: false, detail: message(error, "The booking page could not be revoked.") };

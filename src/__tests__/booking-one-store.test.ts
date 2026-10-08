@@ -32,6 +32,7 @@ vi.mock("@/lib/storage/core", () => ({
 }));
 vi.mock("@/lib/storage/content-store", () => ({ getContent: async () => ({ services: h.services }) }));
 vi.mock("@/lib/storage", async () => ({
+  nativeBusinessServiceReference: (await vi.importActual<typeof import("@/lib/business-record-reader")>("@/lib/business-record-reader")).nativeBusinessServiceReference,
   ...(await vi.importActual<typeof import("@/platform/bookings/legacy-store")>("@/platform/bookings/legacy-store")),
   getContent: async () => ({ services: h.services }),
   logActivity: h.logActivity,
@@ -44,6 +45,7 @@ vi.mock("@/lib/tenants", () => ({ getTenantConfig: async (id: string) => ({ id, 
 vi.mock("@/lib/owner-recipient", () => ({ ownerNoticeEmail: async () => "owner-recipient@example.test" }));
 vi.mock("@/lib/tenant-urls", () => ({ getTenantDashboardUrl: (_c: unknown, path: string) => `https://app.strelva.test${path}` }));
 vi.mock("@/lib/delivery-email", () => ({ sendBookingConfirmation: h.sendBookingConfirmation, sendNewBookingOwnerEmail: h.sendNewBookingOwnerEmail }));
+vi.mock("@/platform/bookings/notice-email", () => ({ sendNewBookingOwnerEmail: h.sendNewBookingOwnerEmail }));
 vi.mock("@/platform/infra/monitoring", () => ({ alertOnce: h.alertOnce }));
 vi.mock("@/platform/infra/auth", () => ({ verifyAuth: async () => true, requireTenantPermission: async () => null, requireTenantAccess: async () => null }));
 vi.mock("@/lib/subscription", () => ({ requireActiveSubscription: async () => null }));

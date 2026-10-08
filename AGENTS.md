@@ -172,6 +172,15 @@ failure evidence. The bounded signed-in-owner three-flag browser runner is
 its own local Auth stack and app, with providers disabled and a fictional
 source-site transport. A passing local run is never proof of hosted delivery.
 
+For actor-bound section-content receipts, also run
+`PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH bash scripts/check-content-authority-http.sh`.
+It owns disposable loopback Auth/Postgres and the app, applies the full forward
+schema, enables the receipt path, and exercises signed-owner Content PUT/draft
+publication plus actual agency attribution and linked-admin/revoked-owner
+refusals. It does not call a storefront or qualify hosted publication. See
+[the authority handoff](./docs/operations/content-version-authority-2026-10-08.md)
+for SQL recovery/race checks and exact limits.
+
 `CUSTOM_DOMAIN_MAP` routes custom domains locally.
 [docs/operations/testing-and-ci.md](./docs/operations/testing-and-ci.md) explains when Redis,
 Postgres, or bypass mode changes what a green run means.

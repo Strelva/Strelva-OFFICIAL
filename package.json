@@ -28,6 +28,7 @@
     "check:ontology": "tsx scripts/check-ontology.ts",
     "check:boundaries": "tsx scripts/check-product-boundaries.ts",
     "db:types": "tsx scripts/generate-database-types.ts",
+    "check:public-business-verification": "bash scripts/check-public-business-verification-sql.sh",
     "check:agency-workflow": "bash scripts/check-agency-workflow-sql.sh",
     "check:workspace-sql": "bash scripts/check-workspace-sql.sh",
     "check:workspace-upgrade": "bash scripts/check-workspace-upgrade.sh",
@@ -41,7 +42,7 @@
     "check:journeys": "bash scripts/check-journeys.sh",
     "check:readonly-rpcs": "node --import tsx scripts/check-readonly-rpcs.mjs",
     "check:make-real-compensation-sql": "bash scripts/check-make-real-compensation-sql.sh",
-    "smoke:workspace": "STRELVA_WORKSPACE_RELEASE=1 playwright test tests/workspace-release.spec.ts",
+    "smoke:workspace": "STRELVA_WORKSPACE_RELEASE=1 playwright test tests/workspace-release.spec.ts tests/provider-seat-workspace.spec.ts",
     "audit:full": "npx tsx --env-file-if-exists=.env.local scripts/full-audit.ts",
     "check:site-domains": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/check-site-domains.ts",
     "check:prod": "tsx scripts/production-checklist.ts",
@@ -49,7 +50,8 @@
     "reborn:progress": "node scripts/reborn-progress.mjs",
     "version:check": "node scripts/check-version-sync.mjs",
     "check:release-safety": "vitest run src/__tests__/release-safety-tools.test.ts src/__tests__/release-restore.test.ts src/__tests__/production-readiness-snapshot.test.ts && tsx scripts/check-release-safety.ts",
-    "check:release-safety:batch8": "tsx scripts/check-release-safety-batch8.ts"
+    "check:release-safety:batch8": "tsx scripts/check-release-safety-batch8.ts",
+    "check:authentication-time": "tsx scripts/check-authentication-time-local.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.78",

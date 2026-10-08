@@ -1,8 +1,9 @@
+import { assertAskServiceTenantSource } from "@/products/scheduling/server";
 import { bookingServicePoliciesEnabled, servicePolicy } from "@/platform/bookings/service-policy";
 import { bookingReadSource } from "@/platform/bookings/flags";
 import { readBookingContext } from "@/platform/bookings/store";
 import { NextResponse } from "next/server";
-import { getContent } from "@/lib/storage";
+import { getContent, nativeBusinessServiceReference } from "@/lib/storage";
 import { getAvailableSlots } from "@/platform/bookings/legacy-store";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
@@ -36,6 +37,7 @@ export async function GET(request: Request) {
     if (!service || service.comingSoon) {
       return NextResponse.json({ error: "Invalid service" }, { status: 400 });
     }
+    await assertAskServiceTenantSource(tenant,serviceId,nativeBusinessServiceReference(service));
 
     const slots = await getAvailableSlots(date, serviceId, tenant);
     if (bookingServicePoliciesEnabled() && await bookingReadSource() === "postgres") {

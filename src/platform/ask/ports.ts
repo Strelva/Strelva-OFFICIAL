@@ -1,3 +1,4 @@
+import type { AskNewService } from "./new-service";
 import type { UnifiedEvent } from "@/lib/types";
 import { observedTenantRoute } from "@/platform/needs-you/tenant-classify";
 import { createPossibility, type DeclaredEffect, type SystemChange, type PossibilityRepository } from "@/platform/possibilities";
@@ -223,7 +224,7 @@ export interface AskPossibilityInput {
   words?: string;
   origin?: AskChangeOrigin;
   askedOnBehalf?: AskedOnBehalf | null;
-  candidate?: { kind: "website-pages"; pages: Array<{ path: string; title: string; description: string; paragraphs: string[] }> }
+  candidate?: AskNewService | { kind: "website-pages"; pages: Array<{ path: string; title: string; description: string; paragraphs: string[] }> }
     | { kind: "existing-website-pages"; mode: "section" | "page-set" | "rebuild"; pages: Array<{ path: string; title: string; description: string; paragraphs: string[] }> }
     | { kind: "inquiry-follow-up-rule"; capabilityId?: string; afterMinutes: number; maxAttempts: number; messageTemplate: string }
     | { kind: "existing-booking-page"; path: string; title: string; description: string; bookingGrantId?: string };

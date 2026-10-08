@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import { createInMemoryPossibilityRepository, type Possibility } from "@/platform/possibilities";
 import type { ListedPossibility, SupabasePossibilityRepository } from "@/platform/possibilities/supabase-repository";
@@ -15,6 +15,8 @@ import {
   revisionHistory,
   storedPossibilityViews,
   syncRebuildPossibilities,
+  syncAskPageSetPossibilities,
+  syncAskInquiryFollowUpPossibilities,
   type StoredTarget,
 } from "@/experience/systems/stored-possibilities";
 
@@ -99,6 +101,53 @@ describe("stored rebuild possibilities", () => {
     expect(repo.writes).toBe(writes);
   });
 
+  it("recovers when rehearsal persisted but a concurrent Ready save failed", async () => {
+    const { live, target, revisions } = fixture();
+    const repo = memoryRepo();
+    const save = repo.save;
+    let interrupted = false;
+    repo.save = async (value, expected) => {
+      if (value.status === "ready" && !interrupted) {
+        interrupted = true;
+        throw new Error("Synthetic concurrent Ready-write failure");
+      }
+      return save(value, expected);
+    };
+    const deps = { repo, live: live.port, businessId: BIZ, targets: [target], revisions, actorId: ACTOR, at: AT, canWrite: true };
+    await syncRebuildPossibilities(deps);
+    const first = await repo.listWithSources(BIZ);
+    expect(first[0]!.possibility).toMatchObject({ status: "exploring", rehearsal: { ok: true } });
+    const recovered = await syncRebuildPossibilities(deps);
+    expect(recovered[0]!.possibility).toMatchObject({ id: first[0]!.possibility.id, status: "ready", rehearsal: { ok: true } });
+    const writes = repo.writes;
+    expect((await syncRebuildPossibilities(deps))[0]!.possibility.status).toBe("ready");
+    expect(repo.writes).toBe(writes);
+  });
+
+  it.each(["live moved", "review withdrawn", "member"] as const)("does not recover partial readiness when %s", async (reason) => {
+    const { live, ref, target, revisions } = fixture();
+    const repo = memoryRepo();
+    const save = repo.save;
+    repo.save = async (value, expected) => {
+      if (value.status === "ready") throw new Error("Synthetic interrupted Ready save");
+      return save(value, expected);
+    };
+    const deps = { repo, live: live.port, businessId: BIZ, targets: [target], revisions, actorId: ACTOR, at: AT, canWrite: true };
+    await syncRebuildPossibilities(deps);
+    repo.save = save;
+    const before = (await repo.listWithSources(BIZ))[0]!.possibility;
+    const writes = repo.writes;
+    if (reason === "live moved") live.edit(ref, { pointer: "tenant_content@changed-after-rehearsal" });
+    const [retried] = await syncRebuildPossibilities({
+      ...deps,
+      targets: reason === "review withdrawn" ? [{ ...target, candidate: candidate({ ready: false }) }] : deps.targets,
+      canWrite: reason !== "member",
+    });
+    expect(retried!.possibility).toMatchObject({ id: before.id, status: "exploring" });
+    if (reason === "live moved") expect(retried!.possibility.rehearsal!.ok).toBe(false);
+    else expect(repo.writes).toBe(writes);
+  });
+
   it("refreshes the candidate when the rebuild or the live site moved, and asks again", async () => {
     const { live, ref, target, revisions } = fixture();
     const repo = memoryRepo();
@@ -117,6 +166,29 @@ describe("stored rebuild possibilities", () => {
     expect(repo.writes).toBe(0);
     const denied = memoryRepo({ deny: true });
     await expect(syncRebuildPossibilities({ repo: denied, live: live.port, businessId: BIZ, targets: [target], revisions, actorId: ACTOR, at: AT, canWrite: true })).resolves.toEqual([]);
+  });
+
+  it("read-only refresh blocks a moved baseline without saving, rehearsing or repinning any stored candidate", async () => {
+    const { live, ref, target, revisions } = fixture();
+    const repo = memoryRepo();
+    const deps = { repo, live: live.port, businessId: BIZ, targets: [target], revisions, actorId: ACTOR, at: AT, canWrite: true };
+    const rows = await syncRebuildPossibilities(deps);
+    const before = structuredClone(rows);
+    const writes = repo.writes;
+    const moved = live.edit(ref, { pointer: "materially-changed-content" });
+    const current = new Map([[ref.systemId, { revisionId: moved, number: 2 }]]);
+    const stored = await syncRebuildPossibilities({ ...deps, canWrite: false, revisions: current });
+    const read = vi.fn();
+    const checked = await syncAskPageSetPossibilities({ ...deps, stored, canWrite: false, read });
+    const currentInquiry = vi.fn();
+    expect(await syncAskInquiryFollowUpPossibilities({ ...deps, stored: checked, canWrite: false, current: currentInquiry })).toEqual(before);
+    expect(read).not.toHaveBeenCalled();
+    expect(currentInquiry).not.toHaveBeenCalled();
+    expect(repo.writes).toBe(writes);
+    expect(await repo.listWithSources(BIZ)).toEqual(before);
+    expect(storedPossibilityViews(stored, [target.candidate], undefined, current)[0]).toMatchObject({ status: "exploring", staleReason: expect.stringContaining("moved") });
+    expect(stored[0]!.possibility.status).toBe("ready");
+    expect(stored[0]!.possibility.changes[0]!.baseline.revisionId).toBe(revisions.get(ref.systemId)!.revisionId);
   });
 
   it("shows open ones with the reason a stale one went back to Exploring; made real moves to History", async () => {

@@ -22,6 +22,7 @@ const profiles = {
     ["email-only-owner-authenticated-local.spec.ts", 2],
     ["versions-authenticated-local.spec.ts", 1],
     ["inquiries-1-0-authenticated-local.spec.ts", 1],
+    ["website-stale-refresh-authenticated-local.spec.ts", 2],
   ],
   "journeys-off": [
     ["release-1-0-flags-off-authenticated-local.spec.ts", 1],
@@ -81,6 +82,26 @@ describe("critical browser proof gate", () => {
   });
   it.each(["journeys-on", "journeys-off"] as const)("accepts a complete %s run", profile => {
     expect(run(report(profile), profile).status).toBe(0);
+  });
+  it("accepts all fourteen retained flags-on cases", () => {
+    const value = report("journeys-on");
+    expect(value.stats.expected).toBe(14);
+    const result = run(value, "journeys-on");
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("14 isolated journeys-on Auth/browser journeys passed");
+  });
+  it.each([0, 1])("rejects only %s stale-workspace cases even when the summary claims fourteen passes", count => {
+    const value = report("journeys-on");
+    const staleFile = "website-stale-refresh-authenticated-local.spec.ts";
+    const retained = value.suites[0]!.specs.filter(spec => spec.file === staleFile).slice(0, count);
+    value.suites[0]!.specs = [...value.suites[0]!.specs.filter(spec => spec.file !== staleFile), ...retained];
+    expect(run(value, "journeys-on").status).toBe(1);
+  });
+  it("requires both stale-workspace cases to pass without retries", () => {
+    const value = report("journeys-on");
+    const stale = value.suites[0]!.specs.find(spec => spec.file === "website-stale-refresh-authenticated-local.spec.ts")!;
+    stale.tests[0]!.results[0]!.retry = 1;
+    expect(run(value, "journeys-on").status).toBe(1);
   });
   for (const profile of ["journeys-on", "journeys-off"] as const) {
     it.each(profiles[profile].map(([file]) => file))(`rejects an omitted %s test in ${profile} even with green summary counts`, file => {

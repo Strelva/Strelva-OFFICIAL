@@ -13,7 +13,7 @@
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { ownerNoticeEmail } from "@/lib/owner-recipient";
-import { sendNewBookingOwnerEmail } from "@/lib/delivery-email";
+import { sendNewBookingOwnerEmail } from "./notice-email";
 import type { Booking } from "@/lib/types";
 import { bookingOwnerNoticeEnabled } from "./flags";
 

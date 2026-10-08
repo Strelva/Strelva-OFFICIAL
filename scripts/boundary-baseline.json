@@ -64,7 +64,6 @@
       "src/lib/types"
     ],
     "src/platform/bookings/notices.ts": [
-      "src/lib/delivery-email",
       "src/lib/owner-recipient",
       "src/lib/tenant-urls",
       "src/lib/tenants",
@@ -204,9 +203,6 @@
       "src/lib/lead-spam",
       "src/lib/pinned-public-text"
     ],
-    "src/products/domain-monitor/server.ts": [
-      "src/lib/delivery-email"
-    ],
     "src/products/google-listing/linked-reviews.ts": [
       "src/lib/connections",
       "src/lib/events",
@@ -241,7 +237,6 @@
     "src/products/inquiries/delivery.ts": [
       "src/lib/leads",
       "src/lib/owner-recipient",
-      "src/lib/tenant-crm",
       "src/lib/tenants"
     ],
     "src/products/inquiries/follow-up-cron.ts": [

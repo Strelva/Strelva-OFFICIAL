@@ -18,6 +18,25 @@ tracked in [#315](https://github.com/Strelva/Strelva-OFFICIAL/issues/315).
 Status: steps 0–4 done Oct 7; later steps prepared, not executed by this
 amendment. Every remaining production step is a separate yes.
 
+**October 8 recovery reconciliation.** This packet retains the historical
+1.0 plan and inventories below; it is not the current hosted migration ledger.
+The later [October 7 security/runtime release](./security-runtime-production-2026-10-07.md)
+records a bounded deployed release and exact 266-version hosted history. Do not
+replay these prepared batches or the retired `20261015120000` migration against
+that upgraded target. Full 1.0 acceptance remains open under
+[#337](https://github.com/Strelva/Strelva-OFFICIAL/issues/337).
+
+The historical 114-file companion rehearsal failed pre-upgrade catalog
+restoration. The current recovery contract intentionally retains forward schema
+and accepted evidence, disables only reviewed original-scope service RPCs, and
+restores captured grants on separately approved reactivation. Fresh local
+qualification at source `e9ac136f` on October 8 applied all 40 corrective tails;
+both rounds disabled 188 RPCs and reproduced the exact secured public catalog
+while preserving every public row. It does not prove destructive schema
+restoration, full hosted disaster recovery, provider undo or the remaining
+commercial/customer rollout. Exact SQL order and refusal guards are owned by
+[release-safety tools](../../scripts/release-safety/README.md).
+
 **HOLD: steps 11–12 (S5 and conversions) until batch 7A lands.** The hold
 decision [#234](https://github.com/Strelva/Strelva-OFFICIAL/issues/234) is
 **pending**, not decided. This packet records the required stop; it does not
@@ -206,7 +225,7 @@ disagree, the checklist's stop conditions win.
 | [4](https://github.com/Strelva/Strelva-OFFICIAL/issues/347) | Lead backfill · done Oct 7 | data | 3 · S1 |
 | [5](https://github.com/Strelva/Strelva-OFFICIAL/issues/348) | Preview environment (optional, recommended before batch 2) | new env | 5 |
 | [6](https://github.com/Strelva/Strelva-OFFICIAL/issues/349) | Batches 1 to 7 (unchanged, after release-safety's rehearsal) | migration ×7 | 1 |
-| 6b | Batch 8 (prepared; empty-only recovery proven locally): readers fix and w6 migrations, after 7A | migration | 1 |
+| 6b | Batch 8 (historical prepared inventory; current recovery retains schema): readers fix and w6 migrations, after 7A | migration | 1 |
 | [6a](https://github.com/Strelva/Strelva-OFFICIAL/issues/350) | Batch 7A: agency-neutral amendments, dated before w6 migrations | migration | 1 |
 | [7](https://github.com/Strelva/Strelva-OFFICIAL/issues/351) | Deploy the 1.0 candidate with every new flag unset | deploy | 2 |
 | [8](https://github.com/Strelva/Strelva-OFFICIAL/issues/352) | Copy report and analytics state; client-records dual-write, backfill, parity | data | 3 · S2–S3 |
@@ -417,7 +436,7 @@ After each batch:
 | 5 | `20261008110000`, `20261008111000`, `20261008123000`, `20261008124000`, `20261008130000`, `20261008131000`, `20261008140000` | No Sept 30 objects. Triggers on batch 1–2 tables (`systems`, `tenant_workspace_links`), wraps `tenant_unlink_plan`, replaces `workspace_release_flag_names` | Ask history, website change receipts, listing read-back queue, Needs you policy imports, Possibilities, Make real live, lead reads |
 | 6 | `20261008141000`, `20261008150000`, `20261008150100`, `20261008151000`, `20261009100000`, `20261009110000`, `20261009113000` | Yes: `btree_gist` extension, a column + FK and an index on live `public_website_bookings`; checks, columns and indexes on `tenant_leads` (written since `0.2.1`); a column + trigger on `owner_decisions`; replaces batch 1–5 functions | Booking store and lifecycle, linked-tenant publishing, domain approvals, connected sites, the Strelva service actor, inquiry records |
 | 7 | `20261009130000`, `20261009131000`, `20261009140000` | Yes, small: replaces two batch 3/6 functions (`read_strelva_handled`, `record_strelva_service_action`) with the same signatures, swaps the `purpose` check on `strelva_service_actions` (batch 6, append-only), and replaces `workspace_release_flag_names()` (batch 6) with one more key | Strelva handled lists decided Needs you items; Make real by signed link for an owner with no account, behind its own `make_real_owner_link` flag |
-| 8 (prepared; empty-only recovery proven locally) | Complete filename-sorted prepared inventory in "Batch 8 · proposed", including integrated amendments after w6 | Not classified yet: live-object and lock impact unreviewed | Nothing until rehearsed; listed for review only |
+| 8 (historical prepared inventory; current recovery retains schema) | Complete filename-sorted prepared inventory in "Batch 8 · proposed", including integrated amendments after w6 | Not classified yet: live-object and lock impact unreviewed | Nothing until rehearsed; listed for review only |
 
 Batches 5 and 6 are in filename order; batch 6 depends on batch 5
 (`20261009100000` keeps every flag name `20261008131000` adds;
@@ -468,14 +487,14 @@ cannot be recreated by rolling back its function implementation.
 
 Historical rehearsal at `d8604ce0` ran 114 forwards and every companion,
 but retained 20 evidence tables and 60 functions instead of restoring the
-catalog. The current 118-file rehearsal now preserves those companions and
-adds an **optional, explicitly authorized empty-only structural completion**.
-It proves full public catalog/ACL equality and an identical second forward;
-accepted evidence, four added fields, flag state/history, incompatible old rows,
-missing authority and function drift all refuse atomically. Independent review
-and repeat rehearsal pass. See `scripts/release-safety/README.md` for the exact
-capture/recovery contract. This does not qualify a populated rollback or
-production migration. Restored production-copy qualification remains pending.
+catalog. A later 118-file empty-only fixture demonstrated a separate structural
+helper. Both are historical evidence. The current command does not run those
+companions or structural helpers; it qualifies forward-only runtime permission
+recovery with retained evidence. See the October 8 reconciliation above and the
+current [release-safety contract](../../scripts/release-safety/README.md).
+The [bounded deployed release](./security-runtime-production-2026-10-07.md)
+records subsequent actual-PUBLIC restored-copy qualification; that excludes
+managed Auth/storage and does not establish whole hosted disaster recovery.
 
 RL-14 readiness output now reports agency workspace counts, provider rows by
 source, Strelva designation row count, and accounts by `payer_kind`. An existing
@@ -485,32 +504,30 @@ cannot prove the payer or service-function amendments. This code was tested
 with local fixtures; no production readiness snapshot was taken.
 
 <!-- proposed-batch-8:start -->
-### Batch 8 · prepared, empty-only recovery qualified locally
+### Batch 8 · historical prepared inventory
 
-Current inventory: **118** pinned forwards, after H, batches 1–7 and 7A.
-`check:release-safety:batch8` verifies whole-inventory coverage and hashes before
-creating its isolated cluster. All 118 forwards and receipt-preserving companions
-pass. The optional empty-only helper restores the complete catalog/ACL inside one
-transaction, then 118 reapplications reproduce the original forward catalog.
-Legacy content/routing/billing/owner-access probes pass throughout. Independent
-review and an independent repeat rehearsal also pass.
+The following **118-file** inventory records an earlier prepared packet. It is
+not a staging list for the current upgraded target. Current machine-readable
+owners are `scripts/release-safety/batches.json` and
+`scripts/release-safety/original-batch8-scope.json`; the current-tail rehearsal
+records every checked-out forward digest and distinguishes original RPC scope
+from later corrective APIs. The retired `20261015120000` entry below was never
+applied in the bounded release and must not be restored to the current source.
 
-This preserves historical companion behavior: receipt/history tables remain
-until the separately authorized empty-only completion proves they contain no
-evidence. The helper requires target-specific before/forward catalog captures,
-exact body/ACL fingerprints, disabled callers and explicit recovery authority.
-It takes deterministic exclusive locks, refuses every populated retained table,
-non-null added field, new flag/history and incompatible old constraint, and uses
-no CASCADE or customer-row deletion. Populated production recovery remains a
-retention/forward-correction job; this proof grants no live rollback authority.
+The per-file companions and empty-only helper remain historical artifacts,
+not the current batch recovery gate. Some companions remove receipt tables or
+refuse after adoption/purge. Do not run the companions as a populated batch
+rollback or reverse batches 0–7 under retained batch 8. Current recovery keeps
+the additive schema and evidence, preserves later security repairs, and
+restores only captured permissions. Application flags/configuration are still
+required because later APIs and direct service table access remain outside the
+original RPC scope. No local proof grants production recovery authority.
 
 Execution contract: [release-safety tools](../../scripts/release-safety/README.md).
-The prepared batch remains under `proposed`; offline staging and this local proof
-do not establish hosted application, delivered effects or broader 1.0 acceptance.
-Migration/source drift requires a fresh qualification. Newsletter delivery
-companions remain unsafe after receipt adoption without a preservation plan;
-inquiry retention refuses reversal after its first marked purge. Neither restores
-accepted provider effects or expired data.
+The [bounded production receipt](./security-runtime-production-2026-10-07.md)
+owns what was deployed and qualified. Neither that receipt nor the local
+recovery rehearsal completes broader 1.0 acceptance or authorizes its remaining
+steps, external effects, conversions or activation.
 
 | Forward file | SHA-256 prefix | Rollback companion |
 | --- | --- | --- |
@@ -1971,16 +1988,19 @@ bypass for an ordinary agency action.
 
 ## Still unproven
 
-- Steps 0–4 have the supplied Oct 7 evidence above. This docs-only amendment
-  did not re-read production or inspect private dumps. Later production
-  steps, including batch 7A and all agency gates, remain unexecuted here.
+- Steps 0–4 have the supplied Oct 7 evidence above. Subsequent bounded
+  production work is recorded in the October 7 security/runtime release;
+  the original checklist is not its execution ledger. Full 1.0 rollout,
+  customer adoption and commercial acceptance remain unproven.
 - The hold decision #234 is pending. Verification method and agreement
   terms still need Jacob; each of the 9 clients' `existing_contract` evidence
   and Twin Trees' business structure must be confirmed before conversion.
 - Audit H reports release-safety's local restored-copy rehearsal and rollback
   companions for batches 1–7. The current branch contains that harness and
-  pins proposed H, 7A, 8 and 9. The expanded packet still needs complete local
-  rollback/catalog qualification; hosted Postgres 17 remains a separate gate.
+  pins H, 7A, 8 and 9. Current exact-source runtime recovery passes locally;
+  the bounded release also records actual-PUBLIC restored-copy proof. Neither
+  proves whole hosted disaster recovery or qualifies destructive reversal of
+  the current populated schema.
 - The exact signup kill switch, verification/re-path tools, amended
   `--agency` conversion option and `payerKind` metadata writer are prerequisites,
   not runnable completion claims in this checkout.

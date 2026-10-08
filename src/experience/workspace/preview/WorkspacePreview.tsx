@@ -36,7 +36,12 @@ function withSystems(base: typeof fetch, systems: PreviewSystems | undefined, we
       if (websiteDetail === "loading") return new Promise<Response>(() => undefined);
       if (websiteDetail === "error") return previewJson({ error: "This website's details could not be loaded." }, 503);
       if (websiteDetail === "permission") return previewJson({ error: "This business is unavailable to your account." }, 403);
-      return previewJson({ detail: previewWebsiteDetail(url.searchParams.get("systemId") ?? "", websiteDetail, undefined, url.searchParams.get("workspaceId") ?? undefined) });
+      const workspaceId = url.searchParams.get("workspaceId") ?? undefined;
+      const systemId = url.searchParams.get("systemId") ?? "";
+      const system = workspaceId ? systems.systems[workspaceId]?.systems.find(item => item.ref.systemId === systemId) : undefined;
+      return previewJson({ detail: { ...previewWebsiteDetail(systemId, websiteDetail, undefined, workspaceId),
+        ...(system?.currentRevisionId !== undefined ? { currentRevisionId: system.currentRevisionId } : {}),
+      } });
     }
     if (url.pathname === "/api/workspace/systems/website/restore" && method === "POST") {
       if (!systems.released) return previewJson({ error: "Website restore is not enabled." }, 503);

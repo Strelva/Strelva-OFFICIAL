@@ -286,7 +286,7 @@ describe("Make real and the System page", () => {
     const html = render({ system: { ...site, kind: "bookings", lifecycle: "paused", surface: { kind: "work", workId: "w", productId: "unknown" },
       possibilities: [{ ...site.possibilities[0]!, status: "exploring", staleReason: "attymooney.com changed since this was built." }] } });
     expect(html).toContain("Paused. Bookings already made are kept.");
-    expect(html).toContain("attymooney.com changed since this was built. Strelva is refreshing it.");
+    expect(html).toContain("attymooney.com changed since this was built.");
   });
 
   it("gives a non-owner a visible permission state on Make real", () => {

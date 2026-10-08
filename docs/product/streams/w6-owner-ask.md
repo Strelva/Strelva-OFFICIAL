@@ -261,7 +261,20 @@ Do not invent a financial return. Next test: compare complete runs on the
 integrated snapshot with recorded load/free space; retire any heavier factory
 proposal if it adds maintenance without reducing failures or attention.
 
-## Merge hazards and ADR 0012 call sites
+## Historical merge hazards and ADR 0012 call sites
+
+October 8 reconciliation at `753edc93`: the following describes earlier stream
+bodies, not the effective runtime. The baseline already replaces the tenant-link
+shortcut with `platform_provider_runs_business`, requiring an active provider
+verified for the specific effect; `strelva_runs_business` is its email alias.
+`20261018131000_owner_decision_runtime_authority.sql` requires current provider,
+execution effects and verified session/identity for owner links. Creating a
+tenant/link names no provider and grants no such authority. Existing
+platform-service-actor and acting-provider SQL fixtures pass in the current
+ordered workspace SQL/upgrade. #510 needs no duplicate migration. This is local
+source/SQL proof; no new production verification or issue closure was performed.
+The prepared Ask successor and combined evidence are recorded in
+[the October 8 candidate](../../operations/backlog-candidate-2026-10-08.md).
 
 **`workspace_release_flag_names()` (issue #253, not fixed here).** Both
 streams `create or replace` it from the same 11-name list in
@@ -294,7 +307,7 @@ publish entry points (`20261010102100`) and the fact-draft decision RPC
 would swap this check for "an agency with a delegation runs this business" in
 those three functions; the callers needn't change.
 
-## Exact next action
+## Historical next action
 
 Coordinator reviews the PR and decides two things: the #253 flag-name union
 migration, and whether to reopen the new-booking-service attempt at
@@ -329,3 +342,38 @@ cf3f2dbb Prepare real isolated Ask website page-set Possibilities
 966a9434 Scope booking calendar revalidation to prepared Ask candidates
 e6545c33 Open prepared Ask alternatives in their isolated signed Try
 ```
+
+## October 8 prepared native service successor — #456
+
+The removed `db4657ab` attempt now has a separate bounded implementation from
+`e9ac136f`: Ask prepares a first native inquiry and booking-request service for an
+already created, converted, explicitly bound tenant. Verified direct business and
+tenant ownership, an existing configured calendar, empty native setup, exact
+whole-minute availability and effective qualified Postgres booking reads are
+required. It creates confirmed service duration, native Inquiry form/record,
+request policy, exact availability overrides, saved Work, scoped grant and an
+immutable acceptance receipt together. Try discards input; activation still
+requires the existing owner-approved Make real effect.
+
+The additive `/book/<tenant>/<capability>` page makes the approved request flow
+usable. New setup capabilities remain guarded on existing visitor readers,
+reservation, email confirmation, cancellation and native status recovery. Legacy
+tenant primitives refuse this new request-only service; ordinary services retain
+their behavior. Read rollback/parity fallback and feature-off refuse before writes.
+Stop pauses its own setup and preserves history. Existing qualified teardown is
+proved; later independently edited policies/services refuse automatic cleanup.
+
+Local proof covers 267 ordered migrations, malformed/null/authority/CAS/replay/
+stop/DST/teardown/catalog-drift failures, actual native slots and booking/inquiry
+receipts through four in-process HTTP cases, and desktop/mobile Try and `/book`.
+HTTP proof mocks external tenant/email/lead/rate-limit boundaries and uses socket
+SQL; browser schedules are fictional intercepted responses. This does not prove
+hosted PostgREST/Auth, live provider/email delivery or customer adoption. Migration
+`20261020113000` and guarded companion belong only to proposed batch12 and require
+intended-target prefix qualification. No deployment, merge or production operation
+is included. Exact source/proof/resumption contract lives in
+`.scratch/issue456-native-service-setup.md`; private runtime reports stay local.
+
+Next: review and integrate the isolated successor with release inventory, then
+qualify the intended target. Fresh-tenant provisioning and provider onboarding
+still require their own authority contracts; #456 remains open.

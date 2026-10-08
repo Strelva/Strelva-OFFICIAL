@@ -72,7 +72,7 @@ describe("website System page reads its lists from the server", () => {
     return node;
   }
   it("asks for this System only and renders the answer", async () => {
-    const request = vi.fn(async () => new Response(JSON.stringify({ detail: previewWebsiteDetail(SITE, "full") }), { status: 200 }));
+    const request = vi.fn(async () => new Response(JSON.stringify({ detail: { ...previewWebsiteDetail(SITE, "full"), workspaceId: BUSINESS } }), { status: 200 }));
     const node = await mount(request as unknown as typeof fetch);
     expect(request).toHaveBeenCalledWith(`/api/workspace/systems/website?workspaceId=${BUSINESS}&systemId=${SITE}`);
     expect(node.textContent).toContain("Add a private consultations page");

@@ -236,3 +236,5 @@ export { BUSINESS_HANDLE_PATTERN, businessFactSheet, businessPageUrl, formatAddr
 export { jsonLdScriptContent, schemaBlock, schemaBlockStatus, type SchemaBlock, type SchemaBlockStatus } from "./schema-block";
 
 export { publishedPolicyRows } from "./published-policies";
+
+export { readPublicBusinessVerification } from "./public-verification";

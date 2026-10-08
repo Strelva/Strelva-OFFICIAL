@@ -207,7 +207,15 @@ describe("release-one private workspace routes", () => {
     const customer = await (await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${otherId}`))).json();
     expect(customer.systems).toEqual(systems);
     expect(customer.releases).toEqual({ systems: true, needsYou: false, ask: false, inquiries: false, websiteRebuild: false });
-    expect(mocks.systems).toHaveBeenCalledWith({ actor: { userId: "actor", verifiedEmail: "owner@example.com" }, businessId: otherId, savedWork: [work], canWrite: true, siteDomains: new Map([["mooney-firm", "www.attymooney.com"]]) });
+    expect(mocks.systems).toHaveBeenCalledWith({ actor: { userId: "actor", verifiedEmail: "owner@example.com" }, businessId: otherId, savedWork: [work], readOnly: false, canWrite: true, siteDomains: new Map([["mooney-firm", "www.attymooney.com"]]) });
+
+    mocks.systems.mockClear();
+    mocks.personal.mockClear();
+    const refreshed = await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${otherId}&systemsReadOnly=1`));
+    expect(refreshed.status).toBe(200);
+    expect(mocks.systems).toHaveBeenCalledWith(expect.objectContaining({ businessId: otherId, readOnly: true, canWrite: false }));
+    expect(mocks.personal).not.toHaveBeenCalled();
+    expect(mocks.save).not.toHaveBeenCalled();
 
     mocks.systems.mockClear();
     const personal = await (await GET(new Request("https://strelva.com/api/workspace"))).json();

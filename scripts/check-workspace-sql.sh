@@ -1565,6 +1565,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/provider-seat-readonly-websites-
 node --import tsx "$repo_root/scripts/check-readonly-rpcs.mjs" "postgresql:///postgres?host=$cluster_socket&port=$cluster_port"
 node --test "$repo_root/scripts/tests/readonly-rpcs.node-test.mjs"
 bash "$repo_root/scripts/check-reader-writer-locks.sh" "postgresql:///postgres?host=$cluster_socket&port=$cluster_port"
+bash "$repo_root/scripts/check-audit-append-only-sql.sh"
 
 # Additive final authority correction follows provider/operator guards.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261018131000_owner_decision_runtime_authority.sql"

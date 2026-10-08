@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
-import { adminClient, cleanup, convertedBusinessWithOwner, decisions, journeyEnvironment, noHorizontalOverflow, person, reviewedRebuild, type Person } from "./support/journeys";
+import { adminClient, cleanup, convertedBusinessWithOwner, decisions, journeyEnvironment, localSql, noHorizontalOverflow, person, reviewedRebuild, type Person } from "./support/journeys";
 
 // Make real on a website Possibility, through Needs you, on real local Auth
 // and Postgres. A reviewed rebuild of the converted site is the Ready
@@ -19,6 +19,12 @@ test("the owner makes a website Possibility real through Needs you and sees a pa
   try {
     setup = await convertedBusinessWithOwner(browser, admin, "j10-makereal");
     const { owner, businessId, tenantId, workspaceName } = setup;
+    const env = journeyEnvironment();
+    // Conversion records the legacy implementation. The real detail route
+    // reconciles its current website implementation before this draft is reviewed.
+    const websiteId = localSql<string>("select to_json(id) from public.systems where business_workspace_id=:'v1'::uuid and kind='website' and origin_kind='tenant' limit 1;", businessId);
+    const reconciled = await owner.context.request.get(`/api/workspace/systems/website?${new URLSearchParams({ workspaceId: businessId, systemId: websiteId })}`);
+    expect(reconciled.status(), await reconciled.text()).toBe(200);
     const workId = randomUUID();
     const work = await admin.from("saved_product_work").insert({
       id: workId, workspace_id: businessId, product_id: "websites", resource_kind: "website", title: "Harbor rebuild", created_by: owner.userId, payload: reviewedRebuild(workId, tenantId, owner.userId),
@@ -39,7 +45,6 @@ test("the owner makes a website Possibility real through Needs you and sees a pa
     // A member sees it but cannot make it real.
     member = await person(browser, admin, "j10-makereal-member");
     expect((await admin.from("workspace_memberships").insert({ workspace_id: businessId, user_id: member.userId, role: "member", created_by: owner.userId })).error).toBeNull();
-    const env = journeyEnvironment();
     const refused = await member.context.request.post("/api/workspace/systems/make-real", { headers: { origin: env.app }, data: { workspaceId: businessId, possibilityId } });
     expect(refused.status()).toBe(403);
     expect((await refused.json()).permission).toBe("not_owner");
@@ -48,7 +53,8 @@ test("the owner makes a website Possibility real through Needs you and sees a pa
     const systems = home.getByRole("list", { name: `${workspaceName} systems` });
     await systems.getByRole("link", { name: /Website/ }).first().click();
     await expect(home).toHaveURL(/view=system/);
-    const possibility = home.locator("li").filter({ hasText: /A rebuilt / }).first();
+    const possibility = home.getByRole("region", { name: /^Possibilities/ }).getByRole("listitem").filter({ hasText: /A rebuilt / });
+    await expect(possibility).toHaveCount(1);
     await expect(possibility).toBeVisible();
     const makeReal = possibility.getByRole("button", { name: "Make real", exact: true });
     await expect(makeReal).toBeEnabled();

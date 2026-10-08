@@ -62,7 +62,7 @@ test("a visitor's message reaches the owner's Inquiries; a held one is released 
     await expect(page.getByRole("heading", { name: "Who reached out", level: 1 })).toBeVisible({ timeout: 60_000 });
     await expect(page.getByRole("heading", { name: real.name })).toBeVisible();
     await expect(page.getByText(real.message)).toBeVisible();
-    await expect(page.getByText(/1 in the last 30 days · 1 in all/)).toBeVisible();
+    await expect(page.getByText("1 shown", { exact: true })).toBeVisible();
     const held = page.getByRole("region", { name: "Held as spam" });
     await expect(held.getByRole("heading", { name: caught.name })).toBeVisible();
     await expect(held.getByText("Filled in a field people can't see")).toBeVisible();
@@ -81,7 +81,7 @@ test("a visitor's message reaches the owner's Inquiries; a held one is released 
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();
-    await expect(page.getByText(/2 in the last 30 days · 2 in all/)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText("2 shown", { exact: true })).toBeVisible({ timeout: 60_000 });
     const releasedCard = page.getByRole("article").filter({ has: page.getByRole("heading", { name: caught.name }) });
     await expect(releasedCard).toHaveCount(1);
     await expect(page.getByRole("region", { name: "Held as spam" })).toHaveCount(0);

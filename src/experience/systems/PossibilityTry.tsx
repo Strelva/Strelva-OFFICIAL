@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useSyncExternalStore, type FormEvent } from "react";
+import { StrelvaInquiryForm } from "../../../custom-repo-starter/StrelvaInquiryForm";
+import type { PublicInquiryForm } from "../../../custom-repo-starter/inquiry-client";
+import { StrelvaBookingForm } from "../../../custom-repo-starter/StrelvaBookingForm";
 import { Button } from "@/components/ui/Button";
 import { SiteDocumentTry, type SiteDocument } from "@/products/websites/client";
 import type { PublicBookingSchedule } from "../../../custom-repo-starter/booking-client";
@@ -17,6 +20,7 @@ export interface PossibilityTryView {
   websiteDocument?: SiteDocument;
   bookingSchedule?: PublicBookingSchedule;
   bookingPath?: string;
+  serviceSetup?: { durationMinutes:number; schedule:PublicBookingSchedule; inquiry:PublicInquiryForm };
   inquiryFollowUp?: {
     afterMinutes: number;
     maxAttempts: number;
@@ -36,6 +40,7 @@ export type PossibilityTryState =
  * submission is a test: it goes nowhere and says so (spec behaviors 19-20).
  */
 export function PossibilityTry({ state }: { state: PossibilityTryState }) {
+  const hydrated=useSyncExternalStore(subscribe,clientReady,serverReady);
   if (state.kind === "expired") return <Shell><h1 className="font-display text-2xl">This link has expired.</h1><p className="mt-3 text-sm text-gray-muted">Links in Strelva&apos;s emails last 14 days. The next email has a fresh one. Nothing changed.</p></Shell>;
   if (state.kind === "changed") return <Shell><h1 className="font-display text-2xl">This changed since we emailed you.</h1><p className="mt-3 text-sm text-gray-muted">Strelva is refreshing it. The latest version comes in the next email. Nothing live changed.</p></Shell>;
   const { view } = state;
@@ -51,10 +56,24 @@ export function PossibilityTry({ state }: { state: PossibilityTryState }) {
       </ul>
     </section> : null}
     {view.websiteDocument ? <div className="mt-6"><SiteDocumentTry document={view.websiteDocument} bookingSchedule={view.bookingSchedule} bookingPath={view.bookingPath} /></div> : null}
+    {view.serviceSetup && hydrated ? <section className="mt-6 rounded-lg border border-gray-border p-4" aria-label="Proposed native service">
+      <h2 className="font-display text-xl">{view.serviceSetup.schedule.name}</h2>
+      <p className="my-3 text-sm">{view.serviceSetup.durationMinutes} minutes, in {view.serviceSetup.schedule.timeZone}. Live requests need business confirmation. The new inquiry collects name, email and message; it sends no replies or notifications.</p>
+      <ServiceInquiryTry definition={view.serviceSetup.inquiry} />
+      <StrelvaBookingForm schedule={view.serviceSetup.schedule} testOnly submitLabel="Try this time" onReserve={async slot => ({schemaVersion:1,reservationId:"test-reservation",managementToken:"test-only-token",capabilityId:view.serviceSetup!.schedule.capabilityId,version:1,provider:view.serviceSetup!.schedule.provider,status:"pending",title:view.serviceSetup!.schedule.name,start:slot.start,end:slot.end,timeZone:view.serviceSetup!.schedule.timeZone})} />
+    </section> : null}
     {view.inquiryFollowUp ? <InquiryFollowUpTry proposal={view.inquiryFollowUp} /> : null}
     {view.takesSubmissions && !view.websiteDocument ? <TestSubmission /> : null}
     <p className="mt-8 text-xs text-gray-muted">Nothing here changes your live site, sends a message or books anything. Make it live from the email when you are ready.</p>
   </Shell>;
+}
+const subscribe=()=>()=>{};
+const clientReady=()=>true;
+const serverReady=()=>false;
+
+function ServiceInquiryTry({definition}:{definition:PublicInquiryForm}) {
+  const [sent,setSent]=useState(false);
+  return <div className="my-6 rounded border border-gray-border p-4">{sent ? <p role="status">Test inquiry completed. Nobody was told and no real record was kept.</p> : <StrelvaInquiryForm definition={definition} submitLabel="Send a test inquiry" onSubmit={async()=>{setSent(true);}} />}</div>;
 }
 
 function InquiryFollowUpTry({ proposal }: { proposal: NonNullable<PossibilityTryView["inquiryFollowUp"]> }) {

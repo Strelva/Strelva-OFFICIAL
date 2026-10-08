@@ -5,7 +5,7 @@ import { systemOriginId } from "@/platform/systems/invariants";
 import { createMemoryInquiryDeliveryStore, deliverInquiryAction } from "@/products/inquiries/delivery";
 import type { ResponsibilityEvaluation } from "@/products/inquiries/contracts";
 
-vi.mock("@/lib/tenant-crm", () => ({ addTenantActivity: vi.fn(async () => undefined) }));
+vi.mock("@/platform/infra/tenant-crm", () => ({ addTenantActivity: vi.fn(async () => undefined) }));
 const workspaceId = "f6350000-0000-4000-8000-000000000001";
 const inquiryWorkspaceId = "f6350000-0000-4000-8000-000000000002";
 const evaluation: ResponsibilityEvaluation = { decision: "allow", action: "reply", reason: "Current trusted policy", clause: null, disclosedAs: "Strelva" };

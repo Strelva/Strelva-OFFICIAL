@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const ports = vi.hoisted(() => ({
   enabled: vi.fn(), limited: vi.fn(), services: vi.fn(), slots: vi.fn(), request: vi.fn(), lookup: vi.fn(),
-  confirmable: vi.fn(), updates: vi.fn(), context: vi.fn(), rpc: vi.fn(), directory: vi.fn(), scope: vi.fn(),
+  verification: vi.fn(), confirmable: vi.fn(), updates: vi.fn(), context: vi.fn(), rpc: vi.fn(), directory: vi.fn(), scope: vi.fn(),
 }));
 vi.mock("@/platform/bookings/native", async original => ({
   ...await original<typeof import("@/platform/bookings/native")>(),
@@ -15,7 +15,7 @@ vi.mock("@/platform/bookings/store", async original => ({
   readBookingContext: ports.context, bookingStoreDb: () => ({ rpc: ports.rpc }),
 }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: ports.limited, isRateLimitedWindowedAsync: ports.limited, rateLimitKey: (_r: Request, prefix: string) => `${prefix}:ip` }));
-vi.mock("@/app/api/mcp/_directory", () => ({ tenantDirectory: { list: ports.directory, scope: ports.scope } }));
+vi.mock("@/app/api/mcp/_directory", () => ({ tenantDirectory: { list: ports.directory, scope: ports.scope, verification: ports.verification } }));
 
 import { DELETE, GET, POST as platform } from "@/app/api/mcp/public/route";
 import { POST as alias } from "@/app/api/mcp/bookings/[tenant]/route";
@@ -53,6 +53,7 @@ const fixtureContext = { workspaceId: "ws", paused: false, phone: "716-555-0100"
 
 beforeEach(() => {
   vi.resetAllMocks();
+  ports.verification.mockResolvedValue(undefined);
   ports.enabled.mockResolvedValue(undefined); ports.limited.mockResolvedValue(false); ports.updates.mockResolvedValue(undefined);
   ports.confirmable.mockResolvedValue(true); ports.context.mockResolvedValue(fixtureContext);
   ports.rpc.mockResolvedValue({ data: { name: "Fixture Barbers", address: "1 Main St, Buffalo" }, error: null });
@@ -151,7 +152,8 @@ describe("modern MCP 2026-07-28", () => {
     expect(off.status).toBe(503);
     expect((await off.json()).error.code).toBe(-31003);
     expect(ports.limited).not.toHaveBeenCalled();
-    ports.enabled.mockResolvedValue(undefined); ports.limited.mockResolvedValue(true);
+    ports.verification.mockResolvedValue(undefined);
+  ports.enabled.mockResolvedValue(undefined); ports.limited.mockResolvedValue(true);
     const throttled = await tool("list_services", { business: "fixture" });
     expect(throttled.status).toBe(429);
     expect((await throttled.json()).error.code).toBe(-31029);
@@ -230,9 +232,22 @@ describe("platform tools", () => {
     expect(body.result.structuredContent).toEqual({
       business: "fixture", name: "Fixture Barbers", industry: "barber", website: "https://fixture.example", address: "1 Main St, Buffalo",
       phone: "716-555-0100", timeZone: "America/New_York", paused: false, acceptsBookingRequests: true, serviceCount: 1,
+      verification: { domains: [], googleBusinessProfile: { linked: null, verified: null, checkedAt: null, stale: true }, ownerConfirmedFactCount: null, lastConfirmedAt: null, operatingAgency: null },
     });
     expect(ports.rpc).toHaveBeenCalledWith("read_booking_business_details", { p_tenant_id: "fixture" });
     expect((await (await tool("get_business", { business: "not-listed" })).json()).result).toMatchObject({ isError: true, content: [{ text: "This business is unavailable." }] });
+  });
+
+  it("returns the public verification block, and loses claims when its reader fails", async () => {
+    ports.services.mockResolvedValue({ services: [{ id: "svc" }], timeZone: "America/New_York", paused: false });
+    const verification = { domains: [], googleBusinessProfile: { linked: true, verified: null, checkedAt: "2026-10-08T10:00:00Z", stale: false }, ownerConfirmedFactCount: 3, lastConfirmedAt: "2026-10-08T10:00:00Z", operatingAgency: { name: "Fictional Agency" } };
+    ports.verification.mockResolvedValueOnce(verification);
+    expect((await (await tool("get_business", { business: "fixture" })).json()).result.structuredContent.verification).toEqual(verification);
+    ports.verification.mockRejectedValueOnce(new Error("PRIVATE"));
+    const result = (await (await tool("get_business", { business: "fixture" })).json()).result.structuredContent;
+    expect(result.verification.ownerConfirmedFactCount).toBeNull();
+    expect(result.verification.googleBusinessProfile.verified).toBeNull();
+    expect(JSON.stringify(result)).not.toContain("PRIVATE");
   });
 
   it("requires a valid business handle on every business tool", async () => {

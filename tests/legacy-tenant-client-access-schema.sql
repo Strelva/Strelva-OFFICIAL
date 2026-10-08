@@ -2,7 +2,7 @@
 -- legacy tenant tables through PostgREST. Each attack from the security review
 -- runs as the client role with the member's JWT subject and must be refused;
 -- the user-session reads the app actually makes still work, and the service
--- role keeps full access. Runs in one transaction and rolls back.
+-- role keeps its application access. Runs in one transaction and rolls back.
 begin;
 
 insert into public.users (id, email, verified_at) values
@@ -183,15 +183,17 @@ begin
   end if;
 end $catalog$;
 
--- The server path (service role) keeps exactly the grants it had before, and
--- where it holds Supabase's default write grants (production), it still writes.
+-- The server path keeps its original grants except the explicit append-only
+-- audit successor, covered by audit-service-role-append-only-schema.sql.
+-- Where it holds Supabase's default write grants (production), it still writes.
 do $server_grants$
 begin
   if exists (
     select 1
     from release_rollback_baseline.m20261005100000_legacy_tenant_grants b
     join pg_class c on c.oid = b.relation_oid
-    where (select coalesce(array_agg(a.privilege_type order by a.privilege_type), '{}')
+    where c.relname <> 'audit_logs'
+      and (select coalesce(array_agg(a.privilege_type order by a.privilege_type), '{}')
            from aclexplode(b.grants) a where a.grantee = 'service_role'::regrole)
       is distinct from
           (select coalesce(array_agg(a.privilege_type order by a.privilege_type), '{}')

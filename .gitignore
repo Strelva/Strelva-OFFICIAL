@@ -118,3 +118,6 @@ clear-stale-reval-failures.mjs
 
 # Reviewed Strelva atmospheric brandkit proposal
 !docs/design/references/strelva-atmospheric-brandkit-v2-2026-09-17.png
+
+# Isolated Ask setup runtime proof (private local DB/token receipts).
+/output/ask456/

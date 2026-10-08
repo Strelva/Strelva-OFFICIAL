@@ -9,6 +9,7 @@
  * connected sites release and the business's row are on, and the page is
  * published. Ported from feat/connected-sites `/b/{handle}`.
  */
+import { BusinessVerification } from "@/experience/business-record/BusinessVerification";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -67,7 +68,7 @@ export default async function BusinessPage({ params }: Params) {
   if (!page) notFound();
   const { facts } = page;
   const url = businessPageUrl(appOrigin(), page.handle);
-  const ld = businessJsonLd(facts, url);
+  const ld = businessJsonLd(facts, url, page.verification);
   const hours = weeklyHours(facts);
   const services = facts.services ?? [];
   const policies = publishedPolicyRows(facts.policies);
@@ -87,6 +88,8 @@ export default async function BusinessPage({ params }: Params) {
           {facts.email && !facts.booking_url ? <a href={`mailto:${facts.email}`} className={`${action} border border-gray-border bg-surface hover:bg-gray-bg`}>Email</a> : null}
         </div> : null}
       </header>
+
+      <BusinessVerification verification={page.verification} />
 
       <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
         <div className="grid gap-12">

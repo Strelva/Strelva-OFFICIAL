@@ -6,6 +6,7 @@
  * only ever receives a status token. Owner and agency tools are not here (#302).
  */
 import { z } from "zod";
+import { publicBusinessVerification, type PublicBusinessVerification } from "@/platform/business-record/verification";
 import { PublicBookingError } from "@/platform/bookings/errors";
 import { bookingScopeFor } from "@/platform/bookings/booking-scope";
 import { agentConfirmationAvailable, agentReceipt, nativeBookingByToken, nativeServices, nativeSlots, requestAgentBooking, requireAgentBookings, statusAccessLive, tokenHash } from "@/platform/bookings/native";
@@ -20,6 +21,7 @@ import type { McpServer, McpTool, ToolOutcome } from "./protocol";
 export interface DirectoryEntry { business: string; name: string; industry: string | null; website: string | null }
 export interface BusinessDirectory {
   list(): Promise<DirectoryEntry[]>;
+  verification?(business: string): Promise<PublicBusinessVerification>;
   /** The booking scope a handle names, or null when it is not publicly bookable. */
   scope(business: string): Promise<string | null>;
 }
@@ -37,7 +39,7 @@ const directoryTools: McpTool[] = [
     description: "Find businesses that take booking requests through Strelva, by name, handle or kind of business. Returns handles for the other tools.",
     inputSchema: schema({ query: { type: "string", minLength: 2, maxLength: 80 }, limit: { type: "integer", minimum: 1, maximum: 10 } }, ["query"]) },
   { name: "get_business", title: "Business details", annotations: read,
-    description: "Public facts for one business: name, website, address, phone, time zone, whether it is paused and whether it accepts booking requests.",
+    description: "Public facts for one business: name, website, address, phone, time zone, whether it is paused, whether it accepts booking requests, and verification evidence. A linked Google profile is not a verified profile.",
     inputSchema: schema({ business: businessProperty }, ["business"]) },
 ];
 
@@ -118,6 +120,7 @@ async function getBusiness(directory: BusinessDirectory, business: string, scope
     address: text(facts?.address) || null, phone: ctx?.phone ?? null, timeZone: services.timeZone, paused: services.paused,
     acceptsBookingRequests: !services.paused && services.services.length > 0 && await agentConfirmationAvailable(scope),
     serviceCount: services.services.length,
+    verification: await directory.verification?.(business).catch(() => publicBusinessVerification(null)) ?? publicBusinessVerification(null),
   };
 }
 

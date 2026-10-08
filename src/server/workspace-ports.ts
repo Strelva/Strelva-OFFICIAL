@@ -7,9 +7,15 @@
  * This file imports no src/lib module: the shapes are checked where the
  * loaders are registered.
  */
+import * as operatorRecipients from "@/platform/operator-notices/recipients";
+
 const inquiryPublicationServer = () => import("@/products/inquiries/server");
 
 export const workspacePortLoaders = {
+  // Pure configuration only, loaded synchronously for the existing synchronous API.
+  operatorNoticeRecipients: () => operatorRecipients,
+  bookingEmails: () => import("@/platform/bookings/notice-email"),
+  operatorNotices: () => import("@/platform/operator-notices/email"),
   bookingProof: () => import("@/platform/bookings/agent-proof"),
   clientRecords: async () => {
     const [mirror, move] = await Promise.all([

@@ -2,13 +2,15 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BusinessPagesStore } from "@/products/connected-sites/business-pages-store";
 
-const deps = vi.hoisted(() => ({ headers: new Headers(), flag: vi.fn(), hosted: null as null | { preview: boolean; origin: string } }));
+const deps = vi.hoisted(() => ({ headers: new Headers(), flag: vi.fn(), verification: vi.fn(), hosted: null as null | { preview: boolean; origin: string } }));
+vi.mock("@/products/connected-sites/public-verification", () => ({ readPublicBusinessVerification: deps.verification }));
 vi.mock("next/headers", () => ({ headers: async () => deps.headers }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
 // The business's own connected_sites row (the public gate).
 vi.mock("@/platform/release-flags/store", () => ({ workspaceReleaseFlagEnabled: deps.flag }));
 vi.mock("@/products/websites/index", () => ({ getHostedSite: async () => deps.hosted }));
 
+import { publicBusinessVerification } from "@/platform/business-record/verification";
 import { createBusinessPagesStore, setBusinessPagesStoreForTests } from "@/products/connected-sites/business-pages-store";
 import { loadPublishedBusinessPage } from "@/products/connected-sites/business-pages";
 import BusinessPage, { generateMetadata } from "@/app/biz/[handle]/page";
@@ -45,6 +47,7 @@ beforeEach(() => {
   vi.stubEnv("STRELVA_CONNECTED_SITES_RELEASE", "1");
   vi.stubEnv("STRELVA_BUSINESS_PAGES", "1");
   vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://app.strelva.test");
+  deps.verification.mockReset().mockResolvedValue(undefined);
   deps.headers = new Headers();
   deps.hosted = null;
   deps.flag.mockReset().mockResolvedValue(true);
@@ -142,6 +145,19 @@ describe("/biz/{handle}", () => {
     ]));
     for (const secret of ["AGENCY_PRIVATE", "OWNER_UNCONFIRMED", "updatedBy", BUSINESS]) expect(html).not.toContain(secret);
   });
+  it("renders the exact public verification block and proof URLs in server JSON-LD", async () => {
+    const now = Date.parse("2026-10-08T12:00:00Z");
+    const verification = publicBusinessVerification({ domains: [{ url: "https://fictional.example/", checkedAt: "2026-10-08T10:00:00Z" }], googleBusinessProfile: { linked: true, checkedAt: "2026-10-08T10:00:00Z" }, ownerConfirmedFactCount: 3, lastConfirmedAt: "2026-10-08T10:00:00Z", operatingAgency: { name: "Fictional Agency" } }, now);
+    deps.verification.mockResolvedValue(verification);
+    const html = renderToStaticMarkup(await BusinessPage(params("fictional-barber")));
+    expect(html).toContain("fictional.example — verified");
+    expect(html).toContain("Google verification unknown");
+    expect(html).toContain("Fictional Agency");
+    const ld = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)![1]!);
+    expect(ld.sameAs).toEqual(["https://fictional.example/"]);
+    expect(deps.verification).toHaveBeenCalledWith({ handle: "fictional-barber" });
+  });
+
   it("names its canonical address from configuration, never the request host", async () => {
     deps.headers = new Headers({ host: "evil.example", "x-forwarded-host": "evil.example" });
     const metadata = await generateMetadata(params("fictional-barber"));

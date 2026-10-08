@@ -503,3 +503,7 @@ reads and durable per-agency quota behind the default-off
 owns the routes, configuration, migration/rollback proof and extension handoff.
 This is local implementation, not a production change or evidence of agency
 adoption. Extensions and richer agency profiles/branding remain unfinished.
+
+## Public business verification (#308, October 8 local)
+
+The isolated `feat/verified-business-profile-308-20261008` lane adds a bounded verification block on platform MCP `get_business` and the existing `/biz/{handle}` public page, with recent verified public domains in JSON-LD `sameAs`. `/b/[token]` remains the booking management route. The [stream contract](./docs/product/streams/public-business-verification.md) owns the projection, proof and remaining Google dependency. No deployment, provider access or production migration is established.

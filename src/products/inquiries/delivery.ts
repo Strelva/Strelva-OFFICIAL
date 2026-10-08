@@ -21,7 +21,7 @@ import type { InquiryTimelineEventType } from "@/products/inquiries/contracts";
 import type { LeadRecord } from "@/lib/leads";
 export type { LeadRecord } from "@/lib/leads";
 import { getTenantConfig } from "@/lib/tenants";
-import { addTenantActivity } from "@/lib/tenant-crm";
+import { addTenantActivity } from "@/platform/infra/tenant-crm";
 import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
 import { createEmailInquiryTransport } from "./delivery-email";
 import { createRedisInquiryDeliveryStore } from "./delivery-store";

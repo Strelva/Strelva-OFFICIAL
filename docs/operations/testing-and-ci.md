@@ -159,10 +159,12 @@ under conflicting locks, concurrent index creation does not queue out client
 writes, a valid index can be retried, and an incompatible index is rejected.
 It never connects to a hosted or production database.
 
+`pnpm check:public-business-verification` applies the complete ordered migration history to an owned throwaway cluster, then proves published consent, owner-confirmed fact counts, tenant/connected-domain proof, privacy, revocation, actual READ ONLY execution and exact additive rollback/reapply for #308. `check:agency-workflow` also runs the projection contract on its final ordered schema. No hosted connection or provider call is made.
+
 Both commands require PostgreSQL server binaries. The SQL check scripts and
 release-safety rehearsal set `LC_ALL=C` internally, including for `initdb` and
 `pg_ctl`; callers do not need to export a locale on macOS/PostgreSQL 18.
-The workspace, upgrade, inquiry and customer-mapping checks remove only the
+The workspace, upgrade, inquiry, customer-mapping and nested agency-prospects checks remove only the
 cluster/socket directories they create on success, failure, SIGINT or SIGTERM.
 They record the postmaster PID and stop that cluster before deleting its files,
 including when startup fails after launching Postgres. If both shutdown attempts
@@ -238,6 +240,99 @@ boundaries → ontology invariants → isolated workspace SQL → vitest+coverag
 `tests/fixtures/tenants.fixture.json` → `./dev-tenants.json`). CI has **no DB and no Redis**
 and never touches prod. Browser steps are conditional on a non-draft pull request; the
 workflow explicitly includes `ready_for_review` so a draft becoming reviewable runs them.
+
+`pnpm smoke:workspace` enables only the workspace shell release and explicitly
+runs both `workspace-release.spec.ts` and `provider-seat-workspace.spec.ts`.
+The provider fixture keeps its assertions for assigned client work, disabled
+general Ask and an enabled saved rebuild retry. Every API response is fictional;
+this proves rendered controls, not authenticated provider authority. Public smoke
+keeps the workspace gate closed and skips that release-dependent fixture. The
+October 8 CI failure rendered the intended closed workspace page in the first
+two attempts; the later ENOSPC retry was separate. The fixture existed unchanged
+at `e9ac136f`. The guard fixes profile routing, and the explicit enabled command
+retains its coverage. Actual enabled-profile and full-CI reruns belong to root
+integration; no production gate is changed here.
+
+The agency pagination fixture also follows the current scoped batched API:
+100 clients, then two by the last client UUID cursor. It checks keyboard Show
+more, retained earlier rows and queue items, a named unavailable client and
+page retry, and no client-by-client reads or writes during discovery. Only an
+explicit queue action opens the exact client/work. The September 20 fixture's
+“Clients 1–8 of 10”, Next/Previous and per-client unavailable-work expectations
+remain historical, unqualified expectations of the retired pagination UI; the
+current product is unchanged. Returning WorkspaceSnapshot from the broad
+fixture route to `/api/workspace/agency-clients` caused the October 8 failure:
+the strict page parser correctly refused it. Final desktop/mobile browser proof
+and the complete CI run belong to root integration after this fixture repair.
+
+The third October 8 CI attempt reached the correct100→102 UI but the request
+count assertion counted an aborted development startup request as a completed
+page. All six retained traces (both viewports and retries) show two initial
+workspace200 reads, an initial client-page request without a response, one
+replacement client-page200 and one UUID-cursor200. `AgencyHome` cleanup aborts
+the first read; `WorkspaceApp` guards startup response generations. This matches
+[Next.js App Router's default Strict Mode](https://nextjs.org/docs/app/api-reference/config/next-config-js/reactStrictMode)
+and [React's extra development effect setup/cleanup](https://react.dev/reference/react/StrictMode#fixing-bugs-found-by-re-running-effects-in-development).
+The fixture now requires exactly one completed initial client page, allows only
+one additional initial attempt proven `net::ERR_ABORTED`, and keeps completed
+Show more/retry cursors exact. Initial workspace reads are bounded to one or two
+for the same agency; pagination/retry add none, and only explicit queue opening
+adds the exact client read. No product behavior changed. The third red traces
+remain in `output/release-safety/backlog-ci-third-20261008`; fresh zero-retry
+focused browser proof remains root's next step. Captures include the current
+last-client viewport at390px as well as the full-page evidence.
+
+The next zero-retry focused run passed desktop and all mobile request, page,
+retry and no-write checks, then failed the final mobile selector assertion.
+The retained390px snapshot shows the opened work and the closed responsive
+navigation, which correctly hides Current workspace. The fixture now checks
+the exact client/work URL and rendered work, opens the actual mobile navigation,
+checks the visible selector's client ID and selected client name, then closes
+it without navigation or writes. The rest of this two-viewport case uses shared
+visible list, queue and pagination controls. Its first focused failure remains
+in `/tmp/strelva-backlog-final-agency_fixture-20261008.log` and
+`test-results/backlog-agency-focused`; the corrected zero-retry rerun remains
+pending root integration. Product source and desktop/mobile layout are unchanged.
+
+The combined authenticated run passed13 of14 flags-on journeys, including both
+stale-workspace cases, but Make real failed; its fresh narrow rerun also failed.
+An initial Home/HMR hypothesis was based on compressed trace DOM and is withdrawn.
+The concrete final frame (`/tmp/strelva-make-real-failure-review.jpeg`) shows the
+website System, a Ready Possibility and enabled Make real. After detail returns,
+Waiting on you contains the same rebuilt title earlier in the document. The
+unscoped first matching `li` then switches from the Possibility to that decision
+row, which has no Make real button. The fixture now selects the single rebuilt
+list item inside the named Possibilities region. The region name includes its
+count, so matching its title prefix follows the existing SystemPanel contract.
+Enabled control, POST200, partial/isolated result, exact owner decision and member
+refusal assertions are unchanged. The narrow red log remains
+`/tmp/strelva-backlog-final-make_real-20261008.log`, with private artifacts in
+`test-results/journeys-on`. Corrected narrow and full14-on/8-off proof are pending
+root's sequential rerun; no product guard or runtime source changed.
+
+The corrected narrow Make real case passed1/1 without retries at root
+`72e28786`. Its compound runner still exits1 because a filtered run does not
+execute the full critical profile; this proves the case, not that gate. During
+the next fresh full run, inspection found the flags-on validator still required
+only the original12 cases despite the runner including both new stale-workspace
+cases. The `journeys-on` profile now requires those two as well (14 total),
+retaining every original file minimum and the single-attempt/no-skips/no-errors
+requirements. Gate regressions first reproduced three false acceptances with
+the new file absent or incomplete; corrected proof covers retained14 acceptance,
+absent/one-case rejection even with a claimed14-pass summary, and retried stale
+case refusal. Logs: `/tmp/journeys-expanded-gate-{red,green}.log`. Root must
+validate its retained full14-on/8-off JSON with this updated gate after the
+active browser run stops; no current-browser source or product changes occur.
+
+The final combined candidate at `753edc93` passes the complete CI-faithful local
+sim: 8,614 tests/50 skips, coverage, build, public94/332 profile skips,
+workspace39 and surface20. Fresh real loopback Auth at `72e28786` passes all14
+enabled/eight disabled journeys without retries; the expanded validator at
+`753edc93` passes both retained reports. Runtime/SQL are unchanged between these
+checkpoints. Separate preview UI50 and focused agency2 also pass without retries.
+These results supersede the pending reruns above without erasing their failed
+logs. [The combined candidate record](backlog-candidate-2026-10-08.md) owns exact
+sources, retained evidence and hosted/provider limits; no deployment is implied.
 
 ### The CI-faithful local sim (use this before trusting a green local run)
 

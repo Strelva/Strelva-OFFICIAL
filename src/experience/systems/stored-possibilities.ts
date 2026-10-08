@@ -1,3 +1,4 @@
+import { askServiceSetupSelectionSchema } from "@/platform/ask/new-service";
 /**
  * Possibilities in Postgres for the Systems experience (systems-experience
  * spec behavior 15). Server only.
@@ -142,7 +143,9 @@ export async function syncRebuildPossibilities(deps: {
         await deps.repo.save(revised, existing.revision);
         await prepare(revised, target.candidate.ready, deps);
         wrote = true;
-      } else if (existing.status === "exploring" && target.candidate.ready && !existing.rehearsal) {
+      } else if (existing.status === "exploring" && target.candidate.ready) {
+        // A prior rehearsal may have saved before Ready failed. Recheck the
+        // reviewed candidate and live pins before retrying that transition.
         await prepare(existing, true, deps);
         wrote = true;
       }
@@ -207,10 +210,11 @@ function lastStale(p: Possibility): string | null {
 }
 
 /** Open stored Possibilities as the browser reads them. Made real and withdrawn move to History. */
-export function storedPossibilityViews(stored: readonly ListedPossibility[], candidates: readonly WebsiteRebuildCandidate[], summaries: { evidence: (workId: string) => string | null } = { evidence: () => null }): WorkspaceSystemPossibility[] {
+export function storedPossibilityViews(stored: readonly ListedPossibility[], candidates: readonly WebsiteRebuildCandidate[], summaries: { evidence: (workId: string) => string | null } = { evidence: () => null }, currentRevisions?: ReadonlyMap<string, { revisionId: string; number: number }>): WorkspaceSystemPossibility[] {
   return stored.flatMap(({ possibility: p, sourceRef }) => {
     if (p.status !== "exploring" && p.status !== "ready") return [];
-    const askContent = [...p.introduces, ...p.changes].find(item => item.candidate.content.kind === "ask-inquiry-follow-up" || ["ask-website-pages", "ask-existing-booking-page", "ask-existing-website-pages"].includes(String(item.candidate.content.kind)))?.candidate.content;
+    const baselineMoved = currentRevisions !== undefined && p.changes.some(change => currentRevisions.get(change.baseline.systemId)?.revisionId !== change.baseline.revisionId);
+    const askContent = [...p.introduces, ...p.changes].find(item => item.candidate.content.kind === "ask-new-service-setup" || item.candidate.content.kind === "ask-inquiry-follow-up" || ["ask-website-pages", "ask-existing-booking-page", "ask-existing-website-pages"].includes(String(item.candidate.content.kind)))?.candidate.content;
     const workId = sourceRef?.startsWith(REBUILD_SOURCE_PREFIX) ? sourceRef.slice(REBUILD_SOURCE_PREFIX.length)
       : typeof askContent?.rebuildWorkId === "string" ? askContent.rebuildWorkId : null;
     const candidate = workId ? candidates.find((item) => item.workId === workId) : undefined;
@@ -222,14 +226,14 @@ export function storedPossibilityViews(stored: readonly ListedPossibility[], can
       id: p.id,
       title: p.title,
       summary: askContent ? p.intent : candidate?.summary ?? p.intent,
-      status: p.status,
+      status: baselineMoved ? "exploring" : p.status,
       affects: [...new Set([...p.changes.map((c) => c.baseline.systemId), ...(typeof askContent?.contextSystemId === "string" ? [askContent.contextSystemId] : [])])],
       evidence: candidate?.evidence ?? (workId ? summaries.evidence(workId) : null),
       previewHref: candidate?.previewHref ?? null,
       ...(tryHref ? { tryHref } : {}),
       workId: workId ?? p.id,
       stored: true,
-      staleReason: lastStale(p),
+      staleReason: baselineMoved ? "A System this changes moved. Review a refreshed alternative before making it real." : lastStale(p),
     }];
   });
 }
@@ -338,6 +342,32 @@ export async function syncAskInquiryFollowUpPossibilities(deps: {
       }
       if (p.status === "exploring") rows[index] = { ...row, possibility: await prepare(p, true, deps) };
     } catch { /* Missing authority, moved native rules, or concurrent saves remain held for review. */ }
+  }
+  return rows;
+}
+
+/** New native setups stay Ready only while owner authority and native pins still hold. */
+export async function syncAskServiceSetupPossibilities(deps: {
+  repo: SupabasePossibilityRepository; live: LiveSystemsReader; actorId: string; at: string;
+  stored: ListedPossibility[]; canWrite: boolean; current(selection: unknown): Promise<boolean>;
+}): Promise<ListedPossibility[]> {
+  if (!deps.canWrite) return deps.stored;
+  const rows = [...deps.stored];
+  for (let index = 0; index < rows.length; index++) {
+    const row = rows[index]!; const p = row.possibility;
+    const content = p.introduces.find(item => item.candidate.content.kind === "ask-new-service-setup")?.candidate.content;
+    if (!content || p.activationId || !["exploring", "ready"].includes(p.status)) continue;
+    try {
+      const valid = askServiceSetupSelectionSchema.safeParse(content.selection);
+      if (!valid.success || !await deps.current(valid.data)) {
+        if (p.status === "ready") {
+          const stale = returnToExploring(p, "The tenant, calendar, record or inquiry configuration changed. Prepare a refreshed service alternative.", deps.actorId, deps.at);
+          await deps.repo.save(stale, p.revision); rows[index] = {...row, possibility:stale};
+        }
+        continue;
+      }
+      if (p.status === "exploring") rows[index] = {...row, possibility:await prepare(p,true,deps)};
+    } catch { /* Unreadable authority and pins remain held; no live effect runs. */ }
   }
   return rows;
 }

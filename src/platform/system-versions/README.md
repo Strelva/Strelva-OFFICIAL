@@ -104,14 +104,25 @@ added beside them; nothing is renamed:
 - Strelva-authored sources live in Strelva's agency workspace, read from
   `platform_workspaces` (`resolveStrelvaAgencyWorkspaceId`).
 
+## Native Live authority (prepared October 8)
+
+Native application Versions prepare one exact `system.change_live` owner
+item through `src/platform/needs-you/sources/version-release.ts`. Agencies can
+prepare client drafts through their staffed provider seat. Native app effect
+mandates are not qualified yet, so the signed-in business owner approves and
+executes Live; a provider/operator review or owner-link session cannot publish
+one. `save_system_version` binds the same Version, System, row revision,
+baseline and approved candidate, and rechecks the approver's current verified
+owner membership. Issued decisions and release history remain unchanged.
+
+The additive `20261020112000_version_live_owner_authority` successor is prepared
+and pinned in proposed batch 12. Local unit and ordered SQL proof establish this
+boundary, not deployment. See
+[the authority qualification](../../../docs/operations/content-version-authority-2026-10-08.md)
+for checks, failure evidence and remaining work.
+
 ## Not built yet
 
-- The release port is wired to Needs you
-  (`src/platform/needs-you/sources/version-release.ts`): a Version with an
-  unreleased working definition opens one `system.change_live` item, and
-  Approve (Home, session or the workspace-keyed email link) releases through
-  the gate, which re-reads that item. No screen offers "release" outside
-  Needs you yet. Proven locally with the in-memory store only.
 - Offering installations and inquiry pattern installations are still read
   through `mapping.ts`, not stored as Version rows.
 - Collection/franchise Versions across several Systems.

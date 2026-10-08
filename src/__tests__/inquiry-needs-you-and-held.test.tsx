@@ -87,6 +87,21 @@ describe("held spam on the workspace Inquiries page", () => {
     expect(result).not.toHaveProperty("held");
   });
 
+  it("keeps a released row's receipt and return control when Postgres already includes it in normal leads", async () => {
+    const released = row({ intakeState: "released", leadId: "lead_existing", name: "Marta" });
+    const result = await readWorkspaceLeads(ACTOR, WS, deps({
+      leads: async () => [{ id: released.leadId, name: released.name, createdAt: released.capturedAt }],
+      records: async () => ({ held: [], released: [released] }),
+    }));
+    expect(result.sites[0]!.leads).toEqual([expect.objectContaining({
+      id: released.leadId, rowId: released.id, releasedRowId: released.id,
+    })]);
+    expect(result.sites[0]!.lastThirtyDays).toBe(1);
+    const html = renderToStaticMarkup(<WorkspaceInquiries workspaceId={WS} state={{ kind: "ready", data: result }} />);
+    expect(html).toContain("Released from held messages.");
+    expect(html).toContain("Move the message from Marta back to held");
+  });
+
   it("a failed held read is unavailable, never an empty list; a refusal passes through", async () => {
     const result = await readWorkspaceLeads(ACTOR, WS, deps({ records: async () => { throw new Error("pg down"); } }));
     expect(result.held).toEqual({ items: [], unavailable: true });
