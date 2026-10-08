@@ -26,9 +26,19 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-202610200
 query "$catalog" >"$cluster_root/after.catalog"
 cmp "$cluster_root/before.catalog" "$cluster_root/after.catalog"
 printf 'Empty monthly rollback restores exact prior function catalog and ACLs.\n'
+# The later attachment owns a foreign key to the historical bundle table.
+# Retire that empty attachment in reverse dependency order for this old-cycle
+# proof; its guard remains authoritative and the full composition is restored.
+maintenance_forward="$repo_root/supabase/migrations/20261020090036_bundle_maintenance.sql"
+if [[ -f "$maintenance_forward" ]]; then
+  psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261020090036_bundle_maintenance.sql" >/dev/null
+fi
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261020090028_recurring_responsibilities.sql" >/dev/null
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261020090028_recurring_responsibilities.sql" >/dev/null
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261020090032_responsibility_month_evidence.sql" >/dev/null
+if [[ -f "$maintenance_forward" ]]; then
+  psql "${psql_args[@]}" --file="$maintenance_forward" >/dev/null
+fi
 psql "${psql_args[@]}" --file="$repo_root/tests/recurring-responsibilities-schema.sql" >/dev/null
 # Retain fictional history only in this owned disposable cluster, then execute
 # the actual inverse. Its refusal must preserve both rows and function catalog.

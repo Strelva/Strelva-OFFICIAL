@@ -6,8 +6,16 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 [[ ! -e .env.local && ! -e .env ]] || { echo 'Local service credential files must be absent.' >&2; exit 1; }
 path_sites=0
-if [[ "${1:-}" == "--path-sites" ]]; then path_sites=1; shift; fi
-[[ $# == 0 ]] || { echo "Usage: $0 [--path-sites]" >&2; exit 2; }
+bundler=turbopack
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --path-sites) path_sites=1; shift ;;
+    --bundler)
+      [[ $# -ge 2 && ( "$2" == webpack || "$2" == turbopack ) ]] || { echo 'Bundler must be webpack or turbopack.' >&2; exit 2; }
+      bundler="$2"; shift 2 ;;
+    *) echo "Usage: $0 [--path-sites] [--bundler webpack|turbopack]" >&2; exit 2 ;;
+  esac
+done
 read -r -a supabase_cli <<< "${SUPABASE_CLI:-npx --yes supabase@2.117.0}"
 for command_name in docker psql node curl python3 openssl rg redis-server; do command -v "$command_name" >/dev/null || exit 1; done
 docker info >/dev/null 2>&1 || { echo 'Docker is unavailable.' >&2; exit 1; }
@@ -96,7 +104,11 @@ syncBuiltinESMExports();
 JS
 export NODE_OPTIONS="--import=$work/crawl-transport.mjs"
 psql "$STRELVA_LOCAL_DB_URL" -X -Atq -v ON_ERROR_STOP=1 -c 'select count(*) from supabase_migrations.schema_migrations' > "$work/migration-count.txt"
-pnpm exec next dev --hostname localhost --port "$port" > "$work/app.log" 2>&1 & app_pid=$!
+next_dev_args=(--hostname localhost --port "$port")
+if [[ "$bundler" == webpack ]]; then next_dev_args+=(--webpack); fi
+printf '%s\n' "$bundler" > "$work/bundler.txt"
+pnpm exec next --version > "$work/next-version.txt"
+pnpm exec next dev "${next_dev_args[@]}" > "$work/app.log" 2>&1 & app_pid=$!
 ready=0
 for _ in $(seq 1 120); do
   if curl --fail --silent --max-time 5 "$PLAYWRIGHT_BASE_URL/sign-in" > /dev/null; then ready=1; break; fi
