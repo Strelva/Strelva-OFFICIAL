@@ -41,7 +41,7 @@
     "check:journeys": "bash scripts/check-journeys.sh",
     "check:readonly-rpcs": "node --import tsx scripts/check-readonly-rpcs.mjs",
     "check:make-real-compensation-sql": "bash scripts/check-make-real-compensation-sql.sh",
-    "smoke:workspace": "STRELVA_WORKSPACE_RELEASE=1 playwright test tests/workspace-release.spec.ts",
+    "smoke:workspace": "STRELVA_WORKSPACE_RELEASE=1 playwright test tests/workspace-release.spec.ts tests/provider-seat-workspace.spec.ts",
     "audit:full": "npx tsx --env-file-if-exists=.env.local scripts/full-audit.ts",
     "check:site-domains": "tsx --env-file-if-exists=.env --env-file-if-exists=.env.local scripts/check-site-domains.ts",
     "check:prod": "tsx scripts/production-checklist.ts",

@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+test.skip(process.env.STRELVA_WORKSPACE_RELEASE !== "1", "Provider-seat browser checks require the opt-in workspace release server; API responses are isolated fixtures.");
+
 const workspaceId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const workId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const rebuild = {
