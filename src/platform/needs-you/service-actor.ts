@@ -24,11 +24,14 @@
  *   (20261009131000_make_real_owner_link.sql).
  *
  * - `owner_decision_link`: one routine signed owner decision, bound to its
- *   ID, recipient and revision. Access, money and exit are never admitted.
+ *   ID, recipient, revision and intended approve/decline. Admission and each use
+ *   recheck the actual source effect against the same provider. Draft approval
+ *   and decline have no immediate outside effect. Access, money and exit are never admitted.
  *   The actual member role is unchanged; a run must be authorized after claim.
  *
  * Only for a business whose provider of record is an agency verified for
- * the purpose's effect (needs_you_sync: email; Make real: publish), the same
+ * the purpose's effect (needs_you_sync: email; Make real: publish; owner
+ * decision: the bound source action), the same
  * rule for every agency, Strelva's included. The session names that
  * provider. Anything else gets no session.
  */
@@ -144,11 +147,11 @@ export async function recordServiceAction(session: ServiceSession, action: Servi
 }
 
 /** Narrow session for one routine owner decision, with the actual reader's existing membership. */
-export async function startOwnerDecisionLinkSession(workspaceId: string, decisionId: string, revisionHash: string, recipient: string): Promise<ServiceSession | null> {
+export async function startOwnerDecisionLinkSession(workspaceId: string, decisionId: string, revisionHash: string, recipient: string, decision: "approve" | "not_yet" = "approve"): Promise<ServiceSession | null> {
   const normalized = z.string().email().parse(recipient.trim().toLowerCase());
   const { data, error } = await db().rpc("strelva_owner_decision_link_session", {
     p_workspace_id: z.string().uuid().parse(workspaceId), p_decision_id: z.string().uuid().parse(decisionId),
-    p_revision_hash: z.string().regex(/^[a-f0-9]{64}$/).parse(revisionHash), p_recipient: normalized,
+    p_revision_hash: z.string().regex(/^[a-f0-9]{64}$/).parse(revisionHash), p_recipient: normalized, p_decision: decision,
   });
   if (error) {
     const code = LINK_REFUSALS.find(name => error.message?.includes(name));

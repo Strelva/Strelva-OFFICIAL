@@ -172,15 +172,20 @@ pnpm scrubbed-copy dry-run --out=$HOME/strelva-copies/<date> --tenants=gldf   # 
 ```
 
 For each copied active tenant, this runs `scripts/convert-tenant-to-workspace.ts
-<slug> --json` against the copy. Tenants and content come from `<out>/dev`;
-leads, booking config and accounts come from the copy's Redis. The planner
-writes nothing. The tool then applies the plan through the real
+<slug> --agency=<synthetic-agency> --agency-staff=<synthetic-member>
+--agency-basis=existing_contract --json` against the copy. Tenants and content
+come from `<out>/dev`; leads, booking config and accounts come from the copy's
+Redis. The planner writes nothing. For a rehearsal, the tool creates a local
+fictional agency and verified staff identity in the copy, then applies the plan through the real
 `convert_tenant_to_business` RPC as `operator@scrubbed.strelva.test`, a
 local-only super admin, inside a transaction that is always rolled back. The
 result is `<out>/dry-run-report.json`: plan counts, skipped fields, command id,
 digest, and the database receipt counts (including `contactsMerged`). The
-command exits non-zero if any tenant fails to plan or apply. `--no-rehearse`
-skips the SQL step.
+command exits non-zero if the explicit provider route fails to plan or apply.
+This synthetic `existing_contract` route validates conversion mechanics only;
+it proves no real agency agreement or staff assignment. The copy sends no
+owner invitation or email. `--no-rehearse` skips the SQL step and does not
+validate the agency fixture.
 
 A tenant that fails here must not be converted in production until the
 failure is understood.

@@ -29,7 +29,7 @@ begin
   insert into public.tenant_workspace_links(tenant_stable_id,tenant_slug_at_link,workspace_id,linked_by,command_id,command_digest,receipt)
     select t.stable_id,t.id,ws,actor,gen_random_uuid(),h,'{}'::jsonb from public.tenants t where t.id='ol-existing-fixture';
   -- Batch 7A: the platform serves a business through its agency of record,
-  -- verified for email, the same for every agency (Strelva's included).
+  -- verified per outside effect, the same for every agency (Strelva's included).
   insert into public.workspaces(id,kind,name,created_by) values('b2000000-0000-4000-8000-0000000000a1','agency','Owner link fixture agency',actor);
   insert into public.workspace_providers(customer_workspace_id,provider_workspace_id,source,started_by) values(ws,'b2000000-0000-4000-8000-0000000000a1','business_choice',actor);
   insert into public.agency_verifications(agency_workspace_id,effect,status,evidence,verified_by,verifier_is_agency_member)
@@ -44,6 +44,14 @@ begin
   perform pg_temp.ol_expect(format('select public.strelva_owner_decision_link_session(%L,%L,%L,%L)',ws,id,h,'ol-owner@example.test'),'strelva_service_access_denied');
   perform pg_temp.ol_expect(format('select public.strelva_owner_decision_link_session(%L,%L,%L,%L)',ws,id,revision_hash,'intruder@example.test'),'owner_decision_recipient_not_owner');
   perform pg_temp.ol_expect(format('select public.strelva_owner_decision_link_session(%L,%L,%L,%L)',gen_random_uuid(),id,revision_hash,'ol-owner@example.test'),'strelva_service_access_denied');
+  -- Email transport never grants publication. No session, run, tenant or publication.
+  perform pg_temp.ol_assert(public.strelva_owner_decision_link_session(ws,id,revision_hash,'ol-owner@example.test') is null,'email-only agency cannot admit launch');
+  perform pg_temp.ol_assert(not exists(select 1 from public.owner_decision_link_sessions where decision_id=id),'refused launch creates no session');
+  -- Decline needs no publication authority and cannot authorize approval later.
+  link:=public.strelva_owner_decision_link_session(ws,id,revision_hash,'ol-owner@example.test','not_yet');
+  perform pg_temp.ol_assert(link is not null,'email-only agency may decline launch');
+  insert into public.agency_verifications(agency_workspace_id,effect,status,evidence,verified_by,verifier_is_agency_member)
+    values('b2000000-0000-4000-8000-0000000000a1','publish','verified','{"note":"fixture"}',actor,false);
   link:=public.strelva_owner_decision_link_session(ws,id,revision_hash,' OL-Owner@Example.test ');
   sid:=(link->>'sessionId')::uuid;
   perform pg_temp.ol_assert(link->>'role'='admin' and link->>'recipient'='ol-owner@example.test' and link->>'decisionId'=id::text,'bound unchanged admin identity');
@@ -51,10 +59,24 @@ begin
     and (select a.provider_workspace_id from public.strelva_service_actions a where a.id=sid)='b2000000-0000-4000-8000-0000000000a1','session names the agency of record');
   perform pg_temp.ol_expect(format('select public.authorize_owner_decision_link_run(%L,%L,%L,%L,%L)',ws,sid,id,revision_hash,'ol-owner@example.test'),'strelva_service_access_denied');
   perform public.claim_owner_decision(ws,id,revision_hash,'approve','owner_link',null,null,'ol-owner@example.test');
+  -- A verification revoked after session creation blocks run authorization.
+  insert into public.agency_verifications(agency_workspace_id,effect,status,reason,verified_by,verifier_is_agency_member)
+    values('b2000000-0000-4000-8000-0000000000a1','publish','unverified','Fixture revocation after session',actor,false);
+  perform pg_temp.ol_expect(format('select public.authorize_owner_decision_link_run(%L,%L,%L,%L,%L)',ws,sid,id,revision_hash,'ol-owner@example.test'),'strelva_service_access_denied');
+  perform pg_temp.ol_assert(not exists(select 1 from public.strelva_service_actions where session_id=sid and action='run'),'revocation logs no run');
+  insert into public.agency_verifications(agency_workspace_id,effect,status,evidence,verified_by,verifier_is_agency_member)
+    values('b2000000-0000-4000-8000-0000000000a1','publish','verified','{"note":"fixture reverified"}',actor,false);
   perform public.authorize_owner_decision_link_run(ws,sid,id,revision_hash,'ol-owner@example.test');
   perform pg_temp.ol_expect(format('select public.authorize_owner_decision_link_run(%L,%L,%L,%L,%L)',ws,sid,id,revision_hash,'ol-owner@example.test'),'strelva_service_access_denied');
   perform pg_temp.ol_expect(format('select public.reserve_website_by_owner_link(%L,%L,%L,%L,1,%L,%L,%L,%L,%L,%L)',ws,work.id,actor,'ol-operator@example.test',h,'ol-existing-fixture',sid,id,revision_hash,'ol-owner@example.test'),'website_publication_conflict');
   perform pg_temp.ol_expect(format('select public.reserve_website_by_owner_link(%L,%L,%L,%L,1,%L,%L,%L,%L,%L,%L)',ws,work.id,actor,'ol-operator@example.test',revision_hash,'ol-new-fixture',sid,id,revision_hash,'ol-owner@example.test'),'website_approval_required');
+  -- Revocation after run authorization blocks native reservation too.
+  insert into public.agency_verifications(agency_workspace_id,effect,status,reason,verified_by,verifier_is_agency_member)
+    values('b2000000-0000-4000-8000-0000000000a1','publish','unverified','Fixture revocation after run',actor,false);
+  perform pg_temp.ol_expect(format('select public.reserve_website_by_owner_link(%L,%L,%L,%L,1,%L,%L,%L,%L,%L,%L)',ws,work.id,actor,'ol-operator@example.test',h,'ol-new-fixture',sid,id,revision_hash,'ol-owner@example.test'),'strelva_service_access_denied');
+  perform pg_temp.ol_assert(not exists(select 1 from public.tenants where public.tenants.id='ol-new-fixture'),'refused reserve creates no tenant');
+  insert into public.agency_verifications(agency_workspace_id,effect,status,evidence,verified_by,verifier_is_agency_member)
+    values('b2000000-0000-4000-8000-0000000000a1','publish','verified','{"note":"fixture reverified"}',actor,false);
   select tenant_id into reserved from public.reserve_website_by_owner_link(ws,work.id,actor,'ol-operator@example.test',1,h,'ol-new-fixture',sid,id,revision_hash,'ol-owner@example.test');
   perform pg_temp.ol_assert(reserved='ol-new-fixture','new hosted tenant reserved');
   perform pg_temp.ol_assert(not exists(select 1 from public.memberships where tenant_id=reserved),'no tenant membership granted');
@@ -62,6 +84,14 @@ begin
   rec:=jsonb_build_object('status','published','provider','strelva-hosted','artifactHash',h,'candidateRevision',1,'receiptId','ol-receipt','providerUrl','https://ol-new-fixture.strelva.com/','evidence','Fictional','publishedAt','2026-10-08T10:00:00Z');
   perform pg_temp.ol_expect(format('select public.publish_website_by_owner_link(%L,%L,%L,%L,1,%L,%L,%L,%L,%L,%L,%L)',ws,work.id,actor,'ol-operator@example.test',h,'ol-existing-fixture',rec,sid,id,revision_hash,'ol-owner@example.test'),'website_tenant_access_denied');
   perform pg_temp.ol_expect(format('select public.publish_website_by_owner_link(%L,%L,%L,%L,1,%L,%L,%L,%L,%L,%L,%L)',ws,work.id,actor,'ol-operator@example.test',h,reserved,rec||'{"candidateRevision":2}',sid,id,revision_hash,'ol-owner@example.test'),'website_receipt_invalid');
+  -- Even a reserved tenant and authorized run do not outlive publish verification.
+  insert into public.agency_verifications(agency_workspace_id,effect,status,reason,verified_by,verifier_is_agency_member)
+    values('b2000000-0000-4000-8000-0000000000a1','publish','unverified','Fixture revocation before publish',actor,false);
+  perform pg_temp.ol_expect(format('select public.publish_website_by_owner_link(%L,%L,%L,%L,1,%L,%L,%L,%L,%L,%L,%L)',ws,work.id,actor,'ol-operator@example.test',h,reserved,rec,sid,id,revision_hash,'ol-owner@example.test'),'strelva_service_access_denied');
+  perform pg_temp.ol_assert(not exists(select 1 from public.website_document_publications where website_work_id=work.id),'refused publish creates no publication');
+  perform pg_temp.ol_assert(not exists(select 1 from public.website_document_receipts where website_work_id=work.id),'refused publish creates no receipt');
+  insert into public.agency_verifications(agency_workspace_id,effect,status,evidence,verified_by,verifier_is_agency_member)
+    values('b2000000-0000-4000-8000-0000000000a1','publish','verified','{"note":"fixture reverified"}',actor,false);
   published:=public.publish_website_by_owner_link(ws,work.id,actor,'ol-operator@example.test',1,h,reserved,rec,sid,id,revision_hash,'ol-owner@example.test');
   perform pg_temp.ol_assert(published->>'tenant_id'=reserved,'publishes exact approved candidate');
   perform public.publish_website_by_owner_link(ws,work.id,actor,'ol-operator@example.test',1,h,reserved,rec,sid,id,revision_hash,'ol-owner@example.test');
@@ -79,6 +109,11 @@ begin
   perform pg_temp.ol_expect(format('select public.publish_website_by_owner_link(%L,%L,%L,%L,1,%L,%L,%L,%L,%L,%L,%L)',ws,work.id,actor,'ol-operator@example.test',h,reserved,rec,sid,id,revision_hash,'ol-owner@example.test'),'strelva_service_access_denied');
   -- The same account-free owner can decide an exact fact patch. This is the
   -- real writer RPC, with no owner account or synthetic membership.
+  -- An internal fact approval has no immediate outside effect, even if email
+  -- and publish are both revoked. Its later outside writes retain their own gates.
+  insert into public.agency_verifications(agency_workspace_id,effect,status,reason,verified_by,verifier_is_agency_member)
+    values('b2000000-0000-4000-8000-0000000000a1','publish','unverified','Internal approval independent',actor,false),
+    ('b2000000-0000-4000-8000-0000000000a1','email','unverified','Internal approval independent',actor,false);
   draft:=public.save_ask_business_draft(ws,actor,'ol-operator@example.test',null,0,
     '{"facts":{"phone":{"value":"716-555-0111"}}}','Change phone','ol-fact-one');
   item:=public.open_owner_decision(ws,jsonb_build_object('kind','fact.inferred','route','owner_decides','title','Change exact phone',
