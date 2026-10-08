@@ -52,6 +52,17 @@ change needs a separate explicit decision; do not infer it from this migration.
   and `pnpm check:workspace-upgrade` pass. The former invokes the new full-schema
   audit runner; the latter includes the new lifecycle/denial SQL contract.
 - `bash -n scripts/check-audit-append-only-sql.sh` and `git diff --check` pass.
+- Release inventory follow-up: the original `--current-tail` gate refused
+  `Migrations missing from the prepared packet: 20261020111000_audit_service_role_append_only.sql`.
+  Proposed, unapplied batch 12 now pins the successor and rollback SHA256;
+  every previous baseline/batch/proposed entry and original recovery scope is
+  preserved. No rollout authority follows from this prepared inventory.
+- `pnpm exec vitest run src/__tests__/release-safety-tools.test.ts src/__tests__/release-restore.test.ts`
+  passes all 32 tests. `pnpm check:release-safety:batch8 --current-tail` qualifies
+  all 267 forwards and 41 corrective tails. Both recovery rounds disable 188
+  active service RPCs, preserve every public row and restore the exact secured
+  catalog. Original scope remains 85 files/238 signatures (189 original service
+  RPCs, one later retired). The successor's audit ACL survives both rounds.
 
 The before-fix error was `service_role could mutate existing audit: update
 public.audit_logs set action='forged' where id='audit528-original'`.
@@ -59,6 +70,10 @@ Local logs are retained under `output/issue-528-audit-2026-10-08/`; the
 `proof.json` manifest pins SHA256 values and the tested source files.
 No hosted CI, target ACL/role graph, production read/write, adoption or deployment
 proof is established by this work.
+In particular, hosted superuser attributes and noninherited SET ROLE paths are
+not qualified; this follow-up does not expand the independently reviewed ACL
+repair. `runtime-recovery-receipt.json` beside the proof manifest retains the
+complete current-tail file hashes and original scope from the local run.
 
 ## Continuation
 

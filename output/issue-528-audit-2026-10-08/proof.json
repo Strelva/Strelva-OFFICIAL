@@ -10,7 +10,9 @@
     "pnpm check:workspace-upgrade": 0,
     "pnpm typecheck": 0,
     "bash -n scripts/check-audit-append-only-sql.sh": 0,
-    "git diff --check": 0
+    "git diff --check": 0,
+    "pnpm exec vitest run src/__tests__/release-safety-tools.test.ts src/__tests__/release-restore.test.ts": 0,
+    "pnpm check:release-safety:batch8 --current-tail": 0
   },
   "sourceSha256": {
     "supabase/migrations/20261020111000_audit_service_role_append_only.sql": "47adc8d510850fff3637a4ae74dc9f685336e72134ed59d8e94ae34bc7bd7b4b",
@@ -19,19 +21,35 @@
     "scripts/check-workspace-sql.sh": "41ec15775b270923849cb09efd8a3983585e96f673b698a8643f913a47cc8cc4",
     "scripts/check-workspace-upgrade.sh": "26da1187701fefd82c3ff87fe1a3bf13c43687af53a49f31aa230a2994e4762e",
     "tests/audit-service-role-append-only-schema.sql": "a8ec532e7d38d1d8c781cc5e38ed24f4edab1d7b5465bb9a74c728822e84e37d",
-    "tests/legacy-tenant-client-access-schema.sql": "fedb0248eb2cf172f066d6e515474103ba137f6b2eb1cb1afdecf912e517a57f"
+    "tests/legacy-tenant-client-access-schema.sql": "fedb0248eb2cf172f066d6e515474103ba137f6b2eb1cb1afdecf912e517a57f",
+    "scripts/release-safety/batches.json": "39395141bce90d194134ee697e408d3c8bbef5026d3b742045ed394f9a1c7695"
   },
   "logSha256": {
     "before.log": "d0b8f574d1af93bbd1fc643cbae09f698933c13ab0fa03d8772cae74967e2702",
     "after.log": "ba21a42436c4b2efab2f97fd61da13ff5aee56c02b64f0784f9ec78eb6601fd0",
     "workspace-sql.log": "a37741c95ab9731afa21e1d177322aa21c28c24e46e675e7bb1cb0edaf21c8e9",
     "workspace-upgrade.log": "de36a6865b1c7f38d0ef2f2b5adfb5a81bab546f686cf5c05ef37f752cfe6102",
-    "typecheck.log": "841b99801d4ffa5669fc1d78cd1e5458c8b0264c83efecc17378067a639fc7da"
+    "typecheck.log": "841b99801d4ffa5669fc1d78cd1e5458c8b0264c83efecc17378067a639fc7da",
+    "runtime-before.log": "cbd1028b93211fba42766d6dcb34c277d7afe7d5e7bcaafca5007f06f5243944",
+    "runtime-after.log": "db186f8db1b493d2d23a651eaf6f2fbad53073f5402324d3848b3e8623e7ae3b",
+    "inventory-tests.log": "03f7e6d448e6643e8a932af0b3912fc727d14c166375e136f74dfa0f46fea158"
   },
   "unproven": [
     "hosted CI",
     "exact current target ACL/role graph",
     "migration deployment",
     "retention policy beyond preserved lifecycle boundaries"
-  ]
+  ],
+  "inventoryUnitTestsPassed": 32,
+  "runtimeRecoveryReceipt": {
+    "file": "runtime-recovery-receipt.json",
+    "sha256": "6e78733781b07e2d9ebe556de3d2ee73434ff4af5759cc47e2a6f3dbb9933d4d",
+    "files": 85,
+    "currentInventory": 267,
+    "correctiveTails": 41,
+    "originalSignatures": 238,
+    "originalServiceRpcCount": 189,
+    "activeServiceRpcCount": 188,
+    "rounds": 2
+  }
 }

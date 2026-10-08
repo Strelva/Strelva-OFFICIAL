@@ -1263,6 +1263,21 @@
           "rollback": "rollback-20261019100000_actor_rpc_service_boundary.sql"
         }
       ]
+    },
+    {
+      "batch": "12",
+      "status": "proposed, unapplied",
+      "description": "October 8 prepared backlog successors; no production authority",
+      "note": "Local qualification only. Preserve existing baseline and original batch-8 RPC recovery scope. Audit raw server mutations remain restricted during forward-only application recovery; established lifecycle cleanup remains unchanged.",
+      "items": [
+        {
+          "file": "20261020111000_audit_service_role_append_only.sql",
+          "sha256": "47adc8d510850fff3637a4ae74dc9f685336e72134ed59d8e94ae34bc7bd7b4b",
+          "rollback": "rollback-20261020111000_audit_service_role_append_only.sql",
+          "rollbackSha256": "e19e85259bd73ba910dd42f6d3926d17646e5625b5a95cd0749d42264c920a08",
+          "rollbackStatus": "refused; forward-only security repair retains append/read and established lifecycle cleanup"
+        }
+      ]
     }
   ]
 }
