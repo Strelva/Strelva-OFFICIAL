@@ -5,7 +5,7 @@ import {
   PUBLIC_URL_VALIDATION_TIMEOUT_MS,
   validateUrlSafety,
   withPublicUrlValidationTimeout,
-} from "@/lib/public-url-safety";
+} from "@/platform/infra/public-url-safety";
 import type { CategoryResult } from "@/lib/audit/types";
 
 const websiteSourceInputSchema = z.object({

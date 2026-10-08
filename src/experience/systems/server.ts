@@ -1,5 +1,5 @@
 import { getInquiryRepository } from "@/products/inquiries/server";
-import type { InquiryWorkspaceSnapshot } from "@/products/inquiries/repository";
+import type { InquiryWorkspaceSnapshot } from "@/products/inquiries/server";
 import { publishingEnabledForWorkspace } from "@/products/publishing/server";
 /**
  * Server projection for the Systems experience. Server only: it reads the

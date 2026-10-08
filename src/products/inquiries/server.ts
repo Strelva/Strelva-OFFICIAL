@@ -62,6 +62,7 @@ export {
 } from "./workspace-exit";
 export { executeInquiryPublication, authorizeInquiryPublicationActor } from "./publication";
 export { getInquiryRepository } from "./repository";
+export type { InquiryWorkspaceSnapshot } from "./repository";
 export { publicationClaimToken } from "./repository";
 export { InquiryPersistenceError, InquiryValidationError } from "./repository";
 export { projectPublishedInquiry } from "./storefront";

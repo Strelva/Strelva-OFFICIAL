@@ -13,6 +13,11 @@ vi.mock("node:http", () => ({ request: mocks.request }));
 vi.mock("node:https", () => ({ request: mocks.request }));
 
 import { fetchPinnedPublicResponse, fetchPinnedPublicText } from "@/lib/pinned-public-text";
+import * as pinnedInfrastructure from "@/platform/infra/pinned-public-text";
+import * as legacyPublicSafety from "@/lib/public-url-safety";
+import * as publicSafetyInfrastructure from "@/platform/infra/public-url-safety";
+import * as legacySafeFetch from "@/lib/safe-fetch";
+import * as safeFetchInfrastructure from "@/platform/infra/safe-fetch";
 import { fetchRebuildPage } from "@/products/websites/rebuild-crawl";
 
 type RequestCallback = (response: PassThrough & {
@@ -242,4 +247,14 @@ describe("pinned public text transport", () => {
     expect(mocks.request).toHaveBeenCalledTimes(1);
     expect(mocks.lookup).toHaveBeenCalledTimes(1);
   });
+});
+
+
+it("keeps legacy fetch imports on the same infrastructure implementations and error identities", () => {
+  expect(fetchPinnedPublicResponse).toBe(pinnedInfrastructure.fetchPinnedPublicResponse);
+  expect(fetchPinnedPublicText).toBe(pinnedInfrastructure.fetchPinnedPublicText);
+  expect(legacyPublicSafety.validateUrlSafety).toBe(publicSafetyInfrastructure.validateUrlSafety);
+  expect(legacyPublicSafety.UnsafePublicUrlError).toBe(publicSafetyInfrastructure.UnsafePublicUrlError);
+  expect(legacyPublicSafety.withPublicUrlValidationTimeout).toBe(publicSafetyInfrastructure.withPublicUrlValidationTimeout);
+  expect(legacySafeFetch.isSafeFetchUrl).toBe(safeFetchInfrastructure.isSafeFetchUrl);
 });

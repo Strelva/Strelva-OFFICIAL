@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import * as cheerio from "cheerio";
 import { computeVisibleText } from "@/lib/audit/checks";
-import { isSafeFetchUrl } from "@/lib/safe-fetch";
-import { fetchPinnedPublicResponse } from "@/lib/pinned-public-text";
+import { isSafeFetchUrl } from "@/platform/infra/safe-fetch";
+import { fetchPinnedPublicResponse } from "@/platform/infra/pinned-public-text";
 import { registrableRebuildDomain } from "./rebuild-domain-key";
 
 export const REBUILD_USER_AGENT = "StrelvaRebuild/1.0";
