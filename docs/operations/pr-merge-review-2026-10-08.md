@@ -69,16 +69,20 @@ The public smoke also exposed a missing flag guard on the new mapping fixture
 spec. Its three enabled-preview checks already passed; the spec now explicitly
 requires the fictional preview flag, matching other preview acceptance specs.
 This preserves the product's disabled-preview behavior and keeps fixture proof
-separate from public smoke. The final public smoke rerun remains required.
-Coverage thresholds passed (9,032 tests; 51 skipped).
+separate from public smoke. The final public smoke passed 94 checks, with
+339 explicitly gated checks skipped.
+Coverage thresholds passed (9,032 tests; 51 skipped). Workspace browser acceptance
+passed all 39 checks and synthetic operator/owner surface smoke passed all 20.
 
 ## Limits and next action
 
 #496's billing copy and navigation are implemented and locally qualified. #310's
 alarm portion is implemented, but the broader hardening issue remains open and its
-threshold is provisional. #278, #327, #457 and #482 retain their broader scope;
-no completion of human qualification, commercial payer migration, all import debt,
-or production fact propagation is implied.
+threshold is provisional. #278, #327 and #457 retain their broader scope.
+The bounded #482 shrink/split and #326 declaration requirements are satisfied.
+Remaining import debt belongs under #336. No completion of human qualification,
+commercial payer migration, all import debt or production fact propagation is
+implied.
 
 Continue with the remaining issue acceptance criteria from the nearest owner.
 The older main-target #545 is blocked by its hosted dependency/build failure and
@@ -106,7 +110,7 @@ Independent current-tree comparison found these separate from the ready backlog:
   self-service website building remains outside Reborn scope.
 - #205's migration and service exactly match current source; its operator views
   are integrated and now measure every business, refusing incomplete medians.
-  Close as superseded rather than restore the old active-only measurement.
+  Closed as superseded rather than restoring the old active-only measurement.
 - #206 is real isolated future offering/Home Finder preparation, outside current
   release and still missing brokerage/inventory/commercial delivery evidence.
   Keep prepared, inactive; Version declarations are a different unit of work.
