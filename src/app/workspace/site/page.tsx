@@ -37,6 +37,7 @@ import { listWebsiteRebuilds } from "@/products/websites/index";
 import { parseRebuildView } from "@/experience/websites/rebuild-transport";
 import { connectedSitesReleasedFor, readBusinessVisibility, readConnectedSites, suggestBusinessHandle } from "@/products/connected-sites/server";
 import { ServerVisibility } from "@/experience/connected-sites/ServerVisibility";
+import { providerSeatBusiness } from "@/products/agency-clients/server";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Website", robots: { index: false, follow: false }, referrer: "no-referrer" };
@@ -175,7 +176,9 @@ async function WebsiteEntryPage({ workspaceId, entry, workId }: { workspaceId: s
   let workspaces: Awaited<ReturnType<typeof listWorkspaces>>;
   try { workspaces = await listWorkspaces(actor); }
   catch { return <Unavailable message="This business couldn't be loaded just now. Nothing changed. Try again in a moment." />; }
-  const workspace = workspaces.find(item => item.id === workspaceId && item.kind === "customer" && item.access === "member");
+  // A staffed agency seat holder (#259) has no direct membership; SQL still decides what it may change.
+  const workspace = workspaces.find(item => item.id === workspaceId && item.kind === "customer" && item.access === "member")
+    ?? await providerSeatBusiness(actor, workspaceId).catch(() => null);
   if (!workspace) return <Unavailable message="This business isn't available to your account." />;
   const operator = await isSuperAdmin().catch(() => false);
   const systemsOn = await systemsReleaseEnabledForWorkspace(workspaceId, { operator, tester: false, userId: user.id }).catch(() => false);
