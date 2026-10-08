@@ -93,6 +93,10 @@ export interface QueueFacts {
   daysToExpiry?: number | null;
   /** ops_alert severity from the attention briefing. */
   severity?: "high" | "medium" | "low";
+  /** Aggregate-only, provisional agent hold confirmation observation. */
+  agentHoldRatio?: boolean;
+  /** A closed ratio alert can reopen on newly matured unconfirmed evidence. */
+  newEvidenceAt?: string | null;
   /** draft_review: events expire at 90 days; raised to P2 after 80. */
   expiresAt?: string | null;
   /** owner_pending: raw reach from marks, resolved with the email gate. */

@@ -97,7 +97,15 @@ export function projectQueue(input: ProjectInput): OperatorQueue {
       if (seen.has(key)) continue;
       seen.add(key);
       count.read += 1;
-      const mark = marks.get(key) ?? null;
+      const savedMark = marks.get(key) ?? null;
+      // Closing an observation acknowledges its evidence, not all future
+      // failures for this business. Preserve assignment and notes on reopening.
+      const hasNewRatioEvidence = raw.kind === "ops_alert" && raw.facts?.agentHoldRatio
+        && savedMark?.closedAt && raw.facts.newEvidenceAt
+        && Date.parse(raw.facts.newEvidenceAt) > Date.parse(savedMark.closedAt);
+      const mark = hasNewRatioEvidence && savedMark
+        ? { ...savedMark, closedState: null, closedAt: null, closedReason: null, closedReceiptId: null }
+        : savedMark;
       const { priority, move, reason } = priorityFor(raw, now);
       const dueAt = dueAtFor(raw, priority, mark);
       const closedElsewhere = raw.facts?.closedElsewhere ?? null;

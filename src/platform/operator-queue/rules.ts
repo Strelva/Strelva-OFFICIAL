@@ -48,6 +48,7 @@ export function priorityFor(raw: QueueItemRaw, now: number): PriorityResult {
       return { priority: "P4", move: "owner", reason: days === null ? "Renewal is the owner's call." : `Expires in ${days} days. Renewal is the owner's call.` };
     }
     case "ops_alert":
+      if (facts.agentHoldRatio) return { priority: "P2", move: "strelva", reason: "Low customer confirmation share. Provisional threshold; review before taking action." };
       return facts.severity === "high"
         ? { priority: "P1", move: "strelva", reason: "A failure that is affecting a live site or client data." }
         : { priority: "P2", move: "strelva", reason: null };

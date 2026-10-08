@@ -1579,3 +1579,15 @@ fi
 grep -q 'owner_decision_runtime_rollback_requires_data_preservation' "$cluster_root/owner-effects-rollback.log"
 psql "${psql_args[@]}" -Atc "select exists(select 1 from information_schema.columns where table_schema='public' and table_name='owner_decision_link_sessions' and column_name='intended_decision') and exists(select 1 from public.owner_decision_link_sessions) and to_regprocedure('public.owner_decision_provider_holds(uuid,uuid,text[])') is not null" | grep -qx t
 printf 'Owner effect rollback retained sessions and authority gates.\n'
+
+# #310 aggregate-only hold confirmation observation: forward, rollback/reapply,
+# actual role checks and the unchanged anonymous admission regression probes.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261019112000_agent_hold_ratio.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agent-hold-ratio-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261019112000_agent_hold_ratio.sql"
+psql "${psql_args[@]}" -Atc "select to_regprocedure('public.read_agent_hold_ratio(uuid,text,timestamptz)') is null and to_regclass('public.business_bookings_agent_ratio_idx') is null" | grep -qx t
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261019112000_agent_hold_ratio.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agent-hold-ratio-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-admission-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/public-booking-admission-schema.sql"
+node --import tsx "$repo_root/scripts/check-readonly-rpcs.mjs" "postgresql:///postgres?host=$cluster_socket&port=$cluster_port"
