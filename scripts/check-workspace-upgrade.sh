@@ -484,3 +484,6 @@ printf 'Package declarations passed against the full ordered upgrade.\n'
 
 # #278 additive read-only payer UI capabilities and retained obligation proof.
 source "$repo_root/scripts/payer-transition-actions-checks.sh"
+
+# #251: bounded platform support reads; pure snapshot APIs remain unchanged.
+source "$repo_root/scripts/platform-operator-read-audit-checks.sh"

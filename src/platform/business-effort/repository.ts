@@ -25,7 +25,7 @@ function identity(actor: BusinessEffortActor) {
 export function businessEffortFailure(error: Failure): void {
   if (!error) return;
   const detail = `${error.code ?? ""} ${error.message ?? ""}`;
-  if (detail.includes("business_effort_access_denied")) throw new BusinessEffortAccessError();
+  if (detail.includes("business_effort_access_denied") || detail.includes("platform_operator_read_access_denied")) throw new BusinessEffortAccessError();
   if (detail.includes("business_effort_invalid")) throw new BusinessEffortValidationError();
   if (detail.includes("business_effort_business_not_found")) throw new BusinessEffortNotFoundError("That customer business was not found.");
   if (detail.includes("business_effort_entry_not_found")) throw new BusinessEffortNotFoundError("That entry was not found.");
@@ -65,10 +65,11 @@ export const PostgresBusinessEffortStore: BusinessEffortStore = {
     }));
   },
   async listBusinesses(actor): Promise<EffortBusiness[]> {
-    return parse(z.array(effortBusinessSchema), await rpc("read_effort_businesses", identity(actor)));
+    return parse(z.array(effortBusinessSchema), await rpc("read_audited_platform_operator_source", { ...identity(actor), p_reader_name: "read_effort_businesses" }));
   },
   async listEntries(actor, query): Promise<BusinessEffortEntry[]> {
-    return parse(z.array(businessEffortEntrySchema), await rpc("read_business_effort", {
+    return parse(z.array(businessEffortEntrySchema), await rpc("read_audited_platform_operator_detail", {
+      p_reader_name: "read_business_effort",
       ...identity(actor), p_from: query.from, p_business_id: query.businessId ?? null,
     }));
   },
