@@ -426,3 +426,5 @@ psql "${psql_args[@]}" --file="$repo_root/tests/readonly-reader-authority-schema
 node "$repo_root/scripts/check-readonly-rpcs.mjs" "postgresql://$(id -un)@localhost:$cluster_port/postgres?host=$cluster_socket"
 node --test "$repo_root/scripts/tests/readonly-rpcs.node-test.mjs"
 bash "$repo_root/scripts/check-reader-writer-locks.sh" "postgresql://$(id -un)@localhost:$cluster_port/postgres?host=$cluster_socket"
+# Legacy calendar row-existence compatibility and receipt-preserving rollback.
+psql "${psql_args[@]}" --file="$repo_root/tests/legacy-calendar-revoke-result-schema.sql"

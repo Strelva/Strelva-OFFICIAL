@@ -1230,6 +1230,8 @@ psql "${psql_args[@]}" --file="$repo_root/tests/provider-disconnect-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011180000_provider_disconnect_receipts.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011180000_provider_disconnect_receipts.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/provider-disconnect-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261014120000_legacy_calendar_revoke_result.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/legacy-calendar-revoke-result-schema.sql"
 # #524: owner links go only to a trusted owner address. The rollback must
 # restore every public function body and privilege, trigger, relation, column
 # and constraint exactly; then the migration reapplies.
