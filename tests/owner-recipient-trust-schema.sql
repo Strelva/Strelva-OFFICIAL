@@ -277,53 +277,47 @@ end $$;
 rollback;
 
 -- 11. A claim serializes with a trust change. Session B (dblink) moves trust
---     to a new address and holds its transaction open; the old address's
---     claim, started meanwhile, waits for B and is refused. Committed
---     fictional fixture, removed at the end.
+--     to a new address through business_owner_recipient_set_trust, the one
+--     path every trust change takes, and holds its transaction open; the old
+--     address's claim, started meanwhile, waits for B and is refused.
+--     Committed fictional fixture, removed at the end.
 create extension if not exists dblink;
 create or replace function pg_temp.rt_assert(v boolean, message text) returns void language plpgsql as $$
 begin if v is not true then raise exception 'owner recipient trust: %', message; end if; end $$;
 do $$
 declare
-  operator_id uuid := '52400000-0000-4000-8000-000000000101';
-  owner_id uuid := '52400000-0000-4000-8000-000000000102';
-  ws uuid; item uuid; result jsonb;
+  creator uuid := '52400000-0000-4000-8000-000000000201';
+  ws uuid := '52400000-0000-4000-8000-000000000202';
+  item uuid;
 begin
-  insert into public.users(id, email, verified_at) values
-    (operator_id, 'rt-race-operator@strelva.example.test', now()), (owner_id, 'rt-race-owner@example.test', now());
-  insert into public.super_admins(user_id, email) values (operator_id, 'rt-race-operator@strelva.example.test');
-  insert into public.tenants(id, stable_id, site_name, active, owner_email)
-    values ('rt-race', '52400000-0000-4000-8000-0000000001a1', 'RT Race', true, 'rt-race-owner@example.test');
-  result := public.convert_tenant_to_business('rt-race-operator@strelva.example.test', 'rt-race',
-    '{"tenantId":"rt-race","tenantStableId":"52400000-0000-4000-8000-0000000001a1","workspaceName":"RT Race","billing":null,"account":null,"patch":{},"contacts":[]}',
-    '52400000-0000-4000-8000-0000000001c1', repeat('a', 64));
-  ws := (result->>'workspaceId')::uuid;
-  insert into public.workspace_memberships(workspace_id, user_id, role, created_by) values (ws, owner_id, 'owner', operator_id);
+  insert into public.users(id, email, verified_at) values (creator, 'rt-race-creator@example.test', now());
+  insert into public.workspaces(id, kind, name, created_by) values (ws, 'customer', 'RT Race', creator);
+  perform public.business_owner_recipient_set_trust(ws, 'rt-race-owner@example.test', null, null, false, 'owner_write',
+    null, null, null, 'owner', creator::text);
   item := (public.open_owner_decision(ws, jsonb_build_object('kind', 'system.go_live', 'route', 'owner_decides', 'title', 'Race decision',
     'approveEffect', 'It happens.', 'notYetEffect', 'Nothing changes.', 'sourceLifecycle', 'website_domain', 'sourceId', 'rt-race',
     'revisionHash', repeat('7', 64), 'urgent', false, 'adminMayDecide', false))->>'id')::uuid;
-  perform public.record_owner_decision_delivery(ws, item, 'digest', 'sent', 'rt-race-owner@example.test', 'fixture-message', null);
-  perform pg_temp.rt_assert(exists (select 1 from public.owner_decision_link_bindings where decision_id = item and recipient = 'rt-race-owner@example.test'),
-    'race fixture: the link went to the trusted owner');
+  -- The link went to the trusted owner (what a sent delivery records; a
+  -- delivery row itself never deletes, so the fixture binds it directly).
+  insert into public.owner_decision_link_bindings(decision_id, workspace_id, recipient) values (item, ws, 'rt-race-owner@example.test');
 end $$;
 
 do $$
 declare
-  ws uuid := (select workspace_id from public.tenant_workspace_links where tenant_stable_id = '52400000-0000-4000-8000-0000000001a1');
-  item uuid := (select id from public.owner_decisions where source_id = 'rt-race');
+  ws uuid := '52400000-0000-4000-8000-000000000202';
+  item uuid := (select id from public.owner_decisions where workspace_id = '52400000-0000-4000-8000-000000000202');
   conn text := format('host=%s port=%s dbname=%s', split_part(current_setting('unix_socket_directories'), ',', 1), current_setting('port'), current_database());
   b_pid integer; waited integer := 0; result jsonb; caught text;
 begin
   perform dblink_connect('rt_race', conn);
   b_pid := (select pid from dblink('rt_race', 'select pg_backend_pid()') as t(pid integer));
-  -- B: the owner sets a new address (trusted at once) and holds the lock for 2 s.
+  -- B: the owner's new address becomes trusted; B holds the row for 2 s before committing.
   perform dblink_send_query('rt_race', format($q$
     begin;
-    select public.patch_business_record(%L, %L, 'rt-race-owner@example.test', 'owner',
-      (select revision from public.business_records where workspace_id = %L),
-      '{"facts":{"owner_recipient":{"value":{"email":"rt-race-new@example.test"}}}}', gen_random_uuid(), repeat('b', 64));
+    select public.business_owner_recipient_set_trust(%L, 'rt-race-new@example.test', null, null, false, 'owner_write',
+      null, null, null, 'owner', 'rt-race');
     select pg_sleep(2);
-    commit;$q$, ws, '52400000-0000-4000-8000-000000000102', ws));
+    commit;$q$, ws));
   -- Wait until B has moved trust and is sleeping inside its open transaction.
   loop
     perform pg_stat_clear_snapshot();
@@ -341,18 +335,18 @@ begin
   perform dblink_get_result('rt_race');
   perform dblink_disconnect('rt_race');
   perform pg_temp.rt_assert(caught = 'owner_decision_recipient_not_owner',
-    format('race: an in-flight trust change refuses the old address''s claim (got %s)', coalesce(result::text, caught)));
+    format('race: an in-flight trust change refuses the old address''s claim (got %s)', coalesce(result->>'status', caught)));
   perform pg_temp.rt_assert((select state = 'open' from public.owner_decisions where id = item), 'race: the item stays open');
   perform pg_temp.rt_assert((select email from public.business_owner_recipient_trust where workspace_id = ws) = 'rt-race-new@example.test',
     'race: B''s change committed');
 end $$;
 
+-- The business goes, and with it its item, binding, trust and log.
 do $$
-declare ws uuid := (select workspace_id from public.tenant_workspace_links where tenant_stable_id = '52400000-0000-4000-8000-0000000001a1');
 begin
-  perform public.unlink_tenant_from_business('rt-race-operator@strelva.example.test', 'rt-race', ws, '52400000-0000-4000-8000-0000000001c9', repeat('a', 64));
-  delete from public.tenants where id = 'rt-race';
-  delete from public.super_admins where user_id = '52400000-0000-4000-8000-000000000101';
-  delete from public.users where id in ('52400000-0000-4000-8000-000000000101', '52400000-0000-4000-8000-000000000102');
-  perform pg_temp.rt_assert(not exists (select 1 from public.workspaces where id = ws), 'race fixture removed');
+  delete from public.workspaces where id = '52400000-0000-4000-8000-000000000202';
+  delete from public.users where id = '52400000-0000-4000-8000-000000000201';
+  perform pg_temp.rt_assert(not exists (select 1 from public.owner_decisions where workspace_id = '52400000-0000-4000-8000-000000000202')
+    and not exists (select 1 from public.business_owner_recipient_trust where workspace_id = '52400000-0000-4000-8000-000000000202'),
+    'race fixture removed');
 end $$;
