@@ -1,6 +1,7 @@
 import { getDashboardSurfaces, tenantHasStore, type SurfaceTenantConfig } from "@/lib/dashboard-surfaces";
 import type { Connection } from "@/lib/types";
 import { readTenantWorkspaceLink } from "@/platform/business-record/service";
+import type { WorkspaceActor } from "@/platform/workspaces/types";
 import {
   RELEASE_FLAG_ENV,
   RELEASE_FLAG_LABELS,
@@ -23,12 +24,13 @@ import {
   type ReleaseFlagChange,
 } from "@/platform/release-flags/store";
 import { pagesBlockingOwnerEntry, type DashboardPageUse } from "./dispositions";
+import type { OperatorAuditContext } from "@/platform/workspaces/operator-approvals";
 
 /**
  * Operator controls for one client's release flags (`/admin/clients/[id]`).
  * Every change names its reason and is recorded in the flag history; the
- * first `on` for a client also needs a one-use server approval from a distinct
- * active operator, bound to the exact flag, state and reason.
+ * first `on` for a client records a one-use server approval for the
+ * authenticated operator, bound to the exact flag, state and reason.
  */
 
 export interface TenantPageFacts {
@@ -100,10 +102,11 @@ export async function readTenantReleaseState(operatorEmail: string, tenantId: st
 }
 
 export type ReleaseFlagCommand =
-  | { kind: "flag"; flag: ReleaseFlag; state: ReleaseFlagRowState | "unset"; reason: string; expectedRevision: number; approvalId?: string }
+  | { kind: "flag"; flag: ReleaseFlag; state: ReleaseFlagRowState | "unset"; reason: string; expectedRevision: number }
   | { kind: "tester"; email: string; present: boolean; reason: string };
 
-export async function applyTenantReleaseCommand(operatorEmail: string, tenantId: string, facts: TenantPageFacts, command: ReleaseFlagCommand): Promise<void> {
+export async function applyTenantReleaseCommand(actor: WorkspaceActor, tenantId: string, facts: TenantPageFacts, command: ReleaseFlagCommand, auditContext: OperatorAuditContext = { source: "web" }): Promise<void> {
+  const operatorEmail = actor.verifiedEmail;
   const link = await readTenantWorkspaceLink(operatorEmail, tenantId);
   if (!link.link) throw new ReleaseFlagValidationError("workspace_release_unlinked", "This client isn't converted to a business workspace yet.");
   const workspaceId = link.link.workspaceId;
@@ -121,9 +124,6 @@ export async function applyTenantReleaseCommand(operatorEmail: string, tenantId:
     }
   }
   if (command.state === "on") {
-    if (!command.approvalId) {
-      throw new ReleaseFlagValidationError("workspace_release_approval_required", "Turning a client on needs a recorded approval from a different operator.");
-    }
     if (command.flag === "owner_entry") {
       const blockers = pagesBlockingOwnerEntry(dashboardUsesForTenant(facts));
       if (blockers.length > 0) {
@@ -132,6 +132,5 @@ export async function applyTenantReleaseCommand(operatorEmail: string, tenantId:
       }
     }
   }
-  await setWorkspaceReleaseFlag({ operatorEmail, workspaceId, flag: command.flag, state: command.state, reason, expectedRevision: command.expectedRevision,
-    ...(command.state === "on" ? { approvalId: command.approvalId } : {}) });
+  await setWorkspaceReleaseFlag({ actor, workspaceId, flag: command.flag, state: command.state, reason, expectedRevision: command.expectedRevision, auditContext });
 }

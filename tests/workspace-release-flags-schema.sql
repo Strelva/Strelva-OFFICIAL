@@ -14,8 +14,8 @@ begin
   raise exception 'expected % but the statement succeeded: %', expected, statement;
 end; $$;
 create or replace function pg_temp.rf_approval(p_flag text, p_reason text) returns uuid language sql as $$
-  select (public.create_operator_action_approval('rf-approver@example.test', '7f000000-0000-4000-8000-000000000010',
-    'workspace_release_flag.on', jsonb_build_object('flag', p_flag, 'state', 'on', 'reason', p_reason))->>'approvalId')::uuid
+  select (public.create_operator_action_approval('7f000000-0000-4000-8000-000000000001', '7f000000-0000-4000-8000-000000000010',
+    'workspace_release_flag.on', jsonb_build_object('flag', p_flag, 'state', 'on', 'reason', p_reason), '{"source":"web"}'::jsonb)->>'approvalId')::uuid
 $$;
 
 -- Only the service role reaches the RPCs; nobody reads the tables directly.
@@ -27,7 +27,7 @@ select pg_temp.rf_assert(
   and not has_function_privilege('anon', 'public.resolve_tenant_owner_entry(text,uuid,text)', 'EXECUTE')
   and not has_function_privilege('service_role', 'public.workspace_release_assert_operator(text)', 'EXECUTE')
   and has_function_privilege('service_role', 'public.read_workspace_release_flags(uuid)', 'EXECUTE')
-  and has_function_privilege('service_role', 'public.set_workspace_release_flag_approved(text,uuid,text,text,text,bigint,uuid)', 'EXECUTE')
+  and has_function_privilege('service_role', 'public.set_workspace_release_flag_approved(uuid,uuid,text,text,text,bigint,uuid)', 'EXECUTE')
   and has_function_privilege('service_role', 'public.set_workspace_release_tester(text,uuid,text,boolean,text)', 'EXECUTE')
   and has_function_privilege('service_role', 'public.read_workspace_release_flag_history(text,uuid,integer)', 'EXECUTE')
   and has_function_privilege('service_role', 'public.resolve_tenant_owner_entry(text,uuid,text)', 'EXECUTE'),
@@ -81,26 +81,26 @@ select pg_temp.rf_assert(public.resolve_tenant_owner_entry('rf-nope', '7f000000-
   'an unknown tenant resolves no workspace');
 
 -- Only a verified, unrevoked super admin changes a flag.
-select pg_temp.rf_expect($$select public.set_workspace_release_flag_approved('rf-owner@example.test', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'on', 'owner tries', 0, null)$$, 'workspace_release_operator_required');
-select pg_temp.rf_expect($$select public.set_workspace_release_flag_approved('rf-revoked@example.test', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'on', 'revoked tries', 0, null)$$, 'workspace_release_operator_required');
+select pg_temp.rf_expect($$select public.set_workspace_release_flag_approved('7f000000-0000-4000-8000-000000000002', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'on', 'owner tries', 0, null)$$, 'workspace_release_operator_required');
+select pg_temp.rf_expect($$select public.set_workspace_release_flag_approved('7f000000-0000-4000-8000-000000000007', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'on', 'revoked tries', 0, null)$$, 'workspace_release_operator_required');
 select pg_temp.rf_expect($$select public.set_workspace_release_flag_approved(null, '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'on', 'no email', 0, null)$$, 'workspace_release_operator_required');
 -- Validation.
-select pg_temp.rf_expect($$select public.set_workspace_release_flag_approved('rf-operator@example.test', '7f000000-0000-4000-8000-000000000010', 'workspace', 'on', 'not a flag', 0, null)$$, 'workspace_release_flag_unknown');
-select pg_temp.rf_expect($$select public.set_workspace_release_flag_approved('rf-operator@example.test', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'maybe', 'bad state', 0, null)$$, 'workspace_release_state_invalid');
-select pg_temp.rf_expect($$select public.set_workspace_release_flag_approved('rf-operator@example.test', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'on', '  ', 0, null)$$, 'workspace_release_reason_required');
-select pg_temp.rf_expect($$select public.set_workspace_release_flag_approved('rf-operator@example.test', '7f000000-0000-4000-8000-000000000012', 'owner_entry', 'on', 'personal workspace', 0, null)$$, 'workspace_release_workspace_invalid');
-select pg_temp.rf_expect($$select public.set_workspace_release_flag_approved('rf-operator@example.test', '7f000000-0000-4000-8000-0000000000ff', 'owner_entry', 'on', 'missing workspace', 0, null)$$, 'workspace_release_workspace_invalid');
-select pg_temp.rf_expect($$select public.set_workspace_release_flag_approved('rf-operator@example.test', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'on', 'stale revision', 3, pg_temp.rf_approval('owner_entry', 'stale revision'))$$, 'workspace_release_revision_conflict');
-select pg_temp.rf_expect($$select public.set_workspace_release_flag_approved('rf-operator@example.test', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'on', 'missing approval', 0, null)$$, 'operator_action_approval_required');
+select pg_temp.rf_expect($$select public.set_workspace_release_flag_approved('7f000000-0000-4000-8000-000000000001', '7f000000-0000-4000-8000-000000000010', 'workspace', 'on', 'not a flag', 0, null)$$, 'workspace_release_flag_unknown');
+select pg_temp.rf_expect($$select public.set_workspace_release_flag_approved('7f000000-0000-4000-8000-000000000001', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'maybe', 'bad state', 0, null)$$, 'workspace_release_state_invalid');
+select pg_temp.rf_expect($$select public.set_workspace_release_flag_approved('7f000000-0000-4000-8000-000000000001', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'on', '  ', 0, null)$$, 'workspace_release_reason_required');
+select pg_temp.rf_expect($$select public.set_workspace_release_flag_approved('7f000000-0000-4000-8000-000000000001', '7f000000-0000-4000-8000-000000000012', 'owner_entry', 'on', 'personal workspace', 0, null)$$, 'workspace_release_workspace_invalid');
+select pg_temp.rf_expect($$select public.set_workspace_release_flag_approved('7f000000-0000-4000-8000-000000000001', '7f000000-0000-4000-8000-0000000000ff', 'owner_entry', 'on', 'missing workspace', 0, null)$$, 'workspace_release_workspace_invalid');
+select pg_temp.rf_expect($$select public.set_workspace_release_flag_approved('7f000000-0000-4000-8000-000000000001', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'on', 'stale revision', 3, pg_temp.rf_approval('owner_entry', 'stale revision'))$$, 'workspace_release_revision_conflict');
+select pg_temp.rf_expect($$select public.set_workspace_release_flag_approved('7f000000-0000-4000-8000-000000000001', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'on', 'missing approval', 0, null)$$, 'operator_action_approval_required');
 
 -- Operator sets owner entry to operators, then on; each change is recorded.
-select pg_temp.rf_assert(public.set_workspace_release_flag_approved('rf-operator@example.test', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'operators', 'Walk gldf pages first', 0, null)
+select pg_temp.rf_assert(public.set_workspace_release_flag_approved('7f000000-0000-4000-8000-000000000001', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'operators', 'Walk gldf pages first', 0, null)
   #>> '{flags,owner_entry,state}' = 'operators', 'operators state stored');
-select pg_temp.rf_expect($$select public.set_workspace_release_flag_approved('rf-operator@example.test', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'on', 'racing operator', 0, pg_temp.rf_approval('owner_entry', 'racing operator'))$$, 'workspace_release_revision_conflict');
-select pg_temp.rf_assert(public.set_workspace_release_flag_approved('rf-operator@example.test', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'on', 'Walk gldf pages first', 1, pg_temp.rf_approval('owner_entry', 'Walk gldf pages first'))
+select pg_temp.rf_expect($$select public.set_workspace_release_flag_approved('7f000000-0000-4000-8000-000000000001', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'on', 'racing operator', 0, pg_temp.rf_approval('owner_entry', 'racing operator'))$$, 'workspace_release_revision_conflict');
+select pg_temp.rf_assert(public.set_workspace_release_flag_approved('7f000000-0000-4000-8000-000000000001', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'on', 'Walk gldf pages first', 1, pg_temp.rf_approval('owner_entry', 'Walk gldf pages first'))
   #>> '{flags,owner_entry,revision}' = '2', 'on stored at revision 2');
 -- Repeating the same state writes nothing new.
-select public.set_workspace_release_flag_approved('rf-operator@example.test', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'on', 'again', 2, null);
+select public.set_workspace_release_flag_approved('7f000000-0000-4000-8000-000000000001', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'on', 'again', 2, null);
 select pg_temp.rf_assert((select count(*) from public.workspace_release_flag_changes where workspace_id = '7f000000-0000-4000-8000-000000000010') = 2,
   'two history rows, the repeat wrote none');
 select pg_temp.rf_assert((select string_agg(from_state || '>' || to_state, ',' order by changed_at, id) from public.workspace_release_flag_changes
@@ -156,9 +156,9 @@ select pg_temp.rf_expect($$select public.read_workspace_tenant_links('7f000000-0
 select pg_temp.rf_expect($$select public.read_workspace_tenant_links('7f000000-0000-4000-8000-000000000010', '7f000000-0000-4000-8000-000000000005', 'rf-tester@example.test')$$, '%workspace_access_denied%');
 
 -- Unset removes the row and records it; rollback from on to off is one call.
-select pg_temp.rf_assert(public.set_workspace_release_flag_approved('rf-operator@example.test', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'off', 'Store page broke', 2, null)
+select pg_temp.rf_assert(public.set_workspace_release_flag_approved('7f000000-0000-4000-8000-000000000001', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'off', 'Store page broke', 2, null)
   #>> '{flags,owner_entry,state}' = 'off', 'rolled back to off');
-select pg_temp.rf_assert(public.set_workspace_release_flag_approved('rf-operator@example.test', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'unset', 'Follow the env again', 3, null)
+select pg_temp.rf_assert(public.set_workspace_release_flag_approved('7f000000-0000-4000-8000-000000000001', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'unset', 'Follow the env again', 3, null)
   -> 'flags' = '{}'::jsonb, 'unset removes the row');
 select pg_temp.rf_assert((select count(*) from public.workspace_release_flag_changes where workspace_id = '7f000000-0000-4000-8000-000000000010') = 6,
   'every change, testers included, is in the history');

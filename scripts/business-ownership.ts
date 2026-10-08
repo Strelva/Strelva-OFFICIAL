@@ -3,10 +3,10 @@
  * Who owns and operates a converted business. Operator commands only; nothing
  * here runs on its own.
  *
- *   npx tsx scripts/business-ownership.ts invite-owner <tenant-slug> --operator-email=<super admin>              # dry run
- *   npx tsx scripts/business-ownership.ts invite-owner <tenant-slug> --operator-email=<email> --approval-id=<id> --apply # recorded approval required
- *   npx tsx scripts/business-ownership.ts revoke-owner-invite <invitation-id> --operator-email=<email> --apply
- *   npx tsx scripts/business-ownership.ts designate-agency <agency-workspace-id> --operator-email=<email> --apply
+ *   STRELVA_OPERATOR_SESSION_ACCESS_TOKEN=<signed session> npx tsx scripts/business-ownership.ts invite-owner <tenant-slug> # dry run
+ *   … invite-owner <tenant-slug> --approval-id=<id> --apply # required for non-trusted addresses
+ *   … revoke-owner-invite <invitation-id> --apply
+ *   … designate-agency <agency-workspace-id> --apply
  *
  * --apply refuses unless SUPABASE_URL is a loopback host, or --i-have-jacobs-yes
  * is passed. Invitation email is disabled during the silent rollout. The recipient defaults to the
@@ -21,14 +21,19 @@ import {
   revokeOwnerInvitation,
 } from "../src/platform/workspaces/business-ownership";
 import { parseOwnershipArgs, runOwnershipCommand } from "./business-ownership-ops";
+import { readOperatorSessionFromEnv } from "./operator-session";
 
 async function main() {
   const options = parseOwnershipArgs(process.argv.slice(2));
   if (!getSupabase()) throw new Error("No database is configured; ownership lives in Postgres.");
+  const session = await readOperatorSessionFromEnv();
   const outcome = await runOwnershipCommand({ ...options, databaseUrl: process.env.SUPABASE_URL }, {
+    actor: { userId: session.userId, verifiedEmail: session.verifiedEmail },
+    authTime: session.authTime,
+    auditContext: session.auditContext,
     readLink: readTenantWorkspaceLink,
     readState: readOwnerInvitationState,
-    invite: (operator, workspaceId, input) => inviteBusinessOwner(operator, workspaceId, input),
+    invite: (actor, workspaceId, input) => inviteBusinessOwner(actor, workspaceId, input),
     revoke: revokeOwnerInvitation,
     designate: designateStrelvaAgencyWorkspace,
     log: options.json ? () => undefined : (line) => console.log(line),

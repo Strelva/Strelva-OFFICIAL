@@ -1,7 +1,7 @@
 # Strelva Reborn
 
 Created: 2026-10-02
-Changed: 2026-10-06. Reborn is now the one build to `1.0.0`, not a ladder of `0.x` releases.
+Changed: 2026-10-07. Reborn is now the one build to `1.0.0`, not a ladder of `0.x` releases.
 Status: building. Nothing in this release is deployed.
 
 **Strelva Reborn is the build that becomes Strelva 1.0.0: every client runs
@@ -420,17 +420,18 @@ Neither is used by any journey today.
 - [ ] Owner memberships exist for every converted client, in both the
       workspace and the tenant while `/dashboard` pages remain. Workspace
       invites don't email today; tenant invites do. *Path built and proven
-      locally Oct 6 (`build/business-ownership`): operator-issued owner
-      invitation, emailed through `send.ts`; accepting writes both
-      memberships in one transaction. No converted client has an owner yet:
-      each invitation is Jacob's yes (`scripts/business-ownership.ts`) · S
-      per client*
+      locally Oct 7 (PR #558): a trusted owner address can
+      be invited after a fresh sign-in, with a same-session approval recorded
+      and audited; every other address needs a different active operator's
+      approval. Email remains disabled; accepting writes both memberships in
+      one transaction. No converted client has an owner yet; the route remains
+      behind its production rollout gate · S per client*
 - [ ] Per-workspace flags layered over the env flags, so each client's
       landing, inquiries and rebuild turn on and roll back on their own. The
       same flags split Preview per tester. *Built locally on
-      `build/owner-entry`: migration `20261007130000` (not applied anywhere),
-      SQL checks and unit tests pass; operator controls on
-      `/admin/clients/[id]`.*
+      `build/owner-entry`, with migration `20261013130000`: switching on
+      records and audits the authenticated operator's approval; controls are
+      on `/admin/clients/[id]`.*
 
 ### 7. Structure that keeps it this way
 

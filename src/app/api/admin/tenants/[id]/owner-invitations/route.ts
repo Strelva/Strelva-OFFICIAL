@@ -10,8 +10,7 @@ const command = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("invite"),
     recipientEmail: z.string().trim().toLowerCase().email().max(254).optional(),
-    sendEmail: z.boolean().default(false),
-    jacobApproved: z.literal(true),
+    approvalId: z.string().uuid().optional(),
   }).strict(),
   z.object({ action: z.literal("revoke"), invitationId: z.string().uuid() }).strict(),
 ]);
@@ -44,19 +43,20 @@ export async function POST(request: Request, { params }: Context) {
   try { body = await request.json(); }
   catch { return json({ error: "Invalid invitation request." }, 400); }
   const parsed = command.safeParse(body);
-  if (!parsed.success) return json({ error: "Invalid invitation request. Creating an invitation requires Jacob's approval." }, 400);
+  if (!parsed.success) return json({ error: "Invalid owner invitation request." }, 400);
   const input = parsed.data;
   try {
-    const { operator, state } = await operatorOwnerInvitationContext(parsedTenant.data);
+    const { actor, authTime, state } = await operatorOwnerInvitationContext(parsedTenant.data);
     if (input.action === "revoke") {
       // A super-admin's other business membership cannot revoke across this route's tenant scope.
       if (!state.pending.some((invitation) => invitation.invitationId === input.invitationId)) return json({ error: "This invitation is not pending for this business. Refresh its state." }, 409);
-      const status = await revokeOwnerInvitation(operator, input.invitationId);
+      const status = await revokeOwnerInvitation(actor, input.invitationId);
       return json({ status });
     }
-    const result = await inviteBusinessOwner(operator, state.workspaceId, {
+    const result = await inviteBusinessOwner(actor, state.workspaceId, {
       recipientEmail: input.recipientEmail,
-      sendEmail: input.sendEmail,
+      approvalId: input.approvalId,
+      authTime,
     });
     // The bearer link belongs only in the authenticated response when delivery did not happen.
     return json({ invitation: result.invitation, delivery: result.delivery,

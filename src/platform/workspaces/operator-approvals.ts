@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { RELEASE_FLAGS, type ReleaseFlag } from "@/platform/release-flags/resolve";
 import { getSupabase } from "@/platform/infra/db/client";
-import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError } from "./types";
+import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "./types";
 
 type DbError = { message?: string; code?: string } | null;
 type ApprovalDb = { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: DbError }> };
@@ -46,21 +46,30 @@ const approvalSchema = z.object({
 });
 export type OperatorActionApproval = z.infer<typeof approvalSchema>;
 
+export const operatorAuditContextSchema = z.discriminatedUnion("source", [
+  z.object({ source: z.literal("web") }).strict(),
+  z.object({ source: z.literal("cli"), osUser: z.string().trim().min(1).max(120), machine: z.string().trim().min(1).max(200) }).strict(),
+]);
+export type OperatorAuditContext = z.infer<typeof operatorAuditContextSchema>;
+
 /** Records the authenticated operator and exact action in the database. */
 export async function recordOperatorActionApproval(
-  approverEmail: string,
+  actor: WorkspaceActor,
   workspaceId: string,
   input: OperatorApprovalRequest,
+  auditContext: OperatorAuditContext = { source: "web" },
 ): Promise<OperatorActionApproval> {
   const request = operatorApprovalRequestSchema.parse(input);
+  const context = operatorAuditContextSchema.parse(auditContext);
   const target = request.kind === "owner_invitation.issue"
     ? { recipientEmail: request.recipientEmail, sendEmail: request.sendEmail }
     : { flag: request.flag as ReleaseFlag, state: request.state, reason: request.reason.trim() };
   const { data, error } = await db().rpc("create_operator_action_approval", {
-    p_approver_email: z.string().trim().toLowerCase().email().parse(approverEmail),
+    p_approver_user_id: z.string().uuid().parse(actor.userId),
     p_workspace_id: uuid.parse(workspaceId),
     p_action_kind: request.kind,
     p_target: target,
+    p_audit_context: context,
   });
   if (error) {
     const detail = `${error.code ?? ""} ${error.message ?? ""}`;

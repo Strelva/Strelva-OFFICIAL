@@ -197,11 +197,6 @@ psql "${psql_args[@]}" --file="$repo_root/tests/business-record-schema.sql"
 psql "${psql_args[@]}" --set=tenant_import="$(cat "$repo_root/tests/fixtures/business-record-tenant-import.json")" \
   --file="$repo_root/tests/business-record-conversion-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
-psql "${psql_args[@]}" --file="$repo_root/tests/business-ownership-schema.sql"
-# Operator approval records are exercised against the full converted-business
-# schema, including owner invitation and release-flag action binding.
-psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
-psql "${psql_args[@]}" --file="$repo_root/tests/operator-action-approvals-schema.sql"
 # accept_workspace_invitation is replaced by 20261007110000; the original
 # invitation contract must still hold against the replacement.
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-invitations-schema.sql"
@@ -218,7 +213,6 @@ psql "${psql_args[@]}" --file="$repo_root/tests/business-billing-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/convert-separate-business-schema.sql"
 # Release rows: agency workspaces accepted since 20261008161000; business
 # workspaces still accepted, personal ones still refused.
-psql "${psql_args[@]}" --file="$repo_root/tests/release-flags-agency-workspaces-schema.sql"
 # 20261009113000 replaces read_tenant_leads, read_tenant_lead and
 # read_tenant_lead_digests; their contracts and the new records hold.
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-lead-reads-schema.sql"
@@ -273,6 +267,7 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013130000_ope
 psql "${psql_args[@]}" --file="$repo_root/tests/operator-action-approvals-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/business-ownership-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/release-flags-agency-workspaces-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 

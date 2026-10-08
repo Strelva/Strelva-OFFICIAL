@@ -11,18 +11,18 @@
  *    The mark grants nothing: the client list is provider rows intersected
  *    with the reader's own membership.
  *
- * Nothing here runs automatically. Every issuance is an explicit operator
- * action and needs a server-recorded approval from a different active
- * operator. Invitations may be rehearsed with a handoff link; email remains
+ * Nothing here runs automatically. A trusted owner recipient can be issued by
+ * one active operator after a fresh sign-in; every other address needs a
+ * different active operator's server-recorded approval. Email remains
  * disabled during the silent rollout.
  */
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import { OPERATOR_URL } from "@/platform/infra/brand";
-import type { SendEmailInput, SendEmailResult } from "@/platform/infra/email/send";
 import type { EmailOptions } from "@/platform/infra/email/layout";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "./types";
+import { recordOperatorActionApproval, type OperatorAuditContext } from "./operator-approvals";
 
 export const OWNER_INVITATION_LIFETIME_DAYS = 14;
 
@@ -154,65 +154,69 @@ export function ownerInvitationEmail(input: { workspaceName: string; siteNames: 
 export interface InviteOwnerOptions {
   /** Defaults to the business record's owner recipient (resolve_business_owner_recipient). */
   recipientEmail?: string;
-  /** A distinct operator's server-recorded approval for this workspace and address. */
-  approvalId: string;
-  /** Must remain false while owner invitations are paused in the silent rollout. */
-  sendEmail: boolean;
-  /** Injected transport; defaults to src/lib/email/send.ts. */
-  send?: (input: SendEmailInput) => Promise<SendEmailResult>;
+  /** A different operator's server-recorded approval for any non-trusted address. */
+  approvalId?: string;
+  /** `auth_time` from the verified session token, in seconds since epoch. */
+  authTime: number | null;
+  auditContext?: OperatorAuditContext;
   now?: () => Date;
 }
 
+function trustedRecipient(state: OwnerInvitationState): string | null {
+  const recipient = state.recipient as (OwnerInvitationState["recipient"] & { trusted?: boolean; source?: string; verified?: boolean }) | null;
+  if (!recipient) return null;
+  const trusted = recipient.trusted === true || (recipient.from === "record" && (
+    recipient.source === "tenant_import" || (recipient.source === "owner" && recipient.verified === true)
+  ));
+  return trusted ? recipient.email.trim().toLowerCase() : null;
+}
+
+function freshSignIn(authTime: number | null, now: Date): boolean {
+  if (typeof authTime !== "number" || !Number.isFinite(authTime)) return false;
+  const ageSeconds = now.getTime() / 1000 - authTime;
+  return ageSeconds >= 0 && ageSeconds <= 10 * 60;
+}
+
 /** Issue an approved owner invitation without sending email during the silent rollout. */
-export async function inviteBusinessOwner(operator: string, workspaceId: string, options: InviteOwnerOptions): Promise<OwnerInvitationResult> {
-  if (options.sendEmail) throw new WorkspaceConflictError("Owner invitation email is disabled during the silent rollout.");
-  const normalizedOperator = operatorEmail.parse(operator);
-  const state = await readOwnerInvitationState(operator, workspaceId);
+export async function inviteBusinessOwner(actor: WorkspaceActor, workspaceId: string, options: InviteOwnerOptions): Promise<OwnerInvitationResult> {
+  const normalizedOperator = operatorEmail.parse(actor.verifiedEmail);
+  const state = await readOwnerInvitationState(normalizedOperator, workspaceId);
   if (state.hasOwner) throw new WorkspaceConflictError(CONFLICTS.operator_owner_invitation_owner_exists);
   const recipient = email.safeParse(options.recipientEmail ?? state.recipient?.email ?? "");
   if (!recipient.success) throw new WorkspaceConflictError("No owner address is on record. Pass the owner's email address.");
-  if (recipient.data === normalizedOperator) throw new WorkspaceConflictError("An operator can't invite their own address as the owner.");
+  const trusted = trustedRecipient(state) === recipient.data;
+  let approvalId = options.approvalId;
+  if (trusted) {
+    const now = options.now?.() ?? new Date();
+    if (!freshSignIn(options.authTime, now)) {
+      throw new WorkspaceConflictError("Sign in again before inviting the trusted business owner; this action needs a sign-in from the last 10 minutes.");
+    }
+    const approval = await recordOperatorActionApproval(actor, state.workspaceId, {
+      kind: "owner_invitation.issue", recipientEmail: recipient.data, sendEmail: false,
+    }, options.auditContext ?? { source: "web" });
+    approvalId = approval.approvalId;
+  }
+  if (!approvalId) {
+    throw new WorkspaceConflictError("A different active operator must record approval for this owner address before it can be invited.");
+  }
   const token = randomBytes(32).toString("base64url");
   const now = options.now?.() ?? new Date();
   const invitation = await call("create_operator_owner_invitation_approved", {
-    p_operator_email: normalizedOperator,
+    p_operator_user_id: uuid.parse(actor.userId),
     p_workspace_id: state.workspaceId,
     p_recipient_email: recipient.data,
     p_token_hash: createHash("sha256").update(token, "utf8").digest("hex"),
     p_expires_at: new Date(now.getTime() + OWNER_INVITATION_LIFETIME_DAYS * 24 * 60 * 60 * 1000).toISOString(),
-    p_approval_id: uuid.parse(options.approvalId),
-    p_send_email: options.sendEmail,
+    p_approval_id: uuid.parse(approvalId),
+    p_send_email: false,
+    p_audit_context: options.auditContext ?? { source: "web" },
   }, createdSchema, "The owner invitation could not be created.");
   const acceptUrl = ownerInvitationAcceptUrl(token);
-  if (!options.sendEmail) return { invitation, acceptUrl, delivery: { status: "not_sent", reason: "email_not_requested" } };
-  const primaryTenant = invitation.tenants[0]?.tenantId;
-  const recipientName = state.recipient && state.recipient.email === recipient.data ? state.recipient.name : null;
-  try {
-    const send = options.send ?? (await import("@/platform/infra/email/send")).sendEmailWithReceipt;
-    const result = await send({
-      audience: "client",
-      ...(primaryTenant ? { tenantId: primaryTenant } : {}),
-      to: invitation.recipientEmail,
-      subject: `Strelva set up ${invitation.workspaceName} for you`,
-      idempotencyKey: `owner-invitation:${invitation.invitationId}`,
-      options: ownerInvitationEmail({
-        workspaceName: invitation.workspaceName,
-        siteNames: invitation.tenants.map((tenant) => tenant.siteName),
-        acceptUrl,
-        expiresAt: invitation.expiresAt,
-        recipientName,
-      }),
-    });
-    return result.status === "accepted"
-      ? { invitation, acceptUrl, delivery: { status: "sent", providerMessageId: result.providerMessageId } }
-      : { invitation, acceptUrl, delivery: { status: "not_sent", reason: result.reason } };
-  } catch (error) {
-    return { invitation, acceptUrl, delivery: { status: "not_sent", reason: error instanceof Error ? error.message : "send_failed" } };
-  }
+  return { invitation, acceptUrl, delivery: { status: "not_sent", reason: "email_not_requested" } };
 }
 
-export async function revokeOwnerInvitation(operator: string, invitationId: string): Promise<"revoked" | "expired" | "accepted"> {
-  return call("revoke_operator_owner_invitation_audited", { p_operator_email: operatorEmail.parse(operator), p_invitation_id: uuid.parse(invitationId) },
+export async function revokeOwnerInvitation(actor: WorkspaceActor, invitationId: string, auditContext: OperatorAuditContext = { source: "web" }): Promise<"revoked" | "expired" | "accepted"> {
+  return call("revoke_operator_owner_invitation_audited", { p_operator_user_id: uuid.parse(actor.userId), p_invitation_id: uuid.parse(invitationId), p_audit_context: auditContext },
     z.enum(["revoked", "expired", "accepted"]), "The owner invitation could not be revoked.");
 }
 
@@ -220,8 +224,8 @@ const designationSchema = z.object({ workspaceId: uuid, designatedBy: uuid, desi
 export type StrelvaAgencyDesignation = z.infer<typeof designationSchema>;
 
 /** Name Strelva's agency workspace once, marking every converted business as operated by it. */
-export async function designateStrelvaAgencyWorkspace(operator: string, agencyWorkspaceId: string): Promise<StrelvaAgencyDesignation> {
-  return call("designate_strelva_agency_workspace", { p_operator_email: operatorEmail.parse(operator), p_workspace_id: uuid.parse(agencyWorkspaceId) },
+export async function designateStrelvaAgencyWorkspace(actor: WorkspaceActor, agencyWorkspaceId: string, auditContext: OperatorAuditContext = { source: "web" }): Promise<StrelvaAgencyDesignation> {
+  return call("designate_strelva_agency_workspace_audited", { p_operator_user_id: uuid.parse(actor.userId), p_workspace_id: uuid.parse(agencyWorkspaceId), p_audit_context: auditContext },
     designationSchema, "Strelva's agency workspace could not be designated.");
 }
 
