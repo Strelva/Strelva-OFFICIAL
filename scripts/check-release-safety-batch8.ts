@@ -70,8 +70,9 @@ function main() {
   const items: Item[] = batch8.items;
   const args = process.argv.slice(2), tails: string[] = [];
   for (let i = 0; i < args.length; i += 2) {
-    if (args[i] !== "--tail" || !/^\d{14}_[a-z0-9_]+\.sql$/.test(args[i + 1] ?? "")) throw new Error("Expected --tail <forward-migration.sql>");
-    tails.push(args[i + 1]);
+    const file = args[i + 1];
+    if (args[i] !== "--tail" || !file || !/^\d{14}_[a-z0-9_]+\.sql$/.test(file)) throw new Error("Expected --tail <forward-migration.sql>");
+    tails.push(file);
   }
   for (const item of items) if (item.rollback !== "rollback-" + item.file) throw new Error("Rollback companion is not rollback-<file>: " + item.file);
   // 7A has no pinned manifest yet; its four files are taken from disk in order.
@@ -110,7 +111,7 @@ function main() {
     // evidence so row equality proves more than an empty database's counts.
     command("psql", ["--dbname=" + admin, "-X", "-qAt", "-v", "ON_ERROR_STOP=1", "-f", "-"], readFileSync(join(root, "tests/inquiry-decision-notice-events-schema.sql"), "utf8").replace(/^rollback;$/m, "commit;"));
     const forward = catalog(admin, root), rows = data(admin);
-    const added = Object.keys(forward.functions).filter((key) => !Object.hasOwn(before.functions, key));
+    const added = Object.keys(forward.functions ?? {}).filter((key) => !Object.hasOwn(before.functions ?? {}, key));
     expectRefusal(admin, () => recover(admin, "disable-batch8-runtime.sql", "0".repeat(64)), "Wrong approved hash", "batch8_runtime_recovery_catalog_drift");
     expectRefusal(admin, () => recover(admin, "enable-batch8-runtime.sql"), "Enable before disable", "batch8_runtime_recovery_wrong_state");
     sql(admin, { text: "grant execute on function public.read_owner_decision_website_preview(uuid,uuid,text,text) to anon;" });
@@ -128,7 +129,7 @@ function main() {
       assertEqual(Object.keys(changes), ["functions"], "Permission recovery changed schema");
       assertEqual(changes.functions, revoked, "Permission recovery changed nonselected functions");
       for (const key of revoked) {
-        const actual = disabled.functions[key] as Record<string, unknown>, expected = forward.functions[key] as Record<string, unknown>;
+        const actual = disabled.functions?.[key] as Record<string, unknown>, expected = forward.functions?.[key] as Record<string, unknown>;
         assertEqual({ ...actual, acl: expected.acl }, expected, "Recovery changed function body or owner: " + key);
       }
       if (sql(admin, { text: "select exists(select 1 from release_runtime_recovery.batch8_grants where has_function_privilege('service_role',function_oid,'execute'));" }) !== "f") throw new Error("Disabled service RPC still executable");
@@ -148,7 +149,7 @@ function main() {
       console.log(`Runtime recovery round ${round}: ${revoked.length} introduced service RPCs dark; entire forward schema/bodies/owners preserved; exact all-public rows retained; legacy auth/content/billing passed; exact catalog/ACL reproduced.`);
     }
     const receipt = { scope: "local forward-only batch8 schema; permission recovery only; no hosted/provider effects exercised", files: items.length, correctiveTails: tails,
-      introducedFunctions: added.length, tables: Object.keys(forward.tables).length, runtimeRecoveryRounds: 2,
+      introducedFunctions: added.length, tables: Object.keys(forward.tables ?? {}).length, runtimeRecoveryRounds: 2,
       exactCatalogReproduced: true, exactPublicRowsPreserved: true, legacyBehavior: true, failClosed: ["baseline overwrite", "wrong approved hash", "wrong state", "catalog drift", "browser privilege bypass", "inherited privilege bypass", "actual denied RPC invocation"] };
     const out = join(root, "output/release-safety", "batch8-" + Date.now());
     mkdirSync(out, { recursive: true, mode: 0o700 });
