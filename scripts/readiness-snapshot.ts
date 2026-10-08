@@ -206,6 +206,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261016130000": "responsibility_bundles",
   "20261016100700": "split_recovery_payouts",
   "20261016100800": "invoice_money_evidence",
+  "20261016100900": "sandbox_build_attempts",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */
