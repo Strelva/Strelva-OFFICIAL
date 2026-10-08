@@ -17,3 +17,6 @@ tests/ux-shots
 .scratch
 output
 .next-*
+
+# Generated typecheck cache; rebuilding on Vercel makes it unnecessary.
+*.tsbuildinfo
