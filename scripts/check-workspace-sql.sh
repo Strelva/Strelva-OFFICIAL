@@ -1079,7 +1079,19 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010103000_ask
 psql "${psql_args[@]}" --file="$repo_root/tests/ask-business-fact-drafts-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010102000_owner_decision_links.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010102100_website_owner_link_launch.sql"
+# The #560 launch regression must fail on the prior email-only gate.
+if psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-links-schema.sql" >"$cluster_root/owner-effects-before.log" 2>&1; then
+  printf 'Owner decision launch probes passed without effect-specific verification.\n' >&2
+  exit 1
+fi
+grep -q 'email-only agency cannot admit launch' "$cluster_root/owner-effects-before.log"
+# #560 owner decision effects: apply, restore old definitions, reapply, then
+# execute the real link/native writer regressions under the corrected gate.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261014110000_owner_decision_effects.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261014110000_owner_decision_effects.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261014110000_owner_decision_effects.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-links-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-effects-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010104000_owner_decision_website_preview.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-website-preview-schema.sql"
 # Retain a fictional native Version, then prove rollback leaves the business's
@@ -1336,3 +1348,14 @@ fi
 grep -q 'agency_brand_rollback_requires_data_preservation' "$cluster_root/brand-rollback-refusal.log"
 psql "${psql_args[@]}" -c "update public.workspaces set agency_brand=null where agency_brand is not null"
 printf 'Agency brand SQL passed: resolution, revocation, exposure, rollback/reapply and preservation.\n'
+
+# Retained owner-link sessions are an explicit rollback stop point. The actual
+# rollback must fail without altering their intended-decision binding or gates.
+psql "${psql_args[@]}" --set=keep_fixture=true --file="$repo_root/tests/owner-decision-effects-schema.sql"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261014110000_owner_decision_effects.sql" >"$cluster_root/owner-effects-rollback.log" 2>&1; then
+  printf 'Owner effect rollback discarded retained session intent.\n' >&2
+  exit 1
+fi
+grep -q 'owner_decision_effects_rollback_requires_data_preservation' "$cluster_root/owner-effects-rollback.log"
+psql "${psql_args[@]}" -Atc "select exists(select 1 from information_schema.columns where table_schema='public' and table_name='owner_decision_link_sessions' and column_name='intended_decision') and exists(select 1 from public.owner_decision_link_sessions) and to_regprocedure('public.owner_decision_provider_holds(uuid,uuid,text[])') is not null" | grep -qx t
+printf 'Owner effect rollback retained sessions and authority gates.\n'

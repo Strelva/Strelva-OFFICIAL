@@ -33,7 +33,7 @@ describe("account-free owner decisions", () => {
   it.each(ROUTINE)("%s uses the signed owner claim and unchanged admin execution identity", async lifecycle => {
     const s = await setup(lifecycle);
     expect(await s.decide()).toMatchObject({ status: "done", item: { state: "approved", decidedByKind: "owner_link" } });
-    expect(s.start).toHaveBeenCalledWith(WS, s.item.id, HASH, EMAIL);
+    expect(s.start).toHaveBeenCalledWith(WS, s.item.id, HASH, EMAIL, "approve");
     expect(s.authorize).toHaveBeenCalledWith(s.session);
     expect(s.resolve).toHaveBeenCalledWith({ workspaceId: WS, actor: ADMIN }, expect.objectContaining({ state: "approved" }), "approve", { kind: "owner_link", recipient: EMAIL, actor: ADMIN, service: s.session });
     expect(s.authorize.mock.invocationCallOrder[0]).toBeLessThan(s.resolve.mock.invocationCallOrder[0]!);
@@ -76,6 +76,7 @@ describe("account-free owner decisions", () => {
     const s = await setup();
     await expect(s.decide("not_yet")).resolves.toMatchObject({ status: "done", item: { state: "declined" } });
     expect(s.resolve.mock.calls[0]?.[2]).toBe("not_yet");
+    expect(s.start).toHaveBeenCalledWith(WS, s.item.id, HASH, EMAIL, "not_yet");
   });
   it("a receipt persistence failure after acceptance never runs the effect twice", async () => {
     const s = await setup("website_document");
@@ -104,6 +105,14 @@ describe("bound link storage and release gate", () => {
     const rpc = vi.fn(async () => ({ data: { ...raw, recipient: "changed@example.test" }, error: null }));
     setServiceActorDb({ rpc });
     await expect(startOwnerDecisionLinkSession(WS, ITEM, HASH, EMAIL)).rejects.toThrow(/another decision/);
+  });
+  it.each(["approve", "not_yet"] as const)("admission sends the intended %s decision to the effect gate", async decision => {
+    const rpc = vi.fn(async () => ({ data: raw, error: null }));
+    setServiceActorDb({ rpc });
+    await startOwnerDecisionLinkSession(WS, ITEM, HASH, EMAIL, decision);
+    expect(rpc).toHaveBeenCalledWith("strelva_owner_decision_link_session", {
+      p_workspace_id: WS, p_decision_id: ITEM, p_revision_hash: HASH, p_recipient: EMAIL, p_decision: decision,
+    });
   });
   it("authorization carries every bound claim and refuses non-link purposes", async () => {
     const rpc = vi.fn(async () => ({ data: null, error: null }));
