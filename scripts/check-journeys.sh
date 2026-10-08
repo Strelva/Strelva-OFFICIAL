@@ -54,6 +54,7 @@ ON_SPECS=(
   tests/email-only-owner-authenticated-local.spec.ts
   tests/versions-authenticated-local.spec.ts
   tests/inquiries-1-0-authenticated-local.spec.ts
+  tests/website-stale-refresh-authenticated-local.spec.ts
 )
 # With every 1.0 flag off: the journeys live clients and owners use today
 # (the launch-verification CI set), plus the proof that 1.0 surfaces stay dark.

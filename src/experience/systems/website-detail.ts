@@ -71,6 +71,9 @@ export interface ConnectedSiteDetail {
 
 export interface WebsiteSystemDetail {
   systemId: string;
+  /** Authenticated current revision, observed after implementation reconciliation. */
+  workspaceId?: string;
+  currentRevisionId?: string | null;
   connectedSite?: ConnectedSiteDetail;
   domains: WebsiteDomainItem[];
   waiting: WebsiteWaitingItem[];
@@ -91,6 +94,7 @@ export interface RepoDeploymentRow { id: string; requestId: string; title: strin
 
 export interface WebsiteDetailInputs {
   systemId: string;
+  currentRevisionId?: string | null;
   actorId: string;
   workspaceId?: string;
   workId?: string | null;
@@ -181,7 +185,8 @@ export function buildWebsiteSystemDetail(input: WebsiteDetailInputs): WebsiteSys
   if (input.connectedSite && !input.connectedSite.verified) {
     waiting.unshift({ id: `connect:${input.connectedSite.siteId}`, kind: "decision", title: `Prove ${input.connectedSite.siteHost} is yours`, detail: "Add the two lines shown under Connected site, publish your site, then check. Nothing is collected until then.", at: null, href: null });
   }
-  return { systemId: input.systemId, ...(input.connectedSite ? { connectedSite: input.connectedSite } : {}), domains: input.domains, waiting, requests, history, unavailable: [...new Set(input.unavailable)] };
+  return { systemId: input.systemId, ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
+    ...(input.currentRevisionId !== undefined ? { currentRevisionId: input.currentRevisionId } : {}), ...(input.connectedSite ? { connectedSite: input.connectedSite } : {}), domains: input.domains, waiting, requests, history, unavailable: [...new Set(input.unavailable)] };
 }
 
 /** Native rows already describe their mirrored System revision. Handled

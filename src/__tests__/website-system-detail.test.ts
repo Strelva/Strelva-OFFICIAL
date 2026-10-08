@@ -110,6 +110,25 @@ function sources(overrides: Partial<WebsiteDetailSources> = {}): WebsiteDetailSo
 }
 
 describe("website System page loader", () => {
+  it("reads the current pointer after release reconciliation, scoped to this actor and System", async () => {
+    const order: string[] = [];
+    const s = sources({
+      reconcileReleases: vi.fn(async () => { order.push("reconcile"); return 1; }),
+      currentRevision: vi.fn(async () => { order.push("current"); return "new-current-revision"; }),
+    });
+    const listing = await s.listSystems(actor, businessId, { store: {} as never });
+    listing.systems[0]!.system.origin = { kind: "tenant", ref: "fixture-tenant" };
+    s.listSystems = vi.fn(async () => listing);
+    const detail = await readWebsiteSystemDetail(actor, businessId, siteId, s);
+    expect(order).toEqual(["reconcile", "current"]);
+    expect(s.currentRevision).toHaveBeenCalledWith(actor, businessId, siteId);
+    expect(detail).toMatchObject({ workspaceId: businessId, systemId: siteId, currentRevisionId: "new-current-revision" });
+  });
+  it("does not claim a current revision after an unavailable pointer read", async () => {
+    const detail = await readWebsiteSystemDetail(actor, businessId, siteId, sources({ currentRevision: async () => { throw new Error("Unavailable"); } }));
+    expect(detail).not.toHaveProperty("currentRevisionId");
+    expect(detail!.unavailable).toContain("Current System revision");
+  });
   const connectedId = "75000000-0000-4000-8000-000000000020";
   function connectedOverview(siteHost = "gldf.example.test"): ConnectedSitesOverview {
     return { sites: [{ id: connectedId, workspaceId: businessId, publicKey: `sk_pub_${"a".repeat(24)}`, label: siteHost,

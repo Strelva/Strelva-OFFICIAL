@@ -171,6 +171,7 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
     }
     return {
       id: entry.ref.systemId,
+      ...(entry.currentRevisionId !== undefined ? { currentRevisionId: entry.currentRevisionId } : {}),
       kind,
       // A managed website reads by its address; the spine keeps the site name.
       name: kind === "website" && domain ? domain : entry.name,

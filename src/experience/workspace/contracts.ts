@@ -287,6 +287,8 @@ export interface WorkspacePublishing {
 
 export interface WorkspaceSystemEntry {
   ref: SystemRef;
+  /** Current stored revision observed by this projection; absent for older responses. */
+  currentRevisionId?: string | null;
   name: string;
   /** Spine descriptor slug, e.g. `website`, `inquiry`, `booking`, `internal_app`. */
   kind: string;

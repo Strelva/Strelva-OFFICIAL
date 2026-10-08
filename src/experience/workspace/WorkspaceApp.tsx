@@ -145,6 +145,22 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     }
   }, [inquiryConfig, request]);
 
+  const refreshSystems = useCallback(async (workspaceId: string, systemId: string, observedRevisionId: string | null, signal: AbortSignal) => {
+    const requestId = requestRef.current;
+    const isCurrent = () => {
+      const params = new URLSearchParams(window.location.search);
+      return !signal.aborted && requestId === requestRef.current
+        && activeWorkspaceRef.current === workspaceId && requestedWorkspaceRef.current === workspaceId
+        && params.get("workspaceId") === workspaceId && params.get("view") === "system" && params.get("system") === systemId;
+    };
+    if (!isCurrent()) return;
+    const response = await request(`/api/workspace?${new URLSearchParams({ workspaceId, systemsReadOnly: "1" })}`, { cache: "no-store", signal });
+    const data = normalizeWorkspaceSnapshot(await readResponse<WorkspaceSnapshot>(response, "The current System could not be confirmed. Reload before deciding."));
+    if (!isCurrent()) return;
+    if (data.workspaceId !== workspaceId || data.systems?.systems.find(item => item.ref.systemId === systemId && item.ref.businessId === workspaceId)?.currentRevisionId !== observedRevisionId) throw new Error("The current System could not be confirmed. Reload before deciding.");
+    setSnapshot(current => isCurrent() && current?.workspaceId === workspaceId ? data : current);
+  }, [request]);
+
   useEffect(() => {
     const restore = () => {
       setReturnTarget(workspaceReturnTarget(`/workspace${window.location.search}`) || "/workspace");
@@ -554,6 +570,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
         managedWork={snapshot.managedWork}
         managedWorkUnavailable={snapshot.managedWorkUnavailable}
         onHome={goHome}
+        onRefreshSystems={refreshSystems}
         onChoose={chooseWork}
         onCreatedApp={id => openWorkFromPlan(id, "applications")}
         onNew={(context) => { if (workspaceExitBlocks) return; leaveCurrentWork({ showAssessment: true, start: context?.route === "assessment" ? { view: "work", continuation: context } : null }); setRetryWork(null); const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.set("workspaceId", workspaceIdForNavigation(snapshot.workspaceId)); url.searchParams.set("view", "work"); url.searchParams.delete("work"); window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`); setHome(false); setView("work"); setNotice(null); }}

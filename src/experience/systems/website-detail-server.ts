@@ -52,6 +52,7 @@ export interface WebsiteDetailSources {
   connectedSites: (actor: WorkspaceActor, businessId: string) => Promise<ConnectedSitesOverview> | null;
   repoChanges?: ReturnType<typeof createSiteChangeStore>["list"];
   reconcileReleases?: typeof reconcileWebsiteSystemReleases;
+  currentRevision?: (actor: WorkspaceActor, businessId: string, systemId: string) => Promise<string | null>;
 }
 
 const liveSources: WebsiteDetailSources = {
@@ -66,6 +67,7 @@ const liveSources: WebsiteDetailSources = {
   documents: websiteDocumentStore,
   repoChanges: (actor, businessId, systemId) => createSiteChangeStore().list(actor, businessId, systemId),
   reconcileReleases: reconcileWebsiteSystemReleases,
+  currentRevision: async (actor, businessId, systemId) => (await createSupabaseSystemStore().readSystem(actor, { businessId, systemId })).system.currentRevision?.revisionId ?? null,
   rebuild: async (actor, workId) => {
     if (!websiteRebuildReleaseEnabled()) return null;
     const { readWebsiteRebuild } = await import("@/products/websites/index");
@@ -155,8 +157,11 @@ export async function readWebsiteSystemDetail(actor: WorkspaceActor, businessId:
   const reviewing = rebuild?.rebuild.status === "review_ready" && rebuild.rebuild.candidate ? rebuild.rebuild.candidate : null;
   const aboutThisSite = (context: Record<string, unknown>) => context.systemId === systemId || (tenantId !== null && (context.tenantId === tenantId || context.siteId === tenantId));
 
+  const currentRevisionId = sources.currentRevision
+    ? await read("Current System revision", unavailable, undefined, () => sources.currentRevision!(actor, businessId, systemId)) : undefined;
   return buildWebsiteSystemDetail({
     systemId,
+    ...(currentRevisionId !== undefined ? { currentRevisionId } : {}),
     actorId: actor.userId,
     workspaceId: businessId,
     workId: savedWorkId,
