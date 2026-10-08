@@ -7,6 +7,14 @@ begin
   begin execute statement; exception when others then if sqlerrm like '%'||expected||'%' then return; end if; raise; end;
   raise exception 'Expected % for %',expected,statement;
 end $$;
+-- Later owner-recipient trust also requires evidence that this exact link
+-- was delivered while trusted. Record only a fictional receipt, never mail.
+create or replace function pg_temp.oe_delivered(ws uuid,item uuid) returns void language plpgsql as $$
+begin
+  if to_regclass('public.owner_decision_link_bindings') is not null then
+    perform public.record_owner_decision_delivery(ws,item,'digest','sent','oe-owner@example.test','oe-fictional-message',null);
+  end if;
+end $$;
 select pg_temp.oe_assert(not has_function_privilege('service_role','public.owner_decision_execution_effects(text,text,text)','execute')
   and not has_function_privilege('service_role','public.owner_decision_provider_holds(uuid,uuid,text[])','execute'),'effect helpers private');
 select pg_temp.oe_assert(has_function_privilege('service_role','public.strelva_owner_decision_link_session(uuid,uuid,text,text,text)','execute')
@@ -36,6 +44,7 @@ begin
     values(agency,'google','verified','{"note":"fixture"}',actor,false);
   link:=public.strelva_owner_decision_link_session(ws,id,h,'oe-owner@example.test'); sid:=(link->>'sessionId')::uuid;
   perform pg_temp.oe_assert(link->>'providerWorkspaceId'=agency::text,'Google session names same provider');
+  perform pg_temp.oe_delivered(ws,id);
   perform public.claim_owner_decision(ws,id,h,'approve','owner_link',null,null,'oe-owner@example.test');
   insert into public.agency_verifications(agency_workspace_id,effect,status,reason,verified_by,verifier_is_agency_member)
     values(agency,'google','unverified','Google revoked after session',actor,false);
@@ -54,6 +63,7 @@ begin
     perform pg_temp.oe_assert(public.strelva_owner_decision_link_session(ws,id,h,'oe-owner@example.test') is not null,'email decision needs only email');
   end loop;
   link:=public.strelva_owner_decision_link_session(ws,id,h,'oe-owner@example.test'); sid:=(link->>'sessionId')::uuid;
+  perform pg_temp.oe_delivered(ws,id);
   perform public.claim_owner_decision(ws,id,h,'approve','owner_link',null,null,'oe-owner@example.test');
   perform public.authorize_owner_decision_link_run(ws,sid,id,h,'oe-owner@example.test');
   insert into public.agency_verifications(agency_workspace_id,effect,status,reason,verified_by,verifier_is_agency_member)
@@ -66,7 +76,8 @@ begin
       'sourceLifecycle','service_request','sourceId',kind,'revisionHash',h)); id:=(item->>'id')::uuid;
     link:=public.strelva_owner_decision_link_session(ws,id,h,'oe-owner@example.test'); sid:=(link->>'sessionId')::uuid;
     perform pg_temp.oe_assert(link is not null,'internal admitted without any verified outside effect');
-    perform public.claim_owner_decision(ws,id,h,'approve','owner_link',null,null,'oe-owner@example.test');
+    perform pg_temp.oe_delivered(ws,id);
+  perform public.claim_owner_decision(ws,id,h,'approve','owner_link',null,null,'oe-owner@example.test');
     perform public.authorize_owner_decision_link_run(ws,sid,id,h,'oe-owner@example.test');
     perform public.strelva_service_session(ws,sid,'owner_decision_link');
   end loop;
@@ -92,6 +103,7 @@ begin
   perform pg_temp.oe_assert(decline_link is not null,'decline admitted without publish');
   insert into public.agency_verifications(agency_workspace_id,effect,status,evidence,verified_by,verifier_is_agency_member)
     values(agency,'publish','verified','{"note":"fixture"}',actor,false);
+  perform pg_temp.oe_delivered(ws,id);
   perform public.claim_owner_decision(ws,id,h,'approve','owner_link',null,null,'oe-owner@example.test');
   perform pg_temp.oe_expect(format('select public.authorize_owner_decision_link_run(%L,%L,%L,%L,%L)',ws,sid,id,h,'oe-owner@example.test'),'strelva_service_access_denied');
 end $$;
