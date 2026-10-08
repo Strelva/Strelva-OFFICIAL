@@ -159,6 +159,44 @@ CSS) is retained alongside the passing retry. Stored console logs normalize
 line endings, tabs and trailing whitespace only; test results/errors are intact.
 Original stdout logs remain in `/private/tmp/strelva-mcp-reborn-*.log`.
 
+## October 8 security review: public MCP body cap (#396)
+
+Review of scoped source `4afd7c28` found the public MCP transport buffered the
+entire body with `request.text()` before applying its 30,000-character check or
+any authorization/rate limit. A synthetic chunked 1,000,000-byte unauthenticated
+request was fully consumed before HTTP 400; its stream was never canceled.
+
+Isolated branch `security/mcp-body-cap-20261008` at
+`/private/tmp/strelva-mcp-body-cap-20261008` prepares a streaming 30,000-byte cap.
+Declared oversize bodies are canceled before reading. Chunked bodies are canceled
+as soon as a delivered chunk exceeds the remaining budget. The same native
+reproduction now consumes four 10,000-byte chunks, cancels the stream and returns
+HTTP 400; only chunks within the budget are retained. This preserves the existing
+invalid-request response and keeps protocol parsing independent of session code.
+
+Twelve new tests exercise the actual `/api/mcp/public` handler for public and
+protected tool names: declared/chunked oversize and cancellation, multibyte bytes,
+an exact 30,000-byte body, UTF-8 split across chunks, and empty/malformed JSON.
+Protected calls still challenge absent bearer authority when a cookie is present.
+The eight focused MCP suites pass **106 tests**. Typecheck and scoped ESLint pass. The
+baseline ordered disposable-Postgres authority, renewal, revocation and website
+contracts passed before this transport-only repair; SQL did not change.
+
+Proof commands are `pnpm exec vitest run` with the OAuth, protected-tools,
+routes, website-tools, connections, platform, directory and booking MCP suites;
+`pnpm typecheck`; and `pnpm exec eslint src/platform/agent-channel/protocol.ts
+src/__tests__/platform-mcp.test.ts`. Reproduction and verification logs remain in
+`/private/tmp/mcp-body-cap-{byte-proof,unit,typecheck}.log`; baseline SQL review
+is `/private/tmp/mcp-396-review-sql.log`.
+
+This is local preparation for #396, not production rollout or issue closure.
+The broader issue also owns owner email links, public leads/bookings, seat and
+verification predicates, provider endpoints and remaining dependency findings.
+Native HTTPS assistant sign-in/renewal remains the separate unproved matrix below.
+Next action is to review this isolated commit for Git integration. Deployment,
+configuration, migrations and native-client test-business access retain their
+existing separate authority boundaries.
+
 ## Earlier private-source local evidence
 
 - Integrated MCP/related contracts: **232 tests passed across 12 files**.

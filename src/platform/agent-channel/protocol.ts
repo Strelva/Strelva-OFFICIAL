@@ -59,9 +59,32 @@ const record = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 
 async function boundedBody(request: Request): Promise<Record<string, unknown> | null> {
+  const maximum = 30_000;
   try {
-    const raw = await request.text();
-    if (!raw.trim() || raw.length > 30_000) return null;
+    if (Number(request.headers.get("content-length")) > maximum) {
+      await request.body?.cancel();
+      return null;
+    }
+    const reader = request.body?.getReader();
+    if (!reader) return null;
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    try {
+      while (true) {
+        const next = await reader.read();
+        if (next.done) break;
+        size += next.value.byteLength;
+        if (size > maximum) {
+          await reader.cancel();
+          return null;
+        }
+        chunks.push(next.value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    const raw = new TextDecoder().decode(Buffer.concat(chunks));
+    if (!raw.trim()) return null;
     return record(JSON.parse(raw));
   } catch {
     return null;
