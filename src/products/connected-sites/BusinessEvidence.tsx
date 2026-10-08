@@ -1,4 +1,4 @@
-import type { PublicVerification } from "@/platform/agent-channel/profile";
+import type { PublicVerification } from "@/platform/agent-channel/contracts";
 
 /** Display the public provenance receipt without promoting linkage to verification. */
 export function BusinessEvidence({ verification: v }: { verification: PublicVerification }) {

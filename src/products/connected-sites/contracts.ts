@@ -95,7 +95,7 @@ export interface ConnectedInquiry {
 // fills into `[data-strelva-fact]` elements, derived from the business record.
 
 export interface PublicFacts {
-  verification?: import("@/platform/agent-channel/profile").PublicVerification;
+  verification?: import("@/platform/agent-channel/contracts").PublicVerification;
   policies?: PublishedPolicies;
   name?: string;
   description?: string;
