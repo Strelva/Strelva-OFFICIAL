@@ -118,3 +118,10 @@ typecheck, combined source tests/build, rendered desktop/mobile/loading/error/
 permission/stopped/empty verification remain pending the coordinator window.
 ProviderOfRecord server population is assigned to runtime; platform Queue source
 removal is assigned to integration. No finished full1.0 claim follows this lane.
+
+
+### Follow-up proof and entry convergence
+
+The private follow-up keeps saved preview scenarios on direct System links, sanitizes Next router history markers, and requires business identity on System sign-in returns. HomeFinder uses stored `home_finder` identity and opens the actual ordinary business management page; Units is discoverable in customer/agency settings. No unqualified public brokerage address is synthesized. The root server owns HomeFinder health evidence.
+
+Navigation: 7 focused suites/65 tests pass. Enterprise/reader type follow-up: 4 suites/52 tests pass. Scoped lint and diff checks pass. The genuine READ ONLY fixture passed in a repaired native attempt, including owner/current staffed agency and withdrawn seat. Final atomic catalog rollback proof remains unproven: disposable PostgreSQL crashed during earlier baseline with ENOSPC. Failure log `/private/tmp/strelva-experience-neutral-native-final.log` is retained; runner stopped. Integrated typecheck and rendered desktop/mobile remain pending coordinator verification.
