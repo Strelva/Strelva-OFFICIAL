@@ -54,6 +54,7 @@ export function WorkspaceBusinessSettings({
   managedWorkUnavailable = false,
   accountHref,
   needsYouReleased = false,
+  assistantConnectionsReleased = false,
 }: {
   workspace?: WorkspaceSummary;
   sites: readonly ManagedWorkSummary[];
@@ -66,6 +67,7 @@ export function WorkspaceBusinessSettings({
   accountHref: string;
   /** STRELVA_NEEDS_YOU_RELEASE: off renders this page exactly as before. */
   needsYouReleased?: boolean;
+  assistantConnectionsReleased?: boolean;
 }) {
   const readOnly = workspace?.access === "delegated_read" || workspace?.access === "provider_seat";
   const business = workspace?.kind === "customer";
@@ -132,6 +134,8 @@ export function WorkspaceBusinessSettings({
         </section>
       </div>}
     </section>
+
+    {assistantConnectionsReleased && business && workspace ? <section className="border-b border-gray-border py-8" aria-labelledby="assistant-settings-heading"><h2 id="assistant-settings-heading" className="text-base font-medium text-warm-black">Connected assistants</h2><p className="mt-3 text-sm text-gray-muted">Read business facts and prepare website changes from Claude or Codex. The business owner controls access.</p><Link href={`/connect?workspaceId=${encodeURIComponent(workspace.id)}`} className="mt-4 inline-flex min-h-11 items-center text-sm text-accent-text underline underline-offset-4">Manage assistant connections</Link></section> : null}
 
     {needsYouReleased && business && workspace && !readOnly ? <DecisionPolicySettings workspaceId={workspace.id} /> : null}
 
