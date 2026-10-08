@@ -33,8 +33,13 @@ begin
  perform pg_temp.website_error(format('select public.read_agent_website_proposal_retry(%L,%L,%L,%L,%L)',repeat('4',64),resource,ws,request_id,repeat('6',64)),'website_request_conflict');
  perform public.approve_website_document(ws,work_id,owner_id,'mcp-website@example.test',2,repeat('b',64));
  perform pg_temp.website_assert(public.list_agent_website_proposals(repeat('4',64),resource,ws,work_id)->0->>'status'='approved','status tracks native owner approval');
+ -- Native owner fact review/continuation appends a new immutable candidate.
+ next_payload:=next_payload||jsonb_build_object('revision',2,'candidate',jsonb_build_object('revision',3,'contentHash',repeat('c',64),'document',next_doc),'history',(next_payload->'history')||jsonb_build_array(jsonb_build_object('revision',2,'kind','fact_confirmed','actorId',owner_id,'at','2026-10-08T12:02:00Z')));
+ perform public.commit_website_document_candidate(ws,work_id,owner_id,'mcp-website@example.test',2,1,repeat('c',64),next_doc,next_payload);
+ actual:=public.list_agent_website_proposals(repeat('4',64),resource,ws,work_id)->0;
+ perform pg_temp.website_assert(actual->>'status'='superseded' and actual->>'revision'='2' and actual->>'currentRevision'='3' and actual->>'currentContentHash'=repeat('c',64),'exact proposal identity retained while current owner-reviewed revision is exposed');
  update public.assistant_tokens set scopes=array['website:propose'] where token_hash=repeat('4',64);
- perform pg_temp.website_assert(public.read_agent_website_work(repeat('4',64),resource,ws,work_id,'website:propose')->>'documentRevision'='2','proposal scope can prepare a candidate without granting unrelated read tools');
+ perform pg_temp.website_assert(public.read_agent_website_work(repeat('4',64),resource,ws,work_id,'website:propose')->>'documentRevision'='3','proposal scope can prepare a candidate without granting unrelated read tools');
  perform pg_temp.website_error(format('select public.read_agent_website_work(%L,%L,%L,%L,%L)',repeat('4',64),resource,ws,work_id,'quotes:approve'),'oauth_invalid_token');
  update public.assistant_tokens set scopes=array['business:read'] where token_hash=repeat('4',64);
  perform pg_temp.website_error(format('select public.list_agent_websites(%L,%L,%L)',repeat('4',64),resource,ws),'oauth_invalid_token');

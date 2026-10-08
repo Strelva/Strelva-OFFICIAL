@@ -133,6 +133,20 @@ Use only after those gates pass:
 The production URL is not an invitation yet. Do not send this copy to the firm
 until the qualified endpoint and actual grant are confirmed.
 
+## Exact-revision website proposal receipts
+
+The prepared native website tools save changes through the existing candidate
+and immutable document workflow. `list_website_proposals` reports the status of
+the exact revision originally saved by the connector, alongside
+`currentRevision`, `currentContentHash`, an explanation and the owner review
+link. `read_website` reads the current candidate.
+
+`superseded` means a newer candidate exists. Native owner fact review also
+creates a newer revision, so this status can describe an owner-reviewed
+continuation; it does not establish rejection. The receipt does not infer
+whether later copy retained the proposal's intent. Approval and publication
+remain the native owner's workflow, and no connector tool grants either.
+
 ## Resume
 
 Current objective: prepare the first client-owned Claude connection for website

@@ -80,11 +80,20 @@ describe("assistant business context", () => {
   });
   it("returns insufficient_scope for a live connection without the requested authority", async () => {
     ports.validate.mockResolvedValue(null);
-    ports.inspect.mockResolvedValue({ userId, verifiedEmail: "owner@example.test", workspaceId, agencyId: null });
+    ports.inspect.mockResolvedValue({ userId, verifiedEmail: "owner@example.test", workspaceId, agencyId: null, scopes: [] });
     const response = await serveMcp(request("list_websites"), server());
     expect(response.status).toBe(403);
     expect(response.headers.get("www-authenticate")).toContain('error="insufficient_scope"');
     expect(response.headers.get("www-authenticate")).toContain('scope="website:read"');
+    expect(ports.rpc).not.toHaveBeenCalled();
+  });
+  it("preserves current scopes when requesting additional website proposal authority", async () => {
+    ports.validate.mockResolvedValue(null);
+    ports.inspect.mockResolvedValue({ userId, verifiedEmail: "owner@example.test", workspaceId, agencyId: null, scopes: ["business:read", "website:read"] });
+    const response = await serveMcp(request("propose_website_change"), server());
+    expect(response.status).toBe(403);
+    expect(response.headers.get("www-authenticate")).toContain('error="insufficient_scope"');
+    expect(response.headers.get("www-authenticate")).toContain('scope="business:read website:read website:propose"');
     expect(ports.rpc).not.toHaveBeenCalled();
   });
   it("reads selected-business native websites with no public directory lookup", async () => {

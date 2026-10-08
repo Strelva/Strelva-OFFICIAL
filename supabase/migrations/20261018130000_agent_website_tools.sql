@@ -20,11 +20,12 @@ create trigger assistant_website_proposals_immutable before update or delete on 
 
 create function public.agent_website_proposal_receipt(p_row public.assistant_website_proposals) returns jsonb
 language sql stable set search_path=public,pg_temp as $$
- select jsonb_build_object('requestId',p_row.request_id,'websiteWorkId',p_row.website_work_id,'revision',p_row.revision,'contentHash',p_row.content_hash,'summary',p_row.summary,'createdAt',p_row.created_at,
+ select jsonb_build_object('requestId',p_row.request_id,'websiteWorkId',p_row.website_work_id,'revision',p_row.revision,'contentHash',p_row.content_hash,'currentRevision',h.revision,'currentContentHash',d.content_hash,'summary',p_row.summary,'createdAt',p_row.created_at,
  'status',case when exists(select 1 from public.website_document_publications where workspace_id=p_row.workspace_id and website_work_id=p_row.website_work_id and revision=p_row.revision and content_hash=p_row.content_hash) then 'published'
  when h.revision<>p_row.revision then 'superseded'
  when h.approved_revision=p_row.revision and h.approved_hash=p_row.content_hash then 'approved' else 'awaiting_review' end)
- from public.website_document_heads h where h.workspace_id=p_row.workspace_id and h.website_work_id=p_row.website_work_id
+ from public.website_document_heads h join public.website_documents d on d.workspace_id=h.workspace_id and d.website_work_id=h.website_work_id and d.revision=h.revision
+ where h.workspace_id=p_row.workspace_id and h.website_work_id=p_row.website_work_id
 $$;
 revoke all on function public.agent_website_proposal_receipt(public.assistant_website_proposals) from public,anon,authenticated,service_role;
 
