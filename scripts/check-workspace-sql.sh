@@ -1324,3 +1324,11 @@ fi
 grep -q 'owner_decision_effects_rollback_requires_data_preservation' "$cluster_root/owner-effects-rollback.log"
 psql "${psql_args[@]}" -Atc "select exists(select 1 from information_schema.columns where table_schema='public' and table_name='owner_decision_link_sessions' and column_name='intended_decision') and exists(select 1 from public.owner_decision_link_sessions) and to_regprocedure('public.owner_decision_provider_holds(uuid,uuid,text[])') is not null" | grep -qx t
 printf 'Owner effect rollback retained sessions and authority gates.\n'
+
+# Actual READ ONLY qualification: lock-free reader authorization, exact rollback,
+# outsider denials and unchanged writer definitions on the final schema.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013230000_readonly_reader_authority.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/readonly-reader-authority-schema.sql"
+node "$repo_root/scripts/check-readonly-rpcs.mjs" "postgresql://$(id -un)@localhost:$cluster_port/postgres?host=$cluster_socket"
+node --test "$repo_root/scripts/tests/readonly-rpcs.node-test.mjs"
+bash "$repo_root/scripts/check-reader-writer-locks.sh" "postgresql://$(id -un)@localhost:$cluster_port/postgres?host=$cluster_socket"
