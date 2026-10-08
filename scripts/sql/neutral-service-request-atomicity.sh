@@ -5,11 +5,13 @@ set -euo pipefail
 neutral_db_url=${1:?Pass the disposable loopback database URL}
 neutral_repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 python3 - "$neutral_db_url" <<'PY'
-import sys,urllib.parse
+import sys,urllib.parse,pathlib,tempfile
 p=urllib.parse.urlparse(sys.argv[1]);q=urllib.parse.parse_qs(p.query)
 if p.scheme not in ('postgres','postgresql') or set(q)-{'host','port'}: raise SystemExit('Only a disposable loopback URL is accepted')
 host=q.get('host',[p.hostname])[0]
-if host not in ('localhost','127.0.0.1','::1') and not (host and (host.startswith('/private/tmp/') or host.startswith('/tmp/'))): raise SystemExit('Refusing non-loopback database')
+socket_roots=[pathlib.Path('/tmp').resolve(),pathlib.Path(tempfile.gettempdir()).resolve()]
+is_local_socket=bool(host and host.startswith('/') and any(pathlib.Path(host).resolve().is_relative_to(root) for root in socket_roots))
+if host not in ('localhost','127.0.0.1','::1') and not is_local_socket: raise SystemExit('Refusing non-loopback database')
 PY
 neutral_tmp=$(mktemp -d "${TMPDIR:-/tmp}/strelva-neutral-atomicity.XXXXXX")
 trap 'rm -f "$neutral_tmp/before.json" "$neutral_tmp/after.json" "$neutral_tmp/fail.sql" "$neutral_tmp/failure.log"; rmdir "$neutral_tmp"' EXIT
@@ -23,7 +25,7 @@ source=pathlib.Path(sys.argv[1]).read_text()
 first_end=source.index('$$;')+3
 prefix=source[:first_end]
 if 'begin;' not in prefix.lower() or 'create or replace function' not in prefix.lower(): raise SystemExit('Atomic replacement prefix missing')
-pathlib.Path(sys.argv[2]).write_text(prefix+"\ncreate or replace function public.service_request_assert_provider(text,uuid,uuid,text) returns void language plpgsql security definer set search_path=public,pg_temp as $$ begin raise exception 'injected replacement'; end $$;\nselect 1/0;\ncommit;\n")
+pathlib.Path(sys.argv[2]).write_text(prefix+"\ncreate or replace function public.service_request_assert_provider(p_provider_kind text,p_agency_workspace_id uuid,p_user_id uuid,p_verified_email text) returns void language plpgsql security definer set search_path=public,pg_temp as $$ begin raise exception 'injected replacement'; end $$;\nselect 1/0;\ncommit;\n")
 PY
 if psql "$neutral_db_url" -X -v ON_ERROR_STOP=1 --file="$neutral_tmp/fail.sql" > "$neutral_tmp/failure.log" 2>&1; then
   echo 'Failure injection unexpectedly succeeded' >&2; exit 1

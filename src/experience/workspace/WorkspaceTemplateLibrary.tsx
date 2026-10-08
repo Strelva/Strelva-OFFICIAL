@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { ApplicationDraftEditor } from "@/experience/applications/ApplicationDraftEditor";
 import { ApplicationDraftPreview } from "@/experience/applications/ApplicationDraftPreview";
 import { APP_TEMPLATES, templateDraft, validateApplicationDraft, type AppTemplate, type ApplicationDraftSpec } from "@/experience/applications/app-templates";
+import { workspaceHistoryState } from "@/platform/workspaces/location";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
 import styles from "./template-library.module.css";
 
@@ -53,7 +54,7 @@ export function WorkspaceTemplateLibrary(props: WorkspaceTemplateLibraryProps) {
       listTrigger.current = template.id;
       url.searchParams.set("template", template.id);
     } else url.searchParams.delete("template");
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
     if (!template) window.requestAnimationFrame(() => document.getElementById(`template-${listTrigger.current}`)?.focus());
   }
   if (selected) return <div className={styles.library}>

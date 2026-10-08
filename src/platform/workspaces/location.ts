@@ -9,6 +9,16 @@ const INVITATION_TOKEN = /^[A-Za-z0-9_-]{43}$/;
 const VIEWS = new Set(["system", "requests", "customers", "apps", "work", "ongoing", "settings", "products", "access", "help", "inquiries", "tracker", "document", "plan", "start", "websites", "custom-applications", "onboarding", "applications", "scheduling", "investigations", "operations", "product-learning", "ask"]);
 const INQUIRY_VIEWS = new Set(["home", "new", "shape", "work", "plan", "preview", "rehearsal", "receipt", "search", "record", "why", "responsibility", "connections", "onboarding", "account", "attention", "patterns"]);
 
+/** Keep app-owned history data without replaying Next router markers. */
+export function workspaceHistoryState(state: unknown): Record<string, unknown> | null {
+  if (!state || typeof state !== "object" || Array.isArray(state)) return null;
+  const custom = { ...(state as Record<string, unknown>) };
+  delete custom.__NA;
+  delete custom.__PRIVATE_NEXTJS_INTERNALS_TREE;
+  delete custom._N;
+  return Object.keys(custom).length ? custom : null;
+}
+
 export function workspaceReturnTarget(value: string | null): string | null {
   if (value === "/workspace/account?continue=public") return value;
   if (value?.startsWith("/workspace/delivery/") && /^\/workspace\/delivery\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value)) return value;
@@ -103,7 +113,7 @@ export function workspaceReturnTarget(value: string | null): string | null {
       : key === "view" ? !VIEWS.has(item) : true) return null;
   }
   // A System page needs its System; `view=system` alone opens nothing.
-  if (params.get("view") === "system" && !params.get("system")) return null;
+  if (params.get("view") === "system" && (!UUID.test(params.get("workspaceId") || "") || !params.has("system"))) return null;
   return `/workspace${params.size ? `?${params}` : ""}`;
 }
 
@@ -145,5 +155,5 @@ export function replaceWorkspaceLocation(workspaceId: string, workId?: string) {
     url.searchParams.delete("offering");
   }
   else url.searchParams.delete("work");
-  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  window.history.replaceState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
 }

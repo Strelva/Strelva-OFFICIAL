@@ -3,7 +3,7 @@
 import { requestDraftKey, writeRequestDraft } from "./request-draft";
 import { prepareWebsiteRequestDraft } from "@/lib/website-request-draft";
 import { WebsiteAuditPage } from "@/products/website-audit";
-import { replaceWorkspaceLocation, workspaceReturnTarget } from "@/platform/workspaces/location";
+import { replaceWorkspaceLocation, workspaceHistoryState, workspaceReturnTarget } from "@/platform/workspaces/location";
 
 import {
   ArrowRight,
@@ -49,6 +49,7 @@ import type { WorkspaceStartContinuation } from "./workspace-start";
 import { selectWorkspaceLocation, isHorizontalView, viewForWork, type HorizontalView, type WorkspaceView as View } from "./workspace-selection";
 import { workspaceExitBlocksChanges, workspaceExitIsStopped } from "./workspace-exit-ui";
 import { NO_OPEN_WORK, leaveWork, startContinuation, startRequest, type OpenWorkContext } from "./open-work";
+import type { PreviewRouteContext } from "./preview/route-context";
 
 type Notice = { kind: "success" | "error"; message: string } | null;
 
@@ -69,11 +70,11 @@ function formatDate(value: string): string {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(date);
 }
 
-export function WorkspaceApp({ request = fetch, appBase = "", signOut, inquiry, rebuildEnabled = false }: { rebuildEnabled?: boolean; request?: typeof fetch; appBase?: string; signOut?: React.ReactNode; inquiry?: WorkspaceInquiryConfig } = {}) {
-  return <WorkspaceRequestContext.Provider value={request}><WorkspaceContent appBase={appBase} signOut={signOut} inquiry={inquiry} rebuildEnabled={rebuildEnabled} /></WorkspaceRequestContext.Provider>;
+export function WorkspaceApp({ request = fetch, appBase = "", signOut, inquiry, rebuildEnabled = false, previewRouteContext }: { previewRouteContext?: PreviewRouteContext; rebuildEnabled?: boolean; request?: typeof fetch; appBase?: string; signOut?: React.ReactNode; inquiry?: WorkspaceInquiryConfig } = {}) {
+  return <WorkspaceRequestContext.Provider value={request}><WorkspaceContent appBase={appBase} signOut={signOut} inquiry={inquiry} rebuildEnabled={rebuildEnabled} previewRouteContext={previewRouteContext} /></WorkspaceRequestContext.Provider>;
 }
 
-function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEnabled }: { rebuildEnabled: boolean; appBase: string; signOut?: React.ReactNode; inquiry?: WorkspaceInquiryConfig }) {
+function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEnabled, previewRouteContext }: { previewRouteContext?: PreviewRouteContext; rebuildEnabled: boolean; appBase: string; signOut?: React.ReactNode; inquiry?: WorkspaceInquiryConfig }) {
   const router = useRouter();
   const request = useWorkspaceRequest();
   const postAction = usePostAction();
@@ -289,7 +290,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     url.searchParams.set("work", id);
     clearEmbeddedRouteParams(url);
     url.searchParams.set("view", viewForWork(productId));
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
     void loadWorkspace(workspaceId);
   }
 
@@ -327,7 +328,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     url.searchParams.set("view", "tracker");
     url.searchParams.delete("work");
     clearEmbeddedRouteParams(url);
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
   }
 
   function startDocument(context?: WorkspaceStartContinuation) {
@@ -343,7 +344,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     url.searchParams.set("view", "document");
     url.searchParams.delete("work");
     clearEmbeddedRouteParams(url);
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
   }
 
   function startPlan(requestText: string) {
@@ -359,7 +360,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     url.searchParams.set("view", "plan");
     url.searchParams.delete("work");
     clearEmbeddedRouteParams(url);
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
   }
 
   function startHorizontal(productId: HorizontalView, context?: WorkspaceStartContinuation) {
@@ -378,7 +379,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     setSelectedWorkId(null); setHome(false); setView(productId); setNotice(null);
     const workspaceId = workspaceIdForNavigation(snapshot!.workspaceId);
     const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.set("workspaceId", workspaceId); url.searchParams.set("view", productId); url.searchParams.delete("work");
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
   }
   function openOngoing() {
     if (!snapshot) return;
@@ -394,7 +395,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     url.searchParams.set("view", "work");
     url.searchParams.delete("search");
     url.searchParams.delete("offering");
-    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.replaceState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
     setHome(false);
     setView("work");
     void loadWorkspace(workspaceId);
@@ -413,13 +414,13 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     url.searchParams.set("view", "operations");
     url.searchParams.set("standingId", standingId);
     url.searchParams.delete("work");
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
   }
   function horizontalSaved(workId: string) {
     if (!snapshot || !acceptsWorkspaceCallback(snapshot.workspaceId)) return;
     const workspaceId = snapshot.workspaceId;
     leaveCurrentWork(); setSelectedWorkId(workId); const url = new URL(window.location.href); url.searchParams.set("workspaceId", workspaceId); url.searchParams.set("work", workId); url.searchParams.set("view", view); url.searchParams.delete("standingId"); url.searchParams.delete("assignmentId");
-    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`); void loadWorkspace(workspaceId, true);
+    window.history.replaceState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`); void loadWorkspace(workspaceId, true);
   }
   function goHome() {
     leaveCurrentWork();
@@ -440,7 +441,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     url.searchParams.set("view", "tracker");
     url.searchParams.set("work", workId);
     clearEmbeddedRouteParams(url);
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
     void loadWorkspace(workspaceId, true);
   }
 
@@ -456,7 +457,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     url.searchParams.set("view", "document");
     url.searchParams.set("work", workId);
     clearEmbeddedRouteParams(url);
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
     void loadWorkspace(workspaceId, true);
   }
 
@@ -472,7 +473,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     url.searchParams.set("view", "plan");
     url.searchParams.set("work", workId);
     clearEmbeddedRouteParams(url);
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
     void loadWorkspace(workspaceId, true);
   }
 
@@ -559,7 +560,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   return (
     <WorkspaceFrame>
       <div inert={Boolean(handoffLoading || (handoffToken && handoffPreview) || publicSaveResultId) || undefined}>
-      <WorkspaceLayout rebuildEnabled={snapshot.releases?.websiteRebuild ?? rebuildEnabled} appBase={appBase} signOut={signOut} key={snapshot.workspaceId} snapshot={snapshot} home={home} agency={view === "agency"} busy={loading} selectedWork={showAssessment ? null : selectedWork}
+      <WorkspaceLayout previewRouteContext={previewRouteContext} rebuildEnabled={snapshot.releases?.websiteRebuild ?? rebuildEnabled} appBase={appBase} signOut={signOut} key={snapshot.workspaceId} snapshot={snapshot} home={home} agency={view === "agency"} busy={loading} selectedWork={showAssessment ? null : selectedWork}
         workingTitle={view === "websites" ? "Website" : view === "operations" ? finiteJobOpen ? "Request" : "Running" : view === "applications" ? "Applications" : view === "scheduling" ? "Reservations" : view === "investigations" ? "Saved checks" : view === "product-learning" ? "Learning" : undefined}
         workingSection={view === "operations" ? finiteJobOpen ? "requests" : "ongoing" : "work"}
         atSectionRoot={view === "operations" && !selectedWork && !selectedStandingId && !selectedAssignmentId}
@@ -568,7 +569,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
         onHome={goHome}
         onChoose={chooseWork}
         onCreatedApp={id => openWorkFromPlan(id, "applications")}
-        onNew={(context) => { if (workspaceExitBlocks) return; leaveCurrentWork({ showAssessment: true, start: context?.route === "assessment" ? { view: "work", continuation: context } : null }); setRetryWork(null); const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.set("workspaceId", workspaceIdForNavigation(snapshot.workspaceId)); url.searchParams.set("view", "work"); url.searchParams.delete("work"); window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`); setHome(false); setView("work"); setNotice(null); }}
+        onNew={(context) => { if (workspaceExitBlocks) return; leaveCurrentWork({ showAssessment: true, start: context?.route === "assessment" ? { view: "work", continuation: context } : null }); setRetryWork(null); const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.set("workspaceId", workspaceIdForNavigation(snapshot.workspaceId)); url.searchParams.set("view", "work"); url.searchParams.delete("work"); window.history.replaceState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`); setHome(false); setView("work"); setNotice(null); }}
         onPlan={startPlan}
         onOngoing={openOngoing}
         onHorizontal={startHorizontal}

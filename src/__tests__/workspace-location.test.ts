@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { accountReturnTarget, replaceWorkspaceLocation, workspaceReturnTarget } from "@/platform/workspaces/location";
+import { accountReturnTarget, replaceWorkspaceLocation, workspaceHistoryState, workspaceReturnTarget } from "@/platform/workspaces/location";
 
 it("preserves website creation and saved website destinations through sign-in", () => {
   expect(workspaceReturnTarget("/workspace?view=websites")).toBe("/workspace?view=websites");
@@ -35,6 +35,23 @@ describe("workspace return destination", () => {
   });
   it("preserves the document start route through sign-in", () => {
     expect(workspaceReturnTarget(`/workspace?workspaceId=${workspaceId}&view=document`)).toBe(`/workspace?workspaceId=${workspaceId}&view=document`);
+  });
+  it("preserves a System deep link through sign-in and the nested account return", () => {
+    const systemId = "44444444-4444-4444-8444-444444444444";
+    const target = `/workspace?view=system&system=${systemId}&workspaceId=${workspaceId}`;
+    expect(workspaceReturnTarget(target)).toBe(target);
+    expect(accountReturnTarget(`/account?next=${encodeURIComponent(target)}`)).toBe(`/account?next=${encodeURIComponent(target)}`);
+  });
+  it.each([
+    "/workspace?view=system&system=invalid&workspaceId=22222222-2222-4222-8222-222222222222",
+    "/workspace?view=system&system=44444444-4444-4444-8444-444444444444&workspaceId=invalid",
+    "/workspace?view=system&system=44444444-4444-4444-8444-444444444444",
+    "/workspace?view=work&system=44444444-4444-4444-8444-444444444444&workspaceId=22222222-2222-4222-8222-222222222222",
+    "/workspace?view=system&system=44444444-4444-4444-8444-444444444444&workspaceId=22222222-2222-4222-8222-222222222222&extra=ignored",
+    "/workspace?view=system&system=44444444-4444-4444-8444-444444444444&system=44444444-4444-4444-8444-444444444444&workspaceId=22222222-2222-4222-8222-222222222222",
+  ])("rejects malformed or mismatched System destinations: %s", (target) => {
+    expect(workspaceReturnTarget(target)).toBeNull();
+    expect(accountReturnTarget(`/account?next=${encodeURIComponent(target)}`)).toBeNull();
   });
   it("preserves a new horizontal job and an exact linked tracker record", () => {
     for (const view of ["applications", "scheduling", "investigations", "operations", "product-learning"]) {
@@ -106,3 +123,5 @@ it("preserves an exact custom application destination through sign-in", () => {
   expect(accountReturnTarget(`/account?next=${encodeURIComponent(target)}`)).toBe(`/account?next=${encodeURIComponent(target)}`);
   expect(workspaceReturnTarget(target + "&next=https%3A%2F%2Fevil.example")).toBeNull();
 });
+
+it("strips router state while preserving app state", () => { expect(workspaceHistoryState({ source: "workspace", __NA: true, __PRIVATE_NEXTJS_INTERNALS_TREE: ["stale"], _N: true })).toEqual({ source: "workspace" }); expect(workspaceHistoryState({ __NA: true })).toBeNull(); expect(workspaceHistoryState(null)).toBeNull(); expect(workspaceHistoryState([])).toBeNull(); });

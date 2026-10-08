@@ -9,6 +9,8 @@ import { createPreviewRequest, PREVIEW_SCENARIOS, type PreviewScenario } from ".
 import { MOONEY_INQUIRY_PROFILE, MOONEY_TENANT } from "./systems-fixture";
 import { withNeedsYouPreview } from "./needs-you-fixture";
 import { previewWebsiteDetail, previewWebsiteDetailMode, type PreviewWebsiteDetailMode } from "./website-detail-fixture";
+import type { PreviewRouteContext } from "./route-context";
+import { workspaceHistoryState } from "@/platform/workspaces/location";
 import type { PreviewSystems } from "./systems-projection";
 import { agencyPreviewState, withAgencyPreview } from "./agency-fixture";
 import { versionPreviewState, withVersionPreview } from "./version-fixture";
@@ -89,6 +91,10 @@ export function WorkspacePreview({ scenario, systems, needsYou = false, ask = nu
   const [seededRequests] = useState(() => searchParams.get("previewSetup") === "requests");
   // Keep an explicit `systems=on|off` choice when switching examples.
   const releaseParam = searchParams.get("systems");
+  const previewRouteContext: PreviewRouteContext = {
+    scenario,
+    ...(releaseParam === "on" || releaseParam === "off" ? { systems: releaseParam } : {}),
+  };
   const previewRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
@@ -109,7 +115,7 @@ export function WorkspacePreview({ scenario, systems, needsYou = false, ask = nu
     if (!installedStaffRequest) return;
     const url = new URL(window.location.href);
     url.searchParams.delete("previewSetup");
-    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.replaceState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
   }, [installedStaffRequest]);
   const inquiry = useMemo(() => scenario.startsWith("mooney")
     ? { tenantId: MOONEY_TENANT, label: "The Mooney Firm", adapter: createPreviewInquiryAdapter("business", scenario === "mooney-shared" ? "read-only" : scenario, MOONEY_INQUIRY_PROFILE) }
@@ -122,7 +128,7 @@ export function WorkspacePreview({ scenario, systems, needsYou = false, ask = nu
       {(scenario === "paid" || scenario === "enterprise") && <p>Relationship example only. Pricing and permissions are not simulated.</p>}
     </aside>
     <HomeOutcomesProvider value={outcomes ? PREVIEW_OUTCOMES : null}>
-      <WorkspaceApp key={`${scenario}:${systems?.released ? "systems" : "reborn"}:${needsYou ? "needs-you" : ""}:${ask ?? ""}:${outcomes ? "outcomes" : ""}`} request={request} appBase="/preview/strelva" signOut={null} inquiry={inquiry} />
+      <WorkspaceApp key={`${scenario}:${systems?.released ? "systems" : "reborn"}:${needsYou ? "needs-you" : ""}:${ask ?? ""}:${outcomes ? "outcomes" : ""}`} request={request} appBase="/preview/strelva" signOut={null} inquiry={inquiry} previewRouteContext={previewRouteContext} />
     </HomeOutcomesProvider>
   </div>;
 }

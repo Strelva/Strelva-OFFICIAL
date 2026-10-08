@@ -32,6 +32,8 @@ import {
 } from "./WorkspaceOfferings";
 import type { WorkspaceStartContext, WorkspaceStartContinuation, WorkspaceStartTemplate, WorkspaceStartWebsiteHandoff } from "./workspace-start";
 import { viewForWork } from "./workspace-selection";
+import { workspaceHistoryState } from "@/platform/workspaces/location";
+import { withPreviewRouteContext, type PreviewRouteContext } from "./preview/route-context";
 import styles from "./workspace-surface.module.css";
 
 export interface WorkspaceInquiryTarget {
@@ -85,6 +87,8 @@ interface Props {
   children?: ReactNode;
   /** Inquiry transport for the inquiry System page (local fixtures pass an adapter). */
   inquirySource?: { tenantId: string; adapter?: InquirySurfaceAdapter };
+  /** Preview-only route context for links that must survive direct navigation. */
+  previewRouteContext?: PreviewRouteContext;
 }
 
 function initialSection(): StrelvaSection {
@@ -98,7 +102,7 @@ function forgetRetiredView(): void {
   const url = new URL(window.location.href);
   if (!isRetiredView(url.searchParams.get("view"))) return;
   url.searchParams.delete("view");
-  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  window.history.replaceState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
 }
 
 function initialStartOpen(): boolean {
@@ -116,7 +120,7 @@ function initialOfferingId(): string | null {
   return new URLSearchParams(window.location.search).get("offering");
 }
 
-export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, managedWork = [], managedWorkUnavailable, home, agency, busy, selectedWork, workingTitle, workingSection = "work", atSectionRoot = false, onHome, onNew, onPlan, onOngoing, onAgency, onInquiry, onTracker, onWebsite, onDocument, onHorizontal, trackerTemplates, inquiryBusinesses = [], inquiry, tracker, plan, document, onCreatedApp, onChoose, onWorkspace, onOpenClientWork, notice, children, inquirySource }: Props) {
+export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, managedWork = [], managedWorkUnavailable, home, agency, busy, selectedWork, workingTitle, workingSection = "work", atSectionRoot = false, onHome, onNew, onPlan, onOngoing, onAgency, onInquiry, onTracker, onWebsite, onDocument, onHorizontal, trackerTemplates, inquiryBusinesses = [], inquiry, tracker, plan, document, onCreatedApp, onChoose, onWorkspace, onOpenClientWork, notice, children, inquirySource, previewRouteContext }: Props) {
   const [requestText, setRequestText] = useState("");
   const [requestRoute, setRequestRoute] = useState("start");
   const [requestCurrent, setRequestCurrent] = useState(false);
@@ -204,14 +208,15 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
   const visibleUnassignedSites = unassignedSites.filter(site => site.title.toLowerCase().includes(normalized));
   const person = snapshot.actor.email.split("@")[0] || "Your account";
   const offeringCollection = offerings.state.status === "ready" ? offerings.state.collection : null;
-  const { systems, files, unavailable: systemsUnavailable } = readBusinessSystems({
+  const { systems: projectedSystems, files, unavailable: systemsUnavailable } = readBusinessSystems({
     snapshot, sites,
     installations: offeringCollection?.installations, definitionNames: new Map(offeringCollection?.definitions.map(item => [item.id, item.name]) ?? []),
     stopped: workspaceStopped,
   });
+  const systems = previewRouteContext ? projectedSystems.map(system => ({ ...system, possibilities: system.possibilities.map(possibility => possibility.openHref ? { ...possibility, openHref: withPreviewRouteContext(possibility.openHref, previewRouteContext) } : possibility) })) : projectedSystems;
   const visibleSystems = systems.filter(system => [system.name, system.detail, SYSTEM_KIND_LABEL[system.kind]].some(value => value.toLowerCase().includes(normalized)));
   const visibleFiles = files.filter(work => [work.title, work.assessment?.subject.name, work.assessment?.subject.url, work.assessment?.method.label].some(value => value?.toLowerCase().includes(normalized)));
-  const systemLink = (id: string) => buildSystemHref(appBase || "", snapshot.workspaceId, id);
+  const systemLink = (id: string) => withPreviewRouteContext(buildSystemHref(appBase || "", snapshot.workspaceId, id), previewRouteContext);
   const sourcePlan = selectedWork && (selectedWork.productId === "documents" || selectedWork.productId === "tracker" || selectedWork.productId === "applications") && selectedWork.sourceWorkId
     ? snapshot.work.find((work) => work.id === selectedWork.sourceWorkId && work.productId === "work_plans" && work.resourceKind === "plan")
     : undefined;
@@ -257,7 +262,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
     if (focusSearch && next === "work") url.searchParams.set("search", "1"); else url.searchParams.delete("search");
     url.searchParams.delete("work");
     url.searchParams.delete("offering");
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
   }
   function openSystem(id: string) {
     setStartOpen(false); setSection("system"); setSystemId(id); setProductId(null); setOfferingId(null); setQuery(""); setHelpRequest(undefined); setWebsiteHandoff(null);
@@ -268,7 +273,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
     url.searchParams.set("view", "system");
     url.searchParams.set("system", id);
     url.searchParams.set("workspaceId", workspaceIdForNavigation());
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
   }
 
   /** Ask Strelva on Home (systemId null) or about one System, optionally with words to start from. */
@@ -282,7 +287,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
     url.searchParams.set("view", "ask");
     if (forSystemId) url.searchParams.set("system", forSystemId);
     url.searchParams.set("workspaceId", workspaceIdForNavigation());
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
   }
 
   function openWork(id: string) {
@@ -292,7 +297,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
     const url = new URL(window.location.href); url.searchParams.set("work", id); url.searchParams.set("workspaceId", workspaceIdForNavigation());
     clearEmbeddedParams(url);
     url.searchParams.set("view", viewForWork(selected?.productId));
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
   }
 
   function openInquiry(tenantId: string, context?: WorkspaceStartContinuation) {
@@ -305,7 +310,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
     url.searchParams.delete("inquiryView");
     url.searchParams.delete("inquiryRequest");
     url.searchParams.delete("inquiryRecord");
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
   }
 
   function openAccess() {
@@ -322,7 +327,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
     url.searchParams.set("view", "access");
     url.searchParams.delete("work");
     url.searchParams.delete("offering");
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
   }
 
   function rememberRequest(request: string, route = "start") {
@@ -374,7 +379,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
     url.searchParams.set("view", "start");
     url.searchParams.delete("work");
     url.searchParams.delete("offering");
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
   }
 
   function openOffering(id?: string | null) {
@@ -391,7 +396,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
     url.searchParams.set("view", "products");
     url.searchParams.delete("work");
     if (id) url.searchParams.set("offering", id); else url.searchParams.delete("offering");
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
   }
 
   /** Opening a product leaves the offering: push a new entry so Back returns to the offering. */
@@ -401,7 +406,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
     const url = new URL(window.location.href);
     if (!url.searchParams.has("offering")) return;
     url.searchParams.delete("offering");
-    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
   }
 
   function continueStart(continuation: WorkspaceStartContinuation) {
