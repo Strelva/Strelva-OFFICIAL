@@ -2,7 +2,11 @@
 set -euo pipefail
 # Requires migrated disposable schema, only fictional rows owned by this check.
 database_url="${1:?Pass the disposable local database URL}"
-node -e 'const u=new URL(process.argv[1]),h=u.searchParams.get("host"),a=u.searchParams.get("hostaddr"); if (!["localhost","127.0.0.1"].includes(u.hostname) || (h && !h.startsWith("/") && !["localhost","127.0.0.1"].includes(h)) || (a && a!=="127.0.0.1")) throw Error("Local database required")' "$database_url"
+# Preserve the chosen URL, then remove every ambient libpq routing/service knob.
+while IFS= read -r pg_variable; do unset "$pg_variable"; done < <(env | sed -n 's/^\(PG[A-Za-z0-9_]*\)=.*/\1/p')
+export LC_ALL=C
+reader_repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+node --import tsx --input-type=module -e 'const imported=await import(process.argv[1]); const { isLocalUrl }=imported.default ?? imported; if (!isLocalUrl(process.argv[2])) throw Error("Local database required");' "$reader_repo_root/scripts/release-safety/postgres.ts" "$database_url"
 psql_args=("$database_url" -X -q -v ON_ERROR_STOP=1)
 race_logs="$(mktemp -d "${TMPDIR:-/tmp}/reader-writer-locks.XXXXXX")"
 trap 'rm -rf -- "$race_logs"' EXIT

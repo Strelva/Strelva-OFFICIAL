@@ -1337,6 +1337,6 @@ printf 'Owner effect rollback retained sessions and authority gates.\n'
 # outsider denials and unchanged writer definitions on the final schema.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013230000_readonly_reader_authority.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/readonly-reader-authority-schema.sql"
-node "$repo_root/scripts/check-readonly-rpcs.mjs" "postgresql://$(id -un)@localhost:$cluster_port/postgres?host=$cluster_socket"
+node --import tsx "$repo_root/scripts/check-readonly-rpcs.mjs" "postgresql:///postgres?host=$cluster_socket&port=$cluster_port"
 node --test "$repo_root/scripts/tests/readonly-rpcs.node-test.mjs"
-bash "$repo_root/scripts/check-reader-writer-locks.sh" "postgresql://$(id -un)@localhost:$cluster_port/postgres?host=$cluster_socket"
+bash "$repo_root/scripts/check-reader-writer-locks.sh" "postgresql:///postgres?host=$cluster_socket&port=$cluster_port"

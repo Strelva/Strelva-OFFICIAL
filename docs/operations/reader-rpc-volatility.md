@@ -184,3 +184,38 @@ fixtures now assert each actual contract explicitly.
 
 The parent integration owns aggregate suites and hosted-style HTTP/JWT proof.
 No production migration, deployment, activation or provider write was performed.
+
+### Actual PostgREST and local Auth proof
+
+`check-readonly-rpcs-http.mjs` reuses the already-running disposable Supabase
+stack. It seeds the same fictional cases once, asserts their meaningful SQL
+results, and compares actual GET and POST RPC responses with SQL executed with
+those same arguments. GET uses concrete read controls/defaults where JSON null
+has no URL representation. The test refuses unknown argument conversions.
+
+Run with the local stack's private environment file (never print its contents):
+
+```bash
+STRELVA_LOCAL_AUTH_PROOF=1 node --import tsx --env-file=/path/to/disposable/env scripts/check-readonly-rpcs-http.mjs
+# Repeat against the same unchanged fictional fixture without seeding again:
+STRELVA_LOCAL_AUTH_PROOF=1 node --import tsx --env-file=/path/to/disposable/env scripts/check-readonly-rpcs-http.mjs --reuse-fixture
+```
+
+Both runs passed against the existing combined disposable Supabase stack:
+50 authorized GET/POST results matched SQL, 48 verified-outsider calls received
+the expected authorization error, and anonymous plus genuinely signed-in local
+Auth sessions could not call the private permission helper using either method.
+PostgREST itself enforces READ ONLY for GET. This proves the real HTTP/JWT
+consumption path without converting readers to READ WRITE or using a browser
+fixture. The signed-in session came from local GoTrue signup; no email provider
+or hosted Auth project was used. Both actual writer/revocation orders also
+passed against that stack's PostgreSQL 17.
+
+The scanner, HTTP proof and writer proof now reuse the existing release-safety
+`isLocalUrl` guard. The scanner/HTTP SQL child processes use its `pgEnv()`;
+the shell race check unsets all ambient `PG*` values before any subprocess.
+Duplicate/unknown URL parameters and routing service options are rejected.
+Workspace harnesses use the guard's canonical Unix-socket URL with an empty
+hostname, a single `host` and `port`, and the current OS user. The scanner and
+writer race proof passed with an inherited hostile `PGHOSTADDR` value, proving
+that ambient routing did not redirect their database connection.
