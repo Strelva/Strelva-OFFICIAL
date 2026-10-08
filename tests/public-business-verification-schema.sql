@@ -12,7 +12,7 @@ declare
   owner_id uuid := 'b3080000-0000-4000-8000-000000000001';
   ws uuid := 'b3080000-0000-4000-8000-000000000010';
   agency_id uuid := 'b3080000-0000-4000-8000-000000000020';
-  binding_id uuid; result jsonb; tenant_stable uuid;
+  binding_id uuid; result jsonb; tenant_stable uuid; owner_link text;
 begin
   insert into public.users(id,email,verified_at) values (owner_id,'verification-owner@example.test',now());
   insert into public.workspaces(id,kind,name,created_by) values (ws,'customer','Fictional Verification Business',owner_id),(agency_id,'agency','Fictional Verification Agency',owner_id);
@@ -56,6 +56,17 @@ begin
   perform pg_temp.assert_true(public.read_public_business_verification('other-handle',null) is null,'unknown handle');
   perform pg_temp.assert_true(public.read_public_business_verification(null,null) is null and public.read_public_business_verification('verification-fixture','anything') is null,'exactly one locator');
   perform pg_temp.assert_true(public.read_public_business_verification(null,'verification-site')=result,'tenant locator has identical publication consent and evidence');
+  update public.business_record_facts set value='[{"kind":"website","url":"https://verification.example"}]' where workspace_id=ws and fact_key='links';
+  update public.business_record_confirmed set state=public.business_record_entity_state(ws,'fact','links') where workspace_id=ws and entity='fact' and entity_id='links';
+  result := public.read_public_business_verification('verification-fixture',null);
+  perform pg_temp.assert_true(result->'verification'->'domains'->0->>'url'='https://verification.example' and result->'verification'->'domains'->0->>'checkedAt' is not null,'owner no-slash root matches normalized slash proof and preserves public URL');
+  foreach owner_link in array array['https://verification.example/other','https://verification.example:8443','https://other.example','https://owner@verification.example'] loop
+    update public.business_record_facts set value=jsonb_build_array(jsonb_build_object('kind','website','url',owner_link)) where workspace_id=ws and fact_key='links';
+    update public.business_record_confirmed set state=public.business_record_entity_state(ws,'fact','links') where workspace_id=ws and entity='fact' and entity_id='links';
+    perform pg_temp.assert_true(public.read_public_business_verification('verification-fixture',null)->'verification'->'domains'='[]'::jsonb,'non-equivalent path/port/origin/credentials cannot borrow proof: '||owner_link);
+  end loop;
+  update public.business_record_facts set value='[{"kind":"website","url":"https://verification.example/"}]' where workspace_id=ws and fact_key='links';
+  update public.business_record_confirmed set state=public.business_record_entity_state(ws,'fact','links') where workspace_id=ws and entity='fact' and entity_id='links';
   insert into public.domain_claims(tenant_id,domain,role,status,dns_status,ssl_status) values('verification-site','verification.example','production','verified','valid','ready'),('verification-site','private-admin.example','admin','verified','valid','ready');
   result := public.read_public_business_verification(null,'verification-site');
   perform pg_temp.assert_true(jsonb_array_length(result->'verification'->'domains')=1,'host and connected proofs deduplicated, private admin domain omitted');
