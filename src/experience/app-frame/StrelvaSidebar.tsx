@@ -21,7 +21,7 @@ const PRIMARY_ITEMS: readonly { id: NavigableSection; icon: LucideIcon }[] = [
   { id: "requests", icon: ListChecks },
   { id: "ongoing", icon: Repeat },
 ];
-const PINNED_ICONS: Record<NonNullable<StrelvaPinnedItem["kind"]>, LucideIcon> = { website: Globe2, app: AppWindow, inquiries: Inbox, bookings: CalendarDays, document: FileText, tracker: Sheet, onboarding: UserPlus, listing: MapPin, newsletter: Mail };
+const PINNED_ICONS: Record<NonNullable<StrelvaPinnedItem["kind"]>, LucideIcon> = { website: Globe2, app: AppWindow, inquiries: Inbox, bookings: CalendarDays, document: FileText, tracker: Sheet, onboarding: UserPlus, listing: MapPin, newsletter: Mail, home_finder: MapPin };
 
 const BUSINESS_ITEMS: readonly { id: NavigableSection; icon: LucideIcon }[] = [
   { id: "settings", icon: Building2 },

@@ -200,7 +200,7 @@ async function WebsiteEntryPage({ workspaceId, entry, workId }: { workspaceId: s
       path === "connect" ? Promise.resolve().then(() => readBusinessVisibility(actor, workspaceId)).catch(() => null) : null,
     ]);
     body = <>
-      <WebsiteEntry actorEmail={actor.verifiedEmail} agency={workspace.access === "provider_seat"} workspaceId={workspaceId} connectedEnabled={connectedEnabled} rebuildEnabled={rebuildEnabled} path={path} canManage={canManage} operator={operator}
+      <WebsiteEntry actorEmail={actor.verifiedEmail} agency={!("access" in workspace) || workspace.access === "provider_seat"} workspaceId={workspaceId} connectedEnabled={connectedEnabled} rebuildEnabled={rebuildEnabled} path={path} canManage={canManage} operator={operator}
         initialWorkId={workId ?? undefined} rebuilds={records.map(parseRebuildView)} sites={overview?.sites.map(site => ({ id: site.id, siteHost: site.siteHost, siteUrl: site.siteUrl, status: site.status, verifiedAt: site.verifiedAt, systemId: site.systemId, snippet: site.snippet }))} />
       {visibility ? <ServerVisibility workspaceId={workspaceId} canManage={canManage} suggestedHandle={suggestBusinessHandle(workspace.name)}
         initial={{ pagesEnabled: visibility.pagesEnabled, page: visibility.page, blocks: visibility.blocks?.map(item => ({ id: item.id, label: item.label, url: item.url, checkable: item.checkable, block: { hash: item.block.hash, html: item.block.html } })) ?? null }} /> : null}

@@ -8,7 +8,7 @@ import styles from "./systems.module.css";
 
 export const SYSTEM_ICONS: Record<SystemKind, LucideIcon> = {
   website: Globe2, inquiries: Inbox, bookings: CalendarDays, document: FileText, app: AppWindow, tracker: Sheet, onboarding: UserPlus,
-  listing: MapPin, newsletter: Mail,
+  listing: MapPin, newsletter: Mail, home_finder: MapPin,
 };
 
 export function LifecyclePill({ lifecycle }: { lifecycle: SystemLifecycle }) {

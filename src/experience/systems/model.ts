@@ -17,7 +17,7 @@ import type { WorkspaceMakeRealResult, WorkspaceSnapshot } from "@/experience/wo
 export const SYSTEMS_LABEL = "Systems";
 export const SYSTEMS_LIST_LABEL = "All systems and files";
 
-export type SystemKind = "website" | "inquiries" | "bookings" | "document" | "app" | "tracker" | "onboarding" | "listing" | "newsletter";
+export type SystemKind = "website" | "inquiries" | "bookings" | "document" | "app" | "tracker" | "onboarding" | "listing" | "newsletter" | "home_finder";
 
 /** Intended operation only. Health is a separate signal (RULE_SYSTEM_PAUSE_HEALTH). */
 export type SystemLifecycle = SpineLifecycle;
@@ -179,6 +179,7 @@ export const SYSTEM_KIND_LABEL: Record<SystemKind, string> = {
   onboarding: "Client onboarding",
   listing: "Google listing",
   newsletter: "Newsletter",
+  home_finder: "HomeFinder",
 };
 
 export const LIFECYCLE_LABEL: Record<SystemLifecycle, string> = { draft: "Draft", live: "Live", paused: "Paused" };

@@ -52,6 +52,7 @@ const KIND_VIEW: Record<string, SystemKind> = {
   pricing: "app",
   listing: "listing",
   newsletter: "newsletter",
+  home_finder: "home_finder",
 };
 
 function hostname(value: unknown): string | undefined {
@@ -72,6 +73,7 @@ const CONNECTION_STATUS = { connected: "connected", disconnected: "not_connected
 function detailFor(kind: SystemKind, work: WorkspaceWork | undefined, entry: WorkspaceSystemEntry): string {
   if (kind === "document" && work?.document) return `Revision ${work.document.revision}`;
   if (kind === "app") return work?.productId === "tracker" ? "Used by your team · started from a list" : "Used by your team";
+  if (kind === "home_finder") return "Home search installation";
   if (kind === "bookings") return "Time people can reserve";
   if (kind === "onboarding") return "New-client intake";
   if (kind === "website" && !entry.tenantId) return "Website draft";
@@ -146,6 +148,8 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
         : { kind: "listing", healthMessage: "Strelva couldn't read this listing just now.", receipts: [], unavailable: true };
     } else if (kind === "newsletter") {
       surface = { kind: "newsletter", audience: entry.basis ?? "Sent to active subscribers." };
+    } else if (kind === "home_finder") {
+      surface = { kind: "work", workId: entry.ref.systemId, productId: "home_finder" };
     } else if (work) {
       surface = { kind: "work", workId: work.id, productId: work.productId };
     }

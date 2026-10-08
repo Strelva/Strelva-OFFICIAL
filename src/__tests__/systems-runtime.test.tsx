@@ -181,3 +181,16 @@ it.each([undefined, "delegated_read" as const, "provider_seat" as const])("lists
   expect(container.textContent).toContain("Campaign evidence");
   expect(container.querySelector('[aria-labelledby="systems-directory-title"]')?.textContent).not.toContain("Registry newsletter");
 });
+
+it("projects registry HomeFinder to the native business management surface", async () => {
+  const state = await snapshot({ id: "file", workspaceId: "workspace-a", title: "File", productId: "ai_visibility", resourceKind: "assessment", payload: null, input: {}, createdAt: "2026-10-08T00:00:00Z" }, "member");
+  state.work = [];
+  state.systems!.systems = [{ ref: { businessId: state.workspaceId, systemId: SYSTEM }, name: "Brokerage search", kind: "home_finder", lifecycle: "draft", basis: null, savedWorkId: null, tenantId: null, health: { status: "unknown", summary: "License evidence pending", lastVerifiedAt: null } }];
+  const result = readBusinessSystems({ snapshot: state, sites: [] });
+  expect(result.systems[0]?.kind).toBe("home_finder");
+  expect(result.systems[0]?.surface).toEqual({ kind: "work", workId: SYSTEM, productId: "home_finder" });
+  const request = vi.fn(async () => new Response(JSON.stringify({ error: "Unavailable" }), { status: 503 }));
+  await mountLayout(state, request);
+  expect([...container.querySelectorAll("a")].find(link => link.textContent?.includes("Open HomeFinder"))?.getAttribute("href")).toBe("/workspace/home-finder?workspaceId=workspace-a");
+  expect(container.textContent).toContain("License evidence pending");
+});
