@@ -78,7 +78,7 @@ vi.mock("@/platform/infra/db/client", () => ({
     from: (table: string) => query(table),
     async rpc(name: string, args: Row) {
       if (name === "workspace_exit_completed") return { data: false, error: null };
-      if (name === "agency_can_read_assigned_work") return { data: false, error: null };
+      if (name === "agency_can_read_assigned_work" || name === "agency_can_read_package_work") return { data: false, error: null };
       boundary.calls.push({ name, args });
       if (boundary.nextRpc) {
         const next = boundary.nextRpc;

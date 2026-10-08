@@ -50,6 +50,7 @@ insert into spr_readers values
  ('versions',$q$select public.read_business_versions('d7100000-0000-4000-8000-000000000011','@actor','@email')->'versions' @> '[{"id":"@version"}]'::jsonb$q$),
  ('native runtime',$q$select public.read_version_native_runtime('d7100000-0000-4000-8000-000000000011','@actor','@email','@version')->>'kind'='internal_app'$q$);
 update spr_readers set statement=replace(replace(statement,'@system',:'spr_agency_system'),'@version',:'spr_agency_version');
+insert into spr_readers values ('package work scope',format($q$select public.agency_can_read_package_work('d7100000-0000-4000-8000-000000000011','@actor','@email',%L)$q$,(select s.origin_ref from public.systems s where s.id=:'spr_agency_system')));
 create function pg_temp.spr_agency_probes(denied boolean default false) returns void language plpgsql as $$
 declare r record;
 begin
@@ -83,7 +84,7 @@ select pg_temp.spr_catalog_assert(not exists(
 -- Owner and exact-granted agency use the real public System and Version APIs.
 begin read only;
 set local role service_role;
-select pg_temp.spr_probe(replace(replace(statement,'@actor','d7100000-0000-4000-8000-000000000002'),'@email','readonly-package-owner@example.test')) from spr_readers where label<>'actor scope';
+select pg_temp.spr_probe(replace(replace(statement,'@actor','d7100000-0000-4000-8000-000000000002'),'@email','readonly-package-owner@example.test')) from spr_readers where label not in ('actor scope','package work scope');
 select pg_temp.spr_agency_probes();
 select pg_temp.spr_assert(jsonb_array_length(public.read_system_package_listings('d7100000-0000-4000-8000-000000000011','d7100000-0000-4000-8000-000000000002','readonly-package-owner@example.test'))=1,'owner lists qualified native Package');
 select pg_temp.spr_assert(jsonb_array_length(public.read_system_package_listings('d7100000-0000-4000-8000-000000000011','d7100000-0000-4000-8000-000000000001','readonly-package-creator@example.test'))=1,'scoped agency lists qualified native Package');
@@ -94,6 +95,7 @@ select pg_temp.spr_probe(format($q$select public.read_business_system('d7100000-
 -- appears in the exact agency System/Version scope.
 select pg_temp.spr_assert(not (public.read_business_systems('d7100000-0000-4000-8000-000000000011','d7100000-0000-4000-8000-000000000001','readonly-package-creator@example.test')->'systems' @> jsonb_build_array(jsonb_build_object('origin',jsonb_build_object('kind','saved_work','ref',:'spr_unrelated_work')))),'unrelated saved work is excluded');
 select pg_temp.spr_assert(not has_function_privilege('service_role','public.system_package_read_work_ids(uuid,uuid,text)','EXECUTE'),'new snapshot grant helper is private');
+select pg_temp.spr_assert(not has_function_privilege('service_role','public.website_document_read_actor_package_core(uuid,uuid,uuid,text,boolean,boolean)','EXECUTE'),'website snapshot core is private');
 select pg_temp.spr_assert(not has_function_privilege('service_role','public.system_read_scope_package_core(uuid,uuid,text,boolean)','EXECUTE'),'renamed snapshot core is private');
 select pg_temp.spr_assert(not has_function_privilege('service_role','public.system_actor_scope_package_core(uuid,uuid,text,boolean)','EXECUTE'),'locking writer core remains private');
 select pg_temp.spr_assert(not has_function_privilege('service_role','public.save_system_version_package_core(uuid,text,uuid,bigint,jsonb)','EXECUTE'),'qualification writer bypass remains private');
