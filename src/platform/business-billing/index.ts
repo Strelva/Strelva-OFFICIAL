@@ -16,7 +16,7 @@
  * on. Off by default. Nothing here changes a price, amount, plan or card.
  */
 import { agencyInvoiceSchema } from "@/platform/agency-billing/types";
-import { workspacePlanByKey } from "@/lib/billing-plans";
+import { workspacePlanByKey } from "@/platform/infra/billing-plans";
 import { z } from "zod";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { WorkspaceAccessError, WorkspaceStoreError } from "@/platform/workspaces/types";

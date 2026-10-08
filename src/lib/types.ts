@@ -462,7 +462,7 @@ export type PresenceProfile = (typeof PRESENCE_PROFILES)[number];
 export type IntegrationProvider = "google" | "yelp" | "calendly" | "instagram" | "vegaro";
 
 export type TenantDeliveryModel = "custom_repo" | "platform_template";
-export type CommercialPlanKey = "presence" | "growth" | "scale";
+export type CommercialPlanKey = import("@/platform/infra/billing-plans").CommercialPlanKey;
 
 /**
  * How a managed client is billed — set explicitly by the operator in the admin
