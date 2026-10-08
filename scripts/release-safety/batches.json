@@ -1186,6 +1186,11 @@
           "file": "20261018110000_provider_seat_website_access.sql",
           "sha256": "b108d67d2d968bf4dfa8ae7551997b07d653eac8cefcc97f8e123b579cc9c6d4",
           "rollback": "rollback-20261018110000_provider_seat_website_access.sql"
+        },
+        {
+          "file": "20261018120000_connected_site_schema_conflicts.sql",
+          "sha256": "c636ee4328ba2da0bd0e922c89c60ac5c53e9480aa6d14f3e35816bde51a40e9",
+          "rollback": "rollback-20261018120000_connected_site_schema_conflicts.sql"
         }
       ]
     },

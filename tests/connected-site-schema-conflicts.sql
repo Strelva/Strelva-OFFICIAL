@@ -26,8 +26,13 @@ begin
   insert into public.business_record_facts(workspace_id,fact_key,value,source,verified,updated_by) values
     (ws,'display_name','"Confirmed Name"','owner',false,owner_id),
     (ws,'phone','"7165550100"','agent',false,owner_id),
-    (ws,'address','{"line1":"1 Main St","city":"Buffalo"}','operator',true,owner_id),
+    (ws,'address','{"line1":"1 Main St","city":"Buffalo"}','owner',true,owner_id),
     (ws,'owner_recipient','{"email":"external-owner@example.test"}','owner',true,owner_id);
+  -- Sites read the owner-confirmed copy (#521), so mirror owner writes into
+  -- that copy exactly as the connected-sites contract fixture does.
+  insert into public.business_record_confirmed(workspace_id,entity,entity_id,state,confirmed_by_kind)
+    select ws,'fact',f.fact_key,public.business_record_entity_state(ws,'fact',f.fact_key),'owner_write'
+      from public.business_record_facts f where f.workspace_id=ws and f.source='owner';
   site := public.create_connected_site(ws,owner_id,'schema-owner@example.test',jsonb_build_object('publicKey',key,'verificationToken',token,'label','Schema fixture','siteUrl',origin||'/','siteHost','schema-fixture.example','allowedOrigins',jsonb_build_array(origin),'platform','wix'));
   item := jsonb_build_object('kind','fact.inferred','route','owner_decides','title','Check published facts','detail','Website differs from confirmed name','approveEffect','Acknowledge only; no facts change','notYetEffect','Nothing changes','sourceLifecycle','connected_site_schema','sourceId',site->>'id','revisionHash',repeat('a',64),'urgent',false,'adminMayDecide',true);
   perform pg_temp.expect_error(format('select public.record_connected_site_schema_conflict(%L,%L,%L)',key,origin,item),'connected_site_not_verified');
@@ -47,6 +52,8 @@ begin
   perform pg_temp.assert_true(first_item->>'deliveryState'='not_sent' and not (first_item->>'signInRequired')::boolean,'recorded only, no login requirement');
   perform pg_temp.assert_true(public.read_connected_site_schema_conflict(other_ws,(site->>'id')::uuid) is null,'read cannot cross business boundary');
   perform pg_temp.assert_true(public.read_connected_site_schema_conflict(ws,(site->>'id')::uuid)->>'id'=first_item->>'id','source reads open decision');
+  insert into public.owner_decision_link_bindings(decision_id,workspace_id,recipient)
+    values ((first_item->>'id')::uuid,ws,'external-owner@example.test');
   perform public.claim_owner_decision(ws,(first_item->>'id')::uuid,repeat('a',64),'approve','owner_link',null,null,'external-owner@example.test');
   perform public.finish_owner_decision(ws,(first_item->>'id')::uuid,'done','Acknowledged; no facts changed',null);
   perform pg_temp.assert_true(public.record_connected_site_schema_conflict(key,origin,item)->>'state'='approved','closed revision is not reopened');

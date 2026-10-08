@@ -86,6 +86,15 @@ describe("record-only schema decision path", () => {
     await record("key", { ...site, injectSchema: false }, null, report([{ name: "Wrong" }]), store);
     expect(store.recordSchemaConflict).not.toHaveBeenCalled();
   });
+  it("rejects client-supplied schema fields and fetches only the stored connected-site URL", async () => {
+    const { store } = setup();
+    const fetchPage = vi.fn(async (url: string) => { expect(url).toBe(site.siteUrl); return html("Server-side fact"); });
+    await expect(recordPlatformSchema("key", site, site.allowedOrigins[0]!, { present: true, businesses: [{ name: "Forged" }] }, store, { fetchPage })).rejects.toThrow();
+    expect(fetchPage).not.toHaveBeenCalled();
+    await recordPlatformSchema("key", site, site.allowedOrigins[0]!, hint, store, { fetchPage });
+    expect(fetchPage).toHaveBeenCalledOnce();
+    expect(store.recordSchemaConflict).toHaveBeenCalledWith("key", site.allowedOrigins[0], expect.objectContaining({ detail: expect.stringContaining("Server-side fact") }));
+  });
   it("accepts report-only events additively and propagates storage failures", async () => {
     const { store } = setup();
     const deps = { fetchPage: async () => html("Wrong") };
@@ -107,10 +116,15 @@ describe("record-only schema decision path", () => {
     expect(sendEmail).not.toHaveBeenCalled();
   });
   it("keeps already-recorded decisions resolvable when only new reports are disabled", async () => {
+    const { memory, store, clock } = setup();
+    await record("key", site, site.allowedOrigins[0]!, report([{ name: "Wrong" }]), store);
+    const item = [...memory.items.values()][0]!;
     vi.stubEnv("STRELVA_CONNECTED_SITE_SCHEMA_CONFLICTS_RELEASE", "0");
-    const read = vi.fn(async () => ({ revisionHash: "a".repeat(64) }));
+    const read = vi.fn(async () => item);
     const adapter = connectedSiteSchemaAdapter(read as never);
-    await expect(adapter.currentRevision!({ workspaceId: site.workspaceId }, site.id)).resolves.toBe("a".repeat(64));
+    const service = createNeedsYouService({ store: memory.store, adapters: [adapter], now: () => clock.now, appOrigin: "https://app.example", sendEmail: vi.fn() });
+    const result = await service.decide({ workspaceId: site.workspaceId, itemId: item.id, revision: item.revisionHash, decision: "approve", by: { kind: "owner_link", recipient: "owner@example.test" } });
+    expect(result.status).toBe("done");
     expect(read).toHaveBeenCalledWith(site.workspaceId, site.id);
   });
   it("keeps client delivery suppressed by the existing rollout gate", async () => {
