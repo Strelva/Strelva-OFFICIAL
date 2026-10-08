@@ -13,6 +13,10 @@ begin
   if expected_state is not null then raise exception 'Expected %: %',expected_state,statement; end if;
   perform pg_temp.rr_assert(ok,statement);
 end $$;
+select to_regprocedure('public.system_read_scope_package_core(uuid,uuid,text,boolean)') is not null as package_reader_tail \gset
+\if :package_reader_tail
+\ir ../supabase/migrations/rollback-20261016120600_package_readonly_authority.sql
+\endif
 -- The entire public catalog, including writer bodies, ACLs and volatility.
 create temporary table rr_final as select p.oid::regprocedure::text signature,pg_get_functiondef(p.oid) definition,p.proacl
   from pg_proc p where pronamespace='public'::regnamespace and prokind='f';
@@ -113,3 +117,7 @@ select pg_temp.rr_assert(not exists(
 \ir ../supabase/migrations/20261013230000_readonly_reader_authority.sql
 \o
 \echo Read-only reader proof: 26 READ ONLY calls pass after repair; baseline locking/projection failures reproduced; outsider/bearer denial; exact catalog rollback/reapply; writer definitions unchanged.
+
+\if :package_reader_tail
+\ir ../supabase/migrations/20261016120600_package_readonly_authority.sql
+\endif
