@@ -134,10 +134,13 @@ const manualHelpers = new Set(MANUAL_MIGRATION_HELPERS);
 export const ROLLBACK_HELPER_PATTERN = /^rollback-\d{14}_.+\.sql$/;
 
 export function readCandidateMigrations(directory) {
+  const versions = new Set();
   return readdirSync(directory).filter(name => name.endsWith(".sql") &&
     !manualHelpers.has(name) && !ROLLBACK_HELPER_PATTERN.test(name)).sort().map(name => {
     const match = /^(\d{14})_(.+)\.sql$/.exec(name);
     if (!match) throw new Error("Candidate contains a non-versioned SQL migration filename.");
+    if (versions.has(match[1])) throw new Error(`Candidate contains duplicate migration version: ${match[1]}.`);
+    versions.add(match[1]);
     return { version: match[1], name: match[2] };
   });
 }

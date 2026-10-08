@@ -24,12 +24,17 @@ _No current blockers from the original release gate — both prior entries are r
 - Required closure: complete the mandatory PRD journeys with independently reviewed evidence, resolve operating and commercial choices at their dependent boundary, prepare the exact migration/environment/deployment and recovery steps, and obtain the necessary live-action authority. Fixture-only results, local builds and resolved historical launch blockers cannot close this gate.
 - September 21 preparation verified merged implementation/CI and read the actual hosted metadata. Current execution blockers are recorded in the [dated preparation evidence](./strelvav2-horizontal-acceptance.md#september-21-production-preparation-evidence): 63 pending migrations after source reconciliation, shared client-host compatibility, complete operational recovery, auth/email and real delivery acceptance. The [authorized remediation receipt](./strelvav2-horizontal-acceptance.md#september-21-authorized-remediation-and-recovery-rehearsal) records the successful private logical restore, restored-data upgrade, lock-failure checks and production Auth canonical URL correction; these do not close the remaining gates. The [prepared sequence](./horizontal-release-checklist-2026-09-11.md#september-21-production-preparation) preserves client availability. Older feature-gap lists do not override the September 21 release direction.
 
-### Existing Rohlax www availability defect (September 21)
+### Existing Rohlax www availability defect — resolved observation, October 7
 
-- Status: blocked
-- Owner: Jacob for DNS authority; implementation team for exact preparation and verification.
-- Evidence: `www.rohlaxwellness.com` fails DNS resolution; two public resolvers return a CNAME containing a trailing slash. The apex responds successfully. Vercel reports the www alias as misconfigured on `strelva-admin`.
-- Required closure: execute and verify the authorized DNS/alias repair in the [dated evidence](./strelvav2-horizontal-acceptance.md#september-21-production-preparation-evidence), preserving all other client records and intended page routing. User supplied Cloudflare sign-in and repair authority; native browser control is currently disconnected. No DNS change has been made. Do not bundle the repair into a launch or accept the failure as the new baseline.
+The September 21 malformed-CNAME failure no longer reproduces. On October 8 at
+02:36 UTC, both `1.1.1.1` and `8.8.8.8` return
+`c51a194a5cafbd83.vercel-dns-017.com.` for `www.rohlaxwellness.com`.
+HTTPS returns 308 to the apex, then 200. The collaborative browser observed
+"Rohlax Wellness | Assisted Stretching in Williamsville, NY", actual services
+and the current client-booking link. No DNS, alias or customer-content write was
+performed in the agency workflow deployment session. These reads establish
+current availability; they do not identify who repaired it or qualify a new app
+artifact. Preserve the September 21 diagnosis as dated evidence.
 
 ### Security and dependency blockers (2026-07-30 audit — RESOLVED 2026-07-30)
 

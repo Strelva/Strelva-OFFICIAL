@@ -1168,6 +1168,11 @@
           "rollback": "rollback-20261015100000_agency_add_client.sql"
         },
         {
+          "file": "20261015111000_website_owner_agency_publish.sql",
+          "sha256": "578e3fed1454f414914f642769b7d8423229cd67392c527571ee79d074d9f8c1",
+          "rollback": "rollback-20261015111000_website_owner_agency_publish.sql"
+        },
+        {
           "file": "20261016110000_operator_action_approvals.sql",
           "sha256": "e9e4a204e497caa46acc2e113c74e11b18dd1e8aa0996b629dabb650dafee002",
           "rollback": "rollback-20261016110000_operator_action_approvals.sql"

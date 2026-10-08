@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { AiVisibilityResult } from "@/products/ai-visibility/contracts";
 
 /**
  * An agency adds a client business (agency 1.0 #259). Shapes shared by the
@@ -120,7 +121,14 @@ export interface AddAgencyClientResult {
   /** Set when the owner email was given but its link could not be made; the client was still added. */
   ownerClaimError: string | null;
   website: ClientWebsiteEntries;
+  aiCheck: ClientAiCheck;
 }
+
+/** An agency-owned private assessment of the client's public website. */
+export type ClientAiCheck =
+  | { status: "ready"; workId: string; href: string; result: AiVisibilityResult }
+  | { status: "unavailable" | "pending"; message: string; href: string }
+  | { status: "not_requested" };
 
 export function clientWebsiteEntries(customerWorkspaceId: string): ClientWebsiteEntries {
   const base = (entry: "connect" | "rebuild") => `/workspace/site?${new URLSearchParams({ workspaceId: customerWorkspaceId, entry })}`;

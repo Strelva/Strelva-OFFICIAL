@@ -149,7 +149,7 @@ async function main() {
     log: (line) => console.log(line),
   });
   const text = options.json ? JSON.stringify(report, null, 2) : formatReport(report).join("\n");
-  assertNoSensitiveOutput(text);
+  assertNoSensitiveOutput(text, repoMigrations);
   console.log(text);
   if (!report.silentRollout.safe) process.exitCode = 1;
 }

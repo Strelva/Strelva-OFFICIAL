@@ -16,8 +16,8 @@ import { paceGoogleWrites } from "./pacing";
  * release off, keeps the legacy publisher and its outside-write receipt: one
  * ledger per write either way (docs/architecture/persistence-boundaries.md).
  *
- * An operator's reply (operator_instruction) is an agency acting for the
- * business: it also needs the operator to be the business's acting provider
+ * An operator's or agency staff member's reply (operator_instruction) is an
+ * agency acting for the business: the person must be its acting provider
  * for Google on this location (#255), rechecked by the listing service just
  * before the write. Without deps.authorizeProvider it is refused.
  *
@@ -53,20 +53,19 @@ export interface TenantReplyDeps {
   notify(text: string): void;
   control?(workspaceId: string, locationId: string): Promise<{ paused: boolean }>;
   noteAccess?(workspaceId: string, locationId: string, pending: boolean): Promise<unknown>;
-  /** Throws unless this person is the business's acting provider for Google on this location. */
-  authorizeProvider?(workspaceId: string, userId: string, locationId: string, agencyId?: string): Promise<void>;
+  /** Throws unless this person acts for Google on this location through the named agency, when supplied. */
+  authorizeProvider?(workspaceId: string, userId: string, locationId: string, expectedAgencyWorkspaceId?: string): Promise<void>;
 }
 
-/** The provider check for an operator's authority, or nothing for the owner's and the policy's. */
+/** Recheck a delegate's current provider, preserving an agency staff actor's named agency. */
 function providerCheck(authority: ListingAuthority, workspaceId: string, locationId: string, deps: TenantReplyDeps): { authorizeProvider?: () => Promise<void> } {
   if (authority.kind !== "operator_instruction" && authority.kind !== "operator_undo") return {};
-  const userId = /^operator:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(authority.actor)?.[1];
-  const staff = /^agency-staff:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(authority.actor);
-  const actorUserId = userId ?? staff?.[2];
+  const uuid = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+  const staff = new RegExp(`^agency-staff:(${uuid}):(${uuid})$`, "i").exec(authority.actor);
+  const userId = staff?.[2] ?? new RegExp(`^operator:(${uuid})$`, "i").exec(authority.actor)?.[1];
   const authorize = deps.authorizeProvider;
-  return actorUserId && authorize ? { authorizeProvider: () => staff
-    ? authorize(workspaceId, actorUserId, locationId, staff[1])
-    : authorize(workspaceId, actorUserId, locationId) } : {};
+  if (staff && authorize) return { authorizeProvider: () => authorize(workspaceId, staff[2]!, locationId, staff[1]!) };
+  return userId && authorize ? { authorizeProvider: () => authorize(workspaceId, userId, locationId) } : {};
 }
 
 /** Which ledger this tenant's reply belongs to. Decided before any write. */
@@ -199,14 +198,16 @@ export async function defaultTenantReplyDeps(): Promise<TenantReplyDeps> {
     control: async (workspaceId, locationId) => (await import("./controls")).readListingControl(workspaceId, locationId),
     noteAccess: async (workspaceId, locationId, pending) => (await import("./controls")).noteListingAccess(workspaceId, locationId, pending),
     notify: (text) => { sendSlackNotification({ text }).catch(() => {}); },
-    authorizeProvider: async (workspaceId, userId, locationId, agencyId) => {
+    authorizeProvider: async (workspaceId, userId, locationId, expectedAgencyWorkspaceId) => {
       const { getSupabase } = await import("@/platform/infra/db/client");
       const client = getSupabase();
       const user = client ? (await client.from("users").select("email").eq("id", userId).maybeSingle()).data : null;
       if (!user?.email) throw new Error("acting_provider_not_staffed");
       const { assertActingProvider } = await import("@/platform/workspaces/acting-provider");
-      const actingAgency = await assertActingProvider({ userId, verifiedEmail: user.email }, workspaceId, { effect: "google", kind: "google_location", ref: locationId });
-      if (agencyId && actingAgency !== agencyId) throw new Error("acting_provider_not_staffed");
+      const agencyWorkspaceId = await assertActingProvider({ userId, verifiedEmail: user.email }, workspaceId, { effect: "google", kind: "google_location", ref: locationId });
+      if (expectedAgencyWorkspaceId && agencyWorkspaceId.toLowerCase() !== expectedAgencyWorkspaceId.toLowerCase()) {
+        throw new Error("acting_provider_not_staffed");
+      }
     },
   };
 }

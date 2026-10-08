@@ -6,13 +6,13 @@ import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Tabs } from "@/components/ui/Tabs";
 import { TextInput } from "@/components/ui/TextInput";
-import type { AddAgencyClientResult, AgencyClientListItem, OwnerClaim } from "@/products/agency-clients/contracts";
+import type { AddAgencyClientResult, AgencyClientListItem, ClientAiCheck, OwnerClaim } from "@/products/agency-clients/contracts";
 
 /**
  * An agency adds a client (#259). The agency names a website or picks one of
  * its prospects; `POST /api/workspace/agency-clients` creates the business
- * with the agency's provider seat, seeds unconfirmed facts from the site and,
- * given the owner's address, returns the owner claim link once. Nothing is
+ * with the agency's provider seat, seeds unconfirmed facts, saves an AI
+ * Visibility check in the agency and, given the owner's address, returns the owner claim link once. Nothing is
  * emailed during the silent rollout (decision R08): the agency copies the link.
  */
 
@@ -153,7 +153,7 @@ export function AgencyAddClient({ agencyWorkspaceId, prospecting, initialProspec
               items={[{ value: "url", label: "Website" }, { value: "prospect", label: "Prospect" }]} /> : null}
             <div className="mt-6 grid gap-5">
               {source === "url"
-                ? <TextInput label="Their website" type="url" inputMode="url" autoComplete="url" autoFocus required maxLength={2048} placeholder="northsidebakery.com" value={url} onChange={(event) => { setUrl(event.target.value); setError(""); }} helperText="We read a few pages for their phone, email and address. Nothing on their site changes." />
+                ? <TextInput label="Their website" type="url" inputMode="url" autoComplete="url" autoFocus required maxLength={2048} placeholder="northsidebakery.com" value={url} onChange={(event) => { setUrl(event.target.value); setError(""); }} helperText="We read their details and run an AI Visibility check saved in your agency. Nothing on their site changes." />
                 : <ProspectPicker prospects={prospects} error={prospectError} added={added} value={prospectId} onChoose={choose} />}
               <TextInput label="Business name" autoComplete="organization" maxLength={120} placeholder={source === "prospect" && chosen ? chosen.business : "Read from their site if left blank"} value={name} onChange={(event) => setName(event.target.value)} />
               <TextInput label="Owner’s email" type="email" autoComplete="email" maxLength={254} placeholder="owner@business.com" value={ownerEmail} onChange={(event) => setOwnerEmail(event.target.value)} helperText="For their claim link. Strelva doesn’t email it yet; you’ll copy it." />
@@ -236,6 +236,8 @@ function AddedClient({ result, agencyWorkspaceId, agencyHref, onAnother, onClaim
             </div>}</li>
         </ul>
 
+        {result.aiCheck ? <AgencyClientAiCheck check={result.aiCheck} /> : null}
+
         <h2 className="mt-10 text-[15px] font-medium">Details from their site</h2>
         {scan.status === "scanned" && scan.seeded.length
           ? <ul className="mt-3 divide-y divide-gray-border border-y border-gray-border text-[13px]">
@@ -252,6 +254,21 @@ function AddedClient({ result, agencyWorkspaceId, agencyHref, onAnother, onClaim
       <Button variant="secondary" onClick={onAnother} icon={<RefreshCw className="size-4" />}>Add another client</Button>
       <a href={agencyHref} className="inline-flex min-h-11 items-center gap-2 text-[13px] font-medium underline-offset-4 hover:underline">Back to clients<ArrowRight className="size-4" aria-hidden="true" /></a>
     </div>
+  </section>;
+}
+
+/** Uses the existing private assessment work page for the full result. */
+export function AgencyClientAiCheck({ check }: { check: ClientAiCheck }) {
+  if (check.status === "not_requested") return <section className="mt-10" aria-label="AI Visibility check"><h2 className="text-[15px] font-medium">AI Visibility check</h2><p className="mt-2 text-[13px] leading-relaxed text-gray-muted">No website given, so no AI check was requested.</p></section>;
+  return <section className="mt-10" aria-label="AI Visibility check">
+    <h2 className="text-[15px] font-medium">AI Visibility check</h2>
+    {check.status === "ready" ? <>
+      {check.result.measurementStatus !== "unavailable" && check.result.readinessMeasured !== false ? <p className="mt-3 font-mono text-[14px] tabular-nums">{check.result.grade} · {check.result.score}/100</p> : null}
+      {check.result.measurementNote ? <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">{check.result.measurementNote}</p> : null}
+      <p className="mt-2 text-[13px] leading-relaxed text-gray-muted">{check.result.citation.note} {check.result.citation.probed ? "Probe completed." : "Probe not completed."}</p>
+      <p className="mt-2 text-[13px] leading-relaxed">{check.result.topFix}</p>
+    </> : <p className="mt-2 text-[13px] leading-relaxed text-gray-muted" role="status">{check.message}</p>}
+    <a href={check.href} className="mt-3 inline-flex min-h-11 items-center gap-2 text-[13px] font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-text">{check.status === "ready" ? "Open saved AI check" : "Open agency saved work"}<ArrowRight className="size-4" aria-hidden="true" /></a>
   </section>;
 }
 

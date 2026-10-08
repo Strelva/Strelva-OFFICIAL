@@ -263,6 +263,43 @@ describe("production readiness snapshot", () => {
     expect(() => assertNoSensitiveOutput("c2VjcmV0LWtleS1tYXRlcmlhbC10aGF0LW11c3QtbmV2ZXItcHJpbnQ=")).toThrow(/token/);
   });
 
+  it("guards both report formats with the actual repository migration inventory", async () => {
+    const repoMigrations = readdirSync(join(process.cwd(), "supabase/migrations"))
+      .filter((name) => /^\d{14}_.+\.sql$/.test(name)).map((name) => name.replace(/\.sql$/, ""));
+    const report = await runReadinessSnapshot({ jacobsYes: true }, deps({ repoMigrations, appliedVersions: async () => [] }).value);
+    for (const text of [formatReport(report).join("\n"), JSON.stringify(report)]) {
+      expect(() => assertNoSensitiveOutput(text, repoMigrations)).not.toThrow();
+    }
+  });
+
+  it("exempts only complete trusted identifiers and still rejects tokens around them", () => {
+    const migration = "20260930120000_revoke_public_execute_internal_functions";
+    expect(() => assertNoSensitiveOutput(migration)).toThrow(/token/);
+    expect(() => assertNoSensitiveOutput(migration, [migration])).not.toThrow();
+    for (const unsafe of [
+      `prefix${migration}`, `/${migration}`, `-${migration}`, `${migration}suffix`, `${migration}_suffix`, `${migration}/suffix`,
+      `${migration}=`, `sk_live_${migration}`, `eyJ${migration}`,
+      `${migration}.sk_live_abcdefghijklmnop`, `${migration}.owner@private.example`,
+      "20260930120001_revoke_public_execute_internal_functions",
+    ]) {
+      expect(() => assertNoSensitiveOutput(unsafe, [migration]), unsafe).toThrow(/token|email/);
+    }
+  });
+
+  it("hides unrecognized flag values even when they are short or resemble trusted identifiers", async () => {
+    const unknown = "private_opaque_value";
+    const report = await runReadinessSnapshot({ jacobsYes: true }, deps({ env: {
+      EMAIL_SENDING_ENABLED: unknown,
+      STRELVA_OWNER_ENTRY: "workspace",
+      STRELVA_CLIENT_RECORDS_READ: "STRELVA_WEBSITE_BUSINESS_FACTS_ENABLED",
+    } }).value);
+    expect(report.env.flags.EMAIL_SENDING_ENABLED).toBe("set (value hidden)");
+    expect(report.env.flags.STRELVA_OWNER_ENTRY).toBe("value: workspace");
+    expect(report.env.flags.STRELVA_CLIENT_RECORDS_READ).toBe("set (value hidden)");
+    expect(JSON.stringify(report)).not.toContain(unknown);
+    expect(report.silentRollout.safe).toBe(false);
+  });
+
   it("only ever reads: no column with secrets or PII is selected and only the fixed-key email policy enum is fetched", async () => {
     const d = deps();
     await runReadinessSnapshot({ jacobsYes: true }, d.value);

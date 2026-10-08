@@ -20,6 +20,7 @@ export interface WebsiteDocumentRevision {
 }
 export interface WebsiteDocumentKey { workspaceId: string; workId: string; }
 export interface WebsiteDocumentCandidate extends WebsiteDocumentKey { revision: number; contentHash: string; }
+export interface WebsiteAgencyPublishPermission { agencyWorkspaceId: string; agencyName: string; granted: boolean }
 export interface AgencyWebsiteDocumentCandidate { work: SavedWork; section: string; sections: string[]; }
 /** The tenant a website work routes to now. Publication and reservation rows
  * follow a slug rename; the saved work payload keeps the slug it was given. */
@@ -40,7 +41,8 @@ export interface WebsiteDocumentStore {
   read(actor: WorkspaceActor, input: WebsiteDocumentKey & { revision?: number }): Promise<WebsiteDocumentRevision | null>;
   list(actor: WorkspaceActor, input: WebsiteDocumentKey): Promise<WebsiteDocumentRevision[]>;
   receipts(actor: WorkspaceActor, input: WebsiteDocumentKey): Promise<WebsiteLaunchReceipt[]>;
-  approve(actor: WorkspaceActor, input: WebsiteDocumentCandidate): Promise<void>;
+  approve(actor: WorkspaceActor, input: WebsiteDocumentCandidate & { agencyWorkspaceId?: string }): Promise<void>;
+  agencyPublishPermission?(actor: WorkspaceActor, input: WebsiteDocumentKey): Promise<WebsiteAgencyPublishPermission | null>;
   publish(actor: WorkspaceActor, input: WebsiteDocumentCandidate & { tenantId: string; receipt: WebsiteLaunchReceipt }): Promise<WebsiteDocumentRevision>;
   published(tenantId: string): Promise<WebsiteDocumentRevision | null>;
   listPublished(): Promise<WebsiteDocumentRevision[]>;
@@ -91,6 +93,8 @@ export function createWebsiteDocumentStore(db?: WebsiteDocumentRpc, ownerLink?: 
       // An agency launching or attaching a domain: not staffed, not verified for publishing, or no owner mandate.
       const refusal = actingProviderRefusal(result.error.message);
       if (refusal) throw new WorkspaceAccessError(refusal);
+      if (result.error.message.includes("provider_seat_owner_required")) throw new WorkspaceAccessError("Only the business owner can authorize agency publishing.");
+      if (/website_agency_provider_changed|provider_seat_required/.test(result.error.message)) throw new WorkspaceConflictError("Your agency access changed. Reload before authorizing publishing.");
       if (result.error.message.includes("workspace_access_denied") || result.error.message.includes("website_tenant_access_denied") || result.error.message.includes("website_tenant_not_linked") || result.error.message.includes("agency_managed_website_draft_denied")) throw new WorkspaceAccessError();
       if (result.error.message.includes("website_domain_owner_approval_required")) throw new WorkspaceConflictError("The owner hasn't approved this domain yet. Strelva can prepare the records; the owner decides.");
       if (/website_fallback_(?:confirmation_required|unavailable)/.test(result.error.message)) throw new WorkspaceConflictError("Undo requires a verified old project within the fallback window and restored DNS. Nothing was changed.");
@@ -154,7 +158,11 @@ export function createWebsiteDocumentStore(db?: WebsiteDocumentRpc, ownerLink?: 
       const row = await store.read(actor,{ ...input, revision: input.revision });
       if (!row || row.contentHash !== input.contentHash) throw new WorkspaceConflictError("The website candidate changed.");
       if (unresolvedSiteFacts(row.document).length || Object.values(row.document.nodes).some(node => node.verification?.needsReview)) throw new WorkspaceConflictError("Resolve the flagged website facts before approval.");
-      await rpc("approve_website_document", { ...identity(actor), ...candidate(input) });
+      await rpc(input.agencyWorkspaceId ? "approve_website_document_for_agency" : "approve_website_document", { ...identity(actor), ...candidate(input), ...(input.agencyWorkspaceId ? { p_agency_workspace_id: id.parse(input.agencyWorkspaceId) } : {}) });
+    },
+    async agencyPublishPermission(actor,input) {
+      const row = (await rpc("read_website_agency_publish_permission", { ...identity(actor), ...key(input) }))[0];
+      return row ? z.object({ agencyWorkspaceId: id, agencyName: z.string().min(1), granted: z.boolean() }).parse(row) : null;
     },
     async publish(actor,input) {
       const receipt = websiteLaunchReceiptSchema.parse(input.receipt);

@@ -106,6 +106,19 @@ begin
   insert into public.workspaces(id, kind, name, created_by) values (agency_ws, 'agency', 'Fictional Strelva agency', agency_user);
   insert into public.workspace_memberships(workspace_id, user_id, role, created_by) values (agency_ws, agency_user, 'owner', agency_user);
   insert into public.platform_workspaces(role, workspace_id, set_by) values ('strelva_agency', agency_ws, operator_id) on conflict do nothing;
+  -- Owner-only denial must reach an admitted provider actor, rather than
+  -- merely rejecting a platform operator with no current provider authority.
+  insert into public.workspace_memberships(workspace_id, user_id, role, created_by)
+    values (agency_ws, operator_id, 'member', agency_user);
+  insert into public.provider_seats(customer_workspace_id, agency_workspace_id, granted_by_kind, granted_by)
+    values (ws, agency_ws, 'owner', owner_id);
+  insert into public.agency_client_staff(agency_workspace_id, customer_workspace_id, user_id, assigned_by)
+    values (agency_ws, ws, operator_id, agency_user);
+  -- This fixture also runs before the acting-provider migration is applied.
+  if to_regprocedure('public.needs_you_provider_id(uuid,uuid,text)') is not null then
+    perform pg_temp.rt_assert(public.needs_you_provider_id(ws, operator_id, 'rt-operator@strelva.example.test') = agency_ws,
+      'owner-only denial actor holds current staffed provider authority');
+  end if;
   insert into public.saved_product_work(id, workspace_id, product_id, resource_kind, title, payload, created_by)
     values ('52400000-0000-4000-8000-000000000010', ws, 'tracker', 'tracker', 'Agency work', '{}', owner_id);
   insert into public.operational_assignments(id, workspace_id, work_id, sponsor_id, sponsor_email, assignee_user_id, assignee_email, assignee_kind,
