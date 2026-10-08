@@ -1341,6 +1341,19 @@
           "rollbackStatus": "guarded; refuses retained mappings or non-contact/explicit-mapping review claims"
         }
       ]
+    },
+    {
+      "batch": "16",
+      "description": "Party-aware payer transition read projections and UI capabilities",
+      "status": "proposed, not deployed",
+      "note": "Additive service-only v2 snapshot/inbox with current response/revoke eligibility and business-successor inbox. Existing readers, mutation semantics and commitments unchanged. Guarded rollback removes only exact new functions and preserves financial records. No pricing, Stripe or rollout authorization.",
+      "items": [
+        {
+          "file": "20261019114000_payer_transition_actions.sql",
+          "sha256": "7355e8c52f6a94a559bebc74aa995be9b04c81461f1c2b1c2d760f137a4a9cfd",
+          "rollback": "rollback-20261019114000_payer_transition_actions.sql"
+        }
+      ]
     }
   ]
 }

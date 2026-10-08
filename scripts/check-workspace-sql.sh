@@ -1663,3 +1663,5 @@ fi
 grep -q 'native_website_mapping_rollback_requires_data_preservation' "$cluster_root/native-mapping-rollback.log"
 psql "${psql_args[@]}" -Atc "select exists(select 1 from public.website_native_fact_mappings) and exists(select 1 from public.website_native_fact_reviews where section='settings' and status='unconfirmed')" | grep -qx t
 printf 'Native website mappings: authority, isolation, exact rollback/reapply and retained-data refusal passed.\n'
+# #278 additive read-only payer UI capabilities and retained obligation proof.
+source "$repo_root/scripts/payer-transition-actions-checks.sh"

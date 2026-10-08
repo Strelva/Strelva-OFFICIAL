@@ -476,3 +476,6 @@ psql "${psql_args[@]}" --set=declaration_keep_fixture=true --file="$repo_root/te
 psql "${psql_args[@]}" --file="$repo_root/tests/system-version-declarations-readonly.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/actor-rpc-service-boundary-schema.sql"
 printf 'Package declarations passed against the full ordered upgrade.\n'
+
+# #278 additive read-only payer UI capabilities and retained obligation proof.
+source "$repo_root/scripts/payer-transition-actions-checks.sh"
