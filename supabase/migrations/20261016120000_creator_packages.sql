@@ -5,10 +5,34 @@ alter table public.system_version_sources add column creator_workspace_id uuid r
 update public.system_version_sources set creator_workspace_id=business_workspace_id;
 alter table public.system_version_sources alter column creator_workspace_id set not null;
 alter table public.system_version_source_revisions add column creator_workspace_id uuid references public.workspaces(id), add column declaration jsonb;
-update public.system_version_source_revisions r set creator_workspace_id=s.creator_workspace_id from public.system_version_sources s where s.system_id=r.source_system_id;
-alter table public.system_version_source_revisions alter column creator_workspace_id set not null;
 alter table public.system_versions add column creator_workspace_id uuid references public.workspaces(id), add column installed_source_revision_id uuid references public.system_version_source_revisions(id);
-update public.system_versions v set creator_workspace_id=s.creator_workspace_id,installed_source_revision_id=v.baseline_revision_id from public.system_version_sources s where s.system_id=v.source_system_id;
+-- ALTER holds the affected tables until commit. Temporarily extend each existing
+-- guard for exactly its new null metadata columns; no historical field, row
+-- revision, receipt or native pointer may change. Restore the exact definitions
+-- inside this transaction, before any other session can observe the extension.
+do $backfill$ declare history_guard text; identity_guard text;
+begin
+ history_guard:=pg_get_functiondef('public.system_version_history_immutable()'::regprocedure);
+ identity_guard:=pg_get_functiondef('public.system_version_identity_guard()'::regprocedure);
+ execute replace(history_guard,E'begin\n',E'begin\n'||$exception$
+  if tg_op='UPDATE' and tg_table_name='system_version_source_revisions'
+    and old.creator_workspace_id is null and new.declaration is null
+    and (to_jsonb(new)-array['creator_workspace_id','declaration'])=(to_jsonb(old)-array['creator_workspace_id','declaration'])
+    and new.creator_workspace_id=(select business_workspace_id from public.system_version_sources where system_id=new.source_system_id)
+  then return new; end if;
+$exception$);
+ execute replace(identity_guard,E'begin\n',E'begin\n'||$exception$
+  if old.creator_workspace_id is null and old.installed_source_revision_id is null
+    and (to_jsonb(new)-array['creator_workspace_id','installed_source_revision_id'])=(to_jsonb(old)-array['creator_workspace_id','installed_source_revision_id'])
+    and new.creator_workspace_id=old.source_workspace_id and new.installed_source_revision_id=old.baseline_revision_id
+  then return new; end if;
+$exception$);
+ update public.system_version_source_revisions r set creator_workspace_id=s.creator_workspace_id from public.system_version_sources s where s.system_id=r.source_system_id;
+ update public.system_versions v set creator_workspace_id=v.source_workspace_id,installed_source_revision_id=v.baseline_revision_id;
+ execute history_guard;
+ execute identity_guard;
+end $backfill$;
+alter table public.system_version_source_revisions alter column creator_workspace_id set not null;
 alter table public.system_versions alter column creator_workspace_id set not null, alter column installed_source_revision_id set not null;
 create table public.system_revision_reviewers(user_id uuid primary key references public.users(id), policy_version text not null check(char_length(policy_version) between 1 and 120), active boolean not null default true);
 -- Intentionally empty: #323 selects reviewer authority and the review standard.
