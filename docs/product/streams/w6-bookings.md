@@ -210,3 +210,30 @@ d812dd00 Chase booking calendar reconnect actions through Needs You
 d6a6f2e3 WIP w6/bookings round-5 checkpoint (unverified, saved after thread stop)
 28634cac Fix native booking scope and verify the booking agent protocol
 ```
+
+## Integrated anonymous admission verification — October 8, 2026
+
+Issue #529's pending w6 inquiry adapter is present on integration (`44560ade`).
+A visitor choice first checks confirmation-email availability, creates an expiring
+held booking, and issues the separate customer email token. The offer link does
+not authorize placement. The SQL guard rejects owner/visitor confirmation without
+the customer email confirmation. Website, earlier inquiry offers, and w6 inquiry
+choices share the durable budget: 20 outstanding public requests per business,
+one per normalized email, and one overlapping slot; unconfirmed holds expire
+after 15 minutes. No provider-calendar event is placed before confirmation.
+Owner urgent booking mail is limited to five per business per hour; overflow
+remains undelivered for the existing morning digest.
+
+A narrow route fix also catches an unavailable IP limiter on the w6 choice
+endpoint and returns its visible unavailable outcome without choosing a time.
+The new regression fails on the predecessor and passes after this fix. Local
+verification: 84 tests across 11 booking/inquiry files, the public inquiry email
+confirmation tests, the urgent-mail overflow test, typecheck and affected lint;
+`public-booking-admission-schema.sql` and `inquiry-booking-handoff-schema.sql`
+pass against every ordered integration migration in isolated PostgreSQL.
+
+This proves local anonymous-admission security, not the authenticated browser
+journeys in #501. The anonymous tenant booking redirect, released inquiry marker,
+and native-tool maker fixtures still need their own journey rerun. No CI, live
+provider call, email send, production migration, release switch or deployment
+was performed.

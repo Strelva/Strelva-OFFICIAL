@@ -34,6 +34,13 @@ describe("inquiry booking routes", () => {
     mocks.rate.mockResolvedValue(true); mocks.choose.mockClear();
     expect((await choose(selection(), { params: Promise.resolve({ token: "fixture" }) })).headers.get("location")).toContain("error=rate"); expect(mocks.choose).not.toHaveBeenCalled();
   });
+  it("fails closed with a visible retry outcome when the IP limiter is unavailable", async () => {
+    mocks.rate.mockRejectedValue(new Error("Redis unavailable"));
+    const response = await choose(selection(), { params: Promise.resolve({ token: "fixture" }) });
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toContain("error=unavailable");
+    expect(mocks.choose).not.toHaveBeenCalled();
+  });
   it("redirects to the browser Host and refuses a mismatched or malformed Origin (#529)", async () => {
     const request = new Request("http://127.0.0.1:32766/inquiry-booking/fixture/action", { method: "POST", headers: { origin: "http://127.0.0.1:32766", host: "127.0.0.1:32766", "content-type": "application/x-www-form-urlencoded" }, body: "slot=0" });
     const response = await choose(request, { params: Promise.resolve({ token: "fixture" }) });
