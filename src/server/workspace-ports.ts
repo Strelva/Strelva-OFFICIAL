@@ -12,6 +12,7 @@ import * as operatorRecipients from "@/platform/operator-notices/recipients";
 const inquiryPublicationServer = () => import("@/products/inquiries/server");
 
 export const workspacePortLoaders = {
+  operatorReadAdmission: () => import("@/platform/operator-read-audit/admission"),
   // Pure configuration only, loaded synchronously for the existing synchronous API.
   operatorNoticeRecipients: () => operatorRecipients,
   bookingEmails: () => import("@/platform/bookings/notice-email"),

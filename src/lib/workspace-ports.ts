@@ -309,6 +309,8 @@ export interface PublishingContentPort {
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 export interface WorkspacePorts {
+  /** Read-only dashboard platform bypass; missing registration fails closed. */
+  operatorReadAdmission(): Promise<{ authorizeTenantOperatorRead(tenant: string): Promise<void> }>;
   /** Pure operator recipient configuration; preserves the legacy synchronous API. */
   operatorNoticeRecipients(): { resolveLeadNotifyRecipients(): string[] };
   bookingEmails(): Promise<{

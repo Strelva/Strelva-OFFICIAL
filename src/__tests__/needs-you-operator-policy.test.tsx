@@ -1,6 +1,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+const admission = vi.hoisted(() => vi.fn(async (_actor: unknown, _power: string) => undefined));
+vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizePlatformOperatorRead: admission }));
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import type { NotToldRow, PolicyRows, PolicySettingsStore } from "@/platform/needs-you/policy";
 
@@ -57,6 +59,7 @@ function store(rows: PolicyRows = { settings: [], history: [] }) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  admission.mockReset().mockResolvedValue(undefined);
   mocks.superAdmin.mockResolvedValue(true);
   mocks.actor.mockResolvedValue(OPERATOR);
   mocks.released.mockReturnValue(true);
@@ -64,6 +67,14 @@ beforeEach(() => {
 });
 
 describe("operator loaders", () => {
+  it("records the current actor before owner-decision reads and stops on audit loss", async () => {
+    await loadBusinessPolicy(WS);
+    expect(admission).toHaveBeenCalledWith(OPERATOR, "admin.owner-decisions.read");
+    admission.mockRejectedValueOnce(new Error("Audit unavailable"));
+    const source = store().value; mocks.store.current = source;
+    expect((await loadOwnerNotTold()).state).toBe("unavailable");
+    expect(source.notTold).not.toHaveBeenCalled();
+  });
   it("are off with the release, denied without a verified operator, and honest about outages", async () => {
     mocks.released.mockReturnValue(false);
     expect(await loadOwnerNotTold()).toEqual({ state: "off" });

@@ -1,6 +1,9 @@
+const admission = vi.hoisted(() => vi.fn(async () => undefined));
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: admission }));
 import { GET, POST } from "@/app/api/admin/tenants/[id]/owner-invitations/route";
 import { loadOwnerInvitations } from "@/platform/owner-entry/operator-invitations";
+import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import { setBusinessOwnershipDb } from "@/platform/workspaces/business-ownership";
 
 const mocks = vi.hoisted(() => ({ operatorContext: vi.fn(), workspace: vi.fn(), approval: vi.fn() }));
@@ -131,4 +134,9 @@ describe("owner invitation mutations", () => {
       p_operator_user_id: OPERATOR, p_invitation_id: INVITATION, p_audit_context: { source: "web" },
     });
   });
+});
+
+it("preserves forbidden/unavailable GET envelopes and never reads invitation PII without admission", async () => {
+  admission.mockRejectedValueOnce(new WorkspaceAccessError()); expect((await GET(new Request("https://app.test/test"), ctx)).status).toBe(403); expect(rpc).not.toHaveBeenCalled();
+  admission.mockRejectedValueOnce(new Error("audit unavailable")); expect((await GET(new Request("https://app.test/test"), ctx)).status).toBe(503); expect(rpc).not.toHaveBeenCalled(); expect(mocks.workspace).not.toHaveBeenCalled();
 });

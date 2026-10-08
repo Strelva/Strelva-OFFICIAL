@@ -1,0 +1,194 @@
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260618230459_drop_legacy_stub.sql:3: NOTICE:  table "reb_json_documents" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260619120000_auth_provisioning_trigger.sql:63: NOTICE:  trigger "on_auth_user_created" for relation "auth.users" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260619140000_rls.sql:81: NOTICE:  policy "pay_links_tenant_rw" for relation "pay_links" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "memberships_stable_id_trg" for relation "memberships" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "invites_stable_id_trg" for relation "invites" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "domain_claims_stable_id_trg" for relation "domain_claims" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "content_stable_id_trg" for relation "content" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "draft_content_stable_id_trg" for relation "draft_content" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "page_config_stable_id_trg" for relation "page_config" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "draft_page_config_stable_id_trg" for relation "draft_page_config" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "activity_log_stable_id_trg" for relation "activity_log" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "unified_events_stable_id_trg" for relation "unified_events" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "weekly_briefs_stable_id_trg" for relation "weekly_briefs" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "mail_log_stable_id_trg" for relation "mail_log" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "chat_threads_stable_id_trg" for relation "chat_threads" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "chat_messages_stable_id_trg" for relation "chat_messages" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "integrations_stable_id_trg" for relation "integrations" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "reward_members_stable_id_trg" for relation "reward_members" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "reward_transactions_stable_id_trg" for relation "reward_transactions" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "auto_approval_streaks_stable_id_trg" for relation "auto_approval_streaks" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "scan_results_stable_id_trg" for relation "scan_results" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "scan_history_stable_id_trg" for relation "scan_history" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "bookings_stable_id_trg" for relation "bookings" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "newsletter_subscribers_stable_id_trg" for relation "newsletter_subscribers" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "site_snapshots_stable_id_trg" for relation "site_snapshots" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "content_versions_stable_id_trg" for relation "content_versions" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "social_posts_stable_id_trg" for relation "social_posts" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "search_console_data_stable_id_trg" for relation "search_console_data" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "audit_logs_stable_id_trg" for relation "audit_logs" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "inbox_items_stable_id_trg" for relation "inbox_items" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "chat_sessions_stable_id_trg" for relation "chat_sessions" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "site_metrics_stable_id_trg" for relation "site_metrics" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "collection_entries_stable_id_trg" for relation "collection_entries" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "reviews_stable_id_trg" for relation "reviews" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "suggestions_stable_id_trg" for relation "suggestions" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "proposals_stable_id_trg" for relation "proposals" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:72: NOTICE:  trigger "pay_links_stable_id_trg" for relation "pay_links" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:72: NOTICE:  trigger "build_payments_stable_id_trg" for relation "build_payments" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: memberships.memberships_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: invites.invites_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: domain_claims.domain_claims_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: content.content_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: draft_content.draft_content_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: page_config.page_config_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: draft_page_config.draft_page_config_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: activity_log.activity_log_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: unified_events.unified_events_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: weekly_briefs.weekly_briefs_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: mail_log.mail_log_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: chat_threads.chat_threads_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: chat_messages.chat_messages_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: integrations.integrations_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: reward_members.reward_members_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: reward_transactions.reward_transactions_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: pay_links.pay_links_tenant_id_fkey (n on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: build_payments.build_payments_tenant_id_fkey (n on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: auto_approval_streaks.auto_approval_streaks_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: scan_results.scan_results_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: scan_history.scan_history_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: bookings.bookings_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: newsletter_subscribers.newsletter_subscribers_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: site_snapshots.site_snapshots_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: content_versions.content_versions_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: social_posts.social_posts_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: search_console_data.search_console_data_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: audit_logs.audit_logs_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: inbox_items.inbox_items_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: chat_sessions.chat_sessions_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: site_metrics.site_metrics_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: collection_entries.collection_entries_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: reviews.reviews_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: suggestions.suggestions_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: proposals.proposals_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260914021000_application_source_updates.sql:123: NOTICE:  trigger "application_release_history_guard" for relation "public.application_releases" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260914041000_standing_execution.sql:157: NOTICE:  trigger "standing_responsibility_claim_guard_trg" for relation "public.saved_product_work" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260920030000_agency_provider_delivery.sql:32: NOTICE:  trigger "operational_assignment_agency_identity" for relation "public.operational_assignments" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260920080000_subscription_allowance_entitlements.sql:37: NOTICE:  constraint "work_allowances_check2" of relation "work_allowances" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260920080000_subscription_allowance_entitlements.sql:38: NOTICE:  constraint "work_allowances_cap_acceptance_check" of relation "work_allowances" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260920080200_precise_provider_receipts.sql:34: NOTICE:  trigger "work_provider_receipt_fill_exact_amount_trigger" for relation "public.work_provider_receipts" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260920120000_websites.sql:82: NOTICE:  trigger "saved_product_work_website_exit_guard_trg" for relation "public.saved_product_work" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260920123000_public_website_booking_fingerprints.sql:21: NOTICE:  constraint "public_website_bookings_request_fingerprint_check" of relation "public_website_bookings" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260920123000_public_website_booking_fingerprints.sql:28: NOTICE:  constraint "public_website_bookings_slot_bounds_check" of relation "public_website_bookings" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260920123000_public_website_booking_fingerprints.sql:60: NOTICE:  trigger "public_website_booking_fingerprint_trg" for relation "public.public_website_bookings" does not exist, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20260930120000_revoke_public_execute_internal_functions.sql:9: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261005120000_workspace_authority_helpers.sql:19: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261005120100_workspace_authority_write_rpcs.sql:23: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261007130000_workspace_release_flags.sql:16: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261007192000_make_systems_authority.sql:19: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261007192100_internal_tool_links.sql:20: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261008110000_ask_conversations.sql:24: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261008111000_website_change_receipts.sql:26: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261008160000_convert_separate_business.sql:31: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261008161000_release_flags_agency_workspaces.sql:13: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261009100000_strelva_service_actor.sql:44: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261009113000_inquiry_records.sql:36: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261009130000_strelva_handled_decisions.sql:28: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261009131000_make_real_owner_link.sql:40: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261009140000_make_real_owner_link_flag.sql:24: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261009151000_provider_seats.sql:41: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261009152000_agency_verifications.sql:27: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261009153000_platform_service_actor.sql:43: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261009154000_payer_party.sql:45: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261010141000_publishing_release_flags.sql:2: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261010150000_internal_tool_submit_notices.sql:3: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261010150100_internal_tool_use_links.sql:3: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261010150200_internal_tool_notice_delivery.sql:3: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261010150300_catalog_tool_evidence.sql:2: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261010150400_internal_tool_use_edits.sql:4: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261010152000_catalog_report_receipts.sql:3: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261010153000_newsletter_contacts.sql:4: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261010154000_system_work_plan_authority.sql:2: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261010164000_finite_job_adapters.sql:4: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261014100000_client_resource_mandates.sql:46: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261014112000_acting_provider_gates.sql:43: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261015100000_agency_add_client.sql:49: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261015111000_website_owner_agency_publish.sql:3: WARNING:  SET LOCAL can only be used in transaction blocks
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261017120000_owner_decision_operator_refusal.sql:7: NOTICE:  schema "release_rollback_baseline" already exists, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261019100000_actor_rpc_service_boundary.sql:6: NOTICE:  schema "release_rollback_baseline" already exists, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261019113000_native_website_fact_mappings.sql:3: NOTICE:  schema "release_rollback_baseline" already exists, skipping
+psql:/private/tmp/strelva-issue-528-role-path-20261008/supabase/migrations/20261019114000_payer_transition_actions.sql:112: NOTICE:  schema "release_rollback_baseline" already exists, skipping
+BEGIN
+INSERT 0 2
+INSERT 0 1
+GRANT
+GRANT
+SET
+INSERT 0 1
+DO
+INSERT 0 1
+DELETE 1
+DO
+DELETE 1
+DO
+UPDATE 1
+DO
+     deprovision_tenant_rows
+---------------------------------
+ {"tenants": 1, "audit_logs": 1}
+(1 row)
+
+RESET
+DO
+ROLLBACK
+Audit #528: direct mutation denial, append/read, preserved payload, actor deletion, tenant rename and explicit cleanup passed.
+BEGIN
+INSERT 0 2
+INSERT 0 1
+GRANT
+GRANT
+SET
+INSERT 0 1
+DO
+INSERT 0 1
+DELETE 1
+DO
+DELETE 1
+DO
+UPDATE 1
+DO
+     deprovision_tenant_rows
+---------------------------------
+ {"tenants": 1, "audit_logs": 1}
+(1 row)
+
+RESET
+DO
+ROLLBACK
+Audit #528: direct mutation denial, append/read, preserved payload, actor deletion, tenant rename and explicit cleanup passed.
+ALTER TABLE
+BEGIN
+INSERT 0 2
+INSERT 0 1
+GRANT
+GRANT
+SET
+INSERT 0 1
+DO
+INSERT 0 1
+DELETE 1
+DO
+DELETE 1
+DO
+UPDATE 1
+DO
+     deprovision_tenant_rows
+---------------------------------
+ {"tenants": 1, "audit_logs": 1}
+(1 row)
+
+RESET
+DO
+ROLLBACK
+Audit #528: direct mutation denial, append/read, preserved payload, actor deletion, tenant rename and explicit cleanup passed.
+Audit append-only: column repair, inherited/SET/ADMIN/browser/CREATEROLE/superuser/owner atomic refusals and forward-only recovery passed.

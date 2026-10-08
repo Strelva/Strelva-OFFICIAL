@@ -241,6 +241,19 @@ describe("production readiness snapshot", () => {
     expect(withSql.notes.filter((n) => /disagree/.test(n))).toHaveLength(2);
   });
 
+  it("keeps private operator audit presence unknown when its probe is denied", async () => {
+    const fixture = deps();
+    const db = fixture.value.db!;
+    fixture.value.db = {
+      ...db,
+      count: async (table, filters) => table === "platform_operator_read_audit"
+        ? { ok: false, missing: false, reason: "permission denied" }
+        : db.count(table, filters),
+    };
+    const report = await runReadinessSnapshot({ jacobsYes: true }, fixture.value);
+    expect(report.migrations.sentinels["20261020090039"]).toBe("unknown");
+  });
+
   it("degrades to unknown, not zero, when Postgres or Redis is not configured", async () => {
     const report = await runReadinessSnapshot({ jacobsYes: true }, deps({ db: null, redis: null, authUsers: null }).value);
     expect(report.postgres.tenants).toEqual({ total: null, active: null });

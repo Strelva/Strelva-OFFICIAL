@@ -7,6 +7,7 @@ import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
 import { readOperatorQueue } from "@/platform/operator-queue/service";
 import { ServiceRequestService, PostgresServiceRequestStore, type ServiceRequest } from "@/platform/service-requests";
 import type { QueueActionResult } from "./actions";
+import { logAuditEvent } from "@/lib/storage";
 
 export type QueueSourceAction = "retry_lead" | "check_health" | "check_domain" | "accept_request" | "decline_request" | "triage" | "quote";
 
@@ -40,6 +41,26 @@ export async function runQueueSourceAction(input: { key: string; action: QueueSo
   try {
     const { actor, item } = await source(input.key);
     const tenantId = item.business.kind === "strelva" ? null : item.business.tenantId;
+    const auditedRepair = async <T,>(auditTenant: string, work: () => Promise<T>): Promise<T> => {
+      const entry = {
+        tenant: auditTenant, action: `queue.source.${input.action}`, targetType: "queue_source", targetId: item.sourceRef,
+        actor: { userId: actor.userId, email: actor.verifiedEmail, type: "super_admin" as const, isSuperAdmin: true },
+        metadata: { queueKey: item.key, commandId: input.commandId, workspaceId: item.business.kind === "workspace" ? item.business.workspaceId : null },
+      };
+      // The existing append-only audit path must accept the attempt before
+      // any repair changes durable state. A lost result row cannot undo it.
+      await logAuditEvent({ ...entry, metadata: { ...entry.metadata, phase: "attempt" } });
+      try {
+        const result = await work();
+        await logAuditEvent({ ...entry, metadata: { ...entry.metadata, phase: "result", outcome: "completed" } })
+          .catch(() => console.error("[admin/queue] repair audit result unavailable; its attempt stands."));
+        return result;
+      } catch (error) {
+        await logAuditEvent({ ...entry, metadata: { ...entry.metadata, phase: "result", outcome: "unconfirmed" } })
+          .catch(() => console.error("[admin/queue] repair audit result unavailable; its attempt stands."));
+        throw error;
+      }
+    };
     let message: string;
     if (input.action === "retry_lead" && item.kind === "lead_unkept" && tenantId) {
       const { parsePendingMember, mirrorLead, clearLeadMirrorPending } = await import("@/lib/lead-mirror");
@@ -48,9 +69,11 @@ export async function runQueueSourceAction(input: { key: string; action: QueueSo
       if (!ref || ref.tenant !== tenantId) throw new Error("The lead belongs to another business.");
       const lead = await getRedisLeadById(tenantId, ref.leadId);
       if (!lead) throw new Error("The original lead could not be read. Its pending record was kept.");
-      const result = await mirrorLead(tenantId, lead, leadSubmissionHash(lead), { via: "repair" });
-      if (!["recorded", "exists", "duplicate"].includes(result.status)) throw new Error("The lead copy is still unconfirmed. Its pending record was kept.");
-      await clearLeadMirrorPending(tenantId, ref.leadId);
+      await auditedRepair(tenantId, async () => {
+        const result = await mirrorLead(tenantId, lead, leadSubmissionHash(lead), { via: "repair" });
+        if (!["recorded", "exists", "duplicate"].includes(result.status)) throw new Error("The lead copy is still unconfirmed. Its pending record was kept.");
+        await clearLeadMirrorPending(tenantId, ref.leadId);
+      });
       message = "Lead kept in Postgres. No notification sent.";
     } else if (input.action === "check_health" && item.kind === "site_health" && item.sourceRef.startsWith("document:") && item.business.kind === "workspace") {
       const { websiteDocumentStore, checkWebsiteHealth, currentHostedUrl } = await import("@/products/websites/index");
@@ -59,9 +82,12 @@ export async function runQueueSourceAction(input: { key: string; action: QueueSo
       const target = (await websiteDocumentStore.listPublished()).find(row => row.workspaceId === (item.business.kind === "workspace" ? item.business.workspaceId : null)
         && item.sourceRef === `document:${row.workId}:${row.revision}`);
       if (!target?.tenantId) throw new Error("The published site changed. Refresh before checking it.");
-      const receipt = await checkWebsiteHealth({ workspaceId: target.workspaceId, workId: target.workId, tenantId: target.tenantId,
-        revision: target.revision, contentHash: target.contentHash, url: currentHostedUrl({ tenantId: target.tenantId, receipt: target.receipt }) });
-      await websiteDocumentStore.recordHealth(receipt);
+      const receipt = await auditedRepair(target.tenantId, async () => {
+        const checked = await checkWebsiteHealth({ workspaceId: target.workspaceId, workId: target.workId, tenantId: target.tenantId!,
+          revision: target.revision, contentHash: target.contentHash, url: currentHostedUrl({ tenantId: target.tenantId!, receipt: target.receipt }) });
+        await websiteDocumentStore.recordHealth(checked);
+        return checked;
+      });
       message = receipt.status === "healthy" ? "Published revision read back and matched." : `Health check saved: ${receipt.status.replaceAll("_", " ")}. The site still needs attention.`;
     } else if (input.action === "check_health" && item.kind === "site_health" && tenantId) {
       const { POST } = await import("@/app/api/admin/scan/route");
@@ -72,8 +98,10 @@ export async function runQueueSourceAction(input: { key: string; action: QueueSo
       const { refreshDomainClaim } = await import("@/lib/domains");
       const prefix = `${tenantId}:`;
       if (!item.sourceRef.startsWith(prefix)) throw new Error("The domain belongs to another business.");
-      const result = await refreshDomainClaim(tenantId, item.sourceRef.slice(prefix.length));
-      if (!result.ok) throw new Error("The domain check could not be confirmed.");
+      await auditedRepair(tenantId, async () => {
+        const result = await refreshDomainClaim(tenantId, item.sourceRef.slice(prefix.length));
+        if (!result.ok) throw new Error("The domain check could not be confirmed.");
+      });
       message = "Domain verification checked. No DNS changes made.";
     } else if (input.action === "check_domain" && item.kind === "domain_alert") {
       const { POST } = await import("@/app/api/admin/domain-monitor/scan/route");

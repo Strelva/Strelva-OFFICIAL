@@ -106,6 +106,8 @@ export const SEPT30_EXTRA_APPLIED = ["20260930120000"];
  * `accounts`. "missing" there is a stop.
  */
 export const MIGRATION_SENTINELS: Record<string, string> = {
+  // This history stays private. A denied probe is unknown, not proof of absence.
+  "20261020090039": "platform_operator_read_audit",
   "20261019111000": "system_revision_qualifications",
   "20261019113000": "website_native_fact_mappings",
   "20261020113000": "ask_native_service_setups",

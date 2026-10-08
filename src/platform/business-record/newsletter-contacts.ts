@@ -56,7 +56,7 @@ const backfillResult = z.object({
   failed: z.number().int().nonnegative(), nextAfter: z.string().nullable(),
 });
 
-/** Preparation is read-only by default. The production run still needs Jacob's
+/** Dry runs preserve subscriber/contact/sync data and record operator access. The production run still needs Jacob's
  * explicit authorization; the helper grants none. Page by nextAfter until null.
  * Applying also requires the workspace's row explicitly on (SQL), as well as
  * the env gates (here), and never writes newsletter_subscribers. */

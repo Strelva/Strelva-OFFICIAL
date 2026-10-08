@@ -1,3 +1,4 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 /**
  * Calendly Connection API - Get status and disconnect
  */
@@ -16,6 +17,7 @@ export async function GET() {
     const tenant = await getTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    await authorizeTenantOperatorRead(tenant);
 
     const connection = await getConnection(tenant, "calendly");
 

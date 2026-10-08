@@ -1,3 +1,4 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import type { ContentMap, ContentSection } from "@/lib/types";
@@ -41,6 +42,7 @@ export async function GET(
     // (The public storefront read is the separate, tenant-in-path /api/v1/* route.)
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    await authorizeTenantOperatorRead(tenant);
 
     // A known section TYPE that this tenant's template doesn't include still has
     // a valid (empty) read — getContent returns null. Only a genuinely unknown

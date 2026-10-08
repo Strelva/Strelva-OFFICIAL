@@ -41,15 +41,8 @@ export async function readOperatorQueue(
   now: number = Date.now(),
 ): Promise<OperatorQueue & { context: QueueContext | null }> {
   const actor = requireActor(inputActor);
-  let context: QueueContext | null = null;
-  let contextFailure: string | undefined;
-  try {
-    context = await deps.readContext(actor);
-  } catch (error) {
-    // Access failures are not a gap: a non-operator gets nothing.
-    if (error instanceof OperatorQueueAccessError) throw error;
-    contextFailure = error instanceof Error ? error.message : "Postgres unavailable";
-  }
+  // Both flag states stop before other service-role sources if admission fails.
+  const context = await deps.readContext(actor);
   let tenants: Awaited<ReturnType<QueueDependencies["readTenants"]>> = [];
   let tenantFailure: string | null = null;
   try {
@@ -58,7 +51,7 @@ export async function readOperatorQueue(
     tenantFailure = "Tenants could not be read";
   }
   const reads = await deps.readSources({ tenants, context, actor, now });
-  const queue = projectQueue({ reads, context, contextFailure, tenants, emailPaused: deps.emailPaused(), now });
+  const queue = projectQueue({ reads, context, tenants, emailPaused: deps.emailPaused(), now });
   if (operatorQueueReleaseEnabled() && deps.readLeadCounts) {
     queue.businessLeads = await deps.readLeadCounts(tenants, context?.links ?? [], now);
     if (queue.businessLeads.some(row => row.failure)) {

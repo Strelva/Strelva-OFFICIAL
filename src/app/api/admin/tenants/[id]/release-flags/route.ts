@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getActorContext, getAuthenticatedOperatorContext, getCurrentUserEmail, isSuperAdmin } from "@/platform/infra/auth";
@@ -62,10 +63,11 @@ async function operator() {
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const email = await operator();
   if (!email) return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: noStore });
-  const { id } = await params;
-  const tenantFacts = await facts(id);
-  if (!tenantFacts) return NextResponse.json({ error: "Tenant not found" }, { status: 404, headers: noStore });
   try {
+    await authorizeAdminOperatorRead("admin.tenant-controls.read");
+    const { id } = await params;
+    const tenantFacts = await facts(id);
+    if (!tenantFacts) return NextResponse.json({ error: "Tenant not found" }, { status: 404, headers: noStore });
     return NextResponse.json(await readTenantReleaseState(email, id, tenantFacts), { headers: noStore });
   } catch (error) {
     return failure(error);

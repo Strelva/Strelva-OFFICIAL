@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { UserPlus } from "lucide-react";
 import { getDeliveryLeads } from "@/lib/access-request-delivery";
 import { getAllLeadWorkflow } from "@/lib/lead-workflow";
@@ -7,6 +8,7 @@ import { AdminEmpty } from "@/app/admin/console";
 export const dynamic = "force-dynamic";
 
 export default async function AdminLeadsPage() {
+  await authorizeAdminOperatorRead("admin.leads.read");
   const leads = await getDeliveryLeads();
   const workflow = await getAllLeadWorkflow(leads.map((l) => l.statusToken));
 

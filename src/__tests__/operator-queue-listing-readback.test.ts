@@ -56,7 +56,8 @@ describe("listing read-back failures in the operator queue", () => {
     setOperatorQueueDb({ rpc });
     const rows = await readListingReadbackFailures(ACTOR, 50);
     expect(rows).toHaveLength(1);
-    expect(rpc).toHaveBeenCalledWith("read_google_listing_readback_failures", {
+    expect(rpc).toHaveBeenCalledWith("read_audited_platform_operator_detail", {
+      p_reader_name: "read_google_listing_readback_failures",
       p_user_id: ACTOR.userId, p_verified_email: "operator@example.test", p_limit: 50,
     });
   });

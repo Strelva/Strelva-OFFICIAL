@@ -1666,3 +1666,12 @@ psql "${psql_args[@]}" -Atc "select exists(select 1 from public.website_native_f
 printf 'Native website mappings: authority, isolation, exact rollback/reapply and retained-data refusal passed.\n'
 # #278 additive read-only payer UI capabilities and retained obligation proof.
 source "$repo_root/scripts/payer-transition-actions-checks.sh"
+
+# #251: final-schema support reads and contact repair require durable actor audit.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261020090038_newsletter_backfill_audit.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-backfill-audit-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-inquiry-audit-schema.sql"
+
+# #251: atomic platform support access logging, additive to READ ONLY APIs.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261020090039_platform_operator_read_audit.sql"
+source "$repo_root/scripts/platform-operator-read-audit-checks.sh"

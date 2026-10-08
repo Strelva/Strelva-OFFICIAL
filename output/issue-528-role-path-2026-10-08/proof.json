@@ -1,0 +1,54 @@
+{
+  "scope": "local disposable PostgreSQL18 and static typecheck; no hosted/provider/GitHub mutations",
+  "baseCommit": "3f3eac4f",
+  "originalMigrationSha256": "47adc8d510850fff3637a4ae74dc9f685336e72134ed59d8e94ae34bc7bd7b4b",
+  "observedBefore": "Migration committed despite NOINHERIT SET TRUE mutation-role membership; actual SET SESSION AUTHORIZATION service_role; SET ROLE mutator; UPDATE changed existing audit payload",
+  "roleManagementBoundary": "Conservatively refuse CREATEROLE/superuser and audit-capable MEMBER roles, including currently noninherited and disabled SET paths. ADMIN fixture proves self-grant activation with service_role NOCREATEROLE.",
+  "preservedLifecycle": [
+    "atomic tenant teardown",
+    "tenant delete and rename cascades",
+    "actor account ON DELETE SET NULL"
+  ],
+  "checks": {
+    "PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH bash scripts/check-audit-append-only-sql.sh": 0,
+    "pnpm typecheck": 0,
+    "pnpm exec vitest run src/__tests__/release-safety-tools.test.ts src/__tests__/release-restore.test.ts": 0,
+    "PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:release-safety:batch8 --current-tail": 0,
+    "bash -n scripts/check-audit-append-only-sql.sh": 0,
+    "git diff --check": 0
+  },
+  "fixtureFailure": "First expanded SQL runner failed on dependent ADMIN self-grant during fixture cleanup; cleanup now revokes the self-grant as its grantor, final runner passes.",
+  "sourceSha256": {
+    "supabase/migrations/20261020111000_audit_service_role_append_only.sql": "eae9458d3cac3bf13feb5a0dfbf195665c7f579f0db679068443db6a86e5a277",
+    "scripts/check-audit-append-only-sql.sh": "e46d5de1d3e8301353d09b803631b57977f41f68df951e5e10fc2deb30dc94cb",
+    "scripts/release-safety/batches.json": "e22a6f2f6e6d77e3a06c1265f82ec0d500655962bae6f422191995cdc734e2e5",
+    "docs/operations/audit-append-only-2026-10-08.md": "dadd92e9d50504aabc8b56b4c775aeafa05f677b1e674dc66a6e58e9032de6d7"
+  },
+  "logSha256": {
+    "before-role-path.log": "1879e36c15574b3f331e85c2d806435b22bcdec199e763f76bbd0deb7acef4aa",
+    "failed-admin-fixture.log": "b777d8d8f77e98491432fbb6d8fc14f70a57d1b01ecfcf0c0c922e60a995c363",
+    "final-audit-sql.log": "a0b3986dab7ac798d7527574b99284eeb2c70fa7036203099d02f07ec68be184",
+    "typecheck.log": "513f92198fed039a9e29e7345aec235c79165cb4a143f8c8c29c0590ab353544",
+    "inventory-tests.log": "b6d016affec0437e221c5c787ac3221cade8704ac2d6db94b4bbba62a6bfbd99",
+    "runtime-recovery.log": "f71147c333a39c314205a6dd3a3aaa7567b6bf412e9bb9bf06aa1faf38d77252"
+  },
+  "inventoryUnitTestsPassed": 32,
+  "runtimeRecoveryReceipt": {
+    "file": "runtime-recovery-receipt.json",
+    "sha256": "b8a3a0a6847c81ba1f177bf7436a0376a891ea213e75a83c4e3322b7536414a4",
+    "currentInventory": 276,
+    "correctiveTails": 50,
+    "originalSignatures": 238,
+    "originalServiceRpcCount": 189,
+    "rounds": 2
+  },
+  "unproven": [
+    "exact hosted target role graph and attributes",
+    "hosted CI",
+    "migration application",
+    "production behavior",
+    "retention policy beyond preserved lifecycle boundaries"
+  ],
+  "continuation": "Independent review, then coordinator reconciles canonical model and tracker; hosted target qualification and migration rollout require explicit authority.",
+  "logNormalization": "Trailing whitespace and final blank lines removed from retained log copies only; raw local logs remain under /tmp/strelva-528*.log."
+}

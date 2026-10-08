@@ -84,6 +84,8 @@ else
   cmp "$cluster_root/owner-link-after.hashes" "$cluster_root/owner-link-reapplied.hashes"
 fi
 psql "${psql_args[@]}" --file="$repo_root/tests/operator-owner-decisions-schema.sql" >/dev/null
+psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-backfill-audit-schema.sql" >/dev/null
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-inquiry-audit-schema.sql" >/dev/null
 # The actor-RPC correction is additive to the earlier packet. Exercise native
 # anonymous/authenticated denial and preserved service application/AI authority
 # whenever that correction is in the ordered schema under test. The combined
@@ -114,3 +116,6 @@ printf 'Agency workflow SQL passed on %s ordered migrations: add client, seat-on
 
 # #278 additive read-only payer UI capabilities and retained obligation proof.
 source "$repo_root/scripts/payer-transition-actions-checks.sh"
+
+# #251: bounded platform support reads; pure snapshot APIs remain unchanged.
+source "$repo_root/scripts/platform-operator-read-audit-checks.sh"

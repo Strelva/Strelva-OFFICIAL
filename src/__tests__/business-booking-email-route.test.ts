@@ -1,8 +1,11 @@
+const admission = vi.hoisted(() => vi.fn(async () => undefined));
 import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: admission }));
 const m = vi.hoisted(() => ({ admin: vi.fn(), actor: vi.fn(), set: vi.fn(), history: vi.fn(), enabled: vi.fn() }));
 vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: m.admin }));
 vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: m.actor }));
 vi.mock("@/platform/bookings/email-enablement", () => ({ setBusinessBookingEmail: m.set, readBusinessBookingEmailHistory: m.history, businessBookingEmailEnabled: m.enabled }));
+import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import { GET, POST } from "@/app/api/admin/businesses/[id]/booking-email/route";
 const id = "af200000-0000-4000-8000-000000000010";
 const params = { params: Promise.resolve({ id }) };
@@ -27,4 +30,9 @@ describe("per-business booking email operator route", () => {
     m.set.mockRejectedValue(new Error("Persistence unavailable"));
     expect((await POST(request({ state: "on", reason: "Arm" }), params)).status).toBe(503);
   });
+});
+
+it("preserves GET refusal envelopes and never reads booking enablement/history without admission", async () => {
+  admission.mockRejectedValueOnce(new WorkspaceAccessError()); expect((await GET(request({}), params)).status).toBe(403);
+  admission.mockRejectedValueOnce(new Error("audit unavailable")); expect((await GET(request({}), params)).status).toBe(503); expect(m.history).not.toHaveBeenCalled(); expect(m.enabled).not.toHaveBeenCalled();
 });

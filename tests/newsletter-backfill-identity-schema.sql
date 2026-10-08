@@ -22,10 +22,14 @@ insert into public.super_admins(user_id,email) values
   ('e9000000-0000-4000-8000-000000000003','backfill-unverified@example.test');
 insert into public.tenants(id,stable_id,site_name,active) values
   ('backfill-identity-site','e9000000-0000-4000-8000-000000000004','Backfill Identity Fixture',true);
-create temp table nb_workspace as select
-  (public.convert_tenant_to_business('backfill-operator@example.test','backfill-identity-site',
-    '{"tenantId":"backfill-identity-site","tenantStableId":"e9000000-0000-4000-8000-000000000004","workspaceName":"Backfill Identity Fixture","billing":null,"account":null,"patch":{},"contacts":[]}',
-    'e9000000-0000-4000-8000-000000000005',repeat('c',64))->>'workspaceId')::uuid as id;
+insert into public.workspaces(id,kind,name,created_by) values
+  ('e9000000-0000-4000-8000-000000000010','customer','Backfill audit fixture','e9000000-0000-4000-8000-000000000002');
+insert into public.business_records(workspace_id,created_by,updated_by) values
+  ('e9000000-0000-4000-8000-000000000010','e9000000-0000-4000-8000-000000000002','e9000000-0000-4000-8000-000000000002');
+insert into public.tenant_workspace_links(tenant_stable_id,tenant_slug_at_link,workspace_id,linked_by,command_id,command_digest,receipt) values
+  ('e9000000-0000-4000-8000-000000000004','backfill-identity-site','e9000000-0000-4000-8000-000000000010',
+   'e9000000-0000-4000-8000-000000000001','e9000000-0000-4000-8000-000000000005',repeat('c',64),'{}');
+create temp table nb_workspace as select 'e9000000-0000-4000-8000-000000000010'::uuid as id;
 grant select on nb_workspace to authenticated;
 insert into public.newsletter_subscribers(tenant_id,email,status) values
   ('backfill-identity-site','active@example.test','active'),
