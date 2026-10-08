@@ -220,7 +220,6 @@ psql "${psql_args[@]}" --file="$repo_root/tests/business-record-schema.sql"
 psql "${psql_args[@]}" --set=tenant_import="$(cat "$repo_root/tests/fixtures/business-record-tenant-import.json")" \
   --file="$repo_root/tests/business-record-conversion-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
-psql "${psql_args[@]}" --file="$repo_root/tests/business-ownership-schema.sql"
 # accept_workspace_invitation is replaced by 20261007110000; the original
 # invitation contract must still hold against the replacement.
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-invitations-schema.sql"
@@ -237,7 +236,6 @@ psql "${psql_args[@]}" --file="$repo_root/tests/business-billing-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/convert-separate-business-schema.sql"
 # Release rows: agency workspaces accepted since 20261008161000; business
 # workspaces still accepted, personal ones still refused.
-psql "${psql_args[@]}" --file="$repo_root/tests/release-flags-agency-workspaces-schema.sql"
 # 20261009113000 replaces read_tenant_leads, read_tenant_lead and
 # read_tenant_lead_digests; their contracts and the new records hold.
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-lead-reads-schema.sql"
@@ -290,6 +288,13 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011102000_nat
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011101000_business_booking_email.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/native-publishing-targets-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/business-booking-email-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261016110000_operator_action_approvals.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261016110000_operator_action_approvals.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-action-approvals-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-ownership-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/release-flags-agency-workspaces-schema.sql"
+
 # #528: no client privilege on legacy tenant tables; every member role and anon refused.
 psql "${psql_args[@]}" --file="$repo_root/tests/legacy-tenant-client-access-schema.sql"
 

@@ -44,6 +44,22 @@ create role service_role nologin bypassrls;
 create role authenticated nologin;
 create role anon nologin;
 
+-- Supabase owns auth.users, auth.identities and auth.uid(). Keep only the
+-- columns the isolated SQL contracts exercise in this local fixture.
+create schema auth;
+create function auth.uid() returns uuid language sql stable as $$
+  select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
+$$;
+create table auth.users (
+  id uuid primary key,
+  email text,
+  email_confirmed_at timestamptz
+);
+create table auth.identities (
+  user_id uuid not null references auth.users(id),
+  identity_data jsonb not null default '{}'::jsonb
+);
+
 create table public.users (
   id uuid primary key,
   email text unique not null,
@@ -53,6 +69,25 @@ create table public.users (
 create table public.tenants (
   id text primary key,
   subscription_status text not null default 'none'
+);
+
+-- The migration's compatibility mirror targets the legacy operator audit log.
+-- Keep the isolated workspace fixture's subset so linked-client checks still
+-- exercise the mirror while agency workspaces exercise the native audit.
+create table public.audit_logs (
+  id text primary key,
+  tenant_id text not null references public.tenants(id) on delete cascade,
+  tenant_stable_id uuid,
+  action text not null,
+  target_type text not null,
+  target_id text,
+  time timestamptz not null,
+  actor_user_id uuid references public.users(id) on delete set null,
+  actor_email text,
+  actor_type text,
+  actor_is_super_admin boolean not null default false,
+  metadata jsonb,
+  created_at timestamptz not null default now()
 );
 SQL
 
@@ -474,7 +509,6 @@ psql "${psql_args[@]}" --file="$repo_root/tests/atomic-tenant-teardown-schema.sq
 # invitation (both memberships in one transaction), the tenant owner-recipient
 # rule and client lead copies kept after a tenant is deprovisioned.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007110000_business_ownership.sql"
-psql "${psql_args[@]}" --file="$repo_root/tests/business-ownership-schema.sql"
 # The earlier contracts still hold with the ownership migration applied. (The
 # invitation contract commits its fixture, so the upgrade gate reruns it.)
 psql "${psql_args[@]}" --set=tenant_import="$(cat "$repo_root/tests/fixtures/business-record-tenant-import.json")" \
@@ -483,12 +517,18 @@ psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 # Owner entry: per-workspace release flags layered over the env flags, and
 # the tenant-to-workspace entry resolution, with cross-workspace denial.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007130000_workspace_release_flags.sql"
-psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 # Release rows on agency workspaces too (agency library under `workspace`);
 # the business-workspace contract above still holds with it applied.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008161000_release_flags_agency_workspaces.sql"
-psql "${psql_args[@]}" --file="$repo_root/tests/release-flags-agency-workspaces-schema.sql"
+# Approval APIs bind the authenticated user ID, audit agency workspaces even
+# when no client tenant is linked, and record same-operator flag approvals.
+# Apply after business ownership and release flag RPCs because the wrappers use
+# both sets of tables and invariants.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261016110000_operator_action_approvals.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-action-approvals-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-ownership-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/release-flags-agency-workspaces-schema.sql"
 # Model-call cost log (one model-call helper, Ask Strelva spec section 5).
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007140000_model_call_log.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/model-call-log-schema.sql"

@@ -10,13 +10,20 @@ import type { OwnerInvitationResult } from "@/platform/workspaces/business-owner
 export function OwnerInvitationsPanel({ tenantId, load, request = fetch }: { tenantId: string; load: OwnerInvitationsLoad; request?: typeof fetch }) {
   const [state, setState] = useState(load.kind === "ready" ? load.state : null);
   const [recipient, setRecipient] = useState(state?.recipient?.email ?? "");
-  const [approved, setApproved] = useState(false);
+  const [approvalId, setApprovalId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [acceptUrl, setAcceptUrl] = useState<string | null>(null);
 
-  async function submit(command: { action: "invite"; sendEmail: boolean } | { action: "revoke"; invitationId: string }) {
+  const recipientRecord = state?.recipient as (NonNullable<typeof state>["recipient"] & { trusted?: boolean; source?: string; verified?: boolean }) | null | undefined;
+  const recipientIsTrusted = Boolean(recipientRecord && (
+    recipientRecord.trusted === true || (recipientRecord.from === "record" && (
+      recipientRecord.source === "tenant_import" || (recipientRecord.source === "owner" && recipientRecord.verified === true)
+    ))
+  ) && recipientRecord?.email.trim().toLowerCase() === recipient.trim().toLowerCase());
+
+  async function submit(command: { action: "invite" } | { action: "revoke"; invitationId: string }) {
     if (busy) return;
     setBusy(true);
     setError(null);
@@ -24,7 +31,7 @@ export function OwnerInvitationsPanel({ tenantId, load, request = fetch }: { ten
       const response = await request(`/api/admin/tenants/${encodeURIComponent(tenantId)}/owner-invitations`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(command.action === "invite"
-          ? { ...command, recipientEmail: recipient.trim(), jacobApproved: approved }
+          ? { ...command, recipientEmail: recipient.trim(), ...(!recipientIsTrusted && approvalId.trim() ? { approvalId: approvalId.trim() } : {}) }
           : command),
       });
       const data = await response.json();
@@ -37,7 +44,7 @@ export function OwnerInvitationsPanel({ tenantId, load, request = fetch }: { ten
       } else {
         const result: Omit<OwnerInvitationResult, "acceptUrl"> & { acceptUrl?: string } = data;
         setAcceptUrl(result.acceptUrl ?? null);
-        setApproved(false);
+        setApprovalId("");
         setMessage(result.delivery.status === "sent"
           ? `Invitation emailed to ${result.invitation.recipientEmail}.`
           : result.delivery.reason === "email_not_requested"
@@ -49,6 +56,24 @@ export function OwnerInvitationsPanel({ tenantId, load, request = fetch }: { ten
         }] }));
       }
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The invitation could not be changed."); }
+    finally { setBusy(false); }
+  }
+
+  async function recordApproval() {
+    if (busy || !state || !recipient.trim()) return;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await request(`/api/admin/workspaces/${encodeURIComponent(state.workspaceId)}/action-approvals`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "owner_invitation.issue", recipientEmail: recipient.trim().toLowerCase(), sendEmail: false }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "The approval could not be recorded.");
+      setApprovalId(data.approval.approvalId as string);
+      setMessage(`Approval recorded by this signed-in operator until ${new Date(data.approval.expiresAt).toLocaleTimeString()}. For this address, a different operator must issue the invitation.`);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "The approval could not be recorded."); }
     finally { setBusy(false); }
   }
 
@@ -67,17 +92,16 @@ export function OwnerInvitationsPanel({ tenantId, load, request = fetch }: { ten
               </p>
               <Button type="button" variant="danger" disabled={busy} onClick={() => void submit({ action: "revoke", invitationId: invitation.invitationId })}>Revoke invitation</Button>
             </li>)}
-          </ul> : <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void submit({ action: "invite", sendEmail: false }); }}>
-            <TextInput type="email" label="Owner email" value={recipient} onChange={(event) => { setRecipient(event.target.value); setApproved(false); }} required disabled={busy} />
-            <label className="flex min-h-12 items-center gap-3 text-sm text-gray-muted">
-              <input type="checkbox" checked={approved} disabled={busy} onChange={(event) => setApproved(event.target.checked)} className="size-5 accent-accent" />
-              Jacob approved an owner invitation for this business and this address.
-            </label>
+          </ul> : <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void submit({ action: "invite" }); }}>
+            <TextInput type="email" label="Owner email" value={recipient} onChange={(event) => { setRecipient(event.target.value); setApprovalId(""); setMessage(null); }} required disabled={busy} />
+            {recipientIsTrusted ? <p className="text-sm text-gray-muted">This matches the business&apos;s trusted owner address. Preparing the link records your approval after a sign-in from the last 10 minutes.</p> : <>
+              <TextInput label="Approval ID from a different operator" value={approvalId} onChange={(event) => setApprovalId(event.target.value)} disabled={busy} autoComplete="off" helperText="A second active operator can record approval for this exact address below. Use that ID while signed in as the issuing operator." />
+              <Button type="button" variant="secondary" disabled={busy || !recipient.trim()} onClick={() => void recordApproval()}>Record approval as this operator</Button>
+            </>}
             <div className="flex flex-wrap gap-4">
-              <Button type="submit" disabled={!approved || busy || !recipient.trim()} loading={busy}>Prepare invitation link</Button>
-              <Button type="button" variant="secondary" disabled={!approved || busy || !recipient.trim()} onClick={() => void submit({ action: "invite", sendEmail: true })}>Email invitation</Button>
+              <Button type="submit" disabled={busy || !recipient.trim() || (!recipientIsTrusted && !approvalId.trim())} loading={busy}>Prepare invitation link</Button>
             </div>
-            <p className="text-sm text-gray-muted">Preparing a link sends no email. Email delivery follows this business&apos;s existing email controls.</p>
+            <p className="text-sm text-gray-muted">Email delivery remains disabled. The link appears only in this authenticated response.</p>
           </form>}
         </>}
       {message && <p role="status" className="text-sm text-gray-muted">{message}</p>}

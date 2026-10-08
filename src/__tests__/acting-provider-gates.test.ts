@@ -12,7 +12,6 @@ import { batchEmailSuppression, sendEmailWithReceipt } from "@/platform/infra/em
 import { senderDomain, setProviderGateDb, type ProviderGateDb } from "@/platform/infra/email/provider-gate";
 import { actingProviderRefusal, assertActingProvider, type ActingProviderDb } from "@/platform/workspaces/acting-provider";
 import { WorkspaceStoreError } from "@/platform/workspaces/types";
-import { inviteBusinessOwner, setBusinessOwnershipDb } from "@/platform/workspaces/business-ownership";
 import type { SendEmailInput } from "@/platform/infra/email/send";
 
 const business = "11111111-1111-4111-8111-111111111111";
@@ -42,7 +41,6 @@ beforeEach(() => {
 
 afterEach(() => {
   setProviderGateDb(null);
-  setBusinessOwnershipDb(null);
   vi.unstubAllEnvs();
 });
 
@@ -136,24 +134,3 @@ describe("email sent for a business by its agency", () => {
   });
 });
 
-describe("owner invitations", () => {
-  it("are sent for the business by its provider of record", async () => {
-    const rpc = vi.fn(async (name: string) => {
-      if (name === "read_operator_owner_invitation_state") {
-        return { data: { workspaceId: business, workspaceName: "Fixture Co", operatorId: person.userId, hasOwner: false, exited: false,
-          recipient: { email: "owner@example.test", name: null, from: "record" }, pending: [], tenants: [] }, error: null };
-      }
-      return { data: { invitationId: "44444444-4444-4444-8444-444444444444", workspaceId: business, workspaceName: "Fixture Co",
-        recipientEmail: "owner@example.test", role: "owner", status: "pending", expiresAt: "2026-10-21T00:00:00.000Z",
-        createdAt: "2026-10-07T00:00:00.000Z", createdBy: person.userId, tenants: [] }, error: null };
-    });
-    setBusinessOwnershipDb({ rpc } as never);
-    const sent: SendEmailInput[] = [];
-    await inviteBusinessOwner("operator@strelva.example.test", business, {
-      sendEmail: true,
-      send: async (input) => { sent.push(input); return { status: "suppressed", reason: "email_suppressed_or_unconfigured" }; },
-    });
-    expect(sent).toHaveLength(1);
-    expect(sent[0]!.provider).toEqual({ businessWorkspaceId: business });
-  });
-});

@@ -23,6 +23,7 @@ import { ReleaseFlagValidationError } from "@/platform/release-flags/store";
 
 const WS = "7f000000-0000-4000-8000-000000000010";
 const SYSTEM = "7f000000-0000-4000-8000-0000000000aa";
+const ACTOR = { userId: "33333333-3333-4333-8333-333333333333", verifiedEmail: "op@example.test" };
 
 beforeEach(() => {
   ownerEntryForTenant.mockReset();
@@ -121,23 +122,23 @@ describe("operator commands", () => {
 
   it("refuses an unconverted client", async () => {
     readTenantWorkspaceLink.mockResolvedValue({ tenantId: "gldf", link: null });
-    await expect(applyTenantReleaseCommand("op@example.test", "gldf", plain, { kind: "flag", flag: "systems", state: "operators", reason: "try", expectedRevision: 0 }))
+    await expect(applyTenantReleaseCommand(ACTOR, "gldf", plain, { kind: "flag", flag: "systems", state: "operators", reason: "try", expectedRevision: 0 }))
       .rejects.toBeInstanceOf(ReleaseFlagValidationError);
     expect(setWorkspaceReleaseFlag).not.toHaveBeenCalled();
   });
 
-  it("needs Jacob's yes for on and records it in the reason", async () => {
+  it("does not trust browser approval fields and records through the authenticated actor", async () => {
     readTenantWorkspaceLink.mockResolvedValue({ tenantId: "gldf", link: { workspaceId: WS } });
-    await expect(applyTenantReleaseCommand("op@example.test", "gldf", plain, { kind: "flag", flag: "systems", state: "on", reason: "ready", expectedRevision: 0 }))
-      .rejects.toThrow(/Jacob's yes/);
-    await applyTenantReleaseCommand("op@example.test", "gldf", plain, { kind: "flag", flag: "systems", state: "on", reason: "ready", expectedRevision: 0, jacobApproved: true });
-    expect(setWorkspaceReleaseFlag).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: WS, flag: "systems", state: "on", reason: "Jacob's yes: ready" }));
+    const untrustedRequest = { kind: "flag" as const, flag: "systems" as const, state: "on" as const, reason: "ready", expectedRevision: 0, jacobApproved: true, approvalId: "attacker" };
+    await applyTenantReleaseCommand(ACTOR, "gldf", plain, untrustedRequest as never);
+    expect(setWorkspaceReleaseFlag).toHaveBeenCalledWith(expect.objectContaining({ actor: ACTOR, workspaceId: WS, flag: "systems", state: "on", reason: "ready" }));
+    expect(setWorkspaceReleaseFlag.mock.calls[0]?.[0]).not.toHaveProperty("approvalId");
   });
 
   it("allows owner entry while intentionally retaining Settings", async () => {
     readTenantWorkspaceLink.mockResolvedValue({ tenantId: "gldf", link: { workspaceId: WS } });
-    await applyTenantReleaseCommand("op@example.test", "gldf", plain, { kind: "flag", flag: "owner_entry", state: "on", reason: "go", expectedRevision: 0, jacobApproved: true });
-    await applyTenantReleaseCommand("op@example.test", "gldf", plain, { kind: "flag", flag: "owner_entry", state: "operators", reason: "walk pages", expectedRevision: 0 });
+    await applyTenantReleaseCommand(ACTOR, "gldf", plain, { kind: "flag", flag: "owner_entry", state: "on", reason: "go", expectedRevision: 0 });
+    await applyTenantReleaseCommand(ACTOR, "gldf", plain, { kind: "flag", flag: "owner_entry", state: "operators", reason: "walk pages", expectedRevision: 0 });
     expect(setWorkspaceReleaseFlag).toHaveBeenCalledTimes(2);
     expect(setWorkspaceReleaseFlag).toHaveBeenCalledWith(expect.objectContaining({ state: "operators", reason: "walk pages" }));
   });

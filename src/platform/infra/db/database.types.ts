@@ -5526,6 +5526,67 @@ export type Database = {
           },
         ]
       }
+      operator_action_approvals: {
+        Row: {
+          action_kind: string
+          approved_at: string
+          approved_by: string
+          approved_email: string
+          consumed_at: string | null
+          consumed_by: string | null
+          expires_at: string
+          id: string
+          target: Json
+          workspace_id: string
+        }
+        Insert: {
+          action_kind: string
+          approved_at?: string
+          approved_by: string
+          approved_email: string
+          consumed_at?: string | null
+          consumed_by?: string | null
+          expires_at: string
+          id?: string
+          target: Json
+          workspace_id: string
+        }
+        Update: {
+          action_kind?: string
+          approved_at?: string
+          approved_by?: string
+          approved_email?: string
+          consumed_at?: string | null
+          consumed_by?: string | null
+          expires_at?: string
+          id?: string
+          target?: Json
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operator_action_approvals_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operator_action_approvals_consumed_by_fkey"
+            columns: ["consumed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operator_action_approvals_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       operator_queue_marks: {
         Row: {
           assignee_user_id: string | null
@@ -13210,6 +13271,37 @@ export type Database = {
         }
         Returns: Json
       }
+      create_operator_action_approval: {
+        Args: {
+          p_action_kind: string
+          p_approver_email: string
+          p_target: Json
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      create_operator_owner_invitation_approved: {
+        Args: {
+          p_approval_id: string
+          p_expires_at: string
+          p_operator_email: string
+          p_recipient_email: string
+          p_send_email: boolean
+          p_token_hash: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      consume_operator_action_approval: {
+        Args: {
+          p_action_kind: string
+          p_approval_id: string
+          p_operator_email: string
+          p_target: Json
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       create_owned_workspace: {
         Args: {
           p_kind: string
@@ -17610,6 +17702,25 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: Json
+      }
+      set_workspace_release_flag_approved: {
+        Args: {
+          p_approval_id: string | null
+          p_expected_revision: number
+          p_flag: string
+          p_operator_email: string
+          p_reason: string
+          p_state: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      revoke_operator_owner_invitation_audited: {
+        Args: {
+          p_invitation_id: string
+          p_operator_email: string
+        }
+        Returns: string
       }
       set_workspace_release_tester: {
         Args: {
