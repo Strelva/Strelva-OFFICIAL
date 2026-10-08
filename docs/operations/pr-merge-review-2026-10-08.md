@@ -61,8 +61,16 @@ focused or complete rerun evidence. Local paths are `/tmp/strelva-pr-merge-*-202
 The first combined signed-in run passed 13/14 flags-on journeys and all 8
 flags-off journeys. The remaining Version fixture published without the now-required
 package declaration. Its setup now uses the real authoring declaration helper;
-no product release check was weakened. The flags-on rerun is the remaining merge
-gate and must pass before #603 merges.
+no product release check was weakened. The clean flags-on rerun passed all 14 journeys without retries; the unchanged
+flags-off run passed all 8. A simultaneous browser run initially collided with
+shared test artifacts; outputs were isolated before the clean rerun.
+
+The public smoke also exposed a missing flag guard on the new mapping fixture
+spec. Its three enabled-preview checks already passed; the spec now explicitly
+requires the fictional preview flag, matching other preview acceptance specs.
+This preserves the product's disabled-preview behavior and keeps fixture proof
+separate from public smoke. The final public smoke rerun remains required.
+Coverage thresholds passed (9,032 tests; 51 skipped).
 
 ## Limits and next action
 
@@ -76,3 +84,35 @@ Continue with the remaining issue acceptance criteria from the nearest owner.
 The older main-target #545 is blocked by its hosted dependency/build failure and
 must not bypass that failure. Historic main/design PRs require separate comparison
 against today's release and accepted product decisions.
+
+## Historic queue disposition
+
+Independent current-tree comparison found these separate from the ready backlog:
+
+- #583 is carried by an identical runtime patch in this integration; close as
+  superseded after #603 merges rather than mutate the obsolete integration target.
+- #545's restrictive migration matches the already integrated security history,
+  but its main-target hosted build fails Next/sharp advisories. Keep blocked; a
+  separately verified release promotion must reconcile main.
+- #102's June draft conflicts in agent and navigation owners and omits its stated
+  customer renderer. Keep parked pending current website architecture reconciliation.
+- #201 retains useful ask-once and readable agency-scope behavior; extract those
+  selectively. Its flat composer conflicts with the October 6 glass ask and its
+  enforced-spend wording exceeds the actual recorded-limit behavior.
+- #202's September Home composition is superseded by accepted October 6 linen/dusk
+  Home. Do not merge wholesale; evaluate any measured-result selection separately.
+- #204 adds an obsolete second `website_publications` authority path. Current
+  publication uses approved document receipts and tenant-backed hosted routing;
+  self-service website building remains outside Reborn scope.
+- #205's migration and service exactly match current source; its operator views
+  are integrated and now measure every business, refusing incomplete medians.
+  Close as superseded rather than restore the old active-only measurement.
+- #206 is real isolated future offering/Home Finder preparation, outside current
+  release and still missing brokerage/inventory/commercial delivery evidence.
+  Keep prepared, inactive; Version declarations are a different unit of work.
+- #207 mixes false-current #204/#206 claims with superseded #205 measurement.
+  Reconcile useful historical evidence into current owners selectively.
+
+Next concrete issue continuation: narrow #201 ask-once and human-readable agency
+scope patch using current owned components, preserving current design and exact
+budget authority. Do not activate the deferred Home Finder or legacy publisher.

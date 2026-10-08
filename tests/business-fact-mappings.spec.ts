@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
 
+// Fictional UI acceptance runs separately with the explicitly enabled preview.
+test.skip(process.env.STRELVA_UI_PREVIEW !== "1", "Requires the fictional UI preview.");
+
 for (const width of [1280, 390]) {
   test(`business record and native mapping controls at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 900 });
