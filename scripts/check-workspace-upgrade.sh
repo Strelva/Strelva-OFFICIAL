@@ -297,6 +297,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/release-flags-agency-workspaces-
 
 # #528: no client privilege on legacy tenant tables; every member role and anon refused.
 psql "${psql_args[@]}" --file="$repo_root/tests/legacy-tenant-client-access-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/audit-service-role-append-only-schema.sql"
 
 # #264 agency brand: full-schema behavior, actual rollback/reapply, configured-data refusal.
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-brand-schema.sql"
