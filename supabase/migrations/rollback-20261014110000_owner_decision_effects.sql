@@ -108,13 +108,16 @@ language sql stable security definer set search_path = public, pg_temp as $$
 $$;
 
 create or replace function public.platform_service_effect(p_purpose text) returns text
-language sql immutable set search_path=public,pg_temp as $$
-  select case p_purpose when 'needs_you_sync' then 'email'
-    when 'make_real_resume' then 'publish' when 'make_real_link' then 'publish'
+language sql immutable set search_path = public, pg_temp as $$
+  select case p_purpose
+    when 'needs_you_sync' then 'email'
+    when 'make_real_resume' then 'publish'
+    when 'make_real_link' then 'publish'
     when 'owner_decision_link' then 'email' end
 $$;
 drop function public.strelva_owner_decision_link_session(uuid,uuid,text,text,text);
 drop function public.owner_decision_provider_holds(uuid,uuid,text[]);
 drop function public.owner_decision_execution_effects(text,text,text);
 alter table public.owner_decision_link_sessions drop column intended_decision;
+alter table public.owner_decision_link_sessions drop column provider_assignment_id;
 commit;

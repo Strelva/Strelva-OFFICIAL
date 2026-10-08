@@ -7,6 +7,12 @@ begin
   begin execute statement; exception when others then if sqlerrm like '%'||expected||'%' then return; end if; raise; end;
   raise exception 'Expected % for %',expected,statement;
 end $$;
+create or replace function pg_temp.ol_delivered(ws uuid,item uuid) returns void language plpgsql as $$
+begin
+  if to_regclass('public.owner_decision_link_bindings') is not null then
+    perform public.record_owner_decision_delivery(ws,item,'digest','sent','ol-owner@example.test','ol-fictional-message',null);
+  end if;
+end $$;
 select pg_temp.ol_assert((select relrowsecurity from pg_class where oid='public.owner_decision_link_sessions'::regclass),'RLS on');
 select pg_temp.ol_assert(not has_table_privilege('service_role','public.owner_decision_link_sessions','select'),'no direct table access');
 select pg_temp.ol_assert(has_function_privilege('service_role','public.strelva_owner_decision_link_session(uuid,uuid,text,text)','execute')
@@ -58,6 +64,7 @@ begin
   perform pg_temp.ol_assert(link->>'providerWorkspaceId'='b2000000-0000-4000-8000-0000000000a1'
     and (select a.provider_workspace_id from public.strelva_service_actions a where a.id=sid)='b2000000-0000-4000-8000-0000000000a1','session names the agency of record');
   perform pg_temp.ol_expect(format('select public.authorize_owner_decision_link_run(%L,%L,%L,%L,%L)',ws,sid,id,revision_hash,'ol-owner@example.test'),'strelva_service_access_denied');
+  perform pg_temp.ol_delivered(ws,id);
   perform public.claim_owner_decision(ws,id,revision_hash,'approve','owner_link',null,null,'ol-owner@example.test');
   -- A verification revoked after session creation blocks run authorization.
   insert into public.agency_verifications(agency_workspace_id,effect,status,reason,verified_by,verifier_is_agency_member)
@@ -98,10 +105,16 @@ begin
   perform pg_temp.ol_assert((select count(*) from public.website_document_receipts where website_work_id=work.id)=1,'accepted write is never duplicated');
   -- Any owner-recipient change after claim revokes the capability immediately.
   update public.tenants t set owner_email='changed@example.test' where t.id='ol-existing-fixture';
+  if to_regclass('public.business_owner_recipient_trust') is not null then
+    perform public.business_owner_recipient_set_trust(ws,'changed@example.test',null,null,false,'conversion',null,null,null,'conversion',actor::text);
+  end if;
   -- Recipient resolver prefers the first linked tenant; set both to remove ambiguity.
   update public.tenants t set owner_email='changed@example.test' where t.id=reserved;
   perform pg_temp.ol_expect(format('select public.publish_website_by_owner_link(%L,%L,%L,%L,1,%L,%L,%L,%L,%L,%L,%L)',ws,work.id,actor,'ol-operator@example.test',h,reserved,rec,sid,id,revision_hash,'ol-owner@example.test'),'owner_decision_recipient_not_owner');
   update public.tenants t set owner_email='ol-owner@example.test' where t.id in ('ol-existing-fixture',reserved);
+  if to_regclass('public.business_owner_recipient_trust') is not null then
+    perform public.business_owner_recipient_set_trust(ws,'ol-owner@example.test',null,null,false,'conversion',null,null,null,'conversion',actor::text);
+  end if;
   delete from public.workspace_memberships where workspace_id=ws and user_id=actor;
   perform pg_temp.ol_expect(format('select public.publish_website_by_owner_link(%L,%L,%L,%L,1,%L,%L,%L,%L,%L,%L,%L)',ws,work.id,actor,'ol-operator@example.test',h,reserved,rec,sid,id,revision_hash,'ol-owner@example.test'),'strelva_service_access_denied');
   insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values(ws,actor,'admin',actor);
@@ -121,6 +134,7 @@ begin
   id:=(item->>'id')::uuid;
   link:=public.strelva_owner_decision_link_session(ws,id,h,'ol-owner@example.test'); sid:=(link->>'sessionId')::uuid;
   perform pg_temp.ol_expect(format('select public.resolve_ask_business_draft_by_owner_link(%L,%L,%L,%L,%L,%L,%L,%L,%L)',ws,actor,'ol-operator@example.test',draft->>'id','approve',sid,id,h,'ol-owner@example.test'),'strelva_service_access_denied');
+  perform pg_temp.ol_delivered(ws,id);
   perform public.claim_owner_decision(ws,id,h,'approve','owner_link',null,null,'ol-owner@example.test');
   perform public.authorize_owner_decision_link_run(ws,sid,id,h,'ol-owner@example.test');
   perform pg_temp.ol_expect(format('select public.resolve_ask_business_draft_by_owner_link(%L,%L,%L,%L,%L,%L,%L,%L,%L)',ws,actor,'ol-operator@example.test',gen_random_uuid(),'approve',sid,id,h,'ol-owner@example.test'),'strelva_service_access_denied');

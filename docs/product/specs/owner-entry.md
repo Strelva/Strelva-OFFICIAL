@@ -36,8 +36,16 @@ production stop points are in [the stream handoff](../streams/w6-owner-ask.md).
   publish each require `publish`; Google decisions require `google`, sending
   decisions `email`. Preview/fact/plan approval and decline have no immediate
   outside effect; later outside writes retain their own gates. Unknown repair
-  effects and sign-in-only decisions fail closed. Rollback refuses retained
-  owner-link sessions. This is local implementation, with activation still off.
+  effects and sign-in-only decisions fail closed. The immutable session also
+  names the exact provider-assignment row: ending and granting the same agency
+  again never revives it. Admission and each native use hold assignment,
+  verified member, decision and agency-verification authority until transaction
+  commit; concurrent revocation applies to subsequent calls. An explicit signed
+  owner decision provides this one-shot source approval; a provider seat alone
+  never supplies the business-member identity used by this service executor.
+  Existing unbound sessions fail closed. The focused local proof command is
+  `PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH bash scripts/check-owner-decision-effects-sql.sh`.
+  Rollback refuses retained owner-link sessions. This is local implementation, with activation still off.
 
 Not proven here: authenticated admin-host entry and rollback on an isolated
 Supabase Auth stack, actual mail delivery, production migrations, live
