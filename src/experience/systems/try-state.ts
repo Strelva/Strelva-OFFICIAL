@@ -1,3 +1,5 @@
+import { askServiceSetupTry, askServiceInquiryTry } from "@/products/scheduling/server";
+import { askServiceSetupSelectionSchema } from "@/platform/ask/new-service";
 import { verifyPossibilityPreviewToken } from "@/platform/possibilities/preview-link";
 import type { PossibilityTryState } from "./PossibilityTry";
 import { siteDocumentSchema } from "@/products/websites/client";
@@ -25,6 +27,10 @@ export async function possibilityTryState(token: string, deps: {
   if (!(await deps.enabled(claims.workspaceId).catch(() => false))) return null;
   const p = await deps.read({ businessId: claims.workspaceId, possibilityId: claims.possibilityId, candidateRevision: claims.candidateRevision }).catch(() => null);
   if (!p) return { kind: "changed" };
+  const setup = p.introduces.find(item => item.candidate?.content.kind === "ask-new-service-setup")?.candidate?.content;
+  const setupSelection = askServiceSetupSelectionSchema.safeParse(setup?.selection);
+  if (setup && !setupSelection.success) return {kind:"changed"};
+  const serviceSetup = setup && setupSelection.success ? { durationMinutes:setupSelection.data.service.durationMinutes, schedule:askServiceSetupTry(setupSelection.data), inquiry:askServiceInquiryTry(setupSelection.data,"isolated-try") } : null;
   const inquiry = p.changes.find(item => item.candidate.content.kind === "ask-inquiry-follow-up")?.candidate.content;
   const inquiryFollowUp = inquiry ? followUpTryView(inquiry.selection, inquiry.draft, inquiry.rehearsal) : null;
   if (inquiry && !inquiryFollowUp) return { kind: "changed" };
@@ -48,8 +54,9 @@ export async function possibilityTryState(token: string, deps: {
       introduces: p.introduces.map((intro) => intro.name),
       ...(document.success ? { websiteDocument: document.data } : {}),
       ...(booking && bookingSchedule.success && typeof bookingPath === "string" ? { bookingSchedule: bookingSchedule.data, bookingPath } : {}),
+      ...(serviceSetup ? {serviceSetup} : {}),
       ...(inquiryFollowUp ? { inquiryFollowUp } : {}),
-      takesSubmissions: !inquiryFollowUp && !document.success && (p.introduces.length > 0
+      takesSubmissions: !serviceSetup && !inquiryFollowUp && !document.success && (p.introduces.length > 0
         || p.effects.some((effect) => effect.channel === "inquiry_form" || effect.channel === "booking_page")
         || p.changes.some((change) => "form" in change.candidate.content)),
     },

@@ -1288,6 +1288,12 @@
           "rollback": "rollback-20261020112000_version_live_owner_authority.sql"
         },
         {
+          "file": "20261020113000_ask_native_service_setup.sql",
+          "sha256": "fec9e56cf6c214424fd24fd35eb7f9ca3f012a28742da08d88ad09e1b8bd64b2",
+          "rollback": "rollback-20261020113000_ask_native_service_setup.sql",
+          "rollbackStatus": "guarded; pre-adoption only; accepted setup and booking/inquiry history retained"
+        },
+        {
           "file": "20261020114000_public_business_verification.sql",
           "sha256": "16f0410a21de96b8800e7a408f5222599543e5760896c8b498f75e819822efa5",
           "rollback": "rollback-20261020114000_public_business_verification.sql"

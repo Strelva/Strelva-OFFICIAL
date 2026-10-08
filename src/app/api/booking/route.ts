@@ -1,9 +1,10 @@
+import { assertAskServiceTenantSource } from "@/products/scheduling/server";
 import { bookingServicePoliciesEnabled } from "@/platform/bookings/service-policy";
 import { z } from "zod";
 import { PublicBookingError } from "@/platform/bookings/errors";
 import { bookingConflictAlternatives, nativeBookingAlternatives } from "@/platform/bookings/conflicts";
 import { NextResponse } from "next/server";
-import { getContent, logActivity } from "@/lib/storage";
+import { getContent, logActivity, nativeBusinessServiceReference } from "@/lib/storage";
 import { createBookingAtomic } from "@/platform/bookings/legacy-store";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
@@ -91,6 +92,7 @@ export async function POST(request: Request) {
     if (!service || service.comingSoon) {
       return NextResponse.json({ error: "Invalid service" }, { status: 400 });
     }
+    await assertAskServiceTenantSource(tenant,serviceId,nativeBusinessServiceReference(service));
     const duration = parseInt(service.duration, 10) || 60;
 
     const [startH, startM] = startTime.split(":").map(Number) as [number, number];

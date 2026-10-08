@@ -16,6 +16,11 @@ export async function readReleasedTenantBusinessContext(tenantId: string): Promi
 }
 
 const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+// Request-local provenance, never serialized into the public content contract.
+const nativeServices=new WeakMap<object,string>();
+export function nativeBusinessServiceReference(service:object):string|null {
+  return nativeServices.get(service)??null;
+}
 export function businessAddress(facts: TenantBusinessContext["facts"]): string | undefined {
   const address = facts.address;
   return address?.formatted || (address ? [address.line1, address.line2, address.city, address.region, address.postalCode, address.country].filter(Boolean).join(", ") : undefined);
@@ -35,10 +40,12 @@ export function contentWithBusinessRecord<K extends ContentSection>(section: K, 
   }
   if (section === "services") {
     const current = data as ContentMap["services"];
-    return { ...current, services: context.services.map(service => {
+    const projected={ ...current, services: context.services.map(service => {
       const existing = current.services.find(item => item.name.toLowerCase() === service.name.toLowerCase());
-      return { id: service.id, duration: "", featured: false, who_its_for: "", booking_link: "", comingSoon: false, image_url: "", ...existing, name: service.name, description: service.description ?? "", price: service.priceText ?? "" };
-    }) } as ContentMap[K];
+      const item={ id: service.id, duration: "", featured: false, who_its_for: "", booking_link: "", comingSoon: false, image_url: "", ...existing, name: service.name, description: service.description ?? "", price: service.priceText ?? "" };
+      nativeServices.set(item,service.id);return item;
+    }) };
+    return projected as ContentMap[K];
   }
   return data;
 }
