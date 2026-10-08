@@ -1,5 +1,7 @@
 \set ON_ERROR_STOP on
 begin;
+select public.system_package_rehearsal(jsonb_build_object('kind','bundle','systems',jsonb_build_array(jsonb_build_object('key','offering','name','Staff offering','definition',public.offering_package_definition('private_staff_requests','1.0.0')))));
+
 create function pg_temp.osv_assert(ok boolean,label text) returns void language plpgsql as $$ begin if ok is distinct from true then raise exception 'Offering lineage: %',label; end if; end $$;
 insert into public.users(id,email,verified_at) values('cf000000-0000-4000-8000-000000000001','offering-operator@example.test',now()),('cf000000-0000-4000-8000-000000000002','offering-owner@example.test',now()),('cf000000-0000-4000-8000-000000000003','offering-reviewer@example.test',now());
 insert into public.super_admins(user_id,email) values('cf000000-0000-4000-8000-000000000001','offering-operator@example.test');

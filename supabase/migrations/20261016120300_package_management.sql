@@ -124,6 +124,7 @@ begin
 end $$;
 revoke all on function public.read_system_package_source(uuid,uuid,uuid,text),public.require_system_package_revision_scope(uuid,uuid,uuid,text,boolean),public.read_system_package_install_grants(uuid,uuid,uuid,text) from public,anon,authenticated;
 grant execute on function public.read_system_package_source(uuid,uuid,uuid,text),public.require_system_package_revision_scope(uuid,uuid,uuid,text,boolean),public.read_system_package_install_grants(uuid,uuid,uuid,text) to service_role;
+revoke all on function public.system_actor_scope(uuid,uuid,text,boolean),public.system_version_assert_source_manager(uuid,uuid,text) from public,anon,authenticated,service_role;
 revoke all on function public.lock_system_revision_qualification(uuid),public.lock_system_package_install_grant(uuid,uuid,text) from public,anon,authenticated,service_role;
 revoke all on function public.grant_system_package_install(uuid,uuid,text,uuid,uuid,uuid,timestamptz),public.revoke_system_package_install(uuid,uuid,text,uuid) from public,anon,authenticated;
 revoke all on function public.save_system_version(uuid,text,uuid,bigint,jsonb) from public,anon,authenticated;

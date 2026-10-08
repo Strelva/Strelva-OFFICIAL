@@ -31,7 +31,7 @@ begin
    if (item-array['key','name','definition'])<>'{}'::jsonb or char_length(coalesce(item->>'key','')) not between 1 and 80 or char_length(coalesce(item->>'name','')) not between 1 and 160 or item->'definition'->>'kind'='bundle' then raise exception 'system_package_input_invalid'; end if;
    part:=public.system_package_behavior(item->'definition',p_bindings);
    for k in select jsonb_object_keys(result) loop
-    result:=jsonb_set(result,array[k],(select coalesce(jsonb_agg(value order by value),'[]'::jsonb) from (select distinct value from jsonb_array_elements(result->k||part->k)) x));
+    result:=jsonb_set(result,array[k],(select coalesce(jsonb_agg(value order by value),'[]'::jsonb) from (select distinct value from jsonb_array_elements((result->k)||(part->k))) x));
    end loop;
   end loop;
   return result;
@@ -39,9 +39,13 @@ begin
  if p_definition->>'kind' is distinct from 'internal_app' or (p_definition-array['kind','title','fields','components'])<>'{}'::jsonb then raise exception 'system_package_runtime_unsupported'; end if;
  perform public.validate_application_spec((p_definition-'kind')||jsonb_build_object('maintenanceOwner','package-qualification'));
  select coalesce(jsonb_agg(x.name order by x.name),'[]'::jsonb) into business_fields from (
-  select distinct name from jsonb_array_elements(p_definition->'fields') f cross join lateral unnest(case f->>'type' when 'contact' then array['contacts.id','contacts.name'] when 'assigned_person' then array['people.id','people.name'] else '{}'::text[] end) name
+  select distinct name from jsonb_array_elements(p_definition->'fields') f cross join lateral unnest(case f->>'type' when 'contact' then array['contacts.id','contacts.name','contacts.email','contacts.phone'] when 'assigned_person' then array['people.id','people.name','people.email','people.active'] else '{}'::text[] end) name
  ) x;
- return jsonb_build_object('recordsRead',jsonb_build_array('application.records'),'recordsWritten',jsonb_build_array('application.records'),'businessRecordFields',business_fields,'outsideEffects','[]'::jsonb,'bindingKinds',to_jsonb(p_bindings),'dataLeavingBusiness','[]'::jsonb);
+ -- Native submit may claim an owner/assignee email notice behind destination flags.
+ -- Contact resolution reads/writes the destination's contact and audited business record.
+ return jsonb_build_object('recordsRead',jsonb_build_array('application.records','internal_tool.notices')||case when p_definition->'fields' @> '[{"type":"contact"}]' then jsonb_build_array('business.contacts','business.record') else '[]'::jsonb end||case when p_definition->'fields' @> '[{"type":"assigned_person"}]' then jsonb_build_array('business.people') else '[]'::jsonb end,
+ 'recordsWritten',jsonb_build_array('application.records','internal_tool.notices')||case when p_definition->'fields' @> '[{"type":"contact"}]' then jsonb_build_array('business.contacts','business.record','business.record.history') else '[]'::jsonb end,
+ 'businessRecordFields',business_fields||jsonb_build_array('owner_recipient.email','owner_recipient.name','tenant.owner_email'),'outsideEffects',jsonb_build_array('email'),'bindingKinds',to_jsonb(p_bindings),'dataLeavingBusiness',jsonb_build_array('tool name, record title, missing-item label and sign-in link to owner or assigned staff email'));
 end $$;
 create function public.system_package_assert_declaration(p_definition jsonb,p_declaration jsonb,p_bindings text[]) returns void
 language plpgsql immutable set search_path=public,pg_temp as $$
@@ -60,6 +64,7 @@ create function public.system_revision_is_qualified(p_revision_id uuid) returns 
 language sql stable security definer set search_path=public,pg_temp as $$
  select exists(select 1 from public.system_revision_qualifications q join public.system_revision_reviewers r on r.user_id=q.reviewer_id and r.active and r.policy_version=q.reviewer_policy_version
  where q.revision_id=p_revision_id and q.human_state='approved' and jsonb_array_length(q.evidence)=4
+ and (select count(distinct e->>'check') from jsonb_array_elements(q.evidence) e where e->>'check' in ('shareable_definition','declaration_match','rehearsal','prior_revision_compare'))=4
  and not exists(select 1 from jsonb_array_elements(q.evidence) e where e->>'revisionId' is distinct from p_revision_id::text or e->>'status' is distinct from 'passed'));
 $$;
 create function public.system_revision_qualification_json(p_revision_id uuid) returns jsonb

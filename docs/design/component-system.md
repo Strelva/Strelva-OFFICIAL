@@ -40,6 +40,25 @@ management actions. Real SQL proof and limitations are in
 [the #261 handoff](../product/streams/a1-agency-team.md); no production or actual
 staff adoption is claimed.
 
+## Creator package library, October 7, 2026
+
+[PackageCatalog](../../src/experience/systems/PackageCatalog.tsx),
+[SourcePackageControls](../../src/experience/workspace/agency/SourcePackageControls.tsx)
+and [PackageInstallDelegation](../../src/experience/systems/PackageInstallDelegation.tsx)
+compose owned Button, TextInput, SelectInput and TextArea with semantic declaration
+lists and native details. Qualified listings show immutable creator and exact source
+revision. Installation saves a private business draft with a stable retry command;
+the existing Version owns business bindings and the separate Needs you release.
+Owners can grant/revoke one exact, expiring installation to an already delegated
+agency. Source managers run exact-revision checks and choose private/clients/listed;
+review authority remains empty until a reviewer policy is configured.
+
+Local 1280px and 390px browser proof covers catalog, declaration, denied controls,
+loading/error/empty states, lost-response retry, source review/listing, and owner
+grant/revoke. Native runtime/authority/upgrade assertions run in disposable SQL.
+These receipts establish prepared implementation, not production rollout, approved
+review policy, provider delivery or customer adoption.
+
 ## Start with tokens and atoms
 
 September 17 clarification: Jacob wants to inspect the tokens and agreed atoms

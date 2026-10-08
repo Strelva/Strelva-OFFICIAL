@@ -16,6 +16,9 @@ begin
  id:=p_definition->>'offeringId'; expected:=public.offering_package_definition(id,p_definition->>'offeringVersion');
  if expected is null or expected<>p_definition then raise exception 'system_package_runtime_unsupported'; end if;
  resource:=expected->'requiredResources'->0->>'kind';
+ if id='private_staff_requests' then
+  return public.system_package_behavior_native_core('{"kind":"internal_app","title":"Native staff resource","fields":[{"id":"contact","label":"Contact","type":"contact","required":false},{"id":"person","label":"Person","type":"assigned_person","required":false}],"components":[{"kind":"form","fields":["contact","person"]}]}'::jsonb,array[resource]);
+ end if;
  return jsonb_build_object('recordsRead',case when id='private_staff_requests' then jsonb_build_array('application.records') when id='customer_inquiry_intake' then jsonb_build_array('inquiries') else jsonb_build_array('website.content','website.requests') end,
  'recordsWritten',case when id='private_staff_requests' then jsonb_build_array('application.records') when id='customer_inquiry_intake' then jsonb_build_array('inquiries','inquiry.actions') else jsonb_build_array('website.requests') end,
  'businessRecordFields',case when id='private_staff_requests' then jsonb_build_array('contacts.id','contacts.name','people.id','people.name') else '[]'::jsonb end,
@@ -30,6 +33,8 @@ begin
  return public.system_package_behavior_native_core(p_definition,p_bindings);
 end $$;
 alter function public.system_package_rehearsal(jsonb) rename to system_package_rehearsal_native_core;
+-- Recursive bundles dispatch to native offering validators that acquire locks.
+alter function public.system_package_rehearsal_native_core(jsonb) volatile;
 revoke all on function public.system_package_rehearsal_native_core(jsonb) from public,anon,authenticated,service_role;
 create function public.system_package_rehearsal(p_definition jsonb) returns jsonb language plpgsql volatile set search_path=public,pg_temp as $$
 declare behavior jsonb; rejected boolean:=false; scopes text[]; surfaces text[]; id text; empty_business uuid:=gen_random_uuid(); responsibility jsonb:='{"kind":"customer_operated","providerName":"Synthetic business"}';

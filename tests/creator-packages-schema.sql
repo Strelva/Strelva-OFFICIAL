@@ -22,6 +22,9 @@ select public.review_system_revision_qualification('ce000000-0000-4000-8000-0000
 select pg_temp.cp_assert(public.system_revision_is_qualified('ce000000-0000-4000-8000-000000000021'),'passing checks plus exact human approval qualifies');
 select public.set_system_package_listing('ce000000-0000-4000-8000-000000000010','ce000000-0000-4000-8000-000000000001','creator@example.test',(select id from cp_source),'listed');
 select pg_temp.cp_assert(jsonb_array_length(public.read_system_package_listings('ce000000-0000-4000-8000-000000000011','ce000000-0000-4000-8000-000000000002','owner@example.test'))=1,'ordinary owner sees qualified independent creator listing');
+select pg_temp.cp_assert(public.system_package_behavior(pg_temp.cp_definition(),'{}')->'outsideEffects' @> '["email"]','native owner notice declared even without link fields');
+select pg_temp.cp_expect($q$select public.system_package_assert_declaration(pg_temp.cp_definition(),jsonb_set(public.system_package_behavior(pg_temp.cp_definition(),'{}'),'{outsideEffects}','[]'),'{}')$q$,'system_package_declaration_exceeded');
+select pg_temp.cp_assert(public.system_package_behavior(jsonb_build_object('kind','bundle','systems',jsonb_build_array(jsonb_build_object('key','app','name','App','definition',pg_temp.cp_definition()))),'{}')->'recordsWritten' @> '["application.records","internal_tool.notices"]','bundle declaration retains native child effects');
 select pg_temp.cp_expect($q$select public.system_package_assert_declaration(pg_temp.cp_definition(),'{"recordsRead":[],"recordsWritten":[],"businessRecordFields":[],"outsideEffects":[],"bindingKinds":[],"dataLeavingBusiness":[]}','{}')$q$,'system_package_declaration_exceeded');
 select pg_temp.cp_expect($q$update public.system_version_sources set creator_workspace_id='ce000000-0000-4000-8000-000000000011' where system_id=(select id from cp_source)$q$,'system_version_identity_immutable');
 

@@ -34,14 +34,23 @@ export function effectivePackageBehavior(definition: JsonObject, bindingKinds: r
     const fixed = listOfferingDefinitions().find(item => item.id === definition.offeringId && item.version === definition.offeringVersion);
     if (!fixed || !jsonEqual(definition, { kind: "offering", offeringId: fixed.id, offeringVersion: fixed.version, name: fixed.name, description: fixed.description, requiredResources: JSON.parse(JSON.stringify(fixed.requiredResources)), scopes: JSON.parse(JSON.stringify(fixed.scopes)), surfaces: JSON.parse(JSON.stringify(fixed.surfaces)), configurationFields: JSON.parse(JSON.stringify(fixed.configurationFields)) })) throw new VersionValidationError("This offering has no exact native definition adapter.");
     const staff = fixed.id === "private_staff_requests", inquiry = fixed.id === "customer_inquiry_intake";
+    if (staff) return nativeApplicationBehavior([{ type: "contact" }, { type: "assigned_person" }], [fixed.requiredResources[0]!.kind]);
     return packageDeclarationSchema.parse({ recordsRead: staff ? ["application.records"] : inquiry ? ["inquiries"] : ["website.content","website.requests"], recordsWritten: staff ? ["application.records"] : inquiry ? ["inquiries","inquiry.actions"] : ["website.requests"], businessRecordFields: staff ? ["contacts.id","contacts.name","people.id","people.name"] : [], outsideEffects: inquiry ? ["email"] : staff ? [] : ["publish"], bindingKinds: [fixed.requiredResources[0]!.kind], dataLeavingBusiness: inquiry ? ["approved email recipients"] : staff ? [] : ["approved public website content"] });
   }
   if (definition.kind !== "internal_app" || Object.keys(definition).some(key => !["kind", "title", "fields", "components"].includes(key)) || !Array.isArray(definition.fields) || !Array.isArray(definition.components)) throw new VersionValidationError("This runtime has no verified package declaration adapter.");
-  const fields = definition.fields as JsonObject[];
+  return nativeApplicationBehavior(definition.fields as JsonObject[], bindingKinds);
+}
+
+/** Potential effects include flagged native notice paths: changing a destination's
+ * flags cannot silently expand the declaration approved for the source revision. */
+function nativeApplicationBehavior(fields: readonly JsonObject[], bindingKinds: readonly string[]): PackageDeclaration {
+  const contact = fields.some(field => field.type === "contact"), person = fields.some(field => field.type === "assigned_person");
   return packageDeclarationSchema.parse({
-    recordsRead: ["application.records"], recordsWritten: ["application.records"],
-    businessRecordFields: [...new Set(fields.flatMap(field => field.type === "contact" ? ["contacts.id", "contacts.name"] : field.type === "assigned_person" ? ["people.id", "people.name"] : []))].sort(),
-    outsideEffects: [], bindingKinds: [...new Set(bindingKinds)].sort(), dataLeavingBusiness: [],
+    recordsRead: ["application.records", "internal_tool.notices", ...(contact ? ["business.contacts", "business.record"] : []), ...(person ? ["business.people"] : [])].sort(),
+    recordsWritten: ["application.records", "internal_tool.notices", ...(contact ? ["business.contacts", "business.record", "business.record.history"] : [])].sort(),
+    businessRecordFields: ["owner_recipient.email", "owner_recipient.name", "tenant.owner_email", ...(contact ? ["contacts.id", "contacts.name", "contacts.email", "contacts.phone"] : []), ...(person ? ["people.id", "people.name", "people.email", "people.active"] : [])].sort(),
+    outsideEffects: ["email"], bindingKinds: [...new Set(bindingKinds)].sort(),
+    dataLeavingBusiness: ["tool name, record title, missing-item label and sign-in link to owner or assigned staff email"],
   });
 }
 
