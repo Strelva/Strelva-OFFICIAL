@@ -65,14 +65,20 @@ pnpm check:ontology
 pnpm build
 PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-sql
 PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-upgrade
+PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH bash scripts/check-payer-authority-race.sh
 ```
 
 Both SQL runners execute `scripts/sql/money-apps-contracts.sh` after their retained
 caller/upgrade/rollback proofs. It generates private native builder input per
-cluster, tests real commands/receipts, and scans all public reader call graphs for
-row locks. Keep the existing public-key ACL test and exact catalog rollback hashes.
+cluster, tests real commands/receipts, and scans public STABLE/IMMUTABLE call
+graphs for row locks, alongside genuine READ ONLY execution of critical readers.
+Keep the public-key ACL test and exact catalog rollback hashes.
 The staged runner applies the real historical delivery and internal-helper ACL
 prerequisites; omitting them is not a source permission exemption.
+
+Allowance cap acceptance locks the current representative until commit. Its
+reader uses snapshot identity checks; writer identity locks remain intact. The
+separate race command proves both transaction orders and exact rollback/reapply.
 
 Focused populated creator history, qualification writer/revoke races, payout
 capacity races and independent settlement/native scope probes have separate
