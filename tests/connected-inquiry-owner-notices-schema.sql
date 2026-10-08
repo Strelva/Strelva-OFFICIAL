@@ -15,8 +15,11 @@ begin
   insert into public.workspaces(id,kind,name,created_by) values(ws,'customer','Connected owner notice',owner_id),(other_ws,'customer','Other notice business',owner_id);
   insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values(ws,owner_id,'owner',owner_id);
   insert into public.business_records(workspace_id,created_by,updated_by) values(ws,owner_id,owner_id);
-  insert into public.business_record_facts(workspace_id,fact_key,value,source,verified,updated_by)
-    values(ws,'owner_recipient','{"email":"cno-owner@example.test","name":"Owner"}','owner',true,owner_id);
+  -- An owner-authored command creates trusted recipient provenance; a raw
+  -- working fact is deliberately insufficient after recipient trust landed.
+  perform public.patch_business_record(ws,owner_id,'cno-owner@example.test','owner',0,
+    '{"facts":{"owner_recipient":{"value":{"email":"cno-owner@example.test","name":"Owner"},"verified":true}}}',
+    gen_random_uuid(),repeat('b',64));
   site_id := (public.create_connected_site(ws,owner_id,'cno-owner@example.test',jsonb_build_object('publicKey',key,'verificationToken',repeat('n',32),
     'label','Fixture','siteUrl',origin||'/','siteHost','owner-notice-fixture.example','allowedOrigins',jsonb_build_array(origin),'platform','custom'))->>'id')::uuid;
   perform public.confirm_connected_site_verification(ws,owner_id,'cno-owner@example.test',site_id,array[repeat('n',32)]);
