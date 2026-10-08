@@ -484,3 +484,7 @@ printf 'Package declarations passed against the full ordered upgrade.\n'
 
 # #278 additive read-only payer UI capabilities and retained obligation proof.
 source "$repo_root/scripts/payer-transition-actions-checks.sh"
+
+# #251: final-schema support reads and contact repair require durable actor audit.
+psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-backfill-audit-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-inquiry-audit-schema.sql"
