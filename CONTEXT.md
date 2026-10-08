@@ -1,19 +1,26 @@
 # Strelva interface and Managed Websites context
 
-## October 7 security/runtime checkpoint (local)
+## October 7 security/runtime and bounded agency release (deployed)
 
-The isolated `fix/security-runtime-20261007-combined-bk_2dx` branch closes the
-requested reader, owner-link authority, inquiry retention and runtime recovery
-issues at implementation/local-behavior scope. Full SQL/upgrade gates, actual
-PostgREST reads/denials, concurrency, 8,368 unit tests and 196 client contract
-checks pass. Signed-link native/custom application and Version releases require
-sign-in until their mutations can enforce session authority atomically.
+The four requested repairs are deployed at `https://app.strelva.com`: snapshot
+readers, owner-link authority, inquiry retention and forward-preserving runtime
+recovery. Final source `954f1905`, artifact `dpl_9k1j1sG8ioAGVeYr6WAAZZvKzBmP`,
+exact hosted 266 migrations. All seven stronger owner guards and the original
+238-signature recovery scope remain unchanged. The retired 151200 was never applied.
 
-Runtime recovery preserves forward schema and evidence; it is not destructive
-schema reversal. Production, actual cron operation and real provider undo remain
-unproven and require separate authority. The existing dirty model checkout was
-preserved. [Evidence, limits, unapplied model delta and exact next action](docs/operations/security-runtime-closure-2026-10-07.md)
-own this dated checkpoint; do not turn it into a shipped capability claim.
+8,505 units, final native SQL/actual-PUBLIC restore, local authenticated agency
+journey and final hosted checks pass. All 60 public client reads remain
+byte-identical. Existing workspace flag was preserved; only agency add-client
+and website-rebuild flags were added as `1`. Other 65 env entries were unchanged.
+
+Agency work can reach signed-in owner claim, exact approval, explicit named-agency
+consent and accepted publication/receipt. New-site public URLs remain unavailable:
+default `<tenant>.strelva.com` has no qualified wildcard DNS. This is not full 1.0
+acceptance, adoption, economics or live external website delivery. Native app/Version
+signed links still require sign-in; scheduled retention and real provider undo
+remain unproven. Existing dirty main/model/customer checkouts were preserved.
+[Exact release, recovery and remaining proof boundaries](docs/operations/security-runtime-production-2026-10-07.md)
+own this rollout. Broader Reborn work remains outside this authorization.
 
 Reviewed: 2026-09-17
 
@@ -22,12 +29,14 @@ own dates.
 Kind: product
 
 Next release: **Strelva Reborn**, the one build to `1.0.0` (decided Oct 6).
-Only the lead fix, `0.2.1`, ships before it. See the
+Jacob subsequently authorized the bounded security/agency rollout above before
+the full 1.0 release. See the
 [build](./docs/product/strelva-reborn.md) and
 [what Strelva becomes at 1.0.0](./docs/product/product-model.md), the product
 model area by area. The earlier
 [strelvav2](./docs/product/strelvav2.md) release shipped the workspace on Sept 30.
-This branch is for internal work and is not approved for production.
+Broader Reborn work remains internal and unapproved for production beyond the
+explicit bounded October 7 security/agency rollout above.
 
 ## Product model
 
@@ -136,12 +145,15 @@ verification and resource authority are rechecked before native effects.
 The [workflow handoff](./docs/operations/agency-workflow-2026-10-07.md) owns
 local Auth/Postgres/browser proof, migration order, failure evidence and next
 actions. Fictional delivery receipts and platform verification are fixtures.
-Loopback rendering is observed; public HTTPS delivery, sent email, production
-integration, adoption and economics are unproven. The branch is not deployed. Current qualification uses 260 ordered migrations;
-8,480 unit tests pass (42 skipped), the full workspace upgrade and native agency
-SQL job pass, and the fresh authenticated website journey passes. The broader
-flags-off app journey remains failed under current app creation authority.
-Deployment is authorized in this session and underway; no promotion is claimed. The minimum three-flag signed-in-owner browser journey passes; the staged artifact preserves all 60 legacy reads. Final delivery is coordinated with the Current Workspace State thread as the sole production writer. A confirmed hosted supplied-actor RPC grant gap requires an additive repair before the combined artifact can be promoted.
+The combined security/agency artifact is deployed as recorded above. Minimum
+three-flag local Auth/browser and final 266 native SQL proofs pass; the final source
+also passes 8,505 unit tests. Signed-in owner claim and consent are qualified;
+public HTTPS website delivery, sent email, adoption and economics are not.
+Fictional providers/models stay fixtures. Public routing remains open under #243/#322.
+The earlier restored-dump supplied-actor ACL finding is historical: fresh hosted
+ACLs deny anon/auth execution; 191 adds explicit drift protection. Root performed
+the sole production migration sequence and final promotion. Broader agency
+#245/#255/#263 and the flags-off app authority acceptance remain open.
 Canonical model reconciliation remains pending because main revision 8 and
 integration revision 7 contain independent evidence; the handoff preserves the
 proposed delta and exact merge action without replacing the main checkout.

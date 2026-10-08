@@ -1,5 +1,7 @@
 # Security/runtime closure — October 7, 2026
 
+Historical local checkpoint. The [final combined production receipt](security-runtime-production-2026-10-07.md) supersedes its source/counts and deployment stop point; preserve the original proof and limits below.
+
 The four requested areas are implemented and qualified locally on
 `fix/security-runtime-20261007-combined-bk_2dx`, from pinned integration base
 `56eef0a3fe32495d06b1f3db32f4d8f720ce3990`. This is an isolated repair branch;

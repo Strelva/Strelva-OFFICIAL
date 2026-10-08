@@ -1,5 +1,31 @@
 # Ordinary agency workflow — October 7, 2026
 
+## Final combined disposition
+
+The [combined production receipt](security-runtime-production-2026-10-07.md)
+supersedes the candidate counts, source and deployment claims below. Final source
+`954f1905` is deployed at app.strelva.com with exact 266 hosted migrations.
+Only add-client and website-rebuild flags were added; existing workspace `1` and
+other configuration remain. Final native SQL and signed-in owner minimum browser
+journey pass. All 60 legacy public reads remain byte-identical after promotion.
+
+**151200 is retired, unshipped and absent from both inventories.** Applying it
+after 181310 would remove stronger assignment/effect guards. Historical seat-only
+anonymous positive fixtures are off the final gate. Current anonymous seat-only
+admission is NULL without effects; genuine verified-owner membership is required.
+Final native proof checks all seven successor functions, mandate revocation
+before/after reservation, publication receipts and 191 actor RPC ACL boundaries.
+
+Publication is an accepted DB revision and receipt. Public delivery is unavailable:
+new-site origin defaults to `<tenant>.strelva.com`, and two public DNS resolvers
+return NXDOMAIN for the qualification host. There is no implemented
+`/sites/<tenant>` renderer fallback. No DNS/domain write occurred; #243/#322 remain
+open. Add-client closure must state this limitation and cannot imply full live
+website delivery. Broader #245/#255/#263 acceptance remains open.
+
+The remainder is preserved historical candidate evidence; its older migration
+names, anonymous positive claims and counts do not define the final release.
+
 ## October 8 release coordination checkpoint
 
 The minimum three-flag browser job passes on a fresh 260-migration Auth stack:
@@ -165,7 +191,7 @@ The new pieces complete the gaps between those features:
   Browser proof checks actual main bounds and nested overflow, then scrolls
   receipts into the visible viewport. The original clipped image is retained.
 
-## Migration order and recovery
+## Historical candidate migration order and recovery
 
 Existing provider-seat conversion originally collided with inquiry retention
 at `20261013220000`. Its prepared forward/rollback pair is now
