@@ -1548,7 +1548,7 @@ CLI cannot name another approver.
 | --- | --- | --- | --- | --- | --- |
 | S0 | Step 0 | — | `npx tsx scripts/production-readiness-snapshot.ts --i-have-jacobs-yes` | nothing | — |
 | S1 | After batch 0 and the `0.2.1` deploy | `npx tsx scripts/backfill-tenant-leads.ts` | `npx tsx scripts/backfill-tenant-leads.ts --apply --i-have-jacobs-yes` | `tenant_leads` via `record_tenant_lead`; clears `reb:lead-mirror:pending` entries, and a successful write also clears `reb:lead-mirror:schema-missing`. Idempotent | batch 0 |
-| S2 | After batch 1 | `npx tsx scripts/copy-report-analytics-state.ts` | `npx tsx scripts/copy-report-analytics-state.ts --apply --i-have-jacobs-yes` | `tenant_report_state`, `tenant_analytics_config` with `via='backfill'`, fills only what's missing | batch 1 |
+| S2 | After batch 1 | `npx tsx scripts/copy-report-analytics-state.ts --i-have-jacobs-yes` (reads both production stores) | `npx tsx scripts/copy-report-analytics-state.ts --apply --i-have-jacobs-yes` | `tenant_report_state`, `tenant_analytics_config` with `via='backfill'`, fills only what's missing | batch 1 |
 | S3 | After batch 3 and `STRELVA_CLIENT_RECORDS_DUAL_WRITE=1` | `npx tsx scripts/client-records-move.ts backfill` | `… backfill --apply --i-have-jacobs-yes`; then the daily `client-records-parity` cron records parity on its own (no command). `client-records-move.ts parity --i-have-jacobs-yes` remains for an on-demand check | `tenant_client_records` (backfill only); parity rows (one per store/tenant/day) come from the cron | batch 3 |
 | S4 | After batch 6 | `pnpm check:scrubbed-copy` (local only, no yes) | `pnpm scrubbed-copy create --out=$HOME/strelva-copies/$(date +%F) --source=<pg host> --source-redis=<db>.upstash.io --grandfathered=gldf,rohlax --i-have-jacobs-yes`, then `pnpm scrubbed-copy dry-run --out=…` and `npx tsx scripts/needs-you-parity.ts` against the copy | nothing in production; a local copy outside every git checkout | read-only source credentials in a clean shell ([scrubbed copy](./scrubbed-production-copy.md)). Check free disk first (12 GB on Oct 6) |
 | S5 | Retired · step 11 held pending 7A and #234 | Read-only check for a designation row | **Do not run `designate-agency`.** Create and verify the ordinary agency in steps 10a–10b instead | no designation or automatic provider rows | batch 7A; section 6 |
@@ -1561,6 +1561,17 @@ CLI cannot name another approver.
 | S11 | After batch 5 and each tenant's conversion, before `STRELVA_NEEDS_YOU_RELEASE=1` | Against the S4 scrubbed copy only: `npx tsx scripts/needs-you-seed-tenant-policies.ts [<slug>] --json` (no yes needed on local stores) | `npx tsx scripts/needs-you-seed-tenant-policies.ts <slug> --operator-user-id=<uuid> --operator-email=<super admin> --i-have-jacobs-yes` | one `decision_policy_tenant_imports` receipt per tenant and kind (content autonomy, review reply mode), the owner's `decision_policies` row and its history. Redis keys never change; idempotent. A choice the new floor doesn't carry over is listed, not migrated | batch 5 (`20261008124000`), conversion. **There is no production dry run**: with the yes it writes, and without it it refuses a non-local store. Review the scrubbed-copy plan first |
 | S12 | After batch 6 and `STRELVA_BOOKING_STORE_WRITE=1` | `npx tsx scripts/booking-store-move.ts backfill --i-have-jacobs-yes` (reads client bookings, writes nothing) | Two yeses. S12a: `… backfill --apply --i-have-jacobs-yes`, then `… schedules --i-have-jacobs-yes` (dry run) and `… schedules --apply --i-have-jacobs-yes`. S12b, after `STRELVA_BOOKING_STORE_READ=compare`: `… parity --i-have-jacobs-yes` once a day for 7 days (finding 14) | `business_bookings` through `record_tenant_booking` (the dual-write RPC; reruns are no-ops, overlaps refused and listed); parity rows under store `bookings`. Legacy stores untouched | batch 6 (`20261008141000`) |
 | — | Not part of 1.0 | `npx tsx scripts/backfill-secret-encryption.ts --i-have-jacobs-yes`; `npx tsx scripts/count-client-redis-keys.ts --i-have-jacobs-yes` (read-only) | backfill: `--apply --i-have-jacobs-yes` | encrypted secret columns and `connections:*` | `SECRETS_ENC_KEY` |
+
+S2 requires both `SUPABASE_URL` and `UPSTASH_REDIS_REST_URL` before any
+reader runs. The local dry run omits `--i-have-jacobs-yes` only when both
+HTTP(S) base URLs name literal `localhost`, `127.0.0.1` or `[::1]`. Any other
+host, including numeric aliases and `*.localhost`, needs the explicit yes
+for reads as well as writes. Missing URLs, credentials embedded in a URL,
+non-HTTP schemes, paths, queries and fragments are refused even with the yes.
+A missing Supabase client no longer falls back to the tenant cache. The copy
+still preserves existing cadence/config and newer sent markers; Redis keys
+stay unchanged. This guard does not qualify the live recipient review,
+backfills or converted-client parity required by #470.
 
 **Stripe, test mode first, done properly (S7).** A test key against
 production ids fails every update. Rehearse on Preview instead: seed one

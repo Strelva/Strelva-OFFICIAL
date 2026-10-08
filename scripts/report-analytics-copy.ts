@@ -9,7 +9,6 @@
  * and never moves a last-sent marker backwards. Rerun freely. The Redis keys
  * are only read, never renamed or deleted.
  */
-import { isLocalDatabaseUrl } from "./tenant-conversion";
 
 export interface CopyTenant {
   id: string;
@@ -47,6 +46,7 @@ export interface CopyOptions {
   apply: boolean;
   jacobsYes: boolean;
   databaseUrl?: string;
+  redisUrl?: string;
 }
 
 export interface CopyTenantReport {
@@ -76,14 +76,51 @@ export function parseCopyArgs(argv: string[]): CopyOptions & { json: boolean } {
   return { tenant: positional[0], apply, jacobsYes: argv.includes("--i-have-jacobs-yes"), json: argv.includes("--json") };
 }
 
-export async function runReportAnalyticsCopy(options: CopyOptions, deps: CopyDeps): Promise<CopyOutcome> {
-  const database = options.databaseUrl ? (isLocalDatabaseUrl(options.databaseUrl) ? "local" : "not local") : "not configured";
-  if (options.apply) {
-    if (database === "not configured") throw new Error("Refusing --apply: no database is configured (SUPABASE_URL).");
-    if (database === "not local" && !options.jacobsYes) {
-      throw new Error("Refusing --apply: the database is not a local loopback host. A production copy needs Jacob's yes (--i-have-jacobs-yes).");
-    }
+/** Reject credentials, non-HTTP schemes and ambiguous URL syntax before any
+ * reader runs. Compare the literal host: URL normalizes numeric IPv4 aliases
+ * into loopback, but those are not an explicitly selected local target. */
+function targetIsLocal(value: string | undefined, name: string): boolean {
+  if (!value) throw new Error(`Refusing: ${name} is not configured.`);
+  const invalid = () => new Error(`Refusing: ${name} must be an HTTP(S) base URL without credentials, path, query or fragment.`);
+  // WHATWG URL strips some embedded controls, including inside IPv6 brackets.
+  // Authorization must never turn such a malformed input into a usable target.
+  if (/[\s\u0000-\u001f\u007f-\u009f]/.test(value)) throw invalid();
+  const base = /^https?:\/\/(\[[0-9a-f:.]+\]|[^:/?#@\\\s]+)(?::[0-9]+)?\/?$/i.exec(value);
+  if (!base) throw invalid();
+  try {
+    const url = new URL(value);
+    if (!url.hostname || url.username || url.password) throw new Error();
+  } catch {
+    // Never include the configured value; it could contain a credential.
+    throw invalid();
   }
+  return ["localhost", "127.0.0.1", "[::1]"].includes(base[1]!.toLowerCase());
+}
+
+/** Dry runs read client state too. Both stores must be explicitly configured;
+ * no missing-database fallback may refresh the tenant cache. Authorization
+ * permits remote targets, never malformed targets. */
+export function assertReportAnalyticsTargetsAllowed(options: CopyOptions): CopyOutcome["database"] {
+  const localDatabase = targetIsLocal(options.databaseUrl, "SUPABASE_URL");
+  const localRedis = targetIsLocal(options.redisUrl, "UPSTASH_REDIS_REST_URL");
+  const remote = [!localDatabase ? "SUPABASE_URL" : null, !localRedis ? "UPSTASH_REDIS_REST_URL" : null].filter(Boolean);
+  if (remote.length && !options.jacobsYes) {
+    throw new Error(`Refusing: ${remote.join(" and ")} ${remote.length > 1 ? "are" : "is"} not an exact loopback target. Reading or copying production state needs Jacob's yes (--i-have-jacobs-yes).`);
+  }
+  return localDatabase ? "local" : "not local";
+}
+
+/** The CLI prepares and authorizes both env targets before creating clients. */
+export function prepareReportAnalyticsCopyOptions(argv: string[], env: {
+  SUPABASE_URL?: string; UPSTASH_REDIS_REST_URL?: string;
+}): CopyOptions & { json: boolean } {
+  const options = { ...parseCopyArgs(argv), databaseUrl: env.SUPABASE_URL, redisUrl: env.UPSTASH_REDIS_REST_URL };
+  assertReportAnalyticsTargetsAllowed(options);
+  return options;
+}
+
+export async function runReportAnalyticsCopy(options: CopyOptions, deps: CopyDeps): Promise<CopyOutcome> {
+  const database = assertReportAnalyticsTargetsAllowed(options);
   const all = await deps.tenants();
   const tenants = options.tenant ? all.filter((t) => t.id === options.tenant) : all;
   if (options.tenant && tenants.length === 0) throw new Error(`No tenant "${options.tenant}".`);
