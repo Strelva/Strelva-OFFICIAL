@@ -26,6 +26,7 @@ function isBooking(item: OwnerDecision): boolean {
 }
 
 function source(item: OwnerDecision): string {
+  if (item.sourceLifecycle === "connected_site_schema") return "Website";
   if (isBooking(item)) return "Bookings";
   if (item.kind.startsWith("google.") || item.kind.startsWith("review.")) return "Google";
   if (item.kind.startsWith("customer.")) return "Inquiries";
@@ -40,6 +41,7 @@ function source(item: OwnerDecision): string {
 }
 
 function verb(item: OwnerDecision): string {
+  if (item.sourceLifecycle === "connected_site_schema") return "Acknowledge";
   if (item.kind === "system.go_live") return "Make it live";
   if (item.kind === "google.post" || item.kind === "google.photo") return "Post it";
   if (item.kind === "customer.message" || item.kind.startsWith("review.reply")) return "Send";
