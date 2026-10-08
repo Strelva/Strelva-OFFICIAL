@@ -48,7 +48,10 @@ create role anon nologin;
 -- columns the isolated SQL contracts exercise in this local fixture.
 create schema auth;
 create function auth.uid() returns uuid language sql stable as $$
-  select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
+  select coalesce(
+    nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub', ''),
+    nullif(current_setting('request.jwt.claim.sub', true), '')
+  )::uuid
 $$;
 create table auth.users (
   id uuid primary key,
@@ -915,13 +918,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/catalog-reports-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010153000_newsletter_contacts.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-contacts-schema.sql"
 psql "${psql_args[@]}" <<'SQL'
-create schema auth;
-create function auth.uid() returns uuid language sql stable as $$
-  select coalesce(
-    nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub', ''),
-    nullif(current_setting('request.jwt.claim.sub', true), '')
-  )::uuid
-$$;
+-- auth.uid() and the Supabase identity fixture are shared from initial setup.
 create function auth.role() returns text language sql stable as $$
   select coalesce(
     nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role', ''),
@@ -1496,7 +1493,7 @@ grep -q 'owner_decision_effects_rollback_requires_data_preservation' "$cluster_r
 psql "${psql_args[@]}" -Atc "select exists(select 1 from information_schema.columns where table_schema='public' and table_name='owner_decision_link_sessions' and column_name='intended_decision') and exists(select 1 from public.owner_decision_link_sessions) and to_regprocedure('public.owner_decision_provider_holds(uuid,uuid,text[])') is not null" | grep -qx t
 printf 'Owner effect rollback retained sessions and authority gates.\n'
 
-# October 17 retention is last in migration order; deleting its fictional
+# October 17 retention precedes provider website checkpoints; deleting its fictional
 # inquiry fixtures has no inverse migration and runs only in this local cluster.
 retention_functions() {
   psql "${psql_args[@]}" -At <<'SQL'
@@ -1523,6 +1520,18 @@ if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-202610
 fi
 grep -q 'inquiry_lead_retention_rollback_requires_data_preservation' "$cluster_root/inquiry-retention-rollback-refusal.log"
 printf 'Inquiry retention rollback restores functions before purge and refuses after marked deletion.\n'
+
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261018110000_provider_seat_website_access.sql"
+
+# #245: provider website saved checkpoint authority, with exact rollback/reapply.
+psql "${psql_args[@]}" -Atc "select md5(pg_get_functiondef('public.update_bounded_product_work(uuid,uuid,uuid,text,text,integer,jsonb)'::regprocedure))" >"$cluster_root/provider-website-forward.txt"
+psql "${psql_args[@]}" --set=rollback_expected=false --file="$repo_root/tests/provider-seat-websites-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261018110000_provider_seat_website_access.sql"
+psql "${psql_args[@]}" --set=rollback_expected=true --file="$repo_root/tests/provider-seat-websites-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261018110000_provider_seat_website_access.sql"
+psql "${psql_args[@]}" --set=rollback_expected=false --file="$repo_root/tests/provider-seat-websites-schema.sql"
+diff -u "$cluster_root/provider-website-forward.txt" <(psql "${psql_args[@]}" -Atc "select md5(pg_get_functiondef('public.update_bounded_product_work(uuid,uuid,uuid,text,text,integer,jsonb)'::regprocedure))")
+printf 'Provider website saved checkpoints: forward/rollback/reapply passed.\n'
 
 # Schema-conflict reports add service-only functions. Rollback restores the
 # pre-report catalog before any records exist and refuses after an owner ask

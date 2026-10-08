@@ -98,7 +98,7 @@ export async function POST(request: Request) {
       isOperator: await isSuperAdmin(),
       async readMembership(current, workspaceId) {
         const workspace = (await listWorkspaces(current)).find((item) => item.id === workspaceId);
-        return workspace ? { role: workspace.role ?? null, access: workspace.access, kind: workspace.kind } : null;
+        return workspace && workspace.access !== "provider_seat" ? { role: workspace.role ?? null, access: workspace.access, kind: workspace.kind } : null;
       },
       async readExited(current, workspaceId) {
         const exit = await readWorkspaceExit(current, workspaceId);
