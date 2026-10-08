@@ -106,7 +106,7 @@ The coordinator owns canonical project/vault reconciliation and R23 review.
 
 Objective: resolve the Opus review on PR #557; no merge or production action.
 Merged moved `origin/integrate/reborn-1.0` with merge commits `0169fb10` and
-`3f3f0ffb`, then `ba793b28`, through integrate `fd230e29` (#556).
+`3f3f0ffb`, `ba793b28`, and `76e7bade`, through integrate `d1dfb486` (#547).
 A cached brand cannot restore a provider seat after the fresh business lookup
 returns Strelva; an additional regression demonstrated that failure before its fix.
 The original migration `20261012180000` is unmerged and outside checksum-pinned
@@ -133,12 +133,13 @@ full SQL rehearsals now pass on that merged head; the initial failure remains in
 the local logs. Six conflicts were resolved in approval/report routing, native
 monthly outcomes, the image compatibility export and upgrade rehearsal blocks,
 preserving both branches. The last merge retains both brand and tracking-key
-rollback rehearsals.
+rollback rehearsals. The final MCP integration merge was clean; its proxy,
+workspace visibility and agent-admission compatibility tests are included.
 The canonical raster parser is `platform/infra/media/image-signature.ts`; the
 redundant parser added by this branch was removed.
 
-Final checks: typecheck, lint and boundaries passed; 78 targeted files passed
-(926 tests passed, 1 skipped). The production build passed locally.
+Final checks: typecheck, lint and boundaries passed; 87 targeted files passed
+(1020 tests passed, 1 skipped). The production build passed locally.
 Final command outputs and counts are recorded in PR #557. Local evidence logs
 are under `.scratch/agency-brand-review/`; they include the known SQL failure.
 Next action: orchestrator reviews this follow-up and decides integration.
