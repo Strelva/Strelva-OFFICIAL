@@ -15,10 +15,14 @@ for migration in "$repo_root"/supabase/migrations/20*.sql; do
     psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261005090000_tenant_leads.sql" >/dev/null
   fi
   if [[ "$migration_name" == "20261020090036_bundle_maintenance.sql" ]]; then
-    psql "${psql_args[@]}" -At --file="$repo_root/scripts/release-safety/catalog.sql" > "$cluster_root/catalog-before36.json"
+    continue
   fi
   psql "${psql_args[@]}" --file="$migration" >/dev/null
  done
+# Preserve every other current packet during the dedicated36 inverse. The
+# ordered fresh/upgrade checks separately apply36 before37 in normal order.
+psql "${psql_args[@]}" -At --file="$repo_root/scripts/release-safety/catalog.sql" > "$cluster_root/catalog-before36.json"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261020090036_bundle_maintenance.sql" >/dev/null
 psql "${psql_args[@]}" -At --file="$repo_root/scripts/release-safety/catalog.sql" > "$cluster_root/catalog-with36.json"
 sed '/-- A revoked accepted mandate/,$d' "$repo_root/tests/recurring-responsibilities-schema.sql" > "$cluster_data/maintenance-fixture.sql"
 cat "$repo_root/tests/bundle-maintenance-schema.sql" >> "$cluster_data/maintenance-fixture.sql"
