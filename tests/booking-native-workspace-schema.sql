@@ -15,12 +15,12 @@ insert into public.workspace_memberships(workspace_id,user_id,role,created_by) v
  ('e6000000-0000-4000-8000-000000000010','e6000000-0000-4000-8000-000000000001','owner','e6000000-0000-4000-8000-000000000001'),
  ('e6000000-0000-4000-8000-000000000010','e6000000-0000-4000-8000-000000000002','member','e6000000-0000-4000-8000-000000000001');
 insert into public.business_records(workspace_id,created_by,updated_by) values('e6000000-0000-4000-8000-000000000010','e6000000-0000-4000-8000-000000000001','e6000000-0000-4000-8000-000000000001');
-insert into public.business_record_facts(workspace_id,fact_key,value,source,updated_by) values
- ('e6000000-0000-4000-8000-000000000010','display_name','"Native Consultation"','owner','e6000000-0000-4000-8000-000000000001'),
- ('e6000000-0000-4000-8000-000000000010','owner_recipient','{"email":"native-owner@example.test","name":"Native Owner"}','owner','e6000000-0000-4000-8000-000000000001'),
- ('e6000000-0000-4000-8000-000000000010','hours','{"timezone":"UTC","weekly":[{"day":0,"opens":"09:00","closes":"17:00"},{"day":1,"opens":"09:00","closes":"17:00"},{"day":2,"opens":"09:00","closes":"17:00"},{"day":3,"opens":"09:00","closes":"17:00"},{"day":4,"opens":"09:00","closes":"17:00"},{"day":5,"opens":"09:00","closes":"17:00"},{"day":6,"opens":"09:00","closes":"17:00"}]}','owner','e6000000-0000-4000-8000-000000000001');
 insert into public.business_services(id,workspace_id,name,duration_minutes,active,source,created_by,updated_by) values
  ('e6000000-0000-4000-8000-000000000030','e6000000-0000-4000-8000-000000000010','Consultation',30,true,'owner','e6000000-0000-4000-8000-000000000001','e6000000-0000-4000-8000-000000000001');
+-- Native admission and notice delivery consume the owner's confirmed record.
+select public.patch_business_record('e6000000-0000-4000-8000-000000000010','e6000000-0000-4000-8000-000000000001','native-owner@example.test','owner',0,
+ '{"facts":{"display_name":{"value":"Native Consultation"},"owner_recipient":{"value":{"email":"native-owner@example.test","name":"Native Owner"}},"hours":{"value":{"timezone":"UTC","weekly":[{"day":0,"opens":"09:00","closes":"17:00"},{"day":1,"opens":"09:00","closes":"17:00"},{"day":2,"opens":"09:00","closes":"17:00"},{"day":3,"opens":"09:00","closes":"17:00"},{"day":4,"opens":"09:00","closes":"17:00"},{"day":5,"opens":"09:00","closes":"17:00"},{"day":6,"opens":"09:00","closes":"17:00"}]} }},"services":[{"op":"upsert","id":"e6000000-0000-4000-8000-000000000030","name":"Consultation","durationMinutes":30,"active":true}]}',
+ gen_random_uuid(),repeat('c',64));
 select pg_temp.nw_assert((public.read_tenant_booking_context('workspace:e6000000-0000-4000-8000-000000000010')->>'paused')::boolean,'missing System closes new admission');
 insert into public.systems(id,business_workspace_id,name,kind,command_id,command_digest,created_by,updated_by) values
  ('e6000000-0000-4000-8000-000000000020','e6000000-0000-4000-8000-000000000010','Bookings','booking','e6000000-0000-4000-8000-000000000040',repeat('a',64),'e6000000-0000-4000-8000-000000000001','e6000000-0000-4000-8000-000000000001');

@@ -15,8 +15,9 @@ insert into public.users(id,email,verified_at) values ('c1700000-0000-4000-8000-
 insert into public.workspaces(id,kind,name,created_by) values ('c1700000-0000-4000-8000-000000000002','customer','Notice fixture','c1700000-0000-4000-8000-000000000001');
 insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values ('c1700000-0000-4000-8000-000000000002','c1700000-0000-4000-8000-000000000001','owner','c1700000-0000-4000-8000-000000000001');
 insert into public.business_records(workspace_id,created_by,updated_by) values ('c1700000-0000-4000-8000-000000000002','c1700000-0000-4000-8000-000000000001','c1700000-0000-4000-8000-000000000001');
-insert into public.business_record_facts(workspace_id,fact_key,value,source,verified,updated_by) values
-  ('c1700000-0000-4000-8000-000000000002','owner_recipient','{"email":"idn-owner@example.test"}','owner',true,'c1700000-0000-4000-8000-000000000001');
+-- Signed owner decisions require confirmed record provenance as well as a linked tenant.
+select public.patch_business_record('c1700000-0000-4000-8000-000000000002','c1700000-0000-4000-8000-000000000001','idn-owner@example.test','owner',0,
+  '{"facts":{"owner_recipient":{"value":{"email":"idn-owner@example.test"}}}}',gen_random_uuid(),repeat('9',64));
 insert into public.tenants(id,stable_id,site_name,active,owner_email) values ('fixture','c1700000-0000-4000-8000-000000000006','Notice fixture',true,'idn-owner@example.test');
 insert into public.tenant_workspace_links(tenant_stable_id,tenant_slug_at_link,workspace_id,linked_by,command_id,command_digest,receipt) values
   ('c1700000-0000-4000-8000-000000000006','fixture','c1700000-0000-4000-8000-000000000002','c1700000-0000-4000-8000-000000000001','c1700000-0000-4000-8000-000000000007',repeat('3',64),'{}');
@@ -36,6 +37,14 @@ select public.finish_inquiry_decision_notice('c1700000-0000-4000-8000-0000000000
 select pg_temp.idn_assert(public.claim_inquiry_decision_notice('c1700000-0000-4000-8000-000000000002','c1700000-0000-4000-8000-000000000004',repeat('2',64),'idn-owner@example.test')->>'status'='accepted','accepted never reacquired');
 select pg_temp.idn_assert((select delivery_state='sent' from public.owner_decisions where id='c1700000-0000-4000-8000-000000000004'),'acceptance records delivery atomically');
 select pg_temp.idn_assert(not public.authorize_inquiry_owner_link_decision('fixture','evt-1',repeat('1',64),'idn-owner@example.test'),'actor label alone grants no owner authority');
+-- The earlier ambiguous notice is not proof that its owner link was sent.
+do $binding$ begin
+  if to_regclass('public.owner_decision_link_bindings') is not null then
+    perform pg_temp.idn_expect($$select public.claim_owner_decision('c1700000-0000-4000-8000-000000000002','c1700000-0000-4000-8000-000000000003',repeat('1',64),'approve','owner_link',null,null,'idn-owner@example.test')$$,'owner_decision_recipient_not_owner');
+  end if;
+end $binding$;
+-- Supply independently observed delivery through the canonical receipt RPC.
+select public.record_owner_decision_delivery('c1700000-0000-4000-8000-000000000002','c1700000-0000-4000-8000-000000000003','digest','sent','idn-owner@example.test','idn-observed-owner-link',null);
 select public.claim_owner_decision('c1700000-0000-4000-8000-000000000002','c1700000-0000-4000-8000-000000000003',repeat('1',64),'approve','owner_link',null,null,'idn-owner@example.test');
 select pg_temp.idn_assert(public.authorize_inquiry_owner_link_decision('fixture','evt-1',repeat('1',64),'idn-owner@example.test'),'exact signed decision authorizes its event');
 select pg_temp.idn_assert(not public.authorize_inquiry_owner_link_decision('fixture','evt-1',repeat('2',64),'idn-owner@example.test')
@@ -44,7 +53,7 @@ select pg_temp.idn_assert(not public.authorize_inquiry_owner_link_decision('fixt
   and not public.authorize_inquiry_owner_link_decision('fixture','evt-1',repeat('1',64),'other@example.test'),'revision, business, event and recipient all bind');
 -- Rotate through the owner's write, which also updates confirmed recipient trust.
 -- A direct working-row overwrite is pending after #509 and cannot revoke it.
-select public.patch_business_record('c1700000-0000-4000-8000-000000000002','c1700000-0000-4000-8000-000000000001','idn-owner@example.test','owner',0,
+select public.patch_business_record('c1700000-0000-4000-8000-000000000002','c1700000-0000-4000-8000-000000000001','idn-owner@example.test','owner',1,
   '{"facts":{"owner_recipient":{"value":{"email":"new-owner@example.test"}}}}', 'c1700000-0000-4000-8000-000000000008', repeat('8',64));
 select pg_temp.idn_assert(not public.authorize_inquiry_owner_link_decision('fixture','evt-1',repeat('1',64),'idn-owner@example.test'),'revoked owner recipient cannot reuse old authority');
 rollback;

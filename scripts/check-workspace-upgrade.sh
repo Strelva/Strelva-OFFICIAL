@@ -385,6 +385,8 @@ fi
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/business-pages-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-confirmed-facts-schema.sql"
+# The original tenantless booking contract also consumes confirmed facts after upgrade.
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-native-workspace-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/owner-recipient-trust-schema.sql"
 printf 'Booking-reader, public-facts and #509 rollbacks restored the exact catalog in reverse order.\n'
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
