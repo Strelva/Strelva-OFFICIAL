@@ -18,8 +18,9 @@ insert into public.workspace_memberships(workspace_id,user_id,role,created_by) v
 insert into public.business_records(workspace_id,created_by,updated_by) values('ac161100-0000-4000-8000-000000000010','ac161100-0000-4000-8000-000000000001','ac161100-0000-4000-8000-000000000001');
 insert into public.business_pages(workspace_id,handle,published,published_at,updated_by) values('ac161100-0000-4000-8000-000000000010','agent-fixture',true,now(),'ac161100-0000-4000-8000-000000000001');
 insert into public.business_services(id,workspace_id,name,source,verified,created_by,updated_by) values('ac161100-0000-4000-8000-000000000040','ac161100-0000-4000-8000-000000000010','Consulting','owner',true,'ac161100-0000-4000-8000-000000000001','ac161100-0000-4000-8000-000000000001');
+select public.patch_business_record('ac161100-0000-4000-8000-000000000010','ac161100-0000-4000-8000-000000000001','ac-owner@example.test','owner',0,
+ '{"facts":{"response_time":{"value":{"maximumHours":24},"verified":true}}}',gen_random_uuid(),repeat('d',64));
 insert into public.business_record_facts(workspace_id,fact_key,value,source,verified,updated_by) values
- ('ac161100-0000-4000-8000-000000000010','response_time','{"maximumHours":24}','owner',true,'ac161100-0000-4000-8000-000000000001'),
  ('ac161100-0000-4000-8000-000000000010','phone','"716-555-0100"','agent',false,'ac161100-0000-4000-8000-000000000001');
 create temporary table ac_receipts(k text primary key,r jsonb);
 create function pg_temp.ac_input(n text,quote boolean default false) returns jsonb language sql as $$select jsonb_build_object('origin','agent','type',case when quote then 'quote' else 'inquiry' end,'requestId','request-'||n,'agent',jsonb_build_object('name','Fixture Assistant'),'customer',jsonb_build_object('name','Dana','email','dana'||n||'@example.test'),'message','Please help with this work','serviceId','ac161100-0000-4000-8000-000000000040','fields',jsonb_build_object('scope','Review our proposal','area','Buffalo'))$$;

@@ -26,7 +26,7 @@ for migration in "$repo_root"/supabase/migrations/20*.sql; do
   psql "${psql_args[@]}" --file="$migration" >/dev/null
 done
 
-if [[ "$#" == 0 ]]; then set -- tests/agent-channel-schema.sql tests/agent-channel-abuse-schema.sql tests/agent-booking-admission-schema.sql; fi
+if [[ "$#" == 0 ]]; then set -- tests/agent-confirmed-provenance-schema.sql tests/agent-channel-schema.sql tests/agent-channel-abuse-schema.sql tests/agent-booking-admission-schema.sql; fi
 for fixture in "$@"; do
   if [[ "$fixture" != tests/*.sql || "$fixture" == *'..'* || ! -f "$repo_root/$fixture" ]]; then
     printf 'Invalid focused fixture: %s\n' "$fixture" >&2
