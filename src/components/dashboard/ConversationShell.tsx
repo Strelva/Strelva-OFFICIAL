@@ -42,7 +42,7 @@ export function ConversationShell({
   const hydrationReady = useHydrationReady();
   const pathname = usePathname();
   const discussionTriggerRef = useRef<HTMLButtonElement>(null);
-  const { dashboardBasePath, impersonation, relationship } = useDashboard();
+  const { tenantId, dashboardBasePath, impersonation, relationship } = useDashboard();
   const effectivePathname = dashboardBasePath && pathname?.startsWith(dashboardBasePath)
     ? pathname.slice(dashboardBasePath.length) || "/dashboard" : pathname || "";
   const isChatRoute = effectivePathname === "/dashboard/chat" || effectivePathname.startsWith("/dashboard/chat/");
@@ -57,6 +57,7 @@ export function ConversationShell({
 
   return (
     <StrelvaShell
+      tenantId={tenantId}
       theme="dashboard"
       active="work"
       title={MANAGED_WEBSITES_LABEL}

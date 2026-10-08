@@ -196,7 +196,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
           try {
             session = item.sourceLifecycle === "make_real"
               ? await deps.store.linkSession?.(input.workspaceId, item.id, input.by.recipient) ?? null
-              : await deps.store.ownerLinkSession?.(input.workspaceId, item.id, input.revision, input.by.recipient) ?? null;
+              : await deps.store.ownerLinkSession?.(input.workspaceId, item.id, input.revision, input.by.recipient, input.decision) ?? null;
           } catch (error) {
             // A link for anyone but the owner on record is refused like any other link.
             if (error instanceof ServiceSessionRefusedError && error.code === "owner_decision_recipient_not_owner") return { status: "not_owner", item };
@@ -365,6 +365,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     try {
       result = await deps.sendEmail({
         audience: "client",
+        workspaceId: first.workspaceId,
         // Client email is tenant-aware; without a linked tenant the global switch decides.
         ...(mailTenant ? { tenantId: mailTenant } : {}),
         to: recipient,

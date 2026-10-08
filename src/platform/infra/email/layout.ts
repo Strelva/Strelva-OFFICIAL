@@ -1,3 +1,4 @@
+import { brandColors, BRAND_CREDIT, type OwnerBrand } from "@/platform/infra/agency-brand";
 /**
  * Strelva shared email design system.
  *
@@ -93,8 +94,9 @@ export interface EmailDecision {
 }
 
 export interface EmailOptions {
-  /** Agency identity; richer logo/color treatment is owned by #264. */
+  /** Legacy name-only attribution. Prefer brand for workspace identity. */
   preparedBy?: string;
+  brand?: OwnerBrand;
   /** Hidden preview text shown in the inbox list before the body. */
   preheader?: string;
   /** The one h1. */
@@ -133,27 +135,32 @@ export function escapeEmailHtml(value: string): string {
 
 /** The real Strelva logo (cairn + Fraunces wordmark) as a hosted image.
  *  `footer` = the smaller footer variant. */
-function logo(footer = false, preparedBy?: string): string {
+function logo(footer = false, preparedBy?: string, brand?: OwnerBrand): string {
+  if (brand?.agencyId) {
+    if (footer) return `<span style="font-size:12px;color:${TOKENS.muted};">${BRAND_CREDIT}</span>`;
+    const image = brand.logoUrl ? `<img src="${escapeEmailHtml(brand.logoUrl)}" alt="" width="132" style="display:block;max-width:132px;max-height:64px;object-fit:contain;margin-bottom:12px;">` : "";
+    return `${image}<span style="font-size:16px;font-weight:600;">${escapeEmailHtml(brand.name)}</span>`;
+  }
   if (preparedBy) return `<span style="font-size:16px;font-weight:600;">${escapeEmailHtml(preparedBy)} <span style="font-size:12px;font-weight:400;">on Strelva</span></span>`;
   const w = footer ? 92 : 132;
   const h = Math.round(w * LOGO_RATIO);
   return `<img src="${escapeEmailHtml(EMAIL_LOGO_URL)}" alt="Strelva" width="${w}" height="${h}" style="display:block;width:${w}px;height:${h}px;border:0;outline:none;text-decoration:none;">`;
 }
 
-function buttonHtml(button: EmailButton): string {
+function buttonHtml(button: EmailButton, colors = brandColors(TOKENS.accent)): string {
   const label = escapeEmailHtml(button.label);
   // Bulletproof-ish button: padded anchor with a solid background.
-  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 4px;"><tr><td style="border-radius:999px;background:${TOKENS.accent};">
-      <a href="${escapeEmailHtml(button.url)}" style="display:inline-block;padding:12px 26px;font-size:15px;font-weight:600;color:${TOKENS.buttonText};text-decoration:none;border-radius:999px;">${label}</a>
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 4px;"><tr><td style="border-radius:999px;background:${colors.accent};">
+      <a href="${escapeEmailHtml(button.url)}" style="display:inline-block;padding:12px 26px;font-size:15px;font-weight:600;color:${colors.onAccent};text-decoration:none;border-radius:999px;">${label}</a>
     </td></tr></table>`;
 }
 
-function secondaryButtonHtml(button: EmailButton): string {
+function secondaryButtonHtml(button: EmailButton, colors = brandColors(TOKENS.accent)): string {
   const label = escapeEmailHtml(button.label);
   // Outline pill: sage border + sage text on the white card, so it reads as the
   // quieter of the two actions without a second filled color.
-  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:4px 0 4px;"><tr><td style="border-radius:999px;border:1px solid ${TOKENS.accent};">
-      <a href="${escapeEmailHtml(button.url)}" style="display:inline-block;padding:11px 25px;font-size:15px;font-weight:600;color:${TOKENS.accent};text-decoration:none;border-radius:999px;">${label}</a>
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:4px 0 4px;"><tr><td style="border-radius:999px;border:1px solid ${colors.accent};">
+      <a href="${escapeEmailHtml(button.url)}" style="display:inline-block;padding:11px 25px;font-size:15px;font-weight:600;color:${colors.onWhite};text-decoration:none;border-radius:999px;">${label}</a>
     </td></tr></table>`;
 }
 
@@ -178,14 +185,14 @@ function highlightHtml(h: EmailHighlight): string {
       </td></tr></table>`;
 }
 
-function bulletsHtml(items: EmailBullet[]): string {
+function bulletsHtml(items: EmailBullet[], colors = brandColors(TOKENS.accent)): string {
   const rows = items
     .map((b, i) => {
       const text = b.text ? ` &mdash; ${escapeEmailHtml(b.text)}` : "";
       const border = i === 0 ? "" : `border-top:1px solid ${TOKENS.hairline};`;
       return `<tr><td style="padding:10px 0;${border}">
         <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-          <td width="16" valign="top" style="padding-top:7px;"><div style="width:7px;height:7px;border-radius:50%;background:${TOKENS.accent};"></div></td>
+          <td width="16" valign="top" style="padding-top:7px;"><div style="width:7px;height:7px;border-radius:50%;background:${colors.accent};"></div></td>
           <td style="font-size:14px;line-height:1.55;color:${TOKENS.muted};"><span style="font-weight:600;color:${TOKENS.ink};">${escapeEmailHtml(b.title)}</span>${text}</td>
         </tr></table>
       </td></tr>`;
@@ -194,9 +201,9 @@ function bulletsHtml(items: EmailBullet[]): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:2px 0 10px;">${rows}</table>`;
 }
 
-function decisionsHtml(items: EmailDecision[]): string {
+function decisionsHtml(items: EmailDecision[], colors = brandColors(TOKENS.accent)): string {
   const link = (b: EmailButton, strong: boolean) =>
-    `<a href="${escapeEmailHtml(b.url)}" style="display:inline-block;margin:6px 14px 0 0;font-size:14px;font-weight:600;color:${strong ? TOKENS.buttonText : TOKENS.accent};${strong ? `background:${TOKENS.accent};padding:8px 18px;border-radius:999px;` : "padding:8px 0;"}text-decoration:${strong ? "none" : "underline"};">${escapeEmailHtml(b.label)}</a>`;
+    `<a href="${escapeEmailHtml(b.url)}" style="display:inline-block;margin:6px 14px 0 0;font-size:14px;font-weight:600;color:${strong ? colors.onAccent : colors.onWhite};${strong ? `background:${colors.accent};padding:8px 18px;border-radius:999px;` : "padding:8px 0;"}text-decoration:${strong ? "none" : "underline"};">${escapeEmailHtml(b.label)}</a>`;
   const rows = items
     .map((d, i) => {
       const border = i === 0 ? "" : `border-top:1px solid ${TOKENS.hairline};`;
@@ -234,11 +241,12 @@ function footerHtml(opts: EmailOptions): string {
   const metaRow = meta.length
     ? `<div style="margin-top:10px;font-size:12px;line-height:1.5;color:${TOKENS.faint};">${meta.join(" &nbsp;·&nbsp; ")}</div>`
     : "";
-  return `<div style="padding:24px 0 8px;">${logo(true, opts.preparedBy)}${metaRow}</div>`;
+  return `<div style="padding:24px 0 8px;">${logo(true, opts.preparedBy, opts.brand)}${metaRow}</div>`;
 }
 
 /** Full branded HTML email document. */
 export function renderEmailHtml(opts: EmailOptions): string {
+  const colors = brandColors(opts.brand?.accentColor ?? TOKENS.accent);
   const preheader = opts.preheader
     ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeEmailHtml(opts.preheader)}</div>`
     : "";
@@ -249,11 +257,11 @@ export function renderEmailHtml(opts: EmailOptions): string {
     )
     .join("");
   const highlight = opts.highlight ? highlightHtml(opts.highlight) : "";
-  const bullets = opts.bullets && opts.bullets.length ? bulletsHtml(opts.bullets) : "";
+  const bullets = opts.bullets && opts.bullets.length ? bulletsHtml(opts.bullets, colors) : "";
   const rows = opts.rows && opts.rows.length ? rowsHtml(opts.rows) : "";
-  const decisions = opts.decisions && opts.decisions.length ? decisionsHtml(opts.decisions) : "";
-  const button = opts.button ? buttonHtml(opts.button) : "";
-  const secondaryButton = opts.secondaryButton ? secondaryButtonHtml(opts.secondaryButton) : "";
+  const decisions = opts.decisions && opts.decisions.length ? decisionsHtml(opts.decisions, colors) : "";
+  const button = opts.button ? buttonHtml(opts.button, colors) : "";
+  const secondaryButton = opts.secondaryButton ? secondaryButtonHtml(opts.secondaryButton, colors) : "";
 
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"></head>
@@ -262,7 +270,7 @@ ${preheader}
 <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background:${TOKENS.page};padding:32px 12px;">
   <tr><td align="center">
     <table role="presentation" cellpadding="0" cellspacing="0" width="${TOKENS.width}" style="max-width:${TOKENS.width}px;width:100%;background:${TOKENS.card};border:1px solid ${TOKENS.hairline};border-radius:14px;font-family:${TOKENS.font};">
-      <tr><td style="padding:28px 32px 0;">${logo(false, opts.preparedBy)}</td></tr>
+      <tr><td style="padding:28px 32px 0;">${logo(false, opts.preparedBy, opts.brand)}</td></tr>
       <tr><td style="padding:20px 32px 0;">
         <h1 style="margin:0 0 16px;font-size:24px;line-height:1.25;font-weight:700;color:${TOKENS.ink};">${escapeEmailHtml(opts.heading)}</h1>
         ${paragraphs}${highlight}${bullets}${decisions}${rows}${button}${secondaryButton}
@@ -298,7 +306,7 @@ export function renderEmailText(opts: EmailOptions): string {
   if (opts.button) parts.push(`${opts.button.label}: ${opts.button.url}`, "");
   if (opts.secondaryButton) parts.push(`${opts.secondaryButton.label}: ${opts.secondaryButton.url}`, "");
   if (opts.footerNote) parts.push(opts.footerNote);
-  parts.push(opts.preparedBy ? `${opts.preparedBy} on Strelva` : "Strelva");
+  parts.push(opts.brand?.agencyId ? `${opts.brand.name} · ${BRAND_CREDIT}` : opts.preparedBy ? `${opts.preparedBy} on Strelva` : "Strelva");
   if (opts.manageUrl) parts.push(`Manage: ${opts.manageUrl}`);
   if (opts.unsubscribeUrl) parts.push(`Unsubscribe: ${opts.unsubscribeUrl}`);
   return parts.join("\n").replace(/\n{3,}/g, "\n\n").trim();
