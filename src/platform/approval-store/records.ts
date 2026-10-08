@@ -16,7 +16,12 @@ export interface ApprovalStore {
   read(businessId: string, id: string): Promise<OwnerDecision | null>;
 }
 
-/** Human approval authority lives on owner_decisions; native lifecycle rows are receipts. */
+/**
+ * Approval evidence for a Needs you decision. Native resolvers retain their
+ * own authorization and execution claims; event actions still gate on Redis.
+ * A record here is neither an exclusive effect claim nor authority for direct
+ * callers outside the Needs you service.
+ */
 export function approvalRecord(row: OwnerDecision | null, subject: ApprovalSubject): ApprovalRecord | null {
   if (!row || row.workspaceId !== subject.businessId || row.sourceLifecycle !== subject.lifecycle
     || row.sourceId !== subject.sourceId || row.revisionHash !== subject.revision) return null;

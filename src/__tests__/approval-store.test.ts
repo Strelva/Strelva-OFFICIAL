@@ -49,6 +49,28 @@ describe("one approval authority behind native adapters", () => {
     expect(read.mock.invocationCallOrder[0]!).toBeLessThan(native.currentRevision.mock.invocationCallOrder[0]!);
     expect(native.currentRevision.mock.invocationCallOrder[0]!).toBeLessThan(native.resolve.mock.invocationCallOrder[0]!);
   });
+  it.each(["done", "done_unverified", "failed"] as const)("does not replay an approval with a recorded %s outcome", async (outcome) => {
+    const native = adapter();
+    // The source may still look pending after a provider accepted the write
+    // but receipt reconciliation failed. The canonical terminal closes it.
+    const finished = row({ outcome, receiptRef: "accepted-provider-write" });
+    const wrapped = withCanonicalApprovalStore(native, { store: { read: async () => finished }, enabled: async () => true });
+    expect(await wrapped.resolve({ workspaceId: businessId, actor }, row(), "approve", { kind: "session", actor }))
+      .toEqual({ outcome: "failed", reason: "approval_already_finished: nothing ran" });
+    expect(native.currentRevision).not.toHaveBeenCalled();
+    expect(native.resolve).not.toHaveBeenCalled();
+  });
+  it("does not repeat terminal declined or expired cleanup", async () => {
+    const native = adapter();
+    let finished = row({ state: "declined", outcome: "done" });
+    const wrapped = withCanonicalApprovalStore(native, { store: { read: async () => finished }, enabled: async () => true });
+    expect(await wrapped.resolve({ workspaceId: businessId }, row(), "not_yet", { kind: "session", actor }))
+      .toMatchObject({ reason: "approval_already_finished: nothing ran" });
+    finished = row({ state: "expired", decidedByKind: "expiry", outcome: "done" });
+    expect(await wrapped.resolve({ workspaceId: businessId }, finished, "not_yet", { kind: "expiry" }))
+      .toMatchObject({ reason: "approval_already_finished: nothing ran" });
+    expect(native.resolve).not.toHaveBeenCalled();
+  });
   it.each([
     ["missing", null], ["withdrawn", row({ state: "withdrawn" })], ["wrong business", row({ workspaceId: actor.userId })],
     ["changed revision", row({ revisionHash: "b".repeat(64) })], ["system approval", row({ decidedByKind: "system" })], ["failed", row({ outcome: "failed" })],
