@@ -93,7 +93,10 @@ separate authorized operational proof. No issue record grants that authority.
 #334 has an optional prepared Sandbox port, not an installed SDK or selected build
 path: see [the concrete dependency/resource proposal](./vercel-sandbox-prepared-build.md).
 The proposed SDK minimum2GB conflicts with the existing literal256MB artifact
-contract. Dependency/resource approval, durable usage evidence, approved image,
+contract. Durable candidate/payer/budget admission, usage observations and supplied exact
+billing evidence are prepared and independently tested, including concurrent
+representative withdrawal. Counters do not prove charges. Dependency/resource
+approval, trusted actual per-session billing retrieval, approved image,
 listed custom-runtime qualification and actual provider isolation/cleanup proof
 must be established before unfreezing it. No spend cap is inferred from a proposal.
 

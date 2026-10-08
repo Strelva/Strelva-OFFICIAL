@@ -4,7 +4,7 @@ check_money_apps_contracts() {
   local bundle_input="$cluster_data/bundle-native-input.sql" fixture
   (cd "$repo_root" && ./node_modules/.bin/tsx scripts/system-bundle-native-fixture.ts "$bundle_input")
   for fixture in \
-    payer-billing-completion-schema.sql agency-billing-receipt-terms-upgrade-schema.sql \
+    payer-billing-completion-schema.sql agency-billing-receipt-terms-upgrade-schema.sql sandbox-build-evidence-schema.sql \
     money-apps-payer-connect-schema.sql money-export-readonly-schema.sql \
     agent-confirmed-provenance-schema.sql agent-channel-schema.sql agent-channel-abuse-schema.sql agent-booking-admission-schema.sql \
     creator-packages-schema.sql offering-source-versions-schema.sql \
