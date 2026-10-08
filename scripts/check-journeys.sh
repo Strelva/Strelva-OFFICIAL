@@ -6,6 +6,7 @@
 #   pnpm check:journeys --keep-stack    # leave the stack up and print how to reuse it
 #   pnpm check:journeys --reuse <dir>   # reuse a kept stack (its env file), stop nothing
 #   pnpm check:journeys --only on|off   # one phase only
+#   pnpm check:journeys --bundler webpack # explicit alternate local bundler; default stays Turbopack
 #   pnpm check:journeys --with-proposed-fixes  # apply scripts/journeys-proposed-fixes.sql to the disposable DB first
 #   pnpm check:journeys -- -g "Approve" # anything after -- goes to Playwright (filters within the phase's specs)
 #
@@ -25,13 +26,16 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 
-keep=0 reuse="" only="" fixes=0 neutral=0 extra=()
+keep=0 reuse="" only="" fixes=0 neutral=0 bundler=turbopack extra=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --neutral) neutral=1 ;;
     --keep-stack) keep=1 ;;
     --reuse) reuse="$2"; shift ;;
     --only) only="$2"; shift ;;
+    --bundler)
+      [[ $# -ge 2 && "$2" != --* ]] || { echo '--bundler takes turbopack or webpack.' >&2; exit 2; }
+      bundler="$2"; shift ;;
     --with-proposed-fixes) fixes=1 ;;
     --) shift; extra=("$@"); break ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
@@ -39,6 +43,10 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 [[ -z "$only" || "$only" == on || "$only" == off ]] || { echo '--only takes on or off.' >&2; exit 2; }
+[[ "$bundler" == turbopack || "$bundler" == webpack ]] || { echo '--bundler takes turbopack or webpack.' >&2; exit 2; }
+# Leave the default command untouched; Webpack is an explicit proof scope.
+bundler_args=()
+[[ "$bundler" != webpack ]] || bundler_args=(--webpack)
 
 # next dev loads .env.local; Redis or Resend keys in it would reach real services.
 [[ ! -e .env.local && ! -e .env ]] || { echo 'Move .env.local / .env aside first: next dev would load real service keys.' >&2; exit 1; }
@@ -126,7 +134,7 @@ cleanup() {
     "${supabase_cli[@]}" stop --workdir "$STRELVA_AUTH_STACK_DIR" --no-backup >/dev/null 2>&1 || true
     echo 'Disposable stack stopped.'
   elif [[ "$keep" == 1 ]]; then
-    echo "Stack kept. Rerun with: pnpm check:journeys --reuse $work"
+    echo "Stack kept. Rerun with: pnpm check:journeys --bundler $bundler --reuse $work"
     echo "Stop it with: ${supabase_cli[*]} stop --workdir \"\$(sed -n 's/^STRELVA_AUTH_STACK_DIR=//p' $work/env)\" --no-backup"
   fi
   echo "Logs and reports: $work"
@@ -156,7 +164,7 @@ export APPROVE_LINK_SECRET="${APPROVE_LINK_SECRET:-$(openssl rand -hex 32)}" CRO
 start_app() {
   local phase="$1"
   # Own build dir: a developer's next dev in this checkout keeps its .next.
-  PLAYWRIGHT_DIST_DIR=.next-journeys pnpm exec next dev --hostname localhost --port "$port" > "$work/app-$phase.log" 2>&1 &
+  PLAYWRIGHT_DIST_DIR=.next-journeys pnpm exec next dev ${bundler_args[@]+"${bundler_args[@]}"} --hostname localhost --port "$port" > "$work/app-$phase.log" 2>&1 &
   app_pid=$!
   for _ in $(seq 1 120); do
     if curl --fail --silent --max-time 60 "$PLAYWRIGHT_BASE_URL/sign-in" >/dev/null; then return 0; fi
@@ -173,7 +181,7 @@ start_app() {
 run_phase() {
   local phase="$1"; shift
   local specs=("$@")
-  echo "== Flags $phase: ${#specs[@]} specs on $PLAYWRIGHT_BASE_URL"
+  echo "== Flags $phase: ${#specs[@]} specs on $PLAYWRIGHT_BASE_URL (bundler: $bundler)"
   # No app, no run: specs against a dead port would only report connection errors.
   start_app "$phase" || return 1
   local status=0

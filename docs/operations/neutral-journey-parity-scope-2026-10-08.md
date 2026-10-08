@@ -79,3 +79,28 @@ Selector-only current dialog/Needs-you fixes were inspected in known later
 journey source `d8f3a4c9e621f3321a0223e6c8ebb8fa34f5a42d` (#501 lineage). Its raw SQL
 `seedLocalNativeMaker` dual-role fixture and runtime fixes were not imported.
 No later release branch or production migration was merged/cherry-picked.
+
+## Explicit alternate bundler proof
+
+The next full default-Turbopack run began at79aeabe3. A documentation-only
+chronology commit7fa3ba18 occurred after handoff; runtime, runner and test bytes
+were identical, but literal clean79ae throughout is not claimed. That run
+encountered Next16.3.8's internal DM Sans font-query compilation500. Both Next
+and the loaded Darwin ARM SWC resolved16.3.8. The failure remains evidence and
+does not establish a cache cause.
+
+An isolated runner successor adds `--bundler webpack`. Installed Next16.3.8
+`next dev --help` explicitly supports `--webpack`. The default remains the same
+Turbopack command. Missing or unknown bundler values fail before stack setup.
+Both choices retain the same owned loopback stack, fixture scope, feature flags,
+test inventory, retries0 and strict result gate. Each phase logs its bundler.
+
+```bash
+SUPABASE_CLI=supabase bash scripts/check-journeys.sh --bundler webpack --reuse <owned-runner-dir>
+```
+
+Parent owns the serialized full on/off execution after the preceding run is
+archived. Preparing this option starts no server. A Webpack pass qualifies only
+that explicit local development-bundler proof; it does not erase default
+Turbopack failure, waive a production build, or prove hosted/production operation.
+No dependency, application font or UI runtime changes accompany this option.
