@@ -1421,6 +1421,18 @@
       ]
     },
     {
+      "batch": "13",
+      "status": "private owner recovery #293; not production-authorized",
+      "items": [
+        {
+          "file": "20261020090031_provider_change_cancel.sql",
+          "sha256": "aff8e993ddad15ff8e35cc0baf1d40a8dcb0bd150282b4004f65ef77904b628e",
+          "rollback": "rollback-20261020090031_provider_change_cancel.sql",
+          "rollbackSha256": "d3dc5319710eea6bcac335c408b00470876fddf26da0c5b744ac327bff2d1802"
+        }
+      ]
+    },
+    {
       "batch": "15",
       "status": "private #284 preparation; unmerged; not production-authorized",
       "note": "Append-only owner-confirmed original bringer attribution, independent operating provider and financial eligibility; MO18-only endings. Batches 13/14 (pending migrations31/32) reserved to separate lanes. No rates, policy, written agreement or legacy backfill selected. Empty-only guarded rollback preserves accepted receipts.",

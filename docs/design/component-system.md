@@ -1012,3 +1012,14 @@ confirmed the review link, honest staged state and no mobile horizontal overflow
 These were fictional local data; native acceptance/readback and current-authority
 checks are separate PostgreSQL proof. Generic native-app approval remains distinct
 from Inquiry/website native publication. No new visual foundation was accepted.
+
+## Private provider-change recovery (#293)
+
+`ProviderChangeNotices` reuses Button, Card and TextArea. Its `canCancel` prop
+is true only for a current direct business owner on the server page. Only an
+unacknowledged `awaiting_policy` request offers Cancel; pending disables the
+control, errors keep it retryable, and the cancelled row retains its receipt
+display. Native SQL rechecks current owner and immutable history independently
+of this presentation hint. The provider-change flag remains disabled by default.
+The gated local provider-change preview uses fictional transport for interface
+proof; it establishes no provider operation or hosted launch evidence.
