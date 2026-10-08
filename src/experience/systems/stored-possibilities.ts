@@ -63,14 +63,15 @@ export function rebuildPossibilityInput(target: StoredTarget, revisions: Readonl
   const { candidate, site, inquiries, domain } = target;
   const siteRevision = revisions.get(site.system.id);
   if (!siteRevision || !candidate.candidateRevision || !candidate.candidateContentHash) return null;
-  const agency = candidate.origin === "agency_draft";
+  const draft = candidate.origin !== "rebuild";
+  const author = candidate.origin === "agent_draft" ? "connected agent" : "agency";
   const pinned = inquiries.filter((item) => revisions.has(item.system.id));
   return {
-    title: agency ? `A proposed change to ${domain}` : `A rebuilt ${domain}`,
-    intent: agency ? `Apply the agency's proposed change to ${domain}.` : `Replace ${domain} with ${candidate.title}.`,
+    title: draft ? `A proposed change to ${domain}` : `A rebuilt ${domain}`,
+    intent: draft ? `Apply the ${author}'s proposed change to ${domain}.` : `Replace ${domain} with ${candidate.title}.`,
     changes: [
       { baseline: { businessId: site.system.businessId, systemId: site.system.id, ...siteRevision },
-        candidate: { summary: agency ? `the agency's change to ${domain}` : `the rebuilt ${domain}`, content: { website: domain, rebuildWorkId: candidate.workId, candidateRevision: candidate.candidateRevision, candidateContentHash: candidate.candidateContentHash } } },
+        candidate: { summary: draft ? `the ${author}'s change to ${domain}` : `the rebuilt ${domain}`, content: { website: domain, rebuildWorkId: candidate.workId, candidateRevision: candidate.candidateRevision, candidateContentHash: candidate.candidateContentHash } } },
       ...pinned.map((item) => ({
         baseline: { businessId: item.system.businessId, systemId: item.system.id, ...revisions.get(item.system.id)! },
         candidate: { summary: "inquiries from the rebuilt contact form", content: { form: `Rebuilt contact form on ${domain}`, rebuildWorkId: candidate.workId } },
@@ -78,7 +79,7 @@ export function rebuildPossibilityInput(target: StoredTarget, revisions: Readonl
     ],
     effects: [{
       id: "publish-site", kind: "publish", channel: "hosted_website", system: { systemId: site.system.id },
-      description: `Publish the ${agency ? "changed" : "rebuilt"} ${domain}`,
+      description: `Publish the ${draft ? "changed" : "rebuilt"} ${domain}`,
       request: { workId: candidate.workId, candidateRevision: candidate.candidateRevision, candidateContentHash: candidate.candidateContentHash,
         ...(site.references.tenantId ? { tenantId: site.references.tenantId } : {}) },
       after: [],

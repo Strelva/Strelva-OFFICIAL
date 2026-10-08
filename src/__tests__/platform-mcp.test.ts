@@ -192,7 +192,7 @@ describe("deterministic tool catalog", () => {
     expect(first.result).toMatchObject({ resultType: "complete", ttlMs: 3600000, cacheScope: "public" });
     const old = await (await legacy("tools/list")).json();
     expect(old.result).toEqual({ tools: first.result.tools });
-    expect(first.result.tools.map((t: { name: string }) => t.name)).toEqual(["search_business", "get_business", "get_policies", "send_inquiry", "request_quote", "get_status", "list_services", "find_slots", "request_booking", "get_booking_status", "read_business_context", "read_customer_inquiries", "approve_quote"]);
+    expect(first.result.tools.map((t: { name: string }) => t.name)).toEqual(["search_business", "get_business", "get_policies", "send_inquiry", "request_quote", "get_status", "list_services", "find_slots", "request_booking", "get_booking_status", "read_business_context", "list_websites", "read_website", "propose_website_change", "list_website_proposals", "read_customer_inquiries", "approve_quote"]);
   });
 
   it("titles and annotates every tool, keeping reads and the one write separate", () => {

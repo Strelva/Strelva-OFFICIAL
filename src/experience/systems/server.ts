@@ -152,6 +152,8 @@ export async function prepareRebuildPossibilities(input: Omit<SystemsProjectionI
     const site = targetSite(candidate, input.listing, input.siteDomains);
     if (!site) continue;
     const domain = siteDomain(site, input.siteDomains) ?? site.system.name;
+    const draft = candidate.origin !== "rebuild";
+    const author = candidate.origin === "agent_draft" ? "connected agent" : "agency";
     // The rebuilt site carries the contact form, so the inquiries it feeds change too.
     const inquiries = input.listing.connections
       .filter(({ connection }) => connection.kind === "appear" && connection.state !== "disconnected"
@@ -162,14 +164,14 @@ export async function prepareRebuildPossibilities(input: Omit<SystemsProjectionI
     const sandbox = await prepareIsolatedPossibility({
       businessId: input.listing.businessId,
       possibilityId: rebuildPossibilityId(candidate.workId),
-      title: candidate.origin === "agency_draft" ? `A proposed change to ${domain}` : `A rebuilt ${domain}`,
-      intent: candidate.origin === "agency_draft" ? `Apply the agency's proposed change to ${domain}.` : `Replace ${domain} with ${candidate.title}.`,
+      title: draft ? `A proposed change to ${domain}` : `A rebuilt ${domain}`,
+      intent: draft ? `Apply the ${author}'s proposed change to ${domain}.` : `Replace ${domain} with ${candidate.title}.`,
       systems: [
         { ref: { businessId: site.system.businessId, systemId: site.system.id }, name: site.system.name, content: { website: domain, tenantId: site.references.tenantId } },
         ...inquiries.map((item) => ({ ref: { businessId: item.system.businessId, systemId: item.system.id }, name: item.system.name, content: { form: `Contact form on ${domain}` } })),
       ],
       changes: [
-        { systemId: site.system.id, summary: candidate.origin === "agency_draft" ? `the agency's change to ${domain}` : `the rebuilt ${domain}`, content: { website: domain, rebuildWorkId: candidate.workId, candidateRevision: candidate.candidateRevision, candidateContentHash: candidate.candidateContentHash } },
+        { systemId: site.system.id, summary: draft ? `the ${author}'s change to ${domain}` : `the rebuilt ${domain}`, content: { website: domain, rebuildWorkId: candidate.workId, candidateRevision: candidate.candidateRevision, candidateContentHash: candidate.candidateContentHash } },
         ...inquiries.map((item) => ({ systemId: item.system.id, summary: "inquiries from the rebuilt contact form", content: { form: `Rebuilt contact form on ${domain}`, rebuildWorkId: candidate.workId } })),
       ],
       checks: [
