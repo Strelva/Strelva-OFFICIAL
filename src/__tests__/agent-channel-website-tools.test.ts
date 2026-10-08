@@ -13,7 +13,7 @@ function fixture() {
  const document = siteDocumentSchema.parse({ version: 2, siteName: "Synthetic firm", theme: { palette: "light", typeScale: "standard" }, pages: [{ path: "/", title: "Firm", description: "", root: "hero" }], nodes: { hero: { id: "hero", type: "Hero", variant: "statement", props: { title: "Original headline", body: "Original body" }, children: [], factIds: [] } }, facts: {}, assets: {}, redirects: [], provenance: { composer: "rules", sourceUrl: "https://private-source.example.test/secret" } });
  const rebuild = websiteRebuildSchema.parse({ version: 2, revision: 3, title: "Synthetic firm", input: { requestId: "fixture-request", url: "https://private-source.example.test/secret" }, status: "approved", stages: [], checkpoint: { privateKey: "private-checkpoint" }, lastError: null, candidate: { revision: 2, contentHash: siteDocumentHash(document), document, previewHref: `/api/websites/${workId}/preview` }, approvedCandidateRevision: 2, tenantId: null, launch: { receipt: null, readBack: null }, createdBy: userId, createdAt: at, history: [] });
  const snapshot = { work: { id: workId, workspace_id: workspaceId, product_id: "websites", resource_kind: "website", payload: rebuild }, documentRevision: 2, contentHash: rebuild.candidate!.contentHash, approvedRevision: 2, publishedRevision: 1 };
- const receipt = { requestId, websiteWorkId: workId, revision: 3, contentHash: "b".repeat(64), summary: "New headline", createdAt: at, status: "awaiting_review" };
+ const receipt = { requestId, websiteWorkId: workId, revision: 3, contentHash: "b".repeat(64), currentRevision: 3, currentContentHash: "b".repeat(64), summary: "New headline", createdAt: at, status: "awaiting_review" };
  const rpc = vi.fn(async (name: string, _args: Record<string,unknown>): Promise<unknown> => name === "read_agent_website_proposal_retry" ? null : name === "read_agent_website_work" ? snapshot : receipt);
  const service = createAgentWebsiteTools(rpc, () => at);
  const request = { websiteWorkId: workId, requestId, expectedRevision: 3, candidateRevision: 2, candidateContentHash: snapshot.contentHash, summary: "New headline", ops: [{ op: "replace", path: "/nodes/hero/props/title", value: "Proposed headline" }] };
@@ -61,6 +61,14 @@ describe("native assistant website work", () => {
   await h.service.call("propose_website_change", { ...h.request, candidateContentHash: h.snapshot.contentHash, ops: [{ op: "replace", path: "/nodes/hero/props/body", value: "New body" }] }, auth);
   const args = h.rpc.mock.calls.find(([name]) => name === "commit_agent_website_candidate")![1]; const payload = websiteRebuildSchema.parse(args.p_payload);
   for (const [id, fact] of Object.entries(previous.document.facts)) expect(payload.candidate!.document.facts[id]).toEqual(fact);
+ });
+ it("explains superseded exact revisions while exposing the current owner-reviewed candidate", async () => {
+  const h = fixture();
+  h.rpc.mockResolvedValueOnce([{ ...h.receipt, status: "superseded", currentRevision: 4, currentContentHash: "c".repeat(64) }]);
+  const result = await h.service.call("list_website_proposals", { websiteWorkId: workId }, auth);
+  expect(result).toMatchObject({ proposals: [{ revision: 3, contentHash: "b".repeat(64), currentRevision: 4, currentContentHash: "c".repeat(64), status: "superseded" }] });
+  expect(JSON.stringify(result)).toContain("superseded does not mean rejected");
+  expect(JSON.stringify(result)).toContain("Owner fact review");
  });
  it("propagates transactional revocation after preparation without reporting success", async () => {
   const h = fixture(); h.rpc.mockImplementation(async name => { if (name === "read_agent_website_proposal_retry") return null; if (name === "read_agent_website_work") return h.snapshot; throw new Error("oauth_invalid_token"); });

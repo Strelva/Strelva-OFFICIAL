@@ -15,7 +15,7 @@ export const websiteProposalSchema = selector.extend({
   candidateRevision: z.number().int().positive(), candidateContentHash: hash,
   summary: z.string().trim().min(1).max(500), ops: sitePatchSchema,
 }).strict();
-const receiptSchema = z.object({ requestId: uuid, websiteWorkId: uuid, revision: z.number().int().positive(), contentHash: hash, summary: z.string().max(500), createdAt: z.string(), status: z.enum(["awaiting_review", "approved", "published", "superseded"]) });
+const receiptSchema = z.object({ requestId: uuid, websiteWorkId: uuid, revision: z.number().int().positive(), contentHash: hash, currentRevision: z.number().int().positive(), currentContentHash: hash, summary: z.string().max(500), createdAt: z.string(), status: z.enum(["awaiting_review", "approved", "published", "superseded"]) });
 const workSchema = z.object({ id: uuid, workspace_id: uuid, product_id: z.literal("websites"), resource_kind: z.literal("website"), payload: websiteRebuildSchema });
 const snapshotSchema = z.object({ work: workSchema, documentRevision: z.number().int().positive(), contentHash: hash, approvedRevision: z.number().int().positive().nullable(), publishedRevision: z.number().int().positive().nullable() });
 export interface AgentWebsiteAuthority { tokenHash: string; resource: string; workspaceId: string; userId: string }
@@ -25,7 +25,13 @@ export function createAgentWebsiteTools(rpc: WebsiteToolRpc = oauthRpc, now = ()
   function reviewHref(workspaceId: string, workId: string) { return `${oauthOrigin()}/workspace?${new URLSearchParams({ workspaceId, view: "websites", work: workId })}`; }
   function receipt(raw: unknown, auth: AgentWebsiteAuthority) {
     const value = receiptSchema.parse(raw);
-    return { ...value, reviewHref: reviewHref(auth.workspaceId, value.websiteWorkId), liveSiteChanged: false };
+    const statusExplanation = {
+      awaiting_review: "This exact saved proposal revision is the current candidate and awaits owner review.",
+      approved: "The owner approved this exact saved proposal revision.",
+      published: "This exact saved proposal revision is the currently published website revision.",
+      superseded: "A newer candidate revision exists. Owner fact review also creates a newer revision; superseded does not mean rejected. Open the review link or read_website to inspect the current candidate.",
+    }[value.status];
+    return { ...value, statusExplanation, reviewHref: reviewHref(auth.workspaceId, value.websiteWorkId), liveSiteChanged: false };
   }
   async function snapshot(auth: AgentWebsiteAuthority, workId: string, scope: "website:read" | "website:propose" = "website:read") {
     const value = snapshotSchema.parse(await rpc("read_agent_website_work", { ...identity(auth), p_work_id: workId, p_scope: scope }));
