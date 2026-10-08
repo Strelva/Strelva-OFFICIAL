@@ -87,9 +87,14 @@ passed all 39 checks and synthetic operator/owner surface smoke passed all 20.
 
 ## Limits and next action
 
-#496's billing copy and navigation are implemented and locally qualified. #310's
-alarm portion is implemented, but the broader hardening issue remains open and its
-threshold is provisional. #278, #327 and #457 retain their broader scope.
+#496's billing copy and navigation are implemented and locally qualified.
+The follow-up issue audit confirmed that #310's complete stated engineering scope
+is present: identity/email caps, shared-egress handling, disposable-email refusal,
+business pause and the operator alarm. Its flags remain off by default and the
+threshold remains provisional. #457's stated mapping, address/hours and scoped
+service requirements are also implemented and locally verified. The earlier
+broader-scope assessments for these two issues were too conservative.
+#278 and #327 retain unmet commercial/provider and human-review requirements.
 The bounded #482 shrink/split and #326 declaration requirements are satisfied.
 Remaining import debt belongs under #336. No completion of human qualification,
 commercial payer migration, all import debt or production fact propagation is
@@ -131,3 +136,24 @@ Independent current-tree comparison found these separate from the ready backlog:
 Next concrete issue continuation: narrow #201 ask-once and human-readable agency
 scope patch using current owned components, preserving current design and exact
 budget authority. Do not activate the deferred Home Finder or legacy publisher.
+
+## Six additional verified engineering closures
+
+The October 8 follow-up audit checked each original issue body against merged
+runtime `7552a133` and its retained tests. All six requirements below are satisfied.
+All six issues were closed with links to the merged code and retained proof.
+No production activation, provider operation or measured-demand claim is implied.
+
+| Issue | Completed requirement and evidence |
+| --- | --- |
+| #454 | Full lint and workspace SQL aggregate pass on the combined release source. |
+| #510 | Active verified provider authority replaces tenant-link authority; effect-specific execution checks and native forward/rollback/reapply pass. |
+| #310 | Agent/email caps, known shared-egress handling, disposable-email refusal, business pause and ratio alarm; identity regression 17/17, native paused-admission SQL and desktop/mobile alarm checks pass. |
+| #494 | Verified current owner session approval and execution replace operator Live Version authority; native/HTTP refusal and signed-in release journey pass. |
+| #495 | Publication receipts snapshot the actual authorized actor and serving agency; transport identifiers do not stand in for provider attribution. Owner/provider HTTP receipt and refusal proofs pass. |
+| #457 | Explicit stable-tenant/service mapping, name/services draft propagation, address/hours editing and scoped dispatch; native isolation/failure SQL and three desktop/mobile mapping checks pass. |
+
+#528 remains open because its main-target fix is not merged and #545 fails hosted
+CI. #327's human verdict lifecycle awaits #323; #308 lacks provider-authorized
+Google verification; #456 still requires an existing bound tenant/calendar. These
+are real remaining requirements, separate from the six engineering closures.

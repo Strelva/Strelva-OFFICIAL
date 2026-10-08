@@ -7,7 +7,9 @@ through #602 and #603. It combines the reviewed billing, email, declaration,
 pending qualification, native mapping, hold-alarm and payer-proposal work. The
 [merge review](docs/operations/pr-merge-review-2026-10-08.md) records integration
 repairs, local evidence, remaining issue scope and the exact next action. Issues
-#496, #326, #482 and #501 are closed for their bounded implementation criteria. These
+#496, #326, #482 and #501 were closed after the source merge. The follow-up audit
+also closed #454, #510, #310, #494, #495 and #457 against their stated engineering
+requirements. Production operation and provider evidence remain separate. These
 source merges do not change the deployed October 7 release or authorize pending
 migrations, external writes, flag activation or commercial qualification. The
 independent frozen launch candidate still needs a separate comparison.
