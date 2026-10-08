@@ -1,11 +1,11 @@
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
 import { CLIENT_SEND_FLAGS, parseRolloutEnv, silentRolloutEnvStops } from "../../scripts/silent-rollout";
 import { verifyReleaseInventory } from "../../scripts/release-safety/inventory";
-import { RELEASE_BASELINE, RELEASE_BATCHES, stageReleaseBatch } from "../../scripts/stage-release-batch";
+import { RELEASE_BASELINE, RELEASE_PACKET, stageReleaseBatch } from "../../scripts/stage-release-batch";
 
 const temps: string[] = [];
 const temp = () => { const dir = mkdtempSync(join(tmpdir(), "strelva-release-tools-")); temps.push(dir); return dir; };
@@ -47,17 +47,30 @@ describe("offline batch staging", () => {
     writeFileSync(join(migrations, "20261013220000_provider_seat_tenant_conversion.sql"), "select 1;");
     writeFileSync(join(migrations, "20261013220000_inquiry_lead_retention.sql"), "select 1;");
     expect(() => verifyReleaseInventory(repo)).toThrow(/20261013220000_inquiry_lead_retention.sql, 20261013220000_provider_seat_tenant_conversion.sql/);
+    const out = join(temp(), "duplicate-stage");
+    expect(() => stageReleaseBatch({ repoRoot: repo, out, batch: 0, appliedVersions: RELEASE_BASELINE.map(({ file }) => file.slice(0, 14)) })).toThrow(/Duplicate migration version/);
+    expect(existsSync(out)).toBe(false);
   });
   it("requires every integrated migration to have one pinned packet entry", () => {
     expect(() => verifyReleaseInventory(process.cwd())).not.toThrow();
   });
-  it.each(RELEASE_BATCHES.map((_, i) => i))("stages precisely the pending batch %i plus its applied prerequisites", (batch) => {
-    const prior = [...RELEASE_BASELINE, ...RELEASE_BATCHES.slice(0, batch).flat()];
+  it("pins H between 0 and 1 and the proposed tail after 7", () => {
+    expect(RELEASE_PACKET.map(step => step.batch)).toEqual([0,"H",1,2,3,4,5,6,7,"7A","8","9"]);
+  });
+  it.each(RELEASE_PACKET)("stages precisely pending batch $batch plus its packet prerequisites", (step) => {
+    const batch = step.batch;
+    const stepIndex = RELEASE_PACKET.findIndex(item => item.batch === batch);
+    const prior = [...RELEASE_BASELINE, ...RELEASE_PACKET.slice(0, stepIndex).flatMap(step => step.items)];
     const out = join(temp(), "batch");
     const receipt = stageReleaseBatch({ repoRoot: process.cwd(), out, batch, appliedVersions: prior.map(({ file }) => file.slice(0, 14)) });
     const staged = readdirSync(join(out, "supabase/migrations"));
-    expect(staged).toEqual([...prior, ...RELEASE_BATCHES[batch]!].map(({ file }) => file).sort());
-    expect(receipt.pending).toEqual(RELEASE_BATCHES[batch]!.map(({ file }) => file));
+    expect(staged).toEqual([...prior, ...step.items].map(({ file }) => file).sort());
+    expect(receipt.pending).toEqual(step.items.map(({ file }) => file));
+    expect(receipt.requiredAppliedVersions).toEqual(prior.map(({ file }) => file.slice(0,14)).sort());
+    expect(receipt.qualification).toBe(typeof batch === "string" ? "proposed" : "prepared");
+    expect(receipt.manifestStatus).toBe(step.manifestStatus);
+    expect(receipt.deploymentAuthorized).toBe(false);
+    expect(receipt.networkAccess).toBe(false);
     expect(staged.some((f) => f.startsWith("rollback-") || f.startsWith("verify-"))).toBe(false);
     expect(JSON.parse(readFileSync(join(out, "batch-receipt.json"), "utf8"))).toEqual(receipt);
   });
@@ -67,6 +80,7 @@ describe("offline batch staging", () => {
     expect(() => stageReleaseBatch({ ...base, batch: 1 })).toThrow(/history/);
     expect(() => stageReleaseBatch({ ...base, appliedVersions: [...base.appliedVersions, "20990101000000"] })).toThrow(/history/);
     expect(() => stageReleaseBatch({ ...base, appliedVersions: base.appliedVersions.slice(1) })).toThrow(/history/);
+    expect(() => stageReleaseBatch({ ...base, appliedVersions: [...base.appliedVersions, base.appliedVersions[0]!] })).toThrow(/history/);
     stageReleaseBatch(base);
     expect(() => stageReleaseBatch(base)).toThrow(/fresh/);
   });
@@ -80,6 +94,41 @@ describe("offline batch staging", () => {
     // This deliberately uses a minimal fixture: the digest failure precedes config or other reads.
     mkdirSync(join(repo, "supabase/migrations"), { recursive: true });
     writeFileSync(join(repo, "supabase/migrations", file), "select 'drift';");
-    expect(() => stageReleaseBatch({ repoRoot: repo, out, batch: 0, appliedVersions: RELEASE_BASELINE.map(({ file }) => file.slice(0, 14)) })).toThrow(/Digest mismatch/);
+    expect(() => stageReleaseBatch({ repoRoot: repo, out, batch: 0, appliedVersions: RELEASE_BASELINE.map(({ file }) => file.slice(0, 14)) })).toThrow(/digest drift/);
+    expect(existsSync(out)).toBe(false);
+  });
+  it("requires H before batch 1 and rejects partial or future history for proposed steps", () => {
+    const out = join(temp(), "missing-H");
+    const withoutH = [...RELEASE_BASELINE, ...RELEASE_PACKET[0]!.items].map(({ file }) => file.slice(0,14));
+    expect(() => stageReleaseBatch({ repoRoot: process.cwd(), out, batch: 1, appliedVersions: withoutH })).toThrow(/history/);
+    const index = RELEASE_PACKET.findIndex(step => step.batch === "8");
+    const prior = [...RELEASE_BASELINE, ...RELEASE_PACKET.slice(0,index).flatMap(step => step.items)].map(({ file }) => file.slice(0,14));
+    const pending = RELEASE_PACKET[index]!.items;
+    for (const appliedVersions of [prior.slice(0,-1), [...prior,pending[0]!.file.slice(0,14)], [...prior,...pending.map(item => item.file.slice(0,14))]]) {
+      expect(() => stageReleaseBatch({ repoRoot: process.cwd(), out, batch: "8", appliedVersions })).toThrow(/history/);
+    }
+    expect(existsSync(out)).toBe(false);
+  });
+  it("verifies future packet digests before creating output for an earlier batch", () => {
+    const repo = temp();
+    cpSync(join(process.cwd(),"supabase/migrations"),join(repo,"supabase/migrations"),{recursive:true});
+    const future = RELEASE_PACKET.find(step => step.batch === "9")!.items[0]!;
+    writeFileSync(join(repo,"supabase/migrations",future.file),"select 'future drift';");
+    const out = join(temp(),"earlier-batch");
+    expect(() => stageReleaseBatch({ repoRoot: repo,out,batch:0,appliedVersions:RELEASE_BASELINE.map(item => item.file.slice(0,14)) })).toThrow(new RegExp("digest drift: " + future.file));
+    expect(existsSync(out)).toBe(false);
+  });
+  it("the CLI accepts an exact proposed ID without granting deployment authority", () => {
+    const prior = [...RELEASE_BASELINE,...RELEASE_PACKET.slice(0,1).flatMap(step => step.items)];
+    const history = join(temp(),"history.json");writeFileSync(history,JSON.stringify(prior.map(item => item.file.slice(0,14))));
+    const out = join(temp(),"hotfix");
+    const result = spawnSync(process.execPath,["--import","tsx","scripts/stage-release-batch.ts","--batch","H","--applied-versions",history,"--out",out],{encoding:"utf8"});
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("Qualification: proposed");
+    expect(result.stdout).toContain("No network access or deployment authority");
+    expect(JSON.parse(readFileSync(join(out,"batch-receipt.json"),"utf8"))).toMatchObject({batch:"H",qualification:"proposed",deploymentAuthorized:false});
+    const invalid = spawnSync(process.execPath,["--import","tsx","scripts/stage-release-batch.ts","--batch","08","--applied-versions",history,"--out",join(temp(),"invalid")],{encoding:"utf8"});
+    expect(invalid.status).toBe(1);
+    expect(invalid.stderr).toContain("Batch must");
   });
 });

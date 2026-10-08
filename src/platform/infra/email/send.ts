@@ -114,7 +114,7 @@ async function audiencePolicyEnabled(input: SendEmailInput, strictClientGate: bo
  * API for existing senders.
  */
 export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendEmailResult> {
-  if (!(await audienceEnabled(input))) {
+  if (!(await audiencePolicyEnabled(input, false))) {
     console.warn(`[email] ${input.audience} email disabled — skipped send`);
     return { status: "suppressed", reason: "email_suppressed_or_unconfigured" };
   }
@@ -141,6 +141,11 @@ export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendE
     : input.fromAddress || `hello@${fromDomain}`;
   const defaultReplyTo = process.env.REPLY_TO_EMAIL || "hello@strelva.com";
   const replyTo = agencyId ? identity?.replyTo || defaultReplyTo : input.replyTo || defaultReplyTo;
+
+  // Authorize the actual sending domain after resolving agency branding.
+  if (input.provider && !(await providerEmailSendAllowed(input.provider, senderDomain(fromAddress)))) {
+    return { status: "suppressed", reason: "email_suppressed_or_unconfigured" };
+  }
 
   const payload = {
     from: formatEmailFrom(fromName, fromAddress),

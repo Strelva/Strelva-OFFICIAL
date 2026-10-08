@@ -5,6 +5,13 @@
 # explicit ignore is the durable guard.
 node_modules
 .next
+.next*
+.env*
+.scratch
+PRODUCT_MODEL.md
+.product
+output
+*.tsbuildinfo
 .next-playwright
 .turbo
 coverage
@@ -17,3 +24,6 @@ tests/ux-shots
 .scratch
 output
 .next-*
+
+# Generated typecheck cache; rebuilding on Vercel makes it unnecessary.
+*.tsbuildinfo

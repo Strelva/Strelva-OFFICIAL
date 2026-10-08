@@ -1168,6 +1168,11 @@
           "rollback": "rollback-20261015100000_agency_add_client.sql"
         },
         {
+          "file": "20261015111000_website_owner_agency_publish.sql",
+          "sha256": "578e3fed1454f414914f642769b7d8423229cd67392c527571ee79d074d9f8c1",
+          "rollback": "rollback-20261015111000_website_owner_agency_publish.sql"
+        },
+        {
           "file": "20261016110000_operator_action_approvals.sql",
           "sha256": "e9e4a204e497caa46acc2e113c74e11b18dd1e8aa0996b629dabb650dafee002",
           "rollback": "rollback-20261016110000_operator_action_approvals.sql"
@@ -1245,6 +1250,17 @@
           "sha256": "748efe03138425400405087f66972d481cbe2b77b1425bd974b5f9d90b11176a",
           "rollback": "rollback-20261018131000_owner_decision_runtime_authority.sql",
           "rollbackStatus": "guarded; runtime recovery preserves accepted work"
+        }
+      ]
+    },
+    {
+      "batch": "11",
+      "description": "Explicit service-only supplied-actor RPC boundary",
+      "items": [
+        {
+          "file": "20261019100000_actor_rpc_service_boundary.sql",
+          "sha256": "f119daf3e4fa5529caf39995c9c2d329dab947c63f5384c1f31b9b66183eb5d1",
+          "rollback": "rollback-20261019100000_actor_rpc_service_boundary.sql"
         }
       ]
     }

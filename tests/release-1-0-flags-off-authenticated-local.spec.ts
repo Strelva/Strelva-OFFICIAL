@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { buildWorkspaceApproveUrl } from "@/lib/approve-link";
-import { adminClient, cleanup, convertTenant, decisions, fixtureTenant, makeOperator, person, type Person } from "./support/journeys";
+import { adminClient, cleanup, decisions, fixtureTenant, makeOperator, operatorScript, person, type ConversionOutcome, type Person } from "./support/journeys";
 import { localEnvironment } from "./support/local-auth";
 
 // The 1.0 flags off, on real local Auth and Postgres: a converted business
@@ -23,18 +23,44 @@ test("with every 1.0 flag off, a converted business's owner sees the workspace a
   const app = new URL(env.app);
   const admin = adminClient();
   const operator = await person(browser, admin, "j10off-operator");
+  const agency = await person(browser, admin, "j10off-agency");
   let owner: Person | null = null;
   let tenantId = "";
   let businessId = "";
+  let agencyId = "";
   try {
     await makeOperator(admin, operator);
+    // A separate ordinary agency supplies the explicit conversion relationship.
+    // The operator gets no standing membership in the converted client.
+    const createdAgency = await agency.context.request.post("/api/workspace", {
+      headers: { origin: env.app }, data: { action: "create_agency", name: "Quiet Harbor's local agency" },
+    });
+    expect(createdAgency.status(), await createdAgency.text()).toBeLessThan(300);
+    agencyId = (await createdAgency.json()).workspaceId;
     const ownerEmail = `local-j10off-owner-${Date.now()}@example.test`;
     tenantId = (await fixtureTenant(admin, { siteName: "Quiet Harbor", ownerEmail })).tenantId;
     const adminOrigin = `${app.protocol}//admin.${tenantId}.localhost:${app.port}`;
     owner = await person(browser, admin, "j10off-owner", { email: ownerEmail, origins: [adminOrigin] });
 
     // Conversion is an operator script, not a 1.0 flag: it works the same either way.
-    businessId = convertTenant(tenantId, operator.email);
+    const conversion = operatorScript<ConversionOutcome>("convert-tenant-to-workspace", [
+      tenantId, "--apply", `--operator-email=${operator.email}`, `--agency=${agencyId}`,
+      `--agency-staff=${agency.email}`, "--agency-basis=existing_contract",
+    ]);
+    expect(conversion.mode).toBe("apply");
+    expect(conversion.receipt?.workspaceId).toMatch(/^[0-9a-f-]{36}$/);
+    businessId = conversion.receipt!.workspaceId;
+    const clientMemberships = await admin.from("workspace_memberships").select("user_id").eq("workspace_id", businessId);
+    expect(clientMemberships.error).toBeNull();
+    expect(clientMemberships.data).toEqual([]);
+    // Provider internals are RPC-only. The real actor projection verifies the
+    // active seat, agency membership and named staff without bypassing that gate.
+    const agencyActor = await admin.rpc("read_version_actor", { p_user_id: agency.userId, p_verified_email: agency.email });
+    expect(agencyActor.error).toBeNull();
+    expect(agencyActor.data).toMatchObject({ memberships: expect.arrayContaining([{ businessId, role: "admin", via: "provider_seat" }]) });
+    const operatorActor = await admin.rpc("read_version_actor", { p_user_id: operator.userId, p_verified_email: operator.email });
+    expect(operatorActor.error).toBeNull();
+    expect(operatorActor.data).toMatchObject({ memberships: expect.not.arrayContaining([expect.objectContaining({ businessId })]) });
     expect((await admin.from("workspace_memberships").insert({ workspace_id: businessId, user_id: owner.userId, role: "owner", created_by: operator.userId })).error).toBeNull();
     const request = owner.context.request;
 
@@ -90,8 +116,8 @@ test("with every 1.0 flag off, a converted business's owner sees the workspace a
     expect(chase.status()).toBe(200);
     expect(await chase.json()).toMatchObject({ status: "disabled" });
     // owner_decisions is RPC-only, including for the service-role client.
-    expect(await decisions(admin, businessId, operator)).toEqual([]);
+    expect(await decisions(admin, businessId, owner)).toEqual([]);
   } finally {
-    await cleanup(admin, { tenantIds: tenantId ? [tenantId] : [], workspaceIds: businessId ? [businessId] : [], operatorEmail: operator.email, people: [operator, ...(owner ? [owner] : [])] });
+    await cleanup(admin, { tenantIds: tenantId ? [tenantId] : [], workspaceIds: [businessId, agencyId].filter(Boolean), operatorEmail: operator.email, people: [operator, agency, ...(owner ? [owner] : [])] });
   }
 });

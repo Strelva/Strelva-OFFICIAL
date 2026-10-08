@@ -14,6 +14,18 @@ test("reads the repository's forward history without manual rollback or verifica
   assert.ok(migrations.every(item => /^\d{14}$/.test(item.version)));
   assert.equal(new Set(migrations.map(item => item.version)).size, migrations.length, "forward migration versions must be unique");
 });
+test("duplicate forward versions refuse before staging any migration", () => {
+  const directory = mkdtempSync(join(tmpdir(), "strelva-duplicate-migrations-"));
+  const destination = mkdtempSync(join(tmpdir(), "strelva-duplicate-staged-"));
+  try {
+    writeFileSync(join(directory, "20261013220000_first.sql"), "select 1;");
+    writeFileSync(join(directory, "20261013220000_second.sql"), "select 1;");
+    assert.throws(() => readCandidateMigrations(directory), /duplicate migration version/);
+    assert.throws(() => copyForwardMigrations(directory, destination), /duplicate migration version/);
+    assert.deepEqual(readdirSync(destination), []);
+  } finally { rmSync(directory, { recursive: true, force: true }); rmSync(destination, { recursive: true, force: true }); }
+});
+
 test("accepts only explicit manual helpers and timestamped rollbacks, and stages only forwards", () => {
   const directory = mkdtempSync(join(tmpdir(), "strelva-target-test-"));
   const destination = join(directory, "staged");

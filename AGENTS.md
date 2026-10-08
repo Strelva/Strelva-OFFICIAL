@@ -160,7 +160,17 @@ cluster and never touch production:
 ```bash
 PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-sql
 PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-upgrade
+PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:agency-workflow
 ```
+
+For agency workflow or provider/owner permission changes, run
+`check:agency-workflow` for the full ordered SQL job, then the authenticated
+browser proof. Read the [October 7 handoff](./docs/operations/agency-workflow-2026-10-07.md)
+for disposable Auth setup, simulated delivery/verification limits, and retained
+failure evidence. The bounded signed-in-owner three-flag browser runner is
+`bash scripts/check-agency-workflow-browser.sh`; it creates and cleans up only
+its own local Auth stack and app, with providers disabled and a fictional
+source-site transport. A passing local run is never proof of hosted delivery.
 
 `CUSTOM_DOMAIN_MAP` routes custom domains locally.
 [docs/operations/testing-and-ci.md](./docs/operations/testing-and-ci.md) explains when Redis,

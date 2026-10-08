@@ -181,8 +181,8 @@ async function WebsiteEntryPage({ workspaceId, entry, workId }: { workspaceId: s
     ?? await providerSeatBusiness(actor, workspaceId).catch(() => null);
   if (!workspace) return <Unavailable message="This business isn't available to your account." />;
   const operator = await isSuperAdmin().catch(() => false);
-  const systemsOn = await systemsReleaseEnabledForWorkspace(workspaceId, { operator, tester: false, userId: user.id }).catch(() => false);
-  if (!systemsOn) redirect(`/workspace?${new URLSearchParams({ workspaceId })}`);
+  // Rebuild has its own release; the connected-sites resolver retains its
+  // Systems prerequisite. Neither release grants workspace or website access.
   const [connectedEnabled, rebuildEnabled] = await Promise.all([
     connectedSitesReleasedFor(actor, workspaceId).catch(() => false),
     websiteRebuildReleasedFor(actor, workspaceId).catch(() => false),

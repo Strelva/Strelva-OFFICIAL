@@ -14,6 +14,7 @@ export const rebuildViewSchema = z.object({
   candidate: z.object({ revision: z.number(), contentHash: z.string(), previewHref: z.string(), pageCount: z.number(), hasForms: z.boolean().default(false), facts: z.record(z.string(), factSchema), unmappedPages: z.array(z.string()).default([]) }).nullable(),
   capabilitySelection: websiteCapabilitySelectionSchema.nullable().default(null),
   approved: z.boolean(), publishedUrl: z.string().nullable(), readBack: z.enum(["verified", "failed", "pending"]).nullable(),
+  agencyPublishPermission: z.object({ agencyWorkspaceId: z.string().uuid(), agencyName: z.string(), granted: z.boolean() }).nullable().optional(),
   domain: z.object({ hostname: z.string(), status: z.string(), checkedAt: z.string().nullable(), error: z.string().optional(), records: z.array(z.object({ type: z.string(), name: z.string(), value: z.string() })) }).nullable(),
   error: z.string().nullable(),
   audit: rebuildAuditSchema.nullable().default(null),
@@ -24,7 +25,7 @@ export type RebuildView = z.infer<typeof rebuildViewSchema>;
 export interface RebuildTransport {
   read(workspaceId: string, workId: string, signal?: AbortSignal): Promise<RebuildView>;
   start(input: { workspaceId: string; requestId: string; url?: string; description?: string; businessName?: string }): Promise<RebuildView>;
-  mutate(record: RebuildView, action: "confirm" | "edit" | "remove" | "approve" | "launch" | "retry" | "domain" | "undo", extra?: { factId?: string; text?: string; domain?: string; targetRevision?: number }): Promise<RebuildView>;
+  mutate(record: RebuildView, action: "confirm" | "edit" | "remove" | "approve" | "launch" | "retry" | "domain" | "undo", extra?: { factId?: string; text?: string; domain?: string; targetRevision?: number; allowAgencyPublish?: boolean; agencyWorkspaceId?: string }): Promise<RebuildView>;
 }
 export class RebuildTransportError extends Error { constructor(message: string, readonly status: number) { super(message); } }
 async function request(path: string, options?: RequestInit): Promise<RebuildView> {
@@ -33,11 +34,11 @@ async function request(path: string, options?: RequestInit): Promise<RebuildView
   if (!response.ok) throw new RebuildTransportError(typeof body?.error === "string" ? body.error : "This website could not be opened. Try again.", response.status);
   return parseRebuildView(body);
 }
-const rebuildEnvelopeSchema = z.object({ workId: z.string(), workspaceId: z.string(), rebuild: websiteRebuildSchema });
+const rebuildEnvelopeSchema = z.object({ workId: z.string(), workspaceId: z.string(), rebuild: websiteRebuildSchema, agencyPublishPermission: rebuildViewSchema.shape.agencyPublishPermission });
 export function parseRebuildView(value: unknown): RebuildView {
   const record = rebuildEnvelopeSchema.parse(value);
   const item = record.rebuild;
-  return rebuildViewSchema.parse({ workId: record.workId, workspaceId: record.workspaceId, tenantId: item.tenantId, revision: item.revision, title: item.title, status: item.status === "review_ready" ? "review" : item.status, stages: Array.from(new Map(item.stages.map(stage => [stage.stage, stage])).values()), skippedPaths: item.skippedPaths, candidate: item.candidate ? { revision: item.candidate.revision, contentHash: item.candidate.contentHash, previewHref: item.candidate.previewHref, pageCount: item.candidate.document.pages.length, hasForms: Boolean(item.candidate.document.capabilities?.inquiry || item.candidate.document.capabilities?.booking), facts: item.candidate.document.facts, unmappedPages: item.pageMapping.filter(page => !page.carriedOver).map(page => page.sourceUrl) } : null, capabilitySelection: "publishedCapabilitySelection" in item ? item.publishedCapabilitySelection : null, approved: Boolean(item.candidate && item.approvedCandidateRevision === item.candidate.revision), publishedUrl: item.launch.receipt?.status === "published" ? item.launch.receipt.providerUrl : null, readBack: item.launch.readBack?.status ?? null, domain: null, error: item.lastError, audit: "audit" in item ? item.audit : null, history: item.history });
+  return rebuildViewSchema.parse({ workId: record.workId, workspaceId: record.workspaceId, agencyPublishPermission: record.agencyPublishPermission, tenantId: item.tenantId, revision: item.revision, title: item.title, status: item.status === "review_ready" ? "review" : item.status, stages: Array.from(new Map(item.stages.map(stage => [stage.stage, stage])).values()), skippedPaths: item.skippedPaths, candidate: item.candidate ? { revision: item.candidate.revision, contentHash: item.candidate.contentHash, previewHref: item.candidate.previewHref, pageCount: item.candidate.document.pages.length, hasForms: Boolean(item.candidate.document.capabilities?.inquiry || item.candidate.document.capabilities?.booking), facts: item.candidate.document.facts, unmappedPages: item.pageMapping.filter(page => !page.carriedOver).map(page => page.sourceUrl) } : null, capabilitySelection: "publishedCapabilitySelection" in item ? item.publishedCapabilitySelection : null, approved: Boolean(item.candidate && item.approvedCandidateRevision === item.candidate.revision), publishedUrl: item.launch.receipt?.status === "published" ? item.launch.receipt.providerUrl : null, readBack: item.launch.readBack?.status ?? null, domain: null, error: item.lastError, audit: "audit" in item ? item.audit : null, history: item.history });
 }
 async function withDomain(record: RebuildView): Promise<RebuildView> {
   if (!record.candidate) return record;
@@ -58,6 +59,7 @@ export const serverRebuildTransport: RebuildTransport = {
     const identity = { expectedRevision: record.revision, candidateRevision: record.candidate?.revision, candidateContentHash: record.candidate?.contentHash };
     const body = facts ? { ...identity, action, ...(action === "edit" ? { text: extra?.text } : {}) }
       : action === "domain" ? { expectedRevision: record.revision, domain: extra?.domain, action: record.domain ? "refresh" : "attach" }
+      : action === "approve" && extra?.allowAgencyPublish ? { ...identity, allowAgencyPublish: true, agencyWorkspaceId: extra.agencyWorkspaceId }
       : action === "retry" ? { expectedRevision: record.revision } : action === "undo" ? { ...identity, targetRevision: extra?.targetRevision } : identity;
     if (action === "domain") {
       const response = await fetch(`/api/websites/${encodeURIComponent(record.workId)}/domain`, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -65,6 +67,7 @@ export const serverRebuildTransport: RebuildTransport = {
       if (!response.ok) throw new RebuildTransportError(value?.error ?? "The domain could not be checked.", response.status);
       return { ...record, domain: rebuildViewSchema.shape.domain.parse(value.domain ?? null) };
     }
-    return withDomain(await request(`/api/websites/${encodeURIComponent(record.workId)}/${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
+    const next = await request(`/api/websites/${encodeURIComponent(record.workId)}/${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    return withDomain({ ...next, agencyPublishPermission: next.agencyPublishPermission === undefined ? record.agencyPublishPermission : next.agencyPublishPermission });
   },
 };

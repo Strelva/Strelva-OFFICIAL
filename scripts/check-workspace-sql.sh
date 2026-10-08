@@ -919,7 +919,7 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010153000_new
 psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-contacts-schema.sql"
 psql "${psql_args[@]}" <<'SQL'
 -- auth.uid() and the Supabase identity fixture are shared from initial setup.
-create function auth.role() returns text language sql stable as $$
+create or replace function auth.role() returns text language sql stable as $$
   select coalesce(
     nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role', ''),
     nullif(current_setting('request.jwt.claim.role', true), '')

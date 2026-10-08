@@ -6,7 +6,7 @@ import { websiteWorkspaceStore as boundedStore } from "./workspace-store";
 import { listWork } from "@/platform/workspaces/repository";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type SavedWork, type WorkspaceActor, type AcceptedHandoff } from "@/platform/workspaces/types";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
-import { websiteDocumentStore, createWebsiteDocumentStore, invalidatePublishedSiteDocument, type OwnerLinkWebsiteSession, type WebsiteDocumentStore, type WebsiteDocumentRevision } from "./document-store";
+import { websiteDocumentStore, createWebsiteDocumentStore, invalidatePublishedSiteDocument, type OwnerLinkWebsiteSession, type WebsiteDocumentStore, type WebsiteDocumentRevision, type WebsiteAgencyPublishPermission } from "./document-store";
 import { siteDocumentHash, siteDocumentSchema, siteIdSchema, catalogNodeSchema, unresolvedSiteFacts, type SiteDocument } from "./site-document";
 import { runWebsiteRebuild, isHighRiskWebsiteClaim, type RebuildCheckpoint, type RebuildOptions, type WebsiteRebuildInput } from "./rebuild-pipeline";
 import { normalizeRebuildUrl } from "./rebuild-crawl";
@@ -28,6 +28,7 @@ import { readCandidateBusinessFacts } from "./business-facts-server";
 import { askExistingPagesSchema, existingWebsitePageOperations } from "./ask-existing-pages";
 
 interface Loaded { work: SavedWork; rebuild: WebsiteRebuild }
+type WebsiteOwnerReviewRecord = WebsiteRebuildRecord & { agencyPublishPermission?: WebsiteAgencyPublishPermission | null };
 /** One part of a cutover onto an existing site, reported on its own. */
 export interface WebsiteCutoverItem { id: "document_published" | "read_back" | "domain_moved" | "old_project_kept" | "redirects_live"; status: "done" | "waiting" | "failed" | "not_needed"; label: string }
 interface ServiceDependencies {
@@ -184,16 +185,17 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     if (loaded.rebuild.revision > 0 || loaded.rebuild.status !== "building") return present(loaded);
     return deferBuild ? present(loaded) : build(actor,loaded);
   }
-  async function read(actor: WorkspaceActor, workId: string) {
+  async function read(actor: WorkspaceActor, workId: string): Promise<WebsiteOwnerReviewRecord> {
     const stored = await load(actor,workId);
     const tenantId = await routeTenant(actor,stored);
     // Presented with the current slug; the stored payload is not rewritten.
     const loaded = tenantId === stored.rebuild.tenantId ? stored : { ...stored, rebuild: { ...stored.rebuild, tenantId } };
+    const agencyPublishPermission = await documents.agencyPublishPermission?.(actor,{ workspaceId: loaded.work.workspaceId, workId }) ?? null;
     if (tenantId && loaded.rebuild.candidate && (loaded.rebuild.launch.receipt?.artifactHash !== loaded.rebuild.candidate.contentHash || loaded.rebuild.launch.receipt?.candidateRevision !== loaded.rebuild.candidate.revision)) {
       const published = await documents.published(tenantId);
-      if (published?.workId === workId && published.revision === loaded.rebuild.candidate.revision && published.contentHash === loaded.rebuild.candidate.contentHash && published.receipt) return present({ ...loaded, rebuild: { ...loaded.rebuild, status: "published", launch: { receipt: published.receipt, readBack: { status: "pending", checkedAt: now(), message: "Publication is committed; the public read-back has not been confirmed yet." } } } });
+      if (published?.workId === workId && published.revision === loaded.rebuild.candidate.revision && published.contentHash === loaded.rebuild.candidate.contentHash && published.receipt) return { ...present({ ...loaded, rebuild: { ...loaded.rebuild, status: "published", launch: { receipt: published.receipt, readBack: { status: "pending", checkedAt: now(), message: "Publication is committed; the public read-back has not been confirmed yet." } } } }), agencyPublishPermission };
     }
-    return present(loaded);
+    return { ...present(loaded), agencyPublishPermission };
   }
   async function list(actor: WorkspaceActor, workspaceId: string) {
     const works = await (dependencies.list ?? listWork)(actor,workspaceId);
@@ -261,11 +263,14 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     const next = await saveCandidate(actor,loaded,siteDocumentSchema.parse(clearReviewedNodeFlags(document)),`fact_${input.action}`);
     return present(next);
   }
-  async function approve(actor: WorkspaceActor, workId: string, raw: unknown) {
-    const loaded = await load(actor,workId); const { candidate } = exact(loaded,raw);
+  async function approve(actor: WorkspaceActor, workId: string, raw: unknown): Promise<WebsiteOwnerReviewRecord> {
+    const { allowAgencyPublish, agencyWorkspaceId, ...selection } = rebuildSelectionSchema.extend({ allowAgencyPublish: z.boolean().optional(), agencyWorkspaceId: z.string().uuid().optional() })
+      .refine(value => value.allowAgencyPublish === true ? Boolean(value.agencyWorkspaceId) : value.agencyWorkspaceId === undefined, "Choose the current agency when authorizing publishing.").parse(raw);
+    const loaded = await load(actor,workId); const { candidate } = exact(loaded,selection);
     if (unresolvedSiteFacts(candidate.document).length || Object.values(candidate.document.nodes).some(node => node.verification?.needsReview)) throw new WorkspaceConflictError("Resolve the flagged facts and changed copy before approving this website.");
-    await documents.approve(actor,{ workspaceId: loaded.work.workspaceId, workId, revision: candidate.revision, contentHash: candidate.contentHash });
-    return present(await update(actor,loaded,"rebuild_approved",{ status: "approved", approvedCandidateRevision: candidate.revision, lastError: null }));
+    await documents.approve(actor,{ workspaceId: loaded.work.workspaceId, workId, revision: candidate.revision, contentHash: candidate.contentHash, ...(allowAgencyPublish ? { agencyWorkspaceId } : {}) });
+    const approved = await update(actor,loaded,"rebuild_approved",{ status: "approved", approvedCandidateRevision: candidate.revision, lastError: null });
+    return { ...present(approved), agencyPublishPermission: await documents.agencyPublishPermission?.(actor,{ workspaceId: loaded.work.workspaceId, workId }) ?? null };
   }
   async function assertCurrentCapabilities(actor: WorkspaceActor, loaded: Loaded) {
     if (!loaded.rebuild.publishedCapabilitySelection) return;
