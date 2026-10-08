@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import {
-  adminClient, bookingStatus, cleanup, convertTenant, decideByLink, decision, decisions, fixtureTenant, journeyEnvironment,
+  adminClient, bookingStatus, cleanup, convertTenant, ordinaryConversionAgency, decideByLink, decision, decisions, fixtureTenant, journeyEnvironment,
   makeOperator, oneTapLink, openLink, person, requestBooking, reviewedRebuild, runNeedsYouChase,
 } from "./support/journeys";
 
@@ -24,7 +24,7 @@ test("an owner who never signs in decides a booking request by email link only",
     const ownerEmail = `local-j10-never-signs-in-${Date.now()}@example.test`;
     const tenant = await fixtureTenant(admin, { siteName: "Willow Studio", ownerEmail, ownerName: "Rae Park" });
     tenantId = tenant.tenantId;
-    businessId = convertTenant(tenantId, operator.email);
+    businessId = convertTenant(tenantId, operator.email, await ordinaryConversionAgency(operator));
 
     // No account exists for the owner, and nobody opens Home.
     const users = await admin.from("users").select("id").eq("email", ownerEmail);
@@ -94,7 +94,7 @@ test("an owner without an account approves Make real by email link", async ({ br
     const ownerEmail = `local-j10-makereal-never-signs-in-${Date.now()}@example.test`;
     const tenant = await fixtureTenant(admin, { siteName: "Harbor Pilates", ownerEmail, ownerName: "Mara Quinn" });
     tenantId = tenant.tenantId;
-    businessId = convertTenant(tenantId, operator.email);
+    businessId = convertTenant(tenantId, operator.email, await ordinaryConversionAgency(operator));
     expect((await admin.from("users").select("id").eq("email", ownerEmail)).data).toEqual([]);
 
     // Strelva rebuilt the site; the reviewed rebuild is a Ready Possibility.

@@ -779,6 +779,18 @@ uses next/image for document assets. Semantic theme variables, 24 px component
 geometry, responsive grids and visible focus are scoped to `.site-document`.
 Brand accents apply only after contrast checking.
 
+An optional configured sites origin mounts published pages at
+`/sites/{tenant}`. `SiteRenderer` accepts the trusted mount as `basePath` and
+the shared tree prefixes only root-relative navigation links. Approved
+document bytes, content hashes, assets and capability endpoints stay pinned.
+This route has no preview or legacy fallback, rechecks durable active
+publication authority, and keeps app sessions off its host. The origin is
+inert until explicitly configured; local evidence is in the
+[October 8 release package](../operations/launch-completion-2026-10-08.md).
+`RebuildExperience` describes this publication as a hosted address and offers
+custom-domain help separately. Its DNS restoration attestation appears only
+after an actual domain is attached to that path publication.
+
 Preview inquiry and booking controls are disabled and submit nothing. Published
 connections reuse the starter's native inquiry and calendar forms, pinning the
 approved capability version; missing connections display their actual state.

@@ -11,7 +11,7 @@ import type { NextRequest } from "next/server";
 import { getDevAccessTenant, isDevAccessBypassEnabled } from "@/platform/infra/dev-access";
 import { MARKETING_HOSTS, isMarketingHost } from "./lib/marketing-hosts";
 import { isSeparateSitesHost, parseTenantHost } from "./lib/tenant-host";
-import { APP_ROOT_DOMAIN, CONTROL_PLANE_URL, MARKETING_URL, OPERATOR_URL, isPlatformDomain, tenantSiteHost } from "@/platform/infra/brand";
+import { APP_ROOT_DOMAIN, CONTROL_PLANE_URL, MARKETING_URL, OPERATOR_URL, isPlatformDomain, tenantSiteHost, isSitesPathHost, parseSitesPath } from "@/platform/infra/brand";
 // No workspace is known here: the proxy only asks "could the rebuild be on";
 // the per-site decision is getPublishedSiteDocument's (per tenant).
 import { websiteRebuildReleaseMayBeOn } from "./products/websites/index";
@@ -77,6 +77,9 @@ const PUBLIC_EXACT = new Set([
   // owner may never sign in); the route serves nothing without it.
   "/api/workspace-export/v3/download",
   "/api/health",
+  // Visitor entry points. Management/config/list routes retain session auth.
+  "/api/booking",
+  "/api/booking/availability",
   "/api/newsletter/subscribe",
   // Signed one-click unsubscribe (RFC 8058); the token is the authorization.
   "/api/newsletter/unsubscribe",
@@ -550,6 +553,20 @@ export async function requestIsSuperAdmin(req: NextRequest): Promise<boolean> {
 export default async function proxy(req: NextRequest) {
   const host = req.headers.get("host") || "";
   const pathname = req.nextUrl.pathname;
+  // An assigned delivery origin serves only published catalog pages and the
+  // existing write-only inquiry beacon. No app/session/preview fallback exists.
+  if (isSitesPathHost(host)) {
+    const selected = parseSitesPath(pathname);
+    const beacon = /^\/api\/v1\/leads\/[a-z0-9-]+$/.test(pathname) && ["POST", "OPTIONS"].includes(req.method);
+    if (!selected && !beacon && pathname !== "/robots.txt") return applySecurityHeaders(new NextResponse("Not found", { status: 404 }), req);
+    const publicHeaders = new Headers(req.headers);
+    for (const key of ["cookie", "authorization", "x-tenant", "x-preview-mode", "x-client-fallback-root", DASHBOARD_PATH_HEADER]) publicHeaders.delete(key);
+    if (selected) publicHeaders.set("x-tenant", selected.tenant);
+    const response = applySecurityHeaders(NextResponse.next({ request: { headers: publicHeaders } }), req);
+    response.headers.set("Cache-Control", "no-store");
+    response.headers.set("Content-Security-Policy", response.headers.get("Content-Security-Policy")!.replace("connect-src 'self'", `connect-src 'self' ${CONTROL_PLANE_URL}`));
+    return response;
+  }
   // Enforce the public-origin boundary before embeds, dev bypasses, internal
   // APIs or client/query fallback routing can reach the app or create a session.
   if (isSeparateSitesHost(host)) {

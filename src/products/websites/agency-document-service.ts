@@ -1,4 +1,4 @@
-import { tenantSiteOrigin } from "@/platform/infra/brand";
+import { tenantHostedBaseUrl } from "@/platform/infra/brand";
 import { z } from "zod";
 import { isDeepStrictEqual } from "node:util";
 import { createAgencyManagedWebsiteDraftAccessService, assertAgencyWebsiteDraftSubscription } from "@/platform/offerings/agency-website-draft";
@@ -85,7 +85,7 @@ export function createAgencyWebsiteDocumentService(dependencies:AgencyDocumentDe
   if(!prepared.changedNodeIds.length)throw new WorkspaceConflictError("This patch does not change the website.");
   const documentRevision=candidate.revision+1;const workRevision=scoped.rebuild.revision+1;
   const nextCandidate={revision:documentRevision,contentHash:prepared.contentHash,document:prepared.document,previewHref:`/api/websites/${scoped.work.id}/preview?revision=${documentRevision}&contentHash=${prepared.contentHash}`};
-  const audit=scoped.rebuild.sourceAudit?{scope:"html" as const,before:scoped.rebuild.sourceAudit,after:auditRebuildHtml(renderSiteDocumentHtml(prepared.document,"/",{canonicalUrl:tenantSiteOrigin(loaded.grant.tenantId),tenant:loaded.grant.tenantId}),tenantSiteOrigin(loaded.grant.tenantId)),checkedAt:now(),unavailable:["PageSpeed and Lighthouse performance","Response security headers","AI assistant visibility","Live hosted response"]}:null;
+  const audit=scoped.rebuild.sourceAudit?{scope:"html" as const,before:scoped.rebuild.sourceAudit,after:auditRebuildHtml(renderSiteDocumentHtml(prepared.document,"/",{canonicalUrl:tenantHostedBaseUrl(loaded.grant.tenantId),tenant:loaded.grant.tenantId}),tenantHostedBaseUrl(loaded.grant.tenantId)),checkedAt:now(),unavailable:["PageSpeed and Lighthouse performance","Response security headers","AI assistant visibility","Live hosted response"]}:null;
   const payload=websiteRebuildSchema.parse({...scoped.rebuild,revision:workRevision,status:"review_ready",candidate:nextCandidate,approvedCandidateRevision:null,checkpoint:null,lastError:null,audit,history:[...scoped.rebuild.history,{revision:workRevision,kind:"agency_document_draft",actorId:actor.userId,at:now()}]});
   if(Buffer.byteLength(JSON.stringify(payload),"utf8")>1_950_000)throw new WorkspaceStoreError("This website draft exceeds its saved-work size limit.");
   // Atomic storage rechecks grant/assignment/native sponsor, scope and both CAS

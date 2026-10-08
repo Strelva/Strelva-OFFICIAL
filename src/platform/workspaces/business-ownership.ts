@@ -17,6 +17,7 @@
  * disabled during the silent rollout.
  */
 import { createHash, randomBytes } from "node:crypto";
+import { freshSignIn } from "@/platform/infra/db/auth-time";
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
@@ -169,12 +170,6 @@ function trustedRecipient(state: OwnerInvitationState): string | null {
     recipient.source === "tenant_import" || (recipient.source === "owner" && recipient.verified === true)
   ));
   return trusted ? recipient.email.trim().toLowerCase() : null;
-}
-
-function freshSignIn(authTime: number | null, now: Date): boolean {
-  if (typeof authTime !== "number" || !Number.isFinite(authTime)) return false;
-  const ageSeconds = now.getTime() / 1000 - authTime;
-  return ageSeconds >= 0 && ageSeconds <= 10 * 60;
 }
 
 /** Issue an approved owner invitation without sending email during the silent rollout. */

@@ -2,9 +2,9 @@ import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { createSystemVersions, type JsonObject } from "@/platform/system-versions";
 import { createSupabaseConnectionOwnership, createSupabaseVersionStore, readVersionActor, type VersionsDb } from "@/platform/system-versions/supabase-store";
-import { adminClient, cleanup, convertedBusinessWithOwner, decisions, designateAgency, journeyEnvironment, localSql, noHorizontalOverflow } from "./support/journeys";
+import { adminClient, cleanup, convertedBusinessWithOwner, decisions, journeyEnvironment, localSql, noHorizontalOverflow } from "./support/journeys";
 
-// Versions at 1.0, on real local Auth and Postgres: Strelva's agency shares a
+// Versions at 1.0, on real local Auth and Postgres: an ordinary agency shares a
 // System as a source; the client's own Version of it goes live only when the
 // owner approves it in Needs you. The agency publishes an improvement and
 // "Review all" prepares it; nothing is live until the owner approves release 2.
@@ -33,9 +33,7 @@ test("an agency's improvement reaches a client's Version only when the owner app
   let setup: Awaited<ReturnType<typeof convertedBusinessWithOwner>> | null = null;
   try {
     setup = await convertedBusinessWithOwner(browser, admin, "j10-versions");
-    const { owner, operator, businessId, workspaceName } = setup;
-    // The operator designates Strelva's agency, which then operates the converted business.
-    const { agencyId } = await designateAgency(admin, operator);
+    const { owner, operator, agencyId, businessId, workspaceName } = setup;
 
     const db = admin as unknown as VersionsDb;
     const versions = createSystemVersions({ store: createSupabaseVersionStore(db), connections: createSupabaseConnectionOwnership(db) });

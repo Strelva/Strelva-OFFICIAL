@@ -19,6 +19,7 @@ import { buildWorkspaceApproveUrl } from "@/lib/approve-link";
 import { siteDocumentHash, siteDocumentSchema } from "@/products/websites/site-document";
 import { localEnvironment, removeLocalSuperAdmin, seedLocalSuperAdmin } from "./local-auth";
 
+const localSignedSessions = new Map<string, string>();
 export type Admin = SupabaseClient;
 export interface Person { context: BrowserContext; userId: string; email: string }
 
@@ -131,6 +132,8 @@ export async function person(browser: Browser, admin: Admin, label: string, opti
   } });
   const signedIn = await auth.auth.signInWithPassword({ email, password });
   if (signedIn.error) throw new Error(`The local Auth service rejected ${label}.`);
+  if (!signedIn.data.session) throw new Error("The local Auth service returned no signed session.");
+  localSignedSessions.set(email, signedIn.data.session.access_token);
   const hosts = [env.app, ...(options.origins ?? [])].map((origin) => new URL(origin).hostname);
   await context.addCookies(hosts.flatMap((domain) => collected.map((cookie) => ({ ...cookie, domain, secure: false, sameSite: "Lax" as const }))));
   if (hosts.some((host) => /^admin\.[a-z0-9-]+\.localhost$/.test(host))) await serveAdminHostsAsOnVercel(context);
@@ -148,6 +151,7 @@ export async function fixtureTenant(admin: Admin, input: { siteName: string; own
   const row = await admin.from("tenants").insert({ id: tenantId, site_name: input.siteName, active: true, owner_email: input.ownerEmail, owner_name: input.ownerName ?? null })
     .select("stable_id").single();
   expect(row.error).toBeNull();
+  seedSyntheticJourneyParity();
   await forgetTenantCache();
   return { tenantId, stableId: String(row.data!.stable_id) };
 }
@@ -165,6 +169,20 @@ export function localSql<T>(sql: string, ...values: string[]): T {
   return (out ? JSON.parse(out) : null) as T;
 }
 
+/** Simulate the historical read-cutover precondition on this disposable DB.
+ * Current readers require coverage of every current tenant. Never describe
+ * these backdated fixture rows as observed seven-day parity. */
+function seedSyntheticJourneyParity() {
+  localSql(`do $$ begin
+    if exists (select 1 from public.tenants where id <> 'journeys-parity' and id !~ '^j10-[a-f0-9]{8}$')
+    then raise exception 'Unexpected tenant in disposable journey parity setup'; end if;
+  end $$;
+  insert into public.tenant_client_record_parity(store, tenant_stable_id, checked_on, ok, redis_count, postgres_count, missing, mismatched)
+    select s.store, t.stable_id, (clock_timestamp() at time zone 'UTC')::date - d, true, 0, 0, 0, 0
+    from public.tenants t cross join generate_series(0, 7) d cross join (values ('bookings'), ('tenant_leads')) s(store)
+    on conflict do nothing;`);
+}
+
 /**
  * The tenant list is cached in Redis (`reb:tenants:all`); the app's own tenant
  * writes drop that key (src/lib/tenants.ts invalidateCache). A fixture written
@@ -180,11 +198,11 @@ export async function forgetTenantCache() {
 }
 
 /** Run one operator script against the loopback database and parse its --json outcome. */
-export function operatorScript<T>(script: "convert-tenant-to-workspace" | "business-ownership", args: string[]): T {
+export function operatorScript<T>(script: "convert-tenant-to-workspace" | "business-ownership", args: string[], operatorEmail?: string): T {
   const env = localEnvironment();
   const stdout = execFileSync("pnpm", ["exec", "tsx", `scripts/${script}.ts`, ...args, "--json"], {
     encoding: "utf8",
-    env: { ...process.env, SUPABASE_URL: env.url, NEXT_PUBLIC_SUPABASE_URL: env.url, SUPABASE_SERVICE_ROLE_KEY: env.service },
+    env: { ...process.env, SUPABASE_URL: env.url, NEXT_PUBLIC_SUPABASE_URL: env.url, SUPABASE_SERVICE_ROLE_KEY: env.service, ...(operatorEmail ? { STRELVA_OPERATOR_SESSION_ACCESS_TOKEN: localSignedSessions.get(operatorEmail) } : {}) },
     timeout: 120_000,
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -200,38 +218,30 @@ export interface InviteOutcome {
   invitation?: { invitation: { invitationId: string; recipientEmail: string }; acceptUrl?: string; delivery: { status: string } };
 }
 
-/** The operator's conversion of one tenant into a business. Returns the business id. */
-export function convertTenant(tenantId: string, operatorEmail: string): string {
-  const outcome = operatorScript<ConversionOutcome>("convert-tenant-to-workspace", [tenantId, "--apply", `--operator-email=${operatorEmail}`]);
+const conversionAgencies = new Map<string, string[]>();
+
+/** Ordinary agency, created through the same account API. No platform role or
+ * singleton designation grants it clients. Conversion names its staffed seat. */
+export async function ordinaryConversionAgency(staff: Person): Promise<{ agencyId: string; staffEmail: string }> {
+  const response = await staff.context.request.post("/api/workspace", { headers: { origin: localEnvironment().app }, data: { action: "create_agency", name: "Harbor Website Care" } });
+  expect(response.status(), await response.text()).toBeLessThan(300);
+  const agencyId = String((await response.json()).workspaceId);
+  expect(agencyId).toMatch(/^[0-9a-f-]{36}$/);
+  conversionAgencies.set(staff.userId, [...(conversionAgencies.get(staff.userId) ?? []), agencyId]);
+  return { agencyId, staffEmail: staff.email };
+}
+
+/** The operator names the ordinary agency and its actual staff explicitly. */
+export function convertTenant(tenantId: string, operatorEmail: string, agency: { agencyId: string; staffEmail: string }): string {
+  const outcome = operatorScript<ConversionOutcome>("convert-tenant-to-workspace", [tenantId, "--apply", `--operator-email=${operatorEmail}`, `--agency=${agency.agencyId}`, `--agency-staff=${agency.staffEmail}`, "--agency-basis=existing_contract"]);
   expect(outcome.mode).toBe("apply");
   expect(outcome.receipt?.workspaceId).toMatch(/^[0-9a-f-]{36}$/);
   return outcome.receipt!.workspaceId;
 }
 
-/**
- * Strelva's agency workspace is a permanent singleton (strelva_agency_workspace
- * refuses update and delete), so a rerun on the same disposable database
- * replays the existing designation instead of naming a second one.
- */
-export async function designateAgency(admin: Admin, operator: Person): Promise<{ agencyId: string; marked: number; replayed: boolean }> {
-  const existing = await admin.rpc("read_platform_workspace", { p_role: "strelva_agency" });
-  expect(existing.error).toBeNull();
-  let agencyId = typeof existing.data === "string" ? existing.data : null;
-  if (!agencyId) {
-    agencyId = randomUUID();
-    expect((await admin.from("workspaces").insert({ id: agencyId, kind: "agency", name: "Strelva", created_by: operator.userId })).error).toBeNull();
-  }
-  // The designation requires the operator to be owner or admin of the agency workspace.
-  const membership = await admin.from("workspace_memberships").upsert({ workspace_id: agencyId, user_id: operator.userId, role: "admin", created_by: operator.userId }, { onConflict: "workspace_id,user_id", ignoreDuplicates: true });
-  expect(membership.error).toBeNull();
-  const outcome = operatorScript<{ designation: { workspaceId: string; marked: number; replayed: boolean } }>("business-ownership", ["designate-agency", agencyId, `--operator-email=${operator.email}`, "--apply"]);
-  expect(outcome.designation.workspaceId).toBe(agencyId);
-  return { agencyId, marked: outcome.designation.marked, replayed: outcome.designation.replayed };
-}
-
 /** The operator's owner invitation. Email is not sent without Jacob's yes, so the accept link comes back. */
 export function inviteOwner(tenantId: string, operatorEmail: string, recipient?: string): { acceptPath: string; workspaceName: string; invitationId: string } {
-  const outcome = operatorScript<InviteOutcome>("business-ownership", ["invite-owner", tenantId, `--operator-email=${operatorEmail}`, "--apply", ...(recipient ? [`--recipient=${recipient}`] : [])]);
+  const outcome = operatorScript<InviteOutcome>("business-ownership", ["invite-owner", tenantId, "--apply", ...(recipient ? [`--recipient=${recipient}`] : [])], operatorEmail);
   expect(outcome.invitation?.delivery.status).not.toBe("sent");
   expect(outcome.invitation?.acceptUrl).toBeTruthy();
   // The link is minted for the operator host; the path is the same everywhere.
@@ -303,6 +313,14 @@ export async function serveBookingsFromTheStore(admin: Admin, tenantId: string, 
   if (!dbUrl || !["localhost", "127.0.0.1"].includes(new URL(dbUrl).hostname)) throw new Error("Set STRELVA_LOCAL_DB_URL to the disposable database (loopback only).");
   const content = await admin.from("content").upsert({ tenant_id: tenantId, section: "services", data: { services: [{ id: service.id, name: service.name, duration: "60" }] } }, { onConflict: "tenant_id,section" });
   expect(content.error).toBeNull();
+  // Current SQL also checks the authoritative business service at admission.
+  // This fixture supplies that record, rather than weakening the service gate
+  // or treating legacy page content as permission to book a retired service.
+  localSql(`insert into public.business_services(workspace_id, name, duration_minutes, external_ref, source, verified, created_by, updated_by)
+    select l.workspace_id, :'v2', 60, :'v3', 'owner', true, m.user_id, m.user_id
+    from public.tenant_workspace_links l join public.tenants t on t.stable_id=l.tenant_stable_id
+      join public.workspace_memberships m on m.workspace_id=l.workspace_id and m.role='owner'
+    where t.id=:'v1' and not exists(select 1 from public.business_services s where s.workspace_id=l.workspace_id and s.external_ref=:'v3');`, tenantId, service.name, service.id);
   const week = [0, 1, 2, 3, 4, 5, 6].map((day) => ({ day, opens: "09:00", closes: "17:00" }));
   const settings = await admin.rpc("upsert_tenant_booking_settings", {
     p_tenant_id: tenantId, p_via: "native",
@@ -313,10 +331,7 @@ export async function serveBookingsFromTheStore(admin: Admin, tenantId: string, 
   expect(stable.error).toBeNull();
   const stableId = String(stable.data!.stable_id);
   if (!/^[0-9a-f-]{36}$/.test(stableId)) throw new Error("The fixture tenant has no stable id.");
-  execFileSync("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-q", "-c",
-    `insert into public.tenant_client_record_parity(store, tenant_stable_id, checked_on, ok, redis_count, postgres_count, missing, mismatched)
-       select 'bookings', '${stableId}'::uuid, (clock_timestamp() at time zone 'UTC')::date - d, true, 0, 0, 0, 0
-       from generate_series(0, 7) d on conflict do nothing`], { stdio: ["ignore", "pipe", "pipe"], timeout: 30_000 });
+  seedSyntheticJourneyParity();
   const streak = await admin.rpc("client_record_parity_streak", { p_store: "bookings" });
   expect(streak.error).toBeNull();
   expect(Number((streak.data as { days: number }).days)).toBeGreaterThanOrEqual(7);
@@ -397,6 +412,9 @@ export async function cleanup(admin: Admin, input: { tenantIds?: string[]; works
   for (const workspaceId of input.workspaceIds ?? []) await admin.from("workspaces").delete().eq("id", workspaceId).then(() => undefined, () => undefined);
   for (const tenantId of input.tenantIds ?? []) await admin.from("tenants").delete().eq("id", tenantId).then(() => undefined, () => undefined);
   for (const one of input.people ?? []) {
+    for (const agencyId of conversionAgencies.get(one.userId) ?? []) await admin.from("workspaces").delete().eq("id", agencyId);
+    conversionAgencies.delete(one.userId);
+    localSignedSessions.delete(one.email);
     await one.context.close().catch(() => undefined);
     try { removeLocalSuperAdmin(one.userId); } catch { /* left for the disposable stack */ }
     await admin.auth.admin.deleteUser(one.userId).catch(() => undefined);
@@ -423,8 +441,9 @@ export async function convertedBusinessWithOwner(browser: Browser, admin: Admin,
   const ownerEmail = `local-${label}-owner-${randomUUID().slice(0, 8)}@example.test`;
   const tenant = await fixtureTenant(admin, { siteName: `Harbor ${label}`, ownerEmail, ownerName: "Mara Quinn" });
   const owner = await person(browser, admin, `${label}-owner`, { email: ownerEmail, origins: options.ownerOrigins?.(tenant.tenantId) ?? [] });
-  const businessId = convertTenant(tenant.tenantId, operator.email);
+  const agency = await ordinaryConversionAgency(operator);
+  const businessId = convertTenant(tenant.tenantId, operator.email, agency);
   const invitation = inviteOwner(tenant.tenantId, operator.email);
   await acceptAsOwner(owner, invitation.acceptPath, invitation.workspaceName);
-  return { operator, owner, tenantId: tenant.tenantId, businessId, workspaceName: invitation.workspaceName };
+  return { operator, owner, agencyId: agency.agencyId, tenantId: tenant.tenantId, businessId, workspaceName: invitation.workspaceName };
 }

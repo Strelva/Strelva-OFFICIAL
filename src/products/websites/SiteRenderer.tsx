@@ -15,6 +15,7 @@ export interface SiteRendererProps {
   preview?: boolean;
   tenant?: string;
   contentHash?: string;
+  basePath?: string;
   businessContext?: TenantBusinessContext | null;
   /** Serve visitor tools under this current tenant slug (after a rename). The
    * page still emits the issued document's hash. */
@@ -23,7 +24,7 @@ export interface SiteRendererProps {
 }
 
 /** Dependency-free catalog renderer behind the replaceable SiteRenderer boundary. */
-export function SiteRenderer({ document: input, path = "/", preview = false, tenant, contentHash, capabilityTenant, businessFacts, businessContext }: SiteRendererProps) {
+export function SiteRenderer({ document: input, path = "/", preview = false, tenant, contentHash, basePath, capabilityTenant, businessFacts, businessContext }: SiteRendererProps) {
   const issued = siteDocumentSchema.parse(input);
   const documentHash = siteDocumentHash(issued);
   // A document bound to the record uses its typed projection (approved copy when
@@ -49,6 +50,6 @@ export function SiteRenderer({ document: input, path = "/", preview = false, ten
     {businessFacts && projected !== issued && !preview ? <meta name="strelva-business-record-revision" content={String(businessFacts.revision)} /> : null}
     <style>{SITE_CATALOG_CSS}</style>
     {faqSchema && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(faqSchema) }} />}
-    {render(sitePageTree(document, path, { preview, tenant }), "site")}
+    {render(sitePageTree(document, path, { preview, tenant, basePath }), "site")}
   </div>;
 }

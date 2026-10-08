@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
-import { MARKETING_URL } from "@/platform/infra/brand";
+import { MARKETING_URL, SITES_PATH_ORIGIN, isSitesPathHost } from "@/platform/infra/brand";
+import { headers } from "next/headers";
 import { getHostedSite } from "@/products/websites/index";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +15,7 @@ export const dynamic = "force-dynamic";
 const AGENT_CONTRACTS = ["/api/v1/*/openapi.json", "/api/mcp/public", "/.well-known/oauth-protected-resource", "/.well-known/oauth-authorization-server"];
 
 export default async function robots(): Promise<MetadataRoute.Robots> {
+  if (SITES_PATH_ORIGIN && isSitesPathHost((await headers()).get("host") || "")) return { rules: { userAgent: "*", allow: "/sites/", disallow: "/" } };
   const hosted = await getHostedSite();
   if (hosted) return hosted.preview ? { rules: { userAgent: "*", disallow: "/" } } : { rules: { userAgent: "*", allow: ["/", ...AGENT_CONTRACTS], disallow: ["/dashboard/", "/api/", "/workspace/", "/preview/", "/admin/"] }, sitemap: `${hosted.origin}/sitemap.xml` };
   return {

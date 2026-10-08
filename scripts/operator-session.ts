@@ -1,10 +1,11 @@
 import { hostname } from "node:os";
+import { verifiedSignInTime } from "../src/platform/infra/db/auth-time";
 import { createClient } from "@supabase/supabase-js";
 import type { WorkspaceActor } from "../src/platform/workspaces/types";
 import type { OperatorAuditContext } from "../src/platform/workspaces/operator-approvals";
 
 export interface OperatorSession extends WorkspaceActor {
-  /** Verified `auth_time` claim, in Unix seconds. */
+  /** Verified credential sign-in time, in Unix seconds. */
   authTime: number | null;
   auditContext: OperatorAuditContext;
 }
@@ -32,8 +33,7 @@ export async function readOperatorSessionFromEnv(
   }
   const email = user.email.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("The signed-in operator has no verified email address.");
-  const rawAuthTime = claims.auth_time;
-  const authTime = typeof rawAuthTime === "number" && Number.isFinite(rawAuthTime) ? rawAuthTime : null;
+  const authTime = verifiedSignInTime(claims, user.id);
   const osUser = env.USER?.trim() || env.LOGNAME?.trim() || `uid:${process.getuid?.() ?? "unknown"}`;
   return {
     userId: user.id,

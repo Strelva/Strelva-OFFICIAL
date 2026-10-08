@@ -1,4 +1,4 @@
-import { APP_ROOT_DOMAIN, SITES_ROOT_DOMAIN, CONTROL_PLANE_URL, isPlatformDomain, tenantSiteOrigin } from "@/platform/infra/brand";
+import { APP_ROOT_DOMAIN, SITES_ROOT_DOMAIN, SITES_PATH_ORIGIN, CONTROL_PLANE_URL, isPlatformDomain, tenantSiteOrigin, tenantHostedBaseUrl } from "@/platform/infra/brand";
 import type { TenantConfig } from "./types";
 import type { SiteConfig, TenantIdentity } from "./tenant/models";
 
@@ -166,9 +166,9 @@ export function getTenantPublicUrl(
 ): string {
   if (environment === "production") {
     const publicDomain = getTenantPublicDomain(tenant);
-    if (publicDomain && !(SITES_ROOT_DOMAIN !== APP_ROOT_DOMAIN && isPlatformDomain(publicDomain))) return `https://${publicDomain}`;
+    if (publicDomain && !((SITES_PATH_ORIGIN || SITES_ROOT_DOMAIN !== APP_ROOT_DOMAIN) && isPlatformDomain(publicDomain)) && !(SITES_PATH_ORIGIN && publicDomain.endsWith(".vercel.app"))) return `https://${publicDomain}`;
     const subdomain = tenant.subdomain || tenant.id;
-    return tenantSiteOrigin(subdomain);
+    return tenantHostedBaseUrl(subdomain);
   }
 
   const subdomain = tenant.subdomain || tenant.id;
