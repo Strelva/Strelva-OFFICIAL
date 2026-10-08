@@ -1,6 +1,6 @@
 /** Connected-site observations become a record-only Needs you ask. Never edits or emails. */
 import { createHash } from "node:crypto";
-import { fetchPinnedPublicText } from "@/lib/pinned-public-text";
+import { fetchPinnedPublicText } from "@/platform/infra/pinned-public-text";
 import type { ProposedItem } from "@/platform/needs-you/contracts";
 import { schemaConflictReleaseEnabled } from "@/platform/needs-you/release";
 import { connectedSitesStore, type ConnectedSitesStore } from "./store";
