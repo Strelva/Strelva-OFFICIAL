@@ -188,6 +188,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261011133700": "business_record_confirmed",
   "20261011170000": "prospects",
   "20261012110000": "business_pages",
+  "20261015100000": "agency_client_additions",
   "20261013120000": "business_owner_recipient_trust",
 };
 
