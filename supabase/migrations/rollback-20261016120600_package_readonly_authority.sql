@@ -4,6 +4,13 @@ set local lock_timeout='3s';
 do $repair$ declare target record; definition text;
 begin
  for target in select * from (values
+  ('public.read_business_system(uuid,uuid,text,uuid)','public.system_read_scope(','public.system_actor_scope('),
+  ('public.read_business_system(uuid,uuid,text,uuid)','public.system_read_load(','public.system_load('),
+  ('public.read_existing_business_systems(uuid,uuid,text)','public.system_read_scope(','public.system_actor_scope('),
+  ('public.read_system_version(uuid,text,uuid)','public.system_version_read_access(','public.system_version_access('),
+  ('public.read_system_version_for_system(uuid,uuid,text,uuid)','public.system_version_read_access(','public.system_version_access('),
+  ('public.read_workspace_version_sources(uuid,uuid,text)','public.system_version_read_access(','public.system_version_access('),
+  ('public.system_version_connection_holder(uuid,text,text)','public.system_version_read_access(','public.system_version_access('),
   ('public.read_system_package_listings(uuid,uuid,text)','public.system_read_scope(','public.system_actor_scope('),
   ('public.read_system_package_creator(uuid,uuid,text,uuid)','public.system_version_read_access(','public.system_version_access(')
  ) changes(signature,old_call,new_call) loop
