@@ -50,6 +50,13 @@ afterEach(() => vi.unstubAllEnvs());
 
 afterEach(() => vi.unstubAllEnvs());
 describe("atomic hosted-tenant deprovision", () => {
+  it("counts signing keys in dry runs and reports their tenant-delete cascade", async () => {
+    db.counts = { tenant_track_signing_keys: 1, tenants: 1 };
+    const dry = await runDeprovision({ tenantId: "fictional-free", tenant: null, dryRun: true });
+    expect(dry.summary.postgres).toContainEqual({ target: "tenant_track_signing_keys", found: 1, deleted: false });
+    const applied = await runDeprovision({ tenantId: "fictional-free", tenant: null, dryRun: false });
+    expect(applied.summary.postgres).toContainEqual({ target: "tenant_track_signing_keys", found: 1, deleted: true });
+  });
   it("Postgres authority refuses a missing export before pausing Systems or purging anything", async () => {
     vi.stubEnv("DUAL_WRITE_PG", "1"); vi.stubEnv("STRELVA_LEADS_AUTHORITY", "postgres");
     db.teardownError = { message: "inquiry_export_required_before_teardown" };
