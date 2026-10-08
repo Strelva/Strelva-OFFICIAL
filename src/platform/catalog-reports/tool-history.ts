@@ -13,7 +13,8 @@ export async function readToolReleases(actor: WorkspaceActor, workspaceId: strin
 
 export async function readToolContactConflicts(actor: WorkspaceActor): Promise<SourceRead[]> {
   if (!systemsReleaseMayBeOn()) return [];
-  const rows = await callReleaseFlagsRpc("read_catalog_tool_contact_conflicts", {
+  const rows = await callReleaseFlagsRpc("read_audited_platform_operator_source", {
+    p_reader_name: "read_catalog_tool_contact_conflicts",
     p_user_id: actor.userId, p_verified_email: actor.verifiedEmail,
   }, z.array(z.object({ id: z.string().uuid(), workspaceId: z.string().uuid(), workId: z.string().uuid(), at: z.string() })), "Internal tool contact conflicts could not be read.");
   const enabled = await Promise.all(rows.map(row => workspaceReleaseFlagEnabled("systems", row.workspaceId, { operator: true, tester: false })));

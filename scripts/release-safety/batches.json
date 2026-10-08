@@ -1369,6 +1369,20 @@
           "rollbackStatus": "quarantine only; grants revoked, accepted contacts/sync/audit/history retained; never restores unaudited entry"
         }
       ]
+    },
+    {
+      "batch": "18",
+      "status": "prepared locally; unapplied",
+      "description": "Eleven platform-wide support reader compositions and seventeen app admission powers with attributed access history (#251)",
+      "note": "Independent branch reservation after batch17 inquiry/operator audit source integration; no source dependency on17. Pure snapshot bodies/ACLs remain unchanged. Eleven typed wrapper reads append atomically; seventeen admission powers precede separate downstream app reads. Inverse disables all three public entrypoints, preserving immutable history. Not universal service-role SQL read auditing or selected retention policy.",
+      "items": [
+        {
+          "file": "20261020090039_platform_operator_read_audit.sql",
+          "sha256": "7bcd8d8a942a591136584f20282ed327c68668b136035fcbb598b52dd96a69ff",
+          "rollback": "rollback-20261020090039_platform_operator_read_audit.sql",
+          "rollbackSha256": "882a103455fa27e8d5249f5416e324b8401cbbb20a24f38944299a1bf35aa6a6"
+        }
+      ]
     }
   ]
 }
