@@ -24,7 +24,7 @@ vi.mock("@/products/connected-sites/server", () => ({ reconcileConnectedInquiryO
 vi.mock("@/platform/needs-you", () => ({ reconcileInquiryDecisionNotice: mocks.decision }));
 
 import { POST } from "@/app/api/webhooks/resend/route";
-import { MAX_RESEND_WEBHOOK_BODY_BYTES } from "@/app/api/webhooks/resend/route";
+import { MAX_RESEND_WEBHOOK_BODY_BYTES } from "@/platform/infra/email/webhook-contracts";
 
 beforeEach(() => {
   vi.clearAllMocks();

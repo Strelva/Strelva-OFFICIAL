@@ -101,14 +101,14 @@ describe("authenticated workspace account context", () => {
     mocks.getSessionUser.mockResolvedValue(null);
     const { default: WorkspaceAccountPage } = await import("@/app/workspace/account/page");
 
-    await expect(WorkspaceAccountPage()).rejects.toThrow("REDIRECT:/sign-in?next=%2Fworkspace");
+    await expect(WorkspaceAccountPage({})).rejects.toThrow("REDIRECT:/sign-in?next=%2Fworkspace");
     expect(mocks.listWorkspaces).not.toHaveBeenCalled();
   });
 
   it("renders verified identity and read-only workspace access without changing permissions", async () => {
     const { default: WorkspaceAccountPage } = await import("@/app/workspace/account/page");
 
-    const page = await WorkspaceAccountPage();
+    const page = await WorkspaceAccountPage({});
     const text = textFrom(page);
 
     expect(mocks.listWorkspaces).toHaveBeenCalledWith({ userId: "user_123", verifiedEmail: "owner@example.com" });
@@ -132,7 +132,7 @@ describe("authenticated workspace account context", () => {
     mocks.listWorkspaces.mockRejectedValue(new Error("database password secret"));
     const { default: WorkspaceAccountPage } = await import("@/app/workspace/account/page");
 
-    const page = await WorkspaceAccountPage();
+    const page = await WorkspaceAccountPage({});
     const text = textFrom(page);
 
     expect(text).toContain("Workspace access is temporarily unavailable");
@@ -164,7 +164,7 @@ describe("authenticated workspace account context", () => {
     });
     const { default: WorkspaceAccountPage } = await import("@/app/workspace/account/page");
 
-    const page = await WorkspaceAccountPage();
+    const page = await WorkspaceAccountPage({});
     const text = textFrom(page);
 
     expect(mocks.listWorkspaces).not.toHaveBeenCalled();
