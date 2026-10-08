@@ -316,8 +316,8 @@ export const ownerRecipientSchema = z.object({
 export type OwnerRecipient = z.infer<typeof ownerRecipientSchema>;
 
 /** The one owner-recipient rule keyed by tenant (resolve_tenant_owner_recipient):
- * the linked record's owner contact, else this tenant's owner_email, else the
- * business's earliest linked tenant's owner_email. */
+ * the business's trusted owner address when the record holds it, else this
+ * tenant's owner_email, else the address the business trusted at conversion. */
 export const tenantOwnerRecipientSchema = z.object({
   email: z.string().email(),
   name: nullableString,

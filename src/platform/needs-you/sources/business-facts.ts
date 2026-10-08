@@ -162,12 +162,18 @@ export function businessFactsDetail(lines: readonly string[]): string {
     : `${flat.length === 1 ? "1 change" : `${flat.length} changes`}, too long to show here. You see every value in full before you approve.`;
 }
 
+/** A new recipient for owner links is pending until this item is approved
+ * (#524), so it leads the detail and never falls past the truncation. */
+function ownerRecipientFirst(changes: BusinessFactChange[]): BusinessFactChange[] {
+  return [...changes].sort((a, b) => Number(b.entity === "fact" && b.id === "owner_recipient") - Number(a.entity === "fact" && a.id === "owner_recipient"));
+}
+
 export function businessFactsItem(review: BusinessFactReview): ProposedItem {
   return {
     // fact.inferred: its floor is owner_decides, so no Strelva policy can loosen it.
     kind: "fact.inferred", route: "owner_decides",
     title: "Confirm changes to your business details",
-    detail: businessFactsDetail(businessFactReviewLines(review)),
+    detail: businessFactsDetail(businessFactReviewLines({ ...review, changes: ownerRecipientFirst(review.changes) })),
     approveEffect: "These details go live wherever Strelva shows your business. A website Strelva updates by hand follows after a quick check.",
     notYetEffect: "Nothing changes. Your website keeps the details you last confirmed.",
     sourceLifecycle: "business_facts", sourceId: review.workspaceId, revisionHash: review.revisionHash,
