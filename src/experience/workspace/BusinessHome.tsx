@@ -127,7 +127,8 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   // An incomplete list would misplace a System; show none until it loads.
   const systems = systemsReleased && !systemsLoading ? knownSystems : [];
   const current = snapshot.workspaces.find(space => space.id === snapshot.workspaceId);
-  const readOnly = current?.access === "delegated_read";
+  const providerSeat = current?.access === "provider_seat";
+  const readOnly = current?.access === "delegated_read" || current?.access === "provider_seat";
   const customer = current?.kind === "customer";
   const name = current?.name || "Your business";
   const home = workspaceHome(snapshot.work);
@@ -278,8 +279,8 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
     <section className={`${styles.dusk} ${styles.reveal}`} aria-labelledby="business-start-title">
       <div className={styles.duskMain}>
         <p className={styles.duskLine}>{readOnly ? systemsReleased ? "Shared with you" : "Shared workspace" : line}{(readOnly || line) ? " · " : ""}{name}</p>
-        <h1 id="business-start-title" className="font-display">{readOnly ? "Review what was shared." : greeting}</h1>
-        {readOnly ? <p className={styles.duskNote}>{name} shared this with your agency to review.</p> : composer}
+        <h1 id="business-start-title" className="font-display">{providerSeat ? "Your client’s website work." : readOnly ? "Review what was shared." : greeting}</h1>
+        {readOnly ? <p className={styles.duskNote}>{providerSeat ? `Your agency has assigned you to ${name}. Open a saved website to continue working.` : `${name} shared this with your agency to review.`}</p> : composer}
       </div>
       {chips.length || systemsLine ? <ul className={styles.chips} aria-label="Right now">
         {chips.map(chip => <li key={chip.id} data-tone={chip.tone}><span className={styles.dot} aria-hidden="true" />{chip.text}</li>)}

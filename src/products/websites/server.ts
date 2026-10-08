@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { boundedStore, type BoundedStore } from "@/platform/bounded-work/repository";
+import { type BoundedStore } from "@/platform/bounded-work/repository";
+import { websiteWorkspaceStore as boundedStore } from "./workspace-store";
 import { listWork } from "@/platform/workspaces/repository";
 import {
   WorkspaceAccessError,

@@ -90,6 +90,24 @@ beforeEach(() => {
   mocks.exitCompleted.mockResolvedValue(false);
 });
 
+it("opens a provider client without publishing inquiry, Ask, decision or member mutation grants", async () => {
+  vi.stubEnv("STRELVA_NEEDS_YOU_RELEASE", "1");
+  vi.stubEnv("STRELVA_ASK_RELEASE", "1");
+  vi.stubEnv("STRELVA_INQUIRIES_RELEASE", "1");
+  mocks.list.mockResolvedValue([{ ...workspace, kind: "customer", access: "provider_seat", role: undefined }]);
+  mocks.work.mockResolvedValue([]);
+  const response = await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${workspaceId}`));
+  expect(response.status).toBe(200);
+  const snapshot = await response.json();
+  expect(snapshot.workspaces[0]).toMatchObject({ access: "provider_seat" });
+  expect(snapshot.workspaces[0].role).toBeUndefined();
+  expect(snapshot.releases).toMatchObject({ needsYou: false, ask: false, inquiries: false });
+  expect(snapshot.products.some((product: { id: string }) => product.id === "inquiries")).toBe(false);
+  expect(mocks.systems).toHaveBeenCalledWith(expect.objectContaining({ canWrite: false }));
+  expect(mocks.pending).not.toHaveBeenCalled();
+  expect(mocks.workDelegations).not.toHaveBeenCalled();
+});
+
 describe("release-one private workspace routes", () => {
   it("fails closed while the release gate is off", async () => {
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "0");
