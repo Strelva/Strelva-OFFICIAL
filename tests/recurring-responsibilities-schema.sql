@@ -43,5 +43,5 @@ insert into public.standing_responsibilities(workspace_id,owner_id,version,revis
 select public.update_standing_responsibility(id,workspace_id,owner_id,'rr-owner@example.test',0,payload||jsonb_build_object('revision',1,'status','active','approvedBy',owner_id,'approvedAt',clock_timestamp(),'history',jsonb_build_array(jsonb_build_object('revision',1,'kind','approve','actorId',owner_id,'at',clock_timestamp(),'detail','Explicit test acceptance')))) from public.standing_responsibilities where workspace_id in ('99100000-0000-4000-8000-000000000031','99100000-0000-4000-8000-000000000032');
 select pg_temp.assert_ok(public.snapshot_due_responsibility_meters(1)->>'failed'='1','unqualified background capture records isolated failure');
 select pg_temp.assert_ok(public.snapshot_due_responsibility_meters(1)->>'failed'='1','second bounded batch progresses despite first failure');
-select pg_temp.assert_ok((select count(*)=2 from public.responsibility_meter_capture_attempts where status='unavailable'),'failed business cannot starve subsequent candidates');
+select pg_temp.assert_ok((select count(*)=2 from public.responsibility_meter_capture_attempts where status='unavailable' and business_workspace_id in ('99100000-0000-4000-8000-000000000031','99100000-0000-4000-8000-000000000032')),'failed business cannot starve subsequent candidates');
 rollback;
