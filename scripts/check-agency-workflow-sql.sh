@@ -4,9 +4,19 @@
 set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$repo_root/scripts/temp-postgres.sh"
-for command_name in initdb pg_ctl psql; do
+for command_name in initdb pg_ctl psql shasum; do
   command -v "$command_name" >/dev/null || { printf 'Missing %s\n' "$command_name" >&2; exit 1; }
 done
+# This reviewed successor replaces the owner-link bodies. Its presence changes
+# the recovery proof to a precise refusal, never permission to skip a rollback.
+owner_runtime_successor="$repo_root/supabase/migrations/20261018131000_owner_decision_runtime_authority.sql"
+owner_runtime_installed=false
+if [[ -f "$owner_runtime_successor" ]]; then
+  successor_digest="$(shasum -a 256 "$owner_runtime_successor")"
+  [[ "${successor_digest%% *}" == "748efe03138425400405087f66972d481cbe2b77b1425bd974b5f9d90b11176a" ]] || {
+    printf 'Owner runtime successor source digest differs; review the changed recovery proof.\n' >&2; exit 1;
+  }
+fi
 create_temp_postgres strelva-agency-workflow strelva-agency-workflow-socket
 cluster_port="$((61000 + ($$ % 3000)))"
 initdb -D "$cluster_data" --locale=C --encoding=UTF8 --auth=trust --no-instructions >/dev/null
@@ -29,18 +39,43 @@ while IFS= read -r migration; do
     exit 1
   fi
   migration_count=$((migration_count + 1))
+  if [[ "$migration" == "$owner_runtime_successor" ]]; then owner_runtime_installed=true; fi
 done < <(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sql' | sort)
 psql "${psql_args[@]}" -Atc "$owner_link_fingerprint_query" >"$cluster_root/owner-link-after.hashes"
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-workflow-schema.sql" >/dev/null
 psql "${psql_args[@]}" --file="$repo_root/tests/website-owner-agency-publish-schema.sql" >/dev/null
 psql "${psql_args[@]}" --file="$repo_root/tests/owner-link-provider-seat-schema.sql" >/dev/null
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261015120000_owner_link_provider_identity.sql" >/dev/null
-psql "${psql_args[@]}" -Atc "$owner_link_fingerprint_query" >"$cluster_root/owner-link-rolled-back.hashes"
-cmp "$cluster_root/owner-link-before.hashes" "$cluster_root/owner-link-rolled-back.hashes"
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261015120000_owner_link_provider_identity.sql" >/dev/null
-psql "${psql_args[@]}" -Atc "$owner_link_fingerprint_query" >"$cluster_root/owner-link-reapplied.hashes"
-cmp "$cluster_root/owner-link-after.hashes" "$cluster_root/owner-link-reapplied.hashes"
+if [[ "$owner_runtime_installed" == true ]]; then
+  # Match the installed successor's entire captured function scope, including
+  # each final body. Claimant authority is outside this seven-function scope.
+  successor_holds="$(psql "${psql_args[@]}" -Atc "select count(*)=7 and bool_and(after_hash is not null and after_hash=md5(pg_get_functiondef(signature::regprocedure))) and count(*) filter (where signature='public.claim_owner_decision(uuid,uuid,text,text,text,uuid,text,text)')=0 from release_rollback_baseline.owner_decision_runtime_authority")"
+  [[ "$successor_holds" == t ]] || { printf 'Owner runtime successor scope/body drift.\n' >&2; exit 1; }
+  function_catalog_query="select p.oid::regprocedure::text,p.oid,p.proowner,coalesce(p.proacl,acldefault('f',p.proowner))::text,md5(pg_get_functiondef(p.oid)) from pg_proc p where p.pronamespace='public'::regnamespace and p.prokind='f' order by p.oid::regprocedure::text"
+  psql "${psql_args[@]}" -Atc "$function_catalog_query" >"$cluster_root/owner-link-successor-before.catalog"
+  if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261015120000_owner_link_provider_identity.sql" >"$cluster_root/owner-link-refusal.log" 2>&1; then
+    printf 'Legacy owner-link rollback overwrote its security successor.\n' >&2; exit 1;
+  fi
+  if ! grep -Fq 'rollback_wrong_order_or_function_drift: owner link provider identity' "$cluster_root/owner-link-refusal.log"; then
+    cat "$cluster_root/owner-link-refusal.log" >&2; exit 1;
+  fi
+  psql "${psql_args[@]}" -Atc "$function_catalog_query" >"$cluster_root/owner-link-successor-after.catalog"
+  cmp "$cluster_root/owner-link-successor-before.catalog" "$cluster_root/owner-link-successor-after.catalog"
+  printf 'Legacy owner-link rollback refused its exact security successor; final function catalog unchanged.\n'
+else
+  psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261015120000_owner_link_provider_identity.sql" >/dev/null
+  psql "${psql_args[@]}" -Atc "$owner_link_fingerprint_query" >"$cluster_root/owner-link-rolled-back.hashes"
+  cmp "$cluster_root/owner-link-before.hashes" "$cluster_root/owner-link-rolled-back.hashes"
+  psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261015120000_owner_link_provider_identity.sql" >/dev/null
+  psql "${psql_args[@]}" -Atc "$owner_link_fingerprint_query" >"$cluster_root/owner-link-reapplied.hashes"
+  cmp "$cluster_root/owner-link-after.hashes" "$cluster_root/owner-link-reapplied.hashes"
+fi
 psql "${psql_args[@]}" --file="$repo_root/tests/operator-owner-decisions-schema.sql" >/dev/null
+# The actor-RPC correction is additive to the earlier packet. Exercise native
+# anonymous/authenticated denial and preserved service application/AI authority
+# whenever that correction is in the ordered schema under test.
+if [[ -f "$repo_root/supabase/migrations/20261019100000_actor_rpc_service_boundary.sql" ]]; then
+  psql "${psql_args[@]}" --file="$repo_root/tests/actor-rpc-service-boundary-schema.sql" >/dev/null
+fi
 owner_boundary_query="select md5(pg_get_functiondef('public.claim_owner_decision(uuid,uuid,text,text,text,uuid,text,text)'::regprocedure))"
 psql "${psql_args[@]}" -Atc "$owner_boundary_query" >"$cluster_root/owner-boundary-after.hash"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261017120000_owner_decision_operator_refusal.sql" >/dev/null
