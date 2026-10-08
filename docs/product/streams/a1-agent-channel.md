@@ -4,6 +4,11 @@ October 7, 2026; private branch preparation for #301–303, #306–310, and #311
 Local implementation and fictional proof do not establish deployment, native
 assistant-client compatibility, legal approval, provider verification or demand.
 
+October 8 client preparation: [The Mooney Firm with Claude](../../operations/client-mcp-mooney-2026-10-08.md)
+adds safe no-selector profile bootstrap and an unauthenticated readiness probe on
+an isolated child branch. Website edits, renewable grants, owner connection
+management and real Claude use remain explicit gates.
+
 ## Native chain
 
 One `/api/mcp/public` server offers public discovery, confirmed policies, booking,

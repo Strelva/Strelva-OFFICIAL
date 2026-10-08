@@ -90,6 +90,11 @@ export async function exchangeAgentCode(p: URLSearchParams) { if (!oauthEnabled(
     throw new Error('temporarily_unavailable'); if (['grant_type', 'client_id', 'redirect_uri', 'resource', 'code', 'code_verifier'].some(k => p.getAll(k).length !== 1))
     throw new Error('invalid_request'); if (p.get('grant_type') !== 'authorization_code' || p.get('resource') !== resourceUrl() || !/^[-A-Za-z0-9._~]{43,128}$/.test(p.get('code_verifier') || '') || !/^[A-Za-z0-9_-]{43}$/.test(p.get('code') || ''))
     throw new Error('invalid_grant'); const token = randomBytes(32).toString('base64url'); const r = z.object({ expiresIn: z.number(), scope: z.string(), workspaceId: z.uuid() }).parse(await oauthRpc('exchange_agent_oauth_code', { p_code_hash: hash(p.get('code')!), p_client_id: p.get('client_id'), p_redirect_uri: p.get('redirect_uri'), p_resource: p.get('resource'), p_challenge: pkce(p.get('code_verifier')!), p_token_hash: hash(token) })); return { access_token: token, token_type: 'Bearer', expires_in: r.expiresIn, scope: r.scope, business_workspace_id: r.workspaceId }; }
-export async function validateAgentToken(request: Request, scope: string, workspaceId: string) { if (!oauthEnabled())
+export async function validateAgentToken(request: Request, scope: string, workspaceId?: string) { if (!oauthEnabled())
     return null; const token = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(request.headers.get('authorization') || '')?.[1]; if (!token)
-    return null; return z.object({ userId: z.uuid(), verifiedEmail: z.email(), workspaceId: z.uuid(), agencyId: z.uuid().nullable() }).nullable().parse(await oauthRpc('validate_agent_oauth_token', { p_token_hash: hash(token), p_resource: resourceUrl(), p_scope: scope, p_workspace_id: workspaceId })); }
+    return null;
+    if (workspaceId === undefined && scope !== 'business:read') return null;
+    const principal = workspaceId === undefined
+      ? await oauthRpc('read_agent_oauth_connection', { p_token_hash: hash(token), p_resource: resourceUrl() })
+      : await oauthRpc('validate_agent_oauth_token', { p_token_hash: hash(token), p_resource: resourceUrl(), p_scope: scope, p_workspace_id: workspaceId });
+    return z.object({ userId: z.uuid(), verifiedEmail: z.email(), workspaceId: z.uuid(), agencyId: z.uuid().nullable() }).nullable().parse(principal); }

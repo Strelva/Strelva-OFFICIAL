@@ -21,6 +21,17 @@ function transport(body: unknown, status = 200) { f.request.mockImplementation((
 beforeEach(() => { vi.clearAllMocks(); vi.stubEnv('STRELVA_MCP_OAUTH', '1'); vi.stubEnv('STRELVA_WORKSPACE_RELEASE', '1'); f.lookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]); f.rpc.mockResolvedValue({ data: null, error: null }); });
 afterEach(() => { vi.unstubAllEnvs(); vi.useRealTimers(); });
 describe('MCP scoped OAuth', () => {
+    it('resolves only basic business context from a header token when no selector is supplied', async () => {
+        const req = new Request('https://app.strelva.com/api/mcp/public', { headers: { Authorization: 'Bearer ' + 'a'.repeat(43) } });
+        await validateAgentToken(req, 'business:read');
+        expect(f.rpc).toHaveBeenCalledWith('read_agent_oauth_connection', { p_token_hash: expect.stringMatching(/^[a-f0-9]{64}$/), p_resource: resourceUrl() });
+        f.rpc.mockClear();
+        expect(await validateAgentToken(req, 'inquiries:read')).toBeNull();
+        expect(f.rpc).not.toHaveBeenCalled();
+        vi.stubEnv('STRELVA_MCP_OAUTH', '0');
+        expect(await validateAgentToken(req, 'business:read')).toBeNull();
+        expect(f.rpc).not.toHaveBeenCalled();
+    });
     it('discovers CIMD, S256 and the exact platform resource with minimal basic scopes', () => { expect(authorizationMetadata()).toMatchObject({ client_id_metadata_document_supported: true, code_challenge_methods_supported: ['S256'], scopes_supported: ['business:read', 'inquiries:read', 'quotes:approve'] }); expect(protectedMetadata()).toMatchObject({ resource: resourceUrl(), scopes_supported: ['business:read'] }); });
     it('rejects literal private, local, credentialed, redirect and fragment CIMD URLs', () => { for (const s of ['http://example.test/client.json', 'https://127.0.0.1/client.json', 'https://169.254.169.254/client.json', 'https://[::1]/client.json', 'https://localhost/client.json', 'https://u:p@example.test/client.json', 'https://example.test/client.json#x', 'https://example.test/'])
         expect(() => cimdUrl(s)).toThrow(); });
