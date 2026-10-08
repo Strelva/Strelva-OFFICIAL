@@ -133,4 +133,3 @@ describe("email sent for a business by its agency", () => {
     expect(senderDomain("Hello@Updates.Strelva.com")).toBe("updates.strelva.com");
   });
 });
-

@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   // Instruction files are user-owned; next dev must not rewrite them.
   agentRules: false,
   distDir: process.env.PLAYWRIGHT_DIST_DIR || ".next",
+  // The email sanitizer creates jsdom at import time. Native package loading
+  // preserves jsdom's __dirname-relative CSS reads in dev and server builds.
+  serverExternalPackages: ["isomorphic-dompurify", "jsdom"],
   // The generated website export copies this dependency into each client
   // repository and the private preview route reads it while building a
   // candidate. Keep it in standalone server output tracing as well as the
@@ -14,6 +17,10 @@ const nextConfig: NextConfig = {
       "./custom-repo-starter/website-generation/renderer.mjs",
       "./custom-repo-starter/website-generation/capability-runtime.mjs",
       "./src/products/websites/site-lead-runtime.mjs",
+      // jsdom loads this runtime asset with fs.readFileSync. Include both the
+      // ordinary install and pnpm's versioned transitive dependency layout.
+      "./node_modules/jsdom/lib/jsdom/browser/default-stylesheet.css",
+      "./node_modules/.pnpm/jsdom@*/node_modules/jsdom/lib/jsdom/browser/default-stylesheet.css",
     ],
   },
   // The dev-tools badge defaults to bottom-left, where it sits on top of the

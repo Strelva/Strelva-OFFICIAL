@@ -1579,4 +1579,3 @@ fi
 grep -q 'owner_decision_runtime_rollback_requires_data_preservation' "$cluster_root/owner-effects-rollback.log"
 psql "${psql_args[@]}" -Atc "select exists(select 1 from information_schema.columns where table_schema='public' and table_name='owner_decision_link_sessions' and column_name='intended_decision') and exists(select 1 from public.owner_decision_link_sessions) and to_regprocedure('public.owner_decision_provider_holds(uuid,uuid,text[])') is not null" | grep -qx t
 printf 'Owner effect rollback retained sessions and authority gates.\n'
-
