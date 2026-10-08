@@ -3953,36 +3953,45 @@ export type Database = {
           actor: string
           actor_id: string | null
           at: string
+          connected_site_id: string | null
           dedupe_key: string | null
           detail: Json
           id: string
           kind: string
           lead_id: string
-          tenant_stable_id: string
+          retain_until: string | null
+          retention_minimized_at: string | null
+          tenant_stable_id: string | null
           workspace_id: string | null
         }
         Insert: {
           actor: string
           actor_id?: string | null
           at?: string
+          connected_site_id?: string | null
           dedupe_key?: string | null
           detail?: Json
           id?: string
           kind: string
           lead_id: string
-          tenant_stable_id: string
+          retain_until?: string | null
+          retention_minimized_at?: string | null
+          tenant_stable_id?: string | null
           workspace_id?: string | null
         }
         Update: {
           actor?: string
           actor_id?: string | null
           at?: string
+          connected_site_id?: string | null
           dedupe_key?: string | null
           detail?: Json
           id?: string
           kind?: string
           lead_id?: string
-          tenant_stable_id?: string
+          retain_until?: string | null
+          retention_minimized_at?: string | null
+          tenant_stable_id?: string | null
           workspace_id?: string | null
         }
         Relationships: [
@@ -4135,6 +4144,33 @@ export type Database = {
             referencedColumns: ["stable_id"]
           },
         ]
+      }
+      inquiry_retention_receipts: {
+        Row: {
+          connected_site_id: string | null
+          id: string
+          minimized_at: string
+          minimized_count: number
+          retain_until: string
+          tenant_stable_id: string | null
+        }
+        Insert: {
+          connected_site_id?: string | null
+          id?: string
+          minimized_at?: string
+          minimized_count: number
+          retain_until: string
+          tenant_stable_id?: string | null
+        }
+        Update: {
+          connected_site_id?: string | null
+          id?: string
+          minimized_at?: string
+          minimized_count?: number
+          retain_until?: string
+          tenant_stable_id?: string | null
+        }
+        Relationships: []
       }
       inquiry_workspaces: {
         Row: {

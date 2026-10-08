@@ -1106,7 +1106,10 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010170000_dep
 psql "${psql_args[@]}" --file="$repo_root/tests/deprovision-retained-after-inquiry-export-schema.sql"
 # Expired inquiry leads now remove their visitor data and reply payloads atomically.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013220000_inquiry_lead_retention.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013221000_inquiry_retention_lifecycle.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-lead-retention.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-retention-lifecycle.sql"
+bash "$repo_root/scripts/check-inquiry-retention.sh" "$cluster_socket" "$cluster_port"
 # Every stream's release flag key survives every redefinition, in any apply order (#253).
 psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 # Policy facts: confirmation/provenance/history/undo on the existing record RPC.

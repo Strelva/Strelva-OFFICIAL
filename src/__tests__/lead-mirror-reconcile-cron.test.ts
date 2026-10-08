@@ -76,6 +76,7 @@ describe("lead-mirror-reconcile cron", () => {
     const res = await GET(new Request("http://localhost/api/cron/lead-mirror-reconcile"));
     expect(res.status).toBe(401);
     expect(mocks.reconcile).not.toHaveBeenCalled();
+    expect(mocks.purge).not.toHaveBeenCalled();
   });
 
   it("records a healthy heartbeat when everything is copied", async () => {
@@ -102,19 +103,31 @@ describe("lead-mirror-reconcile cron", () => {
     expect(mocks.heartbeat).toHaveBeenCalledWith("lead-mirror-reconcile", { ok: true, processed: 0, failed: 0 });
   });
 
+  it("configured retention failure stays visible even when mirror retry throws", async () => {
+    mocks.reconcile.mockRejectedValue(new Error("mirror unavailable"));
+    mocks.purge.mockResolvedValue({ status: "unavailable", reason: "timeout" });
+    const res = await GET(new Request("http://localhost/api/cron/lead-mirror-reconcile"));
+    expect(res.status).toBe(200);
+    expect((await res.json()).retention).toMatchObject({ status: "unavailable", reason: "timeout" });
+    expect(mocks.alertOnce).toHaveBeenCalledWith("lead_retention_failed", "high", { status: "unavailable" }, 6 * 3600);
+    expect(mocks.heartbeat).toHaveBeenCalledWith("lead-mirror-reconcile", { ok: false, processed: 0, failed: 2 });
+  });
+
   it("missing schema still pages for leads that left Redis before they were copied", async () => {
     mocks.reconcile.mockResolvedValue({ checked: 1, repaired: 0, failed: 0, missing: 1, remaining: 40, schemaMissing: true });
     await GET(new Request("http://localhost/api/cron/lead-mirror-reconcile"));
     expect(mocks.alertOnce).toHaveBeenCalledWith("lead_mirror_backlog", "high", { remaining: 40, missing: 1, failed: 0 }, 6 * 3600);
   });
 
-  it("runs the lead retention purge and reports it without affecting the heartbeat", async () => {
+  it("runs retention before retries and pages a configured purge failure", async () => {
     mocks.reconcile.mockResolvedValue({ checked: 0, repaired: 0, failed: 0, missing: 0, remaining: 0 });
     mocks.purge.mockResolvedValue({ status: "unavailable", reason: "function does not exist" });
     const res = await GET(new Request("http://localhost/api/cron/lead-mirror-reconcile"));
     expect(res.status).toBe(200);
     expect(mocks.purge).toHaveBeenCalledWith(1000);
     expect((await res.json()).retention).toEqual({ status: "unavailable", reason: "function does not exist" });
-    expect(mocks.heartbeat).toHaveBeenCalledWith("lead-mirror-reconcile", { ok: true, processed: 0, failed: 0 });
+    expect(Number(mocks.purge.mock.invocationCallOrder[0])).toBeLessThan(Number(mocks.reconcile.mock.invocationCallOrder[0]));
+    expect(mocks.alertOnce).toHaveBeenCalledWith("lead_retention_failed", "high", { status: "unavailable" }, 6 * 3600);
+    expect(mocks.heartbeat).toHaveBeenCalledWith("lead-mirror-reconcile", { ok: false, processed: 0, failed: 1 });
   });
 });

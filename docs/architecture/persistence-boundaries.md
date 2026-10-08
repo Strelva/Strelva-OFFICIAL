@@ -233,3 +233,65 @@ Website setup suggestions and corrections are structured evidence inside inquiry
 workspace action receipts. Public-page metadata is a suggestion, not independent
 verification. Corrections survive later website reads and do not directly mutate
 published tenant settings. Customer inquiry fields remain in their Redis authority.
+
+## Inquiry retention recovery and local proof (October 7, 2026)
+
+`20261013220000_inquiry_lead_retention.sql` extends the existing detached-lead
+policy: 365 days after tenant deletion, or 365 days after a deleted tenant's
+lead becomes detached from its business. Hourly `lead-mirror-reconcile` purges
+at most 1,000 candidates per run. Each transaction locks only its candidate
+leads with `FOR UPDATE SKIP LOCKED`, removes their inquiry event/reply/notice/
+claim/overlay/booking-offer and mirrored inquiry payload copies, then records
+one immutable aggregate receipt per tenant. The follow-up also recognizes
+actual composite timeline IDs and hashed delivery targets/checkpoints through
+their nested inquiry identity, including owner-notice repair purposes. Pure
+provider-event deduplication markers contain no visitor payload and remain. A failure anywhere, including
+receipt insertion, rolls all deletes back. Receipts retain tenant identity,
+deadlines, count and purge time; no visitor name, contact, inquiry body or
+reply body is copied into them.
+
+Old business-attached inquiries, prior capability versions and replies remain
+business evidence. Undo, pause and capability changes do not start a new
+retention clock or delete records. Fresh detached data and unrelated client
+stores are excluded. The follow-up `20261013221000_inquiry_retention_lifecycle.sql` stamps orphan
+history with the existing 365-day interval at tenant/business deletion. A
+converted tenant's unanchored history follows its linked business. Conversion
+receipts recover that attachment even after tenant deletion clears the link's
+tenant foreign key; connected origins recover their existing business too. Historical
+absent-origin events with no matching lead use their immutable event time plus
+365 days, never earlier than a known tenant purge deadline. Active origins and
+attached businesses remain excluded. Expired orphan raw contact/body/arbitrary
+payload and email-bearing actor/dedupe fields are minimized; event identity,
+source, role, time and enum acceptance/outcome evidence remain, with an immutable
+aggregate receipt in `inquiry_retention_receipts`. The combined run handles at
+most 1,000 lead deletions plus orphan minimizations. No ordinary inquiry age
+limit is selected here.
+
+The purge starts before mirror repair, bounds the database request at 10 seconds
+and aborts it on timeout. A timeout reports unavailable rather than claiming
+counts; a database commit may already have completed, so the next bounded run
+and durable purge receipts settle the actual result. Configured purge failure
+pages `lead_retention_failed` (six-hour deduplication) and makes the cron heartbeat
+unhealthy, independently of successful mirror work. Failure is paged before
+mirror retries; an unexpected mirror rejection still reaches the heartbeat.
+Unconfigured storage remains an expected pre-migration state; configured
+schema/function failures are visible. Existing
+cron authentication and hourly schedule are unchanged.
+
+The companions `rollback-20261013221000_inquiry_retention_lifecycle.sql` and
+`rollback-20261013220000_inquiry_lead_retention.sql` disable the
+purge and restores immutable history without changing surviving data or
+receipts. Retention is intentionally unavailable until forward reapply; do not
+leave this recovery state unmonitored. Aggregate receipts cannot reconstruct
+purged visitor data. Restoring such data requires a separately reviewed backup
+recovery, not schema reversal.
+
+Local proof: `pnpm check:workspace-sql` runs `tests/inquiry-lead-retention.sql`,
+`tests/inquiry-retention-lifecycle.sql` and `scripts/check-inquiry-retention.sh` in disposable PostgreSQL. These exercise
+the actual purge, dependency deletion, atomic failure, preserved fresh/attached/
+version-bound/unrelated data, orphan minimization and lifecycle/backfill
+deadlines, exact rollback snapshots, reapply, overlapping
+workers and one-row batches. `lead-retention.test.ts` and
+`lead-mirror-reconcile-cron.test.ts` cover bounded/failed/malformed RPC results,
+cron authentication and failure visibility. These checks do not establish that
+this migration or the hourly worker is operating in production.

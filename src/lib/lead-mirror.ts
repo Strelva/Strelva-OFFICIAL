@@ -364,8 +364,11 @@ export async function mirrorLead(
   }
 }
 
+/** Hourly maintenance must not wait indefinitely for the database. */
+export const LEAD_RETENTION_TIMEOUT_MS = 10_000;
+
 export type LeadRetentionPurge =
-  | { status: "purged"; purged: number; tenants: number }
+  | { status: "purged"; purged: number; tenants: number; minimized?: number }
   | { status: "unavailable"; reason: string };
 
 /**
@@ -383,15 +386,29 @@ export async function purgeExpiredTenantLeads(limit = 1000): Promise<LeadRetenti
     db = null;
   }
   if (!db) return { status: "unavailable", reason: "unconfigured" };
+  const bound = Number.isFinite(limit) ? Math.min(10_000, Math.max(1, Math.trunc(limit))) : 1000;
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const { data, error } = await db.rpc("purge_expired_tenant_leads", { p_limit: limit });
+    let call = db.rpc("purge_expired_tenant_leads", { p_limit: bound });
+    if (call.abortSignal) call = call.abortSignal(controller.signal);
+    const { data, error } = await Promise.race([
+      call,
+      new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error("timeout")); }, LEAD_RETENTION_TIMEOUT_MS); }),
+    ]);
     if (error) return { status: "unavailable", reason: error.message || "rpc_failed" };
-    const row = data as { purged?: unknown; tenants?: unknown } | null;
+    const row = data as { purged?: unknown; tenants?: unknown; minimized?: unknown } | null;
     const purged = Number(row?.purged ?? NaN);
     const tenants = Number(row?.tenants ?? NaN);
-    if (!Number.isInteger(purged) || !Number.isInteger(tenants)) return { status: "unavailable", reason: "malformed_response" };
-    return { status: "purged", purged, tenants };
+    if (typeof row?.purged !== "number" || typeof row?.tenants !== "number" || !Number.isSafeInteger(purged) || purged < 0 || purged > bound || !Number.isSafeInteger(tenants) || tenants < 0 || tenants > purged) return { status: "unavailable", reason: "malformed_response" };
+    const minimized = row?.minimized;
+    if (minimized !== undefined && (typeof minimized !== "number" || !Number.isSafeInteger(minimized) || minimized < 0 || purged + minimized > bound)) {
+      return { status: "unavailable", reason: "malformed_response" };
+    }
+    return { status: "purged", purged, tenants, ...(minimized === undefined ? {} : { minimized }) };
   } catch (err) {
     return { status: "unavailable", reason: err instanceof Error ? err.message : "rpc_failed" };
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
