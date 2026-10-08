@@ -4,6 +4,11 @@
 begin;
 set local lock_timeout = '3s';
 
+-- Receipts mark which purge implementation removed the lead. The rollback
+-- companion can restore the prior functions only before this marker appears.
+alter table public.tenant_lead_purges
+  add column inquiry_purge_version text check (inquiry_purge_version is null or inquiry_purge_version = '20261017110000');
+
 create or replace function public.inquiry_events_immutable() returns trigger
 language plpgsql set search_path = public, pg_temp as $$
 begin
@@ -76,9 +81,9 @@ begin
     returning l.tenant_stable_id, l.tenant_slug_at_capture, l.captured_at,
       l.site_name_at_delete, l.tenant_deleted_at, l.retain_until
   ), receipts as (
-    insert into public.tenant_lead_purges(tenant_stable_id, tenant_slug, site_name, tenant_deleted_at, retain_until, purged_count)
+    insert into public.tenant_lead_purges(tenant_stable_id, tenant_slug, site_name, tenant_deleted_at, retain_until, purged_count, inquiry_purge_version)
       select tenant_stable_id, (array_agg(tenant_slug_at_capture order by captured_at desc))[1], max(site_name_at_delete),
-          min(tenant_deleted_at), max(retain_until), count(*)
+          min(tenant_deleted_at), max(retain_until), count(*), '20261017110000'
         from deleted group by tenant_stable_id
       returning purged_count
   )

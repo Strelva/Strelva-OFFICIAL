@@ -578,6 +578,7 @@ staged, pushed or approved.
 | `20261010165900_export_build_access` | `e2dd7c05fc27` | `rollback-20261010165900_export_build_access.sql` |
 | `20261010170000_deprovision_retained_after_inquiry_export` | `172e31fd9858` | `rollback-20261010170000_deprovision_retained_after_inquiry_export.sql` |
 | `20261011153000_operator_owner_decisions` | `1859f9b74b7c` | `rollback-20261011153000_operator_owner_decisions.sql` |
+| `20261017110000_inquiry_lead_retention` | `d0199c345492` | `rollback-20261017110000_inquiry_lead_retention.sql` (restores functions before first purge; refuses after marked deletion, which is irreversible) |
 
 <!-- proposed-batch-8:end -->
 
