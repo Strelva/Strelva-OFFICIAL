@@ -42,11 +42,37 @@ s=Path(sys.argv[1]).read_text();body=re.search(r'create function public.accrue_i
 Path(sys.argv[2]).write_text(body.replace('create function','create or replace function',1))
 PYCODE
 psql "${psql_args[@]}" -f "$cluster_root/wrapper.sql" >/dev/null
+# Private helper ACL and body drift must also refuse an otherwise empty inverse.
+helper='public.accrue_invoice_splits_before_attribution(uuid,text,timestamptz,timestamptz,text,text,bigint,text,uuid,uuid)'
+query "select pg_get_functiondef('$helper'::regprocedure)" > "$cluster_root/private-helper.sql"
+query "grant execute on function $helper to service_role" >/dev/null
+if psql "${psql_args[@]}" -f "$rollback" > "$cluster_root/private-acl-drift.log" 2>&1;then printf 'Inverse erased private helper ACL drift\n' >&2;exit 1;fi
+rg -q split_attribution_rollback_wrong_order "$cluster_root/private-acl-drift.log"
+query "revoke execute on function $helper from service_role" >/dev/null
+python3 - "$cluster_root/private-helper.sql" "$cluster_root/private-helper-drift.sql" <<'PYCODE'
+from pathlib import Path
+import re,sys
+s=Path(sys.argv[1]).read_text()
+Path(sys.argv[2]).write_text(re.sub(r'AS \$function\$.*?\$function\$', 'AS $function$begin return null;end$function$',s,flags=re.S))
+PYCODE
+psql "${psql_args[@]}" -f "$cluster_root/private-helper-drift.sql" >/dev/null
+if psql "${psql_args[@]}" -f "$rollback" > "$cluster_root/private-body-drift.log" 2>&1;then printf 'Inverse erased private helper body drift\n' >&2;exit 1;fi
+rg -q split_attribution_rollback_wrong_order "$cluster_root/private-body-drift.log"
+psql "${psql_args[@]}" -f "$cluster_root/private-helper.sql" >/dev/null
+query "alter function $helper security invoker" >/dev/null
+if psql "${psql_args[@]}" -f "$rollback" > "$cluster_root/private-security-drift.log" 2>&1;then printf 'Inverse erased private helper security drift\n' >&2;exit 1;fi
+rg -q split_attribution_rollback_wrong_order "$cluster_root/private-security-drift.log"
+psql "${psql_args[@]}" -f "$cluster_root/private-helper.sql" >/dev/null
+query "alter function $helper set search_path=public" >/dev/null
+if psql "${psql_args[@]}" -f "$rollback" > "$cluster_root/private-config-drift.log" 2>&1;then printf 'Inverse erased private helper config drift\n' >&2;exit 1;fi
+rg -q split_attribution_rollback_wrong_order "$cluster_root/private-config-drift.log"
+psql "${psql_args[@]}" -f "$cluster_root/private-helper.sql" >/dev/null
 psql "${psql_args[@]}" -f "$rollback" >/dev/null
 query "$catalog" > "$cluster_root/after.catalog"
 cmp "$cluster_root/before.catalog" "$cluster_root/after.catalog"
 printf 'Empty inverse restores exact full prior function source/ACL; later wrapper drift refuses.\n'
 psql "${psql_args[@]}" -f "$forward" >/dev/null
+query "create schema extensions;alter extension pgcrypto set schema extensions" >/dev/null
 psql "${psql_args[@]}" -f "$repo_root/tests/ledger-attribution-schema.sql"
 # Historical committed rows belong only to the upgrade database. Original
 # regression fixtures intentionally assert whole clean-ledger results.
@@ -66,17 +92,17 @@ printf 'Original connect-money/creator-ledger regressions pass in an independent
 psql "${psql_args[@]}" --set=ledger_attribution_retain=1 -f "$repo_root/tests/ledger-attribution-schema.sql" >/dev/null
 source "$repo_root/scripts/sql/ledger-attribution-races.sh"
 check_ledger_attribution_races
-query "select source_account_id||':'||invoice_line_id||':'||encode(digest(receipt::text,'sha256'),'hex') from public.invoice_split_attributions order by 1" > "$cluster_root/receipts.before"
+query "select source_account_id||':'||invoice_line_id||':'||encode(sha256(convert_to(receipt::text,'UTF8')),'hex') from public.invoice_split_attributions order by 1" > "$cluster_root/receipts.before"
 if psql "${psql_args[@]}" -f "$rollback" > "$cluster_root/populated.log" 2>&1;then printf 'Rollback erased attribution receipts\n' >&2;exit 1;fi
 rg -q split_attribution_receipts_require_preservation "$cluster_root/populated.log"
-query "select source_account_id||':'||invoice_line_id||':'||encode(digest(receipt::text,'sha256'),'hex') from public.invoice_split_attributions order by 1" > "$cluster_root/receipts.after"
+query "select source_account_id||':'||invoice_line_id||':'||encode(sha256(convert_to(receipt::text,'UTF8')),'hex') from public.invoice_split_attributions order by 1" > "$cluster_root/receipts.after"
 cmp "$cluster_root/receipts.before" "$cluster_root/receipts.after"
 query "begin read only;set local role service_role;select public.export_workspace_v3_category('b2850000-0000-4000-8000-000000000010','b2850000-0000-4000-8000-000000000001','attribution-owner@example.test','revenue_splits',0,1000);commit" >/dev/null
 node --import tsx "$repo_root/scripts/check-readonly-rpcs.mjs" "postgresql:///postgres?host=$cluster_socket&port=$cluster_port"
 psql "${psql_args[@]}" -f "$repo_root/tests/function-exposure-schema.sql" >/dev/null
 if [[ -n "${LEDGER_ATTRIBUTION_PROOF_DIR:-}" ]];then
  mkdir -p "$LEDGER_ATTRIBUTION_PROOF_DIR"
- cp "$cluster_root"/race-*.log "$cluster_root/drift.log" "$cluster_root/populated.log" "$LEDGER_ATTRIBUTION_PROOF_DIR/"
+ cp "$cluster_root"/race-*.log "$cluster_root/drift.log" "$cluster_root/populated.log" "$cluster_root/private-acl-drift.log" "$cluster_root/private-body-drift.log" "$cluster_root/private-security-drift.log" "$cluster_root/private-config-drift.log" "$LEDGER_ATTRIBUTION_PROOF_DIR/"
  cp "$cluster_root/receipts.before" "$cluster_root/receipts.after" "$LEDGER_ATTRIBUTION_PROOF_DIR/"
 fi
 printf 'Native lineage/source/zero/wholesale/loss/replay/legacy/ACL/READ ONLY/guarded rollback proof passed.\n' 

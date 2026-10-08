@@ -44,7 +44,7 @@ ending receipts supply their shared `to_at`; the separate private exit cleanup
 can append genuine exit-origin endings without changing this bridge.
 
 The inverse takes an exclusive relation lock, refuses any retained new receipt,
-and rejects later accrual/creator/export wrapper body drift. With no new receipt
+and rejects full definition (including security/config) and normalized ACL drift across all six public and hidden accrual/export routines. With no new receipt
 and the exact wrapper order, it restores the full previous function source,
 configuration, volatility and ACL catalog. It never drops accepted lineage.
 
@@ -65,7 +65,7 @@ legacy upgrade without backfill, zero and approved fictional rates, source
 failure, wholesale exclusion, opening/ending boundaries, frozen none/replay,
 refund/dispute/restoration, owner/operator export separation, service ACLs,
 actual completion/accrual races in both directions, nonblocking read-only
-exports, exact empty inverse, wrong-order refusal and populated inverse refusal.
+exports, exact empty inverse, public/private body and private ACL drift refusal and populated inverse refusal.
 
 Original connect-money and creator-ledger fixtures run in a separate clean
 regression database: their whole-ledger assertions are not mixed with committed

@@ -83,7 +83,7 @@ begin
   'status',case when source.payer_kind='agency' then 'wholesale_excluded' when attribution.id is null then 'no_explicit_attribution' else 'explicit_owner_confirmed_attribution' end,
   'attributionId',attribution.id,'agencyWorkspaceId',attribution.agency_workspace_id,
   'attribution',case when attribution.id is not null then public.business_attribution_receipt(attribution) else null end,
-  'invoiceSourceSha256',encode(digest(to_jsonb(source)::text,'sha256'),'hex'),'capturedAt',clock_timestamp());
+  'invoiceSourceSha256',encode(sha256(convert_to(to_jsonb(source)::text,'UTF8')),'hex'),'capturedAt',clock_timestamp());
  insert into public.invoice_split_attributions(source_account_id,invoice_line_id,business_workspace_id,attribution_id,receipt)
  values(p_source_account,p_line_id,p_business_id,attribution.id,receipt);
  return public.accrue_invoice_splits_before_attribution(p_business_id,p_line_id,p_period_start,p_period_end,p_source_account,p_charge_id,p_basis,p_currency,p_installation_id,p_source_revision_id);
@@ -112,14 +112,18 @@ grant execute on function public.export_workspace_v3_category(uuid,uuid,text,tex
 
 -- Guard exact inverse order against later creator/export wrappers as well as
 -- populated new receipts. This table is implementation metadata, not authority.
-create table public.split_attribution_rollback_state(signature text primary key,body_md5 text not null);
+create table public.split_attribution_rollback_state(signature text primary key,definition_hash text not null,acl_hash text not null);
 revoke all on public.split_attribution_rollback_state from public,anon,authenticated,service_role;
 alter table public.split_attribution_rollback_state enable row level security;
 create trigger split_attribution_rollback_immutable before update or delete on public.split_attribution_rollback_state for each row execute function public.money_immutable_guard();
 insert into public.split_attribution_rollback_state
-select signature,md5(p.prosrc) from (values
+select signature,md5(pg_get_functiondef(p.oid)),md5(coalesce((select jsonb_agg(to_jsonb(a) order by a.grantor,a.grantee,a.privilege_type)::text
+ from aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a),'[]')) from (values
  ('public.accrue_invoice_splits(uuid,text,timestamptz,timestamptz,text,text,bigint,text,uuid,uuid)'),
  ('public.accrue_invoice_splits_before_loss(uuid,text,timestamptz,timestamptz,text,text,bigint,text,uuid,uuid)'),
- ('public.export_workspace_v3_category(uuid,uuid,text,text,integer,integer)')) signatures(signature) join pg_proc p on p.oid=signature::regprocedure;
+ ('public.export_workspace_v3_category(uuid,uuid,text,text,integer,integer)'),
+ ('public.accrue_invoice_splits_provider_v1(uuid,text,timestamptz,timestamptz,text,text,bigint,text,uuid,uuid)'),
+ ('public.accrue_invoice_splits_before_attribution(uuid,text,timestamptz,timestamptz,text,text,bigint,text,uuid,uuid)'),
+ ('public.export_workspace_v3_category_before_split_attribution(uuid,uuid,text,text,integer,integer)')) signatures(signature) join pg_proc p on p.oid=signature::regprocedure;
 notify pgrst,'reload schema';
 commit;
