@@ -7,6 +7,22 @@ The [visual direction map](../../DESIGN.md#visual-direction-and-extension-map) o
 how identity, imagery, composition and component treatment fit together. This
 file owns component contracts, extension and adoption, including gaps in source.
 
+## Agency Team management, October 7, 2026
+
+[AgencyTeamView](../../src/experience/workspace/agency/AgencyTeamView.tsx) composes
+the owned Button, TextInput and SelectInput, semantic lists, native details and
+labelled checkboxes. Agency owners/admins manage invitation links, Member/Admin
+roles, confirmed staff removal and individual/bulk client assignments. Owners
+and the actor's own membership have no role/removal control. Members see the
+same agency's assignments without management controls. A failed mutation locks
+management until an explicit reload; a confirmed write with a failed refresh is
+reported separately. Team reads active seats independently of the Clients page.
+Workspace and Systems flags gate the API and tab. Local browser proof covers
+1280px and 390px, keyboard focus, loading/error/empty/member states and fictional
+management actions. Real SQL proof and limitations are in
+[the #261 handoff](../product/streams/a1-agency-team.md); no production or actual
+staff adoption is claimed.
+
 ## Start with tokens and atoms
 
 September 17 clarification: Jacob wants to inspect the tokens and agreed atoms
