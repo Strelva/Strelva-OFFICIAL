@@ -1349,6 +1349,7 @@ printf 'Agency brand SQL passed: resolution, revocation, exposure, rollback/reap
 
 # Actual READ ONLY qualification: lock-free reader authorization, exact rollback,
 # outsider denials and unchanged writer definitions on the final schema.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260930120000_revoke_public_execute_internal_functions.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013230000_readonly_reader_authority.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/readonly-reader-authority-schema.sql"
 node "$repo_root/scripts/check-readonly-rpcs.mjs" "postgresql://$(id -un)@localhost:$cluster_port/postgres?host=$cluster_socket"

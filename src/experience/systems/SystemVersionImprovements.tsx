@@ -29,6 +29,13 @@ const resultSchema = z.object({ outcome: z.enum(["prepared", "declined","conflic
 type View = z.infer<typeof viewSchema>;
 function errorMessage(value: unknown, fallback: string) { return value && typeof value === "object" && "error" in value && typeof value.error === "string" ? value.error : fallback; }
 function valueLabel(value: unknown) { return value === undefined ? "Removed" : typeof value === "string" ? value : JSON.stringify(value); }
+function nativeValueLabel(value: unknown) {
+  if (value === null || value === undefined) return "Removed";
+  if (typeof value === "string") return value;
+  if (typeof value === "object" && "title" in value && typeof value.title === "string") return value.title;
+  if (typeof value === "object" && "name" in value && typeof value.name === "string") return value.name;
+  return "Changed content";
+}
 
 /** Reuses the real app renderer with component-local records only. A source
  * definition never supplies a maintenance owner, records or network transport. */
@@ -162,7 +169,7 @@ function ScopedSystemVersionImprovements({ workspaceId, systemId, versionId, rea
       {prepared && "kind" in prepared ? <a className="inline-flex min-h-11 items-center text-brand underline" href={prepared.reviewHref}>Review in this business’s Needs you</a> : <Button size="lg" disabled={!allowed || busy} loading={busy} onClick={() => void (view?.nativeRuntime ? prepare("prepare_release") : makeReal())}>{view?.nativeRuntime ? "Prepare native draft for review" : approval.current ? "Retry Make real" : "Make real"}</Button>}
       {!allowed ? <p className="text-gray-muted">Only this business&apos;s owner can make it real. An admin can prepare it for review.</p> : null}
     </div> : null}
-    {nativeConflict ? <div className="space-y-3"><p>Local work overlaps this source update. Choose what to keep; nothing went live.</p>{nativeConflict.conflicts.map(c=><div key={c.path}><p className="break-words">{c.path}: local {valueLabel(c.local)} · source {valueLabel(c.source)}</p><SelectInput label={`Keep which ${c.path}?`} value={nativeChoices[c.path]??""} options={[{value:"",label:"Choose what to keep"},{value:"local",label:"Keep local"},{value:"source",label:"Use source"}]} onChange={e=>setNativeChoices(current=>({...current,[c.path]:e.target.value as "local"|"source"}))}/></div>)}<Button size="lg" disabled={busy||nativeConflict.conflicts.some(c=>!nativeChoices[c.path])} onClick={()=>void prepare("prepare_release")}>Stage the chosen native draft</Button></div>:null}
+    {nativeConflict ? <div className="space-y-3"><p>Local work overlaps this source update. Choose what to keep; nothing went live.</p>{nativeConflict.conflicts.map(c=><div key={c.path}><p className="break-words">{view.nativeRuntime?.kind === "website_section" ? "FAQ section" : "Inquiry pattern"}</p><p className="break-words">Local: {nativeValueLabel(c.local)} · Source: {nativeValueLabel(c.source)}</p><SelectInput label="Choose which content to keep" value={nativeChoices[c.path]??""} options={[{value:"",label:"Choose what to keep"},{value:"local",label:"Keep local"},{value:"source",label:"Use source"}]} onChange={e=>setNativeChoices(current=>({...current,[c.path]:e.target.value as "local"|"source"}))}/></div>)}<Button size="lg" disabled={busy||nativeConflict.conflicts.some(c=>!nativeChoices[c.path])} onClick={()=>void prepare("prepare_release")}>Stage the chosen native draft</Button></div>:null}
     {success ? <p role="status">{success}</p> : null}
   </div>;
 }
