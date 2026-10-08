@@ -1,7 +1,7 @@
 import { getHostedSite } from '@/products/websites/index';
 import { publicBusinessProfile } from '@/platform/agent-channel/profile';
 import { publicFactsFromRecord } from '@/products/connected-sites/contracts';
-import { businessFactSheet } from '@/products/connected-sites/business-page';
+import { businessFactSheet } from '@/products/connected-sites/server';
 export const dynamic = 'force-dynamic';
 export async function GET() { const unavailable = () => new Response('Not found\n', { status: 404, headers: { 'Cache-Control': 'no-store' } }); if (process.env.STRELVA_AGENT_READABLE !== '1' || process.env.STRELVA_WORKSPACE_RELEASE !== '1')
     return unavailable(); const hosted = await getHostedSite(); if (!hosted || hosted.preview)

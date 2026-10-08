@@ -9,7 +9,7 @@
  * connected sites release and the business's row are on, and the page is
  * published. Ported from feat/connected-sites `/b/{handle}`.
  */
-import { BusinessEvidence } from "@/products/connected-sites/BusinessEvidence";
+import { BusinessEvidence } from "@/products/connected-sites";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
