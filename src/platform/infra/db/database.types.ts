@@ -16005,6 +16005,10 @@ export type Database = {
           status: string
         }[]
       }
+      read_public_business_verification: {
+        Args: { p_handle: string | null; p_tenant_id: string | null }
+        Returns: Json
+      }
       read_public_booking_by_manage_token: {
         Args: {
           p_token_hash: string
