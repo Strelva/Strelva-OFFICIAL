@@ -59,7 +59,7 @@ export function createStripeAgentPaymentProvider(stripe: Pick<Stripe, "rawReques
         amount: input.amountCents, currency: input.currency, confirm: true,
         payment_method_data: { shared_payment_granted_token: input.sharedPaymentToken },
         metadata: { businessPaymentId: input.paymentId },
-      }, opts), input);
+      }, options(input.merchantAccountId, input.idempotencyKey)), input);
     },
   };
 }
