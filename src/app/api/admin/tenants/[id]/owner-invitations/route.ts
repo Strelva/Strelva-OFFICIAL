@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { operatorOwnerInvitationContext, ownerInvitationsReleaseEnabled } from "@/platform/owner-entry/operator-invitations";
@@ -28,6 +29,7 @@ export async function GET(_request: Request, { params }: Context) {
   const parsed = tenantId.safeParse((await params).id);
   if (!parsed.success) return json({ error: "Invalid tenant." }, 400);
   try {
+    await authorizeAdminOperatorRead("admin.tenant-controls.read");
     const { state } = await operatorOwnerInvitationContext(parsed.data);
     return json({ state });
   } catch (error) { return refused(error); }

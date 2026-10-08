@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getActorContext, isSuperAdmin } from "@/platform/infra/auth";
@@ -33,6 +34,7 @@ export async function GET(req: Request) {
   if (!admin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  await authorizeAdminOperatorRead("admin.clients.read");
 
   const includeArchived = new URL(req.url).searchParams.get("includeArchived") === "true";
   const tenants = await getAllTenants();

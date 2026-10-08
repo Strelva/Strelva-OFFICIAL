@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { MessageSquareText } from "lucide-react";
@@ -41,6 +42,7 @@ export default async function ClientLeadsPage({
   // The layout also gates /admin; check here too so this page never reads
   // client data for anyone else, whatever renders first.
   if (!(await isSuperAdmin())) redirect("/sign-in");
+  await authorizeAdminOperatorRead("admin.client-leads.read");
 
   const params = await searchParams;
   const raw = Array.isArray(params.tenant) ? params.tenant[0] : params.tenant;

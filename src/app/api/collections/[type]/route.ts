@@ -1,3 +1,4 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 /**
  * Authenticated Collections CMS CRUD (the basic client editor + admin/agent).
  * Tenant comes from the request host/headers and is access-gated, so a user of
@@ -22,6 +23,7 @@ export async function GET(
   const tenant = await requireTenantFromHeaders();
   const denied = await requireTenantAccess(tenant);
   if (denied) return denied;
+  await authorizeTenantOperatorRead(tenant);
 
   const statusParam = new URL(request.url).searchParams.get("status");
   const status = statusParam === "published" || statusParam === "draft" ? statusParam : undefined;

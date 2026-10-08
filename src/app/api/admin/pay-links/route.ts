@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { businessBillingEnabled } from "@/platform/business-billing";
 import { NextResponse } from "next/server";
 import { isSuperAdmin, getCurrentUserEmail, getActorContext } from "@/platform/infra/auth";
@@ -103,6 +104,7 @@ export async function GET() {
   if (!(await isSuperAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  await authorizeAdminOperatorRead("admin.pay-links.read");
 
   let payLinks;
   try {

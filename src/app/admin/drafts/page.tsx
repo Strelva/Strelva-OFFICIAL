@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { FileCheck } from "lucide-react";
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
 import { listDrafts, getDraftContent, getContent } from "@/lib/storage";
@@ -17,6 +18,7 @@ interface DraftItem {
 }
 
 export default async function AdminDraftsPage() {
+  await authorizeAdminOperatorRead("admin.drafts.read");
   const TENANTS = (await getAllTenants()).filter(isActiveTenant);
   const allDrafts: DraftItem[] = [];
 

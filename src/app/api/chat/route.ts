@@ -1,3 +1,4 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { requireTenantAccess } from "@/platform/infra/auth";
 import { loadChatMessages, saveChatMessages } from "@/lib/storage";
@@ -10,6 +11,7 @@ export async function GET() {
     const tenant = await getTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    await authorizeTenantOperatorRead(tenant);
     const blocked = await requireActiveSubscription(tenant);
     if (blocked) return blocked;
 

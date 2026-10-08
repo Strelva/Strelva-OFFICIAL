@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { getPortfolioActions } from "./portfolio-actions";
 import { scanPortfolioOpportunities } from "./portfolio-opportunities";
 import { PortfolioActionsClient } from "./PortfolioActionsClient";
@@ -20,6 +21,7 @@ export const dynamic = "force-dynamic";
  * /admin layout (and re-checked inside each server action that performs a write).
  */
 export default async function PortfolioActionsPage() {
+  await authorizeAdminOperatorRead("admin.actions.read");
   const [opportunities, snapshot] = await Promise.all([
     scanPortfolioOpportunities(),
     getPortfolioActions(),

@@ -1,9 +1,11 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { listPendingDigests } from "@/lib/maintenance-digest";
 import { MaintenanceDigests } from "./MaintenanceDigests";
 
 /** Operator review of the weekly autonomous-maintenance digests. The admin
  *  layout already gates super-admin access. */
 export default async function DigestsPage() {
+  await authorizeAdminOperatorRead("admin.digests.read");
   const digests = await listPendingDigests();
   return (
     <div className="max-w-6xl">

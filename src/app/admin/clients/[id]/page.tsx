@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { isSuperAdmin } from "@/platform/infra/auth";
@@ -95,6 +96,7 @@ export default async function ClientDetailPage({
   // /sign-in rather than "/" to avoid a loop on the bare admin host where "/"
   // rewrites back to /admin.
   if (!(await isSuperAdmin())) redirect("/sign-in");
+  await authorizeAdminOperatorRead("admin.clients.read");
 
   const { id } = await params;
   const tenant = await getTenantConfig(id);

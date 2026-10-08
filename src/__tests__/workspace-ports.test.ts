@@ -36,6 +36,7 @@ describe("workspace ports", () => {
   it("every port loads the workspace module with the functions src/lib calls", async () => {
     const ports = workspacePorts();
     const expected: Record<keyof WorkspacePorts, string[]> = {
+      operatorReadAdmission: ["authorizeTenantOperatorRead"],
       responsibilityProof: ["responsibilityProofEmailParagraphs"],
       bookingProof: ["readAgentBookingOutcomes", "agentBookingOutcomesLine"],
       clientRecords: ["mirrorClientRecord", "mirrorClientRecordRemoval", "readThroughFlag"],

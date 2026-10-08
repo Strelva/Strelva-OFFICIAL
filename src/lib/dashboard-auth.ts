@@ -1,3 +1,4 @@
+import { workspacePorts } from "./workspace-ports";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getTenantFromHeaders } from "./tenant";
@@ -19,5 +20,6 @@ export async function requireDashboardView(): Promise<{ tenant: string; clientFa
   if (!(await hasDashboardViewAccess(tenant))) {
     redirect(withClientFallbackRoot(clientFallbackRoot, "/no-access"));
   }
+  await (await workspacePorts().operatorReadAdmission()).authorizeTenantOperatorRead(tenant);
   return { tenant, clientFallbackRoot };
 }

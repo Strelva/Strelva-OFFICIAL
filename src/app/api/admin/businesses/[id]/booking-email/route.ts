@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { isSuperAdmin } from "@/platform/infra/auth";
 import { businessBookingEmailEnabled, readBusinessBookingEmailHistory, setBusinessBookingEmail } from "@/platform/bookings/email-enablement";
 import { workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard, readWorkspaceBody } from "@/platform/workspaces/http";
@@ -10,6 +11,7 @@ async function operator() {
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const actor = await operator(); if (!actor) return workspaceJson({ error: "Forbidden" }, 403);
   try {
+    await authorizeAdminOperatorRead("admin.booking-email.read");
     const workspaceId = z.string().uuid().parse((await params).id);
     return workspaceJson({ enabled: await businessBookingEmailEnabled(workspaceId), history: await readBusinessBookingEmailHistory(actor, workspaceId) });
   } catch (error) { return workspaceHttpFailure(error); }

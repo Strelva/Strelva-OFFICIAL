@@ -1,3 +1,4 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import type { ContentMap, ContentSection } from "@/lib/types";
@@ -34,6 +35,7 @@ export async function GET() {
     const tenant = await requireTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    await authorizeTenantOperatorRead(tenant);
 
     const [contentDrafts, pageConfigDraft] = await Promise.all([
       listDrafts(tenant),

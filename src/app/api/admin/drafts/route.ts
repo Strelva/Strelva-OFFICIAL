@@ -1,3 +1,4 @@
+import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { releasedOwnerNoticeEmail } from "@/lib/owner-recipient";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
@@ -28,6 +29,7 @@ export async function GET() {
   if (!(await isSuperAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  await authorizeAdminOperatorRead("admin.drafts.read");
 
   const TENANTS = (await getAllTenants()).filter(isActiveTenant);
   const allDrafts: { tenant: string; section: string; data: unknown }[] = [];

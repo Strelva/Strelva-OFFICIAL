@@ -1,3 +1,4 @@
+vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: vi.fn(async () => undefined), authorizeTenantOperatorRead: vi.fn(async () => undefined) }));
 import { describe, it, expect, vi, beforeEach } from "vitest";
 // Transform the newsletter dependency graph during collection, outside the
 // request-validation test's timeout. These route mocks are shared by all tests.

@@ -10,6 +10,7 @@
 const inquiryPublicationServer = () => import("@/products/inquiries/server");
 
 export const workspacePortLoaders = {
+  operatorReadAdmission: () => import("@/platform/operator-read-audit/admission"),
   responsibilityProof: () => import("@/products/operations/server"),
   bookingProof: () => import("@/platform/bookings/agent-proof"),
   clientRecords: async () => {

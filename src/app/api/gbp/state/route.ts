@@ -1,3 +1,4 @@
+import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 /**
  * GET /api/gbp/state
  *
@@ -32,6 +33,7 @@ export async function GET() {
 
   const denied = await requireTenantAccess(tenantId);
   if (denied) return denied;
+  await authorizeTenantOperatorRead(tenantId);
 
   const state = await getGbpState(tenantId);
   if (!state) {

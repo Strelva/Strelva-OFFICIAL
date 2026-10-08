@@ -1,3 +1,4 @@
+vi.mock("@/platform/operator-read-audit/admission", () => ({ authorizeAdminOperatorRead: vi.fn(async () => undefined), authorizeTenantOperatorRead: vi.fn(async () => undefined) }));
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mock = vi.hoisted(() => ({ actor: vi.fn(), manage: vi.fn(), resolve: vi.fn(), tenant: vi.fn(), list: vi.fn(), access: vi.fn(), rpc: vi.fn() }));
 vi.mock("@/platform/workspaces/http", async original => ({ ...await original<typeof import("@/platform/workspaces/http")>(), workspaceHttpActor: mock.actor }));

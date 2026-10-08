@@ -308,6 +308,8 @@ export interface PublishingContentPort {
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 export interface WorkspacePorts {
+  /** Read-only dashboard platform bypass; missing registration fails closed. */
+  operatorReadAdmission(): Promise<{ authorizeTenantOperatorRead(tenant: string): Promise<void> }>;
   responsibilityProof(): Promise<{ responsibilityProofEmailParagraphs(tenantId: string, from: string, to: string): Promise<string[]> }>;
   bookingProof(): Promise<{
     readAgentBookingOutcomes(tenantId: string, from: string, to: string): Promise<{ businessName: string; discoveryCalls: number; discoveryCoverage: "partial" | "unknown"; discoverySince: string | null; holds: number; confirmations: number; completed: number } | null>;
