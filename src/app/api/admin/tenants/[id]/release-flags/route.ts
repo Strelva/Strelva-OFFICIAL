@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getActorContext, getCurrentUserEmail, isSuperAdmin } from "@/platform/infra/auth";
+import { getActorContext, getAuthenticatedOperatorContext, getCurrentUserEmail, isSuperAdmin } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { getConnections } from "@/lib/connections";
 import { getProducts } from "@/lib/products";
@@ -24,8 +24,7 @@ const command = z.discriminatedUnion("kind", [
     state: z.enum(["off", "operators", "on", "unset"]),
     reason: z.string().trim().min(3).max(480),
     expectedRevision: z.number().int().min(0),
-    jacobApproved: z.boolean().optional(),
-  }),
+  }).strict(),
   z.object({
     kind: z.literal("tester"),
     email: z.string().trim().email(),
@@ -74,14 +73,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const email = await operator();
-  if (!email) return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: noStore });
+  const operatorContext = await getAuthenticatedOperatorContext();
+  if (!operatorContext) return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: noStore });
+  const email = operatorContext.email;
   const { id } = await params;
   const tenantFacts = await facts(id);
   if (!tenantFacts) return NextResponse.json({ error: "Tenant not found" }, { status: 404, headers: noStore });
   try {
     const body = command.parse(await request.json().catch(() => null));
-    await applyTenantReleaseCommand(email, id, tenantFacts, body);
+    await applyTenantReleaseCommand(operatorContext.actor, id, tenantFacts, body);
     await logAuditEvent({
       tenant: id,
       action: "tenant.release-flag",

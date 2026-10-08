@@ -110,11 +110,11 @@ export class WorkspaceAccessError extends Error {
 }
 
 /** Shown to owners, admins and members who try to make or change an internal tool. */
-export const MAKE_SYSTEMS_REQUIRED_MESSAGE = "Ask Strelva to build this.";
+export const MAKE_SYSTEMS_REQUIRED_MESSAGE = "Ask your agency, or find one.";
 
 /**
- * Only a Strelva operator inside the workspace or a delegated agency makes
- * Systems (`make_systems`). Everyone else files a Request instead. Extends the
+ * Only the business's acting provider (an agency's seat and staff row) or a
+ * delegated agency makes Systems (`make_systems`). Everyone else files a Request instead. Extends the
  * access error so every existing 403 path still applies.
  */
 export class WorkspaceMakeSystemsError extends WorkspaceAccessError {

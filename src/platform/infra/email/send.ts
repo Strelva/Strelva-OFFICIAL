@@ -8,6 +8,7 @@ import {
   prospectEmailsEnabled,
 } from "@/platform/infra/email/enabled";
 import { getClientEmailOverride } from "@/platform/infra/email/client-override";
+import { providerEmailSendAllowed, senderDomain, type EmailProvider } from "@/platform/infra/email/provider-gate";
 import { renderEmailHtml, renderEmailText, type EmailOptions } from "@/platform/infra/email/layout";
 
 /** The four people Strelva can address. These are relationship roles, not
@@ -26,6 +27,11 @@ export type SendEmailInput = RenderedEmail & {
    * Absent (or any other audience) ⇒ behavior is unchanged (follow the global
    * switch). */
   tenantId?: string;
+  /** Set when an agency sends this for a business (an owner invitation, a
+   * client's mail). The send then also needs that agency's seat, its email
+   * verification and the business's mandate for the sending domain
+   * (provider-gate.ts). Absent ⇒ behavior is unchanged. */
+  provider?: EmailProvider;
   /** Business scope for owner presentation; never an authority grant. */
   workspaceId?: string;
   fromName?: string;
@@ -68,7 +74,17 @@ export type EmailReceivedReadbackResult =
     }
   | { status: "unavailable"; reason: string };
 
+function fromAddressFor(input: Pick<SendEmailInput, "fromAddress">): string {
+  return input.fromAddress || `hello@${process.env.RESEND_DOMAIN || "updates.strelva.com"}`;
+}
+
 async function audienceEnabled(input: SendEmailInput, strictClientGate = false): Promise<boolean> {
+  if (!(await audiencePolicyEnabled(input, strictClientGate))) return false;
+  // The audience allows it; an agency's send also needs its own effect gate.
+  return !input.provider || providerEmailSendAllowed(input.provider, senderDomain(fromAddressFor(input)));
+}
+
+async function audiencePolicyEnabled(input: SendEmailInput, strictClientGate: boolean): Promise<boolean> {
   const { audience } = input;
   if (audience === "operator") return operatorEmailsEnabled();
   if (audience === "prospect") return prospectEmailsEnabled();
@@ -143,6 +159,9 @@ export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendE
         }
       : {}),
   };
+  if (input.provider && !(await providerEmailSendAllowed(input.provider, senderDomain(fromAddress)))) {
+    return { status: "suppressed", reason: "provider_not_cleared" };
+  }
   const result = input.idempotencyKey
     ? await resend.emails.send(payload, { idempotencyKey: input.idempotencyKey })
     : await resend.emails.send(payload);
@@ -169,6 +188,8 @@ export interface SendBatchInput {
   requireClientGate?: boolean;
   audience: EmailAudience;
   tenantId?: string;
+  /** As SendEmailInput.provider; checked against fromAddress's domain. */
+  provider?: EmailProvider;
   /** Business scope for owner presentation; never an authority grant. */
   workspaceId?: string;
   fromName: string;
@@ -188,10 +209,11 @@ export type SendBatchResult =
 const ALLOWED_FROM_DOMAINS = ["updates.strelva.com", CLIENT_MAIL_DOMAIN];
 
 /** Check before rendering unsubscribe links; the transport checks again at send. */
-export async function batchEmailSuppression(input: Pick<SendBatchInput, "audience" | "tenantId" | "requireClientGate">): Promise<string | null> {
+export async function batchEmailSuppression(input: Pick<SendBatchInput, "audience" | "tenantId" | "requireClientGate"> & Partial<Pick<SendBatchInput, "provider" | "fromAddress">>): Promise<string | null> {
   const rendered = { subject: "", to: [], html: "", text: "" };
   if (input.requireClientGate && !(await audienceEnabled({ ...rendered, audience: "client", tenantId: input.tenantId }, true))) return "not sent: gated";
   if (!(await audienceEnabled({ ...rendered, audience: input.audience, tenantId: input.tenantId }))) return "not sent: gated";
+  if (input.provider && !(await providerEmailSendAllowed(input.provider, senderDomain(fromAddressFor(input))))) return "not sent: provider not cleared";
   if (!process.env.RESEND_API_KEY) return "not sent: unconfigured";
   return null;
 }
@@ -222,6 +244,9 @@ export async function sendBatchWithReceipt(input: SendBatchInput): Promise<SendB
     text: message.text,
     ...(message.headers ? { headers: message.headers } : {}),
   }));
+  if (input.provider && !(await providerEmailSendAllowed(input.provider, domain))) {
+    return { status: "suppressed", reason: "not sent: provider not cleared" };
+  }
   const result = input.idempotencyKey
     ? await resend.batch.send(payload, { idempotencyKey: input.idempotencyKey })
     : await resend.batch.send(payload);

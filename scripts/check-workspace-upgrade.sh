@@ -220,7 +220,6 @@ psql "${psql_args[@]}" --file="$repo_root/tests/business-record-schema.sql"
 psql "${psql_args[@]}" --set=tenant_import="$(cat "$repo_root/tests/fixtures/business-record-tenant-import.json")" \
   --file="$repo_root/tests/business-record-conversion-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
-psql "${psql_args[@]}" --file="$repo_root/tests/business-ownership-schema.sql"
 # accept_workspace_invitation is replaced by 20261007110000; the original
 # invitation contract must still hold against the replacement.
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-invitations-schema.sql"
@@ -237,7 +236,6 @@ psql "${psql_args[@]}" --file="$repo_root/tests/business-billing-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/convert-separate-business-schema.sql"
 # Release rows: agency workspaces accepted since 20261008161000; business
 # workspaces still accepted, personal ones still refused.
-psql "${psql_args[@]}" --file="$repo_root/tests/release-flags-agency-workspaces-schema.sql"
 # 20261009113000 replaces read_tenant_leads, read_tenant_lead and
 # read_tenant_lead_digests; their contracts and the new records hold.
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-lead-reads-schema.sql"
@@ -290,6 +288,13 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011102000_nat
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011101000_business_booking_email.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/native-publishing-targets-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/business-booking-email-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261016110000_operator_action_approvals.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261016110000_operator_action_approvals.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-action-approvals-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-ownership-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/release-flags-agency-workspaces-schema.sql"
+
 # #528: no client privilege on legacy tenant tables; every member role and anon refused.
 psql "${psql_args[@]}" --file="$repo_root/tests/legacy-tenant-client-access-schema.sql"
 
@@ -335,6 +340,14 @@ fi
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012010000_tenant_track_signing_keys.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012120000_track_signing_key_rotation.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-track-signing-keys-schema.sql"
+# 20261014100000-20261014112000 (#255/#534) replace website and per-business
+# decision provider gates with the acting provider and make owner-link website
+# launches need publish; the effect matrix and the owner-link contracts hold
+# after the full ordered upgrade, and the replaced contracts above ran against it.
+psql "${psql_args[@]}" --file="$repo_root/tests/acting-provider-gates-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-links-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-website-preview-schema.sql"
+
 # The booking readers (20261013115000) and the public-facts reader roll back
 # in reverse order on the full ordered schema, then #509. Each rollback
 # restores exactly the readers it replaced, as they were before its forward
@@ -353,6 +366,9 @@ rollback_readers() {
 }
 psql "${psql_args[@]}" --file="$repo_root/tests/owner-recipient-trust-schema.sql"
 catalog_fingerprint >"$cluster_root/catalog-full.txt"
+# The newest gate patches the owner-trust claimant. Undo it first and reapply
+# after those reader/trust rehearsals, preserving #560's actual effect gate.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261014112000_acting_provider_gates.sql"
 # Newest first; the public-facts reader is last.
 public_facts_rollbacks=(20261013120000_owner_recipient_trust 20261013115000_booking_reads_confirmed_facts 20261013110000_public_facts_read_confirmed)
 for name in "${public_facts_rollbacks[@]}"; do
@@ -383,6 +399,7 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011133700_bus
 for (( index=${#public_facts_rollbacks[@]}-1; index>=0; index-- )); do
   psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/${public_facts_rollbacks[$index]}.sql"
 done
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261014112000_acting_provider_gates.sql"
 catalog_fingerprint >"$cluster_root/catalog-full-reapplied.txt"
 if ! diff -u "$cluster_root/catalog-full.txt" "$cluster_root/catalog-full-reapplied.txt"; then
   printf 'Reapplying #509, the public-facts and booking readers did not restore the full catalog.\n' >&2

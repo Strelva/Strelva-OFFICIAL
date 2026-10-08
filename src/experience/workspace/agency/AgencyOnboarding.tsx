@@ -52,7 +52,7 @@ function rememberAgency(workspaceId: string) {
   window.history.replaceState(window.history.state, "", url);
 }
 
-export function AgencyOnboarding({ initialWorkspaceId }: { initialWorkspaceId: string | null }) {
+export function AgencyOnboarding({ initialWorkspaceId, addClient = false }: { initialWorkspaceId: string | null; addClient?: boolean }) {
   const [workspaceId, setWorkspaceId] = useState(initialWorkspaceId);
   const [attempt, setAttempt] = useState(0);
   // Each read is stored with the key it was made for, so a change of agency or
@@ -97,7 +97,7 @@ export function AgencyOnboarding({ initialWorkspaceId }: { initialWorkspaceId: s
           : state.kind === "error" ? <Notice title="Your agency setup didn’t load." body={state.message} alert><Button variant="secondary" icon={<RefreshCw className="size-4" />} onClick={() => setAttempt((value) => value + 1)}>Try again</Button></Notice>
           : state.kind === "choose" ? <ChooseAgency agencies={state.agencies} onOpen={open} onCreate={() => setState({ kind: "create" })} />
           : state.kind === "create" ? <CreateAgency onCreated={open} onSignedOut={() => setState({ kind: "signed_out" })} />
-          : <Checklist onboarding={state.onboarding} workspaceHref={workspaceHref} />}
+          : <Checklist onboarding={state.onboarding} workspaceHref={workspaceHref} addClient={addClient} />}
       </div>
     </main>
   );
@@ -197,7 +197,7 @@ function stepStatus(step: AgencyOnboardingStep, next: boolean): string {
   return "Not started";
 }
 
-function Checklist({ onboarding, workspaceHref }: { onboarding: Onboarding; workspaceHref: string }) {
+function Checklist({ onboarding, workspaceHref, addClient }: { onboarding: Onboarding; workspaceHref: string; addClient: boolean }) {
   const id = useId().replace(/:/g, "");
   const { agency } = onboarding;
   const done = onboarding.steps.filter((step) => step.done).length;
@@ -231,7 +231,9 @@ function Checklist({ onboarding, workspaceHref }: { onboarding: Onboarding; work
       ? <p>{onboarding.clients} {onboarding.clients === 1 ? "client has" : "clients have"} chosen {agency.name} as their provider.</p>
       : <>
         <p>Each client keeps ownership of their business. Your agency works inside the access they give it.</p>
-        <p className="mt-2 font-medium text-warm-black">Adding clients opens here next.</p>
+        {addClient && agency.role !== "member"
+          ? <a href={`/workspace/agency/clients/new?workspaceId=${encodeURIComponent(agency.id)}`} className="mt-3 inline-flex min-h-11 items-center gap-2 font-medium text-warm-black underline-offset-4 hover:underline">Add your first client<ArrowRight className="size-4" aria-hidden="true" /></a>
+          : <p className="mt-2 font-medium text-warm-black">{addClient ? `An owner or admin of ${agency.name} adds clients.` : "Adding clients opens here next."}</p>}
       </>,
   };
 

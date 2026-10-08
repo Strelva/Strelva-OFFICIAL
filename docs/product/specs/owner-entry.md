@@ -126,14 +126,27 @@ Owner entry isn't a System. It's the door to the **Business**.
    website rebuild and Systems resolve per workspace, layered over the env
    flags (rule in section 4). An operator turns one client on or off from
    `/admin/clients/[id]`, with a reason. The change is recorded and takes
-   effect within 60 seconds, without a deploy.
+   effect within 60 seconds, without a deploy. Switching a flag on records a
+   server-side approval for the authenticated operator and audits that actor;
+   the browser supplies no approver or approval ID.
 8. **Owners are invited through an operator.** For a converted workspace, a
    Strelva operator (active `super_admins` row and `admin` membership) can
-   invite exactly one owner. The address defaults to the business record's
-   owner recipient (`resolve_business_owner_recipient`, falling back to
-   `tenants.owner_email`). The invitation goes out by email through
-   `src/lib/email/send.ts` with audience `client` and the tenant id, so the
-   per-tenant email override applies. Each invitation needs Jacob's yes.
+   invite exactly one owner. The address defaults to the business's trusted
+   recipient. Use `business_trusted_owner_recipient` when available; until
+   that migration lands, trust only a conversion-imported owner recipient or
+   a verified owner-written record fact. An exact trusted address may be
+   issued after a verified sign-in within 10 minutes; the server records the
+   approval for that same session user. Any other address needs a different
+   active operator's server-recorded approval bound to the workspace, action
+   and exact normalized address. It expires after 15 minutes and is single-use.
+   Reject operator-controlled addresses, including linked auth identities,
+   membership emails and operator-list addresses after plus-tag and Gmail dot
+   normalization. The authenticated route is
+   `POST /api/admin/tenants/{tenantId}/owner-invitations`; it derives the actor
+   from the session, ignores browser-supplied approval identity, and never
+   accepts a `jacobApproved` flag. Record approval, issuance and revocation in
+   the workspace audit and mirror client-linked events into each tenant's
+   audit log. Email remains disabled during the silent rollout.
 9. **Accepting grants both memberships at once.** Accepting the invitation
    creates the `workspace_memberships` owner row and, for every tenant linked
    to that workspace, a `memberships` row with role `owner`, in one database
@@ -194,8 +207,8 @@ since the catalog gives those pages no workspace home at 1.0.0.
 
 | Action | Who |
 | --- | --- |
-| Turn a workspace's owner entry or other flags on or off | Strelva operator, with Jacob's yes for each client's first `on` |
-| Invite the owner of a converted workspace | Strelva operator, with Jacob's yes for each client |
+| Turn a workspace's owner entry or other flags on or off | Strelva operator; a first `on` needs a server-recorded approval from a different active operator, bound to the workspace, flag and reason |
+| Invite the owner of a converted workspace | Strelva operator with a single-use, server-recorded approval from a different active operator; operator-controlled addresses are refused |
 | Invite members | Owner (today's `create_workspace_invitation` requires `owner`) |
 | Open the old `/dashboard` for a moved tenant | Super admin only |
 | Change where admin hosts land, globally | Jacob (Reborn "Needs Jacob's yes") |
@@ -329,8 +342,9 @@ still need the authorized rollout inventory; code readiness grants no rollout.
   `admin` membership on a workspace that has a tenant link and no owner yet.
   The accept path is extended to write tenant `memberships` rows for linked
   tenants in the same transaction.
-- An owner invitation email through `send.ts`, plus an operator button on
-  `/admin/clients/[id]`.
+- The operator panel on `/admin/clients/[id]` records a second operator's
+  approval for a non-trusted recipient. Trusted-owner issuance requires a
+  fresh sign-in; invitation email remains disabled in the silent rollout.
 
 **Retires (later, not at 1.0.0):** the `/dashboard` page bodies, one per
 page, once every workspace that used it has moved. The route files stay
@@ -351,8 +365,12 @@ emails, Stripe return URLs, bookmarks), not owners' habits.
    workspace to `operators`, and run the proof below.
 3. Convert gldf. Set `operators`. Jacob walks every gldf page. Pages not
    `ready` show `/dashboard` with the back link.
-4. With Jacob's yes, invite gldf's owner. Set `on` only when gldf's blocking
-   pages are `ready`.
+4. Keep owner invitations and sending off in the silent rollout. When that gate
+   is opened later, the authenticated operator records the approval as part
+   of issuing an invite to the trusted owner after a sign-in from the last 10
+   minutes. Other recipient addresses need a different active operator's
+   approval. Set `on` only when gldf's blocking pages are `ready`; switching
+   it on records and audits the signed-in operator's approval.
 5. Repeat per client. Clients who never accept an invitation stay
    `operators`. Their owners keep getting email, and every old link still
    resolves.
@@ -390,8 +408,11 @@ last-owner guard in both stores.
   `dashboard-surfaces.test.ts`.
 - **SQL tests** in `check:workspace-sql`. Operator owner invitation: refuses
   a non-super-admin, refuses when an owner exists, refuses a workspace with
-  no link. Accept writes both memberships or neither. Cross-workspace
-  denial.
+  no link. A trusted recipient accepts same-operator approval; another address
+  requires a different operator's exact, single-use approval. Verify normalized
+  operator aliases, native agency audit without a client link, and same-actor
+  release-flag approvals. Accept writes both memberships or neither.
+  Cross-workspace denial.
 - **Authenticated local journeys,** desktop and mobile. gldf admin host
   (custom domain, fallback auth), rohlax `/client/rohlax/dashboard`, and an
   `admin.<tenant>.strelva.com` subdomain. Each in three states: not signed
@@ -400,9 +421,12 @@ last-owner guard in both stores.
 - **Redirect contract.** Fetch each `/dashboard` path in the gldf and rohlax
   repos' hard-coded forms and assert 307 to the mapped target. Then flip
   the flag to `off` and assert 200 on `/dashboard`.
-- **Production.** On the Strelva-owned test business: owner invitation
-  email received, accepted, admin host sign-in lands in the workspace, one
-  flag rollback observed. Then gldf on Jacob's yes.
+- **Production.** Owner invitations remain off in the silent rollout; no
+  invitation email is sent. Once separately released, verify the trusted
+  recipient, fresh sign-in, server-recorded same-operator approval, audit row
+  and acceptance on the Strelva-owned test business before inviting a client.
+  Keep gldf's first `on` behind its audited approval from the authenticated
+  operator.
 
 ## 10. Decisions and launch defaults
 
@@ -413,9 +437,12 @@ invitation, pricing or provider authority.
    settled dispositions. Settings is the requested retained exception.
 2. **Env off is the kill switch.** A workspace row cannot override it;
    `workspace` mode allows per-client rollout and rollback.
-3. **Ownership comes only from an operator-issued invitation.** Matching an
-   imported email never auto-grants owner authority. Magic-link claim accepts
-   that existing invitation and creates both memberships atomically.
+3. **Ownership comes only from an operator-issued invitation.** Matching the
+   trusted owner email never auto-grants owner authority. A trusted-address
+   invite needs a recent sign-in and a same-operator server approval; any other
+   address needs a different active operator's exact, one-time approval.
+   Magic-link claim accepts that invitation and creates both memberships
+   atomically.
 4. **Strelva stays admin** in converted businesses. The client's owner
    authority is never borrowed by Ask or synthesized for email execution.
 5. **Same-host workspace entry.** It preserves host-only auth cookies;
