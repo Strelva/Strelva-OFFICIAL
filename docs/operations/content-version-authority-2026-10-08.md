@@ -75,6 +75,24 @@ instead of overwriting a later successor.
 - The authenticated minimum three-flag agency website browser journey passed.
   It is regression proof for ordinary agency/owner behavior, not a hosted
   publication or browser proof of the new receipt-enabled content route.
+- `PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH bash scripts/check-content-authority-http.sh`
+  passed with real signed-in local Auth sessions, Postgres content/operational
+  stores, the full forward schema including both successors, and
+  `STRELVA_OPERATOR_QUEUE_RELEASE=1`. No access bypass or outside provider is
+  enabled. Owner Content PUT and owner draft publication return 200, with
+  accepted receipts, actual owner identity and matched stored/public content
+  projection. The currently staffed, publish-verified serving agency with the
+  exact adopted website mandate also publishes through Content PUT; its receipt
+  snapshots the actual agency ID/name and actor separately from `strelva_content`.
+  A linked admin who still holds legacy content permission and direct client
+  admin membership is refused on PUT and publish, as is a freshly revoked
+  owner with legacy permission retained. Exact accepted content and receipt
+  rows stay unchanged; the refused publication remains a draft. Existing
+  handlers surface these database denials as 500. This proof does not claim a
+  new HTTP error classification. The synthetic custom repo has no revalidation
+  URL: publication reports accepted content alongside failed outside
+  revalidation (`Missing revalidateUrl`), rather than treating matching content
+  projection as observed storefront delivery.
 
 Initial browser startup failed because a dependency symlink pointed outside the
 Turbopack filesystem root. Cloning the already installed dependencies locally
@@ -83,6 +101,24 @@ resolved startup; no package or dependency was added. Failure log is retained at
 `/tmp/strelva-provider-attribution-browser-second.log` with private local artifact
 path `strelva-agency-minimum.QYOUxO`. Focused SQL fixture failures were corrected
 against the actual final schema; these logs remain local, not release evidence.
+
+Final sanitized HTTP proof log:
+`/tmp/strelva-provider-attribution-http-final-sanitized.log`. Private workdir:
+`/var/folders/0t/9xnfycn50vd2yv5gb7p4cdsh0000gn/T/strelva-content-authority.TmNIs6`;
+`results.json` and `evidence/` retain accepted receipt/refusal evidence. The
+implementation commit at proof start was `61309856`; proof source SHA-256:
+runner `9c275ba7b81bf35da7f32a020d96f84a81622ef864a832fd65940113e1382544`,
+spec `a9a5564cc06e90165a8103aff334c8d002af61433abacd4133ed0aa7f3563798`.
+The initial HTTP run accepted owner PUT/publication
+but stopped at a fixture assertion that expected no configured storefront
+instead of the actual missing-custom-repo-revalidation failure. Its log and
+trace remain under `strelva-content-authority.Y0sWS5` and
+`/tmp/strelva-provider-attribution-http.log`. The corrected assertion preserves
+the route's actual distinction between accepted content and outside delivery.
+
+HTTP refusal currently returns the existing generic 500 response. A future
+usability repair can classify current-authority denial explicitly; these tests
+prove refusal/no accepted content or receipt mutation, not a retry entitlement.
 
 ## Limits and next action
 
@@ -95,7 +131,7 @@ continuity. Native collection/newsletter receipts and broader publication caller
 remain outside this section-content repair.
 
 Next: review the proposed branch with the other prepared successors, run the
-combined final migration inventory/recovery checks, and prove receipt-enabled
-content HTTP publication with an ordinary owner/provider. Retain #494/#495 as
+combined final migration inventory/recovery checks, and qualify the target
+before any rollout or hosted acceptance claim. Retain #494/#495 as
 open until integration and the relevant acceptance evidence are reviewed. No
 production migration, rollout, deploy or issue closure is authorized by this record.
