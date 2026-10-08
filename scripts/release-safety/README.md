@@ -171,49 +171,28 @@ refuses any retained `tenant_workspace_links` rows. The July rollback refuses
 history or reverses accepted provider effects. Forward corrective migrations
 remain the preferred live recovery path.
 
-## Batch 8: retained evidence and empty-only structural recovery
+## Historical empty-only structural helper
 
-`pnpm check:release-safety:batch8` applies all pinned batch-8 files, runs their
-existing receipt-preserving companions, then proves optional structural
-completion on its private local database. The full pre-batch public catalog and
-ACL comparison remains exact; the second forward must reproduce the first.
-Legacy client content, routing, billing and access probes run throughout.
+`rollback-batch8-empty-schema.sql` and
+`capture-batch8-structural-baseline.sql` remain historical preparation artifacts.
+The current `check:release-safety:batch8` command does **not** run the per-file
+companions, either structural capture, or this helper. Its current acceptance
+contract is the forward-only permission recovery above. The earlier local
+empty-only result does not qualify these helpers against the current final
+inventory or a populated production database.
 
-The companions intentionally retain sessions, send purposes, receipts, native
-records and exit history. Disabling a feature does not authorize deleting this
-evidence. The separate `rollback-batch8-empty-schema.sql` can complete structural
-reversal only when all 20 registered evidence tables are empty, all four added
-fields on existing tables are NULL, and added release-flag values have no state
-or immutable history. It locks affected tables, checks captured or explicitly
-audited object fingerprints, restores predecessor definitions and constraints,
-and uses ordinary non-cascading drops. Populated evidence, unknown dependencies,
-drift, or rows incompatible with the old constraints stop the whole transaction.
-No customer row is deleted, rewritten, archived or replayed.
+The helper requires target-specific before/forward captures, separately explicit
+recovery authority, disabled callers, empty registered evidence tables, unused
+added fields and flags, and exact reviewed object fingerprints. These refusal
+guards remain intact. Do not reconstruct predecessor metadata from an already
+upgraded target or invoke a historical helper on the current runtime. Choosing
+structural reversal requires a new reviewed compatibility/preservation plan and
+an exact-source rehearsal; the historical passing fixture is insufficient.
 
-Prepare this target's privileged metadata with
-`capture-batch8-structural-baseline.sql` **before** batch 8, then run the same
-capture file with `--set=batch8_capture_forward=true` immediately after forward
-and before any recovery companion. The captures contain catalog definitions,
-fingerprints and flag names, with no customer rows or credentials. Browser and
-service roles cannot access them. Capture reuse and missing metadata refuse;
-do not reconstruct a predecessor capture from an already upgraded target.
-
-Live structural recovery requires separate explicit recovery authorization and
-all batch-8 callers/gates disabled. A release or deployment authorization does
-not grant rollback authority. After the ordinary companions, the reviewed
-manual invocation must include both
-`--set=batch8_empty_recovery_authorized=true` and
-`--set=batch8_callers_disabled=true`. These are explicit operator attestations;
-the SQL cannot inspect application environment switches. The local proof sets
-them only for its disposable database. Nothing invokes this helper on a hosted
-target automatically.
-
-On a populated target, retain the additive schema and use feature disablement
-plus a reviewed forward correction. Moving accepted-send evidence away and
-reapplying empty tables can reopen consumed send purposes; archive/replay
-recovery needs its own plan. The local proof checks atomic refusal for accepted
-send evidence, every new field, flag state and immutable history, function
-drift, missing authorization, and incompatibility with an old constraint.
+For a populated target, retain the additive schema, customer rows, approvals,
+send purposes and receipts. Use separately approved application configuration
+and permission recovery, then a reviewed forward correction. Neither path
+undoes accepted provider effects or recreates expired data.
 
 ## Dump and restore
 
