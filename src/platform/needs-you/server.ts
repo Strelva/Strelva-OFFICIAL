@@ -47,6 +47,7 @@ export function needsYouAppOrigin(): string {
 
 /** What a decision carries past the source, wired at the app edge (routes may import what platform can't). */
 export interface NeedsYouEffects {
+  google?: import("@/platform/make-real/google-adapter").GoogleMakeRealPorts;
   /** After business facts are confirmed: native websites follow (#509). */
   businessFactsConfirmed?: BusinessFactsPorts["confirmed"];
 }
@@ -94,7 +95,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, ef
         change: (actor, input) => commitments.execute(actor, { action: "delivery_commitment", ...input }),
       }),
       businessRecordDraftAdapter(PostgresBusinessFactDraftStore, askReleaseMayBeOn, effects.businessFactsConfirmed),
-      ...systemsSourceAdapters(store),
+      ...systemsSourceAdapters(store, effects.google),
       ...deliverySourceAdapters(),
       ...productSourceAdapters(),
       bookingSettingsAdapter(),

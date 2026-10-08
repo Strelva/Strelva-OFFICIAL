@@ -1,3 +1,4 @@
+import { googleMakeRealPorts } from "@/experience/systems/live-server";
 import { z } from "zod";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
@@ -66,6 +67,7 @@ export async function POST(request: Request) {
     if (path.kind === "live") return workspaceJson({ live: path.result });
     if (needsYouReleaseEnabled()) {
       const decided = await makeRealThroughNeedsYou(actor, workspace.id, path.possibilityId, {
+        google: googleMakeRealPorts,
         store: needsYouStore, appOrigin: needsYouAppOrigin(), sendEmail: sendEmailWithReceipt,
       });
       if (!decided) return workspaceJson({ error: "This possibility is not waiting on a decision. Nothing changed." }, 404);

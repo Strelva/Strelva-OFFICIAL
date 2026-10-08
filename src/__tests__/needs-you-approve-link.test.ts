@@ -11,7 +11,7 @@ const mockService = vi.hoisted(() => vi.fn());
 const mockReleased = vi.hoisted(() => vi.fn(() => true));
 const mockResolveEventAction = vi.hoisted(() => vi.fn());
 
-vi.mock("@/platform/needs-you/server", () => ({
+vi.mock("@/experience/workspace/needs-you-server", () => ({
   needsYouReleaseEnabled: mockReleased,
   needsYouAppOrigin: () => "https://app.example.test",
   needsYouStore: { read: mockRead },

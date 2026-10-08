@@ -4,7 +4,7 @@ import { isSuperAdminUser } from "@/platform/infra/db/repositories";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { listWorkspaces } from "@/platform/workspaces";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
-import { needsYouReleaseEnabled, needsYouService, needsYouStore, readStrelvaHandled } from "@/platform/needs-you/server";
+import { needsYouReleaseEnabled, needsYouService, needsYouStore, readStrelvaHandled } from "@/experience/workspace/needs-you-server";
 
 export const dynamic = "force-dynamic";
 

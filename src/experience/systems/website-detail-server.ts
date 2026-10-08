@@ -28,7 +28,7 @@ import { getRecentVersions } from "@/lib/storage/version-store";
 import { getSiteSnapshots } from "@/lib/storage/site-snapshot-store";
 import { selectWebsiteRequestHistory } from "@/lib/website-history";
 import { tenantEventItem } from "@/platform/needs-you/adapters";
-import { needsYouReleaseEnabled, needsYouService } from "@/platform/needs-you/server";
+import { needsYouReleaseEnabled, needsYouService } from "@/experience/workspace/needs-you-server";
 import { PostgresServiceRequestStore } from "@/platform/service-requests";
 import { websiteDocumentStore } from "@/products/websites/document-store";
 import { websiteRebuildReleaseEnabled } from "@/products/websites/index";

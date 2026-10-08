@@ -15,7 +15,7 @@ vi.mock("@/lib/cron-auth", () => ({ requireCronRequest: () => null }));
 vi.mock("@/platform/infra/heartbeat", () => ({ recordHeartbeat: boundary.heartbeat }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => boundary.release }));
 vi.mock("@/products/operations/server", () => ({ listDueWork: boundary.listDueWork, sweepDueWork: boundary.sweepDueWork, snapshotDueResponsibilityMeters: boundary.snapshotMeters }));
-vi.mock("@/platform/make-real/live-server", () => ({ listDueActivations: boundary.listDueActivations, liveMakeReal: { resumeDue: boundary.resumeDue } }));
+vi.mock("@/experience/systems/live-server", () => ({ listDueActivations: boundary.listDueActivations, liveMakeReal: { resumeDue: boundary.resumeDue } }));
 vi.mock("@/platform/possibilities/supabase-repository", () => ({ withdrawIdlePossibilities: boundary.withdrawIdle }));
 
 import { GET } from "@/app/api/cron/workspace-work/route";

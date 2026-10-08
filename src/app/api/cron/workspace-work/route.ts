@@ -14,7 +14,7 @@ export const maxDuration = 60;
  */
 async function settleSystems(): Promise<{ activations: { processed: number; failed: number }; withdrawn: number; error?: string }> {
   try {
-    const { liveMakeReal, listDueActivations } = await import("@/platform/make-real/live-server");
+    const { liveMakeReal, listDueActivations } = await import("@/experience/systems/live-server");
     const { withdrawIdlePossibilities } = await import("@/platform/possibilities/supabase-repository");
     const resumed = await liveMakeReal.resumeDue(await listDueActivations(20), 15_000);
     const withdrawn = await withdrawIdlePossibilities({ idleDays: 90, limit: 100 }).catch(() => []);

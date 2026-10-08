@@ -23,7 +23,7 @@ vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: vi.f
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: mocks.workspaceReleased }));
 vi.mock("@/platform/workspaces", () => ({ listWorkspaces: mocks.workspaces }));
 vi.mock("@/platform/infra/db/repositories", () => ({ isSuperAdminUser: mocks.superAdmin }));
-vi.mock("@/platform/needs-you/server", () => ({
+vi.mock("@/experience/workspace/needs-you-server", () => ({
   needsYouReleaseEnabled: mocks.released,
   needsYouService: () => ({ chase: mocks.chase, list: mocks.list, decide: mocks.decide }),
   needsYouStore: {},

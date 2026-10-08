@@ -19,6 +19,7 @@ vi.mock("@/products/managed-presence/server", () => ({ listManagedPresenceWork: 
 vi.mock("@/experience/systems/server", () => ({ makeRealForWorkspace: deps.makeReal }));
 vi.mock("@/platform/needs-you/systems-sources", () => ({ makeRealThroughNeedsYou: deps.throughNeedsYou }));
 const path = vi.hoisted(() => ({ makeRealPath: vi.fn() }));
+vi.mock("@/experience/systems/live-server", () => ({ googleMakeRealPorts: {} }));
 vi.mock("@/experience/systems/live-make-real", () => ({ liveMakeRealPorts: async () => ({}), makeRealPath: path.makeRealPath }));
 
 import { POST } from "@/app/api/workspace/systems/make-real/route";

@@ -33,7 +33,7 @@ export async function GET(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Check the request." }, { status: 400, headers: noStore });
   try {
     await authorizeAdminOperatorRead("admin.make-real.read");
-    const { activationStarter, activationRunner, liveMakeReal } = await import("@/platform/make-real/live-server");
+    const { activationStarter, activationRunner, liveMakeReal } = await import("@/experience/systems/live-server");
     // The starter reads it; once the starter has left, Strelva (system) does (a logged session).
     const actor = await activationStarter(parsed.data.workspaceId, parsed.data.activationId)
       ?? (await activationRunner(parsed.data.workspaceId, parsed.data.activationId))?.actor ?? null;
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Check the request. Reconciling needs evidence of at least 10 characters; rolling back needs confirm." }, { status: 400, headers: noStore });
   const input = parsed.data;
   try {
-    const { activationRunner, liveMakeReal } = await import("@/platform/make-real/live-server");
+    const { activationRunner, liveMakeReal } = await import("@/experience/systems/live-server");
     const runner = await activationRunner(input.workspaceId, input.activationId);
     if (!runner) return NextResponse.json({ error: "That activation is not available." }, { status: 404, headers: noStore });
     const { actor, service } = runner;

@@ -5,7 +5,7 @@
  * call into the path that already owns it (live-adapters.ts has the table).
  */
 import { createGoogleListingAdapter } from "./google-adapter";
-import { googleMakeRealPorts } from "@/products/google-listing/server";
+import type { GoogleMakeRealPorts } from "./google-adapter";
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import { getTenantConfig } from "@/lib/tenants";
@@ -49,7 +49,7 @@ export async function anyMakeRealChannelEnabled(workspaceId: string): Promise<bo
   return false;
 }
 
-export function liveChannelAdapters(actor: WorkspaceActor, workspaceId: string) {
+export function liveChannelAdapters(actor: WorkspaceActor, workspaceId: string, google: GoogleMakeRealPorts) {
   const ctx: LiveChannelContext = { actor, enabled: (channel) => makeRealChannelEnabled(workspaceId, channel) };
   return [
     createHostedWebsiteAdapter({
@@ -86,18 +86,20 @@ export function liveChannelAdapters(actor: WorkspaceActor, workspaceId: string) 
       publish: async (a, workId, raw) => (await import("@/products/applications/server")).publishApplication(a, workId, raw),
       rollback: async (a, workId, raw) => (await import("@/products/applications/server")).rollbackApplication(a, workId, raw),
     }, ctx),
-    createGoogleListingAdapter(googleMakeRealPorts, ctx),
+    createGoogleListingAdapter(google, ctx),
   ];
 }
 
-export const liveMakeReal = createLiveMakeRealService({
-  possibilities: (actor) => createSupabasePossibilityRepository(actor),
-  activations: (actor) => createSupabaseActivationRepository(actor),
-  live: (actor) => createSystemStoreLiveSystems({ store: createSupabaseSystemStore(), content: createSupabaseRevisionContent(actor), actor }),
-  adapters: liveChannelAdapters,
-  approvals: createNeedsYouApprovalRecords({ read: (workspaceId, itemId) => PostgresNeedsYouStore.read(workspaceId, itemId) }),
-  recordService: recordServiceAction,
-});
+export function createServerLiveMakeReal(google: GoogleMakeRealPorts) {
+  return createLiveMakeRealService({
+    possibilities: (actor) => createSupabasePossibilityRepository(actor),
+    activations: (actor) => createSupabaseActivationRepository(actor),
+    live: (actor) => createSystemStoreLiveSystems({ store: createSupabaseSystemStore(), content: createSupabaseRevisionContent(actor), actor }),
+    adapters: (actor, workspaceId) => liveChannelAdapters(actor, workspaceId, google),
+    approvals: createNeedsYouApprovalRecords({ read: (workspaceId, itemId) => PostgresNeedsYouStore.read(workspaceId, itemId) }),
+    recordService: recordServiceAction,
+  });
+}
 
 type Rpc = { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message?: string } | null }> };
 function db(): Rpc {
@@ -200,6 +202,6 @@ export async function readLiveReadyPlans(workspaceId: string): Promise<ReadyPlan
 }
 
 /** Start an approved live plan (the item id is the plan approval). */
-export function startLiveMakeReal(input: { actor: WorkspaceActor; workspaceId: string; possibilityId: string; approvalId: string; title: string }) {
-  return startLiveApproved(liveMakeReal, input);
+export function startLiveMakeReal(google: GoogleMakeRealPorts, input: { actor: WorkspaceActor; workspaceId: string; possibilityId: string; approvalId: string; title: string }) {
+  return startLiveApproved(createServerLiveMakeReal(google), input);
 }

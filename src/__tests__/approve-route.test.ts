@@ -14,7 +14,7 @@ const mockGetTenantConfig = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/event-actions", () => ({ resolveEventAction: mockResolveEventAction }));
 // Existing tenant links must not load the unreleased workspace decision runtime.
-vi.mock("@/platform/needs-you/server", () => { throw new Error("Legacy approval loaded workspace runtime"); });
+vi.mock("@/experience/workspace/needs-you-server", () => { throw new Error("Legacy approval loaded workspace runtime"); });
 vi.mock("@/app/api/owner-website-preview/preview", () => { throw new Error("Legacy approval loaded website renderer"); });
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mockGetTenantConfig }));
 vi.mock("@/lib/tenant-urls", () => ({
@@ -22,7 +22,7 @@ vi.mock("@/lib/tenant-urls", () => ({
 }));
 // These cases exercise legacy tenant links. Workspace-link behavior has its
 // own route tests; avoid loading its unrelated execution graph in each reset.
-vi.mock("@/platform/needs-you/server", () => ({
+vi.mock("@/experience/workspace/needs-you-server", () => ({
   needsYouReleaseEnabled: () => false,
   needsYouAppOrigin: () => "https://app.strelva.example",
   needsYouService: {}, needsYouStore: {},

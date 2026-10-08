@@ -23,6 +23,7 @@ import { createNeedsYouService, type DecideStatus, type NeedsYouDeps } from "./s
 import type { WorkspaceMakeRealResult } from "@/experience/workspace/contracts";
 import { makeRealAdapter, needsYouMakeRealApprovals, type ReadyPlan } from "./sources/make-real";
 import { versionReleaseAdapter, type PendingVersionRelease } from "./sources/version-release";
+import type { GoogleMakeRealPorts } from "@/platform/make-real/google-adapter";
 import { recordServiceAction } from "./service-actor";
 
 function systemsOn(workspaceId: string, actor: WorkspaceActor): Promise<boolean> {
@@ -78,7 +79,7 @@ async function liveReadyPlans(workspaceId: string): Promise<ReadyPlan[]> {
  * src/platform/make-real/live.ts). Same item shape, same
  * `<possibility>@<revision>` source id, same approval reader.
  */
-function makeRealSource(store: NeedsYouStore, onResult?: (result: WorkspaceMakeRealResult) => void): SourceAdapter {
+function makeRealSource(store: NeedsYouStore, google: GoogleMakeRealPorts | undefined, onResult?: (result: WorkspaceMakeRealResult) => void): SourceAdapter {
   return makeRealAdapter({
     enabled: systemsOn,
     readyPlans: async (actor, workspaceId) => readyMakeRealPlans(await liveDeps(actor, workspaceId)),
@@ -90,7 +91,8 @@ function makeRealSource(store: NeedsYouStore, onResult?: (result: WorkspaceMakeR
       const live = (await liveReadyPlans(workspaceId)).find((plan) => plan.possibilityId === possibilityId);
       if (live) {
         const { startLiveMakeReal } = await import("@/platform/make-real/live-server");
-        return startLiveMakeReal({ actor, workspaceId, possibilityId, approvalId, title: live.title });
+        if (!google) throw new Error("Google Make real composition is unavailable.");
+        return startLiveMakeReal(google, { actor, workspaceId, possibilityId, approvalId, title: live.title });
       }
       const result = await makeRealForWorkspace(await liveDeps(actor, workspaceId), possibilityId, { canActivate: true }, {
         planApproval: { approvalId, approvals: needsYouMakeRealApprovals((ws, id) => store.read(ws, id)) },
@@ -110,13 +112,13 @@ export async function makeRealThroughNeedsYou(
   actor: WorkspaceActor,
   workspaceId: string,
   possibilityId: string,
-  deps: { store: NeedsYouStore; appOrigin: string; sendEmail: NeedsYouDeps["sendEmail"]; adapter?: (onResult: (result: WorkspaceMakeRealResult) => void) => SourceAdapter },
+  deps: { google?: GoogleMakeRealPorts; store: NeedsYouStore; appOrigin: string; sendEmail: NeedsYouDeps["sendEmail"]; adapter?: (onResult: (result: WorkspaceMakeRealResult) => void) => SourceAdapter },
 ): Promise<{ status: DecideStatus; result: WorkspaceMakeRealResult | null; reason: string | null; receiptRef: string | null } | null> {
   let captured: WorkspaceMakeRealResult | null = null;
   const capture = (result: WorkspaceMakeRealResult) => { captured = result; };
   const service = createNeedsYouService({
     store: deps.store,
-    adapters: [deps.adapter ? deps.adapter(capture) : makeRealSource(deps.store, capture)],
+    adapters: [deps.adapter ? deps.adapter(capture) : makeRealSource(deps.store, deps.google, capture)],
     sendEmail: deps.sendEmail,
     appOrigin: deps.appOrigin,
     now: () => Date.now(),
@@ -129,9 +131,9 @@ export async function makeRealThroughNeedsYou(
   return { status: decided.status, result: captured, reason: decided.item?.outcomeReason ?? null, receiptRef: decided.item?.receiptRef ?? null };
 }
 
-export function systemsSourceAdapters(store: NeedsYouStore): SourceAdapter[] {
+export function systemsSourceAdapters(store: NeedsYouStore, google?: GoogleMakeRealPorts): SourceAdapter[] {
   return [
-    makeRealSource(store),
+    makeRealSource(store, google),
     versionReleaseAdapter({
       enabled: systemsOn,
       pending: pendingVersionReleases,

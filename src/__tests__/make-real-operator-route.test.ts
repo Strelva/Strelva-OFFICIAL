@@ -14,7 +14,7 @@ const deps = vi.hoisted(() => ({
   reconcile: vi.fn(),
 }));
 vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: async () => deps.admin, getCurrentUserEmail: async () => "ops@strelva.test" }));
-vi.mock("@/platform/make-real/live-server", () => ({
+vi.mock("@/experience/systems/live-server", () => ({
   activationStarter: deps.starter,
   activationRunner: deps.runner,
   liveMakeReal: { read: deps.read, resume: deps.resume, rollback: deps.rollback, reconcile: deps.reconcile },

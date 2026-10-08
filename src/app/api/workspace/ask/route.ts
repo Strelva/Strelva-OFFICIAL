@@ -27,7 +27,7 @@ import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { getEventRaw, updateEvent } from "@/lib/events";
 import { classifyTenantEvent } from "@/platform/needs-you/tenant-classify";
 import { evaluateRoute } from "@/platform/needs-you/evaluator";
-import { needsYouReleaseEnabled, needsYouService, needsYouStore } from "@/platform/needs-you/server";
+import { needsYouReleaseEnabled, needsYouService, needsYouStore } from "@/experience/workspace/needs-you-server";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 
 export const dynamic = "force-dynamic";
