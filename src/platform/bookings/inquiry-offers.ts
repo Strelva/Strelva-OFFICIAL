@@ -1,5 +1,7 @@
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 /** Inquiry → three open times → a requested booking in the one store.
  * Off by default. A choice is a short-lived bearer link; GET never reserves. */
+import { requirePublicBookingEmail } from "./public-confirmation";
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { decryptSecret, encryptSecret } from "@/platform/infra/crypto/secrets";
@@ -31,7 +33,7 @@ function project(raw: unknown): InquiryBookingOffer | null {
   if (!row.success) return null;
   const r = row.data, token = decryptSecret(r.token_ciphertext);
   if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) throw new PublicBookingError("unavailable", "Booking suggestions are unavailable.");
-  const origin = (process.env.NEXT_PUBLIC_APP_URL || "https://app.strelva.com").replace(/\/$/, "");
+  const origin = (process.env.NEXT_PUBLIC_APP_URL || CONTROL_PLANE_URL).replace(/\/$/, "");
   return { id: r.id, serviceId: r.service_ref, serviceName: r.service_name, timeZone: r.timezone,
     slots: r.slots, expiresAt: r.expires_at, url: `${origin}/book-inquiry/${token}`, token, booked: !!r.booking_id };
 }
@@ -94,10 +96,11 @@ export async function chooseInquiryBookingOffer(token: string, start: string): P
   // the time. The locked RPC refuses any different choice after consumption.
   if (!offer.booked) {
     const raw = rawOfferSchema.parse(await nativeRpc("read_inquiry_booking_offer", { p_hash: tokenHash(token) }));
+    await requirePublicBookingEmail(raw.tenantId);
     const current = await nativeSlots(raw.tenantId, offer.serviceId, chosen.start, new Date(Date.parse(chosen.end) + 1).toISOString());
     if (!current.slots.some(s => s.start === chosen.start)) throw new PublicBookingError("conflict", "That time has just been taken. Ask the business for new times.");
   }
-  const result = await nativeRpc("choose_inquiry_booking_offer", { p_hash: tokenHash(token), p_start: chosen.start, p_access: newBookingAccess() }) as { booking?: unknown };
+  const result = await nativeRpc("choose_inquiry_booking_offer", { p_hash: tokenHash(token), p_start: chosen.start, p_access: newBookingAccess("Website booking request") }) as { booking?: unknown };
   const booking = parseStoreBooking(result.booking);
   if (!booking) throw new PublicBookingError("unavailable", "The booking request receipt is unavailable.");
   return booking;

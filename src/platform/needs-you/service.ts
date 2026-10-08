@@ -27,6 +27,11 @@ export interface NeedsYouDeps {
   canDeliver?(row: DeliveryRow): Promise<boolean>;
   /** Booking calendar health is an owner action, separate from decisions. */
   bookingWorkspaces?(): Promise<string[]>;
+  /** Businesses a source knows wait on the owner even with no tenant or
+   * bookings to bring them in (business facts on a connected-site client). */
+  pendingWorkspaces?(): Promise<string[]>;
+  /** Overflow stays undelivered and joins the existing morning digest. */
+  bookingUrgentAllowed?(workspaceId: string): Promise<boolean>;
   bookingCalendarHealth?(workspaceId: string, input: { now: number; appOrigin: string; sendEmail: NeedsYouDeps["sendEmail"] }): Promise<{ digests: number; ownerNotTold: number; failed: number; complete: boolean }>;
 }
 
@@ -139,7 +144,24 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     }
     const items = (moved ? await deps.store.list(actor, workspaceId, false) : open)
       .filter(item => item.state === "open" && item.route === "owner_decides");
-    return { items, complete: synced.complete };
+    const reviewed: OwnerDecision[] = [];
+    for (const item of items) {
+      const lines = await review(item, ctx);
+      reviewed.push(lines === undefined ? item : { ...item, review: lines });
+    }
+    return { items: reviewed, complete: synced.complete };
+  }
+
+  /**
+   * The complete lines an owner approves, for a source whose detail can't
+   * hold them. Undefined: the item's own detail is the whole ask. Null: the
+   * source moved on or can't be read, so nothing may be approved from it.
+   */
+  async function review(item: OwnerDecision, ctx: AdapterContext = { workspaceId: item.workspaceId }): Promise<string[] | null | undefined> {
+    const adapter = adapterFor(item.sourceLifecycle);
+    if (!adapter?.review) return undefined;
+    if (ctx.workspaceId !== item.workspaceId) return null;
+    return adapter.review(ctx, item).catch(() => null);
   }
 
   async function decide(input: {
@@ -260,6 +282,14 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
       if (!rows.length) return;
     }
     const first = rows[0]!;
+    // A source that accepts only the trusted owner never mails anyone else.
+    if (first.recipient && first.recipient.trusted !== true) {
+      const untrusted = rows.filter(row => adapterFor(row.sourceLifecycle)?.trustedRecipientOnly);
+      for (const row of untrusted) await deps.store.recordDelivery(row.workspaceId, row.id, kind, "suppressed", null, null, "owner_recipient_unconfirmed");
+      summary.ownerNotTold += untrusted.length;
+      rows = rows.filter(row => !untrusted.includes(row));
+      if (!rows.length) return;
+    }
     const recipient = first.recipient?.email?.trim().toLowerCase() ?? null;
     if (!recipient) {
       // Only a trusted owner address gets owner links (#524). Not sent, and the operator queue says why.
@@ -303,7 +333,8 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     const sessions = new Map<string, AdapterContext>();
     const linked = await deps.store.linkedTenants(null).catch(() => []);
     const native = await deps.bookingWorkspaces?.().catch(() => { summary.failed += 1; return []; }) ?? [];
-    for (const workspaceId of new Set([...linked.map(link => link.workspaceId), ...native])) {
+    const pending = await deps.pendingWorkspaces?.().catch(() => { summary.failed += 1; return []; }) ?? [];
+    for (const workspaceId of new Set([...linked.map(link => link.workspaceId), ...native, ...pending])) {
       await sync(await cronContext(workspaceId, sessions)).catch(() => { summary.failed += 1; });
       if (deps.bookingCalendarHealth) {
         const health = await deps.bookingCalendarHealth(workspaceId, { now, appOrigin: deps.appOrigin, sendEmail: deps.sendEmail }).catch(() => ({ digests: 0, ownerNotTold: 0, failed: 1, complete: false }));
@@ -346,7 +377,8 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
         }
         if (row.sourceLifecycle === "booking_request" && !bookingOwnerNoticeEnabled()) continue;
         if (deps.canDeliver && !(await deps.canDeliver(row))) { summary.ownerNotTold += 1; continue; }
-        if (row.urgent && row.deliveryState === "not_sent") {
+        if (row.urgent && row.deliveryState === "not_sent"
+          && (row.sourceLifecycle !== "booking_request" || !deps.bookingUrgentAllowed || await deps.bookingUrgentAllowed(workspaceId))) {
           await deliver("urgent", [row], summary);
           summary.urgent += 1;
           continue;
@@ -369,11 +401,12 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     if (!bookingOwnerNoticeEnabled()) return summary;
     const row = (await deps.store.dueForDelivery(500)).find(item => item.workspaceId === workspaceId && item.id === itemId && item.sourceLifecycle === "booking_request" && item.state === "open" && item.urgent && item.deliveryState === "not_sent");
     if (!row || await reconcile({ workspaceId }, row) !== "current") return summary;
+    if (deps.bookingUrgentAllowed && !await deps.bookingUrgentAllowed(workspaceId)) return summary;
     await deliver("urgent", [row], summary); summary.urgent = 1;
     return summary;
   }
 
-  return { sync, list, decide, chase, notifyBookingRequest };
+  return { sync, list, review, decide, chase, notifyBookingRequest };
 }
 
 export type NeedsYouService = ReturnType<typeof createNeedsYouService>;

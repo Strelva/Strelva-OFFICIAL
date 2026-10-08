@@ -65,6 +65,20 @@ afterEach(() => {
 });
 
 describe("reading the grant", () => {
+  it("reads native workspace grants and fails closed without a tenant Redis fallback", async () => {
+    const scope = `workspace-${WORKSPACE}`;
+    vi.stubEnv("STRELVA_GOOGLE_BINDINGS", "1");
+    rpc.mockImplementation((name) => ({ data: name === "read_native_workspace_google_binding" ? bindingRow({ originTenantId: null, originTenantStableId: null }) : null, error: null }));
+    expect(await getGoogleGrant(scope)).toMatchObject({ source: "binding", workspaceId: WORKSPACE, bindingId: BINDING });
+    expect(rpc).toHaveBeenCalledWith("read_native_workspace_google_binding", { p_workspace_id: WORKSPACE });
+    expect(mockGetConnection).not.toHaveBeenCalled();
+    rpc.mockImplementation(() => ({ data: null, error: null }));
+    expect(await getGoogleGrant(scope)).toBeNull();
+    vi.stubEnv("STRELVA_GOOGLE_BINDINGS", "0");
+    expect(await getGoogleGrant(scope)).toBeNull();
+    expect(mockGetConnection).not.toHaveBeenCalled();
+    expect(redis.hincrby).not.toHaveBeenCalled();
+  });
   it("with the binding store off, reads Redis only and never calls Postgres", async () => {
     vi.stubEnv("STRELVA_GOOGLE_BINDINGS", "");
     const grant = await getGoogleGrant("mooney");
@@ -130,6 +144,15 @@ describe("reading the grant", () => {
 });
 
 describe("refreshing tokens", () => {
+  it("refreshes native grants through the same encrypted store without a Redis tenant copy", async () => {
+    vi.stubEnv("STRELVA_GOOGLE_BINDINGS", "1");
+    rpc.mockImplementation((name) => ({ data: name === "read_native_workspace_google_binding" ? bindingRow({ originTenantId: null, originTenantStableId: null }) : null, error: null }));
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ access_token: "fresh", expires_in: 3600, refresh_token: "rotated" }) })));
+    const grant = (await getGoogleGrant(`workspace-${WORKSPACE}`))!;
+    expect(await getValidGoogleAccessToken(grant, Date.parse("2026-10-08T00:00:00Z"))).toBe("fresh");
+    expect(rpc).toHaveBeenCalledWith("update_workspace_account_binding_tokens", expect.objectContaining({ p_binding_id: BINDING }));
+    expect(mockGetConnection).not.toHaveBeenCalled(); expect(mockSaveConnection).not.toHaveBeenCalled();
+  });
   it("stores a refreshed and rotated token in the binding, encrypted, and the rotated refresh token in Redis", async () => {
     vi.stubEnv("STRELVA_GOOGLE_BINDINGS", "1");
     rpc.mockImplementation((name) => ({ data: name === "read_google_binding_for_tenant" ? bindingRow() : null, error: null }));

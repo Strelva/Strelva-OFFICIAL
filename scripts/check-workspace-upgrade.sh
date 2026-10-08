@@ -5,24 +5,9 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 baseline_migration="20260802120000_report_snapshots.sql"
 upgrade_migration="20260905190000_release_one_workspaces.sql"
 schema_test="$repo_root/tests/workspace-upgrade-schema.sql"
-cluster_root="$(mktemp -d "${TMPDIR:-/tmp}/strelva-workspace-upgrade.XXXXXX")"
-cluster_data="$cluster_root/data"
-cluster_socket="$(mktemp -d /tmp/strelva-upgrade-socket.XXXXXX)"
-cluster_log="$cluster_root/postgres.log"
+source "$repo_root/scripts/temp-postgres.sh"
+create_temp_postgres strelva-workspace-upgrade strelva-upgrade-socket
 cluster_port="$((61000 + ($$ % 3000)))"
-cluster_started=0
-
-cleanup() {
-  local exit_code=$?
-  trap - EXIT INT TERM
-  if [[ "$cluster_started" -eq 1 ]]; then
-    pg_ctl -D "$cluster_data" -m fast -w stop >/dev/null 2>&1 || true
-  fi
-  rm -rf "$cluster_socket"
-  printf 'Workspace upgrade cluster preserved at: %s\n' "$cluster_root"
-  exit "$exit_code"
-}
-trap cleanup EXIT INT TERM
 
 for command_name in initdb pg_ctl psql grep; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -41,7 +26,7 @@ pg_ctl -D "$cluster_data" \
   -l "$cluster_log" \
   -o "-F -k '$cluster_socket' -c listen_addresses='' -p $cluster_port" \
   -w start >/dev/null
-cluster_started=1
+read -r cluster_postmaster_pid < "$cluster_data/postmaster.pid"
 
 psql_args=(
   --host="$cluster_socket"
@@ -105,6 +90,11 @@ for migration in $(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -na
     printf 'Applying client lead store ahead of October 1: %s\n' "$early_lead_migration"
     psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/$early_lead_migration" >/dev/null
     psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
+  fi
+  if [[ "$migration_name" == "20261013110000_public_facts_read_confirmed.sql" ]]; then
+    # The exact readers its rollback must restore (rehearsed at the end).
+    psql "${psql_args[@]}" --tuples-only --no-align --file="$repo_root/tests/support/public-catalog-fingerprint.sql" \
+      >"$cluster_root/catalog-before-public-facts.txt"
   fi
   printf 'Applying ordered workspace/recovery migration: %s\n' "$migration_name"
   if [[ "$migration_name" == "20260920060000_content_version_request_id.sql" ]]; then
@@ -241,6 +231,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/website-linked-publication-schem
 # 20261008151000 widens tenant_leads, tenant_client_records and
 # system_origin_kinds; their earlier contracts ran above against it.
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-pages-schema.sql"
 # 20261009100000 (Strelva service actor) replaces owner_decision_json and
 # workspace_release_flag_names(); its contract holds after the full ordered upgrade.
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
@@ -256,10 +247,72 @@ psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-flag-schema
 psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 # Batch 7A readers must work in the transaction mode PostgREST chooses for POST.
 psql "${psql_args[@]}" --file="$repo_root/tests/reader-rpc-volatility-schema.sql"
+# Batch 7A (20261009151000-20261009154000) replaces the actor, service-actor
+# and payer functions; its contracts hold after the full ordered upgrade, and
+# the replaced contracts above ran against the replacements.
+psql "${psql_args[@]}" --file="$repo_root/tests/provider-seats-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-verifications-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/platform-service-actor-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/payer-party-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/batch-7a-reader-modes.sql"
+# Native publishing and booking email on the full retained tenant schema.
+psql "${psql_args[@]}" --file="$repo_root/tests/native-publishing-targets-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-booking-email-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011101000_business_booking_email.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011102000_native_publishing_targets.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011102000_native_publishing_targets.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011101000_business_booking_email.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/native-publishing-targets-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-booking-email-schema.sql"
 # 20261013120000 replaces the owner-recipient resolvers, claim_owner_decision
 # and record_owner_decision_delivery; the conversion, ownership, Needs you and
 # Make real contracts above ran against the replacements. Owner links go only
 # to a trusted owner address after the full ordered upgrade.
 psql "${psql_args[@]}" --file="$repo_root/tests/owner-recipient-trust-schema.sql"
+# #524, the public-facts reader and #509 roll back in reverse order on the
+# full ordered schema. The public-facts rollback restores its two readers
+# exactly as before it and moves nothing else; #509's then hands connect.js
+# back to the 20261012110000 reader; reapplying all three returns the exact
+# full catalog, and their contracts hold again.
+catalog_fingerprint() {
+  psql "${psql_args[@]}" --tuples-only --no-align --file="$repo_root/tests/support/public-catalog-fingerprint.sql"
+}
+catalog_fingerprint >"$cluster_root/catalog-full.txt"
+# Newest first; the public-facts reader is last.
+public_facts_rollbacks=(20261013120000_owner_recipient_trust 20261013110000_public_facts_read_confirmed)
+for (( index=0; index<${#public_facts_rollbacks[@]}-1; index++ )); do
+  psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-${public_facts_rollbacks[$index]}.sql"
+done
+catalog_fingerprint >"$cluster_root/catalog-before-public-facts-rollback.txt"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013110000_public_facts_read_confirmed.sql"
+catalog_fingerprint >"$cluster_root/catalog-after-public-facts-rollback.txt"
+# Fixtures above add unrelated objects after the forward migration, so compare
+# its two readers with their exact pre-migration definitions, and require that
+# nothing else in the catalog moved.
+public_facts_readers='^f (business_confirmed_public_facts|read_connected_site_context)\('
+[[ "$(grep -cE "$public_facts_readers" "$cluster_root/catalog-before-public-facts.txt")" == 2 ]]
+if ! diff -u <(grep -E "$public_facts_readers" "$cluster_root/catalog-before-public-facts.txt") \
+    <(grep -E "$public_facts_readers" "$cluster_root/catalog-after-public-facts-rollback.txt") \
+  || ! diff -u <(grep -vE "$public_facts_readers" "$cluster_root/catalog-before-public-facts-rollback.txt") \
+    <(grep -vE "$public_facts_readers" "$cluster_root/catalog-after-public-facts-rollback.txt"); then
+  printf 'Public-facts rollback did not restore the public catalog.\n' >&2
+  exit 1
+fi
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011133700_business_facts_owner_decision.sql"
+psql "${psql_args[@]}" -Atc "select to_regclass('public.business_record_confirmed') is null
+  and (select prosrc like '%business_confirmed_public_facts%' from pg_proc where oid='public.read_connected_site_context(text)'::regprocedure)" | grep -qx t
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011133700_business_facts_owner_decision.sql"
+for (( index=${#public_facts_rollbacks[@]}-1; index>=0; index-- )); do
+  psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/${public_facts_rollbacks[$index]}.sql"
+done
+catalog_fingerprint >"$cluster_root/catalog-full-reapplied.txt"
+if ! diff -u "$cluster_root/catalog-full.txt" "$cluster_root/catalog-full-reapplied.txt"; then
+  printf 'Reapplying #509, the public-facts reader and #524 did not restore the full catalog.\n' >&2
+  exit 1
+fi
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-pages-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-recipient-trust-schema.sql"
+printf 'Rollbacks #524, public facts, #509 restored the exact catalog in reverse order.\n'
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

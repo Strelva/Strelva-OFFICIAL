@@ -1,3 +1,4 @@
+import { hostOnlyAuthCookieOptions } from "@/platform/infra/db/auth-cookie-options";
 /**
  * Request-scoped Supabase client for Strelva — the RLS-enforced auth path.
  *
@@ -53,7 +54,7 @@ export async function createUserClient(): Promise<UserDb | null> {
       setAll(cookiesToSet) {
         try {
           for (const { name, value, options } of cookiesToSet) {
-            cookieStore.set(name, value, options);
+            cookieStore.set(name, value, hostOnlyAuthCookieOptions(options));
           }
         } catch {
           // Called from a Server Component, where the cookie store is read-only.

@@ -36,6 +36,24 @@ describe("Needs you on Home", () => {
     expect(html).toContain(">2</span>");
   });
 
+  it("shows every value of a business-facts change, and offers no Approve when that review can't be shown (#509)", () => {
+    const long = "Owner copy sentence. ".repeat(80).trim();
+    const facts = item({ kind: "fact.inferred", sourceLifecycle: "business_facts", title: "Confirm changes to your business details", adminMayDecide: false,
+      detail: "2 changes, too long to show here. You see every value in full before you approve.",
+      review: [`Description: ${long} (new)`, 'Service "Cleaning" Price: $99 → $999'] });
+    for (const variant of ["rows", "deck"] as const) {
+      const html = renderToStaticMarkup(createElement(NeedsYouSection, { state: ready({ items: [facts] }), pending: null, notices: {}, onDecide: noop, onRetry: noop, variant }));
+      expect(html).toContain(long);
+      expect(html).toContain("Service &quot;Cleaning&quot; Price: $99 → $999");
+      expect(html).not.toContain("too long to show here");
+      expect(html).toContain('aria-label="Approve: Confirm changes to your business details"');
+      const gone = renderToStaticMarkup(createElement(NeedsYouSection, { state: ready({ items: [{ ...facts, review: null }] }), pending: null, notices: {}, onDecide: noop, onRetry: noop, variant }));
+      expect(gone).not.toContain('aria-label="Approve: Confirm changes to your business details"');
+      expect(gone).not.toContain('aria-label="Not yet: Confirm changes to your business details"');
+      expect(gone).toContain("Refresh to see the latest before deciding.");
+    }
+  });
+
   it("is gone when nothing needs the owner", () => {
     expect(needs(ready({ items: [] }))).toBe("");
     expect(needs({ status: "disabled" })).toBe("");

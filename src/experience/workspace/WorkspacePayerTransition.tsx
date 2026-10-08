@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { TextInput } from "@/components/ui/TextInput";
-import type { PayerTransitionSnapshot } from "@/platform/work-economics/payer-transitions";
+import type { PayerTransition, PayerTransitionSnapshot } from "@/platform/work-economics/payer-transitions";
+
+/** Who would pay: a person, an agency, or the business itself. */
+function successorLabel(item: PayerTransition): string {
+  if (item.successorKind === "agency") return `${item.successorWorkspaceName ?? "An agency"} (agency)`;
+  if (item.successorKind === "business") return "This business";
+  return item.successorEmail;
+}
 
 export function WorkspacePayerTransition({ workspaceId, canPropose }: { workspaceId: string; canPropose: boolean }) {
   const [data, setData] = useState<PayerTransitionSnapshot | null>(null);
@@ -46,13 +53,13 @@ export function WorkspacePayerTransition({ workspaceId, canPropose }: { workspac
     {error ? <div className="space-y-3"><p role="alert" className="text-sm text-critical">{error}</p><Button variant="secondary" disabled={busy} onClick={() => void load()}>Retry payer history</Button></div> : null}
     {notice ? <p role="status" className="text-sm text-positive">{notice}</p> : null}
     {!data && !error ? <p role="status" className="text-sm text-gray-muted">Loading payer history…</p> : null}
-    {data?.current ? <p className="text-sm"><strong>Current accepted successor:</strong> {data.current.successorEmail} <span className="text-gray-muted">since {new Date(data.current.acceptedAt!).toLocaleString()}</span></p> : data ? <p className="text-sm text-gray-muted">No successor payer has been accepted for future jobs.</p> : null}
-    {pending ? <div className="rounded-xl border border-gray-border bg-surface-inset p-4 text-sm"><p><strong>Pending:</strong> {pending.successorEmail}</p><p className="mt-1 text-gray-muted">Proposed by {pending.proposerEmail}. Only this addressed verified person can accept.</p>
+    {data?.current ? <p className="text-sm"><strong>Current accepted successor:</strong> {successorLabel(data.current)} <span className="text-gray-muted">since {new Date(data.current.acceptedAt!).toLocaleString()}</span></p> : data ? <p className="text-sm text-gray-muted">No successor payer has been accepted for future jobs.</p> : null}
+    {pending ? <div className="rounded-xl border border-gray-border bg-surface-inset p-4 text-sm"><p><strong>Pending:</strong> {successorLabel(pending)}</p><p className="mt-1 text-gray-muted">Proposed by {pending.proposerEmail}. {pending.successorKind === "agency" ? "Only an owner or admin of this agency can accept." : pending.successorKind === "business" ? "A business owner accepts." : "Only this addressed verified person can accept."}</p>
       <div className="mt-3 flex flex-wrap gap-2">{addressed ? <><Button disabled={busy} onClick={() => void command({ action: "accept", transitionId: pending.id })}>Accept future payer role</Button><Button variant="secondary" disabled={busy} onClick={() => void command({ action: "reject", transitionId: pending.id })}>Decline</Button></> : null}{canPropose ? <Button variant="secondary" disabled={busy} onClick={() => void command({ action: "revoke", transitionId: pending.id })}>Revoke proposal</Button> : null}</div>
     </div> : canPropose && data ? <form className="max-w-md space-y-3" onSubmit={event => { event.preventDefault(); const form = new FormData(event.currentTarget); void command({ action: "propose", workspaceId, successorEmail: form.get("successorEmail") }); }}>
       <TextInput label="Verified payer email" name="successorEmail" type="email" maxLength={254} required />
       <Button type="submit" disabled={busy}>Propose new payer</Button>
     </form> : null}
-    {data?.transitions.length ? <details><summary className="cursor-pointer text-sm">Payer change history</summary><ul className="mt-3 space-y-2 text-sm">{data.transitions.map(item => <li key={item.id} className="border-b border-gray-border pb-2"><span className="capitalize">{item.status}</span> · {item.successorEmail}<span className="block text-xs text-gray-muted">Proposed {new Date(item.proposedAt).toLocaleString()}</span></li>)}</ul></details> : null}
+    {data?.transitions.length ? <details><summary className="cursor-pointer text-sm">Payer change history</summary><ul className="mt-3 space-y-2 text-sm">{data.transitions.map(item => <li key={item.id} className="border-b border-gray-border pb-2"><span className="capitalize">{item.status}</span> · {successorLabel(item)}<span className="block text-xs text-gray-muted">Proposed {new Date(item.proposedAt).toLocaleString()}</span></li>)}</ul></details> : null}
   </section>;
 }

@@ -176,7 +176,20 @@ nothing that wasn't theirs did.
    (`fact.inferred`, `owner_decides`, admins never decide).
    `confirm_business_facts` applies it only for the owner's session or a
    signed link to the trusted owner address (rule 8). A recipient a provider
-   wrote is itself pending and never approves.
+   wrote is itself pending and never approves. Delivery and the link claim
+   resolve that same trusted owner (`resolve_business_owner_recipient`), and the item
+   is never emailed to an address only a provider wrote. The owner approves
+   only where every value is shown in full (the signed-link confirm page and
+   the Needs you card, from `SourceAdapter.review` bound to the item's
+   revision); the 1,000-character item detail is whole lines plus a count,
+   never a cut value, and a pending recipient change leads it. The hourly
+   chase also finds businesses with pending facts and no tenant or bookings.
+   The migration rebuilds the confirmed copy
+   from the owner's own history, so an earlier provider overwrite or deletion
+   stays pending. Confirmed contact facts reach a native website as after the
+   owner's own save: signed in, the owner's contact review is prepared at once;
+   by link, Strelva's review queue gets it and the decision reads
+   done_unverified until then.
 6. **Needs you items are one shape.** Each item has the business, System,
    change kind, a plain title, what happens on Approve, what happens on Not
    yet, its source lifecycle and source id, a revision hash, when it opened,

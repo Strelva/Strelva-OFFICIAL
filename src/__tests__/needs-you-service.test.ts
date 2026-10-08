@@ -390,3 +390,19 @@ describe("booking calendar health alongside Needs You decisions", () => {
     expect(await svc.chase()).toMatchObject({failed:1,digests:0});
   });
 });
+
+
+describe("booking urgent-mail overflow", () => {
+  it("keeps overflow for the morning digest instead of sending another urgent owner email", async () => {
+    vi.stubEnv("STRELVA_BOOKING_OWNER_NOTICE", "1");
+    const row = await mem.store.open(WS, { kind: "customer.commitment", route: "owner_decides", title: "Consultation request", approveEffect: "Confirm", notYetEffect: "Decline", sourceLifecycle: "booking_request", sourceId: "overflow", revisionHash: "revision", urgent: true, adminMayDecide: false });
+    const allowed = vi.fn(async () => false);
+    const svc = createNeedsYouService({ store: mem.store, adapters: [{ lifecycle: "booking_request", needsMemberActor: false, propose: async () => ({ items: [], complete: true }), currentRevision: async () => "revision", resolve: vi.fn() }],
+      sendEmail, now: () => clock.now, appOrigin: "https://app.example.test", bookingUrgentAllowed: allowed });
+    expect((await svc.notifyBookingRequest(WS, row.id)).urgent).toBe(0);
+    expect(sendEmail).not.toHaveBeenCalled(); expect(mem.items.get(row.id)?.deliveryState).toBe("not_sent");
+    const result = await svc.chase();
+    expect(result.urgent).toBe(0); expect(result.digests).toBe(1);
+    expect(sendEmail.mock.calls[0]?.[0].tags?.kind).toBe("digest");
+  });
+});

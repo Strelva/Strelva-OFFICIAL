@@ -1,3 +1,4 @@
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import { bookingScopeFor, workspaceBookingScope } from "./booking-scope";
 import { resolveOwnerRecipient } from "@/platform/business-record";
 import { emailSendingEnabled } from "@/platform/infra/email/enabled";
@@ -25,7 +26,7 @@ import {
 } from "./store";
 
 export function bookingAppOrigin(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL || "https://app.strelva.com").replace(/\/$/, "");
+  return (process.env.NEXT_PUBLIC_APP_URL || CONTROL_PLANE_URL).replace(/\/$/, "");
 }
 
 /** Up to three currently offered times for the same active service. Removed

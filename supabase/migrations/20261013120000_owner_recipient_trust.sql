@@ -275,8 +275,9 @@ language sql stable security definer set search_path = public, pg_temp as $$
   select t.email from public.business_owner_recipient_trust t where t.workspace_id = p_workspace_id
 $$;
 
--- Same JSON as 20261002120000: an imported or owner-set address reads as the
--- record's, a converted site's own owner_email as the tenant fallback.
+-- Same JSON as 20261011133700 (20261002120000 plus `trusted`, always true
+-- here): an imported or owner-set address reads as the record's, a converted
+-- site's own owner_email as the tenant fallback. No trusted address: null.
 create or replace function public.resolve_business_owner_recipient(p_workspace_id uuid) returns jsonb
 language plpgsql stable security definer set search_path = public, pg_temp as $$
 declare trusted public.business_owner_recipient_trust;
@@ -285,10 +286,11 @@ begin
   if not found then return null; end if;
   if trusted.tenant_stable_id is null then
     return jsonb_build_object('email', trusted.email, 'name', trusted.name, 'from', 'record',
-      'source', trusted.source, 'verified', trusted.verified, 'tenantId', null);
+      'source', trusted.source, 'verified', trusted.verified, 'tenantId', null, 'trusted', true);
   end if;
   return jsonb_build_object('email', trusted.email, 'name', null, 'from', 'tenant_fallback',
-    'source', null, 'verified', false, 'tenantId', (select t.id from public.tenants t where t.stable_id = trusted.tenant_stable_id));
+    'source', null, 'verified', false, 'tenantId', (select t.id from public.tenants t where t.stable_id = trusted.tenant_stable_id),
+    'trusted', true);
 end;
 $$;
 

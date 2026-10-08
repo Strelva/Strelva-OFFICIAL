@@ -105,6 +105,18 @@ describe("published public booking resolver", () => {
     expect(boundary.inspectOfferings).toHaveBeenCalledWith({ userId: "owner-1", verifiedEmail: "owner@example.test" }, "workspace-1");
   });
 
+  it("never offers legacy slots beyond the capped provider read window", async () => {
+    boundary.db = fakeClient();
+    boundary.readWorkspaceSchedule.mockResolvedValueOnce({ payload: { version: 1, revision: 4, title: "Consultation", createdBy: "owner-1", createdAt: "2026-09-20T00:00:00.000Z", history: [], availability: [
+      { start: "2026-10-01T14:00:00+00:00", end: "2026-10-01T15:00:00+00:00" },
+      { start: "2027-01-01T14:00:00+00:00", end: "2027-01-01T15:00:00+00:00" },
+    ], reservations: [] } });
+    const result = await resolvePublishedPublicBooking({ tenantId: "northstar", capabilityId: "consultations" });
+    expect(result?.slots).toHaveLength(1);
+    expect(result?.slots[0]?.start).toBe("2026-10-01T14:00:00+00:00");
+    expect(boundary.readWorkspaceProviderAvailability).toHaveBeenLastCalledWith(expect.any(Object), "workspace-1", "outlook", expect.objectContaining({ end: "2026-11-30T14:00:00.000Z" }));
+  });
+
   it("returns no public capability when the published grant is absent", async () => {
     boundary.db = fakeClient();
     boundary.getTenantConfig.mockResolvedValueOnce({ stableId: "stable-tenant", active: true });

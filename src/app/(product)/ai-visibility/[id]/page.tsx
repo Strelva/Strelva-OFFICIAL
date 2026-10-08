@@ -28,5 +28,5 @@ export default async function SharedAiVisibilityPage(
   const stored = await getAiVisibilityResult(id);
   if (!stored) notFound();
   await recordAiVisibilityResultView(id).catch(() => {});
-  return <AiVisibilityPage initialResult={stored.result} scanId={id} workspaceEnabled={workspaceReleaseEnabled()} />;
+  return <AiVisibilityPage initialResult={stored.result} agency={stored.result.agency} scanId={id} workspaceEnabled={workspaceReleaseEnabled()} />;
 }

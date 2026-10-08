@@ -278,7 +278,7 @@ describe("native business confirmation", () => {
   });
   it("calls a native request pending business confirmation instead of calendar readback", async () => {
     await renderForm({ schedule: { ...schedule, bookingAuthority: "business" }, receipt: { ...receipt, status: "pending" }, onReconcile: vi.fn() });
-    expect(container.textContent).toContain("Your request is waiting for the business to confirm"); expect(container.textContent).toContain("Check request status");
+    expect(container.textContent).toContain("confirm within 15 minutes"); expect(container.textContent).toContain("Your request is waiting for the business to confirm"); expect(container.textContent).toContain("Check request status");
     expect(container.textContent).not.toContain("Check the calendar");
   });
   it("keeps the original phone-free provider flow when native metadata is absent", async () => {

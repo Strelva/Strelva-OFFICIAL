@@ -197,8 +197,12 @@ begin
   item := pg_temp.rt_open(ws, 'fact.inferred', 'business_facts', ws::text, review->>'revisionHash');
   perform pg_temp.rt_sent(ws, item, (select d->'recipient'->>'email' from jsonb_array_elements(public.list_open_owner_decisions_for_delivery(2000)) d
     where d->>'id' = item::text));
+  perform pg_temp.rt_assert(public.resolve_business_owner_recipient(ws) @> '{"email":"rt-owner@example.test","trusted":true}',
+    'A, the trusted owner, gets the item (trusted, so the facts source sends it)');
+  perform pg_temp.rt_error(format('select public.claim_owner_decision(%L,%L,%L,%L,%L,null,null,%L)', ws, item, review->>'revisionHash', 'approve', 'owner_link',
+    'office@rtbakery.example.test'), 'owner_decision_recipient_not_owner');
   result := public.claim_owner_decision(ws, item, review->>'revisionHash', 'approve', 'owner_link', null, null, 'rt-owner@example.test');
-  perform pg_temp.rt_assert(result->>'status' = 'claimed', 'previous owner claims by link');
+  perform pg_temp.rt_assert(result->>'status' = 'claimed', 'previous owner claims by link; the pending address B was refused');
   perform public.confirm_business_facts(ws, item, review->>'revisionHash');
   perform pg_temp.rt_assert((select email = 'office@rtbakery.example.test' and name = 'RT Office' and trusted_via = 'owner_decision' and decision_id = item
     from public.business_owner_recipient_trust where workspace_id = ws), 'owner-confirmed address is trusted');

@@ -20,6 +20,10 @@
 -- still logged as actor_kind 'operator' in business_record_revisions and does
 -- not publish. Deleting or undoing a confirmed fact is a pending change too.
 -- The Needs you default reviewer is unchanged; this kind is owner-only.
+-- At migration time the confirmed copy is rebuilt from the owner's own
+-- history, so no earlier provider overwrite or deletion erases what the owner
+-- last decided. Needs you delivery and link claims resolve the same trusted
+-- owner recipient the confirmation checks (resolve_business_owner_recipient).
 begin;
 set local lock_timeout = '3s';
 
@@ -114,22 +118,30 @@ $$;
 create trigger business_record_revisions_confirm_owner_write after insert on public.business_record_revisions
   for each row execute function public.business_record_confirm_owner_write();
 
--- Existing owner-written rows were already the owner's decision.
-insert into public.business_record_confirmed(workspace_id, entity, entity_id, state, confirmed_by_kind)
-  select f.workspace_id, 'fact', f.fact_key, public.business_record_entity_state(f.workspace_id, 'fact', f.fact_key), 'owner_write'
-    from public.business_record_facts f
-    where f.source = 'owner' and public.business_record_owner_actor(f.workspace_id, f.updated_by)
-  on conflict do nothing;
-insert into public.business_record_confirmed(workspace_id, entity, entity_id, state, confirmed_by_kind)
-  select s.workspace_id, 'service', s.id::text, public.business_record_entity_state(s.workspace_id, 'service', s.id::text), 'owner_write'
-    from public.business_services s
-    where s.source = 'owner' and public.business_record_owner_actor(s.workspace_id, s.updated_by)
+-- Existing owner decisions: replay the owner's own history exactly as the
+-- trigger above would have. Per fact or service, the last revision a verified
+-- owner wrote (an edit, a deletion or the owner's undo) is the confirmed
+-- state; a later operator, agency or import write, deletion or undo is not
+-- an owner decision and stays pending against it.
+insert into public.business_record_confirmed(workspace_id, entity, entity_id, state, confirmed_by_kind, revision_sequence)
+  select last.workspace_id, last.entity, last.entity_id, last.after, 'owner_write', last.sequence
+  from (
+    select distinct on (r.workspace_id, c.value->>'entity', c.value->>'id')
+        r.workspace_id, c.value->>'entity' entity, c.value->>'id' entity_id, c.value->'after' after, r.sequence
+      from public.business_record_revisions r
+      cross join lateral jsonb_array_elements(r.changes) with ordinality c(value, n)
+      where r.source = 'owner' and r.actor_kind = 'member' and c.value->>'entity' in ('fact','service')
+        and public.business_record_owner_actor(r.workspace_id, r.actor_id)
+      order by r.workspace_id, c.value->>'entity', c.value->>'id', r.sequence desc, c.n desc
+  ) last
+  where last.after is not null and jsonb_typeof(last.after) = 'object'
   on conflict do nothing;
 
 -- Who may approve by link: the confirmed owner recipient, else the one
 -- imported from the tenant, else the tenant's owner email. A recipient an
 -- operator or agency wrote is pending like any other fact and never approves
--- its own change.
+-- its own change, nor hides the existing owner's address while it waits.
+-- (#524 generalizes which addresses count as the owner's.)
 create function public.business_trusted_owner_recipient(p_workspace_id uuid) returns text
 language sql stable security definer set search_path = public, pg_temp as $$
   select coalesce(
@@ -137,12 +149,43 @@ language sql stable security definer set search_path = public, pg_temp as $$
       where c.workspace_id = p_workspace_id and c.entity = 'fact' and c.entity_id = 'owner_recipient'),
     (select lower(btrim(f.value->>'email')) from public.business_record_facts f
       where f.workspace_id = p_workspace_id and f.fact_key = 'owner_recipient' and f.source = 'tenant_import'),
-    (select case when exists (select 1 from public.business_record_facts f
-        where f.workspace_id = p_workspace_id and f.fact_key = 'owner_recipient') then null
-      else lower(btrim(t.owner_email)) end
+    (select lower(btrim(t.owner_email))
       from public.tenant_workspace_links l join public.tenants t on t.stable_id = l.tenant_stable_id
       where l.workspace_id = p_workspace_id and nullif(btrim(t.owner_email), '') is not null
       order by l.linked_at, l.id limit 1))
+$$;
+
+-- Delivery and the link claim (claim_owner_decision, the delivery list) use
+-- this resolver, so they reach the same trusted owner confirm_business_facts
+-- accepts: an unconfirmed provider-written recipient no longer displaces the
+-- owner's address. Without any trusted address the working recipient is
+-- returned as before, marked trusted false; owner-only facts links are not
+-- sent to it. Same shape as 20261002120000 plus `trusted`.
+create or replace function public.resolve_business_owner_recipient(p_workspace_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+declare fact jsonb; confirmed jsonb; fallback record; trusted text;
+begin
+  select jsonb_build_object('email', f.value->>'email', 'name', f.value->>'name', 'from', 'record',
+      'source', f.source, 'verified', f.verified, 'tenantId', null)
+    into fact from public.business_record_facts f
+    where f.workspace_id = p_workspace_id and f.fact_key = 'owner_recipient';
+  trusted := public.business_trusted_owner_recipient(p_workspace_id);
+  if trusted is null then
+    return case when fact is null then null else fact || jsonb_build_object('trusted', false) end;
+  end if;
+  if fact is not null and lower(btrim(fact->>'email')) = trusted then return fact || jsonb_build_object('trusted', true); end if;
+  select jsonb_build_object('email', lower(btrim(c.state->'value'->>'email')), 'name', c.state->'value'->>'name', 'from', 'record',
+      'source', c.state->>'source', 'verified', coalesce((c.state->>'verified')::boolean, false), 'tenantId', null, 'trusted', true)
+    into confirmed from public.business_record_confirmed c
+    where c.workspace_id = p_workspace_id and c.entity = 'fact' and c.entity_id = 'owner_recipient';
+  if confirmed is not null then return confirmed; end if;
+  select t.id, t.owner_email into fallback
+    from public.tenant_workspace_links l join public.tenants t on t.stable_id = l.tenant_stable_id
+    where l.workspace_id = p_workspace_id and nullif(btrim(t.owner_email), '') is not null
+    order by l.linked_at, l.id limit 1;
+  return jsonb_build_object('email', lower(btrim(fallback.owner_email)), 'name', null, 'from', 'tenant_fallback',
+    'source', null, 'verified', false, 'tenantId', fallback.id, 'trusted', true);
+end;
 $$;
 
 -- Pending changes: working copy vs confirmed copy, by public content, in a
@@ -182,7 +225,20 @@ create function public.business_fact_confirmation_json(r public.business_record_
 language sql stable set search_path = public, pg_temp as $$
   select jsonb_build_object('decisionId', r.decision_id, 'workspaceId', r.workspace_id, 'recordRevision', r.record_revision,
     'revisionHash', r.revision_hash, 'decidedByKind', r.decided_by_kind, 'changeCount', jsonb_array_length(r.changes),
+    'factKeys', coalesce((select jsonb_agg(c->>'id' order by c->>'id') from jsonb_array_elements(r.changes) c where c->>'entity' = 'fact'), '[]'::jsonb),
     'confirmedAt', r.confirmed_at)
+$$;
+
+-- Businesses with changes waiting on the owner, so the hourly chase opens
+-- their item even when no website, tenant or booking would bring them in
+-- (a connected-site-only client). Bounded; same rule as the review.
+create function public.list_business_fact_review_workspaces(p_limit integer) returns jsonb
+language sql stable security definer set search_path = public, pg_temp as $$
+  select coalesce(jsonb_agg(p.workspace_id order by p.workspace_id), '[]'::jsonb) from (
+    select b.workspace_id from public.business_records b join public.workspaces w on w.id = b.workspace_id and w.kind = 'customer'
+      where public.read_business_fact_review(b.workspace_id) is not null
+      order by b.workspace_id
+      limit greatest(1, least(coalesce(p_limit, 500), 2000))) p
 $$;
 
 -- Apply one claimed owner decision. Rechecks the decision, who made it and
@@ -303,7 +359,7 @@ revoke all on function public.business_record_fact_confirmation_immutable(),
   public.business_fact_confirmation_json(public.business_record_fact_confirmations)
   from public, anon, authenticated, service_role;
 revoke all on function public.read_business_fact_review(uuid), public.confirm_business_facts(uuid, uuid, text),
-  public.read_confirmed_business_facts(uuid, uuid, text) from public, anon, authenticated;
+  public.read_confirmed_business_facts(uuid, uuid, text), public.list_business_fact_review_workspaces(integer) from public, anon, authenticated;
 grant execute on function public.read_business_fact_review(uuid), public.confirm_business_facts(uuid, uuid, text),
-  public.read_confirmed_business_facts(uuid, uuid, text) to service_role;
+  public.read_confirmed_business_facts(uuid, uuid, text), public.list_business_fact_review_workspaces(integer) to service_role;
 commit;

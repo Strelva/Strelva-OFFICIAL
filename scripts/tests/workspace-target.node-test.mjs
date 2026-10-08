@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { compareWorkspaceTarget, readCandidateMigrations, REQUIRED_WORKSPACE_RELATIONS } from "../check-workspace-target.mjs";
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { compareWorkspaceTarget, readCandidateMigrations, REQUIRED_WORKSPACE_RELATIONS, MANUAL_MIGRATION_HELPERS } from "../check-workspace-target.mjs";
+import { copyForwardMigrations } from "../copy-forward-migrations.mjs";
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 const now = Date.parse("2026-09-21T12:00:00Z");
@@ -12,10 +13,42 @@ test("reads the repository's forward history without manual rollback or verifica
   assert.ok(migrations.some(item => item.version === "20260921220000"));
   assert.ok(migrations.every(item => /^\d{14}$/.test(item.version)));
 });
-test("rejects an unrecognized non-versioned SQL file instead of hiding a migration", () => {
+test("accepts only explicit manual helpers and timestamped rollbacks, and stages only forwards", () => {
+  const directory = mkdtempSync(join(tmpdir(), "strelva-target-test-"));
+  const destination = join(directory, "staged");
+  const forward = "20260928130000_business_effort_minutes.sql";
+  try {
+    mkdirSync(destination);
+    writeFileSync(join(directory, forward), "select 1;");
+    for (const name of [...MANUAL_MIGRATION_HELPERS, `rollback-${forward}`]) {
+      writeFileSync(join(directory, name), "do $$ begin raise exception 'helper applied'; end $$;");
+    }
+    assert.deepEqual(readCandidateMigrations(directory), [{ version: "20260928130000", name: "business_effort_minutes" }]);
+    copyForwardMigrations(directory, destination);
+    assert.deepEqual(readdirSync(destination), [forward]);
+    assert.equal(readFileSync(join(destination, forward), "utf8"), "select 1;");
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+for (const filename of [
+  "new-business-entry.sql", "rollback-new-business-entry.sql", "verify-new-business-entry.sql",
+  "rollback-2026092813000_short_version.sql", "rollback-202609281300000_long_version.sql",
+  "rollback-20260928130000_.sql", "rollback-20260928130000.sql",
+]) test(`rejects ${filename} instead of hiding a migration`, () => {
   const directory = mkdtempSync(join(tmpdir(), "strelva-target-test-"));
   try {
-    writeFileSync(join(directory, "new-business-entry.sql"), "select 1;");
+    writeFileSync(join(directory, filename), "select 1;");
+    assert.throws(() => readCandidateMigrations(directory), /non-versioned/);
+    const destination = join(directory, "staged");
+    mkdirSync(destination);
+    writeFileSync(join(directory, "20261011000000_valid.sql"), "select 1;");
+    assert.throws(() => copyForwardMigrations(directory, destination), /non-versioned/);
+    assert.deepEqual(readdirSync(destination), []);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+test("rejects an unregistered rollback helper instead of silently dropping SQL", () => {
+  const directory = mkdtempSync(join(tmpdir(), "strelva-target-test-"));
+  try {
+    writeFileSync(join(directory, "rollback-new-business.sql"), "select 1;");
     assert.throws(() => readCandidateMigrations(directory), /non-versioned/);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });

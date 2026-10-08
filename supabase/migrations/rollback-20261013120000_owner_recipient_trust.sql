@@ -1,10 +1,12 @@
 -- Reverses 20261013120000_owner_recipient_trust.sql.
--- WARNING: this restores the old resolvers, so owner links go again to
--- whatever owner_recipient the working record holds, including one an
--- operator or agency wrote (#524). Run only to unblock a failed release,
--- before 20261011133700's rollback, and reapply the forward migration before
--- rollout. The trust rows, their change log and link bindings are dropped;
--- the business record and owner decisions are untouched.
+-- WARNING: this restores the 20261011133700 resolvers. Owner links go to
+-- its trusted address (confirmed, imported or the site's owner_email); a
+-- business with none sends links other than business facts to whatever
+-- owner_recipient the working record holds, including one an operator or
+-- agency wrote (#524). Run only to unblock a failed release, before the
+-- 20261013110000 and 20261011133700 rollbacks, and reapply the forward
+-- migration before rollout. The trust rows, their change log and link
+-- bindings are dropped; the business record and owner decisions are untouched.
 begin;
 set local lock_timeout = '3s';
 
@@ -39,20 +41,28 @@ $$;
 
 create or replace function public.resolve_business_owner_recipient(p_workspace_id uuid) returns jsonb
 language plpgsql stable security definer set search_path = public, pg_temp as $$
-declare fact jsonb; fallback record;
+declare fact jsonb; confirmed jsonb; fallback record; trusted text;
 begin
   select jsonb_build_object('email', f.value->>'email', 'name', f.value->>'name', 'from', 'record',
       'source', f.source, 'verified', f.verified, 'tenantId', null)
     into fact from public.business_record_facts f
     where f.workspace_id = p_workspace_id and f.fact_key = 'owner_recipient';
-  if fact is not null then return fact; end if;
+  trusted := public.business_trusted_owner_recipient(p_workspace_id);
+  if trusted is null then
+    return case when fact is null then null else fact || jsonb_build_object('trusted', false) end;
+  end if;
+  if fact is not null and lower(btrim(fact->>'email')) = trusted then return fact || jsonb_build_object('trusted', true); end if;
+  select jsonb_build_object('email', lower(btrim(c.state->'value'->>'email')), 'name', c.state->'value'->>'name', 'from', 'record',
+      'source', c.state->>'source', 'verified', coalesce((c.state->>'verified')::boolean, false), 'tenantId', null, 'trusted', true)
+    into confirmed from public.business_record_confirmed c
+    where c.workspace_id = p_workspace_id and c.entity = 'fact' and c.entity_id = 'owner_recipient';
+  if confirmed is not null then return confirmed; end if;
   select t.id, t.owner_email into fallback
     from public.tenant_workspace_links l join public.tenants t on t.stable_id = l.tenant_stable_id
     where l.workspace_id = p_workspace_id and nullif(btrim(t.owner_email), '') is not null
     order by l.linked_at, l.id limit 1;
-  if fallback.id is null then return null; end if;
   return jsonb_build_object('email', lower(btrim(fallback.owner_email)), 'name', null, 'from', 'tenant_fallback',
-    'source', null, 'verified', false, 'tenantId', fallback.id);
+    'source', null, 'verified', false, 'tenantId', fallback.id, 'trusted', true);
 end;
 $$;
 
@@ -156,9 +166,7 @@ language sql stable security definer set search_path = public, pg_temp as $$
       where c.workspace_id = p_workspace_id and c.entity = 'fact' and c.entity_id = 'owner_recipient'),
     (select lower(btrim(f.value->>'email')) from public.business_record_facts f
       where f.workspace_id = p_workspace_id and f.fact_key = 'owner_recipient' and f.source = 'tenant_import'),
-    (select case when exists (select 1 from public.business_record_facts f
-        where f.workspace_id = p_workspace_id and f.fact_key = 'owner_recipient') then null
-      else lower(btrim(t.owner_email)) end
+    (select lower(btrim(t.owner_email))
       from public.tenant_workspace_links l join public.tenants t on t.stable_id = l.tenant_stable_id
       where l.workspace_id = p_workspace_id and nullif(btrim(t.owner_email), '') is not null
       order by l.linked_at, l.id limit 1))

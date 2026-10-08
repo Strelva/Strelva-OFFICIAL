@@ -17,5 +17,5 @@ export function createBrowserSupabase(): SupabaseClient<Database> | null {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) return null;
-  return createBrowserClient<Database>(url, key);
+  return createBrowserClient<Database>(url, key, { cookieOptions: { domain: undefined } });
 }
