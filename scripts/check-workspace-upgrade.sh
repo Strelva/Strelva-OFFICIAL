@@ -497,3 +497,7 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021094000_pro
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021096000_agency_release_flag_lock_order.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022090000_guarded_tenant_teardown.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/guarded-tenant-teardown-schema.sql"
+
+# #251: final-schema support reads and contact repair require durable actor audit.
+psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-backfill-audit-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-inquiry-audit-schema.sql"

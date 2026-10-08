@@ -42,6 +42,13 @@ authority rows, and rejects signed-out, unverified, revoked and nonoperator acto
 There is no supplied operator identity. Only authenticated request sessions can
 execute the replacement RPC; anonymous and service-role backfill calls are denied.
 
+The locally proposed #251 successor `20261020090038` records canonical operator
+access audit for dry-run and apply. Dry-run leaves subscribers, contacts and sync
+records unchanged; it appends audit. An audit outage rolls back an apply. The
+[bounded support-audit operating record](../../operations/operator-support-audit-2026-10-08.md)
+owns its source proof, quarantine inverse and remaining #251 scope. This is
+prepared source, not a production application claim.
+
 ## Migration and rollback
 
 New migrations `20261011100000_workspace_newsletter_sender.sql` and

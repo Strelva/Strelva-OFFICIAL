@@ -1506,6 +1506,21 @@
           "rollbackSha256": "26b33d76a734faecfd8a25ef4f343ba7d849d04a37699b2a0f898bbe6e517308"
         }
       ]
+    },
+    {
+      "batch": "17",
+      "description": "Isolated #251 operator support read and newsletter repair attribution",
+      "status": "prepared locally, not deployed",
+      "note": "Based on remote release3f3eac4f; isolated from private money/apps tails. Audit failure refuses sensitive read or rolls back repair. Dry run adds operator audit only. Inverse quarantines new app read and existing repair entry, preserving all accepted data and protections.",
+      "items": [
+        {
+          "file": "20261020090038_newsletter_backfill_audit.sql",
+          "sha256": "5c0c7403b74e078427246bdbf051f593751b066c97858f56ea7c63f290e4c57a",
+          "rollback": "rollback-20261020090038_newsletter_backfill_audit.sql",
+          "rollbackSha256": "b0d7219653cfe96ecef4b3e983fdfd36aa2a110d9f5f99d50d991c7923c3c23d",
+          "rollbackStatus": "quarantine only; grants revoked, accepted contacts/sync/audit/history retained; never restores unaudited entry"
+        }
+      ]
     }
   ]
 }

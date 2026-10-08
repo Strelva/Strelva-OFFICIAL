@@ -1714,3 +1714,8 @@ psql "${outcomes_psql_args[@]}" --file="$repo_root/tests/agent-booking-outcomes-
 psql --host="$cluster_socket" --port="$cluster_port" --username="$(id -un)" --dbname=template1 \
   --set=ON_ERROR_STOP=1 --no-psqlrc -c "drop database $outcomes_database"
 printf 'Agent booking outcome customer receipts and linked-calendar read-only checks passed.\n'
+
+# #251: final-schema support reads and contact repair require durable actor audit.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261020090038_newsletter_backfill_audit.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-backfill-audit-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-inquiry-audit-schema.sql"

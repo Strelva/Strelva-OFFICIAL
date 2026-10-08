@@ -23,8 +23,7 @@ export async function readOperatorInquiryReview(actor: WorkspaceActor, view: Inq
   const notices = view === "notices";
   if (notices ? !operatorNoticeReviewEnabled() : !inquiryRecordsEnabled()) return { state: "off" as const, held: [], notices: [], next: null };
   const args = { ...identity(actor), p_limit: 51, p_before: before ?? null, p_before_id: beforeId ?? null };
-  const data = await inquiryRecordsRpc(notices ? "read_operator_inquiry_notice_issues" : "read_operator_held_inquiries",
-    notices ? args : { ...args, p_state: view === "held" ? "held_as_spam" : view === "spam" ? "confirmed_spam" : "released" }, denied);
+  const data = await inquiryRecordsRpc("read_operator_inquiry_review_audited", { ...args, p_view: view }, denied);
   const parsed = (notices ? z.array(noticeSchema) : z.array(heldSchema)).safeParse(data);
   if (!parsed.success) throw new Error("inquiry_operator_read_malformed");
   const rows = parsed.data.slice(0, 50);

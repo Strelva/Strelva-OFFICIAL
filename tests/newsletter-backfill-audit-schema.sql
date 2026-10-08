@@ -1,5 +1,5 @@
 \set ON_ERROR_STOP on
--- #511: fictional signed-in actors, isolated PostgreSQL only. Every write rolls back.
+-- #251: actual session-bound repair and atomic immutable audit, fictional local actors.
 begin;
 create function pg_temp.nb_assert(condition boolean, message text) returns void language plpgsql as $$
 begin if condition is not true then raise exception 'newsletter identity assertion failed: %', message; end if; end; $$;
@@ -72,6 +72,36 @@ select pg_temp.nb_assert((select count(*)=2 from public.newsletter_contact_sync 
   and exists(select 1 from public.newsletter_subscribers where tenant_id='backfill-identity-site' and email='unsubscribed@example.test' and status='unsubscribed'),
   'apply has repair receipts and preserves unsubscribe authority');
 
+-- Two successful calls (dry/apply) name the signed-in UUID and business.
+select pg_temp.nb_assert((select count(*)=2 and bool_and(actor_user_id='e9000000-0000-4000-8000-000000000001'
+  and actor_email='backfill-operator@example.test' and target_type='newsletter_contacts'
+  and target_id='backfill-identity-site' and metadata->>'tenantId'='backfill-identity-site'
+  and metadata->>'examined'='2') from public.workspace_operator_audit_events
+  where workspace_id=(select id from nb_workspace) and action='newsletter.contacts.backfill'),
+  'dry/apply audit names exact actor, action, workspace and bounded result');
+select pg_temp.nb_assert((select count(*)=2 and bool_and(actor_user_id='e9000000-0000-4000-8000-000000000001')
+  from public.audit_logs where tenant_id='backfill-identity-site' and action='newsletter.contacts.backfill'),
+  'canonical workspace operator audit also mirrors the linked tenant');
+select pg_temp.nb_assert(not exists(select 1 from public.workspace_operator_audit_events
+  where action='newsletter.contacts.backfill' and metadata::text like '%@%'),
+  'audit aggregates never retain subscriber address data');
+
+-- An audit failure refuses the request and rolls back even completed projections.
+insert into public.newsletter_subscribers(tenant_id,email,status) values
+  ('backfill-identity-site','audit-failure@example.test','unsubscribed');
+create function pg_temp.nb_break_audit() returns trigger language plpgsql as $$
+begin if new.action='newsletter.contacts.backfill' then raise exception 'fictional audit unavailable';end if;return new;end $$;
+create trigger nb_break_audit before insert on public.workspace_operator_audit_events
+  for each row execute function pg_temp.nb_break_audit();
+set local role authenticated;
+select pg_temp.nb_error($$select public.backfill_newsletter_contacts('backfill-identity-site',(select id from nb_workspace),true)$$,
+  'fictional audit unavailable');
+reset role;
+select pg_temp.nb_assert(not exists(select 1 from public.business_contacts where email='audit-failure@example.test')
+  and not exists(select 1 from public.newsletter_contact_sync where email='audit-failure@example.test'),
+  'audit refusal atomically rolls back contact and sync writes');
+drop trigger nb_break_audit on public.workspace_operator_audit_events;
+
 update public.super_admins set revoked_at=clock_timestamp() where user_id='e9000000-0000-4000-8000-000000000001';
 set local role authenticated;
 select pg_temp.nb_error($$select public.backfill_newsletter_contacts('backfill-identity-site',(select id from nb_workspace))$$,
@@ -79,4 +109,8 @@ select pg_temp.nb_error($$select public.backfill_newsletter_contacts('backfill-i
 select pg_temp.nb_error($$select public.backfill_newsletter_contacts('backfill-identity-site',(select id from nb_workspace),true)$$,
   'newsletter_contact_operator_required');
 reset role;
+\if :{?newsletter_audit_retain}
+commit;
+\else
 rollback;
+\endif
