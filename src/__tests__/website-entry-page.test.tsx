@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const f = vi.hoisted(() => ({ session: vi.fn(), workspace: vi.fn(), systems: vi.fn(), connected: vi.fn(), rebuild: vi.fn(), sites: vi.fn(), records: vi.fn(), operator: vi.fn(), resolve: vi.fn(), editor: vi.fn(), config: vi.fn() }));
+const f = vi.hoisted(() => ({ session: vi.fn(), workspace: vi.fn(), systems: vi.fn(), connected: vi.fn(), rebuild: vi.fn(), sites: vi.fn(), records: vi.fn(), operator: vi.fn(), resolve: vi.fn(), editor: vi.fn(), config: vi.fn(), seat: vi.fn() }));
 vi.mock("next/navigation", () => ({ redirect: (location: string) => { throw new Error(`redirect:${location}`); }, usePathname: () => "/workspace/site" }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers({ host: "localhost:3000" }) }));
 vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: f.session }));
@@ -18,6 +18,7 @@ vi.mock("@/products/websites/server", () => ({ resolveWorkspaceSite: f.resolve }
 vi.mock("@/products/websites/index", () => ({ listWebsiteRebuilds: f.records, websiteRebuildReleasedFor: f.rebuild }));
 vi.mock("@/products/websites/rebuild-release", () => ({ websiteRebuildReleasedFor: f.rebuild }));
 vi.mock("@/products/connected-sites/server", () => ({ connectedSitesReleasedFor: f.connected, readConnectedSites: f.sites }));
+vi.mock("@/products/agency-clients/server", () => ({ providerSeatBusiness: f.seat }));
 vi.mock("@/experience/app-frame/StrelvaShell", () => ({ StrelvaShell: ({ children }: { children: React.ReactNode }) => createElement("main", {}, children) }));
 import WorkspaceSitePage from "@/app/workspace/site/page";
 
@@ -29,7 +30,7 @@ beforeEach(() => {
   for (const mock of Object.values(f)) mock.mockReset();
   f.session.mockResolvedValue({ id: "actor", email: "owner@example.test", email_confirmed_at: "2026-10-06" });
   f.workspace.mockResolvedValue([{ id: WS, kind: "customer", access: "member", role: "owner", name: "Synthetic business" }]);
-  f.systems.mockResolvedValue(true); f.connected.mockResolvedValue(true); f.rebuild.mockResolvedValue(true); f.operator.mockResolvedValue(false); f.records.mockResolvedValue([]); f.sites.mockResolvedValue({ sites: [] }); f.config.mockResolvedValue(undefined);
+  f.systems.mockResolvedValue(true); f.connected.mockResolvedValue(true); f.rebuild.mockResolvedValue(true); f.operator.mockResolvedValue(false); f.records.mockResolvedValue([]); f.sites.mockResolvedValue({ sites: [] }); f.config.mockResolvedValue(undefined); f.seat.mockResolvedValue(null);
   f.resolve.mockResolvedValue({ kind: "ready", editing: "native", operator: false, role: "owner", canChange: true, tenantAccess: true, workspaceName: "Synthetic business", site: { tenantId: "gldf", tenantStableId: "stable", siteName: "Synthetic website", tenantActive: true } });
 });
 
@@ -48,6 +49,14 @@ describe("website entry page authorization and release boundaries", () => {
     f.systems.mockResolvedValue(true); f.workspace.mockResolvedValue([]); expect(await render({ entry: "connect" })).toContain("isn&#x27;t available to your account");
     f.session.mockResolvedValue(null); await expect(render({ entry: "rebuild", workId: SYSTEM })).rejects.toThrow(`redirect:/sign-in?next=${encodeURIComponent(`/workspace/site?workspaceId=${WS}&entry=rebuild&workId=${SYSTEM}`)}`);
     expect(f.sites).not.toHaveBeenCalled(); expect(f.records).not.toHaveBeenCalled();
+  });
+  it("admits a staffed agency seat holder (#259) with no direct membership, and nobody else", async () => {
+    f.workspace.mockResolvedValue([]);
+    f.seat.mockResolvedValue({ id: WS, name: "Synthetic business", role: "admin" });
+    expect(await render({ entry: "connect" })).toContain("Get my two lines");
+    expect(f.seat).toHaveBeenCalledWith({ userId: "actor", verifiedEmail: "owner@example.test" }, WS);
+    f.seat.mockResolvedValue(null); expect(await render({ entry: "connect" })).toContain("isn&#x27;t available to your account");
+    f.seat.mockRejectedValue(new Error("down")); expect(await render({ entry: "connect" })).toContain("isn&#x27;t available to your account");
   });
   it("shows a retryable read failure without offering creation from a failed list", async () => {
     f.records.mockRejectedValue(new Error("Database unavailable"));

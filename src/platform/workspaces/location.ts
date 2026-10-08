@@ -73,6 +73,16 @@ export function workspaceReturnTarget(value: string | null): string | null {
     if (target.hash || target.pathname !== "/workspace/agency/start" || target.searchParams.size !== 1 || !workspaceId || !UUID.test(workspaceId)) return null;
     return `${target.pathname}?${target.searchParams}`;
   }
+  // An agency adds a client (#259): one agency, optionally one of its prospects.
+  if (value?.startsWith("/workspace/agency/clients/new?")) {
+    const target = new URL(value, "https://workspace.invalid");
+    const params = target.searchParams;
+    const workspaceId = params.get("workspaceId");
+    const prospect = params.get("prospect");
+    if (target.hash || target.pathname !== "/workspace/agency/clients/new" || [...params.keys()].some((key) => !["workspaceId", "prospect"].includes(key) || params.getAll(key).length !== 1)
+      || !workspaceId || !UUID.test(workspaceId) || (prospect !== null && !UUID.test(prospect))) return null;
+    return `${target.pathname}?${params}`;
+  }
   if (!value || (value !== "/workspace" && !value.startsWith("/workspace?"))) return null;
   const url = new URL(value, "https://workspace.invalid");
   if (url.hash || url.pathname !== "/workspace") return null;
@@ -122,7 +132,8 @@ export function accountReturnTarget(value: string | null): string | null {
 /** Preserve only the fixed, opaque workspace invitation acceptance path. */
 export function workspaceInvitationReturnTarget(value: string | null): string | null {
   if (!value) return null;
-  const match = value.match(/^\/workspace\/invitations\/accept\/([A-Za-z0-9_-]{43})$/);
+  // A workspace invitation, or an agency's owner claim link (#259).
+  const match = value.match(/^\/workspace\/(?:invitations\/accept|claim)\/([A-Za-z0-9_-]{43})$/);
   return match?.[1] && INVITATION_TOKEN.test(match[1]) ? value : null;
 }
 
