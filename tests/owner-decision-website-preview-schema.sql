@@ -48,12 +48,12 @@ begin
   perform pg_temp.op_refuse(format('select public.read_owner_decision_website_preview(%L,%L,%L,%L)',ws,id,h,'op-owner@example.test'));
   update public.tenants set owner_email='changed@example.test' where tenants.id='op-existing-fixture';
   if to_regclass('public.business_owner_recipient_trust') is not null then
-    update public.business_owner_recipient_trust set email='changed@example.test' where business_id=ws;
+    update public.business_owner_recipient_trust set email='changed@example.test' where workspace_id=ws;
   end if;
   perform pg_temp.op_refuse(format('select public.read_owner_decision_website_preview(%L,%L,%L,%L)',ws,id,revision_hash,'op-owner@example.test'));
   update public.tenants set owner_email='op-owner@example.test' where tenants.id='op-existing-fixture';
   if to_regclass('public.business_owner_recipient_trust') is not null then
-    update public.business_owner_recipient_trust set email='op-owner@example.test' where business_id=ws;
+    update public.business_owner_recipient_trust set email='op-owner@example.test' where workspace_id=ws;
   end if;
   -- A changed immutable head cannot disclose a document beyond the signed source.
   perform public.append_website_document(ws,work.id,actor,'op-operator@example.test',1,repeat('d',64),doc||'{"siteName":"Changed private preview"}');

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { expect, test, type BrowserContext } from "@playwright/test";
 import type { Learning } from "../src/products/product-learning/contracts";
-import { localEnvironment, signedInContext } from "./support/local-auth";
+import { localEnvironment, removeLocalSuperAdmin, seedLocalSuperAdmin, signedInContext } from "./support/local-auth";
 
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local Auth and Postgres.");
 test.setTimeout(120_000);
@@ -18,7 +18,8 @@ test("internal learning retains a complete synthetic evidence-to-changed-decisio
   const headers = { origin: env.app };
   try {
     for (const person of [builder, reviewer, outsider]) expect((await person.context.request.get("/api/workspace")).status()).toBe(200);
-    expect((await admin.from("super_admins").insert([builder, reviewer].map(person => ({ user_id: person.userId, email: person.email })))).error).toBeNull();
+    seedLocalSuperAdmin(builder.userId, builder.email);
+    seedLocalSuperAdmin(reviewer.userId, reviewer.email);
     expect((await admin.from("workspaces").insert({ id: workspaceId, kind: "customer", name: "Isolated internal learning proof", created_by: builder.userId })).error).toBeNull();
     expect((await admin.from("workspace_memberships").insert([builder, reviewer].map(person => ({ workspace_id: workspaceId, user_id: person.userId, role: person === builder ? "owner" : "member", created_by: builder.userId })))).error).toBeNull();
     expect((await admin.from("saved_product_work").insert(sourceIds.map((id, index) => ({ id, workspace_id: workspaceId, product_id: "documents", resource_kind: "document", title: `Synthetic source ${index + 1}`, payload: { title: `Synthetic source ${index + 1}`, text: index === 0 ? "Fictional exercise: a delayed reply prevented a booking." : "Contrary fictional account: immediate replies did not produce bookings." }, created_by: builder.userId })))).error).toBeNull();
@@ -80,7 +81,12 @@ test("internal learning retains a complete synthetic evidence-to-changed-decisio
     expect((await post(builder.context, { kind: "pause", expectedRevision: learning.revision - 1 })).status()).toBe(409);
     await change({ kind: "pause" });
     expect((await builder.context.request.post("/api/product-learning", { headers, data: { action: "collect", workId, expectedRevision: learning.revision } })).status()).toBe(409);
-    expect((await admin.from("super_admins").update({ revoked_at: new Date().toISOString() }).eq("user_id", reviewer.userId)).error).toBeNull();
+    const revoked = await admin.rpc("revoke_super_admin", {
+      p_user_id: reviewer.userId,
+      p_reason: "Complete the isolated product-learning revocation proof",
+      p_actor_user_id: builder.userId,
+    });
+    expect(revoked.error).toBeNull();
     expect((await reviewer.context.request.get(`/api/product-learning?workId=${workId}`)).status()).toBe(403);
     expect((await post(reviewer.context, { kind: "pause" })).status()).toBe(403);
     expect((await admin.from("saved_product_work").select("payload").eq("id", workId).single()).data?.payload.revision).toBe(learning.revision);
@@ -88,7 +94,7 @@ test("internal learning retains a complete synthetic evidence-to-changed-decisio
     await admin.from("workspaces").delete().eq("id", workspaceId);
     for (const person of [builder, reviewer, outsider]) {
       await person.context.close();
-      await admin.from("super_admins").delete().eq("user_id", person.userId);
+      removeLocalSuperAdmin(person.userId);
       await admin.auth.admin.deleteUser(person.userId);
     }
   }

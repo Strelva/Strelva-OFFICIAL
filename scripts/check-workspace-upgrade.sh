@@ -335,8 +335,8 @@ fi
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012010000_tenant_track_signing_keys.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012120000_track_signing_key_rotation.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-track-signing-keys-schema.sql"
-# 20261014100000-20261014112000 (#255/#534) replace every client-serving
-# super_admins gate with the acting provider and make owner-link website
+# 20261014100000-20261014112000 (#255/#534) replace website and per-business
+# decision provider gates with the acting provider and make owner-link website
 # launches need publish; the effect matrix and the owner-link contracts hold
 # after the full ordered upgrade, and the replaced contracts above ran against it.
 psql "${psql_args[@]}" --file="$repo_root/tests/acting-provider-gates-schema.sql"

@@ -75,7 +75,7 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260912110000_bou
 psql "${psql_args[@]}" --file="$repo_root/tests/bounded-product-work-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260912120000_work_context_participation.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/work-context-participation-schema.sql"
-psql "${psql_args[@]}" --command="create table public.super_admins(user_id uuid primary key references public.users(id), email text, revoked_at timestamptz);"
+psql "${psql_args[@]}" --command="create table public.super_admins(user_id uuid primary key references public.users(id), email text unique not null, granted_at timestamptz not null default now(), granted_by uuid references public.users(id), revoked_at timestamptz);"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260912143000_product_learning_work.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/product-learning-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260912160000_work_responsibilities.sql"
@@ -876,7 +876,21 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010153000_new
 psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-contacts-schema.sql"
 psql "${psql_args[@]}" <<'SQL'
 create schema auth;
-create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+create function auth.uid() returns uuid language sql stable as $$
+  select coalesce(
+    nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub', ''),
+    nullif(current_setting('request.jwt.claim.sub', true), '')
+  )::uuid
+$$;
+create function auth.role() returns text language sql stable as $$
+  select coalesce(
+    nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role', ''),
+    nullif(current_setting('request.jwt.claim.role', true), '')
+  )
+$$;
+create table public.super_admin_bootstrap (email text primary key);
+insert into public.super_admin_bootstrap(email) values
+  ('rhinehart514@gmail.com'), ('noahowsh@gmail.com');
 -- Match the retained collection table; publishing outputs depend on it.
 create table public.collection_entries (
  id uuid primary key default gen_random_uuid(),tenant_id text not null references public.tenants(id),
@@ -1185,6 +1199,51 @@ printf 'Booking readers read only the confirmed copy; rollback is exact and orde
 psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 
 
+# Super-admin grants and revocations use audited functions; rehearse rollback
+# on an empty audit ledger before exercising the append-only SQL contract.
+psql "${psql_args[@]}" --command="delete from public.super_admins;"
+psql "${psql_args[@]}" --command="create table if not exists public.audit_logs(actor_user_id uuid, time timestamptz not null);"
+psql "${psql_args[@]}" <<'SQL'
+create or replace function public.app_is_super_admin() returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from public.super_admins
+    where user_id = auth.uid() and revoked_at is null
+  );
+$$;
+revoke all on function public.app_is_super_admin() from public, anon;
+grant execute on function public.app_is_super_admin() to authenticated, service_role;
+grant select on public.users, public.audit_logs to authenticated, service_role;
+SQL
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261015110000_super_admin_grants.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261015110000_super_admin_grants.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/super-admin-grants-rollback-empty-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261015110000_super_admin_grants.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/super-admin-grants-json-claims-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/super-admin-grants-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/super-admin-grants-rollback-schema.sql"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261015110000_super_admin_grants.sql" >"$cluster_root/super-admin-rollback.log" 2>&1; then
+  printf 'Super-admin grant rollback discarded an existing audit event.\n' >&2
+  exit 1
+fi
+if ! grep -q 'super_admin_grants_rollback_requires_data_preservation' "$cluster_root/super-admin-rollback.log"; then
+  cat "$cluster_root/super-admin-rollback.log" >&2
+  printf 'Super-admin grant rollback did not refuse the populated audit trail.\n' >&2
+  exit 1
+fi
+psql "${psql_args[@]}" <<'SQL'
+do $$
+begin
+  if not exists (
+    select 1 from public.super_admin_access_events
+    where reason = 'rollback must preserve the appended audit event'
+  ) then
+    raise exception 'super-admin audit event was lost by rollback';
+  end if;
+end;
+$$;
+SQL
+printf 'Super-admin rollback preserved the append-only audit trail.\n'
 # Signed tracking keys are service-role-only and cannot be discarded while a
 # site depends on them. Prove guarded rollback, empty rollback, and reapply.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012010000_tenant_track_signing_keys.sql"
