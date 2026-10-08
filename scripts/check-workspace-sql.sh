@@ -1672,6 +1672,9 @@ source "$repo_root/scripts/sql/money-apps-contracts.sh"
 check_money_apps_contracts
 printf 'Combined money/apps contracts passed after the current security/upgrade proof.\n'
 
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021091000_access_review.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/access-review-schema.sql"
+
 # #256: explicit, scoped agency release permission on the final current schema.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021093000_agency_release_flag_ceiling.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-release-flags-schema.sql"
@@ -1692,7 +1695,15 @@ bash "$repo_root/scripts/check-provider-client-queue-sql.sh"
 
 
 # Composed flag lock correction follows its exact #256 predecessor.
+# Legacy billing preservation is seeded before the new provisioner exists.
+psql "${psql_args[@]}" --file="$repo_root/tests/native-business-billing-home-upgrade.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021095000_native_business_billing_home.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/native-business-billing-home-post-upgrade.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/native-business-billing-home-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/native-business-billing-conversion-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021096000_agency_release_flag_lock_order.sql"
+source "$repo_root/scripts/sql/full-model-current-tail.sh"
+check_full_model_current_tail
 # Saved-main guarded teardown composes final export/retention owners.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022090000_guarded_tenant_teardown.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/guarded-tenant-teardown-schema.sql"
@@ -1716,10 +1727,8 @@ psql --host="$cluster_socket" --port="$cluster_port" --username="$(id -un)" --db
 printf 'Agent booking outcome customer receipts and linked-calendar read-only checks passed.\n'
 
 # #251: final-schema support reads and contact repair require durable actor audit.
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261020090038_newsletter_backfill_audit.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-backfill-audit-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/operator-inquiry-audit-schema.sql"
 
 # #251: atomic platform support access logging, additive to READ ONLY APIs.
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261020090039_platform_operator_read_audit.sql"
 source "$repo_root/scripts/platform-operator-read-audit-checks.sh"

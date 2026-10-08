@@ -185,6 +185,7 @@ done
 # Focused money contracts use the exact complete upgrade path before historical tests.
 if [[ "${STRELVA_CONNECT_SQL_ONLY:-0}" == "1" ]]; then
   for money_apps_migration in "$repo_root"/supabase/migrations/20261020*.sql; do psql "${psql_args[@]}" --file="$money_apps_migration" >/dev/null; done
+  for current_migration in "$repo_root"/supabase/migrations/20261021*.sql "$repo_root"/supabase/migrations/20261022*.sql; do psql "${psql_args[@]}" --file="$current_migration" >/dev/null; done
   psql "${psql_args[@]}" --file="$repo_root/tests/connect-money-schema.sql"
   source "$repo_root/scripts/connect-money-concurrency.sh"
   printf 'Connect money contracts passed against the complete historical upgrade.\n'
@@ -489,12 +490,24 @@ source "$repo_root/scripts/sql/money-apps-contracts.sh"
 check_money_apps_contracts
 printf 'Combined money/apps contracts passed after the current security/upgrade proof.\n'
 
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021090031_agent_booking_outcomes.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021091000_access_review.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/access-review-schema.sql"
+
 # #256: pending permissions follow the complete ordered money/apps tail.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021093000_agency_release_flag_ceiling.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-release-flags-schema.sql"
 
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021094000_provider_client_queue.sql"
+# Legacy billing preservation is seeded before the new provisioner exists.
+psql "${psql_args[@]}" --file="$repo_root/tests/native-business-billing-home-upgrade.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021095000_native_business_billing_home.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/native-business-billing-home-post-upgrade.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/native-business-billing-home-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/native-business-billing-conversion-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021096000_agency_release_flag_lock_order.sql"
+source "$repo_root/scripts/sql/full-model-current-tail.sh"
+check_full_model_current_tail
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022090000_guarded_tenant_teardown.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/guarded-tenant-teardown-schema.sql"
 
