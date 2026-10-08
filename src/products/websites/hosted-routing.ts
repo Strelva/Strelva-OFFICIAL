@@ -1,4 +1,4 @@
-import { APP_ROOT_DOMAIN, SITES_ROOT_DOMAIN, tenantSiteOrigin } from "@/platform/infra/brand";
+import { APP_ROOT_DOMAIN, SITES_ROOT_DOMAIN, tenantHostedBaseUrl, SITES_PATH_ORIGIN } from "@/platform/infra/brand";
 import type { SiteDocument } from "./site-document-schema";
 import type { WebsiteLaunchReceipt } from "./contracts";
 
@@ -17,7 +17,9 @@ import type { WebsiteLaunchReceipt } from "./contracts";
 function slugOf(providerUrl: string | undefined, rootDomain: string): string | null {
   if (!providerUrl) return null;
   try {
-    const host = new URL(providerUrl).hostname.toLowerCase();
+    const url = new URL(providerUrl);
+    if (SITES_PATH_ORIGIN && url.origin === SITES_PATH_ORIGIN) return /^\/sites\/([a-z0-9-]+)\/?$/.exec(url.pathname)?.[1] ?? null;
+    const host = url.hostname.toLowerCase();
     const suffix = `.${rootDomain.toLowerCase()}`;
     return host.endsWith(suffix) ? host.slice(0, -suffix.length) : null;
   } catch {
@@ -42,6 +44,6 @@ export function bindToCurrentTenant(document: SiteDocument, currentTenantId: str
  * rename, then the current slug's address. */
 export function currentHostedUrl(row: { tenantId: string; receipt?: Pick<WebsiteLaunchReceipt, "providerUrl"> }, rootDomain = SITES_ROOT_DOMAIN): string {
   const issued = slugOf(row.receipt?.providerUrl, rootDomain);
-  if (issued === row.tenantId && row.receipt?.providerUrl) return row.receipt.providerUrl;
-  return `${tenantSiteOrigin(row.tenantId, rootDomain)}/`;
+  if (!SITES_PATH_ORIGIN && issued === row.tenantId && row.receipt?.providerUrl) return row.receipt.providerUrl;
+  return `${tenantHostedBaseUrl(row.tenantId, rootDomain)}/`;
 }

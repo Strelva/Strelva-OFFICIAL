@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
 import {
-  adminClient, adminHost, bookingStatus, cleanup, convertTenant, convertedBusinessWithOwner, decideByLink, decision, decisions, designateAgency,
+  adminClient, adminHost, bookingStatus, cleanup, convertTenant, convertedBusinessWithOwner, decideByLink, decision, decisions, ordinaryConversionAgency,
   fixtureTenant, inviteOwner, journeyEnvironment, makeOperator, noHorizontalOverflow, oneTapLink, openLink, person, requestBooking, type Person,
 } from "./support/journeys";
 
 // The 1.0 owner journey, end to end on real local Auth and Postgres:
-// operator converts a fixture tenant, designates Strelva's agency workspace,
+// operator converts a fixture tenant, names an ordinary agency and its staff,
 // invites the owner; the owner accepts the signed link, lands in the
 // workspace on the client admin host, sees Systems and Needs you, approves a
 // booking request by the one-tap email link, and sees Strelva handled with
@@ -32,12 +32,13 @@ test("operator converts and invites; the owner accepts, lands on the admin host 
     owner = await person(browser, admin, "j10-owner", { email: ownerEmail, origins: [adminOrigin] });
 
     // 1. Operator converts the fixture tenant (real script, --apply on loopback only).
-    businessId = convertTenant(tenantId, operator.email);
-    const replay = convertTenant(tenantId, operator.email);
+    const designation = await ordinaryConversionAgency(operator);
+    businessId = convertTenant(tenantId, operator.email, designation);
+    const replay = convertTenant(tenantId, operator.email, designation);
     expect(replay).toBe(businessId);
 
-    // 2. Operator designates Strelva's agency workspace; the converted business is marked as operated by it.
-    const designation = await designateAgency(admin, operator);
+    // 2. The ordinary agency receives the explicitly agreed conversion seat.
+    // Conversion installs only the explicit ordinary agency staffed seat.
     expect(designation.agencyId).toMatch(/^[0-9a-f-]{36}$/);
     const clients = await admin.rpc("list_provided_clients", { p_user_id: operator.userId, p_verified_email: operator.email, p_agency_workspace_id: designation.agencyId });
     expect(clients.error).toBeNull();

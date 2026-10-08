@@ -1,4 +1,4 @@
-import { APP_ROOT_DOMAIN, SITES_ROOT_DOMAIN, isPlatformDomain, tenantSiteOrigin } from "@/platform/infra/brand";
+import { APP_ROOT_DOMAIN, SITES_ROOT_DOMAIN, SITES_PATH_ORIGIN, isPlatformDomain, tenantHostedBaseUrl, sitePageUrl } from "@/platform/infra/brand";
 import type { Metadata } from "next";
 import type { SiteDocument } from "./site-document";
 import type { TenantConfig } from "@/lib/types";
@@ -7,11 +7,11 @@ import { getTenantPublicUrlFromDomainMap, normalizeTenantDomain } from "@/lib/te
 /** Canonicals are configuration, never a caller-controlled Host header. */
 export function tenantCanonicalOrigin(tenant: string, config: TenantConfig | null | undefined): string {
   const preferred = normalizeTenantDomain(config?.productionDomain) || normalizeTenantDomain(config?.siteUrl);
-  if (preferred && !(SITES_ROOT_DOMAIN !== APP_ROOT_DOMAIN && isPlatformDomain(preferred)) && !preferred.startsWith("admin.") && !preferred.endsWith(".vercel.app") && !preferred.includes("localhost") && /^[a-z0-9.-]+$/.test(preferred)) return `https://${preferred}`;
+  if (preferred && !((SITES_PATH_ORIGIN || SITES_ROOT_DOMAIN !== APP_ROOT_DOMAIN) && isPlatformDomain(preferred)) && !preferred.startsWith("admin.") && !preferred.endsWith(".vercel.app") && !preferred.includes("localhost") && /^[a-z0-9.-]+$/.test(preferred)) return `https://${preferred}`;
   const verified = config?.domainClaims?.find(claim => claim.status === "verified" && claim.role !== "admin" && !claim.domain.startsWith("admin."));
   const domain = normalizeTenantDomain(verified?.domain);
   if (domain && /^[a-z0-9.-]+$/.test(domain)) return `https://${domain}`;
-  return getTenantPublicUrlFromDomainMap(tenant) || tenantSiteOrigin(tenant);
+  return getTenantPublicUrlFromDomainMap(tenant) || tenantHostedBaseUrl(tenant);
 }
 export function safeJsonLd(value: unknown): string {
   return JSON.stringify(value).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
@@ -19,7 +19,7 @@ export function safeJsonLd(value: unknown): string {
 export function siteDocumentMetadata(document: SiteDocument, path: string, origin: string, preview = false): Metadata {
   const page = document.pages.find(item => item.path === path);
   if (!page) return { robots: { index: false, follow: false } };
-  const url = new URL(path, origin).toString();
+  const url = sitePageUrl(path, origin);
   const logo = document.theme.logo ? document.assets[document.theme.logo] : undefined;
   const hero = Object.values(document.nodes).find(node => node.type === "Hero" && node.props.image);
   const imageId = hero?.type === "Hero" ? hero.props.image : undefined;
@@ -46,7 +46,7 @@ export function siteDocumentJsonLd(document: SiteDocument, origin: string, indus
   const bookingPage = process.env.STRELVA_BOOKING_AGENTS === "1" && document.capabilities?.booking
     ? document.pages.find(page => { const seen = new Set<string>(); const hasBooking = (id: string): boolean => { if (seen.has(id)) return false; seen.add(id); const node = document.nodes[id]; return !!node && (node.type === "Booking" || node.children.some(hasBooking)); }; return hasBooking(page.root); }) : undefined;
   return { "@context": "https://schema.org", "@type": schemaType, name: document.siteName, url: origin, subjectOf: { "@type": "WebSite", "@id": `${origin}/#website`, name: document.siteName, url: origin }, description: document.pages.find(page => page.path === "/")?.description,
-    ...(bookingPage ? { potentialAction: { "@type": "ReserveAction", target: new URL(bookingPage.path, origin).toString() } } : {}),
+    ...(bookingPage ? { potentialAction: { "@type": "ReserveAction", target: sitePageUrl(bookingPage.path, origin) } } : {}),
     ...(phone ? { telephone: phone } : {}), ...(email ? { email } : {}), ...(location?.address ? { address: { "@type": "PostalAddress", streetAddress: location.address } } : {}),
     ...(logo ? { logo: new URL(logo.url, origin).toString() } : {}),
     ...(review?.type === "ReviewSummary" && review.props.rating !== undefined && review.props.count !== undefined && review.props.count > 0 && reviewFacts.length > 0 && reviewFacts.every(fact => fact && (fact.origin === "owner_confirmed" || fact.verification?.supported)) ? { aggregateRating: { "@type": "AggregateRating", ratingValue: review.props.rating, reviewCount: review.props.count } } : {}),

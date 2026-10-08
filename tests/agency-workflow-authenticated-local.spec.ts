@@ -19,6 +19,7 @@ test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local
 test.setTimeout(360_000);
 test.use({ actionTimeout: 120_000, navigationTimeout: 120_000 });
 const expect = baseExpect.configure({ timeout: 60_000 });
+const pathSites = process.env.STRELVA_SITES_PATH_PROOF === "1";
 const minimumFlags = process.env.STRELVA_AGENCY_MINIMUM_PROOF === "1";
 
 function sql(query: string): string {
@@ -266,24 +267,90 @@ test("ordinary agency adds a client, gets the owner's exact approval, publishes,
     expect(replay.status(), await replay.text()).toBe(200);
     expect((await replay.json() as WebsiteRebuildRecord).rebuild.launch.receipt!.receiptId).toBe(receiptId);
     expect(sql(`select count(*) from public.website_document_receipts where website_work_id='${workId}'`)).toBe("1");
+    // Revocation does not turn an accepted publication into a retryable effect.
+    // The same request returns its retained receipt and creates no second write.
+    const mandateId = sql(`select id from public.client_resource_mandates where customer_workspace_id='${businessId}' and agency_workspace_id='${agencyId}' and status='active' limit 1`);
+    const revoked = await admin.rpc("end_client_resource_mandate", { p_user_id: owner.userId, p_verified_email: owner.email, p_workspace_id: businessId, p_mandate_id: mandateId, p_reason: "Owner revocation in disposable local proof" });
+    expect(revoked.error).toBeNull();
+    const afterRevocation = await launch();
+    expect(afterRevocation.status()).toBe(200);
+    expect((await afterRevocation.json() as WebsiteRebuildRecord).rebuild.launch.receipt!.receiptId).toBe(receiptId);
+    expect(sql(`select count(*) from public.website_document_receipts where website_work_id='${workId}'`)).toBe("1");
     expect(sql(`select approved_by from public.website_document_heads where website_work_id='${workId}'`)).toBe(owner.userId);
 
     // Read the actual published renderer over loopback, independently of the
     // failed public HTTPS check. This verifies the served hash and layout;
     // it does not manufacture a healthy public provider receipt.
     const localSite = new URL(env.app);
-    localSite.hostname = `${tenantId}.localhost`;
+    localSite.hostname = pathSites ? "sites.localhost" : `${tenantId}.localhost`;
+    if (pathSites) localSite.pathname = `/sites/${tenantId}/`;
+    // Node's resolver does not resolve *.localhost; send its API probes to the
+    // owned loopback socket with the exact HTTP Host, as an upstream proxy does.
+    const pathGet = (raw: string, extraHeaders: Record<string, string> = {}) => {
+      const target = new URL(raw, localSite);
+      // Next normalizes trailing slashes before proxy execution. Probe the
+      // canonical request path directly so 308 does not obscure route checks.
+      const pathname = target.pathname.replace(/\/$/, "") || "/";
+      return publicContext.request.get(`${env.app}${pathname}${target.search}`, { headers: { host: localSite.host, ...extraHeaders }, maxRedirects: 0 });
+    };
     const publicContext = await browser.newContext();
     try {
       const publicPage = await publicContext.newPage();
       await publicPage.setViewportSize({ width: 1440, height: 1000 });
       await publicPage.goto(localSite.toString());
+      if (pathSites) {
+        expect(record.rebuild.launch.receipt!.providerUrl).toBe(localSite.toString());
+        await expect(publicPage.locator('link[rel="canonical"]')).toHaveAttribute("href", localSite.toString());
+        // Query/headers cannot select another tenant, serve a draft, or create an app session.
+        const spoofed = await pathGet(`${localSite}?preview=true&tenant=missing`, { "x-tenant": "missing", "x-preview-mode": "true" });
+        expect(spoofed.status()).toBe(200);
+        expect(spoofed.headers()["set-cookie"]).toBeUndefined();
+        expect(await spoofed.text()).toContain(record.rebuild.candidate!.contentHash);
+        for (const path of ["/workspace", "/sign-in", "/auth/callback", `/client/${tenantId}/dashboard`, "/api/workspace", "/api/internal/domain-map", "/sites/missing-business/", `/sites/${tenantId}/missing-page`]) {
+          expect((await pathGet(new URL(path, localSite).toString())).status()).toBe(404);
+        }
+        const sitemap = await pathGet(new URL(`sitemap.xml`, localSite).toString());
+        expect(sitemap.status()).toBe(200);
+        expect(await sitemap.text()).toContain(localSite.toString());
+        const navigation = await publicPage.locator('a[href^="/"]').evaluateAll(links => links.map(link => link.getAttribute("href")));
+        expect(navigation.every(href => href?.startsWith(`/sites/${tenantId}/`))).toBe(true);
+      }
       await expect(publicPage.locator('meta[name="strelva-site-hash"]')).toHaveAttribute("content", record.rebuild.candidate!.contentHash);
       await expect(publicPage.getByText("Elmwood Bakery").first()).toBeVisible();
       await publicPage.screenshot({ path: testInfo.outputPath("published-site-loopback-desktop.png"), fullPage: true });
       await publicPage.setViewportSize({ width: 390, height: 844 });
       await fits(publicPage);
       await publicPage.screenshot({ path: testInfo.outputPath("published-site-loopback-390.png"), fullPage: true });
+      if (pathSites) {
+        const form = publicPage.getByRole("form", { name: "Send an inquiry" });
+        await form.getByLabel("Name", { exact: true }).fill("   ");
+        await form.getByLabel("Email", { exact: true }).fill("visitor@example.test");
+        await form.getByLabel("Message", { exact: true }).fill("Can I collect two loaves next Saturday morning?");
+        await form.getByRole("button", { name: "Send request" }).focus();
+        await form.getByRole("button", { name: "Send request" }).press("Enter");
+        await expect(form.getByRole("alert")).toHaveText("name is required");
+        await publicPage.screenshot({ path: testInfo.outputPath("published-inquiry-error-390.png"), fullPage: true });
+        await form.getByLabel("Name", { exact: true }).fill("Rosa Diaz");
+        let releaseTransport!: () => void;
+        const transportGate = new Promise<void>(resolve => { releaseTransport = resolve; });
+        // Hold transport only to inspect pending UI; then continue the real
+        // request. No server response, store result or acceptance is mocked.
+        const beacon = `**/api/v1/leads/${tenantId}`;
+        await publicPage.route(beacon, async route => { await transportGate; await route.continue(); });
+        await form.getByRole("button", { name: "Send request" }).click();
+        await expect(form.getByRole("button", { name: "Sending…" })).toBeDisabled();
+        await expect(form.getByLabel("Name", { exact: true })).toBeDisabled();
+        await publicPage.screenshot({ path: testInfo.outputPath("published-inquiry-pending-390.png"), fullPage: true });
+        releaseTransport();
+        await expect(form.getByRole("status")).toHaveText("Your request has been received.");
+        await publicPage.unroute(beacon);
+        await expect(form.getByLabel("Name", { exact: true })).toHaveValue("");
+        await publicPage.screenshot({ path: testInfo.outputPath("published-inquiry-success-390.png"), fullPage: true });
+        sql(`update public.tenants set active=false where id='${tenantId}';`);
+        expect((await pathGet(localSite.toString())).status()).toBe(404);
+        sql(`update public.tenants set active=true where id='${tenantId}';`);
+        expect((await pathGet(localSite.toString())).status()).toBe(200);
+      }
     } finally { await publicContext.close(); }
 
     // The owner opens the saved website, sees the accepted publication receipt
@@ -292,7 +359,8 @@ test("ordinary agency adds a client, gets the owner's exact approval, publishes,
     await claim.goto(`/workspace/site?workspaceId=${businessId}&entry=rebuild&workId=${workId}`);
     await expect(claim.getByText("This revision has been published.", { exact: true })).toBeVisible();
     const publicReadBack = claim.getByText(/Published, but we could not confirm it yet/);
-    await expect(claim.getByText("Ask Northside Web Care about domain setup and verification.", { exact: true })).toBeVisible();
+    await expect(claim.getByText(pathSites ? "This publication uses a hosted address. Ask Northside Web Care about a custom domain." : "Ask Northside Web Care about domain setup and verification.", { exact: true })).toBeVisible();
+    if (pathSites) await expect(claim.getByRole("heading", { name: "Return to the previous website" })).toHaveCount(0);
     const receipt = claim.getByText(/Published receipt recorded/).first();
     await publicReadBack.scrollIntoViewIfNeeded();
     await expect(publicReadBack).toBeInViewport();

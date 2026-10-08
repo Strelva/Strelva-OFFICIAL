@@ -81,6 +81,7 @@ __pycache__/
 !docs/design/references/strelva-layered-wash-2026-09-17.png
 !docs/design/references/strelva-watercolor-blur-material-2026-09-17.png
 .validation-artifacts/
+/.scratch/launch-completion/
 blueprint-*.md
 full-page-snapshot.md
 PRODUCT.md

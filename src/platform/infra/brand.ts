@@ -28,6 +28,42 @@ export function tenantSiteOrigin(tenant: string, sitesRoot = SITES_ROOT_DOMAIN):
   return `https://${tenantSiteHost(tenant, sitesRoot)}`;
 }
 
+/** Optional DNS-free delivery on an assigned Vercel origin. It is deliberately
+ * separate from app sessions, and is inert until an operator configures it. */
+export function configuredSitesPathOrigin(value: string | undefined): string | null {
+  if (!value?.trim()) return null;
+  const url = new URL(value.trim());
+  const local = process.env.NODE_ENV !== "production" && url.protocol === "http:" && url.hostname === "sites.localhost";
+  const assigned = url.protocol === "https:" && /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.vercel\.app$/.test(url.hostname) && !url.port;
+  if ((!local && !assigned) || url.username || url.password || url.pathname !== "/" || url.search || url.hash ||
+      url.origin === new URL(process.env.NEXT_PUBLIC_APP_URL || CONTROL_PLANE_URL).origin) {
+    throw new Error("Sites path delivery requires a separate assigned HTTPS Vercel origin (no credentials, port, query or path).");
+  }
+  return url.origin;
+}
+
+export const SITES_PATH_ORIGIN = configuredSitesPathOrigin(process.env.NEXT_PUBLIC_SITES_PATH_ORIGIN);
+
+/** A website base can include a path; tenantSiteOrigin remains a bare origin
+ * for existing client/API consumers. Issued receipts are never rewritten. */
+export function tenantHostedBaseUrl(tenant: string, sitesRoot = SITES_ROOT_DOMAIN): string {
+  return SITES_PATH_ORIGIN ? `${SITES_PATH_ORIGIN}/sites/${encodeURIComponent(tenant)}` : tenantSiteOrigin(tenant, sitesRoot);
+}
+
+export function isSitesPathHost(host: string): boolean {
+  return !!SITES_PATH_ORIGIN && host.toLowerCase() === new URL(SITES_PATH_ORIGIN).host;
+}
+
+export function parseSitesPath(path: string): { tenant: string; pagePath: string } | null {
+  const match = /^\/sites\/([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(\/.*)?$/.exec(path);
+  if (!match || !/^\/(?:[a-zA-Z0-9_.-]+\/?)*$/.test(match[2] || "/") || path.split("/").some(segment => segment === "." || segment === "..")) return null;
+  return { tenant: match[1]!, pagePath: match[2] || "/" };
+}
+
+export function sitePageUrl(path: string, base: string): string {
+  return new URL(path.replace(/^\//, ""), `${base.replace(/\/$/, "")}/`).toString();
+}
+
 /** Includes the app apex for legacy hosted addresses during a sites cutover. */
 export function isPlatformDomain(host: string): boolean {
   const normalized = host.toLowerCase().split(":")[0]!;

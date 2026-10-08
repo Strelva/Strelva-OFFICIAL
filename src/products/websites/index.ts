@@ -11,6 +11,8 @@ export * from "./document-store";
 // Keep the non-UI server APIs usable in Node scripts. React/CSS is loaded only
 // when a Next route asks to render a hosted page.
 export const getHostedSite: typeof import("./hosted-public").getHostedSite = (...args) => import("./hosted-public").then(module => module.getHostedSite(...args));
+export const getPathHostedSite: typeof import("./hosted-public").getPathHostedSite = (...args) => import("./hosted-public").then(module => module.getPathHostedSite(...args));
+export const renderPathHostedPage: typeof import("./hosted-public").renderPathHostedPage = (...args) => import("./hosted-public").then(module => module.renderPathHostedPage(...args));
 export const hostedPageMetadata: typeof import("./hosted-public").hostedPageMetadata = (...args) => import("./hosted-public").then(module => module.hostedPageMetadata(...args));
 export const renderHostedPage: typeof import("./hosted-public").renderHostedPage = (...args) => import("./hosted-public").then(module => module.renderHostedPage(...args));
 export * from "./site-seo";

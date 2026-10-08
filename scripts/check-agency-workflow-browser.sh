@@ -5,15 +5,19 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 [[ ! -e .env.local && ! -e .env ]] || { echo 'Local service credential files must be absent.' >&2; exit 1; }
-for command_name in docker psql npx node curl python3 openssl rg; do command -v "$command_name" >/dev/null || exit 1; done
+path_sites=0
+if [[ "${1:-}" == "--path-sites" ]]; then path_sites=1; shift; fi
+[[ $# == 0 ]] || { echo "Usage: $0 [--path-sites]" >&2; exit 2; }
+read -r -a supabase_cli <<< "${SUPABASE_CLI:-npx --yes supabase@2.117.0}"
+for command_name in docker psql node curl python3 openssl rg redis-server; do command -v "$command_name" >/dev/null || exit 1; done
 docker info >/dev/null 2>&1 || { echo 'Docker is unavailable.' >&2; exit 1; }
 work="$(mktemp -d "${TMPDIR:-/tmp}/strelva-agency-minimum.XXXXXX")"
 chmod 700 "$work"
-app_pid="" fixture_pid=""
+app_pid="" fixture_pid="" redis_pid=""
 cleanup() {
   local status=$?
   trap - EXIT INT TERM
-  for pid in "$app_pid" "$fixture_pid"; do
+  for pid in "$app_pid" "$fixture_pid" "$redis_pid"; do
     if [[ -n "$pid" ]]; then pkill -TERM -P "$pid" 2>/dev/null || true; kill -TERM "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; fi
   done
   # The preparer records its unique workdir before bootstrap. Recover that
@@ -21,14 +25,14 @@ cleanup() {
   if [[ -z "${STRELVA_AUTH_STACK_DIR:-}" && -f "$work/env" ]]; then
     STRELVA_AUTH_STACK_DIR="$(sed -n 's/^STRELVA_AUTH_STACK_DIR=//p' "$work/env")"
   fi
-  if [[ -n "${STRELVA_AUTH_STACK_DIR:-}" ]]; then npx --yes supabase@2.117.0 stop --workdir "$STRELVA_AUTH_STACK_DIR" --no-backup > "$work/stop.log" 2>&1 || true; fi
+  if [[ -n "${STRELVA_AUTH_STACK_DIR:-}" ]]; then "${supabase_cli[@]}" stop --workdir "$STRELVA_AUTH_STACK_DIR" --no-backup > "$work/stop.log" 2>&1 || true; fi
   echo "Private local logs and screenshots: $work"
   exit "$status"
 }
 trap cleanup EXIT INT TERM
 env -u SUPABASE_ACCESS_TOKEN -u SUPABASE_SERVICE_ROLE_KEY -u NEXT_PUBLIC_SUPABASE_URL -u VERCEL_ENV -u NODE_OPTIONS \
   CI=true STRELVA_LOCAL_AUTH_PROOF=1 RUNNER_TEMP="$work" GITHUB_ENV="$work/env" \
-  GITHUB_RUN_ID="agm-$(openssl rand -hex 5)" GITHUB_RUN_ATTEMPT="1" SUPABASE_CLI="npx --yes supabase@2.117.0" \
+  GITHUB_RUN_ID="agm-$(openssl rand -hex 5)" GITHUB_RUN_ATTEMPT="1" SUPABASE_CLI="${supabase_cli[*]}" \
   bash scripts/prepare-launch-auth-stack.sh > "$work/prepare.log" 2>&1
 set -a; source "$work/env"; set +a
 export STRELVA_LOCAL_AUTH_PROOF=1 STRELVA_AGENCY_MINIMUM_PROOF=1
@@ -44,7 +48,13 @@ while IFS= read -r key; do unset "$key"; done < <(env | sed -n 's/^\([A-Z0-9_]*\
 export APPROVE_LINK_SECRET="$(openssl rand -hex 32)"
 port="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')"
 export PLAYWRIGHT_BASE_URL="http://localhost:$port" NEXT_PUBLIC_APP_URL="http://localhost:$port"
+unset NEXT_PUBLIC_SITES_PATH_ORIGIN
+if [[ "$path_sites" == 1 ]]; then export NEXT_PUBLIC_SITES_PATH_ORIGIN="http://sites.localhost:$port" STRELVA_SITES_PATH_PROOF=1; fi
 export PLAYWRIGHT_DIST_DIR=.next-agency-minimum
+pnpm exec tsx scripts/journeys-redis.ts "$work/redis.env" > "$work/redis.log" 2>&1 & redis_pid=$!
+for _ in $(seq 1 60); do [[ -s "$work/redis.env" ]] && break; kill -0 "$redis_pid" 2>/dev/null || break; sleep 0.5; done
+[[ -s "$work/redis.env" ]] || { echo "Owned Redis did not start." >&2; exit 1; }
+set -a; source "$work/redis.env"; set +a
 cat > "$work/source-site.mjs" <<'JS'
 import http from 'node:http';
 import { writeFileSync } from 'node:fs';
