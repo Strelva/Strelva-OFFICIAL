@@ -34,7 +34,8 @@ create function pg_temp.pw_update(product text default 'websites') returns void 
  perform public.update_bounded_product_work(item.id,item.workspace_id,'5f000000-0000-4000-8000-000000000003','pw-staff@example.test',product,0,
  item.payload || '{"revision":1,"history":[{"revision":1,"kind":"rebuild_checkpoint","actorId":"5f000000-0000-4000-8000-000000000003","at":"2026-10-07T00:00:01Z"}]}'); end$$;
 \if :rollback_expected
-select pg_temp.pw_expect($$select public.website_document_assert_actor('5f000000-0000-4000-8000-000000000010',null,'5f000000-0000-4000-8000-000000000003','pw-staff@example.test',false,true)$$,'workspace_access_denied');
+-- Existing website draft access from acting-provider gates survives this rollback.
+select public.website_document_assert_actor('5f000000-0000-4000-8000-000000000010',null,'5f000000-0000-4000-8000-000000000003','pw-staff@example.test',false,true);
 select pg_temp.pw_expect('select pg_temp.pw_update()','workspace_access_denied');
 \else
 -- Scope: website-only, no invented membership, and owner-only live launch remains refused.
