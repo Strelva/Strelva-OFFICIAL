@@ -36,10 +36,15 @@ update public.workspace_memberships set role='owner' where user_id='c9350000-000
 select pg_temp.ioa_assert(public.authorize_inquiry_publication_actor('ioa-site','c9350000-0000-4000-8000-000000000001','c9350000-0000-4000-8000-000000000006','publication-event'),'current claim owner may publish');
 select pg_temp.ioa_assert(not public.authorize_inquiry_publication_actor('ioa-site','c9350000-0000-4000-8000-000000000001','c9350000-0000-4000-8000-000000000006','wrong-event'),'event binding required');
 insert into public.business_records(workspace_id,created_by,updated_by) values('c9350000-0000-4000-8000-000000000003','c9350000-0000-4000-8000-000000000001','c9350000-0000-4000-8000-000000000001');
-insert into public.business_record_facts(workspace_id,fact_key,value,source,verified,updated_by) values('c9350000-0000-4000-8000-000000000003','owner_recipient','{"email":"ioa@example.test"}','owner',true,'c9350000-0000-4000-8000-000000000001');
+-- Establish the recipient through the verified owner's write, including the
+-- confirmed trust audit on the complete schema.
+select public.patch_business_record('c9350000-0000-4000-8000-000000000003','c9350000-0000-4000-8000-000000000001','ioa@example.test','owner',0::bigint,
+  '{"facts":{"owner_recipient":{"value":{"email":"ioa@example.test"},"verified":true}}}'::jsonb,
+  'c9350000-0000-4000-8000-000000000010'::uuid,repeat('c',64));
 insert into public.owner_decisions(id,workspace_id,change_kind,route,title,approve_effect,not_yet_effect,source_lifecycle,source_id,revision_hash,urgent,sign_in_required,expires_at)
  values('c9350000-0000-4000-8000-000000000007','c9350000-0000-4000-8000-000000000003','system.go_live','owner_decides','Publish','Form goes live','Nothing publishes','tenant_event','ioa-site:publication-event',repeat('a',64),false,false,now()+interval '14 days');
 select pg_temp.ioa_assert(not public.authorize_inquiry_owner_link_publication('ioa-site','publication-event',repeat('a',64),'ioa@example.test','c9350000-0000-4000-8000-000000000006'),'unclaimed signed publication refused');
+select public.record_owner_decision_delivery('c9350000-0000-4000-8000-000000000003','c9350000-0000-4000-8000-000000000007','digest','sent','ioa@example.test','ioa-fictional-accepted-007',null);
 select public.claim_owner_decision('c9350000-0000-4000-8000-000000000003','c9350000-0000-4000-8000-000000000007',repeat('a',64),'approve','owner_link',null,null,'ioa@example.test');
 select pg_temp.ioa_assert(public.authorize_inquiry_owner_link_publication('ioa-site','publication-event',repeat('a',64),'ioa@example.test','c9350000-0000-4000-8000-000000000006'),'exact approved signed publication accepted');
 select pg_temp.ioa_assert(not public.authorize_inquiry_owner_link_publication('ioa-site','publication-event',repeat('b',64),'ioa@example.test','c9350000-0000-4000-8000-000000000006'),'stale publication revision refused');
@@ -50,7 +55,9 @@ select pg_temp.ioa_assert(not has_function_privilege('authenticated','public.aut
 insert into public.owner_decisions(id,workspace_id,change_kind,route,title,approve_effect,not_yet_effect,source_lifecycle,source_id,revision_hash,urgent,sign_in_required,expires_at)
  values('c9350000-0000-4000-8000-000000000008','c9350000-0000-4000-8000-000000000003','system.go_live','owner_decides','Decline revised publication','Form goes live','Nothing publishes','tenant_event','ioa-site:publication-event',repeat('b',64),false,false,now()+interval '14 days'),
  ('c9350000-0000-4000-8000-000000000009','c9350000-0000-4000-8000-000000000003','customer.message','owner_decides','Decline message','Sends','Nothing sends','tenant_event','ioa-site:message-event',repeat('a',64),true,false,now()+interval '14 days');
+select public.record_owner_decision_delivery('c9350000-0000-4000-8000-000000000003','c9350000-0000-4000-8000-000000000008','digest','sent','ioa@example.test','ioa-fictional-accepted-008',null);
 select public.claim_owner_decision('c9350000-0000-4000-8000-000000000003','c9350000-0000-4000-8000-000000000008',repeat('b',64),'not_yet','owner_link',null,null,'ioa@example.test');
+select public.record_owner_decision_delivery('c9350000-0000-4000-8000-000000000003','c9350000-0000-4000-8000-000000000009','digest','sent','ioa@example.test','ioa-fictional-accepted-009',null);
 select public.claim_owner_decision('c9350000-0000-4000-8000-000000000003','c9350000-0000-4000-8000-000000000009',repeat('a',64),'not_yet','owner_link',null,null,'ioa@example.test');
 select pg_temp.ioa_assert(public.authorize_inquiry_owner_link_publication('ioa-site','publication-event',repeat('b',64),'ioa@example.test','c9350000-0000-4000-8000-000000000006','dismissed'),'signed Not yet may close publication');
 select pg_temp.ioa_assert(not public.authorize_inquiry_owner_link_publication('ioa-site','publication-event',repeat('b',64),'ioa@example.test','c9350000-0000-4000-8000-000000000006','approved'),'signed decline never authorizes publication');
