@@ -82,3 +82,5 @@ export { inquiryBusinessFactsEnabled, inquiryDefinitionAtUse } from "./business-
 
 export { inquiryBookingHandoffEnabled, prepareInquiryBookingInput, prepareWorkspaceInquiryBooking, prepareInquiryBookingOffer, loadInquiryBookingChoice, chooseInquiryBookingSlot } from "./booking-handoff";
 export type { InquiryBookingOffer, InquiryBookingChoice, PrepareInquiryBookingInput } from "./booking-handoff";
+export { prepareBundleInquiry } from "./bundle";
+export { rehearseBundleInquiry } from "./bundle";

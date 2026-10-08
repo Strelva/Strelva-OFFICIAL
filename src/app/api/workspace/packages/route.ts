@@ -1,3 +1,4 @@
+import { bundleTargetsSchema } from "@/platform/system-versions/bundle-contracts";
 import { z } from "zod";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { systemsReleaseMayBeOn, systemsReleasedFor } from "@/platform/systems-release";
@@ -9,9 +10,9 @@ export const dynamic = "force-dynamic";
 const uuid = z.string().uuid();
 const base = { workspaceId: uuid };
 const command = z.discriminatedUnion("action", [
-  z.object({ ...base, action: z.literal("install"), source: z.object({ businessId: uuid, systemId: uuid, revisionId: uuid, number: z.number().int().positive() }).strict(), name: z.string().trim().min(1).max(160), commandId: uuid }).strict(),
   z.object({ ...base, action: z.literal("grant_install"), agencyWorkspaceId: uuid, revisionId: uuid, commandId: uuid, expiresAt: z.string().datetime() }).strict(),
   z.object({ ...base, action: z.literal("revoke_install"), grantId: uuid }).strict(),
+  z.object({ ...base, action: z.literal("install"), source: z.object({ businessId: uuid, systemId: uuid, revisionId: uuid, number: z.number().int().positive() }).strict(), name: z.string().trim().min(1).max(160), commandId: uuid, targets: bundleTargetsSchema.optional() }).strict(),
   z.object({ ...base, action: z.literal("qualify"), revisionId: uuid }).strict(),
   z.object({ ...base, action: z.literal("review"), revisionId: uuid, approve: z.boolean(), note: z.string().trim().min(1).max(1000) }).strict(),
   z.object({ ...base, action: z.literal("listing"), systemId: uuid, state: z.enum(["private", "clients", "listed"]) }).strict(),

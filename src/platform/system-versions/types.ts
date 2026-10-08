@@ -113,6 +113,8 @@ export interface VersionLineage {
   creatorWorkspaceId?: string;
   /** Immutable initial installation revision, including after updates. */
   sourceRevisionId?: string;
+  sourceComponentKey?: string;
+  bundleId?: string;
   context: VersionContext;
   baseline: { revision: number; definition: JsonObject };
   overrides: VersionOverride[];

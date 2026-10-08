@@ -110,7 +110,15 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
     return applyOverrides(lineage.baseline.definition, lineage.overrides);
   }
 
+  function componentRevision(lineage:VersionLineage,revision:SourceRevision):SourceRevision {
+    if(!lineage.sourceComponentKey)return revision;
+    const definition=revision.definition.systems;
+    const part=Array.isArray(definition)?definition.find(item=>item&&typeof item==="object"&&!Array.isArray(item)&&item.key===lineage.sourceComponentKey):undefined;
+    if(!part||typeof part!=="object"||Array.isArray(part)||!part.definition||typeof part.definition!=="object"||Array.isArray(part.definition))throw new VersionValidationError("This bundle component was removed from the source. Keep the current draft and review the source.");
+    return {...revision,definition:part.definition};
+  }
   function compareWith(lineage: VersionLineage, revision: SourceRevision): ImprovementComparison & { upstreamPaths: string[] } {
+    revision=componentRevision(lineage,revision);
     const local = working(lineage);
     if (revision.source.number <= lineage.baseline.revision) {
       return {
@@ -156,7 +164,7 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
     const revision = await store.getRevision(actor, lineage.source, revisionNumber);
     if (!revision) throw new VersionValidationError("That source revision does not exist.");
     if (revision.declaration && !isRevisionQualified(revision)) throw new VersionValidationError("That exact source revision has not passed qualification and human review.");
-    return revision;
+    return componentRevision(lineage,revision);
   }
 
   return {

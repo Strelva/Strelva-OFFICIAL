@@ -100,7 +100,7 @@ const lineageSchema = z.object({
   id: uuid,
   version: ref,
   source: ref,
-  creatorWorkspaceId: uuid.optional(), sourceRevisionId: uuid.optional(),
+  creatorWorkspaceId: uuid.optional(), sourceRevisionId: uuid.optional(), sourceComponentKey: z.string().optional(), bundleId: uuid.optional(),
   context: z.object({ kind: z.enum(VERSION_CONTEXT_KINDS), label: z.string() }).strict(),
   baseline: z.object({ revision: z.number().int().positive(), definition: jsonObject }).strict(),
   overrides: z.array(z.object({ path: z.string(), value: json, setBy: uuid, setAt: iso }).strict()),

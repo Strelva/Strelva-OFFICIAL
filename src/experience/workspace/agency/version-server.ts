@@ -40,6 +40,7 @@ export async function readVersionCreationChoices(actor: WorkspaceActor, agencyWo
 
 export async function readVersionManagement(actor: WorkspaceActor, workspaceId: string, systemId: string, db: VersionsDb = versionsDb()) {
   const view = await readSystemVersion(actor, workspaceId, systemId, db);
+  if (!view.canManage) return { ...view, bindingChoices: [] };
   const { data, error } = await db.rpc("read_version_binding_choices", { p_workspace_id: workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail });
   if (error) mapVersionsError(error, "This business's accounts could not be read.");
   const choices = z.array(z.object({ connectionId: z.string(), kind: z.string(), label: z.string() }).strict()).safeParse(data);

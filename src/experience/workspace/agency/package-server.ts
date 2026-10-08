@@ -1,3 +1,5 @@
+import { installSystemBundle, qualifyNativePackage } from "./bundle-server";
+import type { BundleTargets } from "@/platform/system-versions/bundle-contracts";
 import { z } from "zod";
 import { VersionAccessError, VersionValidationError, isRevisionQualified } from "@/platform/system-versions";
 import { packageCatalogSchema, packageCreatorSchema } from "@/platform/system-versions/listing-contracts";
@@ -21,10 +23,11 @@ export async function readPackageCatalog(actor: WorkspaceActor, workspaceId: str
   if (parsed.data.listings.some(item => !isRevisionQualified(item.revision))) throw new WorkspaceStoreError("The list included a revision without exact qualification.");
   return parsed.data;
 }
-export async function installPackageFromListing(actor: WorkspaceActor, input: { workspaceId: string; source: SystemRevisionRef; commandId: string; name: string }, db: VersionsDb = versionsDb()) {
+export async function installPackageFromListing(actor: WorkspaceActor, input: { workspaceId: string; source: SystemRevisionRef; commandId: string; name: string; targets?: BundleTargets }, db: VersionsDb = versionsDb()) {
   const catalog = await readPackageCatalog(actor, input.workspaceId, db);
   const listing = catalog.listings.find(item => item.revision.source.revisionId === input.source.revisionId && item.revision.source.systemId === input.source.systemId && item.revision.source.businessId === input.source.businessId && item.revision.source.number === input.source.number);
   if (!listing) throw new VersionAccessError();
+  if (listing.revision.definition.kind === "bundle") return installSystemBundle(actor,input,listing.revision.definition,db);
   if (listing.revision.definition.kind !== "internal_app") throw new VersionValidationError("This package has no automatic native install adapter yet.");
   return installBusinessPackage(actor, { ...input, context: { kind: "agency_client", label: input.name } }, db);
 }
@@ -40,7 +43,8 @@ export async function managePackage(actor: WorkspaceActor, workspaceId: string, 
     return z.object({ source: z.object({ businessId: z.literal(workspaceId), systemId: z.literal(input.systemId) }), listingState: z.literal(input.state) }).passthrough().parse(result);
   }
   await rpc(actor, "require_system_package_revision_scope", { p_workspace_id: workspaceId, p_revision_id: input.revisionId, p_review: input.action === "review" }, db);
-  const result = await rpc(actor, input.action === "qualify" ? "record_system_revision_qualification" : "review_system_revision_qualification", { p_revision_id: input.revisionId, ...(input.action === "review" ? { p_approve: input.approve, p_note: input.note } : {}) }, db);
+  const native = input.action === "qualify" ? await qualifyNativePackage(actor, workspaceId, input.revisionId, db) : null;
+  const result = native ?? await rpc(actor, input.action === "qualify" ? "record_system_revision_qualification" : "review_system_revision_qualification", { p_revision_id: input.revisionId, ...(input.action === "review" ? { p_approve: input.approve, p_note: input.note } : {}) }, db);
   const parsed = revisionQualificationSchema.parse(result);
   if (parsed.revisionId !== input.revisionId) throw new WorkspaceStoreError("Qualification returned for another revision.");
   return parsed;

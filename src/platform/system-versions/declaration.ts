@@ -1,3 +1,4 @@
+import { inquiryPackageDefinitionSchema, websiteSectionPackageDefinitionSchema } from "./bundle-contracts";
 import { z } from "zod";
 import { listOfferingDefinitions } from "../offerings/definitions";
 import { assertShareableDefinition, jsonEqual, changedPaths, type JsonObject } from "./compare";
@@ -36,6 +37,14 @@ export function effectivePackageBehavior(definition: JsonObject, bindingKinds: r
     const staff = fixed.id === "private_staff_requests", inquiry = fixed.id === "customer_inquiry_intake";
     if (staff) return nativeApplicationBehavior([{ type: "contact" }, { type: "assigned_person" }], [fixed.requiredResources[0]!.kind]);
     return packageDeclarationSchema.parse({ recordsRead: staff ? ["application.records"] : inquiry ? ["inquiries"] : ["website.content","website.requests"], recordsWritten: staff ? ["application.records"] : inquiry ? ["inquiries","inquiry.actions"] : ["website.requests"], businessRecordFields: staff ? ["contacts.id","contacts.name","people.id","people.name"] : [], outsideEffects: inquiry ? ["email"] : staff ? [] : ["publish"], bindingKinds: [fixed.requiredResources[0]!.kind], dataLeavingBusiness: inquiry ? ["approved email recipients"] : staff ? [] : ["approved public website content"] });
+  }
+  if (definition.kind === "inquiry_pattern") {
+    inquiryPackageDefinitionSchema.parse(definition);
+    return packageDeclarationSchema.parse({recordsRead:["inquiries"],recordsWritten:["inquiries"],businessRecordFields:[],outsideEffects:["email"],bindingKinds:[...new Set([...bindingKinds,"email"])].sort(),dataLeavingBusiness:["Inquiry routing messages to this business's chosen team"]});
+  }
+  if (definition.kind === "website_section") {
+    websiteSectionPackageDefinitionSchema.parse(definition);
+    return packageDeclarationSchema.parse({recordsRead:["website.document"],recordsWritten:["website.document"],businessRecordFields:[],outsideEffects:["publish"],bindingKinds:[...new Set([...bindingKinds,"website"])].sort(),dataLeavingBusiness:["Owner-approved website content published publicly"]});
   }
   if (definition.kind !== "internal_app" || Object.keys(definition).some(key => !["kind", "title", "fields", "components"].includes(key)) || !Array.isArray(definition.fields) || !Array.isArray(definition.components)) throw new VersionValidationError("This runtime has no verified package declaration adapter.");
   return nativeApplicationBehavior(definition.fields as JsonObject[], bindingKinds);

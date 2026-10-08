@@ -67,3 +67,5 @@ export const prepareWebsiteDomainRequest: typeof import("./domain-requests").pre
 export const reconcileWebsiteDomainRequests: typeof import("./domain-requests").reconcileWebsiteDomainRequests = (...args) => import("./domain-requests").then(module => module.reconcileWebsiteDomainRequests(...args));
 export { askExistingPagesSchema, existingWebsitePageOperations } from "./ask-existing-pages";
 export const prepareExistingWebsitePages: typeof import("./rebuild-service").prepareExistingWebsitePages = (...args) => import("./rebuild-service").then(module => module.prepareExistingWebsitePages(...args));
+export { prepareBundleWebsiteSection } from "./bundle";
+export { rehearseBundleWebsiteSection } from "./bundle";
