@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { expect, test } from "@playwright/test";
-import { localEnvironment, seedLocalSuperAdmin, signedInContext } from "./support/local-auth";
+import { localEnvironment, seedLocalNativeMaker, seedLocalSuperAdmin, signedInContext } from "./support/local-auth";
 
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local Auth.");
 test.beforeAll(() => { localEnvironment(); });
 test.setTimeout(240_000);
 
 for (const width of [1440, 390]) {
- test(`fresh business, native work, and agency delivery retain one owner at ${width}px`, async ({browser}, testInfo) => {
+ test(`fresh business, agency-made native work, and delivery retain one owner at ${width}px`, async ({browser}, testInfo) => {
   const env=localEnvironment();
   const admin=createClient(env.url,env.service,{auth:{persistSession:false,autoRefreshToken:false}});
   const owner=await signedInContext(browser,admin,`launch-owner-${width}`);
@@ -17,6 +17,7 @@ for (const width of [1440, 390]) {
   const page=await owner.context.newPage();
   page.setDefaultTimeout(30_000);
   await page.setViewportSize({width,height:900});
+  let removeMaker: (() => void) | undefined;
   let businessId="";
   const tenantId=`launch-${randomUUID().slice(0,8)}`;
   try {
@@ -39,8 +40,14 @@ for (const width of [1440, 390]) {
     expect(strangerWorkspace.status()).toBe(404);
     expect(await strangerWorkspace.json()).toEqual({error:"Workspace unavailable."});
 
-    // The customer creates and publishes the first app through its real UI.
-    // Do not seed the result with an API call and call that first-use proof.
+    // A customer request alone cannot make a System. Prove the refusal, then
+    // give this fixture a separate, explicit agency-maker role on loopback.
+    const refused = await owner.context.request.post("/api/bounded-work", {headers:{origin:env.app},data:{action:"create",productId:"applications",workspaceId:businessId,input:{title:"Team requests",fields:[{id:"request",label:"Request",type:"text",required:true}],components:[{kind:"form",fields:["request"]}]}}});
+    expect(refused.status(),await refused.text()).toBe(403);
+    expect((await refused.json()).code).toBe("make_systems_required");
+    removeMaker = seedLocalNativeMaker(businessId, owner.userId);
+    // The agency maker creates and publishes through the real UI.
+    // The app itself is never seeded by an API or SQL fixture.
     await page.getByRole("form", { name: "Application setup" }).getByLabel("App name",{exact:true}).fill("Team requests");
     await page.getByLabel("Field 1",{exact:true}).fill("Request");
     const appCreation=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/bounded-work"&&r.request().method()==="POST");
@@ -58,6 +65,9 @@ for (const width of [1440, 390]) {
     await expect(page.getByRole("heading",{name:"Team requests",exact:true,level:1})).toBeVisible();
     await expect(page.getByText(/Version 1 is live/)).toBeVisible();
 
+    // The maker phase is complete. Continue with ordinary customer authority.
+    removeMaker();
+    removeMaker = undefined;
     await page.goto(`/workspace?workspaceId=${businessId}&view=help`);
     await page.getByLabel("What are you trying to do?",{exact:true}).fill("Have Strelva build our website.");
     const requestResponse=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/service-requests"&&r.request().method()==="POST");
@@ -67,7 +77,7 @@ for (const width of [1440, 390]) {
     let item=(await requested.json()).request;
     expect(item.businessId).toBe(businessId);expect(item.deliveryCommitment).toBeNull();
     const requestId=item.id;
-    const deliveryCard=page.getByRole("region",{name:"Needs you",exact:true})
+    const deliveryCard=page.getByRole("region",{name:/^Needs you/})
       .locator(`a[href="/workspace/delivery/${requestId}"]`);
 
     // Synthetic local operator identity only. No production grants or bypass.
@@ -84,7 +94,7 @@ for (const width of [1440, 390]) {
     await operatorPage.getByRole("button",{name:"Propose 24-hour delivery",exact:true}).click();
     await expect(operatorPage.getByText("Scope and terms need your acceptance",{exact:true})).toBeVisible();
     await page.goto(`/workspace?workspaceId=${businessId}`);
-    await expect(page.getByRole("heading",{name:"Needs you",exact:true})).toBeVisible();
+    await expect(page.getByRole("heading",{name:/^Needs you/})).toBeVisible();
     await expect(deliveryCard).toBeVisible();
     await page.goto(`/workspace/delivery/${requestId}`);
     await expect(page.getByRole("button",{name:"Propose 24-hour delivery",exact:true})).toHaveCount(0);
@@ -133,7 +143,7 @@ for (const width of [1440, 390]) {
     await page.screenshot({path:testInfo.outputPath(`delivery-${width}.png`),fullPage:true});
     await page.goto(`/workspace?workspaceId=${businessId}`);
     // Accepted work leaves "Needs you" and is listed as done under "Strelva handled".
-    const handledCard=page.getByRole("region",{name:"Strelva handled",exact:true})
+    const handledCard=page.getByRole("region",{name:/^Strelva handled/})
       .locator(`a[href="/workspace/delivery/${requestId}"]`);
     await expect(handledCard.getByText(/^Done/)).toBeVisible();
     await expect(deliveryCard).toHaveCount(0);
@@ -144,6 +154,7 @@ for (const width of [1440, 390]) {
     expect((await businesses.json()).businesses.filter((value:{id:string})=>value.id===businessId)).toHaveLength(1);
     await operatorPage.close();
   } finally {
+    removeMaker?.();
     await page.close();
     if(businessId) await admin.from("workspaces").delete().eq("id",businessId);
     await admin.from("tenants").delete().eq("id",tenantId);

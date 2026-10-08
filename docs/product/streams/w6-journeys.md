@@ -1,5 +1,12 @@
 # W6 stream: journeys
 
+October 8 follow-up on `e9ac136f`: issue #501's anonymous booking and released
+inquiry checks pass locally; all eight flags-off journeys pass after current
+agency-maker fixture qualification. The original account-free acceptance and
+generic Versions proof remain unqualified. See the [dated repair and proof
+matrix](evidence/journey-501-2026-10-08.md) for current contracts, failures and
+safe reproduction. The October 7 baseline below is historical.
+
 Status: baselines recorded locally (Oct 7 2026); journeys remain red. Branch
 `w6/journeys`, based on `integrate/reborn-1.0` @ 0479cdab (the Oct 6 workspace
 redesign is in it). Runtime and migrations match that base; the branch changes
