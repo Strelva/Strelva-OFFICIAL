@@ -33,6 +33,81 @@ reversal, and archive reuse. A receipt and private database cluster remain in
 the printed temporary directory; the cluster is stopped on exit. Archive
 deletion inside this disposable proof cluster is test cleanup only.
 
+## Batch 8 runtime recovery
+
+Batch 8 is **forward-only schema**. Its inquiry, approval, provider, export and
+retention records are evidence that survives disabling the application. The
+historical per-file companions do not restore the pre-batch-8 catalog; several
+remove new tables and are unsuitable for recovery of a populated runtime.
+Do not run them as a whole batch or reverse batches 0–7 underneath retained
+batch 8. Use the permission recovery contract below. A broader schema reversal
+requires a separate reviewed archive/dump and compatibility plan.
+
+```sh
+pnpm check:release-safety:batch8
+# Add corrective migrations in dependency order when qualifying an exact build:
+pnpm exec tsx scripts/check-release-safety-batch8.ts --tail <corrective-migration.sql>
+```
+
+This private local PostgreSQL rehearsal loads packet-order batches 0–7 and
+7A, captures the pre-batch-8 function identities, applies original batch 8,
+pins its introduced identities, then applies optional corrective tails. It
+commits fictional accepted/ambiguous/bounced provider evidence. Two rounds
+disable the introduced service RPCs and reactivate only their captured grants.
+Every round proves exact all-public row equality, exact forward catalog
+reproduction, unchanged function bodies/owners/schema during recovery, and the
+legacy content, identity, owner, billing and verified-entry contracts. New
+corrective helper RPCs remain outside the original batch 8 disable scope;
+security-repaired bodies and already revoked grants are never reverted.
+Reactivation restores permissions rather than rerunning non-idempotent CREATE
+TABLE migrations. This is not a schema-downgrade or production claim.
+
+The reviewed SQL order, each separately subject to deployment/database
+approval, is:
+
+1. Before original batch 8, run `capture-batch8-runtime-baseline.sql` with the
+   approved **pre-upgrade target** fingerprint. It refuses a reused capture.
+2. After original batch 8 and before corrective tails, run
+   `capture-batch8-runtime-scope.sql` with its approved target fingerprint.
+3. Apply reviewed corrective migrations. Rehearse their exact final schema and
+   target roles/ACLs. Keep the before/after dump and receipt.
+4. Deploy the reviewed application recovery configuration with the affected
+   feature switches off, while retaining existing client operation. Run
+   `disable-batch8-runtime.sql` with the approved final fingerprint. It revokes
+   only direct service-role EXECUTE grants on original batch-8-introduced RPCs;
+   it never drops schema or rows, reverses security repairs, or undoes accepted
+   outside effects. Retention-purge helpers introduced by corrective tails
+   remain available under their existing restricted grants.
+5. For separately approved reactivation, run `enable-batch8-runtime.sql`, then
+   deploy the reviewed application configuration. It restores exactly the
+   captured service grants, including grant options, and verifies the entire
+   forward public catalog before committing.
+
+All fingerprint-taking commands are local or use the separately approved
+restored target dump. `runtime-catalog.sql` installs temporary session helpers;
+`select pg_temp.batch8_runtime_fingerprint()` yields the SHA256 of function
+bodies/owners/ACLs, table owners/ACLs/RLS, columns, constraints, indexes, triggers
+and policies. The capture and disable files require psql
+`-v expected_runtime_fingerprint=<approved-64-character-sha256>`. Never use an
+unreviewed live digest as the expected value. Hosted owners/default grants may
+differ from the migration-only fixture, so a local fixture digest is not an
+approved hosted-target fingerprint.
+
+Protected `release_runtime_recovery` metadata stores the baseline, pinned RPC
+identities and exact grant/catalog recovery state. Browser and service roles
+have no schema or table access. Wrong order, reused captures, catalog or
+identity drift, unknown grantors, browser exposure and inherited EXECUTE bypass
+refuse atomically. Each file is transactional with 3-second lock and 120-second
+statement timeouts. A duplicate disable/enable refuses; review the current
+state instead of retrying blindly. Capture metadata is not fabricated on an
+already upgraded target. Do not drop or replace it to bypass a refusal.
+
+This SQL recovery restricts service RPC execution. App flags/configuration
+remain necessary: it does not revoke direct service-role table access, cancel
+in-flight/provider-accepted work, or restore previously deleted/expired data.
+The local rehearsal does not prove the old deployed application against a
+hosted target or provider recovery. Those remain release/incident stop points.
+
 ## Recovery SQL contract
 
 Every pending forward file has `supabase/migrations/rollback-<forward-file>`.
