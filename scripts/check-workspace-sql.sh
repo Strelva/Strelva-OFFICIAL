@@ -1208,9 +1208,12 @@ printf 'Tracking key migration passed forward, guarded rollback, empty rollback 
 # rollback while empty, and reapply. Fixtures use fictional credentials only.
 psql "${psql_args[@]}" --command="alter table public.tenants add column if not exists instagram_access_token text, add column if not exists updated_at timestamptz not null default now();"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011180000_provider_disconnect_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261016140000_calendar_revoke_compatibility.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/provider-disconnect-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261016140000_calendar_revoke_compatibility.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011180000_provider_disconnect_receipts.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011180000_provider_disconnect_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261016140000_calendar_revoke_compatibility.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/provider-disconnect-schema.sql"
 # #524: owner links go only to a trusted owner address. The rollback must
 # restore every public function body and privilege, trigger, relation, column
@@ -1252,6 +1255,12 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013120000_own
 psql "${psql_args[@]}" --file="$repo_root/tests/owner-recipient-trust-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-schema.sql"
+# Recheck the shared caller fixtures under the newer delivery-bound authority.
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-decision-notice-claims-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-decision-notice-events-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-business-facts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-operator-authority-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-operator-review-schema.sql"
 printf 'Owner recipient trust rollback is exact (%s schema objects compared) and reapplies.\n' \
   "$(wc -l <"$cluster_root/owner-trust-before.txt" | tr -d ' ')"
 

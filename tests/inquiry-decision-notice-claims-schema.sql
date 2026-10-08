@@ -38,8 +38,11 @@ select pg_temp.idn_assert((select delivery_state='sent' from public.owner_decisi
 select pg_temp.idn_assert(not public.authorize_inquiry_owner_link_decision('fixture','evt-1',repeat('1',64),'idn-owner@example.test'),'actor label alone grants no owner authority');
 -- The exact link is eligible only after provider acceptance was recorded for
 -- the address trusted at delivery; an ambiguous send cannot create that grant.
+select to_regclass('public.owner_decision_link_bindings') is not null as delivery_binding_required \gset
+\if :delivery_binding_required
 select pg_temp.idn_expect($$select public.claim_owner_decision('c1700000-0000-4000-8000-000000000002','c1700000-0000-4000-8000-000000000003',
   repeat('1',64),'approve','owner_link',null,null,'idn-owner@example.test')$$,'owner_decision_recipient_not_owner');
+\endif
 select public.record_owner_decision_delivery('c1700000-0000-4000-8000-000000000002','c1700000-0000-4000-8000-000000000003',
   'digest','sent','idn-owner@example.test','idn-recovered-message',null);
 select public.claim_owner_decision('c1700000-0000-4000-8000-000000000002','c1700000-0000-4000-8000-000000000003',repeat('1',64),'approve','owner_link',null,null,'idn-owner@example.test');
