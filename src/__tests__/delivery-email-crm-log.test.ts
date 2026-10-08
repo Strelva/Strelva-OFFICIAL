@@ -16,7 +16,7 @@ vi.mock("resend", () => ({
 }));
 
 const addActivityMock = vi.hoisted(() => vi.fn((..._a: unknown[]) => Promise.resolve()));
-vi.mock("@/lib/tenant-crm", () => ({
+vi.mock("@/platform/infra/tenant-crm", () => ({
   addTenantActivity: (...a: unknown[]) => addActivityMock(...a),
 }));
 

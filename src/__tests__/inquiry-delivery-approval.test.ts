@@ -23,7 +23,7 @@ import { tenantEventAdapter, tenantEventItem } from "@/platform/needs-you/adapte
 import { ownerDecisionSchema } from "@/platform/needs-you/contracts";
 import { tenantEventRevision } from "@/platform/needs-you/tenant-classify";
 
-vi.mock("@/lib/tenant-crm", () => ({ addTenantActivity: vi.fn(async () => undefined) }));
+vi.mock("@/platform/infra/tenant-crm", () => ({ addTenantActivity: vi.fn(async () => undefined) }));
 afterEach(() => { setInquiryRecordsDb(undefined); vi.unstubAllEnvs(); });
 
 const TENANT = "approval-tenant";

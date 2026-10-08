@@ -9,7 +9,7 @@ const override = vi.hoisted(() => vi.fn());
 const addTenantActivity = vi.hoisted(() => vi.fn());
 vi.mock("resend", () => ({ Resend: class { emails = { send }; } }));
 vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: override }));
-vi.mock("@/lib/tenant-crm", () => ({ addTenantActivity }));
+vi.mock("@/platform/infra/tenant-crm", () => ({ addTenantActivity }));
 
 import { sendNewLeadEmail } from "@/lib/delivery-email";
 

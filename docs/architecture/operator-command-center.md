@@ -228,8 +228,16 @@ top pages / sources).
 
 ## Email audiences and delivery policy
 
-Authority: `src/lib/email-enabled.ts` owns audience policy. `src/lib/email/send.ts` owns the
+Authority: `src/platform/infra/email/enabled.ts` owns audience policy. `src/platform/infra/email/send.ts` owns the
 shared transport and audience-to-policy mapping.
+
+Booking confirmation and owner-notice envelopes and send behavior belong to
+`src/platform/bookings/notice-email.ts`. Operator intake, signup and payment-failure
+messages belong to `src/platform/operator-notices/email.ts`; its `recipients.ts`
+owns the `LEAD_NOTIFY_EMAILS` rule and fallback. Legacy `src/lib/delivery-email.ts`
+exports reach these owners through the app's registered workspace ports, including
+a synchronous configuration port for the existing synchronous recipient API.
+Triggers, owner resolution, audience gates and approval decisions are unchanged.
 
 | Audience | Transport check | Environment switch | Unset default | Recipients/use |
 |---|---|---|---|---|
@@ -257,8 +265,9 @@ failed", so when a send returns false AND client email is paused the route retur
 `200 { sent: false, paused: true }` — the UI reads it as an off-switch, not an error.
 
 **CRM comms auto-log.** Every real send passes its `tenantId` to the sender, which logs
-an `email` activity into the operator CRM timeline (`src/lib/tenant-crm.ts`
-`addTenantActivity`, via `logSentEmailToCrm` in `delivery-email.ts`). It's a no-op when no
+an `email` activity into the operator CRM timeline (`src/platform/infra/tenant-crm.ts`
+`addTenantActivity`, via `src/platform/infra/email/sent-activity.ts`). The legacy CRM
+module reexports that same Redis persistence implementation. It's a no-op when no
 `tenantId` is passed and fail-soft (a CRM-log failure never breaks the send), and it fires
 **only after a send actually goes out** — every sender returns early when paused or missing
 a key, so a suppressed send is never recorded as sent. Wired from the lifecycle-email route
