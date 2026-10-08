@@ -39,6 +39,9 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      // Next bundles this marker; server-route tests use its server entry.
+      // The production build keeps Next's client-import protection.
+      "server-only": path.resolve(__dirname, "node_modules/next/dist/compiled/server-only/empty.js"),
       // The standalone route is a copied client-site template. Point its
       // template-only `@/lib` import at the starter helper for route tests;
       // the application alias below remains unchanged for product code.

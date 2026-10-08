@@ -27,6 +27,10 @@ import { ownerNoticeUrl } from "@/lib/owner-notice-url";
  *  - Idempotent: a re-submitted or replayed (unexpired) token hits an already-
  *    resolved event and renders a friendly "already handled" page, never a
  *    double action.
+ *  - A tenant link binds no recipient, so it decides only for a site with no
+ *    business. Once the site is converted, its owner decides in Strelva, where
+ *    links go only to the trusted owner address (#524); an old tenant link,
+ *    or one sent to an address an operator edited, does nothing.
  */
 import { NextResponse } from "next/server";
 import { verifyAnyApproveToken, type ApproveLinkClaims, type WorkspaceApproveLinkClaims } from "@/lib/approve-link";
@@ -35,6 +39,7 @@ import { getTenantConfig } from "@/lib/tenants";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { ownerWebsitePreviewHref, ownerWebsitePreviewMayBeOn } from "@/app/api/owner-website-preview/links";
+import { legacyOwnerLinkAllowed } from "@/lib/owner-recipient";
 
 export const dynamic = "force-dynamic";
 
@@ -145,6 +150,7 @@ function workspaceOpenUrl(origin: string, workspaceId: string, href?: string | n
   return `${origin.replace(/\/+$/, "")}${href ?? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}`;
 }
 
+const MOVED = { heading: "Decide this in Strelva", body: "This business now decides in Strelva. Nothing was done. Open your dashboard to decide it there." };
 const CHANGED = { heading: "This changed since we emailed you", body: "Nothing was done. Open Strelva to see the latest version and decide there." };
 const HANDLED = { heading: "Already handled", body: "This was already taken care of. Nothing more to do." };
 const EXPIRED = { heading: "This link expired", body: "Nothing was done. Open Strelva to see what's waiting." };
@@ -237,6 +243,9 @@ async function getPage(request: Request): Promise<NextResponse> {
   const tenant = await getTenantConfig(claims.tenantId).catch(() => null);
   const businessName = tenant?.siteName || "your site";
   const dashboardUrl = tenant ? await ownerNoticeUrl(tenant, "/dashboard", getTenantDashboardUrl(tenant, "/dashboard")) : undefined;
+  if (!await legacyOwnerLinkAllowed({ id: claims.tenantId, ownerEmail: tenant?.ownerEmail })) {
+    return noticePage({ status: 403, ...MOVED, dashboardUrl, buttonLabel: "Open your dashboard" });
+  }
   const isApprove = claims.action === "approve";
 
   return confirmPage({
@@ -271,6 +280,9 @@ async function postPage(request: Request): Promise<NextResponse> {
   const businessName = tenant?.siteName || "your site";
   const dashboardUrl = tenant ? await ownerNoticeUrl(tenant, "/dashboard", getTenantDashboardUrl(tenant, "/dashboard")) : undefined;
   const workflowAction = claims.action === "approve" ? "approved" : "dismissed";
+  if (!await legacyOwnerLinkAllowed({ id: claims.tenantId, ownerEmail: tenant?.ownerEmail })) {
+    return noticePage({ status: 403, ...MOVED, dashboardUrl, buttonLabel: "Open your dashboard" });
+  }
 
   let result: { changed: boolean; reason?: string };
   try {

@@ -4,7 +4,7 @@ import type { UnifiedEvent } from "@/platform/infra/event-contract";
 import { getSessionUser } from "@/platform/infra/db/server-client";
 import { hasTenantPermission } from "@/platform/infra/auth";
 import { readLinkedSite } from "@/platform/owner-entry/linked-sites";
-import { resolveTenantOwnerRecipient, resolveOwnerRecipient } from "@/platform/business-record/service";
+import { resolveOwnerRecipient } from "@/platform/business-record/service";
 import { readBindingTarget } from "@/platform/account-bindings/store";
 import { tenantReleaseFlagEnabled, workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 import { currentReleaseViewer } from "@/platform/release-flags/viewer";
@@ -18,7 +18,8 @@ export function workspacePublishingEvent(event: UnifiedEvent): boolean {
 }
 export interface PublishingAuthorityDeps {
   target: typeof readBindingTarget;
-  owner: typeof resolveTenantOwnerRecipient;
+  /** The business's trusted owner address (#524), never a pending one. */
+  owner: typeof resolveOwnerRecipient;
   session: typeof getSessionUser;
   permission: typeof hasTenantPermission;
   linked: typeof readLinkedSite;
@@ -28,7 +29,7 @@ export interface PublishingAuthorityDeps {
   workspaceOwner?: typeof resolveOwnerRecipient;
   workspaceReleased?: typeof workspaceReleaseFlagEnabled;
 }
-const defaults: PublishingAuthorityDeps = { target: readBindingTarget, owner: resolveTenantOwnerRecipient, session: getSessionUser, permission: hasTenantPermission, linked: readLinkedSite, record: readBusinessRecord, released: tenantReleaseFlagEnabled, viewer: currentReleaseViewer, workspaceOwner: resolveOwnerRecipient, workspaceReleased: workspaceReleaseFlagEnabled };
+const defaults: PublishingAuthorityDeps = { target: readBindingTarget, owner: resolveOwnerRecipient, session: getSessionUser, permission: hasTenantPermission, linked: readLinkedSite, record: readBusinessRecord, released: tenantReleaseFlagEnabled, viewer: currentReleaseViewer, workspaceOwner: resolveOwnerRecipient, workspaceReleased: workspaceReleaseFlagEnabled };
 export type PublishingAuthorityResult = { allowed: false; reason: string } | { allowed: true; viewer: ReleaseViewer; actor: WorkspaceActor | null };
 
 /** A signed Needs-you owner link is checked at the route and again against
@@ -45,7 +46,7 @@ export async function authorizePublishingEvent(input: { tenantId: string; event:
   let viewer: ReleaseViewer;
   if (input.actorId.startsWith("owner-link:")) {
     const recipient = input.actorId.slice("owner-link:".length).trim().toLowerCase();
-    const owner = nativeWorkspace ? await deps.workspaceOwner?.(nativeWorkspace).catch(() => null) : await deps.owner(input.tenantId).catch(() => null);
+    const owner = nativeWorkspace ? await deps.workspaceOwner?.(nativeWorkspace).catch(() => null) : await deps.owner(workspaceId.data).catch(() => null);
     if (!owner || owner.email.trim().toLowerCase() !== recipient) return deny("publishing_owner_changed");
     viewer = { operator: false, tester: false };
   } else {
