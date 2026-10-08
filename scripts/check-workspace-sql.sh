@@ -1054,6 +1054,18 @@ if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
     pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/google-location-versions-postgres.test.ts
 fi
 
+# #530 M8: an operator with an admin seat never decides an owner item.
+# Forward, rollback (the original member branch and the Needs you contract
+# hold again), then forward once more.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011153000_operator_owner_decisions.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-owner-decisions-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011153000_operator_owner_decisions.sql"
+psql "${psql_args[@]}" --set=after_rollback=true --file="$repo_root/tests/operator-owner-decisions-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011153000_operator_owner_decisions.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-owner-decisions-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
+
 # The one booking store through both real route families (legacy /api/booking
 # and the public booking service) against the real booking functions. Last,
 # because it commits its fictional rows.

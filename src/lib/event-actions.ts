@@ -45,10 +45,29 @@ export function isOperatorActor(actorId: string): boolean {
   return OPERATOR_ACTOR.test(actorId);
 }
 
+const AGENCY_STAFF_ACTOR = /^agency-staff:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The actor agency staff approve with on a client's site: the agency whose
+ * provider seat they work through and their own user id. Like an operator,
+ * never the owner's approval. Built only after the staffing check in
+ * src/lib/operator-decisions.ts. */
+export function agencyStaffActorId(agencyWorkspaceId: string, userId: string): string {
+  const actorId = `agency-staff:${agencyWorkspaceId}:${userId}`;
+  if (!AGENCY_STAFF_ACTOR.test(actorId)) throw new Error("agency_staff_actor_invalid");
+  return actorId;
+}
+
+/** Someone deciding for the business who is not its owner: a Strelva
+ * operator or agency staff. Their approval is an instruction, never the
+ * owner's approval, and never counts toward the owner's trust streak. */
+export function isDelegateActor(actorId: string): boolean {
+  return OPERATOR_ACTOR.test(actorId) || AGENCY_STAFF_ACTOR.test(actorId);
+}
+
 /** Who the event's resolution history names. Owner paths keep "user", as
- * before; an operator is always named. */
+ * before; an operator or agency staff member is always named. */
 function resolvedBy(actorId: string): string {
-  return isOperatorActor(actorId) ? actorId : "user";
+  return isDelegateActor(actorId) ? actorId : "user";
 }
 
 export type EventWorkflowAction =
@@ -472,7 +491,7 @@ async function executeResolvedEventAction(
       await appendVersion(
         section,
         draft,
-        isOperatorActor(actorId) ? "admin" : "user",
+        isDelegateActor(actorId) ? "admin" : "user",
         tenantId,
         diffFields(current, draft as unknown as Record<string, unknown>),
         eventId,
@@ -483,9 +502,9 @@ async function executeResolvedEventAction(
       const { revalidateClientSite } = await import("./revalidate-client");
       const revalidation = revalidateClientSite(tenantId, clientRevalidationTargetForSections([section])).catch(() => {});
       await clearDraft(section, tenantId);
-      // The trust streak counts the owner's approvals only. An operator's
-      // approval must never earn the owner's auto-publish.
-      if (event.source === "ai" && !isOperatorActor(actorId)) recordApproval(tenantId).catch(() => {});
+      // The trust streak counts the owner's approvals only. An operator's or
+      // agency's approval must never earn the owner's auto-publish.
+      if (event.source === "ai" && !isDelegateActor(actorId)) recordApproval(tenantId).catch(() => {});
       try {
         await (await workspacePorts().websitePublicationReadback()).observeAcceptedNativePublish({
           tenantId, section, expected: draft, actorId, publicationRef: eventId, revalidation,
@@ -500,7 +519,7 @@ async function executeResolvedEventAction(
     if (section) await clearDraft(section, tenantId);
     if (event.source === "ai") {
       if (action === "dismissed") recordRejection(tenantId).catch(() => {});
-      else if (!isOperatorActor(actorId)) recordApproval(tenantId).catch(() => {});
+      else if (!isDelegateActor(actorId)) recordApproval(tenantId).catch(() => {});
     }
     return { changed: true };
   }
@@ -550,12 +569,12 @@ async function executeResolvedEventAction(
       let acceptedUnverified = false;
       if (route.kind === "listing") {
         const rating = typeof event.metadata?.rating === "number" ? event.metadata.rating : null;
-        // An operator's approval is an operator instruction, never the owner's.
+        // An operator's or agency's approval is an operator instruction, never the owner's.
         const authority = actorId === AUTO_REPLY_ACTOR
           ? rating !== null && rating >= 3 && rating <= 5 && Number.isInteger(rating)
             ? { kind: "auto_reply_policy" as const, rating }
             : null
-          : isOperatorActor(actorId)
+          : isDelegateActor(actorId)
             ? { kind: "operator_instruction" as const, actor: actorId, instructionRef: `event:${eventId}`.slice(0, 200) }
             : { kind: "owner_approval" as const, actor: actorId.slice(0, 200) || "user", approvalRef: `event:${eventId}`.slice(0, 200) };
         if (!authority) return { changed: false, reason: "review_reply_needs_owner" };
@@ -565,7 +584,7 @@ async function executeResolvedEventAction(
         acceptedUnverified = posted.status === "posted_unverified" || posted.status === "held_by_google" || posted.status === "accepted_unrecorded";
       } else {
         const { publishReviewReply } = await import("./gbp-replies");
-        const result = await publishReviewReply(tenantId, reviewId, replyText, { actor: isOperatorActor(actorId) ? `${actorId} approved event ${eventId}` : `approved event ${eventId}`, ...(process.env.STRELVA_OPERATOR_QUEUE_RELEASE === "1" ? { commandKey: `approval:${eventId}` } : {}) });
+        const result = await publishReviewReply(tenantId, reviewId, replyText, { actor: isDelegateActor(actorId) ? `${actorId} approved event ${eventId}` : `approved event ${eventId}`, ...(process.env.STRELVA_OPERATOR_QUEUE_RELEASE === "1" ? { commandKey: `approval:${eventId}` } : {}) });
         if (!result.published) return { changed: false, reason: "review_reply_failed" };
       }
       // Reply accepted by Google — mark acceptance before resolving so a lost

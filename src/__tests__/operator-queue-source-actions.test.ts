@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readQueueServiceRequestAction, runQueueSourceAction, type QueueSourceAction } from "@/app/admin/queue/source-actions";
 const mocks = vi.hoisted(() => ({ admin: vi.fn(), actor: vi.fn(), queue: vi.fn(), request: vi.fn(), execute: vi.fn(),
-  lead: vi.fn(), mirror: vi.fn(), clear: vi.fn(), scan: vi.fn(), domains: vi.fn(), refresh: vi.fn(), event: vi.fn(), resolve: vi.fn(), permission: vi.fn(), subscription: vi.fn(), published: vi.fn(), checkHosted: vi.fn(), saveHosted: vi.fn() }));
+  lead: vi.fn(), mirror: vi.fn(), clear: vi.fn(), scan: vi.fn(), domains: vi.fn(), refresh: vi.fn(), event: vi.fn(), resolve: vi.fn(), permission: vi.fn(), subscription: vi.fn(), published: vi.fn(), checkHosted: vi.fn(), saveHosted: vi.fn(), audit: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: mocks.admin, requireTenantPermission: mocks.permission }));
 vi.mock("@/platform/workspaces/http", () => ({ workspaceHttpActor: mocks.actor }));
@@ -13,7 +13,14 @@ vi.mock("@/app/api/admin/scan/route", () => ({ POST: mocks.scan }));
 vi.mock("@/app/api/admin/domain-monitor/scan/route", () => ({ POST: mocks.domains }));
 vi.mock("@/lib/domains", () => ({ refreshDomainClaim: mocks.refresh }));
 vi.mock("@/lib/events", () => ({ getEventRaw: mocks.event }));
-vi.mock("@/lib/event-actions", () => ({ resolveEventAction: mocks.resolve }));
+vi.mock("@/lib/event-actions", () => ({ resolveEventAction: mocks.resolve, operatorActorId: (id: string) => `operator:${id}` }));
+// The real operator decision runs (src/lib/operator-decisions.ts): same session, audited.
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: async () => {
+  const signedIn = await mocks.actor() as { userId: string; verifiedEmail: string } | null;
+  return signedIn ? { id: signedIn.userId, email: signedIn.verifiedEmail, email_confirmed_at: "2026-10-01T00:00:00Z" } : null;
+} }));
+vi.mock("@/platform/infra/db/repositories", () => ({ getMembershipRole: vi.fn() }));
+vi.mock("@/lib/storage", () => ({ logAuditEvent: mocks.audit }));
 vi.mock("@/lib/subscription", () => ({ requireActiveSubscription: mocks.subscription }));
 vi.mock("@/products/websites/index", () => ({ websiteDocumentStore: { listPublished: mocks.published, recordHealth: mocks.saveHosted }, checkWebsiteHealth: mocks.checkHosted, currentHostedUrl: () => "https://hosted.example.test" }));
 vi.mock("@/products/websites/hosted-routing", () => ({ currentHostedUrl: () => "https://hosted.example.test" }));
@@ -87,8 +94,9 @@ describe("queue source actions", () => {
   });
   it("advances triage/quote through the governed dispatcher with permission and subscription gates", async () => {
     mocks.queue.mockResolvedValue({ items: [item("change_request", "event:change")] }); expect((await run("triage")).ok).toBe(true);
-    expect(mocks.resolve).toHaveBeenCalledWith("alpha", "change", "triaged", actor.userId); expect((await run("quote")).ok).toBe(true);
-    expect(mocks.resolve).toHaveBeenLastCalledWith("alpha", "change", "quoted", actor.userId);
+    expect(mocks.resolve).toHaveBeenCalledWith("alpha", "change", "triaged", `operator:${actor.userId}`); expect((await run("quote")).ok).toBe(true);
+    expect(mocks.resolve).toHaveBeenLastCalledWith("alpha", "change", "quoted", `operator:${actor.userId}`);
+    expect(mocks.audit).toHaveBeenCalledWith(expect.objectContaining({ action: "queue.request.quoted", targetId: "change", metadata: expect.objectContaining({ phase: "attempt", actor: `operator:${actor.userId}` }) }));
     mocks.resolve.mockClear(); mocks.permission.mockResolvedValue(new Response("{}", { status: 403 })); expect((await run("quote")).ok).toBe(false); expect(mocks.resolve).not.toHaveBeenCalled();
     mocks.permission.mockResolvedValue(null); mocks.subscription.mockResolvedValue(new Response("{}", { status: 402 })); expect((await run("quote")).ok).toBe(false); expect(mocks.resolve).not.toHaveBeenCalled();
   });
