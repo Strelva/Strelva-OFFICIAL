@@ -113,6 +113,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261021100000": "investigation_history_events",
   "20261021110000": "enterprise_units",
   "20261021112000": "home_finder_bindings",
+  "20261021112200": "home_finder_configuration_commands",
   "20261021130100": "custom_sandbox_runtime_qualifications",
   "20261021131100": "assistant_connections",
   "20261021131200": "assistant_website_proposals",
