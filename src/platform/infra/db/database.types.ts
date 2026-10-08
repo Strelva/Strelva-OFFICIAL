@@ -9183,6 +9183,38 @@ export type Database = {
           },
         ]
       }
+      tenant_track_signing_keys: {
+        Row: {
+          created_at: string
+          public_key: string
+          previous_public_key: string | null
+          previous_valid_until: string | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          public_key: string
+          previous_public_key?: string | null
+          previous_valid_until?: string | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          public_key?: string
+          previous_public_key?: string | null
+          previous_valid_until?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_track_signing_keys_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       unified_events: {
         Row: {
           body: string | null
@@ -11832,6 +11864,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      rotate_tenant_track_signing_key: {
+        Args: {
+          p_public_key: string | null
+          p_tenant_id: string
+        }
+        Returns: undefined
+      }
       business_policy_integer_valid: {
         Args: {
           hi: number

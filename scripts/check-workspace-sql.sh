@@ -1013,6 +1013,28 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011150000_pub
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011150000_public_booking_admission.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011150000_public_booking_admission.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/public-booking-admission-schema.sql"
+# #547: agent holds share that admission; live-only agent cap; mailbox caps.
+# Forward, rollback to #529's functions, and reapply; #529's contract reruns.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013210000_agent_booking_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-admission-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013210000_agent_booking_admission.sql"
+psql "${psql_args[@]}" -Atc "select to_regprocedure('public.booking_email_identity(text)') is null and to_regprocedure('public.list_published_business_pages()') is null and position('''agent''' in pg_get_functiondef('public.check_public_booking_budget(uuid,text,timestamptz,timestamptz,text,uuid)'::regprocedure))=0" | grep -qx t
+# The regression probes must fail on #529's functions: dead holds, shared budget, one mailbox.
+if psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-admission-schema.sql" >"$cluster_root/agent-admission-before.log" 2>&1; then
+  printf 'Agent admission probes passed without 20261013210000.\n' >&2
+  exit 1
+fi
+for probe in dead_holds shared_budget one_email; do
+  if ! grep -q "$probe: " "$cluster_root/agent-admission-before.log"; then
+    cat "$cluster_root/agent-admission-before.log" >&2
+    printf 'Agent admission probe %s did not fail before the fix.\n' "$probe" >&2
+    exit 1
+  fi
+done
+psql "${psql_args[@]}" --file="$repo_root/tests/public-booking-admission-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013210000_agent_booking_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-admission-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/public-booking-admission-schema.sql"
 
 # Google location lineage through the real Versions/System stores, after the
 # account-binding migrations. Preparation stays fake; no Google dispatch.
@@ -1135,6 +1157,37 @@ end;
 $$;
 SQL
 printf 'Super-admin rollback preserved the append-only audit trail.\n'
+# Signed tracking keys are service-role-only and cannot be discarded while a
+# site depends on them. Prove guarded rollback, empty rollback, and reapply.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012010000_tenant_track_signing_keys.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012120000_track_signing_key_rotation.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-track-signing-keys-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-track-signing-key-rotation.sql"
+psql "${psql_args[@]}" --command="insert into public.tenants(id,site_name) values('track-signing-rollback-fixture','Tracking key rollback fixture'); insert into public.tenant_track_signing_keys(tenant_id,public_key) values('track-signing-rollback-fixture',repeat('o',100)); select public.rotate_tenant_track_signing_key('track-signing-rollback-fixture',repeat('n',100));" >/dev/null
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012120000_track_signing_key_rotation.sql" >"$cluster_root/track-key-rotation-rollback.log" 2>&1; then
+  printf 'Tracking key rotation rollback discarded an in-window key.\n' >&2
+  exit 1
+fi
+grep -q 'track_signing_key_rotation_rollback_requires_data_preservation' "$cluster_root/track-key-rotation-rollback.log"
+psql "${psql_args[@]}" -Atc "select public_key = repeat('n',100) and previous_public_key = repeat('o',100) from public.tenant_track_signing_keys where tenant_id='track-signing-rollback-fixture'" | grep -qx t
+psql "${psql_args[@]}" --command="update public.tenant_track_signing_keys set previous_public_key=null, previous_valid_until=null where tenant_id='track-signing-rollback-fixture';" >/dev/null
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012120000_track_signing_key_rotation.sql"
+psql "${psql_args[@]}" -Atc "select public_key = repeat('n',100) and not exists(select 1 from information_schema.columns where table_schema='public' and table_name='tenant_track_signing_keys' and column_name='previous_public_key') and to_regprocedure('public.rotate_tenant_track_signing_key(text,text)') is null from public.tenant_track_signing_keys where tenant_id='track-signing-rollback-fixture'" | grep -qx t
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012010000_tenant_track_signing_keys.sql" >"$cluster_root/track-key-rollback.log" 2>&1; then
+  printf 'Tracking key rollback discarded an active site key.\n' >&2
+  exit 1
+fi
+grep -q 'tenant_track_signing_keys_rollback_requires_data_preservation' "$cluster_root/track-key-rollback.log"
+psql "${psql_args[@]}" --command="delete from public.tenant_track_signing_keys where tenant_id='track-signing-rollback-fixture'; delete from public.tenants where id='track-signing-rollback-fixture';" >/dev/null
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012010000_tenant_track_signing_keys.sql"
+if [[ "$(psql "${psql_args[@]}" -Atc "select to_regclass('public.tenant_track_signing_keys') is null;")" != t ]]; then
+  printf 'Tracking key rollback left its table behind.\n' >&2
+  exit 1
+fi
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012010000_tenant_track_signing_keys.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012120000_track_signing_key_rotation.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-track-signing-keys-schema.sql"
+printf 'Tracking key migration passed forward, guarded rollback, empty rollback and reapply.\n'
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

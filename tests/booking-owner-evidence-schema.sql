@@ -1,6 +1,8 @@
 \set ON_ERROR_STOP on
 -- Local fixture authority, bounds, evidence and no-show transition proof. Rolls back.
 begin;
+-- This test supplies UTC date ranges and UTC booking times below.
+set local time zone 'UTC';
 create or replace function pg_temp.oe_assert(condition boolean,message text) returns void language plpgsql as $$
 begin if condition is not true then raise exception 'booking owner evidence assertion failed: %',message; end if; end $$;
 create or replace function pg_temp.oe_expect(statement text,expected text) returns void language plpgsql as $$

@@ -48,7 +48,7 @@ beforeEach(() => {
   deps.headers = new Headers();
   deps.hosted = null;
   deps.flag.mockReset().mockResolvedValue(true);
-  store = { read: vi.fn(), set: vi.fn(), confirmedFacts: vi.fn(), published: vi.fn(async (handle: string) => handle === published.handle ? published : null) };
+  store = { read: vi.fn(), set: vi.fn(), confirmedFacts: vi.fn(), published: vi.fn(async (handle: string) => handle === published.handle ? published : null), listPublished: vi.fn(async () => [published]) };
   setBusinessPagesStoreForTests(store);
 });
 afterEach(() => { vi.unstubAllEnvs(); setBusinessPagesStoreForTests(null); });
