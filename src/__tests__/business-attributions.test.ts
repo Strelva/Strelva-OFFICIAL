@@ -29,6 +29,12 @@ describe("independent business attribution evidence", () => {
     expect(businessAttributionReceiptSchema.safeParse({ ...opening, to: ending.to, ending: null }).success).toBe(false);
     expect(businessAttributionReceiptSchema.safeParse({ ...opening, to: "2026-10-08T11:00:00Z", ending: { ...ending, to: "2026-10-08T11:00:00Z" } }).success).toBe(false);
   });
+  it("accepts a genuine exit ending with precisely one origin", () => {
+    const ending = { attributionId: ids.attribution, businessWorkspaceId: ids.business, agencyWorkspaceId: ids.agency, from: opening.from, to: "2026-10-08T13:00:00+00:00", source: opening.source, sourceReceipt: input.sourceReceipt, providerChangeRequestId: null, workspaceExitRequestId: ids.request, endedBy: ids.owner, oldProviderId: ids.provider, newOperatorAgencyWorkspaceId: null, completionReceipt: { state: { status: "completed" } } };
+    expect(businessAttributionReceiptSchema.safeParse({ ...opening, to: ending.to, ending }).success).toBe(true);
+    expect(businessAttributionReceiptSchema.safeParse({ ...opening, to: ending.to, ending: { ...ending, providerChangeRequestId: ids.request } }).success).toBe(false);
+    expect(businessAttributionReceiptSchema.safeParse({ ...opening, to: ending.to, ending: { ...ending, workspaceExitRequestId: null } }).success).toBe(false);
+  });
   it("reads separate current operator and history, refusing cross-business history", async () => {
     const history = { businessWorkspaceId: ids.business, currentProvider: { providerId: ids.provider, agencyWorkspaceId: ids.request }, attributions: [opening] };
     await expect(readBusinessAttributions(actor, ids.business, db(history))).resolves.toEqual(history);

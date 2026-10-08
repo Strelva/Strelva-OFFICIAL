@@ -1,0 +1,39 @@
+# Private provider completion preparation — 2026-10-08
+
+Original #293 AG11 requires an outgoing provider's draft grants and assignments to end on successful provider change, and requires an explicit workspace exit with provider participation revoked to end the provider row. This additive preparation closes those literal local gaps. It does not select a notice window, financial tail, rate, matching policy, external notification channel, or live operation.
+
+## Source and contract
+
+Prepared from `9c1dbef6f15dd4fdce9240636416414534e1410e` (original33 plus cancellation31). Migration `20261020090037_provider_completion_cleanup.sql` and guarded inverse are release packet19. All498 existing SQL files, including the299 existing ordered forwards and exact31/33, retain their original bytes. Independent32/34–36 tails are absent from this lane and require combined qualification before promotion.
+
+Ending an active provider now revokes only that business and outgoing agency's offered/accepted operational assignments, active application/website draft grants, and temporary package-install grants. Existing seat/staff/mandate triggers remain in force. Immutable tenant revisions, installed releases, attribution openings, previous endings, and other businesses' grants remain intact. A private immutable cleanup receipt identifies the exact provider and affected counts. Historical ends without an actor expire grants rather than invent an identity.
+
+Request, notice acknowledgement, completion, cancellation, direct provider choice/end, explicit exit, and relevant grant issuance take the existing business advisory key7415 before inherited row locks. Cancellation and completion therefore agree on lock order. Prior authority checks and immutable cancellation semantics remain in their delegated implementations.
+
+Explicit exit retains the original workspace-kind scope. Verified user, workspace and direct current-owner membership are held before the inherited exit transitions. Only a stored, actually completed exit with provider participation `revoke` permits ending the active provider through a private transaction-local permission row. It inserts no provider-change request and fabricates no notice, acceptance or response window. That permission is inaccessible to client and service roles and is deleted before return.
+
+Original bringer history remains independent of the outgoing/current operator. The ending relation supports exactly one real origin: the existing provider-change request, or a genuine workspace-exit request. Old rows retain their provider-change origin. An exit ending records the actual exit ID, original source receipt, current owner and effect time; the shared reader retains `to_at`. The strict TypeScript schema accepts only the legacy change shape or the exact exit shape and rejects missing/both origins. The ledger34 consumer can continue using the same immutable opening and shared ending time; no invoice/split mutation or new royalty eligibility occurs here.
+
+The inverse refuses accepted cleanup/exit receipts and later function drift before changing anything. An empty rollback restores the prior public function source, signature, security, volatility, configuration and normalized ACL exactly. It does not undo accepted business history.
+
+## Reproduced failures
+
+Before37, real native MO18 completion left the website/application draft grant active and operational assignment accepted, even though the old seat ended. Real owner exit completed while leaving the provider row and seat active. A forced owner/workspace-first completion versus request-first cancellation reproduced PostgreSQL deadlock. Those failing fixtures and logs remain in the private `provider-completion-audit` artifact directory; they are not overwritten by green receipts.
+
+## Evidence at this lane
+
+- `bash scripts/check-provider-completion-sql.sh`: PASS on300 ordered native forwards. Real installed web/app fixtures prove outgoing grant and assignment cleanup, stale regrant/writes denied, immutable revisions/releases retained, other-business grant active, completion replay once, and active website/subscription content retained through change and exit.
+- Actual cancellation-first and completion-first races: PASS. Successful cancellation leaves original attribution/provider unchanged. Successful completion creates one ending/cleanup receipt and later cancellation refuses. The former lock-reversal graph waits before the request lock and completes without deadlock.
+- Owner withdrawal races: PASS. A demotion committed first denies exit. Exit holding current user/membership premises completes before concurrent verification/membership withdrawal; genuinely read-only history still works while completion is paused.
+- Pure reader reachability:1496 public functions checked, none reaches a row lock. Actual native change/exit history also passes the API's strict receipt schema.
+- Empty inverse/reapply restores the exact public function catalog; later-wrapper drift and populated rollback are refused. Private permission/table/function ACL assertions pass.
+- `pnpm check:workspace-upgrade`: PASS populated historical workspace upgrade and current security/money/apps native contracts;1537 public functions checked for reader reachability.
+- Focused existing attribution/API, readiness and release-safety suites:77 tests PASS across5 files. TypeScript check and changed-file lint PASS. Release packet hashes match both37 files.
+
+Full units/build are intentionally reserved for the coordinator's exact combined head. The prior lane's full-unit/build failures remain historical evidence and are not represented as passing here. No new product UI was added, so no new UI journey is claimed. Native local fixtures do not prove production migration, provider delivery, outside agency acknowledgement, an accepted window, or a commercial agreement.
+
+## Matching boundary and remaining gates
+
+A bounded search of provider/platform APIs, relevant agency experience and ordered SQL found explicit accessible-agency payer choice, not an enabled matching/solicitation surface. That choice is current-account authority, not platform solicitation. No matching surface is activated here; no own-agency solicitation feature was invented. This is a scoped negative source observation, not an exhaustive audit of every repository file.
+
+Original #293 remains open for independent review and exact combined source/native/rollback/upgrade qualification, plus outstanding outside-delivery and selected policy/provider gates. Original #284 history remains append-only; financial tail/rate gate236 is unchanged. Next: coordinator integrates this clean local commit with reserved32/34–36, unions the packet metadata in order, preserves all older SQL, runs the final exact combined proof and obtains independent review. No GitHub, main, production, billing, DNS, provider or external message changes were made by this lane.
