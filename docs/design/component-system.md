@@ -927,3 +927,13 @@ retain native semantics; an unconfirmed mutation requires a reload. The guarded
 `/preview/strelva/responsibilities` fixture exposes five mixed evidence states.
 Local 1280px and 390px observation proves layout and fictional proof only; it
 does not prove provider operation, email delivery or a maintained service promise.
+
+### Public business evidence
+
+`src/products/connected-sites/BusinessEvidence.tsx` renders the shared public
+verification receipt inside the business page's existing Section. Linkage and
+provider verification are separate states; unknown facts remain explicit. It
+uses foundation typography/spacing tokens, with long URLs and agency names
+wrapping. The doubly gated `/preview/strelva/agent-oauth?evidence=1` specimen
+provides fictional populated/empty desktop/mobile proof; the native route and
+JSON-LD contracts are covered by business-page/profile tests.

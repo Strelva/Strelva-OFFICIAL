@@ -13,6 +13,7 @@
  *
  * Both use businessJsonLd and schemaBlock, so they never disagree.
  */
+import { publicBusinessProfile, unknownVerification } from "@/platform/agent-channel/profile";
 import { z } from "zod";
 import { WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { BUSINESS_HANDLE_PATTERN, businessPageUrl, type PublishedBusinessPage } from "./business-page";
@@ -37,6 +38,7 @@ export async function loadPublishedBusinessPage(handle: string, deps: { store?: 
   if (!(await (deps.publicFor ?? connectedSitesPublicFor)(row.workspaceId).catch(() => false))) return null;
   const facts = publicFactsFromConfirmedRecord(row.workspaceId, row);
   if (!facts.name) return null;
+  facts.verification = await publicBusinessProfile(`workspace:${row.workspaceId}`).then(p => p.verification).catch(() => unknownVerification);
   return { workspaceId: row.workspaceId, handle: row.handle, facts, confirmedAt: row.confirmedAt };
 }
 

@@ -1,3 +1,4 @@
+import { readAgentAbuseAlarms } from "./agent-abuse";
 import { createHash } from "node:crypto";
 import { getRedis } from "@/platform/infra/redis";
 import { getSupabase } from "@/platform/infra/db/client";
@@ -497,6 +498,7 @@ export async function readAllSources(input: { tenants: QueueTenant[]; context: Q
     guard("site_draft", "Site drafts", () => readSiteDrafts(tenants, now)),
     guard("maintenance_digest", "Maintenance digests", readMaintenanceDigests),
     guard("ops_alert", "Operations alerts", readOpsAlerts),
+    ...(process.env.STRELVA_AGENT_ABUSE_MONITOR === "1" ? [guard("ops_alert", "Agent booking confirmation", () => readAgentAbuseAlarms(actor))] : []),
     guard("ops_alert", "Report delivery", () => readCatalogReportFailures(actor)),
     guard("ops_alert", "Internal tool notifications", () => readToolNoticeFailures(actor)),
     guard("ops_alert", "Internal tool contact links", () => readToolContactConflicts(actor)),

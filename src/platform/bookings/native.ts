@@ -1,5 +1,6 @@
 /** Native services and availability for agent discovery and customer management.
  * Every slot is recomputed from the record and guarded by the one store. */
+import { agentConfirmationEmailAllowed, isolatedAgentConfirmation } from "@/platform/agent-channel/policy";
 import { bookingScopeFor } from "./booking-scope";
 import { contextForService, servicePolicy, validateBookingIntake } from "./service-policy";
 import { createHash, randomBytes } from "node:crypto";
@@ -106,6 +107,7 @@ export async function issueNativeAccess(tenant: string, ref: string) {
 export async function agentConfirmationAvailable(tenant: string): Promise<boolean> {
   const { bookingCustomerEmailAllowed } = await import("./updates");
   const { bookingMessagesEnabled, bookingManagePageEnabled, bookingRemindersEnabled } = await import("./flags");
+  if (isolatedAgentConfirmation()) return bookingMessagesEnabled() && bookingManagePageEnabled() && await agentConfirmationEmailAllowed(tenant);
   return bookingMessagesEnabled() && bookingManagePageEnabled() && bookingRemindersEnabled() && await bookingCustomerEmailAllowed(tenant);
 }
 
