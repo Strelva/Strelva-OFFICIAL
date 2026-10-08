@@ -13,7 +13,8 @@ import {
   type CalendarProvider,
   type CalendarReminderPolicy,
 } from "./contracts";
-import { revokeCalendarOAuthToken, refreshCalendarOAuthToken } from "./oauth";
+import { refreshCalendarOAuthToken } from "./oauth";
+import { revokeProviderAuthorization, type ProviderRevocationResult, type RevocationOutcome } from "@/platform/infra/provider-revocation";
 
 type DbRow = Record<string, unknown>;
 type CalendarConnectionWithSecrets = CalendarConnection & { accessToken?: string; refreshToken?: string };
@@ -334,19 +335,54 @@ export async function configureWorkspaceCalendarConnection(actor: WorkspaceActor
   });
 }
 
-export async function revokeWorkspaceCalendarConnection(actor: WorkspaceActor, workspaceId: string, provider: CalendarProvider): Promise<boolean> {
+export interface CalendarDisconnectResult {
+  disconnected: boolean;
+  receiptId: string;
+  revocationOutcome: RevocationOutcome;
+  revocationErrorCode: string | null;
+  localCleanupStatus: "complete" | "partial";
+}
+
+export async function revokeWorkspaceCalendarConnection(actor: WorkspaceActor, workspaceId: string, provider: CalendarProvider): Promise<CalendarDisconnectResult> {
   await assertWorkspaceCalendarManager(actor, workspaceId);
-  if (process.env.STRELVA_BOOKING_CALENDAR_REVOKE === "1") {
-    const connection = await getWorkspaceCalendarConnection(actor, workspaceId, provider);
-    if (connection) await revokeCalendarOAuthToken(provider, connection.refreshToken || connection.accessToken || "");
+  // Read without refreshing. Disconnect must never make token refresh a
+  // prerequisite for wiping the stored grant.
+  let connection: CalendarConnectionWithSecrets | null = null;
+  let credentialReadFailed = false;
+  try {
+    connection = await readStoredCalendarConnection(workspaceId, provider);
+  } catch {
+    credentialReadFailed = true;
   }
-  const { data, error } = await db().rpc("revoke_workspace_calendar_connection", {
+  const token = connection?.refreshToken || connection?.accessToken || null;
+  let revocation: ProviderRevocationResult;
+  if (credentialReadFailed) {
+    revocation = { outcome: "failed", errorCode: "credential_read_failed" };
+  } else {
+    try {
+      revocation = await revokeProviderAuthorization(provider, token);
+    } catch {
+      revocation = { outcome: "failed", errorCode: "request_failed" };
+    }
+  }
+  const { data, error } = await db().rpc("disconnect_workspace_calendar_connection", {
     p_workspace_id: workspaceId,
     p_user_id: actor.userId,
     p_provider: provider,
+    p_revocation_outcome: revocation.outcome,
+    p_revocation_error_code: revocation.errorCode,
   });
   if (error) rpcFailure(error, "Calendar connection could not be disconnected.", CALENDAR_MANAGER_MESSAGE);
-  return data === true;
+  const row = data && typeof data === "object" ? data as Record<string, unknown> : {};
+  const receiptId = typeof row.receiptId === "string" ? row.receiptId : "";
+  if (!receiptId) failure(null, "Calendar disconnect receipt could not be saved.");
+  return {
+    disconnected: row.disconnected === true,
+    receiptId,
+    revocationOutcome: revocation.outcome,
+    revocationErrorCode: revocation.errorCode,
+    localCleanupStatus: row.localCleanupStatus === "complete" ? "complete" : "partial",
+  };
 }
 
 export async function markWorkspaceCalendarConnectionError(actor: WorkspaceActor, workspaceId: string, provider: CalendarProvider, message: string, expectedUpdatedAt?: string): Promise<void> {

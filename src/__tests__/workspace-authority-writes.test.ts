@@ -18,6 +18,7 @@ const HANDOFF = "ffffffff-ffff-4fff-8fff-ffffffffffff";
 const boundary = vi.hoisted(() => ({
   tables: {} as Record<string, Row[]>,
   calls: [] as RpcCall[],
+  failCalendarRead: false,
   /** What the next authority RPC returns. Defaults to a successful write. */
   nextRpc: null as null | { data?: unknown; error?: { message: string } },
 }));
@@ -26,6 +27,10 @@ function query(table: string) {
   const filters: Array<(row: Row) => boolean> = [];
   let counted = false;
   const run = async () => {
+    if (table === "workspace_calendar_connections" && boundary.failCalendarRead) {
+      boundary.failCalendarRead = false;
+      return { data: [], error: { message: "fixture credential read failure" }, count: null };
+    }
     const rows = (boundary.tables[table] ?? []).filter((row) => filters.every((filter) => filter(row)));
     return { data: structuredClone(rows), error: null, count: counted ? rows.length : null };
   };
@@ -49,6 +54,11 @@ function defaultRpc(name: string, args: Row): { data: unknown; error: null } {
   }
   if (name === "create_workspace_handoff") {
     return { data: [{ id: "88888888-8888-4888-8888-888888888888", agency_workspace_id: AGENCY, source_work_id: args.p_source_work_id, recipient_email: args.p_recipient_email, status: "pending", expires_at: args.p_expires_at, created_by: args.p_user_id, created_at: now }], error: null };
+  }
+  if (name === "disconnect_workspace_calendar_connection") {
+    const row = boundary.tables.workspace_calendar_connections?.find((candidate) => candidate.workspace_id === args.p_workspace_id && candidate.provider === args.p_provider);
+    if (row) Object.assign(row, { status: "revoked", access_token_ciphertext: null, refresh_token_ciphertext: null, token_expires_at: null, last_error: null });
+    return { data: { disconnected: Boolean(row), receiptId: "calendar-disconnect-receipt", localCleanupStatus: "complete" }, error: null };
   }
   if (name === "revoke_workspace_handoff" || name === "revoke_workspace_delegation" || name === "revoke_workspace_calendar_connection") {
     return { data: true, error: null };
@@ -215,22 +225,38 @@ describe("revokeHandoff and revokeDelegation", () => {
 });
 
 describe("calendar connection writes", () => {
-  it("does not wipe stored Google tokens when provider consent revocation fails", async () => {
+  it("wipes stored Google tokens and writes a receipt when provider consent revocation fails", async () => {
     vi.stubEnv("STRELVA_BOOKING_CALENDAR_REVOKE", "1");
     const token = encryptSecret("fictional-refresh-token");
     boundary.tables.workspace_calendar_connections = [{ id: "77777777-7777-4777-8777-777777777777", workspace_id: BUSINESS, provider: "google", calendar_id: "primary", calendar_name: "Bookings", time_zone: "America/New_York", status: "connected", scopes: ["calendar"], reminder_policy: { mode: "off" }, token_expires_at: null, last_checked_at: null, last_error: null, created_at: "2026-10-05T12:00:00Z", updated_at: "2026-10-05T12:00:00Z", refresh_token_ciphertext: token }];
     const fetcher = vi.fn().mockResolvedValue(new Response("failure", { status: 503 })); vi.stubGlobal("fetch", fetcher);
-    await expect(revokeWorkspaceCalendarConnection(as(OWNER), BUSINESS, "google")).rejects.toMatchObject({ code: "provider" });
+    await expect(revokeWorkspaceCalendarConnection(as(OWNER), BUSINESS, "google")).resolves.toMatchObject({
+      disconnected: true, receiptId: "calendar-disconnect-receipt", revocationOutcome: "failed", revocationErrorCode: "http_503", localCleanupStatus: "complete",
+    });
     expect(fetcher).toHaveBeenCalledTimes(1);
-    expect(boundary.calls).toEqual([]);
-    expect(boundary.tables.workspace_calendar_connections[0]?.refresh_token_ciphertext).toBe(token);
+    expect(boundary.calls).toMatchObject([{ name: "disconnect_workspace_calendar_connection", args: { p_provider: "google", p_revocation_outcome: "failed", p_revocation_error_code: "http_503" } }]);
+    expect(boundary.tables.workspace_calendar_connections[0]).toMatchObject({ status: "revoked", access_token_ciphertext: null, refresh_token_ciphertext: null, token_expires_at: null });
+  });
+  it("records credential-read failure but still clears the calendar connection", async () => {
+    boundary.failCalendarRead = true;
+    boundary.tables.workspace_calendar_connections = [{
+      workspace_id: BUSINESS, provider: "google", status: "connected",
+      access_token_ciphertext: encryptSecret("fixture-access"), refresh_token_ciphertext: encryptSecret("fixture-refresh"),
+    }];
+    const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+    await expect(revokeWorkspaceCalendarConnection(as(OWNER), BUSINESS, "google")).resolves.toMatchObject({
+      disconnected: true, receiptId: "calendar-disconnect-receipt", revocationOutcome: "failed", revocationErrorCode: "credential_read_failed",
+    });
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(boundary.calls).toContainEqual(expect.objectContaining({ name: "disconnect_workspace_calendar_connection", args: expect.objectContaining({ p_revocation_outcome: "failed", p_revocation_error_code: "credential_read_failed" }) }));
+    expect(boundary.tables.workspace_calendar_connections[0]).toMatchObject({ status: "revoked", access_token_ciphertext: null, refresh_token_ciphertext: null, token_expires_at: null });
   });
   it("save, mark and revoke through manage_calendar RPCs with ciphertext only", async () => {
     const saved = await saveWorkspaceCalendarConnection(as(ADMIN), BUSINESS, connectionInput, { accessToken: "plain-access", refreshToken: "plain-refresh", scopes: ["calendar"] });
     await markWorkspaceCalendarConnectionError(as(OWNER), BUSINESS, "google", "x".repeat(1200));
-    await expect(revokeWorkspaceCalendarConnection(as(OWNER), BUSINESS, "google")).resolves.toBe(true);
+    await expect(revokeWorkspaceCalendarConnection(as(OWNER), BUSINESS, "google")).resolves.toMatchObject({ disconnected: false, revocationOutcome: "no_token" });
     expect(boundary.calls.map((call) => call.name)).toEqual([
-      "save_workspace_calendar_connection", "mark_workspace_calendar_connection_error", "revoke_workspace_calendar_connection",
+      "save_workspace_calendar_connection", "mark_workspace_calendar_connection_error", "disconnect_workspace_calendar_connection",
     ]);
     const save = boundary.calls[0]!.args;
     expect(save).toMatchObject({ p_workspace_id: BUSINESS, p_user_id: ADMIN, p_provider: "google", p_status: "connected", p_scopes: ["calendar"] });

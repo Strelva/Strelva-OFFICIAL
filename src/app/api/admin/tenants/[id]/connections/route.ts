@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { logAuditEvent } from "@/lib/storage";
-import { getConnections, deleteConnection } from "@/lib/connections";
+import { getConnections } from "@/lib/connections";
 import type { IntegrationProvider } from "@/lib/types";
+import { disconnectTenantProvider } from "@/lib/provider-disconnect";
 
 /**
  * Admin connections surface — lists and removes OAuth/API connections for a
@@ -77,9 +78,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     );
   }
 
-  await deleteConnection(id, provider);
-
   const actor = await getActorContext(id);
+  const receipt = await disconnectTenantProvider({ tenantId: id, provider, actorUserId: actor.userId });
   await logAuditEvent({
     tenant: id,
     action: "connection.delete",
@@ -90,5 +90,13 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   }).catch(() => {});
 
   const connections = await getConnections(id).catch(() => []);
-  return NextResponse.json({ connections: connections.map(safeConnection) });
+  return NextResponse.json({
+    connections: connections.map(safeConnection),
+    disconnectReceipt: {
+      id: receipt.id,
+      revocationOutcome: receipt.revocationOutcome,
+      revocationErrorCode: receipt.revocationErrorCode,
+      localCleanupStatus: receipt.localCleanupStatus,
+    },
+  });
 }
