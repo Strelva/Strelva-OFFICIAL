@@ -35,7 +35,7 @@ describe("agency copy across public artifacts", () => {
     const html = renderAiVisibilityHtml({ ...ai, agency });
     const ui = renderToStaticMarkup(<AiVisibilityResultView result={{ ...ai, agency }} scanId="scan_fixture" shareUrl={null} onReset={() => {}} />);
     for (const artifact of [html, ui]) {
-      expect(artifact).toContain("Northside &amp; Web"); expect(artifact).toContain("on Strelva");
+      expect(artifact).toContain("Northside &amp; Web"); expect(artifact).toMatch(/on Strelva|Runs on Strelva/);
       expect(artifact).toContain("Ask your web provider"); expect(artifact).not.toContain("Ask Strelva");
       expect(artifact).toContain("https://north.example/contact?from=check&amp;kind=fix");
     }
@@ -46,9 +46,9 @@ describe("agency copy across public artifacts", () => {
   it("puts the agency in email HTML/text and agency CTA, retaining default emails unchanged", () => {
     const opts = buildAuditReportEmailOptions({ name: "Jacob", url: audit.url }, attributedAudit(audit, agency), "https://app.example/audit/report/fixture");
     const html = renderEmailHtml(opts); const text = renderEmailText(opts);
-    expect(html).toContain("Northside &amp; Web"); expect(html).toContain("on Strelva");
+    expect(html).toContain("Northside &amp; Web"); expect(html).toContain("Runs on Strelva.");
     expect(html).not.toContain('alt="Strelva"'); expect(html).not.toContain("Ask Strelva");
-    expect(text).toContain("Northside & Web on Strelva"); expect(text).toContain(agency.contactUrl);
+    expect(text).toContain("Northside & Web · Runs on Strelva."); expect(text).toContain(agency.contactUrl);
     const original = buildAuditReportEmailOptions({ name: "Jacob", url: audit.url }, audit, "https://app.example/report");
     expect(original.preparedBy).toBeUndefined(); expect(original.footerNote).toBe("You requested this audit at strelva.com/audit.");
     expect(renderEmailHtml(original)).toContain('alt="Strelva"');

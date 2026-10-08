@@ -1,3 +1,5 @@
+import { resolveTenantBrand } from "@/platform/agency-brand/server";
+import type { OwnerBrand } from "@/platform/infra/agency-brand";
 import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/platform/infra/heartbeat";
@@ -7,8 +9,7 @@ import { alertOnce } from "@/platform/infra/monitoring";
 import { generateAllReports, buildReportSubject, buildReportHeading } from "@/lib/reports";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { generateWeeklyBrief } from "@/lib/weekly-brief";
-import { EMAIL_DOMAIN } from "@/platform/infra/brand";
-import { sanitizeEmailSubjectText } from "@/lib/invite-email";
+import { CONTROL_PLANE_URL, EMAIL_DOMAIN } from "@/platform/infra/brand";
 import { emailSendingPaused } from "@/platform/infra/email/enabled";
 import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
 import type { EmailRow } from "@/platform/infra/email/layout";
@@ -34,9 +35,10 @@ function reportSummaryParagraphs(summary: string): string[] {
     .filter(Boolean);
 }
 
-function reportToHtml(heading: string, summary: string, siteName: string, dashboardUrl: string, analyticsRows: EmailRow[]): string {
+function reportToHtml(heading: string, summary: string, siteName: string, dashboardUrl: string, analyticsRows: EmailRow[], brand: OwnerBrand): string {
   const paragraphs = reportSummaryParagraphs(summary);
   return renderEmailHtml({
+    brand,
     preheader: paragraphs[0],
     // Verdict-first h1 (from buildReportHeading) — the plain verdict the body
     // proves, never the generic "Your weekly report" label.
@@ -50,8 +52,9 @@ function reportToHtml(heading: string, summary: string, siteName: string, dashbo
   });
 }
 
-function reportToText(heading: string, summary: string, dashboardUrl: string, analyticsRows: EmailRow[]): string {
+function reportToText(heading: string, summary: string, dashboardUrl: string, analyticsRows: EmailRow[], brand: OwnerBrand): string {
   return renderEmailText({
+    brand,
     heading,
     paragraphs: reportSummaryParagraphs(summary),
     rows: analyticsRows.length ? analyticsRows : undefined,
@@ -139,23 +142,27 @@ await mapPool(reports, 8, async (report) => {
       const subject = buildReportSubject(report);
       const heading = buildReportHeading(report);
 
+      const brand = await resolveTenantBrand(report.tenant.id);
+      const dashboardUrl = brand.agencyId ? `${CONTROL_PLANE_URL}/client/${encodeURIComponent(report.tenant.id)}/dashboard/reports` : await ownerNoticeUrl(report.tenant, "/dashboard/reports", getTenantDashboardUrl(report.tenant, "/dashboard/reports"));
       const html = reportToHtml(
         heading,
         report.summary,
         report.tenant.siteName,
-        await ownerNoticeUrl(report.tenant, "/dashboard/reports", getTenantDashboardUrl(report.tenant, "/dashboard/reports")),
+        dashboardUrl,
         report.analyticsRows,
+        brand,
       );
       const text = reportToText(
         heading,
         report.summary,
-        await ownerNoticeUrl(report.tenant, "/dashboard/reports", getTenantDashboardUrl(report.tenant, "/dashboard/reports")),
+        dashboardUrl,
         report.analyticsRows,
+        brand,
       );
       await generateWeeklyBrief(report.tenant.id);
 
       if (process.env.RESEND_API_KEY) {
-        const domain = report.tenant.resendDomain || process.env.RESEND_DOMAIN || EMAIL_DOMAIN;
+        const domain = brand.agencyId ? EMAIL_DOMAIN : report.tenant.resendDomain || process.env.RESEND_DOMAIN || EMAIL_DOMAIN;
 
         // Route through the shared transport boundary (audience gate + the single
         // Resend call). sendEmail throws on a provider error and returns false on
@@ -170,7 +177,8 @@ await mapPool(reports, 8, async (report) => {
             subject,
             html,
             text,
-            fromName: sanitizeEmailSubjectText(report.tenant.siteName),
+            brand,
+            fromName: report.tenant.siteName,
             fromAddress: `report@${domain}`,
           });
         } catch (err) {

@@ -133,7 +133,8 @@ describe("owner not told", () => {
     expect(notToldReason(row())).toMatch(/held back.*client email is off or not set up/);
     expect(notToldReason(row({ lastDelivery: { kind: "urgent", status: "bounced", reason: "mailbox_full", at: "2026-10-05T09:00:00Z" } }))).toBe("Email bounced (mailbox_full)");
     expect(notToldReason(row({ lastDelivery: null }))).toBe("Not emailed yet");
-    expect(notToldReason(row({ recipientKnown: false, lastDelivery: null }))).toMatch(/No owner email on file/);
+    expect(notToldReason(row({ recipientKnown: false, lastDelivery: null }))).toMatch(/^Not sent: no trusted owner address/);
+    expect(notToldReason(row({ lastDelivery: { kind: "digest", status: "suppressed", reason: "no_trusted_owner_recipient", at: "2026-10-05T09:00:00Z" } }))).toBe("Not sent: no trusted owner address");
   });
 
   it("renders the list, the empty state and the outage, and nothing when off or denied", () => {

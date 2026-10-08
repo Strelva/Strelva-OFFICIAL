@@ -54,15 +54,19 @@ export interface TenantReplyDeps {
   control?(workspaceId: string, locationId: string): Promise<{ paused: boolean }>;
   noteAccess?(workspaceId: string, locationId: string, pending: boolean): Promise<unknown>;
   /** Throws unless this person is the business's acting provider for Google on this location. */
-  authorizeProvider?(workspaceId: string, userId: string, locationId: string): Promise<void>;
+  authorizeProvider?(workspaceId: string, userId: string, locationId: string, agencyId?: string): Promise<void>;
 }
 
 /** The provider check for an operator's authority, or nothing for the owner's and the policy's. */
 function providerCheck(authority: ListingAuthority, workspaceId: string, locationId: string, deps: TenantReplyDeps): { authorizeProvider?: () => Promise<void> } {
   if (authority.kind !== "operator_instruction" && authority.kind !== "operator_undo") return {};
   const userId = /^operator:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(authority.actor)?.[1];
+  const staff = /^agency-staff:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(authority.actor);
+  const actorUserId = userId ?? staff?.[2];
   const authorize = deps.authorizeProvider;
-  return userId && authorize ? { authorizeProvider: () => authorize(workspaceId, userId, locationId) } : {};
+  return actorUserId && authorize ? { authorizeProvider: () => staff
+    ? authorize(workspaceId, actorUserId, locationId, staff[1])
+    : authorize(workspaceId, actorUserId, locationId) } : {};
 }
 
 /** Which ledger this tenant's reply belongs to. Decided before any write. */
@@ -195,13 +199,14 @@ export async function defaultTenantReplyDeps(): Promise<TenantReplyDeps> {
     control: async (workspaceId, locationId) => (await import("./controls")).readListingControl(workspaceId, locationId),
     noteAccess: async (workspaceId, locationId, pending) => (await import("./controls")).noteListingAccess(workspaceId, locationId, pending),
     notify: (text) => { sendSlackNotification({ text }).catch(() => {}); },
-    authorizeProvider: async (workspaceId, userId, locationId) => {
+    authorizeProvider: async (workspaceId, userId, locationId, agencyId) => {
       const { getSupabase } = await import("@/platform/infra/db/client");
       const client = getSupabase();
       const user = client ? (await client.from("users").select("email").eq("id", userId).maybeSingle()).data : null;
       if (!user?.email) throw new Error("acting_provider_not_staffed");
       const { assertActingProvider } = await import("@/platform/workspaces/acting-provider");
-      await assertActingProvider({ userId, verifiedEmail: user.email }, workspaceId, { effect: "google", kind: "google_location", ref: locationId });
+      const actingAgency = await assertActingProvider({ userId, verifiedEmail: user.email }, workspaceId, { effect: "google", kind: "google_location", ref: locationId });
+      if (agencyId && actingAgency !== agencyId) throw new Error("acting_provider_not_staffed");
     },
   };
 }

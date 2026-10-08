@@ -54,7 +54,7 @@ vi.mock("@/products/google-listing/tenant-replies", async (original) => ({
   defaultTenantReplyDeps: async () => deps,
 }));
 
-import { AUTO_REPLY_ACTOR, isOperatorActor, operatorActorId, resolveEventAction } from "../lib/event-actions";
+import { AUTO_REPLY_ACTOR, agencyStaffActorId, isDelegateActor, isOperatorActor, operatorActorId, resolveEventAction } from "../lib/event-actions";
 
 const WORKSPACE = "ab000000-0000-4000-8000-000000000010";
 const ok = <T,>(data: T): GoogleResult<T> => ({ ok: true, data });
@@ -226,6 +226,29 @@ describe("review reply approve on the listing System", () => {
     expect(await resolveEventAction("tenant-a", "evt_rr", "approved", operator)).toEqual({ changed: true });
     expect(mockPublishReviewReply).toHaveBeenCalledWith("tenant-a", "rev_9", "Thank you!", { actor: `${operator} approved event evt_rr` });
     expect(mockResolveEvent).toHaveBeenCalledWith("evt_rr", "approved", { actor: operator });
+  });
+
+  it("agency staff's reply is an operator instruction naming the agency and the person, never the owner's approval", async () => {
+    const staff = agencyStaffActorId("10000000-0000-4000-8000-0000000000cc", "10000000-0000-4000-8000-0000000000bb");
+    const authorizeProvider = vi.fn(async () => {});
+    const { google, receipts } = setup({ authorizeProvider });
+    expect(await resolveEventAction("tenant-a", "evt_rr", "approved", staff)).toEqual({ changed: true });
+    expect(authorizeProvider).toHaveBeenCalledWith(WORKSPACE, "10000000-0000-4000-8000-0000000000bb", "333", "10000000-0000-4000-8000-0000000000cc");
+    expect(google.writes).toEqual(["Thank you!"]);
+    expect(receipts.all()[0]).toMatchObject({
+      authority: { kind: "operator_instruction", actor: "agency-staff:10000000-0000-4000-8000-0000000000cc:10000000-0000-4000-8000-0000000000bb", instructionRef: "event:evt_rr" },
+    });
+    expect(receipts.all()[0]).not.toMatchObject({ authority: { kind: "owner_approval" } });
+    expect(mockResolveEvent).toHaveBeenCalledWith("evt_rr", "approved", { actor: staff });
+  });
+
+  it("only a verified agency and user id become an agency staff actor", () => {
+    expect(() => agencyStaffActorId("not-a-uuid", "10000000-0000-4000-8000-0000000000bb")).toThrow("agency_staff_actor_invalid");
+    expect(() => agencyStaffActorId("10000000-0000-4000-8000-0000000000cc", "")).toThrow("agency_staff_actor_invalid");
+    expect(isDelegateActor("agency-staff:x:y")).toBe(false);
+    expect(isDelegateActor("10000000-0000-4000-8000-0000000000bb")).toBe(false);
+    expect(isDelegateActor(agencyStaffActorId("10000000-0000-4000-8000-0000000000cc", "10000000-0000-4000-8000-0000000000bb"))).toBe(true);
+    expect(isOperatorActor(agencyStaffActorId("10000000-0000-4000-8000-0000000000cc", "10000000-0000-4000-8000-0000000000bb"))).toBe(false);
   });
 
   it("only a verified operator id becomes an operator actor", () => {

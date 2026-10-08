@@ -1,5 +1,5 @@
--- Agency 1.0 #255 (2 of 2) and #534: every client-serving super_admins
--- branch becomes the acting provider (20261014100000). Local only until
+-- Agency 1.0 #255 and #534: website and per-business decision provider
+-- gates use the acting provider (20261014100000). Local only until
 -- Jacob's yes.
 --
 -- Before: the provider half of each gate was "a Strelva operator", an active
@@ -22,24 +22,55 @@
 --                                      each effect is gated where it happens)
 --   owner-link website launch (#534)   the serving provider verified for publish
 --                                      with the website mandate, on top of the
---                                      email-served owner link; the owner's
---                                      preview needs the publish-served provider
+--                                      delivered owner link. Read-only preview
+--                                      retains the trusted-recipient gate.
 --
 -- A provider seat also opens the website document and change-request reads
 -- and writes, as 7A's business_record_assert_actor does: the seat resolves
 -- to provider_seat_direct_role().
 --
--- Platform operator powers that remain are platform-wide and read-only, or
--- recorded where they happen; none serves a client: the operator queue and
+-- Platform operator paths outside this migration retain their prior gates;
+-- this migration does not establish universal provider coverage. These include
+-- the operator queue and
 -- its read-back list (20261007160000, 20261008123000), the not-told and
 -- policy-business lists (20261008124000), catalog report failures
 -- (20261010152000), the Needs-you tenant seed (20261008124000, logged in
 -- decision_policy_tenant_imports), agency verification (20261009152000) and
 -- conversion mandates (20261014100000), each naming the operator.
 --
--- Rollback restores every replaced body from rollback-20261014101000.
+-- Rollback restores every replaced body from rollback-20261014112000.
 
 set local lock_timeout = '3s';
+
+-- Capture the actual integrated definitions, including #553 recipient trust
+-- and #560 effect-specific owner-link gates. Rollback must restore this exact
+-- predecessor, never an older copied body. Server roles cannot read or write it.
+create table public.acting_provider_gate_predecessors(
+  signature text primary key, before_definition text not null, after_hash text
+);
+alter table public.acting_provider_gate_predecessors enable row level security;
+revoke all on public.acting_provider_gate_predecessors from public,anon,authenticated,service_role;
+insert into public.acting_provider_gate_predecessors(signature,before_definition)
+  select signature,pg_get_functiondef(signature::regprocedure) from unnest(array[
+    'public.website_document_assert_actor(uuid,uuid,uuid,text,boolean,boolean)',
+    'public.website_document_launch_authority(uuid,uuid,uuid)',
+    'public.authorize_website_domain_change(uuid,uuid,uuid,text,text,text,text)',
+    'public.website_change_actor_role(uuid,uuid,text)',
+    'public.record_website_change_receipt(uuid,uuid,text,uuid,text,jsonb)',
+    'public.workspace_make_systems_authority(uuid,uuid)',
+    'public.workspace_require_make_systems(uuid,uuid)',
+    'public.assert_website_owner_link(uuid,uuid,uuid,text,integer,text,uuid,uuid,text,text)',
+    'public.set_decision_policy(uuid,uuid,text,text,uuid,text,text,text,bigint)',
+    'public.read_decision_policies(uuid,uuid,text)',
+    'public.claim_owner_decision(uuid,uuid,text,text,text,uuid,text,text)',
+    'public.escalate_owner_decision(uuid,uuid,uuid,text,text)',
+    'public.list_owner_decisions(uuid,uuid,text,boolean)',
+    'public.read_strelva_handled(uuid,uuid,text,timestamp with time zone)',
+    'public.prepare_website_domain_request(uuid,uuid,uuid,uuid,text,text,integer,text,text,jsonb,text)',
+    'public.claim_native_website_fact_review(uuid,uuid,text,text,bigint,uuid)',
+    'public.read_catalog_report_receipts(uuid,uuid,text,timestamp with time zone)',
+    'public.set_tenant_decision_route(text,uuid,text,text,text,text,text,text,text)'
+  ]) signature;
 
 -- ---- helpers ----
 
@@ -293,13 +324,11 @@ $$;
 
 -- ---- owner-ask website launch (#534, M6) ----
 
--- An owner-decision link is served for email: its session and
+-- An owner-decision link uses its bound decision effect (#560): its session and
 -- assert_owner_decision_link (20261010102000) check the provider verified for
--- email, which is right for the email itself. Launching a website from one
--- also publishes, so the website checks add publish: the preview the owner
--- opens, and the launch choke point (reserve and publish both call it),
--- which also needs the session's provider to hold the website mandate,
--- rechecked at each step. strelva_runs_business keeps meaning email.
+-- its actual execution effect. Website publication additionally requires
+-- a named website mandate at reserve and publish. The read-only preview
+-- retains its existing transport and recipient gates; it publishes nothing.
 do $patch$
 declare
   target text := 'public.assert_website_owner_link(uuid,uuid,uuid,text,integer,text,uuid,uuid,text,text)';
@@ -317,12 +346,6 @@ begin
   if patched = definition then raise exception 'acting_provider_patch_drift: %', target; end if;
   execute patched;
 
-  target := 'public.read_owner_decision_website_preview(uuid,uuid,text,text)';
-  definition := pg_get_functiondef(target::regprocedure);
-  patched := replace(definition, 'or not public.strelva_runs_business(p_workspace_id) then',
-    'or not public.platform_serves_business(p_workspace_id,''publish'') then');
-  if patched = definition then raise exception 'acting_provider_patch_drift: %', target; end if;
-  execute patched;
 end;
 $patch$;
 
@@ -412,3 +435,6 @@ end;
 $$;
 revoke all on function public.read_agency_google_listing_readback_failures(uuid, text, uuid, integer) from public, anon, authenticated;
 grant execute on function public.read_agency_google_listing_readback_failures(uuid, text, uuid, integer) to service_role;
+
+update public.acting_provider_gate_predecessors
+  set after_hash=md5(pg_get_functiondef(signature::regprocedure));

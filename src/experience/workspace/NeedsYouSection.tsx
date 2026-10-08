@@ -65,7 +65,14 @@ export function NeedsYouSection({ state, pending, notices, onDecide, onRetry, ex
         const Icon = look.icon;
         const effects = <small className={styles.effects}>Approve: {item.approveEffect} Not yet: {item.notYetEffect}{item.operatorNote ? ` Strelva's note: ${item.operatorNote}` : ""}</small>;
         const status = notice ? <small role="status" className={notice.tone === "error" ? styles.decisionError : styles.decisionNotice}>{notice.text}</small> : null;
-        const actions = canDecide ? <div className={styles.decisionActions}>
+        // A source with a separate review is decided only where every value shows.
+        const decidable = canDecide && item.review !== null;
+        const review = item.review?.length ? <ul className={styles.reviewLines} aria-label="Every change you approve">
+          {item.review.map((line, row) => <li key={row}>{line}</li>)}
+        </ul> : null;
+        const detail = review ?? (item.detail ? look.shape === "message" ? <blockquote className={styles.quote}>{item.detail}</blockquote> : <p>{item.detail}</p> : null);
+        const unavailable = canDecide && item.review === null ? <small role="status" className={styles.decisionNotice}>This changed or couldn&apos;t be loaded. Refresh to see the latest before deciding.</small> : null;
+        const actions = decidable ? <div className={styles.decisionActions}>
           <Button size="sm" loading={busy} disabled={Boolean(pending)} onClick={() => onDecide(item, "approve")} aria-label={`${look.verb}: ${item.title}`}>{look.verb}</Button>
           <button type="button" className={styles.quietPill} disabled={Boolean(pending)} onClick={() => onDecide(item, "not_yet")} aria-label={`Not yet: ${item.title}`}>Not yet</button>
           {openHref ? <a className={styles.decisionLink} href={openHref}>Open<ArrowRight size={14} aria-hidden="true" /></a> : null}
@@ -76,8 +83,9 @@ export function NeedsYouSection({ state, pending, notices, onDecide, onRetry, ex
             <p className={styles.cardMeta}><span className={styles.dot} aria-hidden="true" />{look.source}<span>{item.urgent ? "Someone is waiting · " : ""}{when(item.openedAt)}</span></p>
             {look.amount ? <p className={styles.amount}>{look.amount}</p> : null}
             <h3>{item.title}</h3>
-            {item.detail ? look.shape === "message" ? <blockquote className={styles.quote}>{item.detail}</blockquote> : <p>{item.detail}</p> : null}
+            {detail}
             {effects}
+            {unavailable}
             {status}
           </div>
           {actions}
@@ -86,8 +94,9 @@ export function NeedsYouSection({ state, pending, notices, onDecide, onRetry, ex
           <span className={styles.decisionIcon} aria-hidden="true"><Icon size={18} strokeWidth={1.6} /></span>
           <div className={styles.decisionBody}>
             <strong>{item.title}</strong>
-            {item.detail ? <p>{item.detail}</p> : null}
+            {review ?? (item.detail ? <p>{item.detail}</p> : null)}
             {effects}
+            {unavailable}
             {status}
           </div>
           {actions}

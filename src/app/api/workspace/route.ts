@@ -1,3 +1,4 @@
+import { resolveOwnerBrand } from "@/platform/agency-brand/server";
 import { agencyProspectingEnabled } from "@/platform/agency-prospecting/server";
 import { websiteRebuildReleaseEnabledForWorkspace, websiteRebuildReleasedFor } from "@/products/websites/index";
 import { websiteRebuildSchema } from "@/products/websites/index";
@@ -305,6 +306,7 @@ export async function GET(request: Request) {
     // off for this workspace. The route still enforces the flag per site.
     if (inquiriesReleased) products.push({ id: "inquiries", name: "Inquiry work", description: "Keep customer requests moving with a clear, inspectable thread.", availability: "available" });
     const snapshot: WorkspaceSnapshot = {
+      ownerBrand: await resolveOwnerBrand(selected.id),
       actor: { email: current.verifiedEmail, localPreview: false },
       workspaces: workspaces.map(({ id, kind, name, access, role }) => ({ id, kind, name, access, role })), workspaceId: selected.id,
       workspaceExitState,

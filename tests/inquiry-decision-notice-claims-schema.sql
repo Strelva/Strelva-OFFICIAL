@@ -42,6 +42,9 @@ select pg_temp.idn_assert(not public.authorize_inquiry_owner_link_decision('fixt
   and not public.authorize_inquiry_owner_link_decision('other-fixture','evt-1',repeat('1',64),'idn-owner@example.test')
   and not public.authorize_inquiry_owner_link_decision('fixture','evt-2',repeat('1',64),'idn-owner@example.test')
   and not public.authorize_inquiry_owner_link_decision('fixture','evt-1',repeat('1',64),'other@example.test'),'revision, business, event and recipient all bind');
-update public.business_record_facts set value='{"email":"new-owner@example.test"}' where workspace_id='c1700000-0000-4000-8000-000000000002' and fact_key='owner_recipient';
+-- Rotate through the owner's write, which also updates confirmed recipient trust.
+-- A direct working-row overwrite is pending after #509 and cannot revoke it.
+select public.patch_business_record('c1700000-0000-4000-8000-000000000002','c1700000-0000-4000-8000-000000000001','idn-owner@example.test','owner',0,
+  '{"facts":{"owner_recipient":{"value":{"email":"new-owner@example.test"}}}}', 'c1700000-0000-4000-8000-000000000008', repeat('8',64));
 select pg_temp.idn_assert(not public.authorize_inquiry_owner_link_decision('fixture','evt-1',repeat('1',64),'idn-owner@example.test'),'revoked owner recipient cannot reuse old authority');
 rollback;

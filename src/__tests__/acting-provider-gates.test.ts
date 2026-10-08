@@ -95,9 +95,17 @@ describe("email sent for a business by its agency", () => {
     setProviderGateDb(db);
     const result = await sendEmailWithReceipt(mail({ provider: { businessWorkspaceId: business, agencyWorkspaceId: agency }, fromAddress: "report@Mail.Strelva.com" }));
     expect(result.status).toBe("accepted");
-    expect(db.calls).toEqual([{ p_workspace_id: business, p_agency_workspace_id: agency, p_sender: "mail.strelva.com" }]);
+    expect(db.calls).toEqual(Array(2).fill({ p_workspace_id: business, p_agency_workspace_id: agency, p_sender: "mail.strelva.com" }));
     await sendEmailWithReceipt(mail({ provider: { businessWorkspaceId: business } }));
-    expect(db.calls[1]).toEqual({ p_workspace_id: business, p_agency_workspace_id: null, p_sender: "updates.strelva.com" });
+    expect(db.calls[2]).toEqual({ p_workspace_id: business, p_agency_workspace_id: null, p_sender: "updates.strelva.com" });
+  });
+
+  it("rechecks revocation immediately before dispatch", async () => {
+    const rpc = vi.fn().mockResolvedValueOnce({ data: true, error: null }).mockResolvedValueOnce({ data: false, error: null });
+    setProviderGateDb({ rpc });
+    expect(await sendEmailWithReceipt(mail({ provider: { businessWorkspaceId: business } }))).toMatchObject({ status: "suppressed", reason: "provider_not_cleared" });
+    expect(send).not.toHaveBeenCalled();
+    expect(rpc).toHaveBeenCalledTimes(2);
   });
 
   it("suppresses when the agency is not cleared, or the gate cannot answer", async () => {

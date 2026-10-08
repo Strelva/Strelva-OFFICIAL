@@ -8,6 +8,7 @@ const tenantAccess = vi.hoisted(() => vi.fn());
 const submit = vi.hoisted(() => vi.fn());
 const limited = vi.hoisted(() => vi.fn());
 const summaries = vi.hoisted(() => vi.fn());
+const decider = vi.hoisted(() => vi.fn());
 
 vi.mock("@/platform/workspaces/http", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/platform/workspaces/http")>()),
@@ -16,6 +17,7 @@ vi.mock("@/platform/workspaces/http", async (importOriginal) => ({
 vi.mock("@/platform/owner-entry/linked-sites", () => ({ ownerEntryHomesOpen: homesOpen, readLinkedSite: linkedSite }));
 vi.mock("@/platform/infra/auth", () => ({ requireTenantAccess: tenantAccess }));
 vi.mock("@/lib/reviews/owner-reply", () => ({ submitOwnerReviewReply: submit }));
+vi.mock("@/lib/operator-decisions", () => ({ sessionTenantDecider: decider }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: limited }));
 vi.mock("@/platform/owner-entry/site-summary", () => ({ readSiteSummaries: summaries }));
 
@@ -38,7 +40,8 @@ const valid = { workspaceId: WS, tenantId: "lakeshore", reviewId: "r1", reply: "
 
 beforeEach(() => {
   vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
-  for (const mock of [actor, homesOpen, linkedSite, tenantAccess, submit, limited, summaries]) mock.mockReset();
+  for (const mock of [actor, homesOpen, linkedSite, tenantAccess, submit, limited, summaries, decider]) mock.mockReset();
+  decider.mockResolvedValue({ kind: "member", actorId: ACTOR.userId });
   actor.mockResolvedValue(ACTOR);
   homesOpen.mockResolvedValue(true);
   linkedSite.mockResolvedValue(SITE);
@@ -55,7 +58,19 @@ describe("POST /api/workspace/reviews/reply", () => {
     expect(await response.json()).toMatchObject({ published: true, review: { reply: "Thanks, Jane!" } });
     expect(linkedSite).toHaveBeenCalledWith(ACTOR, WS, "lakeshore");
     expect(tenantAccess).toHaveBeenCalledWith("lakeshore");
-    expect(submit).toHaveBeenCalledWith("lakeshore", "r1", "Thanks, Jane!", ACTOR.userId);
+    expect(decider).toHaveBeenCalledWith("lakeshore");
+    expect(submit).toHaveBeenCalledWith("lakeshore", "r1", "Thanks, Jane!", { kind: "member", actorId: ACTOR.userId });
+  });
+
+  it("replies as the operator for a Strelva operator, and refuses the owner's draft (#530)", async () => {
+    const operator = { kind: "operator", operator: { userId: ACTOR.userId, verifiedEmail: ACTOR.verifiedEmail, actorId: `operator:${ACTOR.userId}` } };
+    decider.mockResolvedValue(operator);
+    expect((await reply(post(valid))).status).toBe(200);
+    expect(submit).toHaveBeenCalledWith("lakeshore", "r1", "Thanks, Jane!", operator);
+    submit.mockResolvedValueOnce({ status: "owner_decides" });
+    const refused = await reply(post(valid));
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toMatchObject({ error: "The owner decides this reply. Nothing was posted." });
   });
 
   it("refuses while workspaces are off, from another origin, or signed out", async () => {

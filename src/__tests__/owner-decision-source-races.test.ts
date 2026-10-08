@@ -122,7 +122,7 @@ describe.each(cases)("%s account-free source resolution", (_lifecycle, fixture) 
     const source = fixture();
     const service = await accountFreeService(source.adapter);
     expect(await service.decide()).toMatchObject({ status: "done", item: { state: "approved", decidedByKind: "owner_link" } });
-    expect(service.start).toHaveBeenCalledWith(WS, service.item.id, service.item.revisionHash, OWNER_EMAIL);
+    expect(service.start).toHaveBeenCalledWith(WS, service.item.id, service.item.revisionHash, OWNER_EMAIL, "approve");
     expect(source.write).toHaveBeenCalledOnce();
     expect(source.write.mock.calls[0]?.[0]).toEqual(ADMIN);
     expect(service.authorize.mock.invocationCallOrder[0]).toBeLessThan(source.write.mock.invocationCallOrder[0]!);

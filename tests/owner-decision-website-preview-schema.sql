@@ -28,12 +28,6 @@ begin
   insert into public.workspace_providers(customer_workspace_id,provider_workspace_id,source,started_by) values(ws,'b6000000-0000-4000-8000-0000000000a1','business_choice',actor);
   insert into public.agency_verifications(agency_workspace_id,effect,status,evidence,verified_by,verifier_is_agency_member)
     values('b6000000-0000-4000-8000-0000000000a1','email','verified','{"note":"fixture"}',actor,false);
-  -- After 20261014101000 (#534) a website preview also needs the provider
-  -- verified for publish: an email-only agency shows the owner nothing.
-  if to_regprocedure('public.acting_provider(uuid,uuid,text,text,text)') is not null then
-    insert into public.agency_verifications(agency_workspace_id,effect,status,evidence,verified_by,verifier_is_agency_member)
-      values('b6000000-0000-4000-8000-0000000000a1','publish','verified','{"note":"fixture"}',actor,false);
-  end if;
   select * into work from public.claim_website_rebuild(ws,actor,'op-operator@example.test','op-request-one','op-example.test','{"url":"https://op-example.test"}',
     jsonb_build_object('version',2,'revision',0,'title','Fictional Preview','status','building','createdBy',actor,'createdAt','2026-10-08T10:00:00Z','history','[]'::jsonb));
   perform public.append_website_document(ws,work.id,actor,'op-operator@example.test',0,h,doc);
@@ -41,13 +35,6 @@ begin
   item:=public.open_owner_decision(ws,jsonb_build_object('kind','fact.inferred','route','owner_decides','title','Review complete copy',
     'approveEffect','Confirm copy.','notYetEffect','Nothing changes.','sourceLifecycle','website_document','sourceId',work.id::text||':copy.hero','revisionHash',revision_hash,'adminMayDecide',false));
   id:=(item->>'id')::uuid;
-  if to_regprocedure('public.acting_provider(uuid,uuid,text,text,text)') is not null then
-    insert into public.agency_verifications(agency_workspace_id,effect,status,reason,verified_by,verifier_is_agency_member)
-      values('b6000000-0000-4000-8000-0000000000a1','publish','unverified','Fixture revocation.',actor,false);
-    perform pg_temp.op_refuse(format('select public.read_owner_decision_website_preview(%L,%L,%L,%L)',ws,id,revision_hash,'op-owner@example.test'));
-    insert into public.agency_verifications(agency_workspace_id,effect,status,evidence,verified_by,verifier_is_agency_member)
-      values('b6000000-0000-4000-8000-0000000000a1','publish','verified','{"note":"fixture"}',actor,false);
-  end if;
   select count(*) into count_before from public.strelva_service_actions;
   result:=public.read_owner_decision_website_preview(ws,id,revision_hash,' OP-Owner@Example.test ');
   perform pg_temp.op_assert(result->'item'->>'state'='open' and result->'record'->>'workId'=work.id::text
@@ -60,12 +47,21 @@ begin
   perform pg_temp.op_refuse(format('select public.read_owner_decision_website_preview(%L,%L,%L,%L)',gen_random_uuid(),id,revision_hash,'op-owner@example.test'));
   perform pg_temp.op_refuse(format('select public.read_owner_decision_website_preview(%L,%L,%L,%L)',ws,id,h,'op-owner@example.test'));
   update public.tenants set owner_email='changed@example.test' where tenants.id='op-existing-fixture';
+  if to_regclass('public.business_owner_recipient_trust') is not null then
+    update public.business_owner_recipient_trust set email='changed@example.test' where business_id=ws;
+  end if;
   perform pg_temp.op_refuse(format('select public.read_owner_decision_website_preview(%L,%L,%L,%L)',ws,id,revision_hash,'op-owner@example.test'));
   update public.tenants set owner_email='op-owner@example.test' where tenants.id='op-existing-fixture';
+  if to_regclass('public.business_owner_recipient_trust') is not null then
+    update public.business_owner_recipient_trust set email='op-owner@example.test' where business_id=ws;
+  end if;
   -- A changed immutable head cannot disclose a document beyond the signed source.
   perform public.append_website_document(ws,work.id,actor,'op-operator@example.test',1,repeat('d',64),doc||'{"siteName":"Changed private preview"}');
   perform pg_temp.op_refuse(format('select public.read_owner_decision_website_preview(%L,%L,%L,%L)',ws,id,revision_hash,'op-owner@example.test'));
   -- Claims are also refused after a decision is handled, independent of source state.
+  if to_regclass('public.owner_decision_link_bindings') is not null then
+    perform public.record_owner_decision_delivery(ws,id,'digest','sent','op-owner@example.test','op-fictional-delivery',null);
+  end if;
   perform public.claim_owner_decision(ws,id,revision_hash,'not_yet','owner_link',null,null,'op-owner@example.test');
   perform pg_temp.op_refuse(format('select public.read_owner_decision_website_preview(%L,%L,%L,%L)',ws,id,revision_hash,'op-owner@example.test'));
 end $$;

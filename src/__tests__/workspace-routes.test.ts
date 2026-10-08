@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  user: vi.fn(), rate: vi.fn(), score: vi.fn(), personal: vi.fn(), list: vi.fn(), work: vi.fn(), getWork: vi.fn(),
+  brandRpc: vi.fn(), user: vi.fn(), rate: vi.fn(), score: vi.fn(), personal: vi.fn(), list: vi.fn(), work: vi.fn(), getWork: vi.fn(),
   save: vi.fn(), createAgency: vi.fn(), handoff: vi.fn(), inspect: vi.fn(), accept: vi.fn(),
   revoke: vi.fn(), cancel: vi.fn(), handoffs: vi.fn(), agencyDelegations: vi.fn(), workDelegations: vi.fn(),
   pending: vi.fn(), operation: vi.fn(), saveAudit: vi.fn(), preflight: vi.fn(), runPrivate: vi.fn(), savePublicResult: vi.fn(), managedWork: vi.fn(), exitRead: vi.fn(), exitCompleted: vi.fn(), systems: vi.fn(), provided: vi.fn(),
 }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mocks.brandRpc }) }));
 vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.user }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate }));
 vi.mock("@/products/ai-visibility/server", () => ({ runPrivateAiVisibilityAssessment: mocks.runPrivate, savePublicAiVisibilityResult: mocks.savePublicResult }));
@@ -53,6 +54,7 @@ beforeEach(() => {
   vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
   vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "1");
   mocks.user.mockResolvedValue({ id: "actor", email: "OWNER@example.com", email_confirmed_at: "2026-09-05" });
+  mocks.brandRpc.mockResolvedValue({ data: null, error: null });
   mocks.rate.mockResolvedValue(false);
   mocks.pending.mockResolvedValue([]);
   mocks.personal.mockResolvedValue(workspace);
@@ -106,6 +108,13 @@ describe("release-one private workspace routes", () => {
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(await response.json()).toMatchObject({ workspaceId, work: [{ id: workId }], actor: { email: "owner@example.com" } });
     expect(mocks.work).toHaveBeenCalledWith({ userId: "actor", verifiedEmail: "owner@example.com" }, workspaceId);
+  });
+  it.each(["missing column", "thrown error"])("keeps the workspace usable on a brand %s", async failure => {
+    if (failure === "missing column") mocks.brandRpc.mockResolvedValue({ data: null, error: { message: "column w.agency_brand does not exist" } });
+    else mocks.brandRpc.mockRejectedValue(new Error("offline"));
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ownerBrand: { agencyId: null, name: "Strelva" }, work: [{ id: workId }] });
   });
   it("reports an owner exit-state read failure so the browser can fail closed", async () => {
     mocks.exitRead.mockRejectedValue(new Error("temporary exit-state store failure"));

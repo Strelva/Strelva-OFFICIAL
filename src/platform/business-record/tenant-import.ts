@@ -138,7 +138,13 @@ export function uuidFromSeed(seed: string): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
-export function planTenantImport(source: TenantImportSource, options: { targetWorkspaceId?: string; separateBusiness?: boolean } = {}): TenantImportPlan {
+export function planTenantImport(source: TenantImportSource, options: {
+  targetWorkspaceId?: string;
+  separateBusiness?: boolean;
+  agencyWorkspaceId?: string;
+  agencyStaffEmails?: string[];
+  agencySelectionBasis?: "existing_contract" | "owner_choice";
+} = {}): TenantImportPlan {
   if (options.separateBusiness && options.targetWorkspaceId) throw new Error("A separate business cannot also join an existing business.");
   const { tenant } = source;
   const skipped: SkippedField[] = [];
@@ -271,6 +277,9 @@ export function planTenantImport(source: TenantImportSource, options: { targetWo
     workspaceName: (clean(source.account?.multiSite && !options.separateBusiness ? source.account.name : undefined) ?? clean(tenant.siteName) ?? tenant.id).slice(0, 120),
     ...(options.targetWorkspaceId ? { targetWorkspaceId: options.targetWorkspaceId } : {}),
     ...(options.separateBusiness ? { separateBusiness: true as const } : {}),
+    ...(options.agencyWorkspaceId ? { agencyWorkspaceId: options.agencyWorkspaceId } : {}),
+    ...(options.agencyStaffEmails ? { agencyStaffEmails: options.agencyStaffEmails } : {}),
+    ...(options.agencySelectionBasis ? { agencySelectionBasis: options.agencySelectionBasis } : {}),
     billing: source.billing ?? null,
     account: source.account ?? null,
     patch: {

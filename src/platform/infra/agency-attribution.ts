@@ -4,7 +4,8 @@ export interface AgencyAttribution {
   slug: string;
   name: string;
   contactUrl: string;
-  brand: { logoUrl: null; accentColor: null };
+  brand: { logoUrl: string | null; accentColor: string | null };
+  replyTo?: string | null;
 }
 
 /** Only attributed findings change copy; the scanner's shared cache stays untouched. */

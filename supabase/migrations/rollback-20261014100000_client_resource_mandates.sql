@@ -1,6 +1,6 @@
 -- Rollback for 20261014100000_client_resource_mandates.sql
 -- Forward SHA-256: 07fc4948ba20fb23a14a75908b96da10d3112d7b0e286fb927f803c91dead039
--- Agency 1.0 #255. Undo 20261014101000 first; undo every later file first.
+-- Agency 1.0 #255. Undo 20261014112000 first; undo every later file first.
 -- Prepared SQL only. Production execution requires a separately reviewed approval.
 -- Take a verified dump first. Removed data is retained in the private archive schema.
 -- Does not undo provider effects or repair Supabase migration history.
@@ -27,7 +27,7 @@ begin
   if (select md5(pg_get_functiondef(to_regprocedure('public.record_conversion_resource_mandate(text,uuid,uuid,text,text,text,text)')))) is distinct from '50f69c36c8d977bd891eae8907778813' then raise exception 'rollback_wrong_order_or_function_drift: record_conversion_resource_mandate'; end if;
   if (select md5(pg_get_functiondef(to_regprocedure('public.end_client_resource_mandate(uuid,text,uuid,uuid,text)')))) is distinct from '6bb2526c071e29d5fe0e88010cc47c19' then raise exception 'rollback_wrong_order_or_function_drift: end_client_resource_mandate'; end if;
   if (select md5(pg_get_functiondef(to_regprocedure('public.read_client_resource_mandates(uuid,text,uuid)')))) is distinct from '9bfac84eaa542468c7ab9fe466b9f40a' then raise exception 'rollback_wrong_order_or_function_drift: read_client_resource_mandates'; end if;
-  if to_regprocedure('public.needs_you_provider_id(uuid,uuid,text)') is not null then raise exception 'rollback_wrong_order: 20261014101000 is still applied'; end if;
+  if to_regprocedure('public.needs_you_provider_id(uuid,uuid,text)') is not null then raise exception 'rollback_wrong_order: 20261014112000 is still applied'; end if;
 end;
 $rollback_guard$;
 lock table public."client_resource_mandates" in access exclusive mode;

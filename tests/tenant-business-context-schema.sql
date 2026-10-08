@@ -21,6 +21,9 @@ insert into public.business_services(workspace_id,name,description,source,create
   ('eb000000-0000-4000-8000-000000000010','Consult','Confirmed','owner','eb000000-0000-4000-8000-000000000001','eb000000-0000-4000-8000-000000000001',true),
   ('eb000000-0000-4000-8000-000000000010','Unconfirmed','Import','tenant_import','eb000000-0000-4000-8000-000000000001','eb000000-0000-4000-8000-000000000001',true),
   ('eb000000-0000-4000-8000-000000000010','Retired','Old service','owner','eb000000-0000-4000-8000-000000000001','eb000000-0000-4000-8000-000000000001',false);
+-- The owner's rows are confirmed (#509); the import stays pending.
+\ir support/confirm-working-record.sql
+select pg_temp.confirm_working_record('eb000000-0000-4000-8000-000000000010', array['owner']);
 select pg_temp.bc_assert(not has_function_privilege('anon','public.read_tenant_business_context(text)','execute') and not has_function_privilege('authenticated','public.read_tenant_business_context(text)','execute') and has_function_privilege('service_role','public.read_tenant_business_context(text)','execute'),'server-only reader');
 select pg_temp.bc_assert(public.read_tenant_business_context('bc-site')->'facts'->>'display_name' = 'Confirmed name','linked record');
 select pg_temp.bc_assert(not (public.read_tenant_business_context('bc-site')->'facts' ? 'phone') and not (public.read_tenant_business_context('bc-site')->'facts' ? 'owner_recipient'),'unconfirmed and private facts excluded');

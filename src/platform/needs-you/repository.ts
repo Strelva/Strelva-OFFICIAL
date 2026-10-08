@@ -76,7 +76,7 @@ function actorArgs(actor: WorkspaceActor) {
   return { p_user_id: z.string().uuid().parse(actor.userId), p_verified_email: z.string().email().parse(actor.verifiedEmail.trim().toLowerCase()) };
 }
 
-const recipientSchema = z.object({ email: z.string(), from: z.string(), tenantId: z.string().nullable().optional() }).passthrough();
+const recipientSchema = z.object({ email: z.string(), from: z.string(), tenantId: z.string().nullable().optional(), trusted: z.boolean().optional() }).passthrough();
 export type DeliveryRow = OwnerDecision & { businessName: string; timezone: string; recipient: z.infer<typeof recipientSchema> | null };
 const deliveryRowSchema = ownerDecisionSchema.extend({ businessName: z.string(), timezone: z.string(), recipient: recipientSchema.nullable() });
 const inquiryNoticeClaimSchema = z.object({ acquired: z.boolean(), status: z.enum(["sending", "accepted", "delivered", "deferred", "bounced", "failed", "suppressed", "unknown"]) });
@@ -126,7 +126,7 @@ export interface NeedsYouStore {
    * the business's `make_real_owner_link` release flag is off (20261009140000).
    */
   linkSession?(workspaceId: string, itemId: string, recipient: string): Promise<ServiceSession | null>;
-  ownerLinkSession?(workspaceId: string, itemId: string, revision: string, recipient: string): Promise<ServiceSession | null>;
+  ownerLinkSession?(workspaceId: string, itemId: string, revision: string, recipient: string, decision?: Decision): Promise<ServiceSession | null>;
   authorizeOwnerLinkRun?(session: ServiceSession): Promise<void>;
   policies(actor: WorkspaceActor, workspaceId: string): Promise<PolicySetting[]>;
   setPolicy(actor: WorkspaceActor, input: { workspaceId: string; layer: PolicyLayer; systemId: string | null; kind: string; route: LadderRoute | null; reason: string | null; expectedVersion: number }): Promise<PolicyState>;
@@ -162,9 +162,9 @@ export const PostgresNeedsYouStore: NeedsYouStore = {
     (await workspaceReleaseFlagEnabled("make_real_owner_link", workspaceId))
       ? startMakeRealLinkSession(workspaceId, itemId, recipient)
       : null,
-  ownerLinkSession: async (workspaceId, itemId, revision, recipient) =>
+  ownerLinkSession: async (workspaceId, itemId, revision, recipient, decision = "approve") =>
     (await workspaceReleaseFlagEnabled("owner_decision_links", workspaceId))
-      ? startOwnerDecisionLinkSession(workspaceId, itemId, revision, recipient)
+      ? startOwnerDecisionLinkSession(workspaceId, itemId, revision, recipient, decision)
       : null,
   authorizeOwnerLinkRun: async (session) => {
     if (!(await workspaceReleaseFlagEnabled("owner_decision_links", session.workspaceId))) throw new WorkspaceAccessError();

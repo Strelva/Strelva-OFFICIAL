@@ -30,6 +30,14 @@ production stop points are in [the stream handoff](../streams/w6-owner-ask.md).
   bind the exact revision; no membership is synthesized. Signed read-only
   website review shows complete copy and navigable pages without sign-in,
   disables visitor actions and refuses changed recipients or candidates.
+  The prepared `20261014110000_owner_decision_effects.sql` migration binds the
+  intended approve/decline and rechecks the same active provider's actual
+  execution effect at admission and each session use. Website reserve and
+  publish each require `publish`; Google decisions require `google`, sending
+  decisions `email`. Preview/fact/plan approval and decline have no immediate
+  outside effect; later outside writes retain their own gates. Unknown repair
+  effects and sign-in-only decisions fail closed. Rollback refuses retained
+  owner-link sessions. This is local implementation, with activation still off.
 
 Not proven here: authenticated admin-host entry and rollback on an isolated
 Supabase Auth stack, actual mail delivery, production migrations, live
