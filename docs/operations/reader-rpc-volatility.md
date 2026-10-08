@@ -96,3 +96,91 @@ Next action: review this batch 7A follow-up against `integrate/reborn-1.0`,
 then rerun W6 journeys without `--with-proposed-fixes` after integration.
 HTTP/JWT/schema-cache consumption and all production behavior remain unproven
 by the local database test. Deployment is outside this task's authority.
+
+## Read-only authorization repair, October 7, 2026
+
+`20261013230000_readonly_reader_authority.sql` finishes the later reader
+runtime gap with genuine READ ONLY execution. It adds eleven private snapshot
+read helpers and redirects 28 existing read functions/dependencies to them.
+No existing function's volatility, signature, grants, SECURITY DEFINER or
+search path changes. Existing writer helpers remain byte-for-byte unchanged,
+including actor, membership, provider-seat, staff, resource and advisory locks.
+
+The read helpers check the same verified identity, active membership, provider
+seat and staff assignment, delegated work scope, Version grant, or inquiry
+booking witness against the request's snapshot. Their boolean write/lock
+arguments refuse anything except `false`; they cannot substitute for mutation
+checks. A later mutation recomputes authority through its original locking
+path. The inquiry offer read builds a fresh lock-free witness; offer preparation
+and slot selection keep the original locking witness and stale/revocation
+checks. This changes no permission or provider-write policy.
+
+The reported 15-reader inventory includes 14 real STABLE paths and one scanner
+false positive: the lock-free STABLE `read_inquiry_booking_offer(text)` was
+conflated with the VOLATILE UUID overload. The scanner now reads `prosrc`, starts
+at each exact root signature, and visits recursive branches independently.
+Transitive calls remain conservative across overloads because source alone does
+not resolve every SQL argument type. The UUID offer read is repaired too and
+proved in READ ONLY. Agency overview previously caught the locking exception
+and marked a valid client unavailable; its regression requires that client to
+be ready with its own System data.
+
+The corrected affected STABLE function inventory is: agency client overview v2; business
+inquiry outcomes and monthly inquiry outcomes; business Versions; Google listing
+readback failures v2; operator Google uncertainty and Queue v2; provider booking
+evidence; Version binding choices and native runtime; inquiry inbox, leads with
+receipts and reply receipts; and the private inquiry reply-permission helper.
+The earlier ten volatility-workaround readers and the export's business-record
+and Systems branches are also tested READ ONLY. The Systems export branch was
+already lock-free after W6's portability replacement; it remains a positive
+control rather than an invented defect.
+
+The `read_*`/`list_*` prefix alone is not a reader contract. Other legacy
+VOLATILE functions still lock authority or maintain state/checkpoints. Their
+existing POST requests select READ WRITE and do not exhibit this reproduced
+STABLE/READ ONLY failure. This change does not certify every legacy VOLATILE
+function for GET/HEAD or arbitrary read-only transactions. Such a broader
+conversion requires inspecting each command, receipt and concurrency contract;
+changing their declarations alone would neither remove locks nor preserve those
+contracts.
+
+`tests/readonly-reader-authority-schema.sql` uses the real native-Version and
+inquiry/booking command setup in `tests/support/readonly-reader-fixture.sql`.
+Its 26 request cases cover meaningful authorized results, empty/missing controls,
+verified-outsider, mismatched-email and unverified-actor denial, private helper ACLs, expired/changed/revoked
+bearer denial, and absence of booking creation on read. Calls execute inside
+actual READ ONLY transactions; exposed RPCs run as service_role, while the
+already-private permission helper runs only as its owner. Rollback/reapply
+compares the entire public function catalog (body, declaration and ACL), so
+unrelated writer definitions and metadata cannot silently change.
+
+`tests/support/readonly-reader-cases.sql` also exposes `rpc_name`, JSON
+`parameters` and `exposed` for local HTTP qualification. Exclude the private
+helper (`exposed=false`) from direct HTTP calls. These are fictional records,
+never a production fixture.
+
+`check-reader-writer-locks.sh` proves both orders using an actual business-record
+mutation and provider-seat revocation in concurrent sessions. Writer-first makes
+revocation wait until the admitted mutation commits. Revocation-first makes the
+writer wait, then denies it and leaves the earlier record unchanged. Activity
+barriers and statement timeouts bound the races.
+
+Both existing workspace SQL commands now run the final-schema regression,
+scanner, scanner unit tests and writer/revocation races. The focused command
+applies the new migration at its final-schema checkpoint; the ordered upgrade
+applies it in filename order. The earlier volatility regression understands
+that its historical declaration-only rollback no longer reintroduces locks
+after this body repair.
+
+Local evidence from the isolated reader worktree: PostgreSQL 18 applied the
+full historical schema; the 26 READ ONLY cases, previous ten-reader regression,
+exact catalog rollback/reapply and both writer/revocation orders passed. The
+corrected baseline scanner reports 14 STABLE lock paths; the repaired schema
+reports none. Four scanner unit tests, focused ESLint, typecheck, shell syntax
+and `git diff --check` passed. Earlier iterations exposed an agency exception
+being masked, an internal helper's intentionally denied service-role grant,
+a required cohort interval, and the existing lock-free export control; the
+fixtures now assert each actual contract explicitly.
+
+The parent integration owns aggregate suites and hosted-style HTTP/JWT proof.
+No production migration, deployment, activation or provider write was performed.

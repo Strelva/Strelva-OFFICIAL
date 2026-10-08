@@ -430,3 +430,9 @@ psql "${psql_args[@]}" --file="$repo_root/tests/ask-confirmed-facts-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013220000_provider_seat_tenant_conversion.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/provider-seat-tenant-conversion-schema.sql"
 printf 'Provider-seat tenant conversion upgrade contract passed.\n'
+
+# Final-schema READ ONLY qualification and exact migration reversal.
+psql "${psql_args[@]}" --file="$repo_root/tests/readonly-reader-authority-schema.sql"
+node "$repo_root/scripts/check-readonly-rpcs.mjs" "postgresql://$(id -un)@localhost:$cluster_port/postgres?host=$cluster_socket"
+node --test "$repo_root/scripts/tests/readonly-rpcs.node-test.mjs"
+bash "$repo_root/scripts/check-reader-writer-locks.sh" "postgresql://$(id -un)@localhost:$cluster_port/postgres?host=$cluster_socket"
