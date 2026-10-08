@@ -23,10 +23,14 @@ export interface DomainHealthSnapshot {
 }
 
 export async function saveDomainHealth(
-  results: TenantDomainHealth[]
+  results: TenantDomainHealth[],
+  options: { requireStore?: boolean } = {},
 ): Promise<void> {
   const redis = getRedis();
-  if (!redis) return;
+  if (!redis) {
+    if (options.requireStore) throw new Error("Domain health storage is unavailable.");
+    return;
+  }
   const snapshot: DomainHealthSnapshot = {
     scannedAt: new Date().toISOString(),
     results,
@@ -34,6 +38,7 @@ export async function saveDomainHealth(
   try {
     await redis.set(LATEST_KEY, snapshot, { ex: LATEST_TTL_SECONDS });
   } catch {
+    if (options.requireStore) throw new Error("Domain health evidence could not be saved.");
     // persistence is best-effort; a failed write must never break the scan
   }
 }

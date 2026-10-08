@@ -76,11 +76,11 @@ describe("domain verification cron over every site", () => {
     expect(deps.heartbeat).toHaveBeenCalledWith("website-domain-verification", expect.objectContaining({ ok: true, processed: 2 }));
   });
 
-  it("keeps the seven-day operator email when the rebuild release is on", async () => {
+  it("keeps seven-day evidence in the provider queue without global email when rebuild is on", async () => {
     deps.release.mockReturnValue(true);
     const body = await (await GET(authenticatedCronRequest())).json();
-    expect(body).toMatchObject({ mode: "alerting", alerted: 1 });
-    expect(deps.send).toHaveBeenCalledWith(expect.objectContaining({ audience: "operator" }));
+    expect(body).toMatchObject({ mode: "report_only", alertRouting: "provider_queue", alerted: 0 });
+    expect(deps.send).not.toHaveBeenCalled();
   });
 
   it("skips without a provider token and reports a provider failure as failed, not verified", async () => {

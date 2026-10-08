@@ -20,6 +20,7 @@ import { isPlatformDomain } from "@/platform/infra/brand";
 import { getAllTenants } from "./tenants";
 import { normalizeCustomDomain } from "./domains";
 import type { TenantConfig } from "./types";
+import { checkCertificateExpiry } from "./domain-certificate";
 
 /** Bodies smaller than this that return 200 are treated as broken (parking
  *  stubs, blank shells). Orange Crate's dead page was 114 bytes. */
@@ -50,6 +51,9 @@ export interface DomainCheck {
   /** Registry expiry (ISO date) from RDAP, or null when unavailable. */
   expiresAt: string | null;
   daysToExpiry: number | null;
+  /** Optional so stored scans predating certificate checks remain readable. */
+  sslExpiresAt?: string | null;
+  sslDaysToExpiry?: number | null;
   checkedAt: string;
   latencyMs: number | null;
 }
@@ -244,14 +248,15 @@ export async function checkTenantDomains(
   const hosts = monitorableHosts(tenant);
   const checks: DomainCheck[] = await Promise.all(
     hosts.map(async ({ host, kind }) => {
-      const [site, expiry] = await Promise.all([
+      const [site, expiry, certificate] = await Promise.all([
         checkSite(host, kind),
         // Expiry only means something for a real registrable custom domain.
         kind === "custom"
           ? checkExpiry(host)
           : Promise.resolve({ expiresAt: null, daysToExpiry: null }),
+        checkCertificateExpiry(host),
       ]);
-      return { ...site, ...expiry };
+      return { ...site, ...expiry, ...certificate };
     })
   );
 
@@ -355,6 +360,13 @@ export function summarizeDomainAlerts(results: TenantDomainHealth[]): {
     }
 
     for (const c of r.checks) {
+      if (c.sslDaysToExpiry != null) {
+        const bucket = expiryBucket(c.sslDaysToExpiry);
+        if (bucket) {
+          expiring.push({ siteName: r.siteName, host: c.host, problem: `SSL certificate ${c.sslDaysToExpiry <= 0 ? "expired" : `expires in ${c.sslDaysToExpiry}d`} (${c.sslExpiresAt ?? "unknown date"})` });
+          sigParts.push(`S:${c.host}:${bucket}`);
+        }
+      }
       if (c.daysToExpiry === null || c.kind !== "custom") continue;
       const bucket = expiryBucket(c.daysToExpiry);
       if (!bucket) continue;

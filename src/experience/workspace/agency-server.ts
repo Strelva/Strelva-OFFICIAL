@@ -20,6 +20,7 @@ import { readLinkedSites } from "@/platform/owner-entry/linked-sites";
 import { resolveInquiryWorkspace } from "@/products/inquiries/server";
 import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
 import { addAgencyOperatorOverview } from "./agency/operator-overview";
+import { addAgencyProviderAlerts } from "./agency/provider-alerts";
 import { systemsReleasedFor } from "@/platform/systems-release";
 import { prepareVersionRelease, type VersionPreparationReceipt } from "@/platform/system-versions/preparation";
 import type { VersionLineage } from "@/platform/system-versions";
@@ -70,7 +71,8 @@ export async function readAgencyClientsPage(
   if (!parsed.success || parsed.data.agencyWorkspaceId !== agencyWorkspaceId) throw new WorkspaceStoreError("Clients could not be loaded. The response was malformed.");
   const page = { ...parsed.data, clients: parsed.data.clients.map(client => ({ ...client,
     ...(bookingAgentVisibilityEnabled() && client.systems.some(system => ["booking", "bookings"].includes(system.kind)) ? { agentBookings: true } : {}) })) };
-  return released ? addAgencyOperatorOverview(actor, page) : page;
+  if (!released) return page;
+  return addAgencyProviderAlerts(actor, await addAgencyOperatorOverview(actor, page), db);
 }
 
 const sourcesSchema = z.object({
