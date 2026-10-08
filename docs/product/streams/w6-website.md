@@ -1,5 +1,10 @@
 # Wave 6 website — round 5 handoff
 
+October 8 follow-on: [native fact mappings (#457)](a1-native-fact-mappings.md)
+prepares explicit per-site/service mappings, owner address/services editing and
+wiring for the already-existing hours editor. The remaining-gap descriptions
+below are the historical round-5 state, not the current owner-form inventory.
+
 Branch: `w6/website`, worktree `REB-w6-website`. Local only. No production calls,
 client-repository changes, dependencies, notifications, pushes, PRs or merges.
 The interrupted round 1–4 checkpoints are retained; the verification below

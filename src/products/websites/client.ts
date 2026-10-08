@@ -75,3 +75,6 @@ export { AGENCY_DOCUMENT_NODE_SECTIONS, AGENCY_DOCUMENT_SECTIONS } from "./agenc
 // Repo-change Requests on a managed website: shapes, stages and the filing command (browser-safe).
 export { SITE_CHANGE_SCOPE, SITE_CHANGE_STAGE_LABEL, recordSiteChangeSchema, siteChangeReceiptSchema, siteChangeRequestCommand, siteChangeRequestSchema, siteChangeStage, type RecordSiteChange, type SiteChangeReceipt, type SiteChangeRequest, type SiteChangeStage } from "./site-change-model";
 export { siteEditingFor, CONTENT_READING_REPOS, type SiteEditing } from "./site-editing";
+
+export { nativeFactFields, nativeServiceFields, nativeFactMappingInputSchema } from "./native-fact-mappings";
+export type { NativeFactMappingInput, NativeFactMapping } from "./native-fact-mappings";

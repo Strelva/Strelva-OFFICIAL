@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { TextArea, TextInput } from "@/components/ui/TextInput";
 import { RecordPublishingFields } from "@/experience/publishing/RecordPublishingFields";
 import type { RecordGoogleSummary } from "@/products/publishing/client";
 import type { BusinessRecord } from "@/platform/business-record/contracts";
@@ -8,6 +10,7 @@ import { DETAIL_LABELS, detailText, detailsWriteSource, type EditableDetail } fr
 import type { DetailsSaveOutcome } from "@/platform/business-record/details-save";
 import type { LinkedSite } from "@/platform/owner-entry/linked-sites";
 import { WorkspacePlace, type PlaceState } from "./WorkspacePlace";
+import { NativeFactMappings } from "./NativeFactMappings";
 
 /**
  * Business details, in the business menu: the home of /dashboard/settings.
@@ -21,13 +24,15 @@ export interface BusinessDetailsData {
   record: BusinessRecord;
   googleApprovalCopy?: string | null;
   publishing?: boolean;
+  nativeFactsEnabled?: boolean;
+  nativeFactSites?: LinkedSite[];
   operator: boolean;
   sites: LinkedSite[];
   denied: LinkedSite[];
 }
 
 const OUTCOME: Record<DetailsSaveOutcome, { tone: "status" | "alert"; text: string }> = {
-  saved: { tone: "status", text: "Saved to your business record. To change what your site or Google listing shows, ask Strelva from Home." },
+  saved: { tone: "status", text: "Saved to your business record. Website changes still need review before they go live." },
   unchanged: { tone: "status", text: "Nothing changed." },
   conflict: { tone: "alert", text: "Someone changed these details while you were editing. Nothing was saved. Here is the latest; make your change again." },
   invalid: { tone: "alert", text: "That wasn't saved." },
@@ -38,21 +43,15 @@ const OUTCOME: Record<DetailsSaveOutcome, { tone: "status" | "alert"; text: stri
 const INVALID_HINT: Partial<Record<EditableDetail, string>> = {
   phone: "Use a phone number with 7 to 15 digits.",
   email: "Use a full email address.",
+  address: "Use an address of 200 characters or fewer.",
   owner_recipient: "Use a full email address. Strelva needs one to send your reports and alerts.",
 };
 
 function Field({ name, value, readOnly, multiline = false, type = "text", hint }: { name: EditableDetail; value: string; readOnly: boolean; multiline?: boolean; type?: string; hint?: string }) {
   const id = `detail-${name}`;
-  const className = "mt-1 w-full rounded-lg border border-gray-border bg-surface px-3 py-2 text-sm leading-6 focus-visible:outline focus-visible:outline-2 read-only:bg-transparent";
-  return (
-    <div>
-      <label htmlFor={id} className="text-xs font-medium text-gray-muted">{DETAIL_LABELS[name]}</label>
-      {multiline
-        ? <textarea id={id} name={name} defaultValue={value} readOnly={readOnly} rows={4} maxLength={2000} className={className} />
-        : <input id={id} name={name} type={type} defaultValue={value} readOnly={readOnly} maxLength={254} className={className} autoComplete="off" />}
-      {hint ? <p className="mt-1 text-xs text-gray-muted">{hint}</p> : null}
-    </div>
-  );
+  return multiline
+    ? <TextArea id={id} name={name} label={DETAIL_LABELS[name]} defaultValue={value} readOnly={readOnly} rows={4} maxLength={2000} helperText={hint} />
+    : <TextInput id={id} name={name} label={DETAIL_LABELS[name]} type={type} defaultValue={value} readOnly={readOnly} maxLength={name === "address" ? 200 : 254} autoComplete="off" helperText={hint} />;
 }
 
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
@@ -77,7 +76,6 @@ export function WorkspaceBusinessDetails({ workspaceId, state, result, googleRes
   const workspaceHref = (view: string) => `/workspace?view=${view}&workspaceId=${encodeURIComponent(workspaceId)}`;
   const readOnly = !data || !detailsWriteSource(data.record.access, data.operator) || !action;
   const notice = result ? OUTCOME[result] : null;
-  const services = data?.record.services.filter((service) => service.active) ?? [];
   const people = data?.record.people.filter((person) => person.active) ?? [];
   return (
     <WorkspacePlace workspaceId={workspaceId} eyebrow="Business" title="Business details"
@@ -101,6 +99,7 @@ export function WorkspaceBusinessDetails({ workspaceId, state, result, googleRes
                 <Field name="display_name" value={detailText(data.record, "display_name")} readOnly={readOnly} />
                 <Field name="phone" type="tel" value={detailText(data.record, "phone")} readOnly={readOnly} />
                 <Field name="email" type="email" value={detailText(data.record, "email")} readOnly={readOnly} />
+                <Field name="address" value={detailText(data.record, "address")} readOnly={readOnly} hint="Changes here update the display address. Separately recorded street, city and postal details are kept, including when this field is cleared." />
                 <Field name="description" multiline value={detailText(data.record, "description")} readOnly={readOnly} />
                 <div id="notifications" className="scroll-mt-8 border-t border-gray-border pt-4">
                   <Field name="owner_recipient" type="email" value={detailText(data.record, "owner_recipient")} readOnly={readOnly}
@@ -109,18 +108,14 @@ export function WorkspaceBusinessDetails({ workspaceId, state, result, googleRes
                 {data.googleApprovalCopy ? <p role="note" className="text-sm text-gray-muted">{data.googleApprovalCopy}</p> : null}
                 {readOnly
                   ? <p className="text-sm text-gray-muted">Only the owner can change these details.</p>
-                  : <div><button type="submit" className="inline-flex min-h-[40px] items-center rounded-lg bg-warm-black px-4 text-sm font-medium text-warm-white focus-visible:outline focus-visible:outline-2">Save details</button></div>}
+                  : <div><Button type="submit">Save details</Button></div>}
               </form>
             </Card>
           </Section>
 
-          {data.publishing ? <Section id="publishing-facts" title="Publishing facts"><Card padding="lg"><RecordPublishingFields record={data.record} approvalCopy={data.googleApprovalCopy} readOnly={readOnly || data.record.access !== "owner"} /></Card></Section> : null}
+          <Section id="publishing-facts" title="Hours, services and website"><Card padding="lg"><RecordPublishingFields key={workspaceId} record={data.record} approvalCopy={data.publishing ? data.googleApprovalCopy : null} readOnly={readOnly || data.record.access !== "owner"} endpoint="/api/workspace/business-details/record" googleEnabled={Boolean(data.publishing)} /></Card></Section>
 
-          {services.length ? (
-            <Section id="services" title="Services">
-              <Card padding="md"><ul className="grid gap-2 text-sm leading-6">{services.map((service) => <li key={service.id}><span className="font-medium">{service.name}</span>{service.priceText ? <span className="text-gray-muted"> · {service.priceText}</span> : null}</li>)}</ul></Card>
-            </Section>
-          ) : null}
+          {data.nativeFactsEnabled && !readOnly && data.record.access === "owner" ? <Section id="website-fact-settings" title="Website fact settings"><Card padding="lg"><NativeFactMappings key={workspaceId} workspaceId={workspaceId} sites={data.nativeFactSites ?? []} /></Card></Section> : null}
 
           <Section id="people" title="People and access">
             <Card padding="md">

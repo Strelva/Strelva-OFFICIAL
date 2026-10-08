@@ -629,10 +629,24 @@ sends; it never claims delivery. October 7, 2026, `a1/newsletter-sender`: accept
 desktop and gated/unconfirmed 390px fixtures were observed locally. Sending still
 defaults off; see the [implementation handoff](../product/streams/a1-newsletter-sender.md).
 [RecordPublishingFields](../../src/experience/publishing/RecordPublishingFields.tsx)
-saves hours, special hours and website facts through the owner boundary, shows
-the optional Google approval disclosure, and reports each location separately
-as confirmed, awaiting approval, unapplied or unknown. Unknown writes never say
-that nothing was sent. [WorkspaceGoogle](../../src/experience/places/WorkspaceGoogle.tsx)
+saves hours, special hours, website facts and existing services through the owner
+boundary. Business details mounts the shared editor even with Google publishing
+off, using its own record endpoint. Service edits retain their business UUID,
+external reference, active state and position; no website identity is inferred.
+The editor composes owned fields and Button, disables during writes, retains
+input on failure/conflict, keeps uncertain retries on the same command, and
+advances its accepted baseline. Native website results distinguish already-matched
+details or prepared drafts from review still needed, never live publication. The optional Google approval
+disclosure and each location's confirmed, awaiting-approval, unapplied or unknown
+result stay separate. Unknown writes never say that nothing was sent.
+[WorkspaceBusinessDetails](../../src/experience/places/WorkspaceBusinessDetails.tsx)
+also uses owned fields for the formatted address, preserving structured address
+parts and the existing revision/validation boundary.
+October 8, 2026: 77 focused local tests cover these business-detail controls.
+The desktop/mobile Playwright cases are prepared, but this cloud runner denied
+Chromium’s process socket before a page opened, including the scoped escalation
+retry. No rendered or production proof is claimed.
+[WorkspaceGoogle](../../src/experience/places/WorkspaceGoogle.tsx)
 composes the same field and Button family for drafts, pause, reply edits,
 withdrawal and undo; reply forms retain their command identity through a submission retry,
 and undo stays keyed to its original receipt. All have permission and failure states. Local fictional
@@ -641,6 +655,7 @@ fixtures live at `/preview/strelva/publishing`; these do not prove provider writ
 | Component | Source | Contract |
 | --- | --- | --- |
 | Button / IconButton | [Button.tsx](../../src/components/ui/Button.tsx) | Button variants primary, secondary, ghost, danger, contrast; sizes sm/md/lg; loading disables and sets aria-busy; `static` disables press scale. IconButton requires `label`. |
+| Website fact settings | [NativeFactMappings.tsx](../../src/experience/places/NativeFactMappings.tsx) | An editable owner sees this only under the native-facts gate. The site selector receives only currently eligible native websites, and fact checkboxes follow their supported sections. Owned service selectors require explicit business UUID/native ID pairs and individual field choices; name and services are opt-in. Saving applies to subsequent fact changes and never publishes. Stale site reads are discarded, loading blocks editing, and failed/conflicting writes retain choices. Focused DOM tests cover empty, read-only, validation, conflict, repeated submission and saved states; rendered and aggregate proof is recorded with the stream handoff. |
 | Card | [Card.tsx](../../src/components/ui/Card.tsx) | Default solid surface; padding none/sm/md/lg. md is 24 px padding/radius; sm is 16/16; lg is 32/24. `interactive` changes hover styling only, not semantics. |
 | Toggle | [Toggle.tsx](../../src/components/ui/Toggle.tsx) | Controlled checked/onChange, required accessible label, optional disabled, 44 px minimum hit height. |
 | Agency client and Queue rows | [AgencyViews.tsx](../../src/experience/workspace/agency/AgencyViews.tsx) | Existing row controls and tokens; released operator overview adds a separate health label beside lifecycle, scoped links into the client's System, and a named incomplete-source alert. Missing or stale health says Not verified. The old overview remains when the operator release flag is off. |

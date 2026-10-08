@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { WorkspaceInquiries } from "@/experience/places/WorkspaceInquiries";
@@ -10,6 +10,8 @@ import { SiteSummarySection } from "@/experience/workspace/SiteSummarySection";
 import { replyErrorMessage } from "@/experience/places/ReviewReplyForm";
 import type { BusinessRecord } from "@/platform/business-record/contracts";
 import type { ReviewView } from "@/products/google-listing/linked-reviews";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 
 const WS = "7f000000-0000-4000-8000-000000000010";
 const STABLE = "7f000000-0000-4000-8000-0000000000b2";
@@ -112,6 +114,11 @@ describe("Business details", () => {
     expect(page).toContain('value="2"');
     for (const anchor of ["business", "notifications", "ownership", "plan", "domains", "branding", "site-config", "dependencies", "shortcuts", "account", "people"]) expect(page, anchor).toContain(`id="${anchor}"`);
     expect(page).toContain("view=access");
+    expect(page).toContain('name="address"');
+    expect(page).toContain("including when this field is cleared");
+    expect(page).toContain("Hours, services and website");
+    expect(page).toContain("No services have been recorded yet.");
+    expect(page).not.toContain("Review Google drafts and receipts");
   });
 
   it("is read-only for a member and says why, and shows the save outcome", () => {
@@ -121,6 +128,23 @@ describe("Business details", () => {
     expect(page).toContain("Nothing was saved");
     const invalid = html(createElement(WorkspaceBusinessDetails, { workspaceId: WS, action, result: "invalid", field: "phone", state: { kind: "ready", data: { record: record("owner"), operator: false, sites: [], denied: [] } } }));
     expect(invalid).toContain("7 to 15 digits");
+    const invalidAddress = html(createElement(WorkspaceBusinessDetails, { workspaceId: WS, action, result: "invalid", field: "address", state: { kind: "ready", data: { record: record("owner"), operator: false, sites: [], denied: [] } } }));
+    expect(invalidAddress).toContain("200 characters or fewer");
+  });
+
+  it("shows website fact configuration only to an editable owner when its gate is on", () => {
+    const render = (access: BusinessRecord["access"], enabled: boolean, editable = true) => html(createElement(WorkspaceBusinessDetails, {
+      workspaceId: WS, action: editable ? action : undefined,
+      state: { kind: "ready", data: { record: record(access), nativeFactsEnabled: enabled, nativeFactSites: [site], publishing: false, operator: false, sites: [site], denied: [] } },
+    }));
+    expect(render("owner", true)).toContain('aria-label="Website fact settings"');
+    expect(render("owner", false)).not.toContain('aria-label="Website fact settings"');
+    expect(render("member", true)).not.toContain('aria-label="Website fact settings"');
+    expect(render("owner", true, false)).not.toContain('aria-label="Website fact settings"');
+    expect(render("owner", false)).toContain("Save hours, services and website");
+    const unavailable = html(createElement(WorkspaceBusinessDetails, { workspaceId: WS, action, state: { kind: "ready", data: { record: record("owner"), nativeFactsEnabled: true, operator: false, sites: [site], denied: [] } } }));
+    expect(unavailable).toContain("No native website is available for these settings.");
+    expect(unavailable).not.toContain('<option value="lakeshore">');
   });
 });
 

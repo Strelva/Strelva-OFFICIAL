@@ -363,6 +363,26 @@ describe("Business details", () => {
     expect(detailText(record(), "owner_recipient")).toBe("ruth@example.test");
   });
 
+  it("edits the formatted address without replacing its structured fields", () => {
+    const address = { formatted: "1 Main St, Buffalo", line1: "1 Main St", city: "Buffalo", postalCode: "14203", country: "US" };
+    const withAddress = record({ facts: { address: { ...record().facts.display_name!, value: address } } });
+    expect(detailText(withAddress, "address")).toBe(address.formatted);
+    expect(businessDetailsPatch(withAddress, { address: ` ${address.formatted} ` })).toEqual({ kind: "unchanged" });
+    expect(businessDetailsPatch(withAddress, { address: "1 Main Street, Buffalo, NY" })).toEqual({ kind: "patch", facts: { address: { value: { ...address, formatted: "1 Main Street, Buffalo, NY" } } } });
+    expect(businessDetailsPatch(withAddress, { address: "" })).toEqual({ kind: "patch", facts: { address: { value: { line1: "1 Main St", city: "Buffalo", postalCode: "14203", country: "US" } } } });
+    expect(businessDetailsPatch(record(), { address: "New address" })).toEqual({ kind: "patch", facts: { address: { value: { formatted: "New address" } } } });
+    expect(businessDetailsPatch(record(), { address: "x".repeat(201) })).toMatchObject({ kind: "invalid", field: "address" });
+  });
+
+  it("displays a structured-only address, recognizes unchanged text and never clears its independent fields", () => {
+    const address = { line1: "1 Main St", line2: "Suite 4", city: "Buffalo", region: "NY", postalCode: "14203", country: "US" };
+    const structured = record({ facts: { address: { ...record().facts.display_name!, value: address } } });
+    expect(detailText(structured, "address")).toBe("1 Main St, Suite 4, Buffalo, NY, 14203, US");
+    expect(businessDetailsPatch(structured, { address: detailText(structured, "address") })).toEqual({ kind: "unchanged" });
+    expect(businessDetailsPatch(structured, { address: "" })).toEqual({ kind: "unchanged" });
+    expect(businessDetailsPatch(structured, { address: "1 Main Street, Suite 4" })).toEqual({ kind: "patch", facts: { address: { value: { ...address, formatted: "1 Main Street, Suite 4" } } } });
+  });
+
   it("lets the owner edit as owner, a Strelva operator as operator, and nobody else", () => {
     expect(detailsWriteSource("owner", false)).toBe("owner");
     expect(detailsWriteSource("admin", true)).toBe("operator");
@@ -383,6 +403,16 @@ describe("Business details", () => {
     const deps = saveDeps();
     expect(await saveBusinessDetails(ACTOR, WS, 4, form({ phone: "716-555-0100" }), deps)).toEqual({ outcome: "saved" });
     expect(deps.patch).toHaveBeenCalledWith(ACTOR, WS, 4, { facts: { phone: { value: "716-555-0100" } } }, { source: "owner" });
+  });
+
+  it("saves a valid address with the expected revision and refuses invalid or stale address changes", async () => {
+    const deps = saveDeps();
+    expect(await saveBusinessDetails(ACTOR, WS, 4, form({ address: "1 Main St, Buffalo, NY" }), deps)).toEqual({ outcome: "saved" });
+    expect(deps.patch).toHaveBeenCalledWith(ACTOR, WS, 4, { facts: { address: { value: { formatted: "1 Main St, Buffalo, NY" } } } }, { source: "owner" });
+    vi.mocked(deps.patch).mockClear();
+    expect(await saveBusinessDetails(ACTOR, WS, 3, form({ address: "2 Main St" }), deps)).toEqual({ outcome: "conflict" });
+    expect(await saveBusinessDetails(ACTOR, WS, 4, form({ address: "x".repeat(201) }), deps)).toEqual({ outcome: "invalid", field: "address" });
+    expect(deps.patch).not.toHaveBeenCalled();
   });
 
   it("never overwrites a newer record, and refuses members", async () => {
