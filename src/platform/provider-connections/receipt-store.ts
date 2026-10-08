@@ -35,7 +35,7 @@ export async function recordTenantProviderDisconnect(input: {
   const id = typeof row.id === "string" ? row.id : "";
   if (!id) throw new Error("Provider disconnect receipt was not returned by storage.");
   const clearedStores = Array.isArray(row.clearedStores) ? row.clearedStores.filter((item): item is string => typeof item === "string") : input.clearedStores;
-  const localCleanupStatus = row.localCleanupStatus === "partial" || input.localCleanupStatus === "partial" ? "partial" : "complete";
+  const localCleanupStatus: LocalCleanupStatus = row.localCleanupStatus === "partial" || input.localCleanupStatus === "partial" ? "partial" : "complete";
   return {
     id,
     provider: input.provider,
