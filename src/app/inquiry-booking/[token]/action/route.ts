@@ -10,11 +10,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
   const page = new URL(`/inquiry-booking/${encodeURIComponent(token)}`, request.url);
   page.host = request.headers.get("host") ?? page.host;
   if (!isSameOriginBookingForm(request)) return new NextResponse("Forbidden", { status: 403 });
-  if (await isRateLimitedAsync(rateLimitKey(request, "inquiry-booking"), 10)) {
-    page.searchParams.set("error", "rate");
-    return new NextResponse(null, { status: 303, headers: { Location: page.toString() } });
-  }
   try {
+    if (await isRateLimitedAsync(rateLimitKey(request, "inquiry-booking"), 10)) {
+      page.searchParams.set("error", "rate");
+      return new NextResponse(null, { status: 303, headers: { Location: page.toString() } });
+    }
     if (request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase() !== "application/x-www-form-urlencoded") throw new Error("invalid");
     const form = new URLSearchParams((await readBoundedBody(request, 2048)).toString("utf8"));
     const index = form.get("slot");
