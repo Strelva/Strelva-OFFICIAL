@@ -3,6 +3,7 @@
  * per-business alias. https://modelcontextprotocol.io/specification/2026-07-28 */
 import { methodNotAllowed, serveMcp } from "@/platform/agent-channel/protocol";
 import { platformMcpServer } from "@/platform/agent-channel/public-tools";
+import { withProtectedTools } from "@/platform/agent-channel/protected-tools";
 import { tenantDirectory } from "../_directory";
 
 export const dynamic = "force-dynamic";
@@ -11,5 +12,5 @@ const server = platformMcpServer(tenantDirectory);
 export const GET = methodNotAllowed;
 export const DELETE = methodNotAllowed;
 export async function POST(request: Request) {
-  return serveMcp(request, server);
+  return serveMcp(request, withProtectedTools(server, tenantDirectory));
 }

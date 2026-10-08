@@ -159,6 +159,30 @@ describe("modern MCP 2026-07-28", () => {
   });
 });
 
+describe("mixed MCP authorization", () => {
+  it("allows scoped owner work and native inquiries independently of booking confirmation rollout", async () => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1"); vi.stubEnv("STRELVA_AGENT_INQUIRIES", "1");
+    ports.enabled.mockRejectedValue(new Error("booking off"));
+    try { expect((await modern("tools/list")).status).toBe(200); expect(ports.enabled).not.toHaveBeenCalled(); }
+    finally { vi.unstubAllEnvs(); }
+  });
+  it("leaves public discovery open and challenges each protected scope", async () => {
+    vi.stubEnv("STRELVA_MCP_OAUTH", "0");
+    try {
+      expect((await modern("tools/list")).status).toBe(200);
+      for (const [name, scope] of [["read_business_context", "business:read"], ["read_customer_inquiries", "inquiries:read"], ["approve_quote", "quotes:approve"]] as const) {
+        const denied = await tool(name, { workspaceId: NATIVE_WORKSPACE });
+        expect(denied.status).toBe(401);
+        expect(denied.headers.get("www-authenticate")).toContain(`scope="${scope}"`);
+        expect(denied.headers.get("www-authenticate")).toContain("/.well-known/oauth-protected-resource/api/mcp/public");
+        expect(denied.headers.get("cache-control")).toBe("no-store");
+      }
+      expect(ports.rpc).not.toHaveBeenCalled();
+      expect((await modern("tools/list")).status).toBe(200);
+    } finally { vi.unstubAllEnvs(); }
+  });
+});
+
 describe("deterministic tool catalog", () => {
   it("returns the same cacheable list regardless of client identity, history or era", async () => {
     const first = await (await modern("tools/list")).json();
@@ -168,13 +192,13 @@ describe("deterministic tool catalog", () => {
     expect(first.result).toMatchObject({ resultType: "complete", ttlMs: 3600000, cacheScope: "public" });
     const old = await (await legacy("tools/list")).json();
     expect(old.result).toEqual({ tools: first.result.tools });
-    expect(first.result.tools.map((t: { name: string }) => t.name)).toEqual(["search_business", "get_business", "list_services", "find_slots", "request_booking", "get_booking_status"]);
+    expect(first.result.tools.map((t: { name: string }) => t.name)).toEqual(["search_business", "get_business", "get_policies", "send_inquiry", "request_quote", "get_status", "list_services", "find_slots", "request_booking", "get_booking_status", "read_business_context", "read_customer_inquiries", "approve_quote"]);
   });
 
   it("titles and annotates every tool, keeping reads and the one write separate", () => {
     for (const t of [...PLATFORM_TOOLS, ...BUSINESS_TOOLS]) {
       expect(t.title.length).toBeGreaterThan(3);
-      expect(t.annotations.readOnlyHint).toBe(t.name !== "request_booking");
+      expect(t.annotations.readOnlyHint).toBe(!["request_booking", "send_inquiry", "request_quote"].includes(t.name));
       if (t.name === "request_booking") expect(t.annotations).toMatchObject({ destructiveHint: true, idempotentHint: true, openWorldHint: true });
     }
     expect(Object.isFrozen(PLATFORM_TOOLS)).toBe(true);
@@ -229,7 +253,7 @@ describe("platform tools", () => {
     const body = await (await tool("get_business", { business: "fixture" })).json();
     expect(body.result.structuredContent).toEqual({
       business: "fixture", name: "Fixture Barbers", industry: "barber", website: "https://fixture.example", address: "1 Main St, Buffalo",
-      phone: "716-555-0100", timeZone: "America/New_York", paused: false, acceptsBookingRequests: true, serviceCount: 1,
+      phone: "716-555-0100", timeZone: "America/New_York", paused: false, acceptsBookingRequests: true, serviceCount: 1, verification: { domain: { verified: false, url: null, confirmedAt: null }, googleBusinessProfile: { linked: false, verified: null, url: null }, ownerConfirmedFactCount: 0, lastConfirmedAt: null, operatingAgencies: [] },
     });
     expect(ports.rpc).toHaveBeenCalledWith("read_booking_business_details", { p_tenant_id: "fixture" });
     expect((await (await tool("get_business", { business: "not-listed" })).json()).result).toMatchObject({ isError: true, content: [{ text: "This business is unavailable." }] });
@@ -372,7 +396,7 @@ describe("per-business alias delegates to the platform server", () => {
 
   it("speaks the modern era on the alias too, without directory tools", async () => {
     const list = await (await modern("tools/list", {}, { business: "fixture" })).json();
-    expect(list.result.tools.map((t: { name: string }) => t.name)).toEqual(["list_services", "find_slots", "request_booking", "get_booking_status"]);
+    expect(list.result.tools.map((t: { name: string }) => t.name)).toEqual(["get_policies", "send_inquiry", "request_quote", "get_status", "list_services", "find_slots", "request_booking", "get_booking_status"]);
     expect((await (await tool("search_business", { query: "barber" }, { business: "fixture" })).json()).error.code).toBe(-32602);
     expect((await (await modern("server/discover", {}, { business: "fixture" })).json()).result._meta["io.modelcontextprotocol/serverInfo"].name).toBe("strelva-bookings");
   });

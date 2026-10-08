@@ -911,3 +911,13 @@ Public attributed audit/AI-check components and email layouts consume the same
 presentation contract, retaining native identity without agency attribution.
 R23 remains open: this implements brand presentation, not an accepted decision
 to remove platform identity. See [#264 evidence and limits](../product/streams/a1-agency-brand.md).
+
+### Public business evidence
+
+`src/products/connected-sites/BusinessEvidence.tsx` renders the shared public
+verification receipt inside the business page's existing Section. Linkage and
+provider verification are separate states; unknown facts remain explicit. It
+uses foundation typography/spacing tokens, with long URLs and agency names
+wrapping. The doubly gated `/preview/strelva/agent-oauth?evidence=1` specimen
+provides fictional populated/empty desktop/mobile proof; the native route and
+JSON-LD contracts are covered by business-page/profile tests.
