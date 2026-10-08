@@ -8,10 +8,10 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const postgres = process.env.POSTGRES_BIN ?? "/opt/homebrew/opt/postgresql@18/bin";
 const available = existsSync(join(postgres, "initdb"));
-const scripts = ["workspace-sql", "workspace-upgrade", "inquiry-workspace-sql", "customer-mapping-sql"];
+const scripts = ["workspace-sql", "workspace-upgrade", "inquiry-workspace-sql", "customer-mapping-sql", "agency-prospects-sql"];
 
 for (const script of scripts) {
-  for (const failure of ["initdb", "startup", "sql"]) {
+  for (const failure of ["initdb", "startup", "sql", ...(script === "agency-prospects-sql" ? ["signal-INT", "signal-TERM"] : [])]) {
     test(`${script}: ${failure} failure removes only its own cluster and stops its postmaster`, { skip: !available }, () => {
       const sandbox = mkdtempSync(join("/tmp", "strelva-cleanup-test-"));
       const unrelatedData = join(sandbox, "tmp/strelva-unrelated-cluster/data");
@@ -23,7 +23,8 @@ for (const script of scripts) {
         const unrelated = join(temporary, "strelva-unrelated-cluster");
         mkdirSync(unrelated);
         writeFileSync(join(unrelated, "keep"), "another agent's cluster");
-        const liveUnrelated = script === "workspace-sql" && failure === "sql";
+        const liveUnrelated = (script === "workspace-sql" && failure === "sql")
+          || (script === "agency-prospects-sql" && failure === "signal-TERM");
         if (liveUnrelated) {
           const options = { env: { ...process.env, LC_ALL: "C" }, encoding: "utf8" };
           const initialized = spawnSync(join(postgres, "initdb"), ["-D", unrelatedData, "--locale=C", "--encoding=UTF8", "--auth=trust", "--no-instructions"], options);
@@ -44,14 +45,21 @@ if [[ " $* " == *' start '* && "$status" == 0 ]]; then
 fi
 exit "$status"
 `, { mode: 0o700 });
-        writeFileSync(join(bin, "psql"), "#!/usr/bin/env bash\nexit 42\n", { mode: 0o700 });
+        writeFileSync(join(bin, "psql"), `#!/usr/bin/env bash
+if [[ "$TEST_FAILURE" == signal-* ]]; then
+  kill -s "${failure.replace('signal-', '')}" "$PPID"
+  exit 0
+fi
+exit 42
+`, { mode: 0o700 });
         const result = spawnSync("bash", [join(root, `scripts/check-${script}.sh`)], {
           env: { ...process.env, PATH: `${bin}:${postgres}:${process.env.PATH}`, TMPDIR: temporary,
             LC_ALL: "", LANG: "invalid-locale", POSTGRES_BIN: postgres, TEST_FAILURE: failure,
             TEST_POSTMASTER_PID: join(sandbox, "pid"), TEST_CLUSTER_DATA: join(sandbox, "data") },
           encoding: "utf8", timeout: 60_000,
         });
-        assert.equal(result.status, 42, result.stderr);
+        const expectedStatus = failure === "signal-INT" ? 130 : failure === "signal-TERM" ? 143 : 42;
+        assert.equal(result.status, expectedStatus, result.stderr);
         assert.deepEqual(readdirSync(temporary), ["strelva-unrelated-cluster"]);
         assert.equal(readFileSync(join(unrelated, "keep"), "utf8"), "another agent's cluster");
         if (liveUnrelated) {
@@ -63,6 +71,16 @@ exit "$status"
           assert.equal(existsSync(readFileSync(join(sandbox, "data"), "utf8").trim()), false);
         }
       } finally {
+        // A failing regression may retain its OWN partially started postmaster.
+        // Stop it before removing our test sandbox; never unlink a live data dir.
+        const recordedData = join(sandbox, "data");
+        if (existsSync(recordedData)) {
+          const ownedData = readFileSync(recordedData, "utf8").trim();
+          if (existsSync(join(ownedData, "postmaster.pid"))) {
+            const stopped = spawnSync(join(postgres, "pg_ctl"), ["-D", ownedData, "-m", "fast", "-w", "stop"], { stdio: "ignore", env: { ...process.env, LC_ALL: "C" } });
+            assert.equal(stopped.status, 0, "test-owned failed startup must stop before removing its data");
+          }
+        }
         if (existsSync(join(unrelatedData, "postmaster.pid"))) {
           spawnSync(join(postgres, "pg_ctl"), ["-D", unrelatedData, "-m", "fast", "-w", "stop"], { stdio: "ignore", env: { ...process.env, LC_ALL: "C" } });
         }
@@ -71,6 +89,29 @@ exit "$status"
     });
   }
 }
+
+test("agency-prospects-sql: normal completion removes its nested cluster and preserves sibling data", { skip: !available }, () => {
+  const sandbox = mkdtempSync(join("/tmp", "strelva-cleanup-test-"));
+  try {
+    writeFileSync(join(sandbox, "keep"), "another agent's data");
+    const result = spawnSync("bash", [join(root, "scripts/check-agency-prospects-sql.sh")], {
+      env: { ...process.env, PATH: `${postgres}:${process.env.PATH}`, TMPDIR: sandbox, LC_ALL: "C" },
+      encoding: "utf8", timeout: 60_000,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(readdirSync(sandbox), ["keep"]);
+    assert.equal(readFileSync(join(sandbox, "keep"), "utf8"), "another agent's data");
+  } finally {
+    for (const name of readdirSync(sandbox).filter(name => name.startsWith("strelva-agency-prospects."))) {
+      const ownedData = join(sandbox, name, "data");
+      if (existsSync(join(ownedData, "postmaster.pid"))) {
+        const stopped = spawnSync(join(postgres, "pg_ctl"), ["-D", ownedData, "-m", "fast", "-w", "stop"], { stdio: "ignore", env: { ...process.env, LC_ALL: "C" } });
+        assert.equal(stopped.status, 0, "stop the test-owned postmaster before deleting a failing normal-run fixture");
+      }
+    }
+    rmSync(sandbox, { recursive: true, force: true });
+  }
+});
 
 test("release-safety lifecycle cleans up on failure, SIGINT and SIGTERM", { skip: !available }, () => {
   const sandbox = mkdtempSync(join("/tmp", "strelva-cleanup-test-"));
