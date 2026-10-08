@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { AuthorizeAssistant } from '../../../connect/authorize/AuthorizeAssistant';
-import { BusinessEvidence } from '@/products/connected-sites/BusinessEvidence';
+import { BusinessEvidence } from '@/products/connected-sites';
 import { ConnectionPreview } from './ConnectionPreview';
 import { unknownVerification } from '@/platform/agent-channel/profile';
 export default async function Proof({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {

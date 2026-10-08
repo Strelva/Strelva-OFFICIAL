@@ -566,3 +566,6 @@ export { createSiteChangeStore, SiteChangeOrderError } from "./site-changes";
 /** The public-URL crawler and fact extraction, for products that seed a business from its site (agency clients, #259). */
 export { crawlWebsite, normalizeRebuildUrl, WebsiteCrawlError } from "./rebuild-crawl";
 export { extractBusinessFacts } from "./rebuild-pipeline";
+
+/** Product adapter for platform assistant website operations. */
+export { createAgentWebsiteAdapter } from "./agent-adapter";

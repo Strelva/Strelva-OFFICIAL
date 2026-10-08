@@ -4,6 +4,8 @@
 import { methodNotAllowed, serveMcp } from "@/platform/agent-channel/protocol";
 import { platformMcpServer } from "@/platform/agent-channel/public-tools";
 import { withProtectedTools } from "@/platform/agent-channel/protected-tools";
+import { createAgentWebsiteAdapter } from "@/products/websites/server";
+import { oauthRpc, oauthOrigin } from "@/platform/agent-channel/oauth";
 import { tenantDirectory } from "../_directory";
 
 export const dynamic = "force-dynamic";
@@ -12,5 +14,5 @@ const server = platformMcpServer(tenantDirectory);
 export const GET = methodNotAllowed;
 export const DELETE = methodNotAllowed;
 export async function POST(request: Request) {
-  return serveMcp(request, withProtectedTools(server, tenantDirectory));
+  return serveMcp(request, withProtectedTools(server, tenantDirectory, createAgentWebsiteAdapter(oauthRpc, oauthOrigin())));
 }

@@ -5,6 +5,7 @@ vi.mock("@/platform/agent-channel/oauth", async original => ({
   validateAgentToken: ports.validate, inspectAgentToken: ports.inspect, oauthRpc: ports.rpc,
 }));
 vi.mock("@/platform/bookings/store", () => ({ readBookingContext: ports.context }));
+import { createAgentWebsiteAdapter } from "@/products/websites/agent-adapter";
 import { withProtectedTools } from "@/platform/agent-channel/protected-tools";
 import { serveMcp, type McpServer } from "@/platform/agent-channel/protocol";
 import { assistantBusinessContext } from "@/platform/agent-channel/business-context";
@@ -31,7 +32,7 @@ const base: McpServer = {
   name: "strelva", version: "1.0.0", instructions: "Public tools.", tools: [],
   ready: async () => {}, limited: async () => false, call: async () => ({ unknownTool: true }),
 };
-function server() { return withProtectedTools(base, { list: async () => [], scope: ports.scope }); }
+function server() { return withProtectedTools(base, { list: async () => [], scope: ports.scope }, createAgentWebsiteAdapter(ports.rpc, "https://app.strelva.com")); }
 function request(name: string, args: Record<string, unknown> = {}, authenticated = true) {
   return new Request("https://app.strelva.com/api/mcp/public", {
     method: "POST", headers: { "content-type": "application/json", "mcp-protocol-version": "2025-11-25",

@@ -4,7 +4,7 @@ import { resourceUrl, validateAgentToken, inspectAgentToken, oauthRpc, hash } fr
 import type { BusinessDirectory } from "./public-tools";
 import type { McpServer, McpTool } from "./protocol";
 import { assistantBusinessContext } from "./business-context";
-import { createAgentWebsiteTools } from "./website-tools";
+import { isAgentWebsiteToolName, type AgentWebsitePort } from "./website-tools";
 
 const descriptions = {
   read_business_context: ["Business context", "Start here after connecting. With no arguments, read the business facts and services for the business you selected during sign-in. Includes recorded source and verification state; excludes customer inquiries, staff contact details and private notification recipients. Does not read or change website content.", "business:read"],
@@ -53,8 +53,7 @@ const priceApproval = z.object({
 }).strict();
 
 /** Request-local closure; tokens or actor identity are never saved on a shared server. */
-export function withProtectedTools(base: McpServer, directory: BusinessDirectory): McpServer {
-  const websites = createAgentWebsiteTools();
+export function withProtectedTools(base: McpServer, directory: BusinessDirectory, websites: AgentWebsitePort): McpServer {
   let tokenHash: string | null = null;
   let principal: Awaited<ReturnType<typeof validateAgentToken>> = null;
   const challenge = (scope: string, insufficient = false) => new Response(null, { status: insufficient ? 403 : 401, headers: {
@@ -92,7 +91,7 @@ export function withProtectedTools(base: McpServer, directory: BusinessDirectory
       const allowed = new Set(Object.keys(tools.find(t => t.name === name)!.inputSchema.properties as object));
       if (Object.keys(args).some(k => !allowed.has(k))) return { ok: false, message: "Check the tool arguments." };
       try {
-        if (name.includes("website")) {
+        if (isAgentWebsiteToolName(name)) {
           if (!tokenHash || principal.agencyId) throw new Error("oauth_invalid_token");
           return { ok: true, value: await websites.call(name, args, { tokenHash, resource: resourceUrl(), workspaceId: principal.workspaceId, userId: principal.userId }) };
         }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { createAgentWebsiteTools } from "@/platform/agent-channel/website-tools";
+import { createAgentWebsiteAdapter } from "@/products/websites/agent-adapter";
 import { siteDocumentSchema, siteDocumentHash } from "@/products/websites/site-document";
 import { websiteRebuildSchema } from "@/products/websites/rebuild-contracts";
 import { prepareSitePatch } from "@/products/websites/site-operations";
@@ -15,7 +15,7 @@ function fixture() {
  const snapshot = { work: { id: workId, workspace_id: workspaceId, product_id: "websites", resource_kind: "website", payload: rebuild }, documentRevision: 2, contentHash: rebuild.candidate!.contentHash, approvedRevision: 2, publishedRevision: 1 };
  const receipt = { requestId, websiteWorkId: workId, revision: 3, contentHash: "b".repeat(64), currentRevision: 3, currentContentHash: "b".repeat(64), summary: "New headline", createdAt: at, status: "awaiting_review" };
  const rpc = vi.fn(async (name: string, _args: Record<string,unknown>): Promise<unknown> => name === "read_agent_website_proposal_retry" ? null : name === "read_agent_website_work" ? snapshot : receipt);
- const service = createAgentWebsiteTools(rpc, () => at);
+ const service = createAgentWebsiteAdapter(rpc, "https://app.strelva.com", () => at);
  const request = { websiteWorkId: workId, requestId, expectedRevision: 3, candidateRevision: 2, candidateContentHash: snapshot.contentHash, summary: "New headline", ops: [{ op: "replace", path: "/nodes/hero/props/title", value: "Proposed headline" }] };
  return { document, rebuild, snapshot, receipt, rpc, service, request };
 }
