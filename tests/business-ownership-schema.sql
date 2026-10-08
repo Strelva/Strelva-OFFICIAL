@@ -316,8 +316,16 @@ select pg_temp.bo_assert((select count(*) = 1 from public.create_workspace_invit
   'b0000000-0000-4000-8000-000000000002', 'pat-owner@example.test', 'staff@example.test', 'member', repeat('5', 64), now() + interval '7 days')), 'owner invites members');
 
 -- Revoke: the operator withdraws its own invitation; it can't be accepted after.
+select pg_temp.bo_assert((select public.operator_owner_invitation_trusted_recipient(id) = public.resolve_business_owner_recipient(id)->>'email'
+    and case when to_regprocedure('public.business_trusted_owner_recipient(uuid)') is null
+      then public.resolve_business_owner_recipient(id)->>'from' = 'record'
+        and public.resolve_business_owner_recipient(id)->>'source' = 'owner'
+        and public.resolve_business_owner_recipient(id)->>'verified' = 'true'
+      else public.resolve_business_owner_recipient(id)->>'from' in ('record', 'tenant_fallback') end
+  from bo_ws where label = 'later'), 'self-approval uses the trusted resolver''s current owner source');
 insert into bo_invite select 'quinn', public.create_operator_owner_invitation_approved('b0000000-0000-4000-8000-000000000001', id,
-  'quinn-owner@example.test', repeat('6', 64), now() + interval '14 days', pg_temp.bo_approval(id, 'quinn-owner@example.test', 'b0000000-0000-4000-8000-000000000001'), false, '{"source":"web"}'::jsonb)
+  public.operator_owner_invitation_trusted_recipient(id), repeat('6', 64), now() + interval '14 days',
+  pg_temp.bo_approval(id, public.operator_owner_invitation_trusted_recipient(id), 'b0000000-0000-4000-8000-000000000001'), false, '{"source":"web"}'::jsonb)
   from bo_ws where label = 'later';
 select pg_temp.bo_assert(exists (select 1 from public.operator_action_approvals
   where workspace_id = (select id from bo_ws where label = 'later') and action_kind = 'owner_invitation.issue'
