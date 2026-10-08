@@ -1364,9 +1364,10 @@ printf 'Owner recipient trust rollback is exact (%s schema objects compared) and
 # gates. Forward, the effect matrix, the older contracts these replace, then
 # rollback in reverse order (wrong order refused, catalog restored exactly)
 # and reapply.
-acting_provider=(20261014100000_client_resource_mandates 20261014112000_acting_provider_gates)
+acting_provider=(20261014100000_client_resource_mandates 20261014112000_acting_provider_gates 20261017120000_owner_decision_operator_refusal)
 check_acting_provider() {
   psql "${psql_args[@]}" --file="$repo_root/tests/acting-provider-gates-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/operator-owner-decisions-schema.sql"
   psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
   psql "${psql_args[@]}" --file="$repo_root/tests/platform-service-actor-schema.sql"
   psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-links-schema.sql"
@@ -1374,6 +1375,13 @@ check_acting_provider() {
 }
 catalog_fingerprint >"$cluster_root/catalog-before-acting-provider.txt"
 for name in "${acting_provider[@]}"; do
+  if [[ "$name" == 20261017120000_owner_decision_operator_refusal ]]; then
+    if psql "${psql_args[@]}" --file="$repo_root/tests/operator-owner-decisions-schema.sql" >"$cluster_root/operator-refusal-before.log" 2>&1; then
+      printf 'The predecessor unexpectedly refused operator session decisions.\n' >&2
+      exit 1
+    fi
+    grep -q 'expected owner_decision_owner_only but the statement succeeded' "$cluster_root/operator-refusal-before.log"
+  fi
   psql "${psql_args[@]}" --single-transaction --file="$repo_root/supabase/migrations/$name.sql"
 done
 check_acting_provider
