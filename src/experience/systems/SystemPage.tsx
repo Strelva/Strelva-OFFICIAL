@@ -32,6 +32,7 @@ import { WebsiteChangeAsk } from "./WebsiteChangeAsk";
 import { websiteDomainConnections } from "./website-detail";
 import { SystemVersionImprovements } from "./SystemVersionImprovements";
 import { SystemVersionManagement } from "./SystemVersionManagement";
+import { SystemCreator } from "./SystemCreator";
 import styles from "./systems.module.css";
 
 export interface SystemPageProps {
@@ -108,6 +109,7 @@ export function SystemPage(props: SystemPageProps) {
           <HealthSignal health={system.health} detailed />
           {system.operatedBy ? <span>Run by {system.operatedBy}</span> : null}
         </p>
+        {system.storedVersionId ? <SystemCreator workspaceId={props.workspaceId} systemId={system.id} /> : null}
         {system.health.signals?.length ? <ul aria-label="Website health evidence" className="mt-3 space-y-1 text-sm text-gray-muted">{system.health.signals.map(signal => <li key={signal}>{signal}</li>)}</ul> : null}
         {system.lifecycle === "paused" ? <p className={styles.meta} role="note">{PAUSED_KEEPS[system.kind] ?? "Paused. Its records are kept."}</p> : null}
       </div>

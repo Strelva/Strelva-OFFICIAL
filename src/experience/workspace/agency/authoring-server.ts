@@ -2,6 +2,7 @@
  * stores. No provider write, message, client grant or owner decision is implied. */
 import { z } from "zod";
 import { applicationSchema } from "@/products/applications/contracts";
+import { rehearseApplicationPackage } from "@/products/applications/package-rehearsal";
 import { createWorkPlan, executeWorkPlanOutput, presentWorkPlan, type CreateWorkPlanRequest, type ExecuteWorkPlanOutputRequest } from "@/products/work-plans";
 import { getWork, WorkspaceAccessError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces";
 import { createSupabaseSystemStore, listBusinessSystems, type SystemStore } from "@/platform/systems";
@@ -129,7 +130,7 @@ export async function packageAgencySystem(actor: WorkspaceActor, input: { worksp
   if (row.provenance === "existing") await systems.createSystem(actor, input.workspaceId, {
     name: row.system.name, kind: row.system.kind, origin: row.system.origin,
   }, input.systemId);
-  const revision = await createSystemVersions({ store, connections: createSupabaseConnectionOwnership(db) }).publishSourceRevision(actorForVersions, {
+  const revision = await createSystemVersions({ store, connections: createSupabaseConnectionOwnership(db), rehearsePackage: revision => rehearseApplicationPackage(revision.source.revisionId, revision.definition) }).publishSourceRevision(actorForVersions, {
     source: { businessId: input.workspaceId, systemId: input.systemId }, definition: choice.definition, requires: choice.requires, summary: input.summary,
   });
   return { workspaceId: input.workspaceId, systemId: input.systemId, revision: revision.source.number, revisionId: revision.source.revisionId };

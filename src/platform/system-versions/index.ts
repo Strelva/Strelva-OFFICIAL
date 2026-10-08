@@ -5,3 +5,4 @@ export * from "./store";
 export * from "./service";
 export * from "./mapping";
 export * from "./improvement";
+export * from "./declaration";

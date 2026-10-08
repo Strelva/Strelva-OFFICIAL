@@ -6,7 +6,6 @@ import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
 import { WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { requireAgencyAuthoring } from "./authoring-server";
 import { readAgencyLibrary } from "../agency-server";
-import { createSupabaseSystemStore } from "@/platform/systems";
 import { z } from "zod";
 import { mapVersionsError } from "@/platform/system-versions/supabase-store";
 import { createApplicationDraft } from "@/products/applications/server";
@@ -27,7 +26,7 @@ export async function readSystemVersion(actor: WorkspaceActor, workspaceId: stri
     workingDefinition: view.workingDefinition, overrides: view.overrides, bindings: view.bindings ?? [], releases: view.releases, source: view.source,
     offers, ...projectVersionPossibilities(lineage, offers, "The source System"),
     canMakeReal: versionActor.memberships.some(membership => membership.businessId === workspaceId && membership.role === "owner"),
-    canManage: versionActor.memberships.some(membership => membership.businessId === workspaceId && (membership.role === "owner" || membership.role === "admin")),
+    canManage: versionActor.memberships.some(membership => membership.businessId === workspaceId && (membership.role === "owner" || membership.role === "admin")) || Boolean(versionActor.delegatedSystems?.some(scope => scope.businessId === workspaceId && scope.systemId === systemId && scope.canWrite)),
   };
 }
 
@@ -50,19 +49,26 @@ export async function readVersionManagement(actor: WorkspaceActor, workspaceId: 
 
 export async function createBusinessVersion(actor: WorkspaceActor, input: { agencyWorkspaceId: string; workspaceId: string; source: SystemRevisionRef;
   context: VersionContext; name: string; commandId: string }, db: VersionsDb = versionsDb()) {
-  await requireAgencyAuthoring(actor, input.agencyWorkspaceId, input.workspaceId, db);
+  await requireAgencyAuthoring(actor, input.agencyWorkspaceId, input.agencyWorkspaceId, db);
   if (input.source.businessId !== input.agencyWorkspaceId) throw new VersionAccessError();
+  return installBusinessPackage(actor, input, db);
+}
+
+/** Installing a qualified closed package does not grant general app authoring. */
+export async function installBusinessPackage(actor: WorkspaceActor, input: { workspaceId: string; source: SystemRevisionRef; context: VersionContext; name: string; commandId: string }, db: VersionsDb = versionsDb()) {
+  const permission = await db.rpc("require_system_package_install_scope", { p_workspace_id: input.workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail, p_source_system_id: input.source.systemId, p_revision: input.source.number, p_command_id: input.commandId });
+  if (permission.error) mapVersionsError(permission.error, "This package installation is unavailable.");
+  if (permission.data !== true) throw new VersionAccessError();
   const versionActor = await readVersionActor(actor, db);
-  const sourceSystem = await createSupabaseSystemStore(db).readSystem(actor, { businessId: input.source.businessId, systemId: input.source.systemId });
   const base = createSupabaseVersionStore(db);
   const revision = await base.getRevision(versionActor, input.source, input.source.number);
   if (!revision || revision.source.revisionId !== input.source.revisionId) throw new VersionValidationError("This source revision changed. Reload the source before creating a Version.");
-  if (sourceSystem.system.kind !== "internal_app" || revision.definition.kind !== "internal_app") throw new VersionValidationError("This source cannot create a running Version automatically. Custom-repo website changes need an operator-prepared Possibility.");
+  if (revision.definition.kind !== "internal_app") throw new VersionValidationError("This source cannot create a running Version automatically. Custom-repo website changes need an operator-prepared Possibility.");
   if (Object.keys(revision.definition).some(key => !["kind", "title", "fields", "components"].includes(key))) throw new VersionValidationError("The reusable application shape cannot include records, accounts, grants or maintenance authority.");
   const { kind: _kind, ...definition } = revision.definition;
-  const nativePayload = createApplicationDraft({ ...definition, maintenanceOwner: actor.userId }, actor);
+  const nativePayload = createApplicationDraft({ ...definition, maintenanceOwner: actor.userId }, actor, true);
   const atomicDb: VersionsDb = { rpc(name, args) {
-    return name === "create_system_version" ? db.rpc("create_version_system_command", { ...args, p_name: input.name, p_kind: sourceSystem.system.kind, p_command_id: input.commandId, p_native_payload: nativePayload }) : db.rpc(name, args);
+    return name === "create_system_version" ? db.rpc("create_version_system_command", { ...args, p_name: input.name, p_kind: "internal_app", p_command_id: input.commandId, p_native_payload: nativePayload }) : db.rpc(name, args);
   } };
   const atomicStore = createSupabaseVersionStore(atomicDb);
   const versions = createSystemVersions({ store: { ...atomicStore, async getSource(actor, source) {
@@ -84,7 +90,7 @@ export async function manageBusinessVersion(actor: WorkspaceActor, input: Manage
   const versionActor = await readVersionActor(actor, db), store = createSupabaseVersionStore(db);
   const lineage = await store.findLineageByVersion(versionActor, { businessId: input.workspaceId, systemId: input.systemId });
   if (!lineage || lineage.id !== input.versionId) throw new VersionAccessError();
-  if (!versionActor.memberships.some(member => member.businessId === input.workspaceId && (member.role === "owner" || member.role === "admin"))) throw new VersionAccessError();
+  if (!versionActor.memberships.some(member => member.businessId === input.workspaceId && (member.role === "owner" || member.role === "admin")) && !versionActor.delegatedSystems?.some(scope => scope.businessId === input.workspaceId && scope.systemId === input.systemId && scope.canWrite)) throw new VersionAccessError();
   if (lineage.rowRevision !== input.rowRevision) throw new VersionStaleError();
   const versions = createSystemVersions({ store, connections: createSupabaseConnectionOwnership(db) });
   let draft = lineage;
@@ -116,7 +122,7 @@ export async function decideSystemImprovement(actor: WorkspaceActor, input: { wo
     if (lineage.rowRevision !== input.rowRevision + 1 || last?.by !== actor.userId || last.sourceRevision !== input.revision
       || last.choice !== (input.action === "adopt" ? "adopted" : "declined")
       || (last.choice === "adopted" ? lineage.baseline.revision !== input.revision || !sameChoices : last.reason !== input.reason)) throw new VersionStaleError();
-    if (!versionActor.memberships.some(item => item.businessId === input.workspaceId && (item.role === "owner" || item.role === "admin"))) throw new VersionAccessError();
+    if (!versionActor.memberships.some(item => item.businessId === input.workspaceId && (item.role === "owner" || item.role === "admin")) && !versionActor.delegatedSystems?.some(scope => scope.businessId === input.workspaceId && scope.systemId === input.systemId && scope.canWrite)) throw new VersionAccessError();
     if (input.action === "decline") return { outcome: "declined", rowRevision: lineage.rowRevision, receipt: null };
     if (!needsYouReleaseEnabled()) throw new WorkspaceStoreError("Needs you is not enabled. Nothing was released.");
     return { outcome: "prepared", rowRevision: lineage.rowRevision, receipt: await prepareVersionRelease(actor, lineage, { db }) };

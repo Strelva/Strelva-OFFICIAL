@@ -13,6 +13,7 @@ import type { InquirySurfaceAdapter, InquirySurfaceSnapshot, InquiryView } from 
 import type { WorkspaceSnapshot, WorkspaceWork } from "./contracts";
 import { discoveryProducts, sameAppHref, type ManagedWorkSummary } from "./workspace-discovery";
 import { WorkspaceTemplateLibrary } from "./WorkspaceTemplateLibrary";
+import { PackageCatalog } from "@/experience/systems/PackageCatalog";
 import { WorkspaceIntent, retainRequestIntent, routeConsumer } from "./WorkspaceIntent";
 import { readRequestDraft, requestDraftKey, writeRequestDraft } from "./request-draft";
 import { WorkspaceHelp } from "./WorkspaceHelp";
@@ -573,6 +574,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
           </div>
         </> : <>
           <WorkspaceTemplateLibrary key={`${snapshot.actor.email}:${snapshot.workspaceId}`} workspaceId={snapshot.workspaceId} actorEmail={snapshot.actor.email} businessName={current?.name || "Your business"} canCreate={!workspaceMutationReadOnly && Boolean(onHorizontal) && products.some(item => item.id === "applications" && item.availability === "available")} onRequest={openRequest} onCreated={onCreatedApp} />
+          {systemsReleased ? <PackageCatalog workspaceId={snapshot.workspaceId} canInstall={!workspaceMutationReadOnly && ["owner", "admin"].includes(current?.role || "")} /> : null}
           <details open={moreToolsOpen} onToggle={event => setMoreToolsOpen(event.currentTarget.open)} className="mt-8 border-t border-gray-border pt-4"><summary className="cursor-pointer py-4 text-base font-medium">More tools and managed services</summary>
           <WorkspaceOfferingDirectory state={offerings.state} businessName={current?.name || "This business"} work={snapshot.work} managedSites={sites} products={products} selectedId={null} onSelect={openOffering} onOpenWork={openWork} onOpenProduct={openProduct} onRequestSetup={(entry) => navigate("help", `I want setup help for ${entry.offering?.name ?? entry.title} for ${current?.name ?? "this business"}. ${entry.offering?.installationNote || entry.product?.description || entry.description}`)} onRetryConflict={offerings.retryConflict} onRetry={offerings.reload} onCommand={offerings.command} onWebsiteCommand={offerings.websiteCommand} />
           </details>

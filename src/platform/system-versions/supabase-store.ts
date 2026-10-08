@@ -4,6 +4,7 @@ import { canonicalJson, sha256 } from "@/platform/business-record/tenant-import"
 import { WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import type { JsonObject, JsonValue } from "./compare";
 import type { SystemRef } from "./refs";
+import { packageDeclarationSchema, revisionQualificationSchema } from "./declaration";
 import type { ConnectionOwnership, VersionStore } from "./store";
 import {
   VERSION_CONTEXT_KINDS,
@@ -59,6 +60,10 @@ export function mapVersionsError(error: DbError, fallback: string): never {
     throw new VersionValidationError("That account is already connected to another Version. Connect a separate account for this one.");
   }
   if (detail.includes("workspace_exit_future_work_blocked")) throw new VersionValidationError("New work is stopped for this business.");
+  if (detail.includes("system_revision_not_qualified")) throw new VersionValidationError("This exact source revision needs passing checks and human review before installation, update or release.");
+  if (detail.includes("system_revision_reviewer_policy_required")) throw new VersionValidationError("A human reviewer and review standard have to be configured before qualification can be approved.");
+  if (detail.includes("system_package_declaration_exceeded")) throw new VersionValidationError("This System's effective behavior exceeds its approved package declaration.");
+  if (detail.includes("system_package_runtime_unsupported")) throw new VersionValidationError("This package has no verified native runtime adapter yet.");
   for (const code of ["system_version_input_invalid", "system_version_history_immutable", "system_version_identity_immutable",
     "system_version_baseline_backward", "system_input_invalid", "system_command_conflict"]) {
     if (detail.includes(code)) throw new VersionValidationError(`The Version change was refused (${code}).`);
@@ -77,6 +82,7 @@ const sourceSchema = z.object({
   hidden: z.boolean(),
   sharedWith: z.array(uuid),
   createdAt: iso,
+  creatorWorkspaceId: uuid.optional(), listingState: z.enum(["private", "clients", "listed"]).optional(), availableTo: z.array(uuid).optional(),
 }).strict();
 
 const revisionSchema = z.object({
@@ -87,19 +93,21 @@ const revisionSchema = z.object({
   requires: z.object({ bindingKinds: z.array(z.string()) }).strict(),
   publishedBy: uuid,
   publishedAt: iso,
+  creatorWorkspaceId: uuid.optional(), declaration: packageDeclarationSchema.optional(), qualification: revisionQualificationSchema.nullable().optional(),
 }).strict();
 
 const lineageSchema = z.object({
   id: uuid,
   version: ref,
   source: ref,
+  creatorWorkspaceId: uuid.optional(), sourceRevisionId: uuid.optional(),
   context: z.object({ kind: z.enum(VERSION_CONTEXT_KINDS), label: z.string() }).strict(),
   baseline: z.object({ revision: z.number().int().positive(), definition: jsonObject }).strict(),
   overrides: z.array(z.object({ path: z.string(), value: json, setBy: uuid, setAt: iso }).strict()),
   bindings: z.array(z.object({ kind: z.string(), connectionId: z.string(), ownerBusinessId: uuid, boundBy: uuid, boundAt: iso }).strict()),
   localData: z.record(z.string(), json),
   releases: z.array(z.object({
-    number: z.number().int().positive(), definition: jsonObject, baselineRevision: z.number().int().positive(),
+    number: z.number().int().positive(), definition: jsonObject, baselineRevision: z.number().int().positive(), baselineSourceRevisionId: uuid.optional(),
     overridePaths: z.array(z.string()), releasedBy: uuid, releasedAt: iso,
   }).strict()),
   currentRelease: z.number().int().positive().nullable(),
@@ -124,6 +132,7 @@ const actorSchema = z.object({
     role: z.enum(["owner", "admin", "member"]),
     via: z.enum(["membership", "provider_seat"]).optional(),
   }).strict()),
+  delegatedSystems: z.array(z.object({ businessId: uuid, systemId: uuid, canWrite: z.boolean() }).strict()).optional(),
 }).strict();
 
 function actorArgs(actor: VersionActor) {
@@ -149,12 +158,16 @@ async function call<T>(db: VersionsDb, name: string, args: Record<string, unknow
 }
 
 function toRecord(value: z.infer<typeof sourceSchema>): SourceSystemRecord {
-  return { source: value.source, sharedWith: value.sharedWith, createdAt: value.createdAt };
+  const { hidden: _hidden, ...record } = value;
+  return record;
 }
 
 export function createSupabaseVersionStore(client?: VersionsDb): VersionStore {
   const db = () => client ?? versionsDb();
   return {
+    async recordQualification(actor, qualification) {
+      return call(db(), "record_system_revision_qualification", { ...actorArgs(actor), p_revision_id: uuid.parse(qualification.revisionId) }, revisionQualificationSchema, "Qualification checks could not be recorded.");
+    },
     async getSource(actor, source) {
       const at = refArgs(source);
       if (!at) return null;
@@ -231,7 +244,7 @@ export async function readVersionActor(actor: WorkspaceActor, client?: VersionsD
   const value = await call(client ?? versionsDb(), "read_version_actor", {
     p_user_id: uuid.parse(actor.userId), p_verified_email: z.string().email().parse(actor.verifiedEmail.trim().toLowerCase()),
   }, actorSchema, "Your access could not be checked.");
-  return { userId: value.userId, verifiedEmail: actor.verifiedEmail.trim().toLowerCase(), memberships: value.memberships as Array<{ businessId: string; role: VersionRole; via?: VersionMembershipVia }> };
+  return { userId: value.userId, verifiedEmail: actor.verifiedEmail.trim().toLowerCase(), memberships: value.memberships as Array<{ businessId: string; role: VersionRole; via?: VersionMembershipVia }>, ...(value.delegatedSystems ? { delegatedSystems: value.delegatedSystems } : {}) };
 }
 
 /**

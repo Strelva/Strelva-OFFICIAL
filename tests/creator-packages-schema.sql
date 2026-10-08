@@ -1,0 +1,87 @@
+\set ON_ERROR_STOP on
+begin;
+create function pg_temp.cp_assert(ok boolean,label text) returns void language plpgsql as $$ begin if ok is distinct from true then raise exception 'Creator package: %',label; end if; end $$;
+create function pg_temp.cp_expect(q text,expected text) returns void language plpgsql as $$ begin begin execute q; exception when others then if position(expected in sqlerrm)>0 then return; end if; raise; end; raise exception 'Expected %',expected; end $$;
+insert into public.users(id,email,verified_at) values
+ ('ce000000-0000-4000-8000-000000000001','creator@example.test',now()),('ce000000-0000-4000-8000-000000000002','owner@example.test',now()),('ce000000-0000-4000-8000-000000000003','reviewer@example.test',now()),('ce000000-0000-4000-8000-000000000004','stranger@example.test',now());
+insert into public.workspaces(id,kind,name,created_by) values
+ ('ce000000-0000-4000-8000-000000000010','agency','Independent creator','ce000000-0000-4000-8000-000000000001'),('ce000000-0000-4000-8000-000000000011','customer','Owner business','ce000000-0000-4000-8000-000000000002'),('ce000000-0000-4000-8000-000000000012','customer','Other business','ce000000-0000-4000-8000-000000000004');
+insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values
+ ('ce000000-0000-4000-8000-000000000010','ce000000-0000-4000-8000-000000000001','owner','ce000000-0000-4000-8000-000000000001'),('ce000000-0000-4000-8000-000000000011','ce000000-0000-4000-8000-000000000002','owner','ce000000-0000-4000-8000-000000000002'),('ce000000-0000-4000-8000-000000000012','ce000000-0000-4000-8000-000000000004','owner','ce000000-0000-4000-8000-000000000004');
+create temporary table cp_source(id uuid);
+insert into cp_source select (public.create_system_version_source('ce000000-0000-4000-8000-000000000010','ce000000-0000-4000-8000-000000000001','creator@example.test','{"name":"Shared intake","kind":"internal_app"}','ce000000-0000-4000-8000-000000000020',repeat('a',64))->'system'->>'id')::uuid;
+create function pg_temp.cp_definition() returns jsonb language sql as $$ select '{"kind":"internal_app","title":"Client intake","fields":[{"id":"problem","label":"Problem","type":"text","required":true}],"components":[{"kind":"form","fields":["problem"]},{"kind":"list","fields":["problem"]}]}'::jsonb $$;
+create function pg_temp.cp_revision(n integer) returns jsonb language sql as $$ select jsonb_build_object('source',jsonb_build_object('businessId','ce000000-0000-4000-8000-000000000010','systemId',(select id from cp_source),'revisionId',('ce000000-0000-4000-8000-'||lpad((20+n)::text,12,'0'))::uuid,'number',n),'definition',case when n=1 then pg_temp.cp_definition() else jsonb_set(pg_temp.cp_definition(),'{title}',to_jsonb('Updated intake'::text)) end,'declaration',public.system_package_behavior(pg_temp.cp_definition(),'{}'::text[]),'summary','Qualified native intake','requires','{"bindingKinds":[]}'::jsonb,'publishedBy','ce000000-0000-4000-8000-000000000001','publishedAt',now()) $$;
+select public.publish_system_version_source_revision('ce000000-0000-4000-8000-000000000001','creator@example.test',pg_temp.cp_revision(1));
+select pg_temp.cp_assert(not public.system_revision_is_qualified('ce000000-0000-4000-8000-000000000021'),'publication is not qualification');
+select public.record_system_revision_qualification('ce000000-0000-4000-8000-000000000001','creator@example.test','ce000000-0000-4000-8000-000000000021');
+select pg_temp.cp_expect($q$select public.review_system_revision_qualification('ce000000-0000-4000-8000-000000000003','reviewer@example.test','ce000000-0000-4000-8000-000000000021',true,'Review')$q$,'system_revision_reviewer_policy_required');
+-- Fixture-only review policy. No application seed installs a default reviewer.
+insert into public.system_revision_reviewers(user_id,policy_version) values('ce000000-0000-4000-8000-000000000003','fictional-local-test-policy');
+select public.review_system_revision_qualification('ce000000-0000-4000-8000-000000000003','reviewer@example.test','ce000000-0000-4000-8000-000000000021',true,'Reviewed exact immutable definition and declaration');
+select pg_temp.cp_assert(public.system_revision_is_qualified('ce000000-0000-4000-8000-000000000021'),'passing checks plus exact human approval qualifies');
+select public.set_system_package_listing('ce000000-0000-4000-8000-000000000010','ce000000-0000-4000-8000-000000000001','creator@example.test',(select id from cp_source),'listed');
+select pg_temp.cp_assert(jsonb_array_length(public.read_system_package_listings('ce000000-0000-4000-8000-000000000011','ce000000-0000-4000-8000-000000000002','owner@example.test'))=1,'ordinary owner sees qualified independent creator listing');
+select pg_temp.cp_expect($q$select public.system_package_assert_declaration(pg_temp.cp_definition(),'{"recordsRead":[],"recordsWritten":[],"businessRecordFields":[],"outsideEffects":[],"bindingKinds":[],"dataLeavingBusiness":[]}','{}')$q$,'system_package_declaration_exceeded');
+select pg_temp.cp_expect($q$update public.system_version_sources set creator_workspace_id='ce000000-0000-4000-8000-000000000011' where system_id=(select id from cp_source)$q$,'system_version_identity_immutable');
+
+create function pg_temp.cp_lineage(command uuid,actor uuid,business uuid) returns jsonb language sql as $$ select jsonb_build_object('id',gen_random_uuid(),'version',jsonb_build_object('businessId',business,'systemId',command),'source',jsonb_build_object('businessId','ce000000-0000-4000-8000-000000000010','systemId',(select id from cp_source)),'context','{"kind":"agency_client","label":"Owner intake"}'::jsonb,'baseline',jsonb_build_object('revision',1,'definition',pg_temp.cp_definition()),'overrides','[]'::jsonb,'bindings','[]'::jsonb,'localData','{}'::jsonb,'releases','[]'::jsonb,'currentRelease',null,'decisions','[]'::jsonb,'grants','[]'::jsonb,'rowRevision',1,'createdBy',actor,'createdAt',now(),'updatedAt',now()) $$;
+create function pg_temp.cp_payload(actor uuid) returns jsonb language sql as $$ select jsonb_build_object('version',1,'revision',0,'title','Client intake','createdBy',actor,'createdAt',now(),'history','[]'::jsonb,'spec',(pg_temp.cp_definition()-'kind')||jsonb_build_object('maintenanceOwner',actor),'specVersion',1,'status','draft','versions',jsonb_build_array(jsonb_build_object('version',1,'spec',(pg_temp.cp_definition()-'kind')||jsonb_build_object('maintenanceOwner',actor))),'rehearsal',null,'records','[]'::jsonb) $$;
+create temporary table cp_created(value jsonb);
+insert into cp_created select public.create_version_system_command('ce000000-0000-4000-8000-000000000002','owner@example.test',pg_temp.cp_lineage('ce000000-0000-4000-8000-000000000030','ce000000-0000-4000-8000-000000000002','ce000000-0000-4000-8000-000000000011'),'Client intake','internal_app','ce000000-0000-4000-8000-000000000030',pg_temp.cp_payload('ce000000-0000-4000-8000-000000000002'));
+select pg_temp.cp_assert((select value->>'creatorWorkspaceId'='ce000000-0000-4000-8000-000000000010' and value->>'sourceRevisionId'='ce000000-0000-4000-8000-000000000021' and value->'currentRelease'='null'::jsonb from cp_created),'owner installation freezes creator and exact revision; draft does not go live');
+select pg_temp.cp_assert(public.create_version_system_command('ce000000-0000-4000-8000-000000000002','owner@example.test',pg_temp.cp_lineage('ce000000-0000-4000-8000-000000000030','ce000000-0000-4000-8000-000000000002','ce000000-0000-4000-8000-000000000011'),'Client intake','internal_app','ce000000-0000-4000-8000-000000000030',pg_temp.cp_payload('ce000000-0000-4000-8000-000000000002'))->>'id'=(select value->>'id' from cp_created),'retry returns the same real System/Version');
+select pg_temp.cp_expect($q$select public.create_version_system_command('ce000000-0000-4000-8000-000000000001','creator@example.test',pg_temp.cp_lineage('ce000000-0000-4000-8000-000000000031','ce000000-0000-4000-8000-000000000001','ce000000-0000-4000-8000-000000000011'),'Client intake','internal_app','ce000000-0000-4000-8000-000000000031',pg_temp.cp_payload('ce000000-0000-4000-8000-000000000001'))$q$,'business_record_access_denied');
+-- Existing delegated relationship plus owner-selected exact install grant.
+insert into public.saved_product_work(id,workspace_id,product_id,resource_kind,title,payload,created_by) values('ce000000-0000-4000-8000-000000000040','ce000000-0000-4000-8000-000000000011','documents','document','Delegated scope','{}','ce000000-0000-4000-8000-000000000002');
+insert into public.workspace_delegations(customer_workspace_id,customer_work_id,agency_workspace_id,granted_by,accepted_by) values('ce000000-0000-4000-8000-000000000011','ce000000-0000-4000-8000-000000000040','ce000000-0000-4000-8000-000000000010','ce000000-0000-4000-8000-000000000002','ce000000-0000-4000-8000-000000000001');
+select public.grant_system_package_install('ce000000-0000-4000-8000-000000000011','ce000000-0000-4000-8000-000000000002','owner@example.test','ce000000-0000-4000-8000-000000000010','ce000000-0000-4000-8000-000000000021','ce000000-0000-4000-8000-000000000031',now()+interval '1 day');
+insert into cp_created select public.create_version_system_command('ce000000-0000-4000-8000-000000000001','creator@example.test',pg_temp.cp_lineage('ce000000-0000-4000-8000-000000000031','ce000000-0000-4000-8000-000000000001','ce000000-0000-4000-8000-000000000011'),'Client intake','internal_app','ce000000-0000-4000-8000-000000000031',pg_temp.cp_payload('ce000000-0000-4000-8000-000000000001'));
+select pg_temp.cp_assert(jsonb_array_length(public.read_version_actor('ce000000-0000-4000-8000-000000000001','creator@example.test')->'delegatedSystems')=1,'agency gets exact installed System scope without client membership');
+select pg_temp.cp_assert(not exists(select 1 from public.workspace_memberships where workspace_id='ce000000-0000-4000-8000-000000000011' and user_id='ce000000-0000-4000-8000-000000000001'),'install does not grant customer admin');
+select pg_temp.cp_expect($q$select public.create_version_system_command('ce000000-0000-4000-8000-000000000001','creator@example.test',pg_temp.cp_lineage('ce000000-0000-4000-8000-000000000032','ce000000-0000-4000-8000-000000000001','ce000000-0000-4000-8000-000000000012'),'Client intake','internal_app','ce000000-0000-4000-8000-000000000032',pg_temp.cp_payload('ce000000-0000-4000-8000-000000000001'))$q$,'business_record_access_denied');
+create function pg_temp.cp_release(v jsonb,definition jsonb,paths jsonb) returns jsonb language sql as $$ select jsonb_set(jsonb_set(v,'{releases}',(v->'releases')||jsonb_build_array(jsonb_build_object('number',jsonb_array_length(v->'releases')+1,'definition',definition,'baselineRevision',(v->'baseline'->>'revision')::integer,'overridePaths',paths,'releasedBy','ce000000-0000-4000-8000-000000000002','releasedAt',now()))),'{currentRelease}',to_jsonb(jsonb_array_length(v->'releases')+1)) $$;
+create function pg_temp.cp_approve(v jsonb) returns void language plpgsql as $$ declare decision jsonb; hash text; begin
+ hash:=encode(sha256(convert_to('["version_release","'||(v->>'id')||'",'||(v->>'rowRevision')||']','UTF8')),'hex');
+ decision:=public.open_owner_decision('ce000000-0000-4000-8000-000000000011',jsonb_build_object('kind','system.change_live','route','owner_decides','systemId',v->'version'->>'systemId','title','Put intake live','approveEffect','The runtime changes','notYetEffect','Nothing changes','sourceLifecycle','version_release','sourceId',v->>'id','revisionHash',hash,'adminMayDecide',false));
+ perform public.record_version_preparation('ce000000-0000-4000-8000-000000000011','ce000000-0000-4000-8000-000000000002','owner@example.test',(v->>'id')::uuid,(v->>'rowRevision')::bigint,(decision->>'id')::uuid);
+ perform public.claim_owner_decision('ce000000-0000-4000-8000-000000000011',(decision->>'id')::uuid,hash,'approve','session','ce000000-0000-4000-8000-000000000002','owner@example.test',null);
+end $$;
+do $$ declare v jsonb; n uuid; d jsonb; before_count integer; begin
+ select value into v from cp_created where value->>'createdBy'='ce000000-0000-4000-8000-000000000002';
+ select work_id into n from public.system_version_native_applications where version_id=(v->>'id')::uuid;
+ perform pg_temp.cp_expect(format('select public.save_system_version(%L,%L,%L,1,%L)','ce000000-0000-4000-8000-000000000002','owner@example.test',v->>'id',pg_temp.cp_release(v,v->'baseline'->'definition','[]')),'system_version_release_approval_required');
+ perform pg_temp.cp_approve(v);
+ v:=public.save_system_version('ce000000-0000-4000-8000-000000000002','owner@example.test',(v->>'id')::uuid,1,pg_temp.cp_release(v,v->'baseline'->'definition','[]'));
+ perform pg_temp.cp_assert(public.application_runtime_snapshot(n)->>'release_version'='1','exact owner decision publishes destination native runtime');
+ perform public.submit_application_record(n,'ce000000-0000-4000-8000-000000000011','ce000000-0000-4000-8000-000000000002','owner@example.test',1,0,'business-record','{"problem":"Business-only record"}');
+ d:=jsonb_set(v->'baseline'->'definition','{fields}',(v->'baseline'->'definition'->'fields')||'[{"id":"contact","label":"Customer","type":"contact","required":false}]'::jsonb);
+ v:=public.save_system_version('ce000000-0000-4000-8000-000000000002','owner@example.test',(v->>'id')::uuid,2,jsonb_set(v,'{overrides}',jsonb_build_array(jsonb_build_object('path','*','value',d,'setBy','ce000000-0000-4000-8000-000000000002','setAt',now()))));
+ perform pg_temp.cp_approve(v);
+ perform pg_temp.cp_expect(format('select public.save_system_version(%L,%L,%L,3,%L)','ce000000-0000-4000-8000-000000000002','owner@example.test',v->>'id',pg_temp.cp_release(v,d,'["fields"]')),'system_package_declaration_exceeded');
+ perform pg_temp.cp_assert(public.application_runtime_snapshot(n)->>'release_version'='1' and jsonb_array_length(public.application_runtime_snapshot(n)->'records')=1,'declaration rejection atomically preserves live runtime and customer record');
+ update cp_created set value=v where value->>'createdBy'='ce000000-0000-4000-8000-000000000002';
+end $$;
+
+select public.publish_system_version_source_revision('ce000000-0000-4000-8000-000000000001','creator@example.test',pg_temp.cp_revision(2));
+select pg_temp.cp_assert(not public.system_revision_is_qualified('ce000000-0000-4000-8000-000000000022'),'revision 1 approval does not qualify revision 2');
+select pg_temp.cp_assert((public.read_system_package_listings('ce000000-0000-4000-8000-000000000011','ce000000-0000-4000-8000-000000000002','owner@example.test')->0->'revision'->'source'->>'number')='1','unqualified update never reaches listing consumer');
+select pg_temp.cp_expect($q$update public.system_versions set installed_source_revision_id='ce000000-0000-4000-8000-000000000022' where id=(select (value->>'id')::uuid from cp_created limit 1)$q$,'system_version_identity_immutable');
+select public.record_system_revision_qualification('ce000000-0000-4000-8000-000000000001','creator@example.test','ce000000-0000-4000-8000-000000000022');
+select public.review_system_revision_qualification('ce000000-0000-4000-8000-000000000003','reviewer@example.test','ce000000-0000-4000-8000-000000000022',true,'Reviewed exact second revision');
+select pg_temp.cp_assert(public.system_revision_is_qualified('ce000000-0000-4000-8000-000000000022'),'second revision requires its own passing checks and human approval');
+do $$ declare v jsonb; d jsonb; begin
+ select value into v from cp_created where value->>'createdBy'='ce000000-0000-4000-8000-000000000002';
+ d:=jsonb_set(jsonb_set(v,'{baseline}',jsonb_build_object('revision',2,'definition',pg_temp.cp_revision(2)->'definition')),'{overrides}','[]');
+ d:=jsonb_set(d,'{decisions}',(d->'decisions')||jsonb_build_array(jsonb_build_object('sourceRevision',2,'choice','adopted','resolutions','[]'::jsonb,'by','ce000000-0000-4000-8000-000000000002','at',now())));
+ v:=public.save_system_version('ce000000-0000-4000-8000-000000000002','owner@example.test',(v->>'id')::uuid,3,d);
+ perform pg_temp.cp_assert(v->>'sourceRevisionId'='ce000000-0000-4000-8000-000000000021' and v->'baseline'->>'revision'='2','qualified upgrade advances baseline but preserves original paid-install attribution');
+ perform pg_temp.cp_approve(v);
+ v:=public.save_system_version('ce000000-0000-4000-8000-000000000002','owner@example.test',(v->>'id')::uuid,4,pg_temp.cp_release(v,v->'baseline'->'definition','[]'));
+ perform pg_temp.cp_assert(v->>'currentRelease'='2','qualified update still needs its own owner-approved release');
+end $$;
+select public.revoke_system_package_install('ce000000-0000-4000-8000-000000000011','ce000000-0000-4000-8000-000000000002','owner@example.test',(select id from public.system_package_install_grants where command_id='ce000000-0000-4000-8000-000000000031'));
+select pg_temp.cp_assert(jsonb_array_length(public.read_version_actor('ce000000-0000-4000-8000-000000000001','creator@example.test')->'delegatedSystems')=0,'revocation immediately removes delegated install/update authority');
+select pg_temp.cp_assert(not has_function_privilege('service_role','public.save_system_version_package_core(uuid,text,uuid,bigint,jsonb)','EXECUTE'),'service role cannot bypass qualification by calling renamed core');
+select pg_temp.cp_assert(not has_function_privilege('authenticated','public.review_system_revision_qualification(uuid,text,uuid,boolean,text)','EXECUTE'),'anonymous/authenticated callers cannot approve qualifications directly');
+rollback;
