@@ -1,0 +1,1298 @@
+Applying 20260618213606_initial_schema.sql
+Applying 20260618224329_schema_completeness.sql
+Applying 20260618230459_drop_legacy_stub.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260618230459_drop_legacy_stub.sql:3: NOTICE:  table "reb_json_documents" does not exist, skipping
+Applying 20260619120000_auth_provisioning_trigger.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260619120000_auth_provisioning_trigger.sql:63: NOTICE:  trigger "on_auth_user_created" for relation "auth.users" does not exist, skipping
+Applying 20260619130000_fix_provisioning_email_confirm.sql
+Applying 20260619140000_rls.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260619140000_rls.sql:81: NOTICE:  policy "pay_links_tenant_rw" for relation "pay_links" does not exist, skipping
+Applying 20260620120000_cms_collections_reviews_suggestions.sql
+Applying 20260713194947_atomic_site_metric_increment.sql
+Applying 20260713201159_harden_database_security_boundaries.sql
+Applying 20260714170959_add_tenant_commercial_plan.sql
+Applying 20260714183000_align_domain_identifier_types.sql
+Applying 20260714200746_onboarding_firebreak.sql
+Applying 20260714203408_domain_uniqueness_real_columns.sql
+Applying 20260714205130_lifecycle_check_constraints.sql
+Applying 20260714210000_governed_work_tables.sql
+Applying 20260715150000_identity_spine_expand.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "memberships_stable_id_trg" for relation "memberships" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "invites_stable_id_trg" for relation "invites" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "domain_claims_stable_id_trg" for relation "domain_claims" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "content_stable_id_trg" for relation "content" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "draft_content_stable_id_trg" for relation "draft_content" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "page_config_stable_id_trg" for relation "page_config" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "draft_page_config_stable_id_trg" for relation "draft_page_config" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "activity_log_stable_id_trg" for relation "activity_log" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "unified_events_stable_id_trg" for relation "unified_events" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "weekly_briefs_stable_id_trg" for relation "weekly_briefs" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "mail_log_stable_id_trg" for relation "mail_log" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "chat_threads_stable_id_trg" for relation "chat_threads" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "chat_messages_stable_id_trg" for relation "chat_messages" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "integrations_stable_id_trg" for relation "integrations" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "reward_members_stable_id_trg" for relation "reward_members" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "reward_transactions_stable_id_trg" for relation "reward_transactions" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "auto_approval_streaks_stable_id_trg" for relation "auto_approval_streaks" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "scan_results_stable_id_trg" for relation "scan_results" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "scan_history_stable_id_trg" for relation "scan_history" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "bookings_stable_id_trg" for relation "bookings" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "newsletter_subscribers_stable_id_trg" for relation "newsletter_subscribers" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "site_snapshots_stable_id_trg" for relation "site_snapshots" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "content_versions_stable_id_trg" for relation "content_versions" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "social_posts_stable_id_trg" for relation "social_posts" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "search_console_data_stable_id_trg" for relation "search_console_data" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "audit_logs_stable_id_trg" for relation "audit_logs" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "inbox_items_stable_id_trg" for relation "inbox_items" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "chat_sessions_stable_id_trg" for relation "chat_sessions" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "site_metrics_stable_id_trg" for relation "site_metrics" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "collection_entries_stable_id_trg" for relation "collection_entries" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "reviews_stable_id_trg" for relation "reviews" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "suggestions_stable_id_trg" for relation "suggestions" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:52: NOTICE:  trigger "proposals_stable_id_trg" for relation "proposals" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:72: NOTICE:  trigger "pay_links_stable_id_trg" for relation "pay_links" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715150000_identity_spine_expand.sql:72: NOTICE:  trigger "build_payments_stable_id_trg" for relation "build_payments" does not exist, skipping
+Applying 20260715160000_tenant_slug_on_update_cascade.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: memberships.memberships_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: invites.invites_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: domain_claims.domain_claims_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: content.content_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: draft_content.draft_content_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: page_config.page_config_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: draft_page_config.draft_page_config_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: activity_log.activity_log_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: unified_events.unified_events_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: weekly_briefs.weekly_briefs_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: mail_log.mail_log_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: chat_threads.chat_threads_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: chat_messages.chat_messages_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: integrations.integrations_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: reward_members.reward_members_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: reward_transactions.reward_transactions_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: pay_links.pay_links_tenant_id_fkey (n on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: build_payments.build_payments_tenant_id_fkey (n on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: auto_approval_streaks.auto_approval_streaks_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: scan_results.scan_results_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: scan_history.scan_history_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: bookings.bookings_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: newsletter_subscribers.newsletter_subscribers_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: site_snapshots.site_snapshots_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: content_versions.content_versions_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: social_posts.social_posts_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: search_console_data.search_console_data_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: audit_logs.audit_logs_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: inbox_items.inbox_items_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: chat_sessions.chat_sessions_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: site_metrics.site_metrics_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: collection_entries.collection_entries_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: reviews.reviews_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: suggestions.suggestions_tenant_id_fkey (c on delete)
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260715160000_tenant_slug_on_update_cascade.sql:42: NOTICE:  rekeyable FK: proposals.proposals_tenant_id_fkey (c on delete)
+Applying 20260719200000_add_tenant_billing_type.sql
+Applying 20260722210000_site_metric_summary.sql
+Applying 20260729180000_org_layer_phase0_accounts.sql
+Applying 20260802120000_report_snapshots.sql
+Applying 20260905190000_release_one_workspaces.sql
+Applying 20260908120000_workspace_result_recovery.sql
+Applying 20260908150000_enterprise_customers.sql
+Applying 20260911100000_inquiry_capability_workspace.sql
+Applying 20260911150000_tracker_work_updates.sql
+Applying 20260911200000_job_economics.sql
+Applying 20260911210000_document_work.sql
+Applying 20260911220000_work_plan_output_execution.sql
+Applying 20260912010000_budgeted_execution.sql
+Applying 20260912110000_bounded_product_work.sql
+Applying 20260912120000_work_context_participation.sql
+Applying 20260912143000_product_learning_work.sql
+Applying 20260912160000_work_responsibilities.sql
+Applying 20260912180000_work_plan_application_output.sql
+Applying 20260912190000_tracker_record_coordination.sql
+Applying 20260912200000_tracker_handoff_isolation.sql
+Applying 20260914010000_handoff_destinations.sql
+Applying 20260914020000_application_releases.sql
+Applying 20260914021000_application_source_updates.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260914021000_application_source_updates.sql:123: NOTICE:  trigger "application_release_history_guard" for relation "public.application_releases" does not exist, skipping
+Applying 20260914030000_application_use_access.sql
+Applying 20260914040000_standing_responsibilities.sql
+Applying 20260914041000_standing_execution.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260914041000_standing_execution.sql:157: NOTICE:  trigger "standing_responsibility_claim_guard_trg" for relation "public.saved_product_work" does not exist, skipping
+Applying 20260915010000_offering_installations.sql
+Applying 20260915030000_operational_assignments.sql
+Applying 20260915040000_work_allowances.sql
+Applying 20260915050000_agent_access.sql
+Applying 20260915060000_offering_websites.sql
+Applying 20260918010000_provider_delivery.sql
+Applying 20260918120000_public_continuation_imports.sql
+Applying 20260918130000_workspace_invitations.sql
+Applying 20260918140000_workspace_payer_transitions.sql
+Applying 20260918150000_workspace_exports.sql
+Applying 20260919010000_service_requests.sql
+Applying 20260919020000_application_select_fields.sql
+Applying 20260920010000_application_date_fields.sql
+Applying 20260920010100_application_record_edits.sql
+Applying 20260920010200_application_edit_field_preservation.sql
+Applying 20260920020000_onboarding_work.sql
+Applying 20260920020100_onboarding_attachment_immutability.sql
+Applying 20260920030000_agency_provider_delivery.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260920030000_agency_provider_delivery.sql:32: NOTICE:  trigger "operational_assignment_agency_identity" for relation "public.operational_assignments" does not exist, skipping
+Applying 20260920030100_agency_work_access.sql
+Applying 20260920030200_agency_application_draft_authority.sql
+Applying 20260920030201_agency_application_draft_authority_fix.sql
+Applying 20260920040000_offering_inquiry_workspace.sql
+Applying 20260920050000_custom_application_lifecycle.sql
+Applying 20260920050100_custom_application_economics.sql
+Applying 20260920060000_content_version_request_id.sql
+Applying 20260920060100_content_version_request_index.sql
+Applying 20260920070000_workspace_calendar_connections.sql
+Applying 20260920070100_workspace_calendar_event_receipts.sql
+Applying 20260920080000_subscription_allowance_entitlements.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260920080000_subscription_allowance_entitlements.sql:37: NOTICE:  constraint "work_allowances_check2" of relation "work_allowances" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260920080000_subscription_allowance_entitlements.sql:38: NOTICE:  constraint "work_allowances_cap_acceptance_check" of relation "work_allowances" does not exist, skipping
+Applying 20260920080100_trusted_provider_receipts.sql
+Applying 20260920080200_precise_provider_receipts.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260920080200_precise_provider_receipts.sql:34: NOTICE:  trigger "work_provider_receipt_fill_exact_amount_trigger" for relation "public.work_provider_receipts" does not exist, skipping
+Applying 20260920100000_workspace_exit.sql
+Applying 20260920100100_workspace_export_v2.sql
+Applying 20260920100200_workspace_exit_export_boundaries.sql
+Applying 20260920110000_inquiry_workspace_exit.sql
+Applying 20260920120000_websites.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260920120000_websites.sql:82: NOTICE:  trigger "saved_product_work_website_exit_guard_trg" for relation "public.saved_product_work" does not exist, skipping
+Applying 20260920121000_agency_managed_website_draft_authority.sql
+Applying 20260920122000_public_website_bookings.sql
+Applying 20260920123000_public_website_booking_fingerprints.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260920123000_public_website_booking_fingerprints.sql:21: NOTICE:  constraint "public_website_bookings_request_fingerprint_check" of relation "public_website_bookings" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260920123000_public_website_booking_fingerprints.sql:28: NOTICE:  constraint "public_website_bookings_slot_bounds_check" of relation "public_website_bookings" does not exist, skipping
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260920123000_public_website_booking_fingerprints.sql:60: NOTICE:  trigger "public_website_booking_fingerprint_trg" for relation "public.public_website_bookings" does not exist, skipping
+Applying 20260921173000_service_delivery_commitments.sql
+Applying 20260921220000_customer_business_entry.sql
+Applying 20260928130000_business_effort_minutes.sql
+Applying 20260930120000_revoke_public_execute_internal_functions.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20260930120000_revoke_public_execute_internal_functions.sql:9: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261001120000_website_documents.sql
+Applying 20261001130000_domain_registration_attempt.sql
+Applying 20261001140000_agency_website_document_drafts.sql
+Applying 20261002120000_business_record.sql
+Applying 20261004120000_systems.sql
+Applying 20261005100000_restrict_legacy_tenant_client_access.sql
+Applying 20261005120000_workspace_authority_helpers.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261005120000_workspace_authority_helpers.sql:19: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261005120100_workspace_authority_write_rpcs.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261005120100_workspace_authority_write_rpcs.sql:23: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261007100000_atomic_tenant_teardown.sql
+Applying 20261007101000_provider_website_launch_authority.sql
+Applying 20261007110000_business_ownership.sql
+Applying 20261007120000_needs_you.sql
+Applying 20261007130000_workspace_release_flags.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261007130000_workspace_release_flags.sql:16: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261007140000_model_call_log.sql
+Applying 20261007150000_system_versions.sql
+Applying 20261007150100_agency_client_overview.sql
+Applying 20261007150200_platform_agency_workspace.sql
+Applying 20261007155000_make_real_activations.sql
+Applying 20261007160000_operator_queue.sql
+Applying 20261007160100_business_effort_tenant_links.sql
+Applying 20261007170000_workspace_account_bindings.sql
+Applying 20261007180000_business_billing.sql
+Applying 20261007181000_tenant_client_records.sql
+Applying 20261007182000_workspace_export_v3.sql
+Applying 20261007183000_business_outcomes.sql
+Applying 20261007190000_document_revisions.sql
+Applying 20261007190100_onboarding_revisions.sql
+Applying 20261007190200_application_version_history.sql
+Applying 20261007192000_make_systems_authority.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261007192000_make_systems_authority.sql:19: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261007192100_internal_tool_links.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261007192100_internal_tool_links.sql:20: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261007194000_tenant_report_and_analytics_state.sql
+Applying 20261008110000_ask_conversations.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261008110000_ask_conversations.sql:24: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261008111000_website_change_receipts.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261008111000_website_change_receipts.sql:26: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261008123000_listing_readback_queue.sql
+Applying 20261008124000_needs_you_policy_settings.sql
+Applying 20261008130000_system_possibilities.sql
+Applying 20261008131000_make_real_live.sql
+Applying 20261008140000_tenant_lead_reads.sql
+Applying 20261008141000_booking_store.sql
+Applying 20261008150000_website_linked_tenant_publication.sql
+Applying 20261008150100_website_domain_owner_approval.sql
+Applying 20261008151000_connected_sites.sql
+Applying 20261008160000_convert_separate_business.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261008160000_convert_separate_business.sql:31: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261008161000_release_flags_agency_workspaces.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261008161000_release_flags_agency_workspaces.sql:13: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261009100000_strelva_service_actor.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261009100000_strelva_service_actor.sql:44: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261009110000_booking_lifecycle.sql
+Applying 20261009113000_inquiry_records.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261009113000_inquiry_records.sql:36: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261009130000_strelva_handled_decisions.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261009130000_strelva_handled_decisions.sql:28: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261009131000_make_real_owner_link.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261009131000_make_real_owner_link.sql:40: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261009140000_make_real_owner_link_flag.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261009140000_make_real_owner_link_flag.sql:24: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261009150000_reader_rpc_volatility.sql
+Applying 20261009151000_provider_seats.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261009151000_provider_seats.sql:41: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261009152000_agency_verifications.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261009152000_agency_verifications.sql:27: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261009153000_platform_service_actor.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261009153000_platform_service_actor.sql:43: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261009154000_payer_party.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261009154000_payer_party.sql:45: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261009160000_business_effort_coverage.sql
+Applying 20261010100000_owner_invitation_claim.sql
+Applying 20261010102000_owner_decision_links.sql
+Applying 20261010102100_website_owner_link_launch.sql
+Applying 20261010103000_ask_business_fact_drafts.sql
+Applying 20261010104000_owner_decision_website_preview.sql
+Applying 20261010110000_website_cutover_undo.sql
+Applying 20261010113000_website_system_releases.sql
+Applying 20261010114000_website_domain_requests.sql
+Applying 20261010115000_website_model_admission.sql
+Applying 20261010115500_website_business_facts.sql
+Applying 20261010115700_website_native_fact_reviews.sql
+Applying 20261010120000_inquiry_workspace_replies.sql
+Applying 20261010121000_inquiry_outcome_proof.sql
+Applying 20261010122000_inquiry_weekly_outcomes.sql
+Applying 20261010123000_inquiry_context_notices.sql
+Applying 20261010124000_connected_inquiry_records.sql
+Applying 20261010125000_inquiry_urgent_decisions.sql
+Applying 20261010125500_inquiry_inbox.sql
+Applying 20261010125600_inquiry_reply_purpose.sql
+Applying 20261010125700_inquiry_cache_presence.sql
+Applying 20261010125800_connected_inquiry_owner_notices.sql
+Applying 20261010125900_inquiry_export_before_teardown.sql
+Applying 20261010125910_inquiry_decision_notice_claims.sql
+Applying 20261010125915_inquiry_decision_notice_events.sql
+Applying 20261010125920_tenant_lead_parity_completeness.sql
+Applying 20261010125925_inquiry_member_replies.sql
+Applying 20261010125930_inquiry_business_facts.sql
+Applying 20261010125935_inquiry_operator_authority.sql
+Applying 20261010125940_inquiry_booking_handoff.sql
+Applying 20261010125950_inquiry_operator_review.sql
+Applying 20261010125955_inquiry_operator_revocation.sql
+Applying 20261010130000_booking_parity.sql
+Applying 20261010131000_booking_access.sql
+Applying 20261010132000_booking_updates.sql
+Applying 20261010133000_booking_calendar_mirror.sql
+Applying 20261010134000_booking_inquiry_offers.sql
+Applying 20261010135000_booking_setup.sql
+Applying 20261010135500_booking_receipt_history.sql
+Applying 20261010135900_booking_receipt_lifecycle.sql
+Applying 20261010135910_booking_owner_evidence.sql
+Applying 20261010135920_booking_service_policies.sql
+Applying 20261010135940_booking_manual.sql
+Applying 20261010135945_booking_cancellation_cutoff.sql
+Applying 20261010135950_booking_calendar_health.sql
+Applying 20261010135955_booking_exit_admission.sql
+Applying 20261010135956_booking_native_workspace.sql
+Applying 20261010140000_google_listing_controls.sql
+Applying 20261010141000_publishing_release_flags.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261010141000_publishing_release_flags.sql:2: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261010142000_workspace_publishing_content.sql
+Applying 20261010143000_publishing_reconnect.sql
+Applying 20261010150000_internal_tool_submit_notices.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261010150000_internal_tool_submit_notices.sql:3: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261010150100_internal_tool_use_links.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261010150100_internal_tool_use_links.sql:3: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261010150200_internal_tool_notice_delivery.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261010150200_internal_tool_notice_delivery.sql:3: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261010150300_catalog_tool_evidence.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261010150300_catalog_tool_evidence.sql:2: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261010150400_internal_tool_use_edits.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261010150400_internal_tool_use_edits.sql:4: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261010152000_catalog_report_receipts.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261010152000_catalog_report_receipts.sql:3: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261010153000_newsletter_contacts.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261010153000_newsletter_contacts.sql:4: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261010154000_system_work_plan_authority.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261010154000_system_work_plan_authority.sql:2: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261010155000_failed_system_plan_request.sql
+Applying 20261010155100_internal_tool_member_submit.sql
+Applying 20261010155200_internal_tool_use_link_labels.sql
+Applying 20261010160000_agency_authoring.sql
+Applying 20261010161000_operator_google_attempts.sql
+Applying 20261010161100_operator_effort_context.sql
+Applying 20261010161200_operator_content_receipts.sql
+Applying 20261010161300_review_reply_reservations.sql
+Applying 20261010161400_operator_complete_sources.sql
+Applying 20261010162000_complete_client_record_stores.sql
+Applying 20261010162100_tenant_receipt_retention.sql
+Applying 20261010162200_inquiry_delivery_records.sql
+Applying 20261010163000_agency_operator_overview.sql
+Applying 20261010163100_version_management.sql
+Applying 20261010163200_version_owner_grants.sql
+Applying 20261010163300_version_native_applications.sql
+Applying 20261010163400_version_sibling_changes.sql
+Applying 20261010164000_finite_job_adapters.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261010164000_finite_job_adapters.sql:4: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261010165000_tenant_business_context.sql
+Applying 20261010165500_business_portability.sql
+Applying 20261010165600_exit_handoff_evidence.sql
+Applying 20261010165700_export_recovery.sql
+Applying 20261010165800_unbounded_export_archive.sql
+Applying 20261010165900_export_build_access.sql
+Applying 20261010170000_deprovision_retained_after_inquiry_export.sql
+Applying 20261011100000_workspace_newsletter_sender.sql
+Applying 20261011100100_newsletter_backfill_identity.sql
+Applying 20261011101000_business_booking_email.sql
+Applying 20261011102000_native_publishing_targets.sql
+Applying 20261011120000_business_policies.sql
+Applying 20261011133700_business_facts_owner_decision.sql
+Applying 20261011140000_agent_booking_visibility.sql
+Applying 20261011150000_public_booking_admission.sql
+Applying 20261011153000_operator_owner_decisions.sql
+Applying 20261011160000_agency_team.sql
+Applying 20261011170000_agency_prospects.sql
+Applying 20261011180000_provider_disconnect_receipts.sql
+Applying 20261012010000_tenant_track_signing_keys.sql
+Applying 20261012110000_business_pages.sql
+Applying 20261012120000_track_signing_key_rotation.sql
+Applying 20261012180000_agency_brand.sql
+Applying 20261013110000_public_facts_read_confirmed.sql
+Applying 20261013115000_booking_reads_confirmed_facts.sql
+Applying 20261013120000_owner_recipient_trust.sql
+Applying 20261013130000_ask_confirms_owner_facts.sql
+Applying 20261013210000_agent_booking_admission.sql
+Applying 20261013220000_provider_seat_tenant_conversion.sql
+Applying 20261013230000_readonly_reader_authority.sql
+Applying 20261014030000_make_real_compensation_claims.sql
+Applying 20261014100000_client_resource_mandates.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261014100000_client_resource_mandates.sql:46: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261014110000_owner_decision_effects.sql
+Applying 20261014112000_acting_provider_gates.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261014112000_acting_provider_gates.sql:43: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261014120000_legacy_calendar_revoke_result.sql
+Applying 20261015100000_agency_add_client.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261015100000_agency_add_client.sql:49: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261015110000_super_admin_grants.sql
+Applying 20261015111000_website_owner_agency_publish.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261015111000_website_owner_agency_publish.sql:3: WARNING:  SET LOCAL can only be used in transaction blocks
+Applying 20261016110000_operator_action_approvals.sql
+Applying 20261017110000_inquiry_lead_retention.sql
+Applying 20261017111000_inquiry_retention_lifecycle.sql
+Applying 20261017120000_owner_decision_operator_refusal.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261017120000_owner_decision_operator_refusal.sql:7: NOTICE:  schema "release_rollback_baseline" already exists, skipping
+Applying 20261018110000_provider_seat_website_access.sql
+Applying 20261018120000_connected_site_schema_conflicts.sql
+Applying 20261018130000_provider_seat_readonly_website_authority.sql
+Applying 20261018131000_owner_decision_runtime_authority.sql
+Applying 20261019100000_actor_rpc_service_boundary.sql
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/20261019100000_actor_rpc_service_boundary.sql:6: NOTICE:  schema "release_rollback_baseline" already exists, skipping
+Applying 20261020090000_allowance_payer_parties.sql
+Applying 20261020090001_payer_transition_controls.sql
+Applying 20261020090002_agency_billing_accounts.sql
+Applying 20261020090003_agency_billing_intents.sql
+Applying 20261020090004_agency_billing_receipt_terms.sql
+Applying 20261020090005_allowance_payer_writer_authority.sql
+Applying 20261020090006_connect_money.sql
+Applying 20261020090007_revenue_splits.sql
+Applying 20261020090008_provider_change_money_export.sql
+Applying 20261020090009_payment_requests.sql
+Applying 20261020090010_money_reconciliation.sql
+Applying 20261020090011_collection_and_payout_reservations.sql
+Applying 20261020090012_invoice_payer_receipts.sql
+Applying 20261020090013_recovery_payouts.sql
+Applying 20261020090014_reconciliation_reviews.sql
+Applying 20261020090015_sandbox_build_evidence.sql
+Applying 20261020090016_agent_inquiries.sql
+Applying 20261020090017_agent_profile.sql
+Applying 20261020090018_agent_oauth.sql
+Applying 20261020090019_agent_channel_policy.sql
+Applying 20261020090020_agent_confirmed_provenance.sql
+Applying 20261020090021_creator_packages.sql
+Applying 20261020090022_package_install_scope.sql
+Applying 20261020090023_offering_source_versions.sql
+Applying 20261020090024_package_management.sql
+Applying 20261020090025_system_bundles.sql
+Applying 20261020090026_package_readonly_authority.sql
+Applying 20261020090027_bundle_native_lifecycle.sql
+Applying 20261020090028_recurring_responsibilities.sql
+Applying 20261020090029_calendar_revoke_compatibility.sql
+Applying 20261020090030_money_export_readonly_authority.sql
+Applying 20261020090031_agent_oauth_connection_context.sql
+Applying 20261020090032_agent_oauth_renewable.sql
+Applying 20261020090033_agent_website_tools.sql
+Checking tests/agent-confirmed-provenance-schema.sql
+BEGIN
+CREATE FUNCTION
+INSERT 0 3
+INSERT 0 1
+INSERT 0 1
+INSERT 0 3
+INSERT 0 1
+CREATE FUNCTION
+CREATE FUNCTION
+DO
+ROLLBACK
+Checking tests/agent-channel-schema.sql
+BEGIN
+CREATE FUNCTION
+CREATE FUNCTION
+INSERT 0 4
+INSERT 0 3
+INSERT 0 3
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+                                                                                        patch_business_record                                                                                        
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"undoOf": null, "contacts": {"merged": 0, "created": 0, "unchanged": 0}, "replayed": false, "revision": 1, "sequence": 1, "changeCount": 1, "workspaceId": "ac161100-0000-4000-8000-000000000010"}
+(1 row)
+
+INSERT 0 1
+CREATE TABLE
+CREATE FUNCTION
+INSERT 0 1
+ ac_assert 
+-----------
+ 
+(1 row)
+
+ ac_assert 
+-----------
+ 
+(1 row)
+
+ ac_expect 
+-----------
+ 
+(1 row)
+
+ ac_expect 
+-----------
+ 
+(1 row)
+
+ ac_assert 
+-----------
+ 
+(1 row)
+
+ ac_assert 
+-----------
+ 
+(1 row)
+
+INSERT 0 1
+ ac_assert 
+-----------
+ 
+(1 row)
+
+ ac_expect 
+-----------
+ 
+(1 row)
+
+INSERT 0 1
+ ac_assert 
+-----------
+ 
+(1 row)
+
+ ac_expect 
+-----------
+ 
+(1 row)
+
+                                                                       receive_agent_inquiry                                                                       
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"replyBy": null, "expiresAt": "2026-11-07T13:43:53.212007-05:00", "inquiryId": "bac37859-23b7-48c6-9b8a-8dab6d4f0ac9", "statusCiphertext": "encrypted-status-3"}
+(1 row)
+
+ ac_assert 
+-----------
+ 
+(1 row)
+
+ ac_assert 
+-----------
+ 
+(1 row)
+
+ issue_agent_oauth_code 
+------------------------
+ {"issued": true}
+(1 row)
+
+ ac_expect 
+-----------
+ 
+(1 row)
+
+ ac_expect 
+-----------
+ 
+(1 row)
+
+ ac_expect 
+-----------
+ 
+(1 row)
+
+ ac_expect 
+-----------
+ 
+(1 row)
+
+ ac_expect 
+-----------
+ 
+(1 row)
+
+                                              exchange_agent_oauth_code                                              
+---------------------------------------------------------------------------------------------------------------------
+ {"scope": "business:read quotes:approve", "expiresIn": 3600, "workspaceId": "ac161100-0000-4000-8000-000000000010"}
+(1 row)
+
+ ac_expect 
+-----------
+ 
+(1 row)
+
+ ac_assert 
+-----------
+ 
+(1 row)
+
+ ac_assert 
+-----------
+ 
+(1 row)
+
+ ac_assert 
+-----------
+ 
+(1 row)
+
+                                                                                                                                                                                                                                                                                                                                                                                                                               call_agent_protected_tool                                                                                                                                                                                                                                                                                                                                                                                                                               
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"facts": {"phone": {"value": "716-555-0100", "source": "agent", "verified": false, "updatedAt": "2026-10-08T13:43:53.196179-04:00", "updatedBy": "ac161100-0000-4000-8000-000000000001"}, "response_time": {"value": {"maximumHours": 24}, "source": "owner", "verified": true, "updatedAt": "2026-10-08T13:43:53.194739-04:00", "updatedBy": "ac161100-0000-4000-8000-000000000001"}}, "access": "owner", "people": [], "revision": 1, "services": [{"id": "ac161100-0000-4000-8000-000000000040", "name": "Consulting", "active": true, "source": "owner", "position": 0, "verified": true, "priceText": null, "updatedAt": "2026-10-08T13:43:53.191977-04:00", "description": null, "externalRef": null, "durationMinutes": null}], "updatedAt": "2026-10-08T13:43:53.196021-04:00", "workspaceId": "ac161100-0000-4000-8000-000000000010", "contactCount": 0, "lastSequence": 1}
+(1 row)
+
+ revoke_agent_oauth_client_token 
+---------------------------------
+ t
+(1 row)
+
+ ac_assert 
+-----------
+ 
+(1 row)
+
+ revoke_agent_oauth_client_token 
+---------------------------------
+ t
+(1 row)
+
+ ac_assert 
+-----------
+ 
+(1 row)
+
+ issue_agent_oauth_code 
+------------------------
+ {"issued": true}
+(1 row)
+
+UPDATE 1
+ ac_expect 
+-----------
+ 
+(1 row)
+
+ issue_agent_oauth_code 
+------------------------
+ {"issued": true}
+(1 row)
+
+                                      exchange_agent_oauth_code                                       
+------------------------------------------------------------------------------------------------------
+ {"scope": "business:read", "expiresIn": 3600, "workspaceId": "ac161100-0000-4000-8000-000000000010"}
+(1 row)
+
+UPDATE 1
+ ac_assert 
+-----------
+ 
+(1 row)
+
+ ac_expect 
+-----------
+ 
+(1 row)
+
+                                                                                                                                            choose_business_provider                                                                                                                                            
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"seatId": "6df24615-73fb-4fd9-8b48-cf1319ca4f9d", "source": "business_choice", "replayed": false, "providerId": "bed3f740-341d-4035-8a35-b9df1f854c71", "grantedByKind": "owner", "agencyWorkspaceId": "ac161100-0000-4000-8000-000000000020", "customerWorkspaceId": "ac161100-0000-4000-8000-000000000010"}
+(1 row)
+
+                                                                                             set_agency_client_staff                                                                                             
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"active": true, "userId": "ac161100-0000-4000-8000-000000000003", "changed": true, "agencyWorkspaceId": "ac161100-0000-4000-8000-000000000020", "customerWorkspaceId": "ac161100-0000-4000-8000-000000000010"}
+(1 row)
+
+ ac_expect 
+-----------
+ 
+(1 row)
+
+ issue_agent_oauth_code 
+------------------------
+ {"issued": true}
+(1 row)
+
+                                      exchange_agent_oauth_code                                       
+------------------------------------------------------------------------------------------------------
+ {"scope": "business:read", "expiresIn": 3600, "workspaceId": "ac161100-0000-4000-8000-000000000010"}
+(1 row)
+
+ ac_assert 
+-----------
+ 
+(1 row)
+
+ ac_assert 
+-----------
+ 
+(1 row)
+
+                                                                                             set_agency_client_staff                                                                                              
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"active": false, "userId": "ac161100-0000-4000-8000-000000000003", "changed": true, "agencyWorkspaceId": "ac161100-0000-4000-8000-000000000020", "customerWorkspaceId": "ac161100-0000-4000-8000-000000000010"}
+(1 row)
+
+ ac_assert 
+-----------
+ 
+(1 row)
+
+                                                                                             set_agency_client_staff                                                                                             
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"active": true, "userId": "ac161100-0000-4000-8000-000000000003", "changed": true, "agencyWorkspaceId": "ac161100-0000-4000-8000-000000000020", "customerWorkspaceId": "ac161100-0000-4000-8000-000000000010"}
+(1 row)
+
+                                                                          end_provider_seat                                                                          
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"ended": true, "endedByKind": "owner", "agencyWorkspaceId": "ac161100-0000-4000-8000-000000000020", "customerWorkspaceId": "ac161100-0000-4000-8000-000000000010"}
+(1 row)
+
+ ac_assert 
+-----------
+ 
+(1 row)
+
+                                                                                                                                            choose_business_provider                                                                                                                                            
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"seatId": "a546190d-18dc-4647-9128-d9384b845ce8", "source": "business_choice", "replayed": false, "providerId": "bed3f740-341d-4035-8a35-b9df1f854c71", "grantedByKind": "owner", "agencyWorkspaceId": "ac161100-0000-4000-8000-000000000020", "customerWorkspaceId": "ac161100-0000-4000-8000-000000000010"}
+(1 row)
+
+ ac_assert 
+-----------
+ 
+(1 row)
+
+ ac_assert 
+-----------
+ 
+(1 row)
+
+ set_agent_channel_consent 
+---------------------------
+ t
+(1 row)
+
+ ac_assert 
+-----------
+ 
+(1 row)
+
+INSERT 0 1
+ ac_expect 
+-----------
+ 
+(1 row)
+
+ ac_assert 
+-----------
+ 
+(1 row)
+
+ ac_assert 
+-----------
+ 
+(1 row)
+
+UPDATE 1
+ ac_assert 
+-----------
+ 
+(1 row)
+
+ ac_expect 
+-----------
+ 
+(1 row)
+
+ ac_expect 
+-----------
+ 
+(1 row)
+
+ ac_expect 
+-----------
+ 
+(1 row)
+
+DELETE 1
+ ac_assert 
+-----------
+ 
+(1 row)
+
+ ac_assert 
+-----------
+ 
+(1 row)
+
+ ac_assert 
+-----------
+ 
+(1 row)
+
+ROLLBACK
+Checking tests/agent-channel-abuse-schema.sql
+BEGIN
+CREATE TABLE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+CREATE FUNCTION
+CREATE FUNCTION
+ aa_probe 
+----------
+ 
+(1 row)
+
+ aa_probe 
+----------
+ 
+(1 row)
+
+ aa_probe 
+----------
+ 
+(1 row)
+
+DO
+          result           
+---------------------------
+ agent abuse checks passed
+(1 row)
+
+ROLLBACK
+Checking tests/agent-booking-admission-schema.sql
+BEGIN
+CREATE TABLE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+CREATE FUNCTION
+CREATE FUNCTION
+ aa_probe 
+----------
+ 
+(1 row)
+
+ aa_probe 
+----------
+ 
+(1 row)
+
+ aa_probe 
+----------
+ 
+(1 row)
+
+ aa_probe 
+----------
+ 
+(1 row)
+
+ aa_probe 
+----------
+ 
+(1 row)
+
+DO
+                result                 
+---------------------------------------
+ agent booking admission checks passed
+(1 row)
+
+ROLLBACK
+Checking tests/agent-oauth-connection-schema.sql
+BEGIN
+CREATE FUNCTION
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+ issue_agent_oauth_code 
+------------------------
+ {"issued": true}
+(1 row)
+
+                                      exchange_agent_oauth_code                                       
+------------------------------------------------------------------------------------------------------
+ {"scope": "business:read", "expiresIn": 3600, "workspaceId": "ac171200-0000-4000-8000-000000000010"}
+(1 row)
+
+ connection_assert 
+-------------------
+ 
+(1 row)
+
+ connection_assert 
+-------------------
+ 
+(1 row)
+
+ connection_assert 
+-------------------
+ 
+(1 row)
+
+UPDATE 1
+ connection_assert 
+-------------------
+ 
+(1 row)
+
+UPDATE 1
+ connection_assert 
+-------------------
+ 
+(1 row)
+
+UPDATE 1
+ connection_assert 
+-------------------
+ 
+(1 row)
+
+UPDATE 1
+DELETE 1
+ connection_assert 
+-------------------
+ 
+(1 row)
+
+ connection_assert 
+-------------------
+ 
+(1 row)
+
+ROLLBACK
+BEGIN
+DROP FUNCTION
+COMMIT
+DO
+CREATE FUNCTION
+REVOKE
+GRANT
+DO
+Checking tests/agent-oauth-renewable-schema.sql
+BEGIN
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+INSERT 0 3
+INSERT 0 3
+INSERT 0 3
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TABLE
+INSERT 0 1
+ renew_assert 
+--------------
+ 
+(1 row)
+
+ renew_expect 
+--------------
+ 
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+ renew_expect 
+--------------
+ 
+(1 row)
+
+INSERT 0 1
+ renew_assert 
+--------------
+ 
+(1 row)
+
+ renew_expect 
+--------------
+ 
+(1 row)
+
+ renew_expect 
+--------------
+ 
+(1 row)
+
+ disconnect_agent_oauth_connection 
+-----------------------------------
+ t
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+INSERT 0 1
+UPDATE 1
+ renew_assert 
+--------------
+ 
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+INSERT 0 1
+DELETE 1
+ renew_assert 
+--------------
+ 
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+ revoke_agent_oauth_client_token 
+---------------------------------
+ t
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+ revoke_agent_oauth_client_token 
+---------------------------------
+ t
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+                                                                                                                                            choose_business_provider                                                                                                                                            
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"seatId": "cd817be7-0cc8-44a8-b2d7-94a38ea277c7", "source": "business_choice", "replayed": false, "providerId": "d42210e9-91a8-4b77-ab5b-ae2d1fe8116e", "grantedByKind": "owner", "agencyWorkspaceId": "ac181200-0000-4000-8000-000000000020", "customerWorkspaceId": "ac181200-0000-4000-8000-000000000010"}
+(1 row)
+
+                                                                                             set_agency_client_staff                                                                                             
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"active": true, "userId": "ac181200-0000-4000-8000-000000000002", "changed": true, "agencyWorkspaceId": "ac181200-0000-4000-8000-000000000020", "customerWorkspaceId": "ac181200-0000-4000-8000-000000000010"}
+(1 row)
+
+INSERT 0 1
+ renew_assert 
+--------------
+ 
+(1 row)
+
+                                                                                             set_agency_client_staff                                                                                              
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"active": false, "userId": "ac181200-0000-4000-8000-000000000002", "changed": true, "agencyWorkspaceId": "ac181200-0000-4000-8000-000000000020", "customerWorkspaceId": "ac181200-0000-4000-8000-000000000010"}
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+                                                                                             set_agency_client_staff                                                                                             
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"active": true, "userId": "ac181200-0000-4000-8000-000000000002", "changed": true, "agencyWorkspaceId": "ac181200-0000-4000-8000-000000000020", "customerWorkspaceId": "ac181200-0000-4000-8000-000000000010"}
+(1 row)
+
+                                                                          end_provider_seat                                                                          
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"ended": true, "endedByKind": "owner", "agencyWorkspaceId": "ac181200-0000-4000-8000-000000000020", "customerWorkspaceId": "ac181200-0000-4000-8000-000000000010"}
+(1 row)
+
+                                                                                                                                            choose_business_provider                                                                                                                                            
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ {"seatId": "1104bf2c-81e7-4491-b975-b0225aa1a19c", "source": "business_choice", "replayed": false, "providerId": "d42210e9-91a8-4b77-ab5b-ae2d1fe8116e", "grantedByKind": "owner", "agencyWorkspaceId": "ac181200-0000-4000-8000-000000000020", "customerWorkspaceId": "ac181200-0000-4000-8000-000000000010"}
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+ renew_assert 
+--------------
+ 
+(1 row)
+
+ renew_expect 
+--------------
+ 
+(1 row)
+
+ROLLBACK
+Checking tests/agent-oauth-renewable-rollback-schema.sql
+BEGIN
+DO
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+DROP FUNCTION
+DROP FUNCTION
+DROP FUNCTION
+DROP FUNCTION
+DROP FUNCTION
+DROP FUNCTION
+DROP FUNCTION
+DROP TABLE
+ALTER TABLE
+ALTER TABLE
+DROP TABLE
+COMMIT
+DO
+CREATE TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+REVOKE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+BEGIN
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/rollback-20261020090032_agent_oauth_renewable.sql:3: ERROR:  agent_oauth_renewable_rollback_requires_data_preservation
+CONTEXT:  PL/pgSQL function inline_code_block line 1 at RAISE
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/rollback-20261020090032_agent_oauth_renewable.sql:9: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/rollback-20261020090032_agent_oauth_renewable.sql:12: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/rollback-20261020090032_agent_oauth_renewable.sql:32: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/rollback-20261020090032_agent_oauth_renewable.sql:33: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/rollback-20261020090032_agent_oauth_renewable.sql:34: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/rollback-20261020090032_agent_oauth_renewable.sql:35: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/rollback-20261020090032_agent_oauth_renewable.sql:36: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/rollback-20261020090032_agent_oauth_renewable.sql:37: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/rollback-20261020090032_agent_oauth_renewable.sql:38: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/rollback-20261020090032_agent_oauth_renewable.sql:39: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/rollback-20261020090032_agent_oauth_renewable.sql:40: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/rollback-20261020090032_agent_oauth_renewable.sql:41: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/rollback-20261020090032_agent_oauth_renewable.sql:42: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+psql:/private/tmp/strelva-mcp-launch-20261008/supabase/migrations/rollback-20261020090032_agent_oauth_renewable.sql:43: ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ROLLBACK
+DO
+DELETE 1
+DELETE 1
+DELETE 1
+BEGIN
+DO
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+DROP FUNCTION
+DROP FUNCTION
+DROP FUNCTION
+DROP FUNCTION
+DROP FUNCTION
+DROP FUNCTION
+DROP FUNCTION
+DROP TABLE
+ALTER TABLE
+ALTER TABLE
+DROP TABLE
+COMMIT
+CREATE TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+REVOKE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+DO
+Checking tests/agent-website-tools-schema.sql
+BEGIN
+CREATE FUNCTION
+CREATE FUNCTION
+DO
+ website_assert 
+----------------
+ 
+(1 row)
+
+ROLLBACK
+DO
+DROP FUNCTION
+DROP FUNCTION
+DROP FUNCTION
+DROP FUNCTION
+DROP FUNCTION
+DROP FUNCTION
+DROP TABLE
+CREATE TABLE
+ALTER TABLE
+REVOKE
+CREATE TRIGGER
+CREATE FUNCTION
+REVOKE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+Focused SQL contracts passed; full historical upgrade proof remains separate.
+Composed local HTTP/SQL proof failed: ENOENT: no such file or directory, open '/private/tmp/strelva-mcp-launch-20261008/next-env.d.ts'
+Disposable Next log retained at /var/folders/0t/9xnfycn50vd2yv5gb7p4cdsh0000gn/T/strelva-mcp-http-proof-YCq9Y5/next.log.

@@ -454,3 +454,15 @@ reads and durable per-agency quota behind the default-off
 owns the routes, configuration, migration/rollback proof and extension handoff.
 This is local implementation, not a production change or evidence of agency
 adoption. Extensions and richer agency profiles/branding remain unfinished.
+
+## Owner assistant MCP (October 8, local preparation)
+
+Jacob selected business context and website work, with Claude and Croki/Codex
+as the first clients. The isolated `prepare/mcp-launch-integration-20261008`
+branch extends the selected private launch candidate with renewable scoped
+connections, owner disconnect and native website reading/proposals. Proposals
+reuse saved website revisions and owner fact review; the connector cannot approve
+or publish. [The operating record](./docs/operations/owner-assistant-mcp-2026-10-08.md)
+owns exact sources, local proof and the native-client rehearsal. Actual HTTPS
+client login/renewal, production activation and a real customer/site binding
+remain unproved. This is prepared capability, not operated or adopted service.

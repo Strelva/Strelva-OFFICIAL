@@ -921,3 +921,25 @@ uses foundation typography/spacing tokens, with long URLs and agency names
 wrapping. The doubly gated `/preview/strelva/agent-oauth?evidence=1` specimen
 provides fictional populated/empty desktop/mobile proof; the native route and
 JSON-LD contracts are covered by business-page/profile tests.
+
+### Owner assistant access (October 8, local)
+
+[AssistantConnections](../../src/experience/workspace/AssistantConnections.tsx)
+composes the existing Card/Button primitives and workspace request context.
+It is keyed by workspace; validates list responses; shows client identity, scopes,
+expiry and last renewal; and confirms permanent disconnect by connection ID.
+It removes stale mutation controls on uncertain failure and keeps a confirmed
+revocation receipt even when the follow-up read fails. `/connect` lists direct
+owner businesses; WorkspaceBusinessSettings links here through the optional
+`assistantConnectionsReleased` prop and snapshot release field.
+[AuthorizeAssistant](../../src/app/connect/authorize/AuthorizeAssistant.tsx)
+shows the verified client metadata host, self-supplied name, website permissions
+and renewal limit. Consent and RebuildExperience mutation buttons wait for
+hydration to prevent lost clicks on cold server-rendered controls.
+
+The doubly gated `/preview/strelva/agent-oauth?connections=<state>` provides
+fictional loading/empty/permission/error/expiry/departed-owner/disconnect-recovery
+states. [Browser checks](../../tests/agent-connections-ui.spec.ts) cover keyboard
+focus, wrapping at 320/360/768/1280/1600px, confirmation and recovery, consent,
+and native website fact review. These are local fixtures; actual Supabase owner
+session, physical device, screen reader and native assistant use remain open.

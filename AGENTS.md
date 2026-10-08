@@ -160,8 +160,14 @@ cluster and never touch production:
 ```bash
 PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-sql
 PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-upgrade
+PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH \
+  STRELVA_MCP_HTTP_SQL_PROOF=1 bash scripts/check-agent-channel-sql.sh
 ```
 
+The optional MCP proof above composes actual local HTTP with disposable
+Postgres; it rejects repository env files and proves no native assistant or
+Supabase browser sign-in. The [owner-assistant record](./docs/operations/owner-assistant-mcp-2026-10-08.md)
+owns setup, scopes and remaining HTTPS/client qualification.
 `CUSTOM_DOMAIN_MAP` routes custom domains locally.
 [docs/operations/testing-and-ci.md](./docs/operations/testing-and-ci.md) explains when Redis,
 Postgres, or bypass mode changes what a green run means.

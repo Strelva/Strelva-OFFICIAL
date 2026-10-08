@@ -1,0 +1,62 @@
+(node:37566) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+Running 14 tests using 1 worker
+
+(node:37790) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:37790) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:37790) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [desktop] › tests/agent-connections-ui.spec.ts:6:7 › assistant connection wraps and disconnects at 320px (2.6s)
+  ✓   2 [desktop] › tests/agent-connections-ui.spec.ts:6:7 › assistant connection wraps and disconnects at 360px (2.4s)
+  ✓   3 [desktop] › tests/agent-connections-ui.spec.ts:6:7 › assistant connection wraps and disconnects at 768px (2.4s)
+  ✓   4 [desktop] › tests/agent-connections-ui.spec.ts:6:7 › assistant connection wraps and disconnects at 1280px (2.4s)
+  ✓   5 [desktop] › tests/agent-connections-ui.spec.ts:6:7 › assistant connection wraps and disconnects at 1600px (3.2s)
+  ✓   6 [desktop] › tests/agent-connections-ui.spec.ts:25:5 › owners can revoke a connection whose old owner lost authority (2.2s)
+  ✓   7 [desktop] › tests/agent-connections-ui.spec.ts:32:5 › confirmed disconnect survives a failed refresh and reload recovers (2.9s)
+  ✓   8 [desktop] › tests/agent-connections-ui.spec.ts:41:5 › unconfirmed mutation clears stale controls until reload (2.5s)
+  ✓   9 [desktop] › tests/agent-connections-ui.spec.ts:56:7 › assistant empty state (1.3s)
+  ✓  10 [desktop] › tests/agent-connections-ui.spec.ts:56:7 › assistant permission state (949ms)
+  ✓  11 [desktop] › tests/agent-connections-ui.spec.ts:56:7 › assistant loading state (984ms)
+  ✓  12 [desktop] › tests/agent-connections-ui.spec.ts:56:7 › assistant error state (1.4s)
+  ✓  13 [desktop] › tests/agent-connections-ui.spec.ts:62:5 › consent explains client identity, renewal, and website review permissions (1.5s)
+  ✘  14 [desktop] › tests/agent-connections-ui.spec.ts:72:5 › native website review requires owner fact decisions before approval (10.8s)
+
+
+  1) [desktop] › tests/agent-connections-ui.spec.ts:72:5 › native website review requires owner fact decisions before approval 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByText('1 decision needs you')
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for getByText('1 decision needs you')[22m
+
+
+      75 |   await expect(page.getByRole("button", { name: "Approve this preview", exact: true })).toBeDisabled();
+      76 |   await page.getByRole("button", { name: "Confirm", exact: true }).first().click();
+    > 77 |   await expect(page.getByText("1 decision needs you", { exact: false })).toBeVisible();
+         |                                                                          ^
+      78 |   await expect(page.getByRole("button", { name: "Approve this preview", exact: true })).toBeDisabled();
+      79 | });
+      80 |
+        at /private/tmp/strelva-mcp-complete-20261008/tests/agent-connections-ui.spec.ts:77:74
+
+    Error Context: test-results/agent-connections-ui-nativ-291a9-t-decisions-before-approval-desktop/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/agent-connections-ui-nativ-291a9-t-decisions-before-approval-desktop/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace test-results/agent-connections-ui-nativ-291a9-t-decisions-before-approval-desktop/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [desktop] › tests/agent-connections-ui.spec.ts:72:5 › native website review requires owner fact decisions before approval 
+  13 passed (38.0s)
