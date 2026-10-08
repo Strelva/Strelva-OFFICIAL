@@ -19,6 +19,7 @@
 import { z } from "zod";
 import { workspacePorts } from "./workspace-ports";
 import { isSupabaseConfigured } from "@/platform/infra/db/client";
+import { isProductionEnv } from "@/platform/infra/production-guard";
 
 export interface OwnerNoticeRecipient {
   email: string;
@@ -48,10 +49,23 @@ function withoutDatabase(tenant: { ownerEmail?: string | null }): OwnerNoticeRec
   return parsed.success ? { email: parsed.data, name: null, from: "tenant_fallback", workspaceId: null } : null;
 }
 
-type NotSent = "resolver_timeout" | "resolver_error" | "no_owner_recipient" | "malformed_owner_recipient";
+function localNoDatabaseFallbackAllowed(): boolean {
+  const nodeEnvironment = process.env.NODE_ENV;
+  const vercelEnvironment = process.env.VERCEL_ENV?.trim().toLowerCase();
+  const deployed = isProductionEnv()
+    || nodeEnvironment === "production"
+    || (Boolean(vercelEnvironment) && vercelEnvironment !== "development");
+
+  return !deployed && (nodeEnvironment === "development" || nodeEnvironment === "test");
+}
+
+type NotSent = "resolver_timeout" | "resolver_error" | "no_owner_recipient" | "malformed_owner_recipient" | "owner_recipient_unavailable";
 
 async function resolve(tenant: { id: string; ownerEmail?: string | null }): Promise<OwnerNoticeRecipient | NotSent> {
-  if (resolver === resolveTenantOwnerRecipient && !isSupabaseConfigured()) return withoutDatabase(tenant) ?? "no_owner_recipient";
+  if (resolver === resolveTenantOwnerRecipient && !isSupabaseConfigured()) {
+    if (!localNoDatabaseFallbackAllowed()) return "owner_recipient_unavailable";
+    return withoutDatabase(tenant) ?? "no_owner_recipient";
+  }
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const outcome = await Promise.race([
@@ -77,7 +91,11 @@ export async function resolveOwnerNoticeRecipient(
 ): Promise<OwnerNoticeRecipient | null> {
   const outcome = await resolve(tenant);
   if (typeof outcome !== "string") return outcome;
-  console.warn(`[owner-recipient] owner notice not sent for ${tenant.id}: ${outcome}`);
+  if (outcome === "owner_recipient_unavailable") {
+    console.warn(`[owner-recipient] not sent: owner recipient unavailable for ${tenant.id}`);
+  } else {
+    console.warn(`[owner-recipient] owner notice not sent for ${tenant.id}: ${outcome}`);
+  }
   return null;
 }
 
@@ -89,7 +107,7 @@ export async function resolveOwnerNoticeRecipient(
  * database no site has a business.
  */
 export async function legacyOwnerLinkAllowed(tenant: { id: string; ownerEmail?: string | null }): Promise<boolean> {
-  if (resolver === resolveTenantOwnerRecipient && !isSupabaseConfigured()) return true;
+  if (resolver === resolveTenantOwnerRecipient && !isSupabaseConfigured()) return localNoDatabaseFallbackAllowed();
   const outcome = await resolve(tenant);
   return typeof outcome !== "string" && outcome.workspaceId === null;
 }
