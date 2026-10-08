@@ -28,7 +28,7 @@ export async function readAgentRequestProof(tenantId: string, from: string, to: 
   return agentRequestProofLine(result.data);
 }
 
-/** Aggregate-only discovery write. Search text, agent identity and customer data never leave the request. */
+/** Best-effort aggregate-only discovery write. Search text, caller identity and contact data are never stored. */
 export async function recordAgentBusinessDiscoveries(scopes: string[]): Promise<boolean> {
   if (scopes.length === 0) return true;
   if (!bookingAgentVisibilityEnabled() || scopes.length > 10) return false;
@@ -37,7 +37,6 @@ export async function recordAgentBusinessDiscoveries(scopes: string[]): Promise<
   try {
     const call = db.rpc("record_agent_business_discovery", { p_scopes: [...new Set(scopes)] });
     const result = await (call.abortSignal ? call.abortSignal(AbortSignal.timeout(2000)) : call);
-    // A successful lookup is returned only once its aggregate proof is recorded.
     if (result.error) return false;
     return typeof result.data === "number" && Number.isSafeInteger(result.data) && result.data > 0;
   } catch {
@@ -65,7 +64,7 @@ export function agentBookingOutcomesLine(outcomes: AgentBookingOutcomes | null):
   if (!outcomes) return null;
   const { businessName, discoveryCalls, discoveryCoverage, discoverySince, holds, confirmations, completed } = outcomes;
   const discovery = discoveryCoverage === "partial"
-    ? `at least ${discoveryCalls} recorded discovery ${discoveryCalls === 1 ? "call" : "calls"} since ${discoverySince}; full-period coverage is unknown`
+    ? `at least ${discoveryCalls} recorded discovery ${discoveryCalls === 1 ? "call" : "calls"} this week; tracking first observed ${discoverySince}, and full-period coverage is unknown`
     : "discovery count unavailable; tracking was not established for this week";
   return `${businessName}: ${discovery}; ${holds} agent ${holds === 1 ? "booking hold" : "booking holds"}, ${confirmations} customer ${confirmations === 1 ? "confirmation" : "confirmations"}, and ${completed} completed ${completed === 1 ? "booking" : "bookings"} this week.`;
 }

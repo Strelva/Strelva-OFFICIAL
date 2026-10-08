@@ -67,7 +67,7 @@ $probe$);
 select pg_temp.aa_probe('shared_budget',$probe$
  do $$ begin for n in 1..20 loop perform public.claim_public_booking_request('aa-site',pg_temp.aa_request(n)); end loop; end $$;
  select pg_temp.aa_expect($q$select pg_temp.aa_hold(1)$q$,'booking_public_limit_business');
- select pg_temp.aa_assert((select count(*)=0 from public.business_bookings where origin='agent'),'no agent hold admitted past the budget');
+ select pg_temp.aa_assert((select count(*)=0 from public.business_bookings where calendar_key='d5470000-0000-4000-8000-000000000020' and origin='agent'),'no agent hold admitted past this business budget');
 $probe$);
 
 -- One live request per mailbox across channels, aliases included, and

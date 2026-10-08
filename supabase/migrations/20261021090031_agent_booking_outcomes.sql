@@ -14,6 +14,7 @@ create table public.agent_business_discovery_coverage (
   calendar_key uuid primary key,
   first_observed_at timestamptz not null
 );
+create index agent_business_discovery_days_day_idx on public.agent_business_discovery_days(day);
 alter table public.agent_business_discovery_days enable row level security;
 alter table public.agent_business_discovery_coverage enable row level security;
 revoke all on public.agent_business_discovery_days, public.agent_business_discovery_coverage from public, anon, authenticated, service_role;

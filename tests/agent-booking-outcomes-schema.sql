@@ -9,6 +9,9 @@ begin
   raise exception 'expected %, succeeded: %', expected, statement;
 end $$;
 
+select pg_temp.abo_assert(to_regclass('public.agent_business_discovery_days_day_idx') is not null,
+  'bounded retention cleanup has a day index');
+
 insert into public.tenants(id, stable_id, site_name) values
   ('outcome-site', 'ab272000-0000-4000-8000-000000000001', 'Outcome Fixture'),
   ('other-outcome-site', 'ab272000-0000-4000-8000-000000000002', 'Other Outcome Fixture'),
