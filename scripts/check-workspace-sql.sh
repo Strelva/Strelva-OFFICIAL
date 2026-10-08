@@ -999,6 +999,28 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011150000_pub
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011150000_public_booking_admission.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011150000_public_booking_admission.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/public-booking-admission-schema.sql"
+# #547: agent holds share that admission; live-only agent cap; mailbox caps.
+# Forward, rollback to #529's functions, and reapply; #529's contract reruns.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013210000_agent_booking_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-admission-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013210000_agent_booking_admission.sql"
+psql "${psql_args[@]}" -Atc "select to_regprocedure('public.booking_email_identity(text)') is null and to_regprocedure('public.list_published_business_pages()') is null and position('''agent''' in pg_get_functiondef('public.check_public_booking_budget(uuid,text,timestamptz,timestamptz,text,uuid)'::regprocedure))=0" | grep -qx t
+# The regression probes must fail on #529's functions: dead holds, shared budget, one mailbox.
+if psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-admission-schema.sql" >"$cluster_root/agent-admission-before.log" 2>&1; then
+  printf 'Agent admission probes passed without 20261013210000.\n' >&2
+  exit 1
+fi
+for probe in dead_holds shared_budget one_email; do
+  if ! grep -q "$probe: " "$cluster_root/agent-admission-before.log"; then
+    cat "$cluster_root/agent-admission-before.log" >&2
+    printf 'Agent admission probe %s did not fail before the fix.\n' "$probe" >&2
+    exit 1
+  fi
+done
+psql "${psql_args[@]}" --file="$repo_root/tests/public-booking-admission-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013210000_agent_booking_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-admission-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/public-booking-admission-schema.sql"
 
 # Google location lineage through the real Versions/System stores, after the
 # account-binding migrations. Preparation stays fake; no Google dispatch.

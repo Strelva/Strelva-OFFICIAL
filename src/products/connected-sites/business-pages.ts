@@ -40,6 +40,17 @@ export async function loadPublishedBusinessPage(handle: string, deps: { store?: 
   return { workspaceId: row.workspaceId, handle: row.handle, facts, confirmedAt: row.confirmedAt };
 }
 
+/** Every page loadPublishedBusinessPage would serve, under the same gates. */
+export async function listPublishedBusinessPages(deps: { store?: BusinessPagesStore; publicFor?: (workspaceId: string) => Promise<boolean> } = {}): Promise<PublishedBusinessPage[]> {
+  if (!businessPagesReleaseEnabled()) return [];
+  const rows = (await (deps.store ?? businessPagesStore()).listPublished()).filter(row => BUSINESS_HANDLE_PATTERN.test(row.handle));
+  const open = await Promise.all(rows.map(row => (deps.publicFor ?? connectedSitesPublicFor)(row.workspaceId).catch(() => false)));
+  return rows.flatMap((row, i) => {
+    const facts = publicFactsFromConfirmedRecord(row.workspaceId, row);
+    return open[i] && facts.name ? [{ workspaceId: row.workspaceId, handle: row.handle, facts, confirmedAt: row.confirmedAt }] : [];
+  });
+}
+
 export interface SchemaBlockTarget {
   /** A connected site's id, or `any` for a site that isn't connected. */
   id: string;
