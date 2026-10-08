@@ -108,7 +108,7 @@ export async function POST() {
       const next = draft.data as ContentMap[typeof draft.section];
       const changes = diffFields(current, next as unknown as Record<string, unknown>);
 
-      await setContent(draft.section, next, tenant);
+      await setContent(draft.section, next, tenant, actor);
       await appendVersion(draft.section, next, actor.isImpersonating ? "admin" : "user", tenant, changes);
       await recordSectionUpdate(draft.section, tenant);
       await logActivity({

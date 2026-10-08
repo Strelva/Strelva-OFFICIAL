@@ -3,6 +3,10 @@
 \else
 \set native_keep_fixture false
 \endif
+\if :{?native_authority_lock_fixture}
+\else
+\set native_authority_lock_fixture false
+\endif
 begin;
 create function pg_temp.vn_assert(ok boolean,label text) returns void language plpgsql as $$ begin if ok is distinct from true then raise exception 'Version native runtime: %',label; end if; end $$;
 create function pg_temp.vn_expect(q text,expected text) returns void language plpgsql as $$
@@ -19,6 +23,12 @@ insert into public.workspace_memberships(workspace_id,user_id,role,created_by) v
  ('bc630000-0000-4000-8000-000000000010','bc630000-0000-4000-8000-000000000001','owner','bc630000-0000-4000-8000-000000000001'),
  ('bc630000-0000-4000-8000-000000000011','bc630000-0000-4000-8000-000000000001','admin','bc630000-0000-4000-8000-000000000002'),
  ('bc630000-0000-4000-8000-000000000011','bc630000-0000-4000-8000-000000000002','owner','bc630000-0000-4000-8000-000000000002');
+-- Ordinary staffed provider authority prepares the client draft. The platform
+-- operator flag below is deliberately retained for the denied Live path.
+insert into public.provider_seats(customer_workspace_id,agency_workspace_id,granted_by_kind,granted_by) values
+ ('bc630000-0000-4000-8000-000000000011','bc630000-0000-4000-8000-000000000010','owner','bc630000-0000-4000-8000-000000000002');
+insert into public.agency_client_staff(agency_workspace_id,customer_workspace_id,user_id,assigned_by) values
+ ('bc630000-0000-4000-8000-000000000010','bc630000-0000-4000-8000-000000000011','bc630000-0000-4000-8000-000000000001','bc630000-0000-4000-8000-000000000001');
 insert into public.super_admins(user_id,email) values ('bc630000-0000-4000-8000-000000000001','version-operator@example.test');
 create temporary table vn_source(id uuid);
 insert into vn_source select (public.create_system_version_source('bc630000-0000-4000-8000-000000000010','bc630000-0000-4000-8000-000000000001',
@@ -56,13 +66,48 @@ create function pg_temp.vn_approve(v jsonb) returns void language plpgsql as $$ 
  perform public.record_version_preparation('bc630000-0000-4000-8000-000000000011','bc630000-0000-4000-8000-000000000001','version-operator@example.test',(v->>'id')::uuid,(v->>'rowRevision')::bigint,(decision->>'id')::uuid);
  perform public.claim_owner_decision('bc630000-0000-4000-8000-000000000011',(decision->>'id')::uuid,hash,'approve','session','bc630000-0000-4000-8000-000000000002','version-owner@example.test',null);
 end $$;
+\if :native_authority_lock_fixture
+select pg_temp.vn_approve((select value from vn_created));
+insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values
+ ('bc630000-0000-4000-8000-000000000011','bc630000-0000-4000-8000-000000000003','owner','bc630000-0000-4000-8000-000000000002');
+commit;
+\else
 do $$ declare v jsonb; draft jsonb; native uuid; spec jsonb; snapshot jsonb; begin
  v:=(select value from vn_created);
  native:=(select work_id from public.system_version_native_applications where version_id=(v->>'id')::uuid);
  perform pg_temp.vn_expect(format('select public.application_runtime_snapshot(%L)',native),'application_release_unavailable');
  perform pg_temp.vn_assert(public.read_version_native_runtime('bc630000-0000-4000-8000-000000000011','bc630000-0000-4000-8000-000000000002','version-owner@example.test',(v->>'id')::uuid)->'releaseNumber'='null'::jsonb,'new Version starts draft');
  perform pg_temp.vn_expect(format('select public.save_system_version(%L,%L,%L,1,%L)','bc630000-0000-4000-8000-000000000001','version-operator@example.test',v->>'id',pg_temp.vn_release(v,v->'baseline'->'definition')),'system_version_release_approval_required');
+ if to_regclass('release_rollback_baseline.version_live_owner_authority') is not null then
+   -- Preserve a fictional historical operator decision, and prove it cannot
+   -- drive today's owner-only runtime. The subtransaction removes only this
+   -- fixture; no real issued decision is modified by the migration.
+   begin
+     declare historical jsonb; hash text; begin
+       hash:=encode(sha256(convert_to('["version_release","'||(v->>'id')||'",'||(v->>'rowRevision')||']','UTF8')),'hex');
+       historical:=public.open_owner_decision('bc630000-0000-4000-8000-000000000011',jsonb_build_object('kind','system.change_live','route','strelva_reviews','systemId',v->'version'->>'systemId','title','Historical provider review','approveEffect','The runtime changes','notYetEffect','Nothing changes','sourceLifecycle','version_release','sourceId',v->>'id','revisionHash',hash,'adminMayDecide',false));
+       perform public.record_version_preparation('bc630000-0000-4000-8000-000000000011','bc630000-0000-4000-8000-000000000001','version-operator@example.test',(v->>'id')::uuid,1,(historical->>'id')::uuid);
+       update public.owner_decisions set state='approved',decided_by_kind='operator',decided_by='bc630000-0000-4000-8000-000000000001',decided_at=now() where id=(historical->>'id')::uuid;
+       perform pg_temp.vn_expect(format('select public.save_system_version(%L,%L,%L,1,%L)','bc630000-0000-4000-8000-000000000002','version-owner@example.test',v->>'id',pg_temp.vn_release(v,v->'baseline'->'definition')),'system_version_release_approval_required');
+       raise exception 'vn_rollback_historical_fixture';
+     end;
+   exception when others then
+     if sqlerrm<>'vn_rollback_historical_fixture' then raise; end if;
+   end;
+ end if;
  perform pg_temp.vn_approve(v);
+ if to_regclass('release_rollback_baseline.version_live_owner_authority') is not null then
+   perform pg_temp.vn_expect(format('select public.save_system_version(%L,%L,%L,1,%L)','bc630000-0000-4000-8000-000000000001','version-operator@example.test',v->>'id',pg_temp.vn_release(v,v->'baseline'->'definition')),'system_version_release_owner_required');
+   update public.users set verified_at=null where id='bc630000-0000-4000-8000-000000000002';
+   perform pg_temp.vn_expect(format('select public.save_system_version(%L,%L,%L,1,%L)','bc630000-0000-4000-8000-000000000002','version-owner@example.test',v->>'id',pg_temp.vn_release(v,v->'baseline'->'definition')),'business_record_access_denied');
+   update public.users set verified_at=now() where id='bc630000-0000-4000-8000-000000000002';
+   insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values
+     ('bc630000-0000-4000-8000-000000000011','bc630000-0000-4000-8000-000000000003','owner','bc630000-0000-4000-8000-000000000002');
+   update public.workspace_memberships set role='admin' where workspace_id='bc630000-0000-4000-8000-000000000011' and user_id='bc630000-0000-4000-8000-000000000002';
+   perform pg_temp.vn_expect(format('select public.save_system_version(%L,%L,%L,1,%L)','bc630000-0000-4000-8000-000000000003','version-stranger@example.test',v->>'id',pg_temp.vn_release(v,v->'baseline'->'definition')),'system_version_release_approval_required');
+   update public.workspace_memberships set role='owner' where workspace_id='bc630000-0000-4000-8000-000000000011' and user_id='bc630000-0000-4000-8000-000000000002';
+   delete from public.workspace_memberships where workspace_id='bc630000-0000-4000-8000-000000000011' and user_id='bc630000-0000-4000-8000-000000000003';
+ end if;
  perform pg_temp.vn_expect(format('select public.save_system_version(%L,%L,%L,1,%L)','bc630000-0000-4000-8000-000000000002','version-owner@example.test',v->>'id',jsonb_set(pg_temp.vn_release(v,v->'baseline'->'definition'),'{currentRelease}','null')),'system_version_input_invalid');
  perform pg_temp.vn_expect(format('select public.save_system_version(%L,%L,%L,1,%L)','bc630000-0000-4000-8000-000000000002','version-owner@example.test',v->>'id',pg_temp.vn_release(v,jsonb_set(v->'baseline'->'definition','{title}','"Forged candidate"'))),'system_version_stale');
  perform pg_temp.vn_expect(format('select public.save_system_version(%L,%L,%L,1,%L)','bc630000-0000-4000-8000-000000000002','version-owner@example.test',v->>'id',jsonb_set(pg_temp.vn_release(v,v->'baseline'->'definition'),'{overrides}','[{"path":"title","value":"Unapproved draft","setBy":"bc630000-0000-4000-8000-000000000002","setAt":"2026-10-07T12:00:00Z"}]')),'system_version_stale');
@@ -99,4 +144,5 @@ end $$;
 commit;
 \else
 rollback;
+\endif
 \endif

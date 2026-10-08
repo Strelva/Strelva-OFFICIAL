@@ -182,7 +182,12 @@ export interface QueueBusinessLeadCount { businessKey: string; businessName: str
 export interface QueueLink { tenantId: string; tenantStableId: string; workspaceId: string; workspaceName: string; systemId: string | null }
 export interface QueueDelegation { agencyWorkspaceId: string; customerWorkspaceId: string }
 
-/** Receipts. Mirrors `outside_write_receipts`. */
+/** Receipts. Mirrors `outside_write_receipts`.
+ * `provider` is the historical transport identifier. Linked tenant section
+ * publications pin the serving agency and verified actor separately in
+ * `request.authorship`; self-serve owner actions carry a null serving agency.
+ * Issued transport values must never be relabeled as agency identity.
+ */
 export const OUTSIDE_WRITE_PROVIDERS = ["google_business", "vercel", "strelva_routing", "strelva_content"] as const;
 export const OUTSIDE_WRITE_KINDS = ["review_reply", "gbp_hours", "gbp_post", "gbp_photo", "domain_add", "domain_claim_removal", "content_publish"] as const;
 export type OutsideWriteProvider = (typeof OUTSIDE_WRITE_PROVIDERS)[number];

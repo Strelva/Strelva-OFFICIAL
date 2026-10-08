@@ -135,7 +135,24 @@ describe("site snapshots", () => {
     expect(result.restored.status).toBe("restored");
     expect(result.preRestore.reason).toBe("pre_restore");
     expect(mockSetContent).toHaveBeenCalledTimes(SITE_SNAPSHOT_SECTIONS.length);
+    for (const call of mockSetContent.mock.calls) expect(call[3]).toMatchObject({
+      userId: "user_123", email: "owner@example.com",
+    });
     expect(summaries.map((item) => item.reason)).toContain("pre_restore");
+  });
+
+  it("reports partial restore when revoked authority denies recovery too", async () => {
+    const { createSiteSnapshot, restoreSiteSnapshot, SITE_SNAPSHOT_SECTIONS } = await import("@/lib/storage/site-snapshot-store");
+    const snapshot = await createSiteSnapshot("demo", { reason: "manual", label: "Known good", author: "user" });
+    const actor = { userId: "owner-current", email: "owner@example.test", type: "user" as const, isSuperAdmin: false };
+    mockSetContent.mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("acting_provider_no_mandate"))
+      .mockRejectedValueOnce(new Error("acting_provider_no_mandate"));
+    await expect(restoreSiteSnapshot("demo", snapshot.id, { actor })).rejects.toThrow(
+      `Restore is partially applied. Recovery could not restore these sections: ${SITE_SNAPSHOT_SECTIONS[0]}`,
+    );
+    expect(mockSetContent).toHaveBeenCalledTimes(3);
+    for (const call of mockSetContent.mock.calls) expect(call[3]).toBe(actor);
   });
 
   it("dedupes daily backups for the same tenant and date", async () => {

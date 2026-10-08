@@ -9,6 +9,15 @@ describe("atomic content repository", () => {
     await expect(upsertContentDataWithReceipt("alpha", "hero", { headline: "After" })).resolves.toBe("receipt-1");
     expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("write_operator_content", { p_tenant_id: "alpha", p_section: "hero", p_data: { headline: "After" } });
   });
+  it("passes verified actor context to the authority-bearing RPC", async () => {
+    mocks.rpc.mockResolvedValue({ data: { id: "receipt-1" }, error: null });
+    const actor = { userId: "ab000000-0000-4000-8000-000000000001", email: "staff@agency.example.test" };
+    await expect(upsertContentDataWithReceipt("alpha", "hero", { headline: "After" }, actor)).resolves.toBe("receipt-1");
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("write_content_as_actor", {
+      p_tenant_id: "alpha", p_section: "hero", p_data: { headline: "After" },
+      p_user_id: actor.userId, p_verified_email: actor.email,
+    });
+  });
   it("rejects unavailable storage before publication", async () => {
     mocks.db.mockReturnValue(null);
     await expect(upsertContentDataWithReceipt("alpha", "hero", {})).rejects.toThrow("Supabase is not configured");

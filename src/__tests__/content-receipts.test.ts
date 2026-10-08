@@ -52,6 +52,11 @@ describe("content publication receipts", () => {
     expect(mocks.cacheWrite).not.toHaveBeenCalled();
     expect(mocks.settle).not.toHaveBeenCalled();
   });
+  it("preserves the actual verified actor for authority and attribution", async () => {
+    const actor = { userId: "ab000000-0000-4000-8000-000000000001", email: "staff@agency.example.test" };
+    await setContent("hero", defaults.hero, "alpha", actor);
+    expect(mocks.atomic).toHaveBeenCalledWith("alpha", "hero", defaults.hero, actor);
+  });
   it("records acceptance separately from matched public projection", async () => {
     await setContent("hero", defaults.hero, "alpha");
     expect(mocks.atomic).toHaveBeenCalledTimes(1);

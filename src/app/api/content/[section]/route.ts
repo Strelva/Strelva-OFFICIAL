@@ -119,7 +119,7 @@ export async function PUT(
     const current = await getContent(s, tenant) as unknown as Record<string, unknown>;
     const changes = diffFields(current, parsed.data as unknown as Record<string, unknown>);
 
-    await setContent(s, parsed.data as ContentMap[typeof s], tenant);
+    await setContent(s, parsed.data as ContentMap[typeof s], tenant, actor);
     // Content is now live. Version history + the section timestamp are
     // bookkeeping — if one throws here, DON'T 500 (that would tell the owner the
     // save failed when it actually succeeded, and they'd retry / lose trust).

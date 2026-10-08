@@ -390,24 +390,31 @@ export async function restoreSiteSnapshot(
   const written: ContentSection[] = [];
   try {
     for (const { section, data } of toWrite) {
-      await setContent(section, data as ContentMap[typeof section], tenantId);
+      await setContent(section, data as ContentMap[typeof section], tenantId, options.actor);
       written.push(section);
     }
   } catch (err) {
+    // Recover only under the same current authority; revocation may deny
+    // recovery too. Never report full rollback when a prior section remains.
+    const recoveryFailures: ContentSection[] = [];
     // Roll back the sections that already landed.
     for (const section of written) {
       const prev = previous.get(section);
       if (prev) {
         try {
-          await setContent(section, prev as ContentMap[typeof section], tenantId);
+          await setContent(section, prev as ContentMap[typeof section], tenantId, options.actor);
         } catch {
-          // best-effort rollback; the throw below surfaces the original failure
+          recoveryFailures.push(section);
         }
+      } else {
+        recoveryFailures.push(section);
       }
     }
-    throw new Error(
-      `Restore failed on a section write and was rolled back: ${err instanceof Error ? err.message : "unknown error"}`,
-    );
+    const failure = err instanceof Error ? err.message : "unknown error";
+    throw new Error(recoveryFailures.length
+      ? `Restore is partially applied. Recovery could not restore these sections: ${recoveryFailures.join(", ")}. Review the current site and the pre-restore snapshot. Original failure: ${failure}`
+      : `Restore failed on a section write and was rolled back: ${failure}`);
+
   }
 
   const restoredAt = new Date().toISOString();

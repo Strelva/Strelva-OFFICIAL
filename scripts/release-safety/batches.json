@@ -1271,11 +1271,21 @@
       "note": "Local qualification only. Preserve existing baseline and original batch-8 RPC recovery scope. Audit raw server mutations remain restricted during forward-only application recovery; established lifecycle cleanup remains unchanged.",
       "items": [
         {
+          "file": "20261020110000_content_publication_authority.sql",
+          "sha256": "7ede6209f1c40f785a5a4934fb6ffedc9643676f5c7795f19fc12925222a4078",
+          "rollback": "rollback-20261020110000_content_publication_authority.sql"
+        },
+        {
           "file": "20261020111000_audit_service_role_append_only.sql",
           "sha256": "47adc8d510850fff3637a4ae74dc9f685336e72134ed59d8e94ae34bc7bd7b4b",
           "rollback": "rollback-20261020111000_audit_service_role_append_only.sql",
           "rollbackSha256": "e19e85259bd73ba910dd42f6d3926d17646e5625b5a95cd0749d42264c920a08",
           "rollbackStatus": "refused; forward-only security repair retains append/read and established lifecycle cleanup"
+        },
+        {
+          "file": "20261020112000_version_live_owner_authority.sql",
+          "sha256": "303cb0a83284e92128ddecf5feab53614bb69c229cf1894876f1da1f206b2077",
+          "rollback": "rollback-20261020112000_version_live_owner_authority.sql"
         },
         {
           "file": "20261020114000_public_business_verification.sql",
