@@ -56,6 +56,11 @@ describe("documented Stripe direct-account shared payment token protocol", () =>
     expect(rawRequest).not.toHaveBeenCalled();
     expect(() => qualifiedAgentMerchantProfile("acct_Merchant")).toThrow();
   });
+  it("rechecks server approval after token retrieval before creating a charge", async () => {
+    const rawRequest = vi.fn(async () => { vi.stubEnv("STRELVA_AGENT_PAYMENT_SELLER_TERMS_APPROVED", "0"); return token; });
+    await expect(createStripeAgentPaymentProvider({ rawRequest }, () => 1000000).chargeWithSharedPaymentToken(input)).rejects.toThrow(/not qualified/);
+    expect(rawRequest).toHaveBeenCalledTimes(1);
+  });
   it("readback never accepts another intent's metadata or amount", async () => {
     const rawRequest = vi.fn().mockResolvedValue({ ...intent, amount: 1001 });
     await expect(createStripeAgentPaymentProvider({ rawRequest }).retrievePayment!({ ...identity, providerObjectId: "pi_Agent" })).rejects.toThrow(/does not match/);
