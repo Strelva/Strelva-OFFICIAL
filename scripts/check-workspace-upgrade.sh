@@ -78,6 +78,12 @@ for migration in $(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -na
     fi
     tail_started=1
   fi
+  if [[ "$migration_name" == "20261013220000_provider_seat_tenant_conversion.sql" ]]; then
+    # Apply it after the historical conversion fixtures below so they
+    # continue to prove their original RPC;
+    # its new route behavior has a dedicated contract immediately afterward.
+    continue
+  fi
   if [[ "$migration_name" == "$early_lead_migration" ]]; then
     printf 'Skipping %s: applied ahead of the October 1 migrations above.\n' "$migration_name"
     continue
@@ -420,3 +426,7 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011160000_age
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-team-schema.sql"
 
 psql "${psql_args[@]}" --file="$repo_root/tests/ask-confirmed-facts-schema.sql"
+# Apply the new conversion contract after historical callers have been proven.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013220000_provider_seat_tenant_conversion.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/provider-seat-tenant-conversion-schema.sql"
+printf 'Provider-seat tenant conversion upgrade contract passed.\n'

@@ -174,7 +174,7 @@ begin
   ) returning * into v_receipt;
 
   return jsonb_build_object(
-    'disconnected', true,
+    'disconnected', v_changed > 0,
     'receiptId', v_receipt.id,
     'localCleanupStatus', v_receipt.local_cleanup_status,
     'clearedStores', to_jsonb(v_receipt.cleared_stores)

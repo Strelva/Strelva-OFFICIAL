@@ -7569,18 +7569,6 @@ export type Database = {
           },
         ]
       }
-      super_admin_bootstrap: {
-        Row: {
-          email: string
-        }
-        Insert: {
-          email: string
-        }
-        Update: {
-          email?: string
-        }
-        Relationships: []
-      }
       super_admins: {
         Row: {
           email: string

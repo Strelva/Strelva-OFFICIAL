@@ -71,6 +71,10 @@ select pg_temp.pd_assert((select count(*)=1 and bool_and(revocation_outcome='uns
   from public.provider_disconnect_receipts where tenant_stable_id='fd000000-0000-4000-8000-000000000011' and provider='instagram'),
   'Instagram receipt records unsupported provider revoke and every cleared store');
 
+select pg_temp.pd_assert(not (public.disconnect_workspace_calendar_connection('fd000000-0000-4000-8000-000000000010',
+  'fd000000-0000-4000-8000-000000000001','outlook','no_token',null)->>'disconnected')::boolean,
+  'calendar disconnect reports false when no provider row exists');
+
 insert into public.workspace_calendar_connections(workspace_id,provider,calendar_id,calendar_name,time_zone,status,created_by,
   access_token_ciphertext,refresh_token_ciphertext,token_expires_at) values
   ('fd000000-0000-4000-8000-000000000010','google','fixture-calendar','Fixture calendar','UTC','connected',
@@ -90,7 +94,6 @@ select pg_temp.pd_assert((select count(*)=1 and bool_and(connection_source='cale
   from public.provider_disconnect_receipts where workspace_id='fd000000-0000-4000-8000-000000000010'
     and provider='google' and connection_source='calendar_connection'),
   'calendar disconnect receipt preserves remote result and local store');
-
 select pg_temp.pd_assert(public.revoke_workspace_calendar_connection('fd000000-0000-4000-8000-000000000010',
   'fd000000-0000-4000-8000-000000000001','outlook'), 'older app RPC stays able to disconnect');
 select pg_temp.pd_assert((select status='revoked' and access_token_ciphertext is null
@@ -99,7 +102,8 @@ select pg_temp.pd_assert((select status='revoked' and access_token_ciphertext is
   'compatibility RPC clears all local calendar credentials');
 select pg_temp.pd_assert((select count(*)=1 and bool_and(revocation_outcome='not_attempted'
   and revocation_error_code='revocation_not_requested') from public.provider_disconnect_receipts
-  where workspace_id='fd000000-0000-4000-8000-000000000010' and provider='outlook'),
+  where workspace_id='fd000000-0000-4000-8000-000000000010' and provider='outlook'
+    and revocation_outcome='not_attempted' and revocation_error_code='revocation_not_requested'),
   'compatibility RPC records that revocation was not attempted');
 select pg_temp.pd_expect($$select public.disconnect_workspace_calendar_connection('fd000000-0000-4000-8000-000000000010',
   'fd000000-0000-4000-8000-000000000002','outlook','revoked',null)$$,'workspace_membership_required');

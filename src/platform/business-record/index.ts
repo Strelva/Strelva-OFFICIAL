@@ -9,6 +9,7 @@ export {
   readBusinessRecordHistory,
   readConfirmedBusinessFacts,
   readTenantWorkspaceLink,
+  repathConvertedTenantProvider,
   resolveOwnerRecipient,
   resolveTenantOwnerRecipient,
   undoBusinessRecordRevision,
