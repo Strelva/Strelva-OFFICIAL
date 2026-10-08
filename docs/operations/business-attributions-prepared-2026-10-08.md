@@ -65,6 +65,14 @@ normalized ACL. Wrapper drift and populated rollback refuse; accepted receipts
 remain intact. The rollback preserves the exact inherited completion function,
 including a compatible earlier 31 cancellation wrapper when combined later.
 
+A later independent review reproduced a concurrent inverse/writer defect in
+the first prepared inverse: an empty check missed an uncommitted opening, and
+DROP subsequently erased its committed receipt. The successor locks all three
+new tables exclusively before checking emptiness. Run
+`PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH bash scripts/check-business-attribution-rollback-races.sh`
+for writer-first refusal with retained history and inverse-first exclusion of a
+late writer. The first prepared source and failed runs remain historical evidence.
+
 The populated historical workspace upgrade passed before the final exact-text
 input tightening, including the existing native money/apps contracts and a
 1,524-function reader scan. Final migration structure and wrapper are unchanged

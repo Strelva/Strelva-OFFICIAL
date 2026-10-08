@@ -1,6 +1,9 @@
 -- Empty-only rollback. Original bringer and ending receipts are never erased.
 begin;
 set local lock_timeout='3s';
+-- Fence writers before observing emptiness; a pre-lock empty read can miss an
+-- uncommitted receipt and subsequently erase it when DROP waits for its writer.
+lock table public.business_attributions,public.business_attribution_endings,public.business_attribution_change_permissions in access exclusive mode;
 do $$begin
  if exists(select 1 from public.business_attributions) or exists(select 1 from public.business_attribution_endings) or exists(select 1 from public.business_attribution_change_permissions) then raise exception 'business_attribution_receipts_require_preservation';end if;
  if (select md5(prosrc) from pg_proc where oid='public.complete_provider_change(uuid,uuid,text)'::regprocedure) is distinct from '48e09a9db77d635d8d9ff4b11feeeb3e' then raise exception 'business_attribution_rollback_wrong_order';end if;
