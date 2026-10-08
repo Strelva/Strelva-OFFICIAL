@@ -988,6 +988,11 @@
           "file": "20261010170000_deprovision_retained_after_inquiry_export.sql",
           "sha256": "172e31fd98587e04ecf16a91b6e4c86acd6643b2a6473d91986d80bf4419888e",
           "rollback": "rollback-20261010170000_deprovision_retained_after_inquiry_export.sql"
+        },
+        {
+          "file": "20261011153000_operator_owner_decisions.sql",
+          "sha256": "1859f9b74b7cf6f91fad481b60bd2d097d036223b593b8d83466aff2a030935a",
+          "rollback": "rollback-20261011153000_operator_owner_decisions.sql"
         }
       ]
     }

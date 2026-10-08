@@ -76,7 +76,7 @@ function actorArgs(actor: WorkspaceActor) {
   return { p_user_id: z.string().uuid().parse(actor.userId), p_verified_email: z.string().email().parse(actor.verifiedEmail.trim().toLowerCase()) };
 }
 
-const recipientSchema = z.object({ email: z.string(), from: z.string(), tenantId: z.string().nullable().optional() }).passthrough();
+const recipientSchema = z.object({ email: z.string(), from: z.string(), tenantId: z.string().nullable().optional(), trusted: z.boolean().optional() }).passthrough();
 export type DeliveryRow = OwnerDecision & { businessName: string; timezone: string; recipient: z.infer<typeof recipientSchema> | null };
 const deliveryRowSchema = ownerDecisionSchema.extend({ businessName: z.string(), timezone: z.string(), recipient: recipientSchema.nullable() });
 const inquiryNoticeClaimSchema = z.object({ acquired: z.boolean(), status: z.enum(["sending", "accepted", "delivered", "deferred", "bounced", "failed", "suppressed", "unknown"]) });

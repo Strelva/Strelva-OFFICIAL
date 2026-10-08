@@ -816,6 +816,31 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010115500_web
 psql "${psql_args[@]}" --file="$repo_root/tests/website-business-facts-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010115700_website_native_fact_reviews.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/website-native-fact-reviews-schema.sql"
+# #509: provider and operator facts reach client sites only by owner decision.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011133700_business_facts_owner_decision.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011133700_business_facts_owner_decision.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-business-facts-schema.sql"
+# Owner history before the forward migration: the confirmed copy keeps it.
+psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-backfill-seed.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011133700_business_facts_owner_decision.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-backfill.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-business-facts-schema.sql"
+# #509 after #521: every public facts reader (connect.js, /biz, llms.txt,
+# JSON-LD) reads only the owner-confirmed copy. #509's rollback refuses to run
+# before it; its own rollback restores the 20261012110000 reader.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013110000_public_facts_read_confirmed.sql"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011133700_business_facts_owner_decision.sql" >"$cluster_root/facts-rollback-order.log" 2>&1; then
+  printf '#509 rollback ran before the public-facts reader stopped reading its copy.\n' >&2
+  exit 1
+fi
+grep -q 'business_facts_rollback_order' "$cluster_root/facts-rollback-order.log"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013110000_public_facts_read_confirmed.sql"
+psql "${psql_args[@]}" -Atc "select prosrc not like '%business_record_confirmed%' from pg_proc where oid='public.business_confirmed_public_facts(uuid)'::regprocedure" | grep -qx t
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013110000_public_facts_read_confirmed.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/website-cutover-undo-schema.sql"
 # Wave 6 catalog: additive submit/contact RPCs, report receipts, newsletter
 # projection and delegated Make authority. Run after all required flag names,
@@ -1029,6 +1054,18 @@ if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
     pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/google-location-versions-postgres.test.ts
 fi
 
+# #530 M8: an operator with an admin seat never decides an owner item.
+# Forward, rollback (the original member branch and the Needs you contract
+# hold again), then forward once more.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011153000_operator_owner_decisions.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-owner-decisions-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011153000_operator_owner_decisions.sql"
+psql "${psql_args[@]}" --set=after_rollback=true --file="$repo_root/tests/operator-owner-decisions-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011153000_operator_owner_decisions.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-owner-decisions-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
+
 # The one booking store through both real route families (legacy /api/booking
 # and the public booking service) against the real booking functions. Last,
 # because it commits its fictional rows.
@@ -1094,6 +1131,40 @@ fi
 grep -q 'business_pages_rollback_requires_data_preservation' "$cluster_root/business-pages-rollback-refusal.log"
 psql "${psql_args[@]}" -Atc "select exists(select 1 from public.business_pages where handle='rollback-fixture') and to_regprocedure('public.business_confirmed_public_facts(uuid)') is not null" | grep -qx t
 printf 'Business page rollback preserved saved publication settings.\n'
+# #509 round 3: bookings, inquiries and the linked-site overlay read only the
+# owner-confirmed copy. The contract reproduces the leak before the migration
+# (an operator's pending phone reaches booking), holds after it alongside the
+# earlier booking and inquiry contracts, #509's rollback refuses while it is
+# applied, and its rollback restores the exact catalog.
+if psql "${psql_args[@]}" --file="$repo_root/tests/booking-confirmed-facts-schema.sql" >"$cluster_root/booking-facts-before.log" 2>&1; then
+  printf 'Booking readers already ignored pending facts before 20261013115000.\n' >&2
+  exit 1
+fi
+grep -q 'booking phone is confirmed, got 716-555-0999' "$cluster_root/booking-facts-before.log"
+psql "${psql_args[@]}" --tuples-only --no-align --file="$repo_root/tests/support/public-catalog-fingerprint.sql" >"$cluster_root/catalog-before-booking-facts.txt"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013115000_booking_reads_confirmed_facts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-confirmed-facts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-business-context-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-context-notices-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-booking-handoff-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013110000_public_facts_read_confirmed.sql"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011133700_business_facts_owner_decision.sql" >"$cluster_root/booking-facts-rollback-order.log" 2>&1; then
+  printf '#509 rollback ran while the booking readers still read its copy.\n' >&2
+  exit 1
+fi
+grep -q 'roll back 20261013115000_booking_reads_confirmed_facts first' "$cluster_root/booking-facts-rollback-order.log"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013110000_public_facts_read_confirmed.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013115000_booking_reads_confirmed_facts.sql"
+if ! diff -u "$cluster_root/catalog-before-booking-facts.txt" \
+    <(psql "${psql_args[@]}" --tuples-only --no-align --file="$repo_root/tests/support/public-catalog-fingerprint.sql"); then
+  printf 'Booking-reader rollback did not restore the exact catalog.\n' >&2
+  exit 1
+fi
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013115000_booking_reads_confirmed_facts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-confirmed-facts-schema.sql"
+printf 'Booking readers read only the confirmed copy; rollback is exact and ordered.\n'
 # Every stream's release flag key survives the integrated redefinitions (#253).
 psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 
@@ -1129,6 +1200,14 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012010000_ten
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012120000_track_signing_key_rotation.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-track-signing-keys-schema.sql"
 printf 'Tracking key migration passed forward, guarded rollback, empty rollback and reapply.\n'
+# Provider disconnect revocation receipts and local token cleanup: forward,
+# rollback while empty, and reapply. Fixtures use fictional credentials only.
+psql "${psql_args[@]}" --command="alter table public.tenants add column if not exists instagram_access_token text, add column if not exists updated_at timestamptz not null default now();"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011180000_provider_disconnect_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/provider-disconnect-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011180000_provider_disconnect_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011180000_provider_disconnect_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/provider-disconnect-schema.sql"
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

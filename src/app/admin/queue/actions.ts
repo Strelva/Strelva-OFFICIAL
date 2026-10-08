@@ -7,7 +7,7 @@
  * active super_admins row again.
  *
  * Draft decisions run the governed approve path as the operator, never as
- * the owner, and write audit_logs rows (../operator-audit.ts). Retries and
+ * the owner, and write audit_logs rows (@/lib/operator-decisions). Retries and
  * quotes stay on the screens each row links to, through their governed paths.
  */
 import { revalidatePath } from "next/cache";
@@ -25,7 +25,7 @@ import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
 import { getEventRaw } from "@/lib/events";
 import { resolveEventAction, escalateEventToOwner } from "@/lib/event-actions";
 import { isPortfolioApprovable } from "../actions/portfolio-actions";
-import { auditOperatorDecision, operatorStillActive, verifiedOperator } from "../operator-audit";
+import { auditOperatorDecision, operatorStillActive, verifiedOperator } from "@/lib/operator-decisions";
 
 export type QueueActionResult = { ok: boolean; message: string };
 

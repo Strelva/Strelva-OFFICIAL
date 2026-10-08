@@ -41,6 +41,7 @@ export function CalendarConnectionPanel({ workspaceId, disabled = false, onChang
   const [loading, setLoading] = useState(false);
   const [loadingCalendars, setLoadingCalendars] = useState<CalendarProvider | null>(null);
   const [error, setError] = useState("");
+  const [disconnectNotice, setDisconnectNotice] = useState("");
   const [providerConsentAction, setProviderConsentAction] = useState<CalendarProviderConsentAction | null>(null);
   const [draft, setDraft] = useState<{ provider: CalendarProvider; calendarId: string; calendarName: string; timeZone: string; reminderPolicy: CalendarReminderPolicy } | null>(null);
 
@@ -84,11 +85,14 @@ export function CalendarConnectionPanel({ workspaceId, disabled = false, onChang
   async function disconnect(provider: CalendarProvider) {
     setLoading(true); setError("");
     try {
-      const result = await body<{ disconnected: boolean; providerConsentAction?: unknown }>(await request("/api/workspace/calendar-connections", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "disconnect", workspaceId, provider }) }), "Calendar could not be disconnected.");
+      const result = await body<{ disconnected: boolean; revocationOutcome?: string; providerConsentAction?: unknown }>(await request("/api/workspace/calendar-connections", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "disconnect", workspaceId, provider }) }), "Calendar could not be disconnected.");
       if (provider === "outlook") {
         const action = calendarProviderConsentActionSchema.safeParse(result.providerConsentAction);
         setProviderConsentAction(result.disconnected && action.success ? action.data : null);
       }
+      setDisconnectNotice(provider === "google" && (result.revocationOutcome === "failed" || result.revocationOutcome === "partial_failure")
+        ? "Google could not confirm access revocation. The calendar is disconnected here and its stored credentials were removed."
+        : "");
       await load(); onChanged?.();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Calendar could not be disconnected."); }
     finally { setLoading(false); }
@@ -97,6 +101,7 @@ export function CalendarConnectionPanel({ workspaceId, disabled = false, onChang
   return <section className="space-y-5 border-t border-gray-border pt-5" aria-busy={loading}>
     <div><h2 className="font-display text-xl">Calendar connections</h2><p className="text-sm text-gray-muted">Choose one calendar for this workspace. Reminders follow the connected calendar; Strelva does not send separate reminders.</p></div>
     {error ? <div className="space-y-2 text-sm text-critical" role="alert"><p>{error}</p><Button type="button" variant="secondary" disabled={loading} onClick={() => void load()}>Reload calendar connections</Button></div> : null}
+    {disconnectNotice ? <p className="text-sm text-gray-muted" role="status">{disconnectNotice}</p> : null}
     <div className="grid gap-4 md:grid-cols-2">
       {(["outlook", "google"] as const).map(provider => {
         const connection = connections.find(item => item.provider === provider);

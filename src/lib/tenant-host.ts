@@ -9,6 +9,12 @@ import { isMarketingHost } from "./marketing-hosts";
  */
 export const RESERVED_SUBDOMAINS = new Set(["www", "admin", "app", "api"]);
 
+/** Covers the separate public apex, including reserved and unsupported hosts. */
+export function isSeparateSitesHost(host: string, sitesRoot = SITES_ROOT_DOMAIN, appRoot = APP_ROOT_DOMAIN): boolean {
+  const hostname = host.toLowerCase().split(":")[0] ?? "";
+  return sitesRoot !== appRoot && (hostname === sitesRoot || hostname.endsWith(`.${sitesRoot}`));
+}
+
 /**
  * The single source of truth for turning a Host header into a tenant routing
  * slug (+ admin flag). Pure and Edge-safe (no next/headers, no Node deps) so
@@ -44,7 +50,7 @@ export function parseTenantHost(host: string, sitesRoot = SITES_ROOT_DOMAIN, app
 
   // A separate sites apex only hosts one-label public tenants. Admin stays
   // on the app/custom domains; admin.<tenant> needs a deeper wildcard cert.
-  if (sitesRoot !== appRoot && hostWithoutPort.endsWith(`.${sitesRoot}`)) {
+  if (isSeparateSitesHost(host, sitesRoot, appRoot)) {
     const slug = hostWithoutPort.slice(0, -sitesRoot.length - 1);
     return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(slug) && !RESERVED_SUBDOMAINS.has(slug)
       ? { tenant: slug, isAdmin: false } : { tenant: null, isAdmin: false };

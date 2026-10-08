@@ -4,6 +4,12 @@ import { closeQueueItemAction, resolveQueueDraftsAction } from "@/app/admin/queu
 const mocks = vi.hoisted(() => ({ admin: vi.fn(), actor: vi.fn(), read: vi.fn(), mark: vi.fn(), effort: vi.fn(), event: vi.fn(), resolve: vi.fn(), escalate: vi.fn(), audit: vi.fn() }));
 vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: mocks.admin }));
 vi.mock("@/platform/workspaces/http", () => ({ workspaceHttpActor: mocks.actor }));
+// verifiedOperator (src/lib/operator-decisions.ts) reads the same session.
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: async () => {
+  const signedIn = await mocks.actor() as { userId: string; verifiedEmail: string } | null;
+  return signedIn ? { id: signedIn.userId, email: signedIn.verifiedEmail, email_confirmed_at: "2026-10-01T00:00:00Z" } : null;
+} }));
+vi.mock("@/platform/infra/db/repositories", () => ({ getMembershipRole: vi.fn() }));
 vi.mock("@/platform/operator-queue/service", () => ({ readOperatorQueue: mocks.read, markQueueItem: mocks.mark }));
 vi.mock("@/platform/business-effort", () => ({ PostgresBusinessEffortStore: {}, recordBusinessEffort: mocks.effort }));
 vi.mock("@/lib/events", () => ({ getEventRaw: mocks.event }));
