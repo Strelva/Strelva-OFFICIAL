@@ -15,6 +15,9 @@ export interface VersionStore {
   getSource(actor: VersionActor, source: SystemRef): Promise<SourceSystemRecord | null>;
   putSource(actor: VersionActor, record: SourceSystemRecord): Promise<void>;
   getRevision(actor: VersionActor, source: SystemRef, revision: number): Promise<SourceRevision | null>;
+  /** The descendant retains its immutable pin after upstream stops sharing.
+   * This does not expose other revisions or source business data. */
+  getPinnedRevision(actor: VersionActor, versionId: string): Promise<SourceRevision | null>;
   listRevisions(actor: VersionActor, source: SystemRef): Promise<SourceRevision[]>;
   /** Published revisions are append-only. Returns the stored revision when the adapter normalizes it. */
   insertRevision(actor: VersionActor, revision: SourceRevision): Promise<SourceRevision | void>;
@@ -44,6 +47,10 @@ export function createInMemoryVersionStore(): VersionStore {
     putSource: async (_actor, record) => void sources.set(systemKey(record.source), cloneJson(record)),
     getRevision: async (_actor, source, revision) =>
       cloneJson((revisions.get(systemKey(source)) ?? []).find((item) => item.source.number === revision) ?? null),
+    async getPinnedRevision(_actor, versionId) {
+      const lineage = lineages.get(versionId);
+      return cloneJson(lineage ? (revisions.get(systemKey(lineage.source)) ?? []).find(item => item.source.number === lineage.baseline.revision) ?? null : null);
+    },
     listRevisions: async (_actor, source) => cloneJson(revisions.get(systemKey(source)) ?? []),
     async insertRevision(_actor, revision) {
       const list = revisions.get(systemKey(revision.source)) ?? [];

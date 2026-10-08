@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   VersionAccessError,
   VersionConflictError,
+  VersionDeclarationError,
   VersionIncompatibleError,
   VersionStaleError,
   VersionValidationError,
@@ -12,6 +13,7 @@ import {
   type SystemVersions,
   type VersionActor,
   type VersionLineage,
+  type VersionStore,
 } from "@/platform/system-versions";
 
 // Fictional fixture: Northside Studio is an agency; The Mooney Firm and
@@ -41,9 +43,24 @@ function withPath(definition: JsonObject, mutate: (copy: JsonObject) => void): J
 
 describe("System Versions: one agency source, two client Versions", () => {
   let versions: SystemVersions;
+  let store: VersionStore;
   let mooney: VersionLineage;
   let lakeside: VersionLineage;
   let clock = 0;
+
+  // These releases predate package declarations. Seed persisted history directly:
+  // the current release boundary must never authorize this legacy definition.
+  async function seedHistoricalRelease(actor: VersionActor, lineage: VersionLineage): Promise<VersionLineage> {
+    const { workingDefinition } = await versions.readVersion(actor, lineage.id);
+    await store.updateLineage(actor, {
+      ...lineage,
+      currentRelease: 1,
+      releases: [{ number: 1, definition: workingDefinition, baselineRevision: 1,
+        overridePaths: lineage.overrides.map(override => override.path),
+        releasedBy: actor.userId, releasedAt: new Date(Date.UTC(2026, 9, 4, 12, 0, clock++)).toISOString() }],
+    }, lineage.rowRevision);
+    return (await store.getLineage(actor, lineage.id))!;
+  }
 
   beforeEach(async () => {
     clock = 0;
@@ -53,8 +70,9 @@ describe("System Versions: one agency source, two client Versions", () => {
       conn_lakeside_mail: LAKESIDE,
       conn_agency_mail: AGENCY,
     });
+    store = createInMemoryVersionStore();
     versions = createSystemVersions({
-      store: createInMemoryVersionStore(),
+      store,
       connections,
       now: () => new Date(Date.UTC(2026, 9, 4, 12, 0, clock++)).toISOString(),
     });
@@ -76,7 +94,7 @@ describe("System Versions: one agency source, two client Versions", () => {
     mooney = await versions.setOverride(mooneyOwner, mooney.id, { path: "form.title", value: "Talk to a Buffalo attorney", expectedRowRevision: mooney.rowRevision });
     mooney = await versions.bindAccount(mooneyOwner, mooney.id, { kind: "email_sender", connectionId: "conn_mooney_mail", expectedRowRevision: mooney.rowRevision });
     mooney = await versions.putLocalData(mooneyOwner, mooney.id, { key: "practiceAreas", value: ["estate planning"], expectedRowRevision: mooney.rowRevision });
-    mooney = await versions.release(mooneyOwner, mooney.id, { expectedRowRevision: mooney.rowRevision });
+    mooney = await seedHistoricalRelease(mooneyOwner, mooney);
 
     lakeside = await versions.createVersion(lakesideOwner, {
       source: v1.source,
@@ -88,7 +106,7 @@ describe("System Versions: one agency source, two client Versions", () => {
     lakeside = await versions.setOverride(lakesideOwner, lakeside.id, { path: "routing.withinMinutes", value: 10, expectedRowRevision: lakeside.rowRevision });
     lakeside = await versions.bindAccount(lakesideOwner, lakeside.id, { kind: "email_sender", connectionId: "conn_lakeside_mail", expectedRowRevision: lakeside.rowRevision });
     lakeside = await versions.putLocalData(lakesideOwner, lakeside.id, { key: "chairs", value: 4, expectedRowRevision: lakeside.rowRevision });
-    lakeside = await versions.release(lakesideOwner, lakeside.id, { expectedRowRevision: lakeside.rowRevision });
+    lakeside = await seedHistoricalRelease(lakesideOwner, lakeside);
   });
 
   it("gives each client its own System identity, overrides and bindings, and copies no bindings from the source", async () => {
@@ -190,18 +208,20 @@ describe("System Versions: one agency source, two client Versions", () => {
     expect(view.overrides.map((item) => item.path)).toEqual(["branding.accent"]);
   });
 
-  it("keeps release history per Version, separate from source revisions", async () => {
+  it("keeps historical legacy releases readable but refuses a new undeclared release", async () => {
     const fixed = withPath(intakeV1, (copy) => {
       (copy.routing as JsonObject).withinMinutes = 20;
     });
     await versions.publishSourceRevision(agencyOwner, { source: SOURCE, definition: fixed, requires: { bindingKinds: ["email_sender"] }, summary: "Faster routing" });
     mooney = await versions.adoptImprovement(mooneyOwner, mooney.id, { revision: 2, expectedRowRevision: mooney.rowRevision });
-    mooney = await versions.release(mooneyOwner, mooney.id, { expectedRowRevision: mooney.rowRevision });
+    await expect(versions.release(mooneyOwner, mooney.id, { expectedRowRevision: mooney.rowRevision })).rejects.toThrow(VersionDeclarationError);
     const m = await versions.readVersion(mooneyOwner, mooney.id);
-    expect(m.releases.map((release) => [release.number, release.baselineRevision])).toEqual([[1, 1], [2, 2]]);
-    expect(m.currentRelease).toBe(2);
+    expect(m.baselineRevision).toBe(2);
+    expect(m.releases.map((release) => [release.number, release.baselineRevision])).toEqual([[1, 1]]);
+    expect(m.currentRelease).toBe(1);
     expect((await versions.readVersion(lakesideOwner, lakeside.id)).releases.map((release) => release.number)).toEqual([1]);
-    await expect(versions.release(mooneyOwner, mooney.id, { expectedRowRevision: mooney.rowRevision })).rejects.toThrow(VersionValidationError);
+    expect((m.releases[0]!.definition.routing as JsonObject).withinMinutes).toBe(30);
+    expect((m.workingDefinition.routing as JsonObject).withinMinutes).toBe(20);
   });
 
   it("isolates the two clients from each other", async () => {

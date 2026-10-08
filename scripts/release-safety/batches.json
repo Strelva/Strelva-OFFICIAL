@@ -1263,6 +1263,19 @@
           "rollback": "rollback-20261019100000_actor_rpc_service_boundary.sql"
         }
       ]
+    },
+    {
+      "batch": "12",
+      "status": "proposed, local verification pending",
+      "description": "Revision-bound native package declarations after current owner and reader authority; quarantine rollback preserves accepted work",
+      "items": [
+        {
+          "file": "20261019110000_package_declarations.sql",
+          "sha256": "7bc067853cfd285d9654e1bf8fe7b2a7e2293acec0ebd47fd60682eae0cff07c",
+          "rollback": "rollback-20261019110000_package_declarations.sql",
+          "rollbackSha256": "52ffc0e29de2864c363dbd6d0fc5879f14777901f74a81e8ca088dba22ac2d82"
+        }
+      ]
     }
   ]
 }

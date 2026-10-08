@@ -133,6 +133,7 @@ export function versionReleaseAdapter(ports: VersionReleaseSourcePorts): SourceA
         return { outcome: "done", receiptRef: `version_release:${row.versionId}:${released.releaseNumber ?? row.nextRelease}` };
       } catch (error) {
         const name = error instanceof Error ? error.name : "";
+        if (name === "VersionDeclarationError") return { outcome: "failed", reason: "package_declaration_exceeded" };
         if (name === "VersionValidationError") return { outcome: "done", reason: "already_resolved" };
         return { outcome: "failed", reason: name === "VersionStaleError" ? "changed_since_decided" : name === "VersionReleaseNeedsApprovalError" ? "approval_not_found" : "release_failed" };
       }

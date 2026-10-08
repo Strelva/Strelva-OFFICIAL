@@ -567,14 +567,8 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007150200_pla
 psql "${psql_args[@]}" --file="$repo_root/tests/system-versions-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-client-overview-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163200_version_owner_grants.sql"
-if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
-  # The same Version store contract the in-memory store passes, run through
-  # createSupabaseVersionStore against this cluster (psql-backed RPC port).
-  # SQL contracts spawn real Postgres clients; allow bounded host scheduling
-  # time without changing lock limits or any behavior assertion.
-  STRELVA_VERSIONS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
-    pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/system-versions-store-contract.test.ts src/__tests__/agency-versions-server.test.ts
-fi
+# Current Version TypeScript contracts run after the final declaration schema.
+# These historical direct SQL fixtures continue proving their original stage.
 # Needs you and Strelva handled: decision policy, owner decisions and the
 # handled read model, on the same fictional cluster (needs the business record,
 # tenant links and Systems above).
@@ -961,8 +955,6 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163000_age
 psql "${psql_args[@]}" --file="$repo_root/tests/w6-agency-operator-overview.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163100_version_management.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-management.sql"
-STRELVA_VERSIONS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
-  pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 src/__tests__/system-versions-store-contract.test.ts src/__tests__/agency-versions-server.test.ts
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163300_version_native_applications.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-native-applications.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163400_version_sibling_changes.sql"
@@ -1579,3 +1571,68 @@ fi
 grep -q 'owner_decision_runtime_rollback_requires_data_preservation' "$cluster_root/owner-effects-rollback.log"
 psql "${psql_args[@]}" -Atc "select exists(select 1 from information_schema.columns where table_schema='public' and table_name='owner_decision_link_sessions' and column_name='intended_decision') and exists(select 1 from public.owner_decision_link_sessions) and to_regprocedure('public.owner_decision_provider_holds(uuid,uuid,text[])') is not null" | grep -qx t
 printf 'Owner effect rollback retained sessions and authority gates.\n'
+
+# Preserve the latest supplied-actor service boundary before declaration releases.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261019100000_actor_rpc_service_boundary.sql"
+assert_existing_actor_rpc_boundary() {
+  local holds
+  holds="$(psql "${psql_args[@]}" -At <<'SQL'
+select count(*)=3 and bool_and(after_acl is not null
+  and signature=any(array[
+    'public.workspace_operation(text,uuid,uuid,uuid,text,text,jsonb,uuid,jsonb,text,text)',
+    'public.grant_agency_application_draft_edit(uuid,text,uuid,uuid)',
+    'public.update_application_candidate(uuid,uuid,uuid,text,integer,jsonb)'])
+  and signature::regprocedure::oid=function_oid and owner_oid=p.proowner
+  and not has_function_privilege('anon',function_oid,'EXECUTE')
+  and not has_function_privilege('authenticated',function_oid,'EXECUTE')
+  and has_function_privilege('service_role',function_oid,'EXECUTE')
+  and definition_hash=md5(pg_get_functiondef(function_oid)) and p.proacl=after_acl)
+from release_rollback_baseline.actor_rpc_service_boundary b join pg_proc p on p.oid=b.function_oid;
+SQL
+)"
+  [[ "$holds" == t ]] || { printf 'Earlier supplied-actor RPC authority changed.\n' >&2; return 1; }
+}
+# The original agency-application fixture above retains its rows. This checks
+# the exact three bodies/ACLs here; ordered upgrade/agency runs execute its
+# full, non-reentrant service and spoofing fixture on their fresh schema.
+assert_existing_actor_rpc_boundary
+
+# #326: immutable native declarations, direct SQL publication/release boundaries,
+# narrowed adoption/restore, owner approval and all-or-nothing failure paths.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261019110000_package_declarations.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/system-version-declarations.sql"
+printf 'Package declarations: source publication, native release and authority checks passed.\n'
+
+# The current store service depends on native runtime and declaration authority.
+# Run it once against the complete schema, not the historical intermediate RPCs.
+if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
+  STRELVA_VERSIONS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
+    pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/system-versions-store-contract.test.ts src/__tests__/agency-versions-server.test.ts
+fi
+
+# Quarantine rollback retains declarations and accepted runtime/history exactly;
+# reapply restores service-only entrypoints without a pre-declaration gap.
+psql "${psql_args[@]}" --set=declaration_keep_fixture=true --file="$repo_root/tests/system-version-declarations.sql"
+package_declaration_rows() {
+  psql "${psql_args[@]}" -At <<'SQL'
+select 'source:'||r.id||':'||md5(to_jsonb(r)::text) from public.system_version_source_revisions r
+ join public.system_version_sources s on s.system_id=r.source_system_id where s.business_workspace_id='bc326000-0000-4000-8000-000000000010'
+union all select 'version:'||v.id||':'||md5(to_jsonb(v)::text) from public.system_versions v where v.business_workspace_id='bc326000-0000-4000-8000-000000000011'
+union all select 'release:'||r.version_id||':'||r.number||':'||md5(to_jsonb(r)::text) from public.system_version_releases r
+ join public.system_versions v on v.id=r.version_id where v.business_workspace_id='bc326000-0000-4000-8000-000000000011'
+union all select 'runtime:'||s.work_id||':'||md5(to_jsonb(s)::text) from public.application_states s where s.workspace_id='bc326000-0000-4000-8000-000000000011'
+union all select 'native-release:'||r.work_id||':'||r.version||':'||md5(to_jsonb(r)::text) from public.application_releases r where r.workspace_id='bc326000-0000-4000-8000-000000000011'
+order by 1;
+SQL
+}
+package_declaration_rows >"$cluster_root/package-declarations-before-rollback.txt"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261019110000_package_declarations.sql"
+psql "${psql_args[@]}" --set=declaration_rollback_expected=true --file="$repo_root/tests/system-version-declarations-rollback.sql"
+diff -u "$cluster_root/package-declarations-before-rollback.txt" <(package_declaration_rows)
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261019110000_package_declarations.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/system-version-declarations-rollback.sql"
+diff -u "$cluster_root/package-declarations-before-rollback.txt" <(package_declaration_rows)
+printf 'Package declaration quarantine rollback and reapply preserve accepted data exactly.\n'
+psql "${psql_args[@]}" --file="$repo_root/tests/system-version-declarations-readonly.sql"
+printf 'Pinned declaration reader passes an actual service-role READ ONLY transaction.\n'
+assert_existing_actor_rpc_boundary

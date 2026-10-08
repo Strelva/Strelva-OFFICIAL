@@ -8,6 +8,7 @@ import type { ConnectionOwnership, VersionStore } from "./store";
 import {
   VERSION_CONTEXT_KINDS,
   VersionAccessError,
+  VersionDeclarationError,
   VersionStaleError,
   VersionValidationError,
   type SourceRevision,
@@ -52,6 +53,7 @@ const ACCESS_CODES = ["business_record_access_denied", "system_not_found", "syst
 export function mapVersionsError(error: DbError, fallback: string): never {
   const detail = `${error?.code ?? ""} ${error?.message ?? ""}`;
   if (ACCESS_CODES.some((code) => detail.includes(code))) throw new VersionAccessError();
+  if (detail.includes("system_version_declaration_invalid")) throw new VersionDeclarationError();
   if (detail.includes("system_version_stale") || detail.includes("system_version_revision_exists") || detail.includes("system_version_exists")) {
     throw new VersionStaleError(detail.includes("revision_exists") ? "That source revision was already published." : undefined);
   }
@@ -177,6 +179,11 @@ export function createSupabaseVersionStore(client?: VersionsDb): VersionStore {
         p_workspace_id: at.businessId, ...actorArgs(actor), p_system_id: at.systemId, p_number: number,
       }, z.array(revisionSchema), "The source revision could not be loaded.");
       return (list[0] as SourceRevision | undefined) ?? null;
+    },
+    async getPinnedRevision(actor, versionId) {
+      if (!uuid.safeParse(versionId).success) return null;
+      return call(db(), "read_system_version_pinned_revision", { ...actorArgs(actor), p_version_id: versionId },
+        revisionSchema.nullable(), "The Version's pinned source revision could not be loaded.") as Promise<SourceRevision | null>;
     },
     async listRevisions(actor, source) {
       const at = refArgs(source);

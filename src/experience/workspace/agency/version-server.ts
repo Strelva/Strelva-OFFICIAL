@@ -1,4 +1,4 @@
-import { createSystemVersions, VersionAccessError, VersionStaleError, VersionValidationError, type VersionConflictResolution, type JsonValue, type SystemRevisionRef, type VersionContext } from "@/platform/system-versions";
+import { assertDeclaredPackageBehavior, createSystemVersions, VersionAccessError, VersionStaleError, VersionValidationError, type VersionConflictResolution, type JsonValue, type SystemRevisionRef, type VersionContext } from "@/platform/system-versions";
 import { createSupabaseConnectionOwnership, createSupabaseVersionStore, readVersionActor, versionsDb, type VersionsDb } from "@/platform/system-versions/supabase-store";
 import { prepareVersionRelease } from "@/platform/system-versions/preparation";
 import { projectVersionPossibilities } from "@/platform/system-versions/possibilities";
@@ -58,8 +58,9 @@ export async function createBusinessVersion(actor: WorkspaceActor, input: { agen
   const revision = await base.getRevision(versionActor, input.source, input.source.number);
   if (!revision || revision.source.revisionId !== input.source.revisionId) throw new VersionValidationError("This source revision changed. Reload the source before creating a Version.");
   if (sourceSystem.system.kind !== "internal_app" || revision.definition.kind !== "internal_app") throw new VersionValidationError("This source cannot create a running Version automatically. Custom-repo website changes need an operator-prepared Possibility.");
-  if (Object.keys(revision.definition).some(key => !["kind", "title", "fields", "components"].includes(key))) throw new VersionValidationError("The reusable application shape cannot include records, accounts, grants or maintenance authority.");
-  const { kind: _kind, ...definition } = revision.definition;
+  assertDeclaredPackageBehavior(revision.definition, revision.definition.declaration, revision.requires.bindingKinds);
+  if (Object.keys(revision.definition).some(key => !["kind", "title", "fields", "components", "declaration"].includes(key))) throw new VersionValidationError("The reusable application shape cannot include records, accounts, grants or maintenance authority.");
+  const { kind: _kind, declaration: _declaration, ...definition } = revision.definition;
   const nativePayload = createApplicationDraft({ ...definition, maintenanceOwner: actor.userId }, actor);
   const atomicDb: VersionsDb = { rpc(name, args) {
     return name === "create_system_version" ? db.rpc("create_version_system_command", { ...args, p_name: input.name, p_kind: sourceSystem.system.kind, p_command_id: input.commandId, p_native_payload: nativePayload }) : db.rpc(name, args);

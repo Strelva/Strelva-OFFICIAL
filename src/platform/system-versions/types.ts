@@ -44,6 +44,8 @@ export interface SourceRevision {
   /** Optional display label, for example an offering semver "1.0.0". */
   label?: string;
   summary: string;
+  /** Executable packages carry revision-bound `declaration` metadata here.
+   * Legacy definitions remain readable, but cannot be newly released. */
   definition: JsonObject;
   requires: { bindingKinds: string[] };
   publishedBy: string;
@@ -168,6 +170,14 @@ export class VersionValidationError extends Error {
   constructor(message = "The Version request is invalid.") {
     super(message);
     this.name = "VersionValidationError";
+  }
+}
+
+/** Kept distinct from no-op validation: an approval must record failure. */
+export class VersionDeclarationError extends VersionValidationError {
+  constructor(message = "The package declaration does not authorize this Version's behavior.") {
+    super(message);
+    this.name = "VersionDeclarationError";
   }
 }
 

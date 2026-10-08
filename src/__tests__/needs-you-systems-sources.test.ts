@@ -21,6 +21,7 @@ import {
   createInMemoryVersionStore,
   createSystemVersions,
   createVersionReleaseGate,
+  declareApplicationPackage,
   type JsonObject,
   type VersionActor,
 } from "@/platform/system-versions";
@@ -330,7 +331,9 @@ describe("the System page's Make it live, through Needs you", () => {
 
 // ── Version releases ───────────────────────────────────────────────────────
 
-const definition: JsonObject = { followUp: { message: "We will call you back soon." }, routing: { minutes: 30 } };
+const definition: JsonObject = declareApplicationPackage({ kind: "internal_app", title: "Client requests",
+  fields: [{ id: "subject", label: "Subject", type: "text", required: true }],
+  components: [{ kind: "form", fields: ["subject"] }] });
 const VBIZ = "22222222-0000-4000-8000-000000000001";
 
 async function versionsWorld() {
@@ -341,7 +344,7 @@ async function versionsWorld() {
   const v1 = await versions.publishSourceRevision(agency, { source, definition, summary: "Intake" });
   await versions.shareSource(agency, source, VBIZ);
   let lineage = await versions.createVersion(vOwner, { source: v1.source, version: { businessId: VBIZ, systemId: "inquiries" }, context: { kind: "agency_client", label: "The Mooney Firm" } });
-  lineage = await versions.setOverride(vOwner, lineage.id, { path: "followUp.message", value: "We'll call you within one business day", expectedRowRevision: lineage.rowRevision });
+  lineage = await versions.setOverride(vOwner, lineage.id, { path: "title", value: "Client callback requests", expectedRowRevision: lineage.rowRevision });
   return { versions, vOwner, lineage };
 }
 
@@ -357,7 +360,7 @@ function versionPorts(w: Awaited<ReturnType<typeof versionsWorld>>, mem: ReturnT
       const view = await w.versions.readVersion(w.vOwner, w.lineage.id);
       const latest = view.releases.at(-1);
       if (latest && JSON.stringify(latest.definition) === JSON.stringify(view.workingDefinition)) return [];
-      const row: PendingVersionRelease = { versionId: w.lineage.id, systemId: "33333333-0000-4000-8000-000000000001", label: view.context.label, rowRevision: w.lineage.rowRevision, nextRelease: (latest?.number ?? 0) + 1, changedPaths: ["followUp.message"] };
+      const row: PendingVersionRelease = { versionId: w.lineage.id, systemId: "33333333-0000-4000-8000-000000000001", label: view.context.label, rowRevision: w.lineage.rowRevision, nextRelease: (latest?.number ?? 0) + 1, changedPaths: ["title"] };
       return [row];
     },
     policies: async () => [],
@@ -417,7 +420,7 @@ describe("the version_release source and the release gate", () => {
     const { ports, release } = versionPorts(w, mem);
     const ny = service(mem.store, [versionReleaseAdapter(ports)]);
     const [item] = (await ny.list(owner, VBIZ)).items;
-    w.lineage = await w.versions.setOverride(w.vOwner, w.lineage.id, { path: "routing.minutes", value: 10, expectedRowRevision: w.lineage.rowRevision });
+    w.lineage = await w.versions.setOverride(w.vOwner, w.lineage.id, { path: "title", value: "New client callback requests", expectedRowRevision: w.lineage.rowRevision });
     const result = await ny.decide({ workspaceId: VBIZ, itemId: item!.id, revision: item!.revisionHash, decision: "approve", by: { kind: "session", actor: owner } });
     expect(result.status).toBe("changed");
     expect(release).not.toHaveBeenCalled();
@@ -432,6 +435,21 @@ describe("the version_release source and the release gate", () => {
     const result = await ny.decide({ workspaceId: VBIZ, itemId: item!.id, revision: item!.revisionHash, decision: "approve", by: { kind: "session", actor: owner } });
     expect(result).toMatchObject({ status: "failed", item: { outcomeReason: "release_failed" } });
     expect((await w.versions.readVersion(w.vOwner, w.lineage.id)).currentRelease).toBeNull();
+  });
+
+  it("records a declaration-exceeding release as failed rather than already resolved", async () => {
+    const w = await versionsWorld();
+    w.lineage = await w.versions.setOverride(w.vOwner, w.lineage.id, { path: "fields",
+      value: [{ id: "subject", label: "Client", type: "contact", required: true }], expectedRowRevision: w.lineage.rowRevision });
+    const before = await w.versions.readVersion(w.vOwner, w.lineage.id);
+    const mem = needsYouMemoryStore({ clock: { now: Date.parse(at) }, roles: { [owner.userId]: "owner" } });
+    const { ports } = versionPorts(w, mem);
+    const ny = service(mem.store, [versionReleaseAdapter(ports)]);
+    const [item] = (await ny.list(owner, VBIZ)).items;
+    const result = await ny.decide({ workspaceId: VBIZ, itemId: item!.id, revision: item!.revisionHash, decision: "approve", by: { kind: "session", actor: owner } });
+    expect(result).toMatchObject({ status: "failed", item: { outcomeReason: "package_declaration_exceeded" } });
+    expect(await w.versions.readVersion(w.vOwner, w.lineage.id)).toEqual(before);
+    expect(result.item?.receiptRef).toBeNull();
   });
 
   it("a lapse releases nothing", async () => {

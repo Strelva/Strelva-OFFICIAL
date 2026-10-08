@@ -115,3 +115,54 @@ added beside them; nothing is renamed:
 - Offering installations and inquiry pattern installations are still read
   through `mapping.ts`, not stored as Version rows.
 - Collection/franchise Versions across several Systems.
+
+## Revision-bound package declarations (#326)
+
+New executable source revisions carry `definition.declaration` (schema version
+1). The current interpreter supports only the closed native `internal_app`
+shape: title, fields and components. It inspects that shape independently of
+caller-supplied claims. Unknown kinds, fields, components and extra behavior
+keys fail closed. Declaration metadata is stripped at every native-spec boundary.
+
+The declaration states records read and written, directional business-record
+fields, outside effects, required binding kinds, and outbound fields grouped by
+destination. It describes possible behavior, including behavior behind release
+flags. An ordinary application can email the business owner on submission even
+without an assigned-person field; contact resolution can write the business
+record. Shared-view exposure includes visible labels and select options even
+when a recipient cannot read records, plus the release/record revision metadata
+the view emits. It describes what an explicitly granted viewer could receive.
+These declarations never create a grant, connect an account, approve a
+message or authorize an outside write.
+
+A release re-reads the immutable source pin through the owning Version's scope,
+then inspects the effective definition after every override. It validates each
+permission dimension separately, checks required bindings are still locally
+owned, and refuses locally replaced declaration metadata. Publishing a broader
+upstream revision changes nothing until it is adopted. Keeping local behavior
+through adoption, or restoring a prior release, must fit the currently adopted
+ceiling. Restore and whole-definition adoption carry the current declaration,
+not a historical permission ceiling. Unsharing a source prevents new upstream
+access without taking away an existing descendant's immutable pin.
+
+The additive migration repeats these checks for source publication and direct
+SQL release calls. Native application publication and pointer changes cannot
+bypass their mapped Version's accepted release. Rejection is transactional and
+uses `system_version_declaration_invalid` / `VersionDeclarationError`; Needs you
+records this as a failed release rather than a successful no-op.
+
+Compatibility is intentionally fail-closed. Historical revisions, draft edits
+and issued releases stay readable. An undeclared historical definition cannot
+produce a new release: publish a supported declared revision and explicitly
+adopt it first. No existing revision or historical output is rewritten.
+
+Non-native sources also supply product-specific draft planners. Existing Google
+listing copy can still be stored and offered through its separate per-location
+approval flow, but cannot use native Version release. Supplying a declaration
+does not bypass the supported-kind check. Google dispatch is unchanged and is
+not certified by this interpreter; no general Google or payment runtime is added.
+
+Focused proof lives in `system-version-declarations.test.ts`, the owner-decision
+integration tests, and `tests/system-version-declarations.sql`. This is a local
+implementation contract; production migration, feature activation and customer
+adoption remain separate decisions.

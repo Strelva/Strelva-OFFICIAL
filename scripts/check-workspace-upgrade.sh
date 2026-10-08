@@ -470,3 +470,8 @@ node --test "$repo_root/scripts/tests/readonly-rpcs.node-test.mjs"
 # Legacy calendar row-existence compatibility and receipt-preserving rollback.
 psql "${psql_args[@]}" --file="$repo_root/tests/legacy-calendar-revoke-result-schema.sql"
 bash "$repo_root/scripts/check-reader-writer-locks.sh" "postgresql:///postgres?host=$cluster_socket&port=$cluster_port"
+# #326 must work after the full ordered upgrade with final provider/maker gates.
+psql "${psql_args[@]}" --set=declaration_keep_fixture=true --file="$repo_root/tests/system-version-declarations.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/system-version-declarations-readonly.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/actor-rpc-service-boundary-schema.sql"
+printf 'Package declarations passed against the full ordered upgrade.\n'
