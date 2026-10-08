@@ -1156,7 +1156,22 @@ test(`agency queue pages through all clients and reports unavailable work at ${v
 
   // A queue action opens its exact client/work; discovery did not fetch it.
   await page.getByRole("button", { name: /^Review client 101,/ }).click();
-  await expect(page.getByRole("combobox", { name: "Current workspace" })).toHaveValue(customers[100]!.id);
+  await expect(page).toHaveURL(new RegExp(`workspaceId=${customers[100]!.id}.*work=${workId(100)}`));
+  await expect(page.getByRole("main").getByRole("article")).toBeVisible();
+  // Mobile keeps the same workspace selector inside its disclosed navigation.
+  if (viewport.width === 390) {
+    await page.getByRole("button", { name: "Open navigation", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Strelva workspace navigation", exact: true })).toBeVisible();
+  }
+  const selectedWorkspace = page.getByRole("combobox", { name: "Current workspace", exact: true });
+  await expect(selectedWorkspace).toBeVisible();
+  await expect(selectedWorkspace).toHaveValue(customers[100]!.id);
+  await expect(selectedWorkspace.locator("option:checked")).toHaveText("Page Client 101 · Read-only");
+  if (viewport.width === 390) {
+    await page.screenshot({ path: testInfo.outputPath("agency-opened-client-navigation-390.png"), fullPage: false });
+    await page.getByRole("button", { name: "Close navigation", exact: true }).click();
+    await expect(page.getByRole("main").getByRole("article")).toBeVisible();
+  }
   await expect(page).toHaveURL(new RegExp(`workspaceId=${customers[100]!.id}.*work=${workId(100)}`));
   expect(workspaceReads).toEqual([...startupWorkspaceReads, customers[100]!.id]);
   expect(mutations).toEqual([]);

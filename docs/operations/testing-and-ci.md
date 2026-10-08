@@ -280,6 +280,18 @@ remain in `output/release-safety/backlog-ci-third-20261008`; fresh zero-retry
 focused browser proof remains root's next step. Captures include the current
 last-client viewport at390px as well as the full-page evidence.
 
+The next zero-retry focused run passed desktop and all mobile request, page,
+retry and no-write checks, then failed the final mobile selector assertion.
+The retained390px snapshot shows the opened work and the closed responsive
+navigation, which correctly hides Current workspace. The fixture now checks
+the exact client/work URL and rendered work, opens the actual mobile navigation,
+checks the visible selector's client ID and selected client name, then closes
+it without navigation or writes. The rest of this two-viewport case uses shared
+visible list, queue and pagination controls. Its first focused failure remains
+in `/tmp/strelva-backlog-final-agency_fixture-20261008.log` and
+`test-results/backlog-agency-focused`; the corrected zero-retry rerun remains
+pending root integration. Product source and desktop/mobile layout are unchanged.
+
 ### The CI-faithful local sim (use this before trusting a green local run)
 
 Local exports or `.env` may provide Postgres **and** Upstash, which silently masks CI-only
