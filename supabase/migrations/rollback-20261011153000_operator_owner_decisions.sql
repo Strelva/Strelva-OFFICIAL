@@ -1,7 +1,8 @@
 -- Rollback for 20261011153000_operator_owner_decisions.sql: restores
--- claim_owner_decision exactly as 20261007120000_needs_you.sql defined it.
--- No data changes either way. Re-opens #530 M8: a super admin with an admin
--- seat can again decide an admin_may_decide owner item.
+-- claim_owner_decision exactly as 20261007120000_needs_you.sql defined it,
+-- and drops business_agency_seat and tenant_agency_seat. No data changes
+-- either way. Re-opens #530 M8: a super admin or a provider agency's member
+-- with an admin seat can again decide an admin_may_decide owner item.
 
 create or replace function public.claim_owner_decision(
   p_workspace_id uuid, p_decision_id uuid, p_revision_hash text, p_decision text, p_by_kind text,
@@ -68,3 +69,6 @@ $$;
 
 revoke all on function public.claim_owner_decision(uuid, uuid, text, text, text, uuid, text, text) from public, anon, authenticated;
 grant execute on function public.claim_owner_decision(uuid, uuid, text, text, text, uuid, text, text) to service_role;
+
+drop function public.tenant_agency_seat(text, uuid);
+drop function public.business_agency_seat(uuid, uuid);

@@ -4,8 +4,9 @@
  * /dashboard/reviews). Callers authorize first and say who is deciding
  * (`sessionTenantDecider`); this only acts.
  *
- * An operator replying posts under their own operator instruction, audited,
- * never as the owner's approval, and never over a draft routed to the owner.
+ * An operator or agency staff member replying posts under their own operator
+ * instruction, audited, never as the owner's approval, and never over a draft
+ * routed to the owner.
  *
  * A Google review on a connected listing is PUBLISHED through the governed
  * review_reply_draft -> event-actions path (the owner submitting the reply is
@@ -15,7 +16,7 @@
 import { getReviews, replyToReview } from "@/lib/reviews";
 import { getConnection } from "@/lib/connections";
 import { addEvent, getEventRaw, getEvents, updateEvent } from "@/lib/events";
-import { decideTenantEvent, isOwnerDecision, type TenantDecider } from "@/lib/operator-decisions";
+import { decideTenantEvent, isDelegateDecider, isOwnerDecision, type TenantDecider } from "@/lib/operator-decisions";
 import { logActivity } from "@/lib/storage";
 import type { ReviewItem } from "@/lib/types";
 
@@ -47,8 +48,8 @@ async function publishReplyViaApproval(
       e.metadata?.reviewId === gbpReviewId,
   );
 
-  // The owner's draft is theirs: an operator neither rewrites nor posts it.
-  if (existing && decider.kind === "operator" && isOwnerDecision(existing)) return "owner_decides";
+  // The owner's draft is theirs: a delegate neither rewrites nor posts it.
+  if (existing && isDelegateDecider(decider) && isOwnerDecision(existing)) return "owner_decides";
 
   let eventId: string;
   if (existing) {
@@ -134,7 +135,7 @@ export async function submitOwnerReviewReply(tenant: string, reviewId: string, r
           : `Replied to ${updated.author}'s ${updated.rating}-star review`,
         time: new Date().toISOString(),
         type: "review-reply",
-        actor: decider.kind === "operator" ? "admin" : "user",
+        actor: isDelegateDecider(decider) ? "admin" : "user",
       },
       tenant,
     );

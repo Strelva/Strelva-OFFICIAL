@@ -414,7 +414,7 @@ After each batch:
 | 5 | `20261008110000`, `20261008111000`, `20261008123000`, `20261008124000`, `20261008130000`, `20261008131000`, `20261008140000` | No Sept 30 objects. Triggers on batch 1–2 tables (`systems`, `tenant_workspace_links`), wraps `tenant_unlink_plan`, replaces `workspace_release_flag_names` | Ask history, website change receipts, listing read-back queue, Needs you policy imports, Possibilities, Make real live, lead reads |
 | 6 | `20261008141000`, `20261008150000`, `20261008150100`, `20261008151000`, `20261009100000`, `20261009110000`, `20261009113000` | Yes: `btree_gist` extension, a column + FK and an index on live `public_website_bookings`; checks, columns and indexes on `tenant_leads` (written since `0.2.1`); a column + trigger on `owner_decisions`; replaces batch 1–5 functions | Booking store and lifecycle, linked-tenant publishing, domain approvals, connected sites, the Strelva service actor, inquiry records |
 | 7 | `20261009130000`, `20261009131000`, `20261009140000` | Yes, small: replaces two batch 3/6 functions (`read_strelva_handled`, `record_strelva_service_action`) with the same signatures, swaps the `purpose` check on `strelva_service_actions` (batch 6, append-only), and replaces `workspace_release_flag_names()` (batch 6) with one more key | Strelva handled lists decided Needs you items; Make real by signed link for an owner with no account, behind its own `make_real_owner_link` flag |
-| 8 (proposed; rehearsal fails catalog restore) | `20261009150000` and 83 w6 files (`20261010100000`–`20261010170000`); see "Batch 8 · proposed" | Not classified yet: live-object and lock impact unreviewed | Nothing until rehearsed; listed for review only |
+| 8 (proposed; rehearsal fails catalog restore) | `20261009150000`, 83 w6 files (`20261010100000`–`20261010170000`) and `20261011153000` (#530); see "Batch 8 · proposed" | Not classified yet: live-object and lock impact unreviewed | Nothing until rehearsed; listed for review only |
 
 Batches 5 and 6 are in filename order; batch 6 depends on batch 5
 (`20261009100000` keeps every flag name `20261008131000` adds;
@@ -475,6 +475,16 @@ staged, pushed or approved.
   batches 0–7 do. Batch 8 cannot join `batches` until each companion either
   archives and drops (release-safety's contract) or the rehearsal accepts a
   named retained-object list.
+- **Added after the rehearsal (#530, PR #549, not rehearsed):**
+  `20261011153000_operator_owner_decisions` replaces batch 3's
+  `claim_owner_decision` (same signature and grants) so a super admin or a
+  member of the business's provider agency holding an admin seat is refused
+  an owner item, and adds two service-role lookups (`business_agency_seat`,
+  `tenant_agency_seat`). No tables, no data changes. Depends on batch 1
+  (`tenant_workspace_links`), batch 3 (`needs_you`) and 7A (`provider_seats`).
+  Its companion restores batch 3's body and drops the lookups. Proven locally
+  in `check:workspace-sql` (forward, rollback, forward); not in the batch 8
+  rehearsal.
 - Who says yes: Jacob, per file set, after release-safety supplies rehearsal
   evidence. This entry authorizes nothing.
 
@@ -564,6 +574,7 @@ staged, pushed or approved.
 | `20261010165800_unbounded_export_archive` | `8bb45a0d6921` | `rollback-20261010165800_unbounded_export_archive.sql` |
 | `20261010165900_export_build_access` | `e2dd7c05fc27` | `rollback-20261010165900_export_build_access.sql` |
 | `20261010170000_deprovision_retained_after_inquiry_export` | `172e31fd9858` | `rollback-20261010170000_deprovision_retained_after_inquiry_export.sql` |
+| `20261011153000_operator_owner_decisions` | `1859f9b74b7c` | `rollback-20261011153000_operator_owner_decisions.sql` |
 
 <!-- proposed-batch-8:end -->
 

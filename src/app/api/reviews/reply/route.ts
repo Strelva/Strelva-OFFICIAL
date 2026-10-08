@@ -55,7 +55,7 @@ export async function POST(req: Request) {
     );
   }
 
-  // An operator replies as the operator, audited (src/lib/operator-decisions.ts).
+  // An operator or agency staff reply as themselves, audited (src/lib/operator-decisions.ts).
   const decider = await sessionTenantDecider(tenant);
   if (!decider) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

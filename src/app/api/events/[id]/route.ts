@@ -17,7 +17,7 @@ export async function PATCH(
   const tenant = await getTenantFromHeaders();
   const permissionDenied = await requireTenantPermission(tenant, "publishing:manage");
   if (permissionDenied) return permissionDenied;
-  // An operator decides as the operator, never as the owner (operator-decisions.ts).
+  // An operator or agency staff decide as themselves, never as the owner (operator-decisions.ts).
   const decider = await sessionTenantDecider(tenant);
   if (!decider) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
