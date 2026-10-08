@@ -8,7 +8,7 @@ import { alertOnce } from "@/platform/infra/monitoring";
 import { getAllTenants } from "@/lib/tenants";
 import { generateMonthlyRecap } from "@/lib/weekly-brief";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
-import { EMAIL_DOMAIN } from "@/platform/infra/brand";
+import { CONTROL_PLANE_URL, EMAIL_DOMAIN } from "@/platform/infra/brand";
 import { sanitizeEmailSubjectText } from "@/lib/invite-email";
 import { emailSendingPaused } from "@/platform/infra/email/enabled";
 import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
@@ -104,9 +104,9 @@ export async function GET(request: Request) {
 
       const heading = buildMonthlyHeading(recap);
       const paragraphs = recapParagraphs(recap.summary);
-      const dashboardUrl = getTenantDashboardUrl(tenant, "/dashboard/reports");
-
       const brand = await resolveTenantBrand(tenant.id);
+      const dashboardUrl = brand.agencyId ? `${CONTROL_PLANE_URL}/client/${encodeURIComponent(tenant.id)}/dashboard/reports` : getTenantDashboardUrl(tenant, "/dashboard/reports");
+
       const html = renderEmailHtml({
         brand,
         preheader: paragraphs[0],

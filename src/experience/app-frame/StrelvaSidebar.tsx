@@ -83,10 +83,10 @@ export function StrelvaSidebar({ ownerBrand, active, appBase = "", workspaceId, 
   }
   return <aside className={styles.sidebar} data-open={mobileOpen} data-standalone={standalone} aria-label={`${ownerBrand?.agencyId ? ownerBrand.name : "Strelva"} navigation`}>
     <div className={styles.brandRow}>
-      <Link href={href("home")} className={styles.brand} aria-label={`${ownerBrand?.agencyId ? ownerBrand.name : "Strelva"} home`} onClick={event => navigateInPlace(event, onNavigate ? () => { onCloseMobile?.(); onNavigate("home"); } : undefined)}><>{ownerBrand?.agencyId ? <span style={{ overflowWrap: "anywhere", minWidth: 0 }}>{ownerBrand.name}</span> : <><LogoMark className={styles.brandMark} /><span>Strelva</span></>}</></Link>
+      <Link href={href("home")} className={styles.brand} aria-label={`${ownerBrand?.agencyId ? ownerBrand.name : "Strelva"} home`} onClick={event => navigateInPlace(event, onNavigate ? () => { onCloseMobile?.(); onNavigate("home"); } : undefined)}><>{ownerBrand?.agencyId ? <span style={{ overflowWrap: "anywhere", minWidth: 0 }}>{ownerBrand.logoUrl ? <img src={ownerBrand.logoUrl} alt="" width={132} style={{ maxWidth: "100%", maxHeight: 64, objectFit: "contain", background: "#ffffff" }} /> : null}{ownerBrand.name}</span> : <><LogoMark className={styles.brandMark} /><span>Strelva</span></>}</></Link>
       <button className={styles.mobileClose} aria-label="Close navigation" type="button" onClick={onCloseMobile}><X size={20} /></button>
     </div>
-    {ownerBrand?.agencyId ? <OwnerBrandIdentity brand={ownerBrand} /> : null}
+    {ownerBrand?.agencyId ? <OwnerBrandIdentity brand={ownerBrand} rail /> : null}
     {businessContext ? <div className={styles.businessContext}>{businessContext}</div> : null}
     <div className={styles.body}>
       <div className={styles.utilities} aria-label="Workspace utilities">

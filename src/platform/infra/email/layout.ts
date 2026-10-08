@@ -94,7 +94,7 @@ export interface EmailDecision {
 }
 
 export interface EmailOptions {
-  /** Agency identity; richer logo/color treatment is owned by #264. */
+  /** Legacy name-only attribution. Prefer brand for workspace identity. */
   preparedBy?: string;
   brand?: OwnerBrand;
   /** Hidden preview text shown in the inbox list before the body. */

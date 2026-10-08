@@ -272,7 +272,6 @@ if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-202610
 fi
 grep -q 'agency_brand_rollback_requires_data_preservation' "$cluster_root/brand-rollback-refusal.log"
 psql "${psql_args[@]}" -c "update public.workspaces set agency_brand=null where agency_brand is not null"
-psql "${psql_args[@]}" --file="$repo_root/tests/function-exposure-schema.sql"
 printf 'Agency brand SQL passed: resolution, revocation, exposure, rollback/reapply and preservation.\n'
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

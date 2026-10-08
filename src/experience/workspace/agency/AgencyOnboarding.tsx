@@ -173,7 +173,7 @@ function initials(name: string): string {
   return (words.length > 1 ? `${words[0]![0]}${words[1]![0]}` : (words[0] ?? "A").slice(0, 2)).toUpperCase();
 }
 
-/** Stands in for the agency's logo until the brand layer (#264) stores one. */
+/** Compact agency initials for the chooser; the profile editor owns the public brand. */
 function Monogram({ name, size }: { name: string; size: "sm" | "lg" }) {
   return <span aria-hidden="true" className={`flex shrink-0 items-center justify-center rounded-xl border border-dashed border-gray-border bg-surface font-medium text-gray-muted ${size === "lg" ? "size-16 text-[18px]" : "size-10 text-[13px]"}`}>{initials(name)}</span>;
 }

@@ -1,5 +1,5 @@
 import { resolveOwnerBrand, resolveTenantBrand } from "@/platform/agency-brand/server";
-import { brandColors, BRAND_CREDIT, type OwnerBrand } from "@/platform/infra/agency-brand";
+import { brandColors, BRAND_CREDIT, STRELVA_BRAND, type OwnerBrand } from "@/platform/infra/agency-brand";
 /**
  * One-click approve-from-email (with a confirm step).
  *
@@ -209,7 +209,7 @@ async function getPage(request: Request): Promise<NextResponse> {
 
   const verified = verifyAnyApproveToken(token);
   if (!verified) return noticePage({ status: 400, ...INVALID.bad });
-  if (verified.kind === "workspace") return brandPage(await workspaceConfirm(token, verified.claims), await resolveOwnerBrand(verified.claims.workspaceId));
+  if (verified.kind === "workspace") return brandPage(await workspaceConfirm(token, verified.claims), await resolveOwnerBrand(verified.claims.workspaceId).catch(() => STRELVA_BRAND));
   const claims = verified.claims;
 
   const tenant = await getTenantConfig(claims.tenantId).catch(() => null);
@@ -242,7 +242,7 @@ async function postPage(request: Request): Promise<NextResponse> {
 
   const verified = verifyAnyApproveToken(token);
   if (!verified) return noticePage({ status: 400, ...INVALID.bad });
-  if (verified.kind === "workspace") return brandPage(await workspaceResolve(verified.claims), await resolveOwnerBrand(verified.claims.workspaceId));
+  if (verified.kind === "workspace") return brandPage(await workspaceResolve(verified.claims), await resolveOwnerBrand(verified.claims.workspaceId).catch(() => STRELVA_BRAND));
   const claims: ApproveLinkClaims = verified.claims;
 
   const tenant = await getTenantConfig(claims.tenantId).catch(() => null);
@@ -334,12 +334,12 @@ export async function GET(request: Request): Promise<NextResponse> {
   const response = await getPage(request);
   const token = new URL(request.url).searchParams.get("token");
   const verified = token ? verifyAnyApproveToken(token) : null;
-  return verified?.kind === "tenant" ? brandPage(response, await resolveTenantBrand(verified.claims.tenantId)) : response;
+  return verified?.kind === "tenant" ? brandPage(response, await resolveTenantBrand(verified.claims.tenantId).catch(() => STRELVA_BRAND)) : response;
 }
 export async function POST(request: Request): Promise<NextResponse> {
   const copy = request.clone();
   const response = await postPage(request);
   const token = (await copy.formData().catch(() => null))?.get("token");
   const verified = typeof token === "string" ? verifyAnyApproveToken(token) : null;
-  return verified?.kind === "tenant" ? brandPage(response, await resolveTenantBrand(verified.claims.tenantId)) : response;
+  return verified?.kind === "tenant" ? brandPage(response, await resolveTenantBrand(verified.claims.tenantId).catch(() => STRELVA_BRAND)) : response;
 }

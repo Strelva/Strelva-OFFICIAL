@@ -15,6 +15,8 @@ alter table public.workspaces add constraint workspaces_agency_brand_check check
       jsonb_typeof(agency_brand->'logo') = 'object'
       and agency_brand->'logo' ?& array['type','data']
       and (agency_brand->'logo') - array['type','data'] = '{}'::jsonb
+      and jsonb_typeof(agency_brand->'logo'->'type')='string'
+      and jsonb_typeof(agency_brand->'logo'->'data')='string'
       and agency_brand->'logo'->>'type' in ('image/png','image/jpeg','image/webp')
       and length(agency_brand->'logo'->>'data') between 1 and 349528
       and agency_brand->'logo'->>'data' ~ '^[A-Za-z0-9+/]+={0,2}$'

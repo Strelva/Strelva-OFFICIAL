@@ -26,11 +26,11 @@ export function AgencyBrandEditor({ workspaceId }: { workspaceId: string }) {
   }
   if (!brand) return <p role="status">{status}</p>;
   const previewLogo = brand.logo ? `data:${brand.logo.type};base64,${brand.logo.data}` : null;
-  return <form onSubmit={save} className="mt-6 grid max-w-xl gap-4" aria-label="Agency brand">
-    <label className="grid gap-2">Agency name<TextInput required maxLength={120} value={brand.displayName} disabled={busy} onChange={event => setBrand({ ...brand, displayName: event.target.value })} /></label>
-    <label className="grid gap-2">Accent color<TextInput required pattern="#[0-9a-fA-F]{6}" value={brand.accentColor} disabled={busy} onChange={event => setBrand({ ...brand, accentColor: event.target.value })} /></label>
-    <label className="grid gap-2">Reply-to email<TextInput type="email" maxLength={254} value={brand.replyTo ?? ""} disabled={busy} onChange={event => setBrand({ ...brand, replyTo: event.target.value || null })} /></label>
-    <label className="grid gap-2">Logo · PNG, JPEG or WebP · up to 256 KiB<input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={async event => {
+  return <form onSubmit={save} className="mt-6 grid min-w-0 max-w-xl grid-cols-1 gap-4" aria-label="Agency brand">
+    <label className="grid min-w-0 gap-2">Agency name<TextInput required maxLength={120} value={brand.displayName} disabled={busy} onChange={event => setBrand({ ...brand, displayName: event.target.value })} /></label>
+    <label className="grid min-w-0 gap-2">Accent color<TextInput required pattern="#[0-9a-fA-F]{6}" value={brand.accentColor} disabled={busy} onChange={event => setBrand({ ...brand, accentColor: event.target.value })} /></label>
+    <label className="grid min-w-0 gap-2">Reply-to email<TextInput type="email" maxLength={254} value={brand.replyTo ?? ""} disabled={busy} onChange={event => setBrand({ ...brand, replyTo: event.target.value || null })} /></label>
+    <label className="grid min-w-0 gap-2">Logo · PNG, JPEG or WebP · up to 256 KiB<input className="min-w-0 w-full text-[14px]" type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={async event => {
       const file = event.target.files?.[0]; if (!file) return;
       if (file.size > 262144 || !["image/png", "image/jpeg", "image/webp"].includes(file.type)) { setStatus("Use a PNG, JPEG or WebP up to 256 KiB."); return; }
       const reader = new FileReader(); reader.onload = () => { setBrand({ ...brand, logo: { type: file.type as NonNullable<AgencyBrandInput["logo"]>["type"], data: String(reader.result).split(",")[1]! } }); setStatus(""); }; reader.readAsDataURL(file);

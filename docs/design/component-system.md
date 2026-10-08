@@ -776,8 +776,8 @@ Local proof and remaining limits live in
 owned forms/result geometry and semantic marketing tokens. Public attributed
 results add name-only agency identity, neutral provider advice and an agency
 contact CTA. Embed routes compose those same components without account chrome.
-The shared email layout accepts optional `preparedBy` identity; absent identity
-retains the existing Strelva logo markup. Rich logo/color selection remains #264.
+The shared email layout retains optional `preparedBy` compatibility; absent identity
+retains the existing Strelva logo markup. The agency brand contract below owns rich identity.
 The agency prospects page uses a semantic table, scoped to direct agency members.
 See [the stream contract](../product/streams/a1-agency-prospecting.md) for flag,
 state, permission and local-proof limitations; no visual acceptance or production
@@ -790,3 +790,21 @@ semantic canvas/text roles. Opening the page is read-only; the native form
 POSTs to its action route. Expired/unavailable and rate-limit states keep the
 customer from claiming a booking was made. This is local implementation for
 #529; no production adoption or new visual-system decision is implied.
+
+### Agency owner brand (#264, local implementation)
+
+`OwnerBrandIdentity` accepts an authorized `OwnerBrand` presentation value. It
+renders a bounded raster logo, wrapping name, optional reply contact and retained
+"Runs on Strelva." credit. Any six-digit accent may fill the identity; black or
+white text is selected at 4.5:1 minimum contrast. The sidebar `rail` variant uses
+the owned surface and an accent rule, avoiding a second name/logo block.
+`StrelvaShell.ownerBrand` supplies workspace identity; legacy tenant shells read
+the authorized owner-brand endpoint. A changed workspace cannot reuse the last
+workspace's fetched identity. Strelva controls and authority remain explicit.
+
+`AgencyBrandEditor` composes owned `TextInput` and `Button` with native file input,
+save/error status and preview. Only direct agency owners can persist a brand.
+Public attributed audit/AI-check components and email layouts consume the same
+presentation contract, retaining native identity without agency attribution.
+R23 remains open: this implements brand presentation, not an accepted decision
+to remove platform identity. See [#264 evidence and limits](../product/streams/a1-agency-brand.md).

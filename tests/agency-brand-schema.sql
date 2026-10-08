@@ -36,5 +36,5 @@ delete from public.workspace_memberships where workspace_id='b2640000-0000-4000-
 select pg_temp.brand_expect($$select public.manage_agency_brand('b2640000-0000-4000-8000-000000000002','agency-owner@example.test','b2640000-0000-4000-8000-000000000020',null)$$,'agency_brand_access');
 select public.end_provider_seat('b2640000-0000-4000-8000-000000000001','brand-owner@example.test','b2640000-0000-4000-8000-000000000010','b2640000-0000-4000-8000-000000000020','End final seat');
 select pg_temp.brand_assert(public.resolve_owner_brand('b2640000-0000-4000-8000-000000000010') is null,'ended seats stay Strelva');
-select pg_temp.brand_assert(not has_function_privilege('anon','public.resolve_owner_brand(uuid)','execute') and not has_function_privilege('authenticated','public.manage_agency_brand(uuid,text,uuid,jsonb)','execute'),'service-only exposure');
+select pg_temp.brand_assert(not has_function_privilege('anon','public.resolve_owner_brand(uuid)','execute') and not has_function_privilege('authenticated','public.manage_agency_brand(uuid,text,uuid,jsonb)','execute') and not has_function_privilege('authenticated','public.resolve_owner_brand(uuid)','execute') and not has_function_privilege('anon','public.manage_agency_brand(uuid,text,uuid,jsonb)','execute'),'service-only exposure');
 rollback;

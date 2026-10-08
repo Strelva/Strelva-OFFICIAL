@@ -4,7 +4,7 @@ import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import { readImageDimensions, sniffImageType } from "@/platform/infra/image-signature";
 import { releaseWorkspaceForTenant } from "@/platform/release-flags/store";
 import { WorkspaceAccessError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
-import { brandInputSchema, STRELVA_BRAND, type AgencyBrandInput, type OwnerBrand } from "./contracts";
+import { brandInputSchema, STRELVA_BRAND, type AgencyBrandInput, type OwnerBrand } from "@/platform/infra/agency-brand";
 
 export function validateBrand(raw: unknown): AgencyBrandInput {
   const brand = brandInputSchema.parse(raw);

@@ -8,7 +8,7 @@ import { alertOnce } from "@/platform/infra/monitoring";
 import { generateAllReports, buildReportSubject, buildReportHeading } from "@/lib/reports";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { generateWeeklyBrief } from "@/lib/weekly-brief";
-import { EMAIL_DOMAIN } from "@/platform/infra/brand";
+import { CONTROL_PLANE_URL, EMAIL_DOMAIN } from "@/platform/infra/brand";
 import { sanitizeEmailSubjectText } from "@/lib/invite-email";
 import { emailSendingPaused } from "@/platform/infra/email/enabled";
 import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
@@ -143,18 +143,19 @@ await mapPool(reports, 8, async (report) => {
       const heading = buildReportHeading(report);
 
       const brand = await resolveTenantBrand(report.tenant.id);
+      const dashboardUrl = brand.agencyId ? `${CONTROL_PLANE_URL}/client/${encodeURIComponent(report.tenant.id)}/dashboard/reports` : getTenantDashboardUrl(report.tenant, "/dashboard/reports");
       const html = reportToHtml(
         heading,
         report.summary,
         report.tenant.siteName,
-        getTenantDashboardUrl(report.tenant, "/dashboard/reports"),
+        dashboardUrl,
         report.analyticsRows,
         brand,
       );
       const text = reportToText(
         heading,
         report.summary,
-        getTenantDashboardUrl(report.tenant, "/dashboard/reports"),
+        dashboardUrl,
         report.analyticsRows,
         brand,
       );
