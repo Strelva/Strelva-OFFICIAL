@@ -30,8 +30,10 @@ for (const width of [1280, 390]) {
   test(`Operator invitation preparation and revoke send nothing at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/preview/strelva/owner-invitations");
-    await expect(page.getByRole("button", { name: "Prepare invitation link" })).toBeDisabled();
-    await page.getByRole("checkbox").check();
+    await expect(page.getByText(/trusted owner address/)).toBeVisible();
+    await expect(page.getByRole("checkbox")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Email invitation" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Prepare invitation link" })).toBeEnabled();
     await page.getByRole("button", { name: "Prepare invitation link" }).click();
     await expect(page.getByRole("status")).toHaveText("Invitation link prepared. No email was sent.");
     await expect(page.getByRole("textbox", { name: "Invitation link — keep private" })).toHaveValue(/preview-token$/);
@@ -64,11 +66,15 @@ test(`Ask handles unavailable, unsaved, released-off and read-only states at ${w
 test(`Invitation suppression, failure and permission states remain honest at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 900 });
   await page.goto("/preview/strelva/owner-invitations?delivery=suppressed");
-  await page.getByRole("checkbox").check();
-  await page.getByRole("button", { name: "Email invitation" }).click();
-  await expect(page.getByRole("status")).toContainText("Email was not sent");
+  await expect(page.getByText(/Email delivery remains disabled/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Email invitation" })).toHaveCount(0);
+  await page.getByRole("textbox", { name: "Owner email", exact: true }).fill("different-owner@example.test");
+  await expect(page.getByRole("button", { name: "Prepare invitation link" })).toBeDisabled();
+  await expect(page.getByRole("textbox", { name: "Approval ID from a different operator" })).toBeVisible();
+  await page.getByRole("textbox", { name: "Owner email", exact: true }).fill("owner@example.test");
+  await page.getByRole("button", { name: "Prepare invitation link" }).click();
+  await expect(page.getByRole("status")).toHaveText("Invitation link prepared. No email was sent.");
   await page.goto("/preview/strelva/owner-invitations?delivery=error");
-  await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Prepare invitation link" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "storage is unavailable" })).toBeVisible();
   await page.goto("/preview/strelva/owner-invitations?state=denied");

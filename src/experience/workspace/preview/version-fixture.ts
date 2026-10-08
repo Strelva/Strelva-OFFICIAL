@@ -5,8 +5,12 @@ import type { OwnerDecision } from "@/platform/needs-you/contracts";
 
 export const VERSION_PREVIEW_STATES = ["full", "loading", "error", "read-only", "empty", "missing-account"] as const;
 export type VersionPreviewState = typeof VERSION_PREVIEW_STATES[number];
-export function versionPreviewState(value: string | null): VersionPreviewState {
-  return VERSION_PREVIEW_STATES.includes(value as VersionPreviewState) ? value as VersionPreviewState : "full";
+export function versionPreviewState(value: string | null, scenario?: string): VersionPreviewState {
+  const state = VERSION_PREVIEW_STATES.includes(value as VersionPreviewState) ? value as VersionPreviewState : "full";
+  // A display-state query cannot give a fictional read-only viewer authority.
+  // Loading/error transports already refuse every operation without writing.
+  const readOnly = scenario === "mooney-member" || scenario === "mooney-shared" || scenario === "read-only";
+  return readOnly && state !== "loading" && state !== "error" ? "read-only" : state;
 }
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 const calendar = "calendar:f2000000-0000-4000-8000-000000000001";

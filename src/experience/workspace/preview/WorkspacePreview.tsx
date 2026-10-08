@@ -103,7 +103,7 @@ export function WorkspacePreview({ scenario, systems, needsYou = false, ask = nu
   }, []);
   const [agencyState] = useState(() => agencyPreviewState(searchParams.get("agency")));
   const [websiteDetail] = useState(() => previewWebsiteDetailMode(searchParams.get("websiteDetail")));
-  const [versionState] = useState(() => versionPreviewState(searchParams.get("version")));
+  const versionState = versionPreviewState(searchParams.get("version"), scenario);
   const request = useMemo(() => withAskPreview(withVersionPreview(withNeedsYouPreview(withAgencyPreview(withSystems(createPreviewRequest(scenario, { installedStaffRequest, seededRequests }), systems, websiteDetail), scenario, agencyState), scenario, needsYou), systems, versionState), ask), [agencyState, installedStaffRequest, seededRequests, scenario, systems, needsYou, ask, websiteDetail, versionState]);
   useEffect(() => {
     if (!installedStaffRequest) return;

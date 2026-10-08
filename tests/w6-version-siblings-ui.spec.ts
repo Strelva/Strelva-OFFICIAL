@@ -29,14 +29,25 @@ for (const width of [1280, 390]) {
     });
   }
 }
-test("Read-only member can compare scoped sibling shapes without a write control", async ({ page }) => {
+test("Changing from an owner example to a member example drops Version write controls", async ({ page }) => {
+  await page.goto("/preview/strelva?scenario=mooney&systems=on&version=full");
+  await page.getByRole("link", { name: /^Open Mediation intake/ }).click();
+  await expect(page.getByRole("button", { name: "Prepare this draft for release" })).toBeVisible();
+  await page.getByRole("combobox", { name: "Example", exact: true }).selectOption("mooney-member");
+  await page.getByRole("link", { name: /^Open Mediation intake/ }).click();
+  await expect(page.getByRole("region", { name: /^Versions/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Prepare this draft for release" })).toHaveCount(0);
+});
+for (const mode of ["", "&version=full"]) {
+test(`Read-only member can compare scoped sibling shapes without a write control${mode ? " despite full display mode" : ""}`, async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/preview/strelva?scenario=mooney-member&systems=on");
+  await page.goto(`/preview/strelva?scenario=mooney-member&systems=on${mode}`);
   await page.getByRole("link", { name: /^Open Mediation intake/ }).click();
   const versions = page.getByRole("region", { name: /^Versions/ });
   await versions.getByText("What changed here · 3", { exact: true }).click();
   await expect(versions).toContainText("Arbitration intake");
   await expect(versions.getByRole("button")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Prepare this draft for release" })).toHaveCount(0);
-  await versions.screenshot({ path: ".scratch/w6-round5/version-siblings-read-only-390.png" });
+  await versions.screenshot({ path: `.scratch/w6-round5/version-siblings-read-only${mode ? "-full" : ""}-390.png` });
 });
+}
