@@ -444,3 +444,8 @@ psql "${psql_args[@]}" --file="$repo_root/tests/readonly-reader-authority-schema
 node "$repo_root/scripts/check-readonly-rpcs.mjs" "postgresql://$(id -un)@localhost:$cluster_port/postgres?host=$cluster_socket"
 node --test "$repo_root/scripts/tests/readonly-rpcs.node-test.mjs"
 bash "$repo_root/scripts/check-reader-writer-locks.sh" "postgresql://$(id -un)@localhost:$cluster_port/postgres?host=$cluster_socket"
+
+# Integrated money/apps contracts run only after the historical callers and rollbacks.
+source "$repo_root/scripts/sql/money-apps-contracts.sh"
+check_money_apps_contracts
+printf 'Money/apps contracts passed after the full historical upgrade.\n'

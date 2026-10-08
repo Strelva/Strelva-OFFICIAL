@@ -1,0 +1,18 @@
+# Sourced by fresh/upgrade rehearsals that own psql_args and cluster_data.
+# Every provider profile/rate in these SQL fixtures is fictional, local and rolled back.
+check_money_apps_contracts() {
+  local bundle_input="$cluster_data/bundle-native-input.sql" fixture
+  (cd "$repo_root" && ./node_modules/.bin/tsx scripts/system-bundle-native-fixture.ts "$bundle_input")
+  for fixture in \
+    payer-billing-completion-schema.sql agency-billing-receipt-terms-upgrade-schema.sql \
+    money-apps-payer-connect-schema.sql money-export-readonly-schema.sql \
+    agent-confirmed-provenance-schema.sql agent-channel-schema.sql agent-channel-abuse-schema.sql agent-booking-admission-schema.sql \
+    creator-packages-schema.sql offering-source-versions-schema.sql \
+    system-bundles-schema.sql system-bundles-rollback-schema.sql \
+    recurring-responsibilities-schema.sql connect-money-schema.sql money-apps-creator-quote-ledger-schema.sql \
+    system-package-readonly-schema.sql function-exposure-schema.sql; do
+    printf 'Money/apps native contract: %s\n' "$fixture"
+    psql "${psql_args[@]}" --set="bundle_native_input=$bundle_input" --file="$repo_root/tests/$fixture"
+  done
+  node "$repo_root/scripts/check-readonly-rpcs.mjs" "postgresql://$(id -un)@localhost:$cluster_port/postgres?host=$cluster_socket"
+}
