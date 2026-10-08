@@ -17,6 +17,7 @@ import {
   type EffectAdapter,
   activationSchema,
 } from "@/platform/make-real";
+import { customerActivationView } from "@/platform/make-real/view";
 import { uuidFromSeed } from "@/platform/business-record/tenant-import";
 import { systemOriginId } from "@/platform/systems";
 import type { UnifiedEvent } from "@/lib/types";
@@ -201,6 +202,7 @@ describe("Make real: unknown outside effects block rollback (audit 1)", () => {
     const waiting = await w.makeReal.rollback(owner, BIZ, a.id);
     expect(waiting.status).toBe("needs_attention");
     expect(stepOf(waiting, "effect:slot").compensation).toMatchObject({ status: "running", claimId: expect.any(String) });
+    expect(customerActivationView(waiting, "Booking").lines).toContainEqual(expect.objectContaining({ step: "effect:slot", state: "Waiting" }));
     expect(describeActivation(waiting).waiting).toContainEqual(expect.objectContaining({
       step: "effect:slot", reason: "A compensation request is in progress. Wait before retrying.",
     }));
@@ -243,6 +245,9 @@ describe("Make real: unknown outside effects block rollback (audit 1)", () => {
     w.advance(RUNNING_STEP_GRACE_MS + 1);
     const unknown = await w.makeReal.rollback(owner, BIZ, a.id);
     expect(stepOf(unknown, "effect:slot").compensation?.status).toBe("unknown");
+    const customer = customerActivationView(unknown, "Booking");
+    expect(customer.checking).toBe(true);
+    expect(customer.lines).toContainEqual(expect.objectContaining({ step: "effect:slot", state: "Not sure yet" }));
     expect(w.calendarBase.calls.compensate).toBe(1);
 
     await w.makeReal.reconcile(owner, BIZ, a.id, {
