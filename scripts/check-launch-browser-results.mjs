@@ -20,6 +20,7 @@ const profiles = {
     ["email-only-owner-authenticated-local.spec.ts", 2],
     ["versions-authenticated-local.spec.ts", 1],
     ["inquiries-1-0-authenticated-local.spec.ts", 1],
+    ["website-stale-refresh-authenticated-local.spec.ts", 2],
   ],
   "journeys-off": [
     ["release-1-0-flags-off-authenticated-local.spec.ts", 1],

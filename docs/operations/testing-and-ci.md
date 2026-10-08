@@ -310,6 +310,20 @@ refusal assertions are unchanged. The narrow red log remains
 `test-results/journeys-on`. Corrected narrow and full14-on/8-off proof are pending
 root's sequential rerun; no product guard or runtime source changed.
 
+The corrected narrow Make real case passed1/1 without retries at root
+`72e28786`. Its compound runner still exits1 because a filtered run does not
+execute the full critical profile; this proves the case, not that gate. During
+the next fresh full run, inspection found the flags-on validator still required
+only the original12 cases despite the runner including both new stale-workspace
+cases. The `journeys-on` profile now requires those two as well (14 total),
+retaining every original file minimum and the single-attempt/no-skips/no-errors
+requirements. Gate regressions first reproduced three false acceptances with
+the new file absent or incomplete; corrected proof covers retained14 acceptance,
+absent/one-case rejection even with a claimed14-pass summary, and retried stale
+case refusal. Logs: `/tmp/journeys-expanded-gate-{red,green}.log`. Root must
+validate its retained full14-on/8-off JSON with this updated gate after the
+active browser run stops; no current-browser source or product changes occur.
+
 ### The CI-faithful local sim (use this before trusting a green local run)
 
 Local exports or `.env` may provide Postgres **and** Upstash, which silently masks CI-only
