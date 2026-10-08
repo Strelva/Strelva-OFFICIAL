@@ -1084,9 +1084,9 @@ test("unavailable payer history does not claim that no payer exists", async ({ p
   await page.goto(`/workspace?workspaceId=${CUSTOMER_ID}&view=settings`);
   await expect(page.getByText("Payer history could not be loaded.", { exact: true })).toBeVisible();
   await expect(page.getByText("No current accepted payer change is visible here.", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Retry payer history", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Refresh payer history", exact: true })).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("button", { name: "Retry payer history", exact: true }).scrollIntoViewIfNeeded();
+  await page.getByRole("button", { name: "Refresh payer history", exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: "/tmp/strelva-billing-unavailable-mobile.png" });
 });
 

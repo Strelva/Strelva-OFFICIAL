@@ -196,7 +196,7 @@ test("a business owner can propose a future payer and the exact addressee can ac
   await expect(payer).toContainText("Existing budgets, reservations, recorded costs, and unresolved holds keep their original payer and limit.");
   await payer.getByLabel("Verified payer email").fill("successor@harbordental.example");
   await payer.getByRole("button", { name: "Propose new payer" }).click();
-  await expect(payer).toContainText("Only this addressed verified person can accept.");
+  await expect(payer).toContainText("Only the addressed verified person can accept.");
   await payer.getByRole("button", { name: "Accept future payer role" }).click();
   await expect(payer).toContainText("Current accepted successor: successor@harbordental.example");
   await expect(payer.getByRole("status")).toContainText("Payer acceptance is recorded.");
