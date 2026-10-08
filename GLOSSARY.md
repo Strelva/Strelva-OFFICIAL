@@ -67,6 +67,20 @@ Read-only sight of a business workspace that the business grants to an
 agency. It carries no role and lets nobody operate anything.
 _Avoid_: shared access, agency access, read access, Assignment
 
+**Acting provider**:
+The agency a person acts for on a business: the agency holds an active
+provider seat, the person belongs to it and is staffed on the business. For
+an outside effect (publish, Google, email, payments) the agency must also be
+verified for that effect and hold a Client-resource mandate for the resource.
+Every agency is checked the same way, Strelva's included.
+_Avoid_: operator, Strelva staff (as a provider), super admin
+
+**Client-resource mandate**:
+A business's grant letting one agency do one effect to one named resource: a
+website System, a domain, a Google location, a sending domain or a payment
+account. The owner grants and ends it; ending the seat ends it.
+_Avoid_: permission, scope, OAuth grant, verification
+
 **Work access**:
 How the viewer relates to one piece of work: owned (in their personal
 workspace), member, delegated read, addressed (an incoming handoff), or

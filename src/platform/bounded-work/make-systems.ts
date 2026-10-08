@@ -3,10 +3,10 @@ import type { BoundedStore } from "./repository";
 
 /**
  * Making an internal tool (create, from-source copy, plan output) needs
- * make_systems: a Strelva operator inside the workspace or a delegated agency
+ * make_systems: the business's acting provider or a delegated agency
  * (docs/product/specs/systems-catalog.md section 4). Owners, admins and
  * members get WorkspaceMakeSystemsError, which the HTTP layer turns into
- * "Ask Strelva to build this" with a Request action.
+ * MAKE_SYSTEMS_REQUIRED_MESSAGE with a Request action.
  *
  * Focused in-memory test stores have no authority surface; they keep their
  * membership check so existing lifecycle tests stay meaningful.
@@ -17,7 +17,7 @@ export async function requireSystemMaker(store: BoundedStore, actor: WorkspaceAc
     return;
   }
   const authority = await store.makeSystems(actor, workspaceId);
-  if (authority === "operator" || authority === "agency") return;
+  if (authority === "provider" || authority === "agency") return;
   if (authority === "member") throw new WorkspaceMakeSystemsError();
   throw new WorkspaceAccessError();
 }
