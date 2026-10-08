@@ -1,3 +1,4 @@
+import { businessBillingEnabled } from "@/platform/business-billing";
 import { NextResponse } from "next/server";
 import { isSuperAdmin, getCurrentUserEmail, getActorContext } from "@/platform/infra/auth";
 import { logAuditEvent } from "@/lib/storage";
@@ -25,6 +26,7 @@ import {
  * to clobber an existing link (409).
  */
 export async function POST(req: Request) {
+  if (businessBillingEnabled()) return NextResponse.json({ error: "Create invoices in your verified agency workspace.", agencyPath: "/api/agency/pay-links" }, { status: 410 });
   if (!(await isSuperAdmin())) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

@@ -57,3 +57,11 @@ export function planByKey(key: string | undefined): Plan {
 export function planMonthlyCents(key: string | undefined): number {
   return planByKey(key).monthly * 100;
 }
+
+/** Agency 1.0 catalog. Existing PLANS remains the legacy live price adapter. */
+export const PLAN_CATALOG = Object.freeze(["workspace", "presence", "growth", "scale"].map(key => Object.freeze({
+  key, label: key === "workspace" ? "Workspace" : key.charAt(0).toUpperCase() + key.slice(1),
+  retail: Object.freeze({ priceId: null, monthlyCents: null, purchasable: false as const }),
+  wholesale: Object.freeze({ priceId: null, monthlyCents: null, purchasable: false as const }),
+})));
+export function workspacePlanByKey(key: string) { return PLAN_CATALOG.find(plan => plan.key === key) ?? null; }

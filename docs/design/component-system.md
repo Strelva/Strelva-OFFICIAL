@@ -7,6 +7,23 @@ The [visual direction map](../../DESIGN.md#visual-direction-and-extension-map) o
 how identity, imagery, composition and component treatment fit together. This
 file owns component contracts, extension and adoption, including gaps in source.
 
+## Party billing, October 7, 2026 (local)
+
+[AgencyBillingView](../../src/experience/workspace/billing/AgencyBillingView.tsx)
+uses Card, links, semantic client lists and the owned Button, TextInput and
+SelectInput through AgencyInvoiceControls. Null wholesale amounts render as
+unpriced, separately from legacy retail amounts. Accepted retail proposals
+retain their terms and owner acceptance; provider receipts distinguish payment
+page creation from confirmed payment. WorkspacePayerTransition offers business,
+agency and named signer proposals and renders acceptance from SQL's current
+party authority. The default request remains fetch; the development-only
+[billing preview](../../src/app/preview/strelva/billing/page.tsx) supplies isolated
+fictional payer replies. Local browser proof covered 1280px and 390px, both
+party acceptance controls, empty/loading/error/read-only states and overflow.
+This does not prove production or live Stripe behavior. The
+[stream contract](../product/streams/a1-payer-billing-completion.md) records the
+remaining policy and provider proof.
+
 ## Agency Team management, October 7, 2026
 
 [AgencyTeamView](../../src/experience/workspace/agency/AgencyTeamView.tsx) composes

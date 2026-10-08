@@ -32,6 +32,8 @@ export const operatorAllowanceCommandSchema = z.discriminatedUnion("action", [
     action: z.literal("award_period"),
     workspaceId: UUID,
     payerId: UUID,
+    payerKind: z.enum(["business", "agency"]).optional(),
+    payerWorkspaceId: UUID.optional(),
     periodStart: DATE_TIME,
     periodEnd: DATE_TIME,
     spendingCapCents: z.number().int().nonnegative().max(MAX_PERIOD_SPENDING_CAP_CENTS),
@@ -74,6 +76,7 @@ export function parseOperatorAllowanceCommand(value: unknown): OperatorAllowance
   const parsed = operatorAllowanceCommandSchema.safeParse(value);
   if (!parsed.success) throw new WorkAllowanceValidationError("The allowance award is invalid.");
   if (parsed.data.action === "award_period") {
+    if ((parsed.data.payerKind === "agency") !== Boolean(parsed.data.payerWorkspaceId)) throw new WorkAllowanceValidationError("An agency allowance needs its payer workspace.");
     const start = Date.parse(parsed.data.periodStart);
     const end = Date.parse(parsed.data.periodEnd);
     const unitKinds = new Set(parsed.data.grants.map((grant) => grant.unitKind));
@@ -106,6 +109,9 @@ export interface WorkAllowanceRecord {
   workspaceId: string;
   businessName: string;
   payerId: string;
+  payerKind?: "business" | "agency";
+  payerWorkspaceId?: string;
+  canAccept?: boolean;
   periodStart: string;
   periodEnd: string;
   spendingCapCents: number;
@@ -168,7 +174,7 @@ export class WorkAllowanceAccessError extends Error {
   constructor(message = "You do not have access to this allowance.") { super(message); this.name = "WorkAllowanceAccessError"; }
 }
 export class WorkAllowancePayerError extends WorkAllowanceAccessError {
-  constructor() { super("Only the named payer can accept this spending cap."); this.name = "WorkAllowancePayerError"; }
+  constructor() { super("Only an authorized payer can accept this spending cap."); this.name = "WorkAllowancePayerError"; }
 }
 export class WorkAllowanceNotFoundError extends Error {
   constructor() { super("The allowance was not found."); this.name = "WorkAllowanceNotFoundError"; }

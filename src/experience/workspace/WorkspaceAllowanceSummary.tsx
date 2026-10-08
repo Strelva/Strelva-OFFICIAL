@@ -91,7 +91,7 @@ export function WorkspaceAllowanceSummary({ businessId, enabled, compact = false
 
   if (compact) {
     const pending = state.status === "ready" ? state.value.allowances.find((allowance) => allowance.status === "pending_cap_acceptance") : undefined;
-    const pendingForActor = Boolean(pending && state.status === "ready" && pending.payerId === state.value.currentActorId);
+    const pendingForActor = Boolean(pending && state.status === "ready" && (pending.canAccept ?? pending.payerId === state.value.currentActorId));
     const message = state.status === "loading"
       ? "Review allowance and payer details in Business details."
       : state.status === "error"
@@ -120,10 +120,10 @@ export function WorkspaceAllowanceSummary({ businessId, enabled, compact = false
   return <section className={styles.panel} aria-labelledby="home-allowance">
     <header><Gauge size={17} aria-hidden="true" /><h2 id="home-allowance">Work allowance</h2><span>{state.value.allowances.length}</span></header>
     <ul>{state.value.allowances.map((allowance) => {
-      const canAccept = allowance.status === "pending_cap_acceptance" && allowance.payerId === state.value.currentActorId;
+      const canAccept = allowance.status === "pending_cap_acceptance" && (allowance.canAccept ?? allowance.payerId === state.value.currentActorId);
       return <li key={allowance.id}>
         <div className={styles.allowanceHead}><strong>{allowance.status === "pending_cap_acceptance" ? "Cap needs your acceptance" : allowance.status === "closed" ? "Closed period" : "Active period"}</strong><small>{period(allowance)}</small></div>
-        <dl><div><dt>Named payer</dt><dd>{allowance.payerId === state.value.currentActorId ? "You" : "Named business payer"}</dd></div><div><dt>Operational cap</dt><dd>{money(allowance.spendingCapCents)}</dd></div><div><dt>Recorded cost</dt><dd>{money(allowance.actualCostCents)}</dd></div></dl>
+        <dl><div><dt>Payer</dt><dd>{allowance.payerKind === "agency" ? "Agency" : "Business"}</dd></div><div><dt>Operational cap</dt><dd>{money(allowance.spendingCapCents)}</dd></div><div><dt>Recorded cost</dt><dd>{money(allowance.actualCostCents)}</dd></div></dl>
         <p>{allowance.buckets.map(unitSummary).join(" · ")}</p>
         {canAccept ? <button type="button" disabled={Boolean(state.acceptingId)} onClick={() => void accept(allowance.id)}>{state.acceptingId === allowance.id ? "Accepting…" : `Accept ${money(allowance.spendingCapCents)} cap`}</button> : null}
       </li>;
