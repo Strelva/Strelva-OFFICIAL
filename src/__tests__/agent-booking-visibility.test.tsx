@@ -132,7 +132,7 @@ it("reads bounded business outcomes and labels discovery coverage instead of imp
  const rpc=vi.fn(async (name:string) => ({ data:name==="booking_parity_streak" ? {days:7} : outcomes, error:null })); setBookingStoreDb({rpc}); resetBookingFlagCache();
  expect(await readAgentBookingOutcomes("fixture","2026-11-02T00:00:00Z","2026-11-09T00:00:00Z")).toEqual(outcomes);
  expect(rpc).toHaveBeenLastCalledWith("read_agent_booking_outcomes",{p_tenant_id:"fixture",p_from:"2026-11-02T00:00:00Z",p_to:"2026-11-09T00:00:00Z"});
- expect(agentBookingOutcomesLine(outcomes)).toContain("2 recorded discovery appearances since 2026-11-05; earlier coverage is unknown");
+ expect(agentBookingOutcomesLine(outcomes)).toContain("at least 2 recorded discovery calls since 2026-11-05; full-period coverage is unknown");
  expect(agentBookingOutcomesLine({ ...outcomes, discoveryCoverage: "unknown", discoveryCalls: 0 })).toContain("discovery count unavailable; tracking was not established");
  setBookingStoreDb({rpc:async (name:string) => ({data:name==="booking_parity_streak" ? {days:7} : { ...outcomes, holds: "3" },error:null})}); resetBookingFlagCache();
  expect(await readAgentBookingOutcomes("fixture","2026-11-02T00:00:00Z","2026-11-09T00:00:00Z")).toBeNull();
@@ -141,6 +141,15 @@ it("reads bounded business outcomes and labels discovery coverage instead of imp
 it("does not claim Strelva booking for an unrelated site that only shares the submitted business name", async () => {
  const availability = await readAgentBookingAvailability({
   list: async () => [{ business: "other", name: "Fixture", industry: null, website: "https://other.example/" }],
+  scope: async () => "other",
+ }, "Fixture", "https://fixture.example");
+ expect(availability.status).toBe("unknown");
+ expect(availability.detail).toContain("No matching Strelva business profile");
+});
+
+it("keeps explicit website ports in business identity matching", async () => {
+ const availability = await readAgentBookingAvailability({
+  list: async () => [{ business: "other", name: "Fixture", industry: null, website: "https://fixture.example:8443" }],
   scope: async () => "other",
  }, "Fixture", "https://fixture.example");
  expect(availability.status).toBe("unknown");

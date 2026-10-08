@@ -12,7 +12,7 @@ create table public.agent_business_discovery_days (
 );
 create table public.agent_business_discovery_coverage (
   calendar_key uuid primary key,
-  first_day date not null
+  first_observed_at timestamptz not null
 );
 alter table public.agent_business_discovery_days enable row level security;
 alter table public.agent_business_discovery_coverage enable row level security;
@@ -46,7 +46,7 @@ begin
     insert into public.agent_business_discovery_days(calendar_key, day, calls)
       values (v_key, v_day, 1)
       on conflict (calendar_key, day) do update set calls = public.agent_business_discovery_days.calls + 1;
-    insert into public.agent_business_discovery_coverage(calendar_key, first_day) values (v_key, v_day)
+    insert into public.agent_business_discovery_coverage(calendar_key, first_observed_at) values (v_key, clock_timestamp())
       on conflict (calendar_key) do nothing;
     v_count := v_count + 1;
   end loop;
@@ -57,7 +57,7 @@ grant execute on function public.record_agent_business_discovery(text[]) to serv
 
 create function public.read_agent_booking_outcomes(p_tenant_id text, p_from timestamptz, p_to timestamptz) returns jsonb
 language plpgsql stable security definer set search_path = public, pg_temp as $$
-declare v_key uuid; v_workspace uuid; v_name text; v_discovery bigint; v_discovery_since date; v_discovery_coverage text; v_holds bigint; v_confirmations bigint; v_completed bigint;
+declare v_key uuid; v_workspace uuid; v_name text; v_discovery bigint; v_discovery_since date; v_first_observed_at timestamptz; v_discovery_coverage text; v_holds bigint; v_confirmations bigint; v_completed bigint;
 begin
   if p_from is null or p_to is null or p_to <= p_from or p_to - p_from > interval '8 days'
     or date_trunc('day', p_from at time zone 'UTC') <> p_from at time zone 'UTC'
@@ -80,10 +80,13 @@ begin
     (select w.name from public.workspaces w where w.id = v_workspace),
     p_tenant_id
   ) into v_name;
-  select c.first_day into v_discovery_since from public.agent_business_discovery_coverage c where c.calendar_key = v_key;
+  select c.first_observed_at into v_first_observed_at from public.agent_business_discovery_coverage c where c.calendar_key = v_key;
+  v_discovery_since := (v_first_observed_at at time zone 'UTC')::date;
+  -- A first observation cannot establish uninterrupted coverage: it may happen
+  -- late in the day, and the feature can be disabled or writes can fail later.
+  -- All observed counts are therefore lower bounds; no interval is called complete.
   v_discovery_coverage := case
-    when v_discovery_since is null or v_discovery_since >= (p_to at time zone 'UTC')::date then 'unknown'
-    when v_discovery_since <= (p_from at time zone 'UTC')::date then 'complete'
+    when v_first_observed_at is null or v_first_observed_at >= p_to then 'unknown'
     else 'partial'
   end;
   select coalesce(sum(d.calls), 0) into v_discovery from public.agent_business_discovery_days d

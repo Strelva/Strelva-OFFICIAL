@@ -5,7 +5,7 @@ import { z } from "zod";
 export const agentBookingOutcomesSchema = z.object({
   businessName: z.string().min(1).max(160),
   discoveryCalls: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-  discoveryCoverage: z.enum(["complete", "partial", "unknown"]),
+  discoveryCoverage: z.enum(["partial", "unknown"]),
   discoverySince: z.string().date().nullable(),
   holds: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
   confirmations: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
@@ -64,10 +64,8 @@ export async function readAgentBookingOutcomes(tenantId: string, from: string, t
 export function agentBookingOutcomesLine(outcomes: AgentBookingOutcomes | null): string | null {
   if (!outcomes) return null;
   const { businessName, discoveryCalls, discoveryCoverage, discoverySince, holds, confirmations, completed } = outcomes;
-  const discovery = discoveryCoverage === "complete"
-    ? `${discoveryCalls} recorded discovery ${discoveryCalls === 1 ? "appearance" : "appearances"}`
-    : discoveryCoverage === "partial"
-      ? `${discoveryCalls} recorded discovery ${discoveryCalls === 1 ? "appearance" : "appearances"} since ${discoverySince}; earlier coverage is unknown`
-      : "discovery count unavailable; tracking was not established for this week";
+  const discovery = discoveryCoverage === "partial"
+    ? `at least ${discoveryCalls} recorded discovery ${discoveryCalls === 1 ? "call" : "calls"} since ${discoverySince}; full-period coverage is unknown`
+    : "discovery count unavailable; tracking was not established for this week";
   return `${businessName}: ${discovery}; ${holds} agent ${holds === 1 ? "booking hold" : "booking holds"}, ${confirmations} customer ${confirmations === 1 ? "confirmation" : "confirmations"}, and ${completed} completed ${completed === 1 ? "booking" : "bookings"} this week.`;
 }

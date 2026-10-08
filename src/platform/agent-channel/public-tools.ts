@@ -108,7 +108,8 @@ const hostOf = (value: string | null | undefined) => {
     const url = new URL(value.startsWith("http") ? value : `https://${value}`);
     const host = url.hostname.toLowerCase().replace(/^www\./, "");
     const path = url.pathname.replace(/\/+$/, "") || "/";
-    return `${url.protocol}//${host}${path}`;
+    const port = url.port ? `:${url.port}` : "";
+    return `${url.protocol}//${host}${port}${path}`;
   }
   catch { return null; }
 };
@@ -162,9 +163,9 @@ async function searchBusinesses(directory: BusinessDirectory, args: Record<strin
   if (process.env.STRELVA_BOOKING_AGENT_VISIBILITY?.trim() === "1") {
     const scopes = await Promise.all(businesses.map(entry => Promise.resolve(directory.scope(entry.business)).catch(() => null)));
     const resolved = scopes.filter((scope): scope is string => typeof scope === "string");
-    if (resolved.length !== businesses.length || !await recordAgentBusinessDiscoveries(resolved)) {
-      throw new PublicBookingError("unavailable", "Discovery results could not be recorded. Try again.");
-    }
+    // Telemetry is best-effort; returned results remain available during a
+    // recorder outage, and weekly proof labels persisted counts as a lower bound.
+    await recordAgentBusinessDiscoveries(resolved).catch(() => false);
   }
   return { businesses };
 }
@@ -256,9 +257,7 @@ export function platformMcpServer(directory: BusinessDirectory): McpServer {
         if (!scope) throw new PublicBookingError("not_found", "This business is unavailable.");
         if (name === "get_business") {
           const details = await getBusiness(directory, business, scope);
-          if (process.env.STRELVA_BOOKING_AGENT_VISIBILITY?.trim() === "1" && !await recordAgentBusinessDiscoveries([scope])) {
-            throw new PublicBookingError("unavailable", "Discovery results could not be recorded. Try again.");
-          }
+          if (process.env.STRELVA_BOOKING_AGENT_VISIBILITY?.trim() === "1") await recordAgentBusinessDiscoveries([scope]).catch(() => false);
           return details;
         }
         return await runBookingTool(scope, name, rest);

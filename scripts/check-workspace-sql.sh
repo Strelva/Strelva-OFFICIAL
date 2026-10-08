@@ -1075,8 +1075,66 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011140000_age
 psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-visibility-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021090031_agent_booking_outcomes.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-outcomes-schema.sql"
+psql "${psql_args[@]}" <<'SQL'
+insert into public.tenants(id, stable_id, site_name)
+values ('outcome-rollback-site', 'ab272000-0000-4000-8000-000000000004', 'Rollback Fixture');
+insert into public.business_bookings(id,calendar_key,tenant_stable_id,status,origin,service_name_at_booking,start_at,end_at,block_end_at,time_zone,customer_name,customer_email,intake_answers,recorded_via,created_at)
+values ('ab272000-0000-4000-8000-000000000014','ab272000-0000-4000-8000-000000000004','ab272000-0000-4000-8000-000000000004','held','agent','Consultation',now()+interval '3 days',now()+interval '3 days 30 minutes',now()+interval '3 days 30 minutes','UTC','Rollback Fixture Customer','rollback-private@example.test','{}','native',clock_timestamp());
+insert into public.business_booking_history(booking_id,actor,from_status,to_status,reason,at)
+values ('ab272000-0000-4000-8000-000000000014','owner','held','confirmed','fixture history retained across rollback',clock_timestamp());
+SQL
+PGAPPNAME=agent_outcomes_writer psql "${psql_args[@]}" \
+  -c "begin; select public.record_agent_business_discovery(array['outcome-rollback-site']); select pg_sleep(2.5); commit" \
+  >"$cluster_root/agent-outcomes-writer.log" 2>&1 &
+outcomes_writer_pid=$!
+writer_ready=false
+for _ in $(seq 1 80); do
+  if psql "${psql_args[@]}" -Atc "select exists(select 1 from pg_stat_activity where application_name = 'agent_outcomes_writer' and state <> 'idle')" | grep -qx t; then
+    writer_ready=true
+    break
+  fi
+  sleep 0.05
+done
+if [[ "$writer_ready" != true ]]; then
+  wait "$outcomes_writer_pid" || true
+  cat "$cluster_root/agent-outcomes-writer.log" >&2
+  printf 'Concurrent discovery fixture did not reach its held transaction.\n' >&2
+  exit 1
+fi
+PGAPPNAME=agent_outcomes_rollback psql "${psql_args[@]}" \
+  --file="$repo_root/supabase/migrations/rollback-20261021090031_agent_booking_outcomes.sql" \
+  >"$cluster_root/agent-outcomes-rollback-populated.log" 2>&1 &
+outcomes_rollback_pid=$!
+rollback_blocked=false
+for _ in $(seq 1 80); do
+  if psql "${psql_args[@]}" -Atc "select exists(select 1 from pg_stat_activity where application_name = 'agent_outcomes_rollback' and wait_event_type = 'Lock')" | grep -qx t; then
+    rollback_blocked=true
+    break
+  fi
+  if ! kill -0 "$outcomes_rollback_pid" 2>/dev/null; then break; fi
+  sleep 0.05
+done
+if [[ "$rollback_blocked" != true ]]; then
+  wait "$outcomes_writer_pid" || true
+  wait "$outcomes_rollback_pid" || true
+  cat "$cluster_root/agent-outcomes-rollback-populated.log" >&2
+  printf 'Populated rollback did not wait for the in-flight discovery write.\n' >&2
+  exit 1
+fi
+wait "$outcomes_writer_pid"
+rollback_status=0
+wait "$outcomes_rollback_pid" || rollback_status=$?
+if [[ "$rollback_status" -eq 0 ]] || ! grep -q 'agent_booking_outcomes_in_use' "$cluster_root/agent-outcomes-rollback-populated.log"; then
+  cat "$cluster_root/agent-outcomes-rollback-populated.log" >&2
+  printf 'Populated rollback did not refuse after the concurrent write committed.\n' >&2
+  exit 1
+fi
+psql "${psql_args[@]}" -Atc "select to_regclass('public.agent_business_discovery_days') is not null and to_regclass('public.agent_business_discovery_coverage') is not null and (select calls = 1 from public.agent_business_discovery_days where calendar_key = 'ab272000-0000-4000-8000-000000000004') and (select count(*) = 1 from public.business_booking_history where booking_id = 'ab272000-0000-4000-8000-000000000014')" | grep -qx t
+psql "${psql_args[@]}" -c "delete from public.agent_business_discovery_days where calendar_key = 'ab272000-0000-4000-8000-000000000004'; delete from public.agent_business_discovery_coverage where calendar_key = 'ab272000-0000-4000-8000-000000000004';"
+printf 'Populated rollback waited for concurrent discovery, refused, and retained booking history.\n'
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261021090031_agent_booking_outcomes.sql"
 psql "${psql_args[@]}" -Atc "select to_regclass('public.agent_business_discovery_days') is null and to_regprocedure('public.read_agent_booking_outcomes(text,timestamptz,timestamptz)') is null" | grep -qx t
+psql "${psql_args[@]}" -Atc "select count(*) = 1 from public.business_booking_history where booking_id = 'ab272000-0000-4000-8000-000000000014'" | grep -qx t
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021090031_agent_booking_outcomes.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-outcomes-schema.sql"
 

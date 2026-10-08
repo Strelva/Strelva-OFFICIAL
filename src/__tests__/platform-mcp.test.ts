@@ -248,6 +248,31 @@ describe("platform tools", () => {
     expect((await (await tool("search_business", { query: "x" })).json()).result.isError).toBe(true);
   });
 
+  it("keeps public discovery results available when aggregate telemetry writes fail", async () => {
+    vi.stubEnv("STRELVA_BOOKING_AGENT_VISIBILITY", "1");
+    try {
+      ports.services.mockResolvedValue({ services: [], timeZone: "UTC", paused: false });
+      ports.rpc.mockImplementation(async (name: string) => {
+        if (name === "record_agent_business_discovery") throw new Error("telemetry timeout");
+        return { data: { name: "Fixture Barbers", address: "1 Main St, Buffalo" }, error: null };
+      });
+      const found = await tool("search_business", { query: "Barbers" });
+      expect(found.status).toBe(200);
+      expect((await found.json()).result.structuredContent.businesses).toContainEqual(expect.objectContaining({ business: "fixture" }));
+      expect(ports.rpc).toHaveBeenCalledWith("record_agent_business_discovery", { p_scopes: expect.arrayContaining(["fixture"]) });
+
+      ports.rpc.mockImplementation(async (name: string) => ({
+        data: name === "read_booking_business_details" ? { name: "Fixture Barbers", address: "1 Main St, Buffalo" } : null,
+        error: name === "record_agent_business_discovery" ? { message: "telemetry unavailable" } : null,
+      }));
+      const detail = await tool("get_business", { business: "fixture" });
+      expect(detail.status).toBe(200);
+      expect((await detail.json()).result.structuredContent).toMatchObject({ business: "fixture", name: "Fixture Barbers" });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("reads public business facts by handle", async () => {
     ports.services.mockResolvedValue({ services: [{ id: "svc" }], timeZone: "America/New_York", paused: false });
     const body = await (await tool("get_business", { business: "fixture" })).json();
