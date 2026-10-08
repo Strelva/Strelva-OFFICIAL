@@ -59,6 +59,8 @@ export interface ApplySectionUpdateInput {
    * landed. Make real passes its step's idempotency key.
    */
   requestId?: string;
+  /** The person preparing this review, separate from its later approver. */
+  preparer?: { userId: string; email: string; kind: "owner" | "operator" };
 }
 
 export type ApplySectionUpdateResult =
@@ -211,6 +213,7 @@ export async function applySectionUpdate(
       diffs,
       risk,
       governance,
+      ...(input.preparer ? { preparer: input.preparer } : {}),
     });
     eventId = event.id;
     await setDraftContent(section, parsed.data as Parameters<typeof setContent>[1], tenantId);
@@ -228,7 +231,7 @@ export async function applySectionUpdate(
         time: new Date().toISOString(),
         type: "ai",
         section,
-        actor: "ai",
+        actor: input.preparer ? input.preparer.kind === "operator" ? "admin" : "user" : "ai",
         changes,
         eventStatus: autoPublish ? "auto_approved" : "pending",
         governanceReason: governance.reason,

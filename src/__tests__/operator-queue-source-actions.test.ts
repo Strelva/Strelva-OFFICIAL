@@ -39,11 +39,37 @@ beforeEach(() => {
   mocks.event.mockResolvedValue({ type: "change_request", status: "pending", tenantId: "alpha" }); mocks.resolve.mockResolvedValue({ changed: true });
   mocks.request.mockResolvedValue({ id: requestId, businessId: workspaceId, provider: { kind: "strelva" }, status: "requested", providerAcceptance: { status: "pending" }, revision: 3 });
   mocks.execute.mockResolvedValue({});
+  mocks.audit.mockReset().mockResolvedValue({});
   mocks.published.mockResolvedValue([{ workspaceId, workId: "website", tenantId: "hosted", revision: 3, contentHash: "a".repeat(64) }]);
   mocks.checkHosted.mockResolvedValue({ status: "healthy", workspaceId, workId: "website", revision: 3 }); mocks.saveHosted.mockResolvedValue(undefined);
 });
 afterEach(() => vi.unstubAllEnvs());
 describe("queue source actions", () => {
+  it("records the operator, business and exact repair before changing the lead", async () => {
+    await run("retry_lead");
+    expect(mocks.audit).toHaveBeenNthCalledWith(1, expect.objectContaining({ tenant: "alpha", action: "queue.source.retry_lead", targetId: "alpha:lead",
+      actor: { userId: actor.userId, email: actor.verifiedEmail, type: "super_admin", isSuperAdmin: true },
+      metadata: expect.objectContaining({ phase: "attempt", workspaceId, commandId }) }));
+    expect(mocks.audit.mock.invocationCallOrder[0]).toBeLessThan(mocks.mirror.mock.invocationCallOrder[0]!);
+    expect(mocks.audit).toHaveBeenLastCalledWith(expect.objectContaining({ metadata: expect.objectContaining({ phase: "result", outcome: "completed" }) }));
+  });
+  it.each(["retry_lead", "check_health", "check_domain"] as const)("refuses %s when its audit attempt cannot persist", async action => {
+    if (action === "check_health") mocks.queue.mockResolvedValue({ items: [item("site_health", "document:website:3")] });
+    if (action === "check_domain") mocks.queue.mockResolvedValue({ items: [item("domain_unverified", "alpha:alpha.test")] });
+    mocks.audit.mockRejectedValue(new Error("Audit unavailable"));
+    expect((await run(action)).ok).toBe(false);
+    expect(mocks.mirror).not.toHaveBeenCalled();expect(mocks.clear).not.toHaveBeenCalled();
+    expect(mocks.checkHosted).not.toHaveBeenCalled();expect(mocks.saveHosted).not.toHaveBeenCalled();expect(mocks.refresh).not.toHaveBeenCalled();
+  });
+  it("keeps a completed repair successful when only the result audit fails", async () => {
+    mocks.audit.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error("Result unavailable"));
+    expect((await run("retry_lead")).ok).toBe(true);expect(mocks.mirror).toHaveBeenCalledOnce();expect(mocks.clear).toHaveBeenCalledOnce();
+  });
+  it("records unconfirmed failure without retrying a durable write", async () => {
+    mocks.clear.mockRejectedValueOnce(new Error("Pending cleanup uncertain"));
+    expect((await run("retry_lead")).ok).toBe(false);expect(mocks.mirror).toHaveBeenCalledOnce();
+    expect(mocks.audit).toHaveBeenLastCalledWith(expect.objectContaining({ metadata: expect.objectContaining({ phase: "result", outcome: "unconfirmed" }) }));
+  });
   it.each(["retry_lead", "check_health", "check_domain", "accept_request", "decline_request", "triage", "quote"] as const)("runs nothing while off: %s", async action => {
     vi.stubEnv("STRELVA_OPERATOR_QUEUE_RELEASE", "0"); expect((await run(action)).ok).toBe(false);
     expect(mocks.admin).not.toHaveBeenCalled(); expect(mocks.queue).not.toHaveBeenCalled(); expect(mocks.execute).not.toHaveBeenCalled();

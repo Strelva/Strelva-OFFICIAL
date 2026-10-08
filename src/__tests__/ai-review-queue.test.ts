@@ -53,11 +53,14 @@ describe("AI review queue persistence", () => {
         reason: "High-risk business details require review.",
         reasonCode: "high_risk_facts",
       },
+      preparer: { userId: "76000000-0000-4000-8000-000000000001", email: "operator@example.test", kind: "operator" },
     });
 
     expect(event.status).toBe("pending");
     expect(event.type).toBe("content_update");
     expect(event.metadata?.kind).toBe("agent_preview");
+    expect(event.metadata?.preparedBy).toEqual({ userId: "76000000-0000-4000-8000-000000000001", email: "operator@example.test", kind: "operator" });
+    expect(event.metadata).not.toHaveProperty("approvedBy");expect(event.metadata).not.toHaveProperty("authority");
     expect(event.metadata?.proposedData).toEqual({
       services: [{ id: "svc_1", name: "Consult", price: "1" }],
     });
