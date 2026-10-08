@@ -10,13 +10,17 @@ export const recordBusinessAttributionSchema = z.object({
   workspaceId: z.uuid(), agencyWorkspaceId: z.uuid(), source: z.enum(["signup", "conversion", "referral"]),
   sourceReceipt: attributionSourceReceiptSchema, commandId: z.uuid(), expectedProviderId: z.uuid(),
 }).strict();
-const endingSchema = z.object({
+const endingBase = z.object({
   attributionId: z.uuid(), businessWorkspaceId: z.uuid(), agencyWorkspaceId: z.uuid(),
   from: z.string().datetime({ offset: true }), to: z.string().datetime({ offset: true }),
   source: z.enum(["signup", "conversion", "referral"]), sourceReceipt: attributionSourceReceiptSchema,
-  providerChangeRequestId: z.uuid(), endedBy: z.uuid(), oldProviderId: z.uuid(),
+  endedBy: z.uuid(), oldProviderId: z.uuid(),
   newOperatorAgencyWorkspaceId: z.uuid().nullable(), completionReceipt: z.record(z.string(), z.unknown()),
 }).strict();
+const endingSchema = z.union([
+  endingBase.extend({ providerChangeRequestId: z.uuid() }).strict(),
+  endingBase.extend({ providerChangeRequestId: z.null(), workspaceExitRequestId: z.uuid(), newOperatorAgencyWorkspaceId: z.null() }).strict(),
+]);
 export const businessAttributionReceiptSchema = z.object({
   attributionId: z.uuid(), businessWorkspaceId: z.uuid(), agencyWorkspaceId: z.uuid(),
   source: z.enum(["signup", "conversion", "referral"]), sourceReceipt: attributionSourceReceiptSchema,
