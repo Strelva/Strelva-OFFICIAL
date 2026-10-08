@@ -1,5 +1,6 @@
 -- Reverses 20261011133700_business_facts_owner_decision.sql. Roll back
--- 20261013110000_public_facts_read_confirmed first: it reads the confirmed copy.
+-- 20261013115000_booking_reads_confirmed_facts and
+-- 20261013110000_public_facts_read_confirmed first: they read the confirmed copy.
 -- WARNING: restoring these readers lets operator-written facts render on
 -- client sites again with no owner decision (#509). Run only to unblock a
 -- failed release, and reapply the forward migration before rollout.
@@ -9,12 +10,15 @@
 -- written recipient receives owner links).
 begin;
 set local lock_timeout = '3s';
--- Refuse out of order: the public-facts reader must stop reading the
--- confirmed copy before the copy is dropped.
+-- Refuse out of order: the public-facts and booking readers must stop
+-- reading the confirmed copy before the copy is dropped.
 do $$ begin
   if exists (select 1 from pg_proc where oid = to_regprocedure('public.business_confirmed_public_facts(uuid)')
       and prosrc like '%business_record_confirmed%') then
     raise exception 'business_facts_rollback_order: roll back 20261013110000_public_facts_read_confirmed first';
+  end if;
+  if to_regprocedure('public.business_confirmed_facts(uuid)') is not null then
+    raise exception 'business_facts_rollback_order: roll back 20261013115000_booking_reads_confirmed_facts first';
   end if;
 end $$;
 

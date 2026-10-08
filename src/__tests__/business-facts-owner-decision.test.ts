@@ -4,7 +4,7 @@ import {
   createBusinessFactReviewStore, type BusinessFactReview, type BusinessFactsReceipt,
 } from "@/platform/needs-you/sources/business-facts";
 import type { DeliveryRow } from "@/platform/needs-you/repository";
-import { createConfirmedNativeFactsEffect } from "@/app/workspace/business-details/native-website-facts";
+import { createConfirmedNativeFactsEffect, type NativeFactsPreparation } from "@/app/workspace/business-details/native-website-facts";
 import { SOURCE_LIFECYCLES } from "@/platform/needs-you/contracts";
 import { createNeedsYouService } from "@/platform/needs-you/service";
 import { needsYouMemoryStore } from "./support/needs-you-memory";
@@ -221,7 +221,7 @@ describe("native websites follow the owner's confirmation (#509 P2)", () => {
   });
 
   it("a signed-in owner prepares the contact review as themselves; a link queues it for Strelva", async () => {
-    const prepare = vi.fn(async () => undefined);
+    const prepare = vi.fn(async (): Promise<NativeFactsPreparation> => ({ ready: ["native-site"], needsReview: [] }));
     const ports = { enabled: () => true, nativeTenants: vi.fn(async () => ["native-site"]), report: vi.fn(async () => undefined) };
     const effect = createConfirmedNativeFactsEffect(prepare, ports);
     const facts = receipt(DECISION, { recordRevision: 9, factKeys: ["description", "hours", "phone"] });
@@ -236,5 +236,18 @@ describe("native websites follow the owner's confirmation (#509 P2)", () => {
     expect(await effect(facts, { kind: "owner_link", recipient: "owner@example.test", actor: null })).toEqual({ websitePending: false });
     expect(await createConfirmedNativeFactsEffect(prepare, { ...ports, enabled: () => false })(facts, { kind: "owner_link", recipient: "o@example.test", actor: null }))
       .toEqual({ websitePending: false });
+  });
+
+  it("a signed-in decision stays unverified while any native site still needs its review (#509 round 3)", async () => {
+    const prepare = vi.fn(async (): Promise<NativeFactsPreparation> => ({ ready: [], needsReview: [{ tenantId: "native-site", reason: "record_moved", reported: true }] }));
+    const ports = { enabled: () => true, nativeTenants: vi.fn(async () => ["native-site"]), report: vi.fn(async () => undefined) };
+    const facts = receipt(DECISION, { recordRevision: 9, factKeys: ["phone"] });
+    // Preparation already put the site in front of an operator; nothing is reported twice.
+    expect(await createConfirmedNativeFactsEffect(prepare, ports)(facts, { kind: "session", actor: OWNER })).toEqual({ websitePending: true });
+    expect(ports.report).not.toHaveBeenCalled();
+    // Preparation itself failed: every linked native site gets an operator item.
+    prepare.mockRejectedValueOnce(new Error("systems unavailable"));
+    expect(await createConfirmedNativeFactsEffect(prepare, ports)(facts, { kind: "session", actor: OWNER })).toEqual({ websitePending: true });
+    expect(ports.report).toHaveBeenCalledExactlyOnceWith("native-site", 9);
   });
 });

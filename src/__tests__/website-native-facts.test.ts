@@ -1,5 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
-import { createNativeWebsiteFactService, nativeContactFacts, nativeWebsiteFactsPatch, createNativeFactReviewStore, type NativeWebsiteFactPorts } from "@/app/workspace/business-details/native-website-facts";
+import { createConfirmedNativeFactsEffect, createNativeWebsiteFactService, nativeContactFacts, nativeWebsiteFactsPatch, createNativeFactReviewStore, type NativeWebsiteFactPorts } from "@/app/workspace/business-details/native-website-facts";
+import { businessFactsAdapter } from "@/platform/needs-you/sources/business-facts";
 import type { BusinessRecord, ConfirmedBusinessFacts } from "@/platform/business-record/contracts";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 
@@ -111,6 +112,64 @@ describe("native website facts review", () => {
     const { ports, service } = makePorts();ports.current.mockResolvedValueOnce(current).mockResolvedValueOnce({ ...current, headline: "New approved heading" });
     await service(actor, ws, 3, ["phone"]);
     expect(ports.apply).toHaveBeenCalledWith(expect.objectContaining({ data: { ...current, phone: "716-555-0123", headline: "New approved heading" } }));
+  });
+});
+
+describe("native preparation outcome (#509 round 3)", () => {
+  const reasonFor = { stale: "record_moved", permission: "not_allowed", subscription: "not_allowed", queue: "queue_unavailable" } as const;
+  it.each(Object.keys(reasonFor) as Array<keyof typeof reasonFor>)("a %s skip on an eligible native site is reported and returned, never silent", async reason => {
+    const { ports, service } = makePorts();
+    if (reason === "stale") ports.record.mockResolvedValue({ ...record(), revision: 4 });
+    if (reason === "permission" || reason === "subscription") ports.allowed.mockResolvedValue(false);
+    if (reason === "queue") ports.queueAvailable.mockReturnValue(false);
+    expect(await service(actor, ws, 3, ["phone"])).toEqual({ ready: [], needsReview: [{ tenantId: "gldf", reason: reasonFor[reason], reported: true }] });
+    expect(ports.report).toHaveBeenCalledExactlyOnceWith("gldf", 3, reasonFor[reason]);
+    expect(ports.apply).not.toHaveBeenCalled();
+  });
+  it.each(["inactive", "repo", "template", "manifest", "unchanged", "private", "release"])("a site that takes no contact review (%s) is neither ready nor reported", async reason => {
+    const { ports, service } = makePorts();
+    if (reason === "inactive") ports.tenant.mockResolvedValue({ id: "gldf", active: false, deliveryModel: "custom_repo" });
+    if (reason === "repo") ports.tenant.mockResolvedValue({ id: "mclears", active: true, deliveryModel: "custom_repo" });
+    if (reason === "template") ports.template.mockResolvedValue({ contentSections: ["hero"] });
+    if (reason === "manifest") ports.manifest.mockResolvedValue({ sections: { contact: { allowedActions: ["read"] } } });
+    if (reason === "unchanged") ports.current.mockResolvedValue({ ...current, phone: "716-555-0123" });
+    if (reason === "release") ports.released.mockResolvedValue(false);
+    const outcome = await service(actor, ws, 3, [reason === "private" ? "owner_recipient" : "phone"]);
+    expect(outcome.needsReview).toEqual([]);expect(outcome.ready).toEqual(reason === "unchanged" ? ["gldf"] : []);
+    expect(ports.report).not.toHaveBeenCalled();
+  });
+  it("queued, held, blocked at dispatch and uncertain outcomes are each accounted for", async () => {
+    let { ports, service } = makePorts();
+    expect(await service(actor, ws, 3, ["phone"])).toEqual({ ready: ["gldf"], needsReview: [] });
+    ({ ports, service } = makePorts());ports.draft.mockResolvedValue(current as never);
+    expect((await service(actor, ws, 3, ["phone"])).needsReview).toEqual([{ tenantId: "gldf", reason: "draft_held", reported: true }]);
+    ({ ports, service } = makePorts());ports.allowed.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    expect((await service(actor, ws, 3, ["phone"])).needsReview).toEqual([{ tenantId: "gldf", reason: "changed_before_dispatch", reported: true }]);
+    ({ ports, service } = makePorts());ports.apply.mockResolvedValue({ status: "blocked" } as never);
+    expect((await service(actor, ws, 3, ["phone"])).needsReview).toEqual([{ tenantId: "gldf", reason: "not_queued", reported: true }]);
+    ({ ports, service } = makePorts());ports.apply.mockRejectedValue(Error("response lost"));ports.report.mockRejectedValue(Error("events down"));
+    expect((await service(actor, ws, 3, ["phone"])).needsReview).toEqual([{ tenantId: "gldf", reason: "failed", reported: false }]);
+  });
+  it("a signed-in confirmation whose record moved before preparation is reported and done_unverified, not done", async () => {
+    const { ports, service } = makePorts();
+    // Confirmation accepted revision 3; another edit advanced the record to 4.
+    ports.record.mockResolvedValue({ ...record(), revision: 4 });
+    const report = vi.fn(async () => undefined);
+    const effect = createConfirmedNativeFactsEffect(service, { enabled: () => true, nativeTenants: async () => ["gldf"], report });
+    const receipt = { workspaceId: ws, decisionId: "7e000000-0000-4000-8000-000000000020", recordRevision: 3, changeCount: 1, factKeys: ["phone"], replayed: false };
+    const adapter = businessFactsAdapter({ read: async () => null, confirm: async () => receipt, confirmed: effect });
+    const item = { id: receipt.decisionId, sourceId: ws, revisionHash: "a".repeat(64) } as Parameters<typeof adapter.resolve>[1];
+    expect(await adapter.resolve({ workspaceId: ws }, item, "approve", { kind: "session", actor })).toEqual({ outcome: "done_unverified", reason: "website_review_pending", receiptRef: `business_facts:${receipt.decisionId}` });
+    expect(ports.apply).not.toHaveBeenCalled();
+    expect(ports.report).toHaveBeenCalledExactlyOnceWith("gldf", 3, "record_moved");
+    expect(report).not.toHaveBeenCalled();
+  });
+  it("a signed-in confirmation whose queue is unavailable is reported and done_unverified", async () => {
+    const { ports, service } = makePorts();ports.queueAvailable.mockReturnValue(false);
+    const effect = createConfirmedNativeFactsEffect(service, { enabled: () => true, nativeTenants: async () => ["gldf"], report: vi.fn(async () => undefined) });
+    const receipt = { workspaceId: ws, decisionId: "7e000000-0000-4000-8000-000000000020", recordRevision: 3, changeCount: 1, factKeys: ["phone"], replayed: false };
+    expect(await effect(receipt, { kind: "session", actor })).toEqual({ websitePending: true });
+    expect(ports.report).toHaveBeenCalledExactlyOnceWith("gldf", 3, "queue_unavailable");
   });
 });
 

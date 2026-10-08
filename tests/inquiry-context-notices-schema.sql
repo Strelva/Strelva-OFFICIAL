@@ -20,6 +20,12 @@ insert into public.business_record_facts(workspace_id, fact_key, value, source, 
 insert into public.business_people(id, workspace_id, name, email, active, source, verified, created_by, updated_by)
   select 'c1600000-0000-4000-8000-000000000005', id, 'Maria', 'maria@example.test', true, 'operator', true,
     'c1600000-0000-4000-8000-000000000001', 'c1600000-0000-4000-8000-000000000001' from ic_ws;
+\ir support/confirm-working-record.sql
+-- #509: the operator's hours stay pending until the owner decides; the
+-- fixture's owner then confirms them.
+select pg_temp.ic_assert(to_regprocedure('public.business_confirmed_facts(uuid)') is null
+  or not (public.read_inquiry_business_context('context-site')->'facts' ? 'hours'), 'pending operator hours are not read');
+select pg_temp.confirm_working_record(id) from ic_ws;
 select pg_temp.ic_assert(public.read_inquiry_business_context('context-other') is null, 'unconverted site gets no other business facts');
 select pg_temp.ic_assert(public.read_inquiry_business_context('context-site')->'facts'->'hours'->>'verified' = 'true'
   and jsonb_array_length(public.read_inquiry_business_context('context-site')->'people') = 1, 'current business facts and people');

@@ -1119,6 +1119,40 @@ fi
 grep -q 'business_pages_rollback_requires_data_preservation' "$cluster_root/business-pages-rollback-refusal.log"
 psql "${psql_args[@]}" -Atc "select exists(select 1 from public.business_pages where handle='rollback-fixture') and to_regprocedure('public.business_confirmed_public_facts(uuid)') is not null" | grep -qx t
 printf 'Business page rollback preserved saved publication settings.\n'
+# #509 round 3: bookings, inquiries and the linked-site overlay read only the
+# owner-confirmed copy. The contract reproduces the leak before the migration
+# (an operator's pending phone reaches booking), holds after it alongside the
+# earlier booking and inquiry contracts, #509's rollback refuses while it is
+# applied, and its rollback restores the exact catalog.
+if psql "${psql_args[@]}" --file="$repo_root/tests/booking-confirmed-facts-schema.sql" >"$cluster_root/booking-facts-before.log" 2>&1; then
+  printf 'Booking readers already ignored pending facts before 20261013115000.\n' >&2
+  exit 1
+fi
+grep -q 'booking phone is confirmed, got 716-555-0999' "$cluster_root/booking-facts-before.log"
+psql "${psql_args[@]}" --tuples-only --no-align --file="$repo_root/tests/support/public-catalog-fingerprint.sql" >"$cluster_root/catalog-before-booking-facts.txt"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013115000_booking_reads_confirmed_facts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-confirmed-facts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-business-context-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-context-notices-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-booking-handoff-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013110000_public_facts_read_confirmed.sql"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011133700_business_facts_owner_decision.sql" >"$cluster_root/booking-facts-rollback-order.log" 2>&1; then
+  printf '#509 rollback ran while the booking readers still read its copy.\n' >&2
+  exit 1
+fi
+grep -q 'roll back 20261013115000_booking_reads_confirmed_facts first' "$cluster_root/booking-facts-rollback-order.log"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013110000_public_facts_read_confirmed.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013115000_booking_reads_confirmed_facts.sql"
+if ! diff -u "$cluster_root/catalog-before-booking-facts.txt" \
+    <(psql "${psql_args[@]}" --tuples-only --no-align --file="$repo_root/tests/support/public-catalog-fingerprint.sql"); then
+  printf 'Booking-reader rollback did not restore the exact catalog.\n' >&2
+  exit 1
+fi
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013115000_booking_reads_confirmed_facts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-confirmed-facts-schema.sql"
+printf 'Booking readers read only the confirmed copy; rollback is exact and ordered.\n'
 # Every stream's release flag key survives the integrated redefinitions (#253).
 psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 

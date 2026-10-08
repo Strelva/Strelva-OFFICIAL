@@ -82,38 +82,61 @@ const live = {
   queueAvailable: () => Boolean(getRedis()),
   apply: applySectionUpdate,
   reviews: createNativeFactReviewStore(),
-  report: async (tenantId: string, revision: number) => { await addEvent({ tenantId, source: "website", type: "change_verify_failed", status: "pending",
+  report: async (tenantId: string, revision: number, reason?: NativeFactsSkip) => { await addEvent({ tenantId, source: "website", type: "change_verify_failed", status: "pending",
     title: "Business facts need a website review", body: "The business record was saved. Its native contact update could not be prepared; inspect the saved review claim before retrying.",
-    metadata: { reviewAudience: "operator", kind: "native_business_facts", recordRevision: revision } }, { requirePersistence: true }); },
+    metadata: { reviewAudience: "operator", kind: "native_business_facts", recordRevision: revision, ...(reason ? { reason } : {}) } }, { requirePersistence: true }); },
 };
 export type NativeWebsiteFactPorts = typeof live;
 
+/** Why a linked native site's contact review wasn't queued. */
+export type NativeFactsSkip = "record_moved" | "not_allowed" | "queue_unavailable" | "draft_held" | "changed_before_dispatch" | "not_queued" | "failed";
+/**
+ * What preparation did for the linked native websites. `ready`: queued, or
+ * already showing the confirmed details. `needsReview`: still showing older
+ * details with nothing queued; each has an operator item unless `reported`
+ * is false because recording it failed too. Sites that don't take contact
+ * reviews (another delivery model, no contact section) are in neither.
+ */
+export type NativeFactsPreparation = { ready: string[]; needsReview: Array<{ tenantId: string; reason: NativeFactsSkip; reported: boolean }> };
+
 export function createNativeWebsiteFactService(ports: NativeWebsiteFactPorts = live) {
-  return async (actor: WorkspaceActor, workspaceId: string, revision: number, changed: readonly string[]) => {
-    if (!ports.enabled() || !changed.some(key => CONTACT_KEYS.some(contact => contact === key))) return;
-    if (!(await ports.released(actor, workspaceId))) return;
+  return async (actor: WorkspaceActor, workspaceId: string, revision: number, changed: readonly string[]): Promise<NativeFactsPreparation> => {
+    const outcome: NativeFactsPreparation = { ready: [], needsReview: [] };
+    if (!ports.enabled() || !changed.some(key => CONTACT_KEYS.some(contact => contact === key))) return outcome;
+    if (!(await ports.released(actor, workspaceId))) return outcome;
     const record = await ports.record(actor, workspaceId);
-    if (record.revision !== revision || (record.access !== "owner" && record.access !== "admin")) return;
+    if (record.access !== "owner" && record.access !== "admin") return outcome;
+    // Another write moved the record past this revision before preparation:
+    // nothing is queued for it, so every native site waits on an operator.
+    const moved = record.revision !== revision;
+    const skip = async (tenantId: string, reason: NativeFactsSkip, reported = false) => {
+      if (!reported) reported = await ports.report(tenantId, revision, reason).then(() => true, () => false);
+      outcome.needsReview.push({ tenantId, reason, reported });
+    };
     const sites = await ports.sites(actor, workspaceId);
     for (const site of sites.systems.filter(site => site.system.kind === "website" && site.system.lifecycle !== "paused")) {
       const tenantId = site.references.tenantId;
       if (!tenantId) continue;
       const tenant = await ports.tenant(tenantId);
-      if (!tenant?.active || tenant.deliveryModel !== "custom_repo" || siteEditingFor(tenant) !== "native" || !(await ports.allowed(tenantId))) continue;
+      if (!tenant?.active || tenant.deliveryModel !== "custom_repo" || siteEditingFor(tenant) !== "native") continue;
+      if (moved) { await skip(tenantId, "record_moved"); continue; }
+      if (!(await ports.allowed(tenantId))) { await skip(tenantId, "not_allowed"); continue; }
       const [template, manifest] = await Promise.all([ports.template(tenantId), ports.manifest(tenantId)]);
-      if (!template.contentSections.includes("contact") || !manifestAllowsAction(manifest, "contact", "draft") || !ports.queueAvailable()) continue;
+      if (!template.contentSections.includes("contact") || !manifestAllowsAction(manifest, "contact", "draft")) continue;
+      if (!ports.queueAvailable()) { await skip(tenantId, "queue_unavailable"); continue; }
       const current = await ports.current(tenantId);
       const next = nativeContactFacts(await ports.confirmed(actor, workspaceId), changed, current as unknown as Record<string, unknown>);
-      if (JSON.stringify(next) === JSON.stringify(current)) continue;
+      if (JSON.stringify(next) === JSON.stringify(current)) { outcome.ready.push(tenantId); continue; }
       const token = randomUUID();
       try {
-        if (!(await ports.reviews.claim(actor, workspaceId, tenantId, revision, token))) continue;
+        // Already claimed: that preparation queued this revision or reported it.
+        if (!(await ports.reviews.claim(actor, workspaceId, tenantId, revision, token))) { outcome.ready.push(tenantId); continue; }
         // Preserve an existing operator/owner draft instead of overwriting it.
         // The durable claim precedes queue dispatch: uncertain acceptance cannot
         // create a second review when this record revision is observed again.
         if (await ports.draft(tenantId)) {
           await ports.reviews.record(token, "blocked", null);
-          await ports.report(tenantId, revision).catch(() => undefined);
+          await skip(tenantId, "draft_held");
           continue;
         }
         // Recheck permission, subscription, release and active tenant at dispatch.
@@ -125,19 +148,24 @@ export function createNativeWebsiteFactService(ports: NativeWebsiteFactPorts = l
             !latestSites.systems.some(site => site.references.tenantId === tenantId && site.system.kind === "website" && site.system.lifecycle !== "paused") ||
             !latestTemplate.contentSections.includes("contact") || !manifestAllowsAction(latestManifest, "contact", "draft") ||
             !ports.enabled() || !(await ports.released(actor, workspaceId)) || !(await ports.allowed(tenantId))) {
-          await ports.reviews.record(token, "blocked", null); continue;
+          await ports.reviews.record(token, "blocked", null);
+          await skip(tenantId, "changed_before_dispatch");
+          continue;
         }
         const latestCurrent = await ports.current(tenantId);
         const latestNext = nativeContactFacts(await ports.confirmed(actor, workspaceId), changed, latestCurrent as unknown as Record<string, unknown>);
-        if (JSON.stringify(latestNext) === JSON.stringify(latestCurrent)) { await ports.reviews.record(token, "blocked", null); continue; }
+        if (JSON.stringify(latestNext) === JSON.stringify(latestCurrent)) { await ports.reviews.record(token, "blocked", null); outcome.ready.push(tenantId); continue; }
         const result = await ports.apply({ tenantId, section: "contact", data: latestNext, tenantConfig: latest, siteManifest: latestManifest, forceReview: true, requestId: `business-facts:${workspaceId}:${revision}` });
         await ports.reviews.record(token, result.status === "queued" ? "queued" : "blocked", result.status === "queued" ? result.eventId : null);
-        if (result.status !== "queued") await ports.report(tenantId, revision).catch(() => undefined);
+        if (result.status === "queued") outcome.ready.push(tenantId);
+        else await skip(tenantId, "not_queued");
       } catch {
         await ports.reviews.record(token, "unconfirmed", null).catch(() => undefined);
-        await ports.report(tenantId, revision).catch(() => undefined);
+        // The queue may have accepted it: never replay, only report.
+        if (!outcome.needsReview.some(row => row.tenantId === tenantId)) await skip(tenantId, "failed");
       }
     }
+    return outcome;
   };
 }
 
@@ -180,11 +208,15 @@ export function createConfirmedNativeFactsEffect(prepare = createNativeWebsiteFa
     const changed = receipt.factKeys.filter(key => CONTACT_KEYS.some(contact => contact === key));
     if (!changed.length || !ports.enabled()) return { websitePending: false };
     const actor = by.kind === "session" ? by.actor : by.kind === "owner_link" ? by.actor : null;
+    if (by.kind !== "owner_link" && !actor) return { websitePending: false };
     if (actor) {
-      await prepare(actor, receipt.workspaceId, receipt.recordRevision, changed);
-      return { websitePending: false };
+      // Any linked native site left without a queued review keeps the decision
+      // unverified; preparation has already put it in front of an operator.
+      const prepared = await prepare(actor, receipt.workspaceId, receipt.recordRevision, changed).catch(() => null);
+      if (prepared) return { websitePending: prepared.needsReview.length > 0 };
     }
-    if (by.kind !== "owner_link") return { websitePending: false };
+    // No member identity, or preparation itself failed: every linked native
+    // site gets an operator item and the website is reported pending.
     const tenants = await ports.nativeTenants(receipt.workspaceId);
     for (const tenantId of tenants) await ports.report(tenantId, receipt.recordRevision);
     return { websitePending: tenants.length > 0 };

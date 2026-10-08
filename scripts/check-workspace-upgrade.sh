@@ -91,10 +91,11 @@ for migration in $(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -na
     psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/$early_lead_migration" >/dev/null
     psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
   fi
-  if [[ "$migration_name" == "20261013110000_public_facts_read_confirmed.sql" ]]; then
+  if [[ "$migration_name" == "20261013110000_public_facts_read_confirmed.sql" \
+    || "$migration_name" == "20261013115000_booking_reads_confirmed_facts.sql" ]]; then
     # The exact readers its rollback must restore (rehearsed at the end).
     psql "${psql_args[@]}" --tuples-only --no-align --file="$repo_root/tests/support/public-catalog-fingerprint.sql" \
-      >"$cluster_root/catalog-before-public-facts.txt"
+      >"$cluster_root/catalog-before-${migration_name%.sql}.txt"
   fi
   printf 'Applying ordered workspace/recovery migration: %s\n' "$migration_name"
   if [[ "$migration_name" == "20260920060000_content_version_request_id.sql" ]]; then
@@ -298,31 +299,46 @@ fi
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012010000_tenant_track_signing_keys.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012120000_track_signing_key_rotation.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-track-signing-keys-schema.sql"
-# #509 rollbacks in reverse order on the full ordered schema. The public-facts
-# reader's rollback restores the exact readers from before it and nothing else; #509's then
-# hands connect.js back to the 20261012110000 reader; reapplying both returns
-# the exact full catalog, and the public-facts contracts hold again.
+# The booking readers (20261013115000) and the public-facts reader roll back
+# in reverse order on the full ordered schema, then #509. Each rollback
+# restores exactly the readers it replaced, as they were before its forward
+# migration, and moves nothing else; #509's then hands connect.js back to the
+# 20261012110000 reader; reapplying all of them returns the exact full
+# catalog, and their contracts hold again.
 catalog_fingerprint() {
   psql "${psql_args[@]}" --tuples-only --no-align --file="$repo_root/tests/support/public-catalog-fingerprint.sql"
 }
+# The functions each forward migration replaces or adds.
+rollback_readers() {
+  case "$1" in
+    20261013115000_booking_reads_confirmed_facts) printf '%s' 'business_confirmed_facts|business_confirmed_services|read_tenant_booking_context_before_service_policy|read_booking_business_details|read_inquiry_workspace_booking_context|inquiry_booking_offer_json|prepare_inquiry_booking_offer|read_tenant_business_context|read_inquiry_business_context' ;;
+    20261013110000_public_facts_read_confirmed) printf '%s' 'business_confirmed_public_facts|read_connected_site_context' ;;
+  esac
+}
 catalog_fingerprint >"$cluster_root/catalog-full.txt"
-public_facts_rollbacks=(20261013110000_public_facts_read_confirmed)
+# Newest first; the public-facts reader is last.
+public_facts_rollbacks=(20261013115000_booking_reads_confirmed_facts 20261013110000_public_facts_read_confirmed)
 for name in "${public_facts_rollbacks[@]}"; do
+  catalog_fingerprint >"$cluster_root/catalog-before-rollback-$name.txt"
   psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-$name.sql"
+  catalog_fingerprint >"$cluster_root/catalog-after-rollback-$name.txt"
+  if [[ -n "$(rollback_readers "$name")" ]]; then
+    # Fixtures above add unrelated objects after the forward migration, so
+    # compare its readers with their exact pre-migration definitions, and
+    # require that nothing else in the catalog moved.
+    readers="^f ($(rollback_readers "$name"))\\("
+    if ! diff -u <(grep -E "$readers" "$cluster_root/catalog-before-$name.txt") \
+        <(grep -E "$readers" "$cluster_root/catalog-after-rollback-$name.txt") \
+      || ! diff -u <(grep -vE "$readers" "$cluster_root/catalog-before-rollback-$name.txt") \
+        <(grep -vE "$readers" "$cluster_root/catalog-after-rollback-$name.txt"); then
+      printf 'Rollback %s did not restore the public catalog exactly.\n' "$name" >&2
+      exit 1
+    fi
+  fi
 done
-catalog_fingerprint >"$cluster_root/catalog-after-public-facts-rollback.txt"
-# Fixtures above add unrelated objects after the forward migration, so compare
-# its two readers with their exact pre-migration definitions, and require that
-# nothing else in the catalog moved.
-public_facts_readers='^f (business_confirmed_public_facts|read_connected_site_context)\('
-[[ "$(grep -cE "$public_facts_readers" "$cluster_root/catalog-before-public-facts.txt")" == 2 ]]
-if ! diff -u <(grep -E "$public_facts_readers" "$cluster_root/catalog-before-public-facts.txt") \
-    <(grep -E "$public_facts_readers" "$cluster_root/catalog-after-public-facts-rollback.txt") \
-  || ! diff -u <(grep -vE "$public_facts_readers" "$cluster_root/catalog-full.txt") \
-    <(grep -vE "$public_facts_readers" "$cluster_root/catalog-after-public-facts-rollback.txt"); then
-  printf 'Public-facts rollback did not restore the public catalog.\n' >&2
-  exit 1
-fi
+[[ "$(grep -cE '^f (business_confirmed_public_facts|read_connected_site_context)\(' "$cluster_root/catalog-before-20261013110000_public_facts_read_confirmed.txt")" == 2 ]]
+[[ "$(grep -cE "^f ($(rollback_readers 20261013115000_booking_reads_confirmed_facts))\\(" "$cluster_root/catalog-before-20261013115000_booking_reads_confirmed_facts.txt")" == 7 ]]
+[[ "$(grep -cE "^f ($(rollback_readers 20261013115000_booking_reads_confirmed_facts))\\(" "$cluster_root/catalog-full.txt")" == 9 ]]
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011133700_business_facts_owner_decision.sql"
 psql "${psql_args[@]}" -Atc "select to_regclass('public.business_record_confirmed') is null
   and (select prosrc like '%business_confirmed_public_facts%' from pg_proc where oid='public.read_connected_site_context(text)'::regprocedure)" | grep -qx t
@@ -332,12 +348,13 @@ for (( index=${#public_facts_rollbacks[@]}-1; index>=0; index-- )); do
 done
 catalog_fingerprint >"$cluster_root/catalog-full-reapplied.txt"
 if ! diff -u "$cluster_root/catalog-full.txt" "$cluster_root/catalog-full-reapplied.txt"; then
-  printf 'Reapplying #509 and the public-facts reader did not restore the full catalog.\n' >&2
+  printf 'Reapplying #509, the public-facts and booking readers did not restore the full catalog.\n' >&2
   exit 1
 fi
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/business-pages-schema.sql"
-printf 'Public-facts and #509 rollbacks restored the exact catalog in reverse order.\n'
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-confirmed-facts-schema.sql"
+printf 'Booking-reader, public-facts and #509 rollbacks restored the exact catalog in reverse order.\n'
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 
