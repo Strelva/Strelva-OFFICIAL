@@ -92,7 +92,10 @@ disagree, the checklist's stop conditions win.
    otherwise). The library is read for an agency workspace, and rows used to
    be allowed on business workspaces only; `20261008161000` (batch 3) allows
    them on agency workspaces too, set with `scripts/workspace-release-flag.ts`
-   (S10). Without the workspace release, link fields keep the env-only rule.
+   (S10). The command verifies the current operator's signed Supabase session;
+   an `on` write records that same operator's approval and includes the local
+   OS user and machine in its audit. Without the workspace release, link fields
+   keep the env-only rule.
 7. **"Stripe test mode first" can't run as specced.** The script picks its
    mode from the key prefix but reads Stripe ids from whatever Supabase is
    configured. A test key against production ids fails every update. A real
@@ -1453,6 +1456,23 @@ module S12 loads). Every other file under `scripts/` that mentions
 `--i-have-jacobs-yes` is a listed command or the module behind one
 (checked by grep at `30dcba1b`).
 
+For S10, sign in as the active Strelva operator first. Copy the `access_token`
+from that browser's `sb-<project-ref>-auth-token` entry in Application → Local
+Storage, then enter it at a hidden shell prompt so it is not part of command
+history:
+
+```sh
+printf 'Current Strelva session access token: ' >&2
+read -r -s STRELVA_OPERATOR_SESSION_ACCESS_TOKEN
+printf '\n'
+export STRELVA_OPERATOR_SESSION_ACCESS_TOKEN
+```
+
+Run the S10 commands below, replacing `operators` with `on` when enabling
+Systems, then run `unset STRELVA_OPERATOR_SESSION_ACCESS_TOKEN`. The `on`
+write records an approval under the token's verified user ID; the browser or
+CLI cannot name another approver.
+
 | # | When | Dry run | Apply | Writes | Needs |
 | --- | --- | --- | --- | --- | --- |
 | S0 | Step 0 | — | `npx tsx scripts/production-readiness-snapshot.ts --i-have-jacobs-yes` | nothing | — |
@@ -1466,7 +1486,7 @@ module S12 loads). Every other file under `scripts/` that mentions
 | S7 | After conversions and `STRELVA_BUSINESS_BILLING=1` | `npx tsx scripts/stripe-workspace-metadata.ts` (no Stripe call) | test key: `npx tsx scripts/stripe-workspace-metadata.ts --apply --i-have-jacobs-yes`; live key: add `--live` | Stripe `metadata.workspaceId` and `metadata.payerKind`, merge only, after the amended writer lands. The 9 existing clients stay `business` (pay Strelva directly); no payer migration. An object reachable from two businesses is a conflict and never written | batch 4 + 7A payer contract and amended metadata writer. A dry run that lists every tenant as "Not converted" means batch 4 is missing: the RPC error is swallowed |
 | S8 | After conversions | `npx tsx scripts/copy-google-bindings.ts` | `npx tsx scripts/copy-google-bindings.ts --apply --i-have-jacobs-yes`, then `npx tsx scripts/copy-google-bindings.ts --verify-google --i-have-jacobs-yes` | `workspace_account_bindings`, `workspace_google_locations`, re-encrypted, `migrated_from='redis'`; never overwrites. Verify mints one token per copy and makes one read-only Google call. Unconverted tenants are skipped | batch 3, `SECRETS_ENC_KEY` (apply refuses without it), conversion |
 | S9 | Around each step | — | `npx tsx scripts/storefront-parity.ts capture … --i-have-jacobs-yes` and `compare` | only the `--out` file | section 4 |
-| S10 | For a workspace with no client page (the Strelva agency workspace) | `npx tsx scripts/workspace-release-flag.ts <workspace-id> systems operators --operator-email=<super admin> --reason="<why>" --i-have-jacobs-yes` (reads the row) | same with `--apply` | one `workspace_release_flags` row and its change record, revision-checked | batch 3 incl. `20261008161000` |
+| S10 | For a workspace with no client page (the Strelva agency workspace) | `npx tsx --env-file=<prod env> scripts/workspace-release-flag.ts <workspace-id> systems operators --reason="<why>" --i-have-jacobs-yes` (reads the row) | same with `--apply`; use state `on` to enable Systems | one `workspace_release_flags` row and change record, revision-checked. `on` also records a same-operator approval and audit event. | batch 3 incl. `20261008161000`; signed operator session token |
 | S11 | After batch 5 and each tenant's conversion, before `STRELVA_NEEDS_YOU_RELEASE=1` | Against the S4 scrubbed copy only: `npx tsx scripts/needs-you-seed-tenant-policies.ts [<slug>] --json` (no yes needed on local stores) | `npx tsx scripts/needs-you-seed-tenant-policies.ts <slug> --operator-user-id=<uuid> --operator-email=<super admin> --i-have-jacobs-yes` | one `decision_policy_tenant_imports` receipt per tenant and kind (content autonomy, review reply mode), the owner's `decision_policies` row and its history. Redis keys never change; idempotent. A choice the new floor doesn't carry over is listed, not migrated | batch 5 (`20261008124000`), conversion. **There is no production dry run**: with the yes it writes, and without it it refuses a non-local store. Review the scrubbed-copy plan first |
 | S12 | After batch 6 and `STRELVA_BOOKING_STORE_WRITE=1` | `npx tsx scripts/booking-store-move.ts backfill --i-have-jacobs-yes` (reads client bookings, writes nothing) | Two yeses. S12a: `… backfill --apply --i-have-jacobs-yes`, then `… schedules --i-have-jacobs-yes` (dry run) and `… schedules --apply --i-have-jacobs-yes`. S12b, after `STRELVA_BOOKING_STORE_READ=compare`: `… parity --i-have-jacobs-yes` once a day for 7 days (finding 14) | `business_bookings` through `record_tenant_booking` (the dual-write RPC; reruns are no-ops, overlaps refused and listed); parity rows under store `bookings`. Legacy stores untouched | batch 6 (`20261008141000`) |
 | — | Not part of 1.0 | `npx tsx scripts/backfill-secret-encryption.ts --i-have-jacobs-yes`; `npx tsx scripts/count-client-redis-keys.ts --i-have-jacobs-yes` (read-only) | backfill: `--apply --i-have-jacobs-yes` | encrypted secret columns and `connections:*` | `SECRETS_ENC_KEY` |

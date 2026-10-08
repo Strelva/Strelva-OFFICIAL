@@ -481,8 +481,9 @@ workspaces, so no client sees a change until its workspace is on.
    - the owner recipient resolves and client email is on for that business;
    - that channel's adapter is proven on the Strelva-owned test business.
 4. **Order:** the Strelva-owned test business, then gldf (`operators`, then
-   `on`), then the rest. Each client's first `on` needs Jacob's yes
-   (owner-entry table).
+   `on`), then the rest. Each client's first `on` needs a server-recorded
+   approval from a different active operator, bound to that workspace, flag
+   and reason (owner-entry table).
 5. **Turning it off** renders the pre-Systems workspace (this exists today).
    Stored rows stay. An activation already running keeps settling from the
    cron, so no step is left `running`. No new Make real starts.

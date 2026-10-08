@@ -25,6 +25,10 @@ create table auth.users (
   email text,
   email_confirmed_at timestamptz
 );
+create table auth.identities (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  identity_data jsonb not null default '{}'::jsonb
+);
 create function auth.uid()
 returns uuid
 language sql stable
