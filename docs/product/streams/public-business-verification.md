@@ -2,11 +2,11 @@
 
 Prepared on `feat/verified-business-profile-308-20261008`, based on `e9ac136f`.
 Local code and fictional fixtures only; no production/provider operation.
-Migration `20261018132000` is pinned in proposed release packet batch 12 as
-unapplied prepared work. Its timestamp precedes the current final `20261019100000`
-security boundary; filename-sorted local proof does not qualify applying it to
-an already-deployed target. Deployed-target ordering, prerequisites, live-role
-defaults and recovery must be separately qualified before promotion.
+Migration `20261020114000` is pinned in proposed release packet batch 12 as
+unapplied prepared work. Its reserved timestamp follows the current final
+`20261019100000` security boundary. Local ordering and recovery proof do not
+qualify an already-deployed target: prerequisites, live-role defaults, privacy
+and recovery must be separately qualified before promotion.
 
 One public `verification` block accompanies `get_business` and the server-rendered
 `/biz/{handle}` page. Issue #308's `/b/{handle}` wording predates the accepted
@@ -74,7 +74,7 @@ typecheck, boundaries, changed-file ESLint and both SQL runners passed. The
 current-tail packet proved complete coverage of 41 remaining forward files,
 188 introduced RPCs dark during both recovery rounds, and exact restoration
 of public catalog/ACL and legacy auth/content/billing behavior. Local receipt:
-`output/release-safety/batch8-1791466576534`. This is local recovery evidence,
+`output/release-safety/batch8-1791466874112`. This is local recovery evidence,
 not a deployed-target qualification. Custom-repository checks passed 20 cases;
 nine sibling cases were skipped because their paths are absent beside this
 isolated worktree.
@@ -82,6 +82,25 @@ isolated worktree.
 The default-off fictional fixture `/preview/strelva/business-verification`
 shows `fresh`, `stale`, `unknown` and `revoked` states. It requires the existing
 preview gate and accesses no provider or customer store.
+
+Croki inspected the fixture at a 1280px desktop viewport width, then an explicit
+390 × 844 mobile viewport. The mobile DOM reported one main element and equal
+390px viewport/document widths across all four states; long domain and agency
+labels wrapped without horizontal overflow. Retained local mobile artifacts:
+
+- Fresh: `/Users/jacobrhinehart/.croki/userdata/browser-artifacts/browser-screenshot-localhost-muzkpe3f-9f4e6276.png` — recent domain control shown verified, Google linked with verification unknown, owner count/date and active agency.
+- Stale: `/Users/jacobrhinehart/.croki/userdata/browser-artifacts/browser-screenshot-localhost-muzkpe76-c225a560.png` — earlier domain and Google linkage require fresh checks; no current domain verdict.
+- Unknown: `/Users/jacobrhinehart/.croki/userdata/browser-artifacts/browser-screenshot-localhost-muzkpeae-1bf140de.png` — confirmation unavailable, no domain or agency claim.
+- Revoked: `/Users/jacobrhinehart/.croki/userdata/browser-artifacts/browser-screenshot-localhost-muzkpedq-611792dc.png` — removed connections/agency show no current claims; surviving owner confirmations remain distinct.
+
+The mobile screenshot compositor retained a wider canvas with repeated columns;
+DOM inspection reported one main and one verification section. The artifacts
+prove the fictional local rendering, not provider truth or deployment.
+
+After reserving the new migration timestamp, the 27 inventory tests, actual
+current-tail recovery gate and standalone ordered SQL/rollback runner passed
+again. Forward and rollback SQL bytes are identical to the earlier commit;
+all predecessor packet entries are unchanged.
 
 The current connected-site verifier is a one-time ownership check: it retains
 `verified_at` once set. Refreshing aged ownership proof is an independent
