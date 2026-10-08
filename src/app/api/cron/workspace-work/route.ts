@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireCronRequest } from "@/lib/cron-auth";
 import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
-import { listDueWork, sweepDueWork } from "@/products/operations/server";
+import { listDueWork, sweepDueWork, snapshotDueResponsibilityMeters } from "@/products/operations/server";
 
 export const maxDuration = 60;
 
@@ -47,8 +47,9 @@ export async function GET(request: Request) {
   }
   try {
     const result = await sweepDueWork(await listDueWork());
-    await recordHeartbeat("workspace-work", { ok: result.failed === 0 && systems.activations.failed === 0, processed: result.processed + systems.activations.processed, failed: result.failed + systems.activations.failed });
-    return NextResponse.json({ ...result, systems });
+    const responsibilityMeter = await snapshotDueResponsibilityMeters(20).catch(() => ({ processed: 0, failed: 1, failures: [] }));
+    await recordHeartbeat("workspace-work", { ok: result.failed === 0 && systems.activations.failed === 0 && responsibilityMeter.failed === 0, processed: result.processed + systems.activations.processed, failed: result.failed + systems.activations.failed + responsibilityMeter.failed });
+    return NextResponse.json({ ...result, systems, responsibilityMeter });
   } catch {
     await recordHeartbeat("workspace-work", { ok: false, failed: 1 });
     return NextResponse.json({ error: "The work sweep could not be completed.", systems }, { status: 503 });

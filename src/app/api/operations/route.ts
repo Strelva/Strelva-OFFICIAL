@@ -12,6 +12,7 @@ import {
   workspaceResponsibilityCommands,
 } from "@/products/operations/server";
 import { listStandingResponsibilities, readStandingRuns } from "@/platform/work-execution/standing-repository";
+import { createKeepMeFoundBundle, readResponsibilityProof, readResponsibilityBundleState, setProviderResponsibilityCadence, snapshotResponsibilityMeter } from "@/products/operations/server";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 export async function GET(request: Request) {
@@ -19,6 +20,12 @@ export async function GET(request: Request) {
   try {
     const actor = await workspaceHttpActor(); if (!actor) return json({ error: "Sign in to open your work." }, 401);
     const query = new URL(request.url).searchParams;
+    if (query.get("view") === "responsibility_proof") {
+      const workspaceId = z.string().uuid().parse(query.get("workspaceId"));
+      const from = z.string().datetime().parse(query.get("from")), to = z.string().datetime().parse(query.get("to"));
+      const [proof, state] = await Promise.all([readResponsibilityProof(actor, workspaceId, from, to), readResponsibilityBundleState(actor, workspaceId)]);
+      return json({ proof, state });
+    }
     const standingId = query.get("standingId");
     if (standingId) {
       if (query.get("view") !== "runs") throw new z.ZodError([]);
@@ -37,6 +44,9 @@ export async function POST(request: Request) {
   try {
     const actor = await workspaceHttpActor(); if (!actor) return json({ error: "Sign in to change your work." }, 401);
     const input = z.discriminatedUnion("action", [
+      z.object({ action: z.literal("keep_me_found"), input: z.unknown() }).strict(),
+      z.object({ action: z.literal("responsibility_meter"), workspaceId: z.string().uuid(), month: z.string() }).strict(),
+      z.object({ action: z.literal("responsibility_cadence"), workspaceId: z.string().uuid(), cadence: z.enum(["weekly", "monthly"]) }).strict(),
       z.object({ action: z.literal("create"), workspaceId: z.string().uuid(), input: z.unknown() }).strict(),
       z.object({ action: z.literal("command"), workId: z.string().uuid(), command: z.unknown() }).strict(),
       z.object({ action: z.literal("run"), workId: z.string().uuid() }).strict(),
@@ -47,6 +57,9 @@ export async function POST(request: Request) {
       z.object({ action: z.literal("standing_cancel"), runId: z.string().uuid() }).strict(),
       z.object({ action: z.literal("standing_reconcile"), runId: z.string().uuid(), command: z.unknown() }).strict(),
     ]).parse(await readWorkspaceBody(request));
+    if (input.action === "keep_me_found") return json(await createKeepMeFoundBundle(actor, input.input), 201);
+    if (input.action === "responsibility_meter") return json(await snapshotResponsibilityMeter(actor, input.workspaceId, input.month));
+    if (input.action === "responsibility_cadence") return json(await setProviderResponsibilityCadence(actor, input.workspaceId, input.cadence));
     if (input.action === "create") return json(await workspaceResponsibilityCommands.create(actor, input.workspaceId, input.input));
     if (input.action === "command") return json(await workspaceResponsibilityCommands.command(actor, input.workId, input.command));
     if (input.action === "run") return json(await workspaceResponsibilityCommands.run(actor, input.workId));

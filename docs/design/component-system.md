@@ -911,3 +911,19 @@ Public attributed audit/AI-check components and email layouts consume the same
 presentation contract, retaining native identity without agency attribution.
 R23 remains open: this implements brand presentation, not an accepted decision
 to remove platform identity. See [#264 evidence and limits](../product/streams/a1-agency-brand.md).
+
+## Responsibility proof, October 7, 2026 (local)
+
+[ResponsibilityProof](../../src/experience/operations/ResponsibilityProof.tsx)
+composes Card, Button and SelectInput with a semantic list and Did / Verified
+pairs. Running and the agency Clients portfolio use the same receipt projection;
+portfolio proof is loaded only when the assigned provider opens its disclosure.
+Cadence uses the existing tenant report state and report transport. Google action
+receipts distinguish matched read-back, accepted but unverified, held and failed;
+a saved-source check never certifies the maintained responsibility. Review undo
+opens the existing Google receipt and undo review and is shown only for an actual reversible
+write. Loading, unavailable, empty, read-only and provider-only cadence states
+retain native semantics; an unconfirmed mutation requires a reload. The guarded
+`/preview/strelva/responsibilities` fixture exposes five mixed evidence states.
+Local 1280px and 390px observation proves layout and fictional proof only; it
+does not prove provider operation, email delivery or a maintained service promise.
