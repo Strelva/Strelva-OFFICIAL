@@ -42,8 +42,8 @@ begin
  select * into j from public.job_economics where id=s.budget_job_id for update;
  if not found or j.work_id<>p_work or j.workspace_id<>w.workspace_id or j.product_id<>'custom-applications' or j.resource_kind<>'custom-application'
  or j.status not in('accepted','reserved') or j.max_authorized_cents is distinct from s.budget_max_authorized_cents or j.max_authorized_cents<=0
- or j.accepted_by is distinct from j.payer_id or j.accepted_at is null then raise exception 'sandbox_build_budget_required';end if;
- perform 1 from public.users u join public.workspace_memberships m on m.user_id=u.id where u.id=j.payer_id and u.verified_at is not null and m.workspace_id=w.workspace_id for share of u,m;
+ or j.accepted_by is null or j.accepted_at is null then raise exception 'sandbox_build_budget_required';end if;
+ perform 1 from public.users u join public.workspace_memberships m on m.user_id=u.id where u.verified_at is not null and m.workspace_id=coalesce(j.payer_workspace_id,j.workspace_id) and public.work_payer_can_sign(j.payer_kind,j.payer_workspace_id,j.workspace_id,j.payer_id,u.id) for share of u,m;
  if not found then raise exception 'sandbox_build_payer_required';end if;
  expected_name:='strelva-build-'||left(public.custom_application_digest(w.workspace_id,p_work,p_version,p_digest),48);
  if p_name is distinct from expected_name then raise exception 'sandbox_build_attempt_mismatch';end if;
@@ -71,8 +71,8 @@ begin
  select * into s from public.custom_application_states where work_id=a.work_id for update;
  select * into j from public.job_economics where id=a.job_id for update;
  if s.work_id is null or s.lifecycle_status='retired' or s.candidate_version<>a.application_version or s.candidate_revision<>a.candidate_revision or s.candidate_source_digest<>a.source_digest or s.budget_job_id is distinct from a.job_id or s.budget_max_authorized_cents is distinct from a.maximum_cents then raise exception 'sandbox_build_target_changed';end if;
- if j.id is null or j.status not in('accepted','reserved') or j.accepted_by is distinct from j.payer_id or j.max_authorized_cents<>a.maximum_cents then raise exception 'sandbox_build_budget_required';end if;
- perform 1 from public.users u join public.workspace_memberships m on m.user_id=u.id where u.id=j.payer_id and u.verified_at is not null and m.workspace_id=a.workspace_id for share of u,m;
+ if j.id is null or j.status not in('accepted','reserved') or j.accepted_by is null or j.accepted_at is null or j.max_authorized_cents<>a.maximum_cents then raise exception 'sandbox_build_budget_required';end if;
+ perform 1 from public.users u join public.workspace_memberships m on m.user_id=u.id where u.verified_at is not null and m.workspace_id=coalesce(j.payer_workspace_id,j.workspace_id) and public.work_payer_can_sign(j.payer_kind,j.payer_workspace_id,j.workspace_id,j.payer_id,u.id) for share of u,m;
  if not found then raise exception 'sandbox_build_payer_required';end if;
  perform 1 from public.sandbox_build_attempts where id=p_attempt for update;
  if exists(select 1 from public.sandbox_build_observations where attempt_id=p_attempt and kind='started') then raise exception 'sandbox_build_attempt_unresolved';end if;

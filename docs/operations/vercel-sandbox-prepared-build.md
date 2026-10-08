@@ -93,11 +93,15 @@ not evidence that cleanup actually occurred. There are no snapshots or drives.
 
 `sandbox-build-evidence.ts` and migration `20261016100900` prepare durable
 admission against the existing native custom-app work and accepted payer budget.
-Current verified manager and payer authority, exact candidate revision/source,
+Current verified manager and payer-party representative authority, exact candidate revision/source,
 budget snapshot and provider scope/image are checked before a full-cap shared
 ledger reservation. One atomic start admits one creation opportunity. Changed
 or missing source state, canceled funding, identity loss and an unresolved
 attempt cannot authorize another VM. Attempts and observations are append-only;
+Historical accepting users remain receipt history. The canonical current
+business owner or paying agency owner/admin may represent the accepted party;
+an agency representative receives no business workspace membership. Losing all
+verified current representatives denies admission without rewriting terms.
 rollback refuses to remove retained evidence. The supplied exact-revision
 eligibility callback remains unavailable until the actual custom listed runtime
 exists; no build receipt replaces qualification or human approval.

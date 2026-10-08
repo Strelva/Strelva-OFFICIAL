@@ -103,10 +103,15 @@ do $$declare u uuid='cc334000-0000-4000-8000-000000000001';payer uuid='cc334000-
    perform pg_temp.sb_denied(format('select public.prepare_sandbox_build_attempt(%L,1,0,%L,%L,''team_fixture'',''prj_fixture'',%L,%L,''sandbox-owner@example.test'')',w,digest,name,'fixture-team/node@sha256:'||repeat('a',64),u),'sandbox_build_budget_required');
   else
    attempt:=(public.prepare_sandbox_build_attempt(w,1,0,digest,name,'team_fixture','prj_fixture','fixture-team/node@sha256:'||repeat('a',64),u,'sandbox-owner@example.test')->>'id')::uuid;
+   update public.workspace_memberships set role='admin' where workspace_id=ws and user_id=u;
    update public.users set verified_at=null where id=payer;
    perform pg_temp.sb_denied(format('select public.begin_sandbox_build_attempt(%L,%L,''sandbox-owner@example.test'')',attempt,u),'sandbox_build_payer_required');
    update public.users set verified_at=now() where id=payer;
+   update public.workspace_memberships set role='owner' where workspace_id=ws and user_id=u;
+   delete from public.workspace_memberships where workspace_id=ws and user_id=payer;
+   -- Current business owner succeeds after the historical accepting member exits.
    perform public.begin_sandbox_build_attempt(attempt,u,'sandbox-owner@example.test');
+   insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values(ws,payer,'member',u);
    perform public.record_sandbox_build_observation(attempt,'team_fixture','prj_fixture',name,'created','sbx_overage','{}');
    perform public.record_sandbox_build_observation(attempt,'team_fixture','prj_fixture',name,'stopped','sbx_overage','{"activeCpuDurationMs":900,"ingressBytes":500,"egressBytes":200}');
    -- Fictional independently supplied overage; no rate/cost is calculated here.
@@ -116,6 +121,33 @@ do $$declare u uuid='cc334000-0000-4000-8000-000000000001';payer uuid='cc334000-
    perform pg_temp.sb_assert((select reserved_cents=100 and used_cents=0 from public.job_economics where id=job),'overage remains held, no cap expansion');
   end if;
  end loop;
+end;$$;
+do $$declare u uuid='cc334000-0000-4000-8000-000000000001';signer uuid='cc334000-0000-4000-8000-000000000003';successor uuid='cc334000-0000-4000-8000-000000000004';ws uuid='cc334000-0000-4000-8000-000000000011';agency uuid='cc334000-0000-4000-8000-000000000012';w uuid='cc334000-0000-4000-8000-000000000023';t public.workspace_payer_transitions;j public.job_economics;digest text;name text;image text='fixture-team/node@sha256:'||repeat('a',64);attempt uuid;begin
+ insert into public.users(id,email,verified_at) values(signer,'sandbox-agency@example.test',now()),(successor,'sandbox-successor@example.test',now());
+ insert into public.workspaces(id,kind,name,created_by) values(ws,'customer','Sandbox agency payer fixture',u),(agency,'agency','Sandbox fictional paying agency',signer);
+ insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values(ws,u,'owner',u),(agency,signer,'owner',signer),(agency,successor,'admin',signer);
+ insert into public.accounts(name,workspace_id,billing_type) values('Sandbox agency fixture',ws,'subscription');
+ select * into t from public.workspace_payer_transition_command(jsonb_build_object('action','propose','workspaceId',ws,'successorAgencyWorkspaceId',agency),u,'sandbox-owner@example.test');
+ perform * from public.workspace_payer_transition_command(jsonb_build_object('action','accept','transitionId',t.id),signer,'sandbox-agency@example.test');
+ insert into public.saved_product_work(id,workspace_id,product_id,resource_kind,title,payload,created_by) select w,ws,product_id,resource_kind,title,payload,created_by from public.saved_product_work where id='cc334000-0000-4000-8000-000000000020';
+ select * into j from public.job_economics_create_with_payer_transition(jsonb_build_object('action','create','productId','custom-applications','resourceKind','custom-application','workspaceId',ws,'workId',w,'payerId',u,'estimateCents',null,'maxAuthorizedCents',100),u,'sandbox-owner@example.test');
+ select * into j from public.job_economics_command_with_payer_authority(jsonb_build_object('action','accept','jobId',j.id),signer,'sandbox-agency@example.test');
+ perform pg_temp.sb_assert(j.payer_kind='agency' and j.payer_workspace_id=agency and j.accepted_by=signer,'native accepted agency budget, no business membership granted');
+ perform public.custom_application_set_budget(w,ws,j.id,100,null,u,'sandbox-owner@example.test');
+ select candidate_source_digest into digest from public.custom_application_states where work_id=w;name:='strelva-build-'||left(public.custom_application_digest(ws,w,1,digest),48);
+ delete from public.workspace_memberships where workspace_id=agency and user_id=signer;
+ update public.users set verified_at=null where id=signer;
+ attempt:=(public.prepare_sandbox_build_attempt(w,1,0,digest,name,'team_fixture','prj_fixture',image,u,'sandbox-owner@example.test')->>'id')::uuid;
+ perform pg_temp.sb_assert((select accepted_by=signer and payer_id=signer from public.job_economics where id=j.id),'historical signer remains history after successor representative');
+ update public.workspace_memberships set role='member' where workspace_id=agency and user_id=successor;
+ perform pg_temp.sb_denied(format('select public.begin_sandbox_build_attempt(%L,%L,''sandbox-owner@example.test'')',attempt,u),'sandbox_build_payer_required');
+ perform pg_temp.sb_denied(format('select public.prepare_sandbox_build_attempt(%L,1,0,%L,%L,''team_fixture'',''prj_fixture'',%L,%L,''sandbox-owner@example.test'')',w,digest,name,image,u),'sandbox_build_payer_required');
+ update public.workspace_memberships set role='admin' where workspace_id=agency and user_id=successor;
+ update public.users set verified_at=null where id=successor;
+ perform pg_temp.sb_denied(format('select public.begin_sandbox_build_attempt(%L,%L,''sandbox-owner@example.test'')',attempt,u),'sandbox_build_payer_required');
+ update public.users set verified_at=now() where id=successor;
+ perform public.begin_sandbox_build_attempt(attempt,u,'sandbox-owner@example.test');
+ perform pg_temp.sb_assert((select reserved_cents=100 and used_cents=0 from public.job_economics where id=j.id),'genuine current agency representative enables one held attempt');
 end;$$;
 rollback;
 -- Actual empty-schema rollback and reapply; the guard above refused retained attempts.
