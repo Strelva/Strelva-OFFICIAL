@@ -1,19 +1,20 @@
 -- Refuse after accepted cleanup or exit-ending effects; preserve all original histories.
 begin;
 set local lock_timeout='3s';
+-- Actual writers take the provider relation before permissions/cleanup/endings.
+-- Hold their tables through validation and removal so no receipt can appear after
+-- the emptiness guard, and inverse-first cannot form a provider/table lock cycle.
+lock table public.workspace_providers in access exclusive mode;
+lock table public.provider_exit_completion_permissions,public.provider_completion_cleanup_receipts,public.business_attribution_endings,public.provider_completion_rollback_state in access exclusive mode;
+set local search_path=public,pg_temp;
 do $$begin
  if exists(select 1 from public.provider_completion_cleanup_receipts) or exists(select 1 from public.provider_exit_completion_permissions) or exists(select 1 from public.business_attribution_endings where workspace_exit_request_id is not null) then raise exception 'provider_completion_receipts_require_preservation';end if;
- if (select md5(prosrc) from pg_proc where oid='public.provider_completion_end_authority()'::regprocedure) is distinct from '17ad69b114de88af119f4e56dcf7cbc5' then raise exception 'provider_completion_rollback_wrong_order';end if;
- if (select md5(prosrc) from pg_proc where oid='public.business_attribution_require_provider_change()'::regprocedure) is distinct from '08634dde177ade64ed0cc492274f32bb' then raise exception 'provider_completion_rollback_wrong_order';end if;
- if (select md5(prosrc) from pg_proc where oid='public.request_provider_change(uuid,uuid,text,uuid,text,uuid)'::regprocedure) is distinct from '4479781421e0b8af1f35917185a8b923' then raise exception 'provider_completion_rollback_wrong_order';end if;
- if (select md5(prosrc) from pg_proc where oid='public.choose_business_provider(uuid,text,uuid,uuid)'::regprocedure) is distinct from '4c8448ce4d394937a36955bba71adb49' then raise exception 'provider_completion_rollback_wrong_order';end if;
- if (select md5(prosrc) from pg_proc where oid='public.end_business_provider(uuid,text,uuid,text)'::regprocedure) is distinct from 'ed817e640adaf41994ff52f2c47700ac' then raise exception 'provider_completion_rollback_wrong_order';end if;
- if (select md5(prosrc) from pg_proc where oid='public.acknowledge_provider_change_notice(uuid,uuid,text)'::regprocedure) is distinct from '4d2aec70a062d020ba66887a9421af6d' then raise exception 'provider_completion_rollback_wrong_order';end if;
- if (select md5(prosrc) from pg_proc where oid='public.complete_provider_change(uuid,uuid,text)'::regprocedure) is distinct from '77c67300c3fd275390657de9a144c2c4' then raise exception 'provider_completion_rollback_wrong_order';end if;
- if (select md5(prosrc) from pg_proc where oid='public.cancel_provider_change(uuid,uuid,text)'::regprocedure) is distinct from '027c3e8245a4bb9641d3c831362fffa4' then raise exception 'provider_completion_rollback_wrong_order';end if;
- if (select md5(prosrc) from pg_proc where oid='public.grant_agency_application_draft_edit(uuid,text,uuid,uuid)'::regprocedure) is distinct from '6d99d5f8a5d431b6b1b5b8fbfe37584f' then raise exception 'provider_completion_rollback_wrong_order';end if;
- if (select md5(prosrc) from pg_proc where oid='public.grant_system_package_install(uuid,uuid,text,uuid,uuid,uuid,timestamptz)'::regprocedure) is distinct from 'facf67e54f1ca9f841d70fd5b2abbb98' then raise exception 'provider_completion_rollback_wrong_order';end if;
- if (select md5(prosrc) from pg_proc where oid='public.complete_workspace_exit(uuid,uuid,text,text,text,jsonb,text,text,text)'::regprocedure) is distinct from '5fc18db00b90c14600a9d55f0bb76c4d' then raise exception 'provider_completion_rollback_wrong_order';end if;
+ if (select count(*) from public.provider_completion_rollback_state)<>21 or exists(
+  select 1 from public.provider_completion_rollback_state s left join pg_proc p on p.oid=to_regprocedure(s.signature)
+  where p.oid is null or pg_get_functiondef(p.oid) is distinct from s.definition
+   or pg_get_userbyid(p.proowner) is distinct from s.owner_name
+   or coalesce((select jsonb_agg(jsonb_build_object('grantor',pg_get_userbyid(a.grantor),'grantee',case when a.grantee=0 then 'PUBLIC' else pg_get_userbyid(a.grantee) end,'privilege',a.privilege_type,'grantable',a.is_grantable) order by a.grantor,a.grantee,a.privilege_type,a.is_grantable) from aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a),'[]'::jsonb) is distinct from s.normalized_acl
+ ) then raise exception 'provider_completion_rollback_wrong_order';end if;
 end $$;
 drop trigger provider_completion_end_authority on public.workspace_providers;
 drop function public.provider_completion_end_authority();
@@ -60,6 +61,6 @@ grant execute on function public.complete_workspace_exit(uuid,uuid,text,text,tex
 alter table public.business_attribution_endings drop constraint business_attribution_one_ending_origin;
 alter table public.business_attribution_endings alter column provider_change_request_id set not null;
 alter table public.business_attribution_endings drop column workspace_exit_request_id;
-drop table public.provider_exit_completion_permissions,public.provider_completion_cleanup_receipts;
+drop table public.provider_exit_completion_permissions,public.provider_completion_cleanup_receipts,public.provider_completion_rollback_state;
 notify pgrst,'reload schema';
 commit;

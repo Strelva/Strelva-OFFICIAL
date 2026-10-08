@@ -15,6 +15,12 @@ create table public.provider_completion_cleanup_receipts(
  agency_workspace_id uuid not null references public.workspaces(id),
  ended_by uuid references public.users(id),ended_at timestamptz not null,receipt jsonb not null
 );
+create table public.provider_completion_rollback_state(
+ signature text primary key,definition text not null,normalized_acl jsonb not null,owner_name text not null
+);
+alter table public.provider_completion_rollback_state enable row level security;
+revoke all on public.provider_completion_rollback_state from public,anon,authenticated,service_role;
+create trigger provider_completion_rollback_state_immutable before update or delete on public.provider_completion_rollback_state for each row execute function public.money_immutable_guard();
 alter table public.provider_exit_completion_permissions enable row level security;
 alter table public.provider_completion_cleanup_receipts enable row level security;
 revoke all on public.provider_exit_completion_permissions,public.provider_completion_cleanup_receipts from public,anon,authenticated,service_role;
@@ -245,5 +251,36 @@ begin
 end $$;
 revoke all on function public.complete_workspace_exit(uuid,uuid,text,text,text,jsonb,text,text,text) from public,anon,authenticated;
 grant execute on function public.complete_workspace_exit(uuid,uuid,text,text,text,jsonb,text,text,text) to service_role;
+-- Full definitions and normalized ACLs bind every new wrapper/helper and renamed predecessor.
+-- Definition includes security, volatility, parameter defaults and configuration.
+set local search_path=public,pg_temp;
+insert into public.provider_completion_rollback_state(signature,definition,normalized_acl,owner_name)
+select p.oid::regprocedure::text,pg_get_functiondef(p.oid),coalesce((select jsonb_agg(jsonb_build_object('grantor',pg_get_userbyid(a.grantor),'grantee',case when a.grantee=0 then 'PUBLIC' else pg_get_userbyid(a.grantee) end,'privilege',a.privilege_type,'grantable',a.is_grantable) order by a.grantor,a.grantee,a.privilege_type,a.is_grantable) from aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a),'[]'::jsonb),pg_get_userbyid(p.proowner)
+from pg_proc p where p.oid=any(array[
+  'public.request_provider_change(uuid,uuid,text,uuid,text,uuid)'::regprocedure,
+ 'public.request_provider_change_before_completion_cleanup(uuid,uuid,text,uuid,text,uuid)'::regprocedure,
+ 'public.choose_business_provider(uuid,text,uuid,uuid)'::regprocedure,
+ 'public.choose_business_provider_before_completion_cleanup(uuid,text,uuid,uuid)'::regprocedure,
+ 'public.end_business_provider(uuid,text,uuid,text)'::regprocedure,
+ 'public.end_business_provider_before_completion_cleanup(uuid,text,uuid,text)'::regprocedure,
+ 'public.acknowledge_provider_change_notice(uuid,uuid,text)'::regprocedure,
+ 'public.acknowledge_provider_change_notice_before_completion_cleanup(uuid,uuid,text)'::regprocedure,
+ 'public.complete_provider_change(uuid,uuid,text)'::regprocedure,
+ 'public.complete_provider_change_before_completion_cleanup(uuid,uuid,text)'::regprocedure,
+ 'public.cancel_provider_change(uuid,uuid,text)'::regprocedure,
+ 'public.cancel_provider_change_before_completion_cleanup(uuid,uuid,text)'::regprocedure,
+ 'public.grant_agency_application_draft_edit(uuid,text,uuid,uuid)'::regprocedure,
+ 'public.grant_agency_application_draft_edit_before_completion_cleanup(uuid,text,uuid,uuid)'::regprocedure,
+ 'public.grant_system_package_install(uuid,uuid,text,uuid,uuid,uuid,timestamptz)'::regprocedure,
+ 'public.grant_system_package_install_before_completion_cleanup(uuid,uuid,text,uuid,uuid,uuid,timestamptz)'::regprocedure,
+ 'public.complete_workspace_exit(uuid,uuid,text,text,text,jsonb,text,text,text)'::regprocedure,
+ 'public.complete_workspace_exit_before_completion_cleanup(uuid,uuid,text,text,text,jsonb,text,text,text)'::regprocedure,
+ 'public.provider_completion_end_authority()'::regprocedure,
+ 'public.business_attribution_require_provider_change()'::regprocedure,
+ 'public.business_attribution_require_provider_change_before_exit()'::regprocedure
+]::oid[]);
+do $$begin
+ if (select count(*) from public.provider_completion_rollback_state)<>21 then raise exception 'provider_completion_rollback_state_incomplete';end if;
+end $$;
 notify pgrst,'reload schema';
 commit;

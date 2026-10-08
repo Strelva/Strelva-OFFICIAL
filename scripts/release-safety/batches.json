@@ -1452,9 +1452,9 @@
       "items": [
         {
           "file": "20261020090037_provider_completion_cleanup.sql",
-          "sha256": "b7fc575a7e00e4aee50d46af6956dd196b53420b9f1e1539c269ec5e70b3decc",
+          "sha256": "a295e762805bb9b7dc16dc263b1edaa084060ec683035da326d78d651c28a1a8",
           "rollback": "rollback-20261020090037_provider_completion_cleanup.sql",
-          "rollbackSha256": "f545f3f51a03199ea038525e94f2d7c496248aaed694a79aadf390d84d73fd8c"
+          "rollbackSha256": "26b33d76a734faecfd8a25ef4f343ba7d849d04a37699b2a0f898bbe6e517308"
         }
       ]
     }
