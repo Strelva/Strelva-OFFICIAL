@@ -20,18 +20,23 @@ async function call(actor: WorkspaceActor, name: string, args: Record<string, un
   return result.data;
 }
 export async function createKeepMeFoundBundle(actor: WorkspaceActor, raw: unknown, rpc?: OutcomeRpc) {
-  const input = keepMeFoundInputSchema.parse(raw);
-  return call(actor, "create_keep_me_found_bundle", { p_business_id: input.businessId, p_service_request_id: input.serviceRequestId,
+  const input = keepMeFoundInputSchema.extend({maintenance:z.object({bindingId:z.string().uuid(),locationId:z.string().regex(/^[A-Za-z0-9_-]{1,64}$/)}).strict().optional()}).parse(raw);
+  if(input.maintenance && process.env.STRELVA_BUNDLE_MAINTENANCE_RELEASE!=="1") throw new WorkspaceConflictError("Bundle maintenance is not enabled.");
+  return call(actor, input.maintenance ? "create_keep_me_found_maintenance_bundle" : "create_keep_me_found_bundle", { p_business_id: input.businessId, p_service_request_id: input.serviceRequestId,
     p_provider_id: input.providerWorkspaceId, p_idempotency_key: input.idempotencyKey,
+    ...(input.maintenance?{p_binding_id:input.maintenance.bindingId,p_location_id:input.maintenance.locationId}:{}),
     p_investigations: input.investigations, p_every_seconds: input.everySeconds, p_next_at: input.nextAt }, rpc);
 }
 export async function readResponsibilityProof(actor: WorkspaceActor, workspaceId: string, from: string, to: string) {
   z.string().uuid().parse(workspaceId); z.string().datetime().parse(from); z.string().datetime().parse(to);
-  const [rows, domain] = await Promise.all([
+  const [rows, domain, maintenance] = await Promise.all([
     call(actor, "read_responsibility_proof_rows", { p_business_id: workspaceId, p_from: from, p_to: to }),
     call(actor, "read_responsibility_domain_evidence", { p_business_id: workspaceId, p_from: from, p_to: to }),
+    process.env.STRELVA_BUNDLE_MAINTENANCE_RELEASE==="1" ? call(actor,"read_bundle_maintenance_receipts",{p_business_id:workspaceId,p_from:from,p_to:to}) : Promise.resolve([]),
   ]);
-  const cards = projectResponsibilityCards(workspaceId, from, to, rows, domain);
+  const linked=z.array(z.object({responsibilityId:z.string(),receipt:z.unknown()})).parse(maintenance);
+  const merged=z.array(z.object({responsibilityId:z.string(),receipts:z.array(z.unknown())}).passthrough()).parse(domain).map(row=>({...row,receipts:[...new Map([...row.receipts,...linked.filter(item=>item.responsibilityId===row.responsibilityId).map(item=>item.receipt)].map(item=>[z.object({id:z.string()}).parse(item).id,item])).values()]}));
+  const cards = projectResponsibilityCards(workspaceId, from, to, rows, merged);
   return { workspaceId, from, to, cards, verdict: responsibilityVerdict(cards) };
 }
 function projectResponsibilityCards(workspaceId: string, from: string, to: string, rows: unknown, domain: unknown) {

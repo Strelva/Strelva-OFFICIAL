@@ -185,10 +185,11 @@ export async function markReviewReplyDeclined(tenantId: string, reviewId: string
     .catch(() => {});
 }
 
-export async function isReviewReplyDeclined(tenantId: string, reviewId: string): Promise<boolean> {
+export async function isReviewReplyDeclined(tenantId: string, reviewId: string, requirePersistence = false): Promise<boolean> {
   const redis = getRedis();
-  if (!redis || !reviewId) return false;
-  return Boolean(await redis.get(reviewReplyDeclinedKey(tenantId, reviewId)).catch(() => null));
+  if (!redis || !reviewId) { if(requirePersistence) throw new Error("Review dismissal history is unavailable."); return false; }
+  const pending=redis.get(reviewReplyDeclinedKey(tenantId,reviewId));
+  return Boolean(await (requirePersistence?pending:pending.catch(()=>null)));
 }
 
 /**

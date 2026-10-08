@@ -1,0 +1,12 @@
+begin;
+do $$ begin if exists(select 1 from public.bundle_maintenance_attachments) or exists(select 1 from public.bundle_maintenance_preparations) or exists(select 1 from public.bundle_maintenance_event_links) then raise exception 'bundle_maintenance_evidence_preservation_required'; end if; end $$;
+drop function public.read_bundle_maintenance_receipts(uuid,uuid,text,timestamptz,timestamptz);
+drop function public.create_keep_me_found_maintenance_bundle(uuid,uuid,uuid,uuid,text,text,jsonb,integer,timestamptz,uuid,text);
+drop function public.check_bundle_maintenance_event(uuid,text,uuid,uuid,text,jsonb);
+drop function public.link_bundle_maintenance_event(uuid,uuid,text,text);
+drop function public.reserve_bundle_maintenance_preparation(uuid,uuid,text,text,bigint,jsonb);
+drop function public.check_bundle_maintenance_attachment(uuid,uuid,text);
+drop function public.attach_keep_me_found_maintenance(uuid,text,uuid,uuid,text,text,text);
+drop function public.bundle_maintenance_holds(uuid,uuid,text);
+drop table public.bundle_maintenance_event_links,public.bundle_maintenance_preparations,public.bundle_maintenance_attachments;
+commit;
