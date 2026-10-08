@@ -225,9 +225,11 @@ export async function GET(request: Request) {
     const current = await actor();
     if (!current) return json({ error: "Sign in with a confirmed email to open your work." }, 401);
     const query = new URL(request.url).searchParams;
-    const personal = await ensurePersonalWorkspace(current);
+    const systemsReadOnly = query.get("systemsReadOnly") === "1";
+    // A reconciliation refresh names an existing business and creates nothing.
+    const personal = systemsReadOnly ? null : await ensurePersonalWorkspace(current);
     const workspaces = await listWorkspaces(current);
-    const selectedId = query.get("workspaceId") || personal.id;
+    const selectedId = query.get("workspaceId") || personal?.id;
     z.string().uuid().parse(selectedId);
     const selected = workspaces.find((workspace) => workspace.id === selectedId);
     if (!selected) return json({ error: "Workspace unavailable." }, 404);
@@ -289,7 +291,8 @@ export async function GET(request: Request) {
     const inquiriesReleased = inquiryRelease && !providerSeat;
     const systems = systemsReleased && selected.kind === "customer" ? await readWorkspaceSystems({
       actor: current, businessId: selected.id, savedWork: work,
-      canWrite: selected.access === "member" && (selected.role === "owner" || selected.role === "admin"),
+      readOnly: systemsReadOnly,
+      canWrite: !systemsReadOnly && selected.access === "member" && (selected.role === "owner" || selected.role === "admin"),
       siteDomains: new Map(managedPresence.managedWork.flatMap((site) => site.domain ? [[site.id, site.domain] as const] : [])),
     }) : undefined;
     const connectedSitesReleased = systemsReleased && selected.kind === "customer" && selected.access === "member"

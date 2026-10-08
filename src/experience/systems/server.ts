@@ -204,6 +204,7 @@ export async function projectWorkspaceSystems(input: SystemsProjectionInput): Pr
     systems: listings.map((item) => ({
       ref: { businessId: item.system.businessId, systemId: item.system.id },
       name: item.system.name,
+      currentRevisionId: item.system.currentRevision?.revisionId ?? null,
       kind: item.system.kind,
       lifecycle: item.system.lifecycle,
       basis: item.basis,
@@ -310,6 +311,8 @@ export interface LiveSystemsDeps {
   now?: number;
   /** An owner or admin: stored Possibilities may be created or refreshed on read. */
   canWrite?: boolean;
+  /** Explicit refresh: saved candidate state must be readable; never derive a fallback. */
+  readOnly?: boolean;
 }
 
 /**
@@ -391,7 +394,12 @@ export async function readWorkspaceSystems(deps: LiveSystemsDeps): Promise<Works
   try {
     const input = await liveProjectionInput(deps);
     const projection = await projectWorkspaceSystems(input);
-    const stored = await withStoredPossibilities(projection, input, deps).catch(() => projection);
+    const stored = await withStoredPossibilities(projection, input, deps).catch((cause: unknown) => {
+      // A read-only refresh must confirm saved candidate pins. A freshly
+      // derived Ready projection cannot substitute for unavailable stored state.
+      if (deps.readOnly) throw cause;
+      return projection;
+    });
     const lineage = await readBusinessVersions(deps.actor, deps.businessId).catch(() => null);
     const releases = await readToolReleases(deps.actor, deps.businessId);
     const releaseHistory = releases.flatMap(release => {
@@ -430,14 +438,14 @@ export async function withStoredPossibilities(projection: WorkspaceSystems, inpu
     ? [[item.system.id, { revisionId: item.system.currentRevision.revisionId, number: item.system.currentRevision.number }] as const] : []));
   const rebuilds = await syncRebuildPossibilities({
     repo, live, businessId: deps.businessId, targets, revisions, actorId: deps.actor.userId,
-    at: new Date(input.now).toISOString(), canWrite: deps.canWrite === true,
+    at: new Date(input.now).toISOString(), canWrite: deps.canWrite === true && !deps.readOnly,
   });
   const websiteStored = await syncAskPageSetPossibilities({
     repo, live, stored: rebuilds, actorId: deps.actor.userId, at: new Date(input.now).toISOString(),
-    canWrite: deps.canWrite === true, read: workId => readWebsiteRebuild(deps.actor, workId),
+    canWrite: deps.canWrite === true && !deps.readOnly, read: workId => readWebsiteRebuild(deps.actor, workId),
   });
   const { askInquiryFollowUpStillCurrent } = await import("@/products/inquiries/server");
-  const stored = await syncAskInquiryFollowUpPossibilities({ repo, live, stored: websiteStored, actorId: deps.actor.userId, at: new Date(input.now).toISOString(), canWrite: deps.canWrite === true, current: selection => askInquiryFollowUpStillCurrent(deps.actor, selection) });
+  const stored = await syncAskInquiryFollowUpPossibilities({ repo, live, stored: websiteStored, actorId: deps.actor.userId, at: new Date(input.now).toISOString(), canWrite: deps.canWrite === true && !deps.readOnly, current: selection => askInquiryFollowUpStillCurrent(deps.actor, selection) });
   const activations = createSupabaseActivationRepository(deps.actor);
   const withActivation = await Promise.all(stored.map(async ({ possibility }) => ({
     possibility,
@@ -455,7 +463,7 @@ export async function withStoredPossibilities(projection: WorkspaceSystems, inpu
     ...projection,
     possibilities: [
       ...projection.possibilities.filter((item) => !storedWork.has(item.workId)),
-      ...storedPossibilityViews(stored, input.candidates),
+      ...storedPossibilityViews(stored, input.candidates, undefined, deps.readOnly || deps.canWrite === false ? revisions : undefined),
     ],
     activations: activationViews(running),
     history,

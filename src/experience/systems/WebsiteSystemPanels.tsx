@@ -29,7 +29,7 @@ export function useWebsiteSystemDetail(workspaceId: string, systemId: string, en
         const response = await request(`/api/workspace/systems/website?${new URLSearchParams({ workspaceId, systemId })}`);
         const body = await response.json().catch(() => null) as { detail?: WebsiteSystemDetail; error?: string } | null;
         if (!active) return;
-        const value: WebsiteDetailState = response.ok && body?.detail ? { status: "ready", detail: body.detail } : { status: "error", message: body?.error || "This website's details could not be loaded." };
+        const value: WebsiteDetailState = response.ok && body?.detail && body.detail.systemId === systemId && (body.detail.workspaceId === undefined || body.detail.workspaceId === workspaceId) ? { status: "ready", detail: body.detail } : { status: "error", message: body?.error || "This website's details could not be loaded." };
         setState({ key: readKey, value });
         if (value.status === "ready") setShown({ key, value });
       } catch {

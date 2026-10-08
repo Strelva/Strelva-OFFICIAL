@@ -5,7 +5,8 @@ inquiry checks pass locally; the qualified stable-baseline profile passes all
 12 flags-on journeys and native Version owner releases. All eight flags-off
 journeys passed after current agency-maker fixture qualification. The original
 account-free acceptance and generic Versions proof remain unqualified; the
-website reconciliation/refresh discrepancy is a separate unresolved follow-up. See the [dated repair and proof
+website reconciliation/refresh repair is isolated in a stacked follow-up with
+[its own proof and remaining limits](evidence/website-stale-refresh-501-2026-10-08.md). See the [dated repair and proof
 matrix](evidence/journey-501-2026-10-08.md) for current contracts, failures and
 safe reproduction. The October 7 baseline below is historical.
 

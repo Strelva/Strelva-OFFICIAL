@@ -7,6 +7,22 @@ The [visual direction map](../../DESIGN.md#visual-direction-and-extension-map) o
 how identity, imagery, composition and component treatment fit together. This
 file owns component contracts, extension and adoption, including gaps in source.
 
+## Website System freshness, October 8, 2026
+
+`WorkspaceSystemEntry` and `WebsiteSystemDetail` expose the current System revision
+as read freshness, never as an approval or candidate pin. `SystemPage` waits for
+this business's detail before enabling a decision and asks `WorkspaceApp` for a
+read-only refresh when the observed pointer differs. A changed saved baseline
+projects Exploring with a reason requiring another review. A failed confirmation
+stays blocked with a retry. Switching business/System or unmounting discards the
+old request. The refresh preserves the selected System and lifecycle; it creates
+no personal workspace, synchronizes no writing path, repins no candidate, and
+makes no decision. Saved-state read failure is unavailable in this explicit mode;
+ordinary owner/member GET fallback is unchanged. Existing preview detail uses
+its own server projection's pointer so fixture decision controls retain their
+contract. [Local proof and limitations](../product/streams/evidence/website-stale-refresh-501-2026-10-08.md)
+include held response order, owner/member controls and the incomplete full run.
+
 ## Agency Team management, October 7, 2026
 
 [AgencyTeamView](../../src/experience/workspace/agency/AgencyTeamView.tsx) composes

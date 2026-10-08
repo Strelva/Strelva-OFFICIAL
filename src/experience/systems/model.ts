@@ -117,6 +117,8 @@ export type SystemSurface =
 export interface SystemView {
   /** The spine's systemId. Together with the workspace id it is the SystemRef. */
   id: string;
+  /** Read freshness only; never a candidate baseline or permission. */
+  currentRevisionId?: string | null;
   kind: SystemKind;
   name: string;
   /** Short line under the name: domain, source, or what it is for. */

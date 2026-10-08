@@ -209,9 +209,10 @@ function lastStale(p: Possibility): string | null {
 }
 
 /** Open stored Possibilities as the browser reads them. Made real and withdrawn move to History. */
-export function storedPossibilityViews(stored: readonly ListedPossibility[], candidates: readonly WebsiteRebuildCandidate[], summaries: { evidence: (workId: string) => string | null } = { evidence: () => null }): WorkspaceSystemPossibility[] {
+export function storedPossibilityViews(stored: readonly ListedPossibility[], candidates: readonly WebsiteRebuildCandidate[], summaries: { evidence: (workId: string) => string | null } = { evidence: () => null }, currentRevisions?: ReadonlyMap<string, { revisionId: string; number: number }>): WorkspaceSystemPossibility[] {
   return stored.flatMap(({ possibility: p, sourceRef }) => {
     if (p.status !== "exploring" && p.status !== "ready") return [];
+    const baselineMoved = currentRevisions !== undefined && p.changes.some(change => currentRevisions.get(change.baseline.systemId)?.revisionId !== change.baseline.revisionId);
     const askContent = [...p.introduces, ...p.changes].find(item => item.candidate.content.kind === "ask-inquiry-follow-up" || ["ask-website-pages", "ask-existing-booking-page", "ask-existing-website-pages"].includes(String(item.candidate.content.kind)))?.candidate.content;
     const workId = sourceRef?.startsWith(REBUILD_SOURCE_PREFIX) ? sourceRef.slice(REBUILD_SOURCE_PREFIX.length)
       : typeof askContent?.rebuildWorkId === "string" ? askContent.rebuildWorkId : null;
@@ -224,14 +225,14 @@ export function storedPossibilityViews(stored: readonly ListedPossibility[], can
       id: p.id,
       title: p.title,
       summary: askContent ? p.intent : candidate?.summary ?? p.intent,
-      status: p.status,
+      status: baselineMoved ? "exploring" : p.status,
       affects: [...new Set([...p.changes.map((c) => c.baseline.systemId), ...(typeof askContent?.contextSystemId === "string" ? [askContent.contextSystemId] : [])])],
       evidence: candidate?.evidence ?? (workId ? summaries.evidence(workId) : null),
       previewHref: candidate?.previewHref ?? null,
       ...(tryHref ? { tryHref } : {}),
       workId: workId ?? p.id,
       stored: true,
-      staleReason: lastStale(p),
+      staleReason: baselineMoved ? "A System this changes moved. Review a refreshed alternative before making it real." : lastStale(p),
     }];
   });
 }
