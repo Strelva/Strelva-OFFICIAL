@@ -985,5 +985,16 @@ bash "$repo_root/scripts/check-customer-mapping-sql.sh"
 # validates the additive migration without connecting to production.
 bash "$repo_root/scripts/check-inquiry-workspace-sql.sh"
 
+
+# #261 Team authority, atomic staffing, membership cleanup and invitation acceptance.
+catalog_fingerprint >"$cluster_root/catalog-before-agency-team.txt"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011160000_agency_team.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-team-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011160000_agency_team.sql"
+catalog_fingerprint >"$cluster_root/catalog-after-agency-team-rollback.txt"
+diff -u "$cluster_root/catalog-before-agency-team.txt" "$cluster_root/catalog-after-agency-team-rollback.txt"
+printf 'Agency Team rollback restored the public catalog exactly.\n'
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011160000_agency_team.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-team-schema.sql"
 # Agency-sourced public checks: real RLS, quota races and rollback stop points.
 bash "$repo_root/scripts/check-agency-prospects-sql.sh"
