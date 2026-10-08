@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { z } from "zod";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { SelectInput } from "@/components/ui/TextInput";
@@ -9,6 +10,20 @@ export interface ResponsibilityProofData {
   proof: { cards: ResponsibilityProofCard[]; verdict: string };
   state: { businessId: string; providerWorkspaceId: string | null; canSetCadence: boolean; cadence: "weekly" | "monthly";
     mandates: Array<{ serviceRequestId: string; providerWorkspaceId: string; investigations: Record<string,string>; everySeconds: number; nextAt: string; idempotencyKey: string }> };
+}
+const responsibilityProofDataSchema = z.object({
+  proof: z.object({ verdict: z.string(), cards: z.array(z.object({
+    responsibilityId: z.string(), title: z.string(), from: z.string(), to: z.string(),
+    status: z.enum(["verified", "partial", "failed", "unverified"]), did: z.string(), verified: z.string(),
+    receiptRefs: z.array(z.string()), openHref: z.string(), undoHref: z.string().nullable(),
+  })) }),
+  state: z.object({ businessId: z.string(), providerWorkspaceId: z.string().nullable(), canSetCadence: z.boolean(), cadence: z.enum(["weekly", "monthly"]),
+    mandates: z.array(z.object({ serviceRequestId: z.string(), providerWorkspaceId: z.string(), investigations: z.record(z.string(), z.string()), everySeconds: z.number().int().positive(), nextAt: z.string(), idempotencyKey: z.string() })) }),
+});
+function readResponsibilityProof(value: unknown, workspaceId: string): ResponsibilityProofData {
+  const result = responsibilityProofDataSchema.safeParse(value);
+  if (!result.success || result.data.state.businessId !== workspaceId) throw new Error("Responsibility proof is unavailable. Reload to confirm this business.");
+  return result.data;
 }
 export function ResponsibilityProof(props: { workspaceId: string; readOnly: boolean; initial?: ResponsibilityProofData }) {
   return <ScopedResponsibilityProof key={props.workspaceId} {...props} initial={props.initial?.state.businessId === props.workspaceId ? props.initial : undefined} />;
@@ -34,7 +49,7 @@ function ScopedResponsibilityProof({ workspaceId, readOnly, initial }: { workspa
       const response = await fetch(`/api/operations?view=responsibility_proof&workspaceId=${workspaceId}&from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`, { signal: request.signal });
       const result = await response.json().catch(() => { throw new Error("Responsibility proof is unavailable."); });
       if (!response.ok) throw new Error(result.error ?? "Responsibility proof is unavailable.");
-      if (active.current && sequence === readSequence.current) setData(result);
+      if (active.current && sequence === readSequence.current) setData(readResponsibilityProof(result, workspaceId));
     } catch (cause) { if (active.current && sequence === readSequence.current && !request.signal.aborted) setError(cause instanceof Error ? cause.message : "Responsibility proof is unavailable."); }
     finally { controllers.current.delete(request); if (active.current && sequence === readSequence.current) setBusy(false); }
   }
@@ -43,8 +58,8 @@ function ScopedResponsibilityProof({ workspaceId, readOnly, initial }: { workspa
     const sequence = ++readSequence.current, request = controller(), pending = controllers.current;
     const to = new Date(), from = new Date(to.getTime() - 7 * 86_400_000);
     fetch(`/api/operations?view=responsibility_proof&workspaceId=${workspaceId}&from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`, { signal: request.signal })
-      .then(async response => { const result = await response.json().catch(() => { throw new Error("Responsibility proof is unavailable."); }); if (!response.ok) throw new Error(result.error ?? "Responsibility proof is unavailable."); return result; })
-      .then(result => { if (active.current && sequence === readSequence.current) setData(result); }).catch(cause => { if (active.current && sequence === readSequence.current && !request.signal.aborted) setError(cause instanceof Error ? cause.message : "Responsibility proof is unavailable."); });
+      .then(async response => { const result = await response.json().catch(() => { throw new Error("Responsibility proof is unavailable."); }); if (!response.ok) throw new Error(result.error ?? "Responsibility proof is unavailable."); return readResponsibilityProof(result, workspaceId); })
+      .then(result => { if (active.current && sequence === readSequence.current) setData(readResponsibilityProof(result, workspaceId)); }).catch(cause => { if (active.current && sequence === readSequence.current && !request.signal.aborted) setError(cause instanceof Error ? cause.message : "Responsibility proof is unavailable."); });
     return () => { request.abort(); pending.delete(request); };
   }, [workspaceId, initial]);
   async function change(command: Record<string,unknown>) {

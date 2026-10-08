@@ -39,3 +39,15 @@ it("shows an ordinary unavailable state when the gateway returns HTML",async()=>
  vi.stubGlobal("fetch",vi.fn(async()=>new Response("<!DOCTYPE html><title>Unavailable</title>",{status:503})));
  await render(a);expect(document.body.textContent).toContain("Responsibility proof is unavailable.");expect(document.body.textContent).not.toContain("Unexpected token");expect(document.body.textContent).not.toContain("DOCTYPE");
 });
+it("shows unavailable proof for a malformed successful response without claiming an empty result",async()=>{
+  vi.stubGlobal("fetch",vi.fn(async()=>Response.json({responsibilities:[]})));
+  await render(a);
+  expect(document.body.textContent).toContain("Responsibility proof is unavailable");
+  expect(document.body.textContent).not.toContain("No standing responsibilities yet");
+ });
+ it("rejects successful proof for another business",async()=>{
+  vi.stubGlobal("fetch",vi.fn(async()=>Response.json(data(b))));
+  await render(a);
+  expect(document.body.textContent).toContain("Responsibility proof is unavailable");
+  expect(document.body.textContent).not.toContain(`Proof for ${b}`);
+ });

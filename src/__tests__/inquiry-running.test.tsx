@@ -17,7 +17,7 @@ const row = { id: "current", title: "Handle inquiries from Juniper", sentence: "
 describe("Running inquiry policy read", () => {
   it("the existing Running surface includes inquiry policies alongside unchanged operational work", async () => {
     const request = vi.fn(async (input: RequestInfo | URL) => String(input).includes("/api/operations")
-      ? Response.json({ responsibilities: [] }) : Response.json({ details: [{ running: [row] }] }));
+      ? Response.json({ proof: { cards: [], verdict: "No observed responsibility receipts." }, state: { businessId: "one", providerWorkspaceId: null, canSetCadence: false, cadence: "monthly", mandates: [] } }) : Response.json({ details: [{ running: [row] }] }));
     vi.stubGlobal("fetch", request);
     const node = document.createElement("div"); document.body.append(node); const root = createRoot(node); roots.push(root);
     const props = { workspaceId: "one", sources: [], selectedWork: null, selectedStandingId: null, selectedAssignmentId: null,
