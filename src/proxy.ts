@@ -86,6 +86,9 @@ const PUBLIC_EXACT = new Set([
   "/api/publishing/google/reconnect/callback",
   "/api/track",
   "/api/billing/webhook",
+  // The public agent channel: reads and confirmation-gated holds only, behind
+  // STRELVA_BOOKING_AGENTS. Owner/agency MCP paths stay session-gated (#302).
+  "/api/mcp/public",
 ]);
 // Prefix public paths (the old `/foo(.*)` patterns — literal-prefix match, so
 // `/sign-in`, `/sign-in/x`, `/sign-integration` are all public, matching Clerk).
@@ -112,6 +115,8 @@ const PUBLIC_PREFIXES = [
   "/api/agent-access/work/",
   "/api/approve",
   "/api/v1/",
+  // Per-business alias of /api/mcp/public (same tools and gates).
+  "/api/mcp/bookings/",
   "/api/cron/",
   "/api/internal/",
 ];

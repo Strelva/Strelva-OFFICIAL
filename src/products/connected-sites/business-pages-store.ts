@@ -24,6 +24,8 @@ export interface BusinessPagesStore {
   confirmedFacts(actor: WorkspaceActor, workspaceId: string): Promise<ConfirmedFactsRow>;
   /** Public: a published page by handle, or null. */
   published(handle: string): Promise<(ConfirmedFactsRow & { workspaceId: string; handle: string }) | null>;
+  /** Public: every published page, for the platform MCP directory. */
+  listPublished(): Promise<Array<ConfirmedFactsRow & { workspaceId: string; handle: string }>>;
 }
 
 const uuid = z.string().uuid();
@@ -67,6 +69,9 @@ export function createBusinessPagesStore(db?: ConnectedSitesRpc): BusinessPagesS
     async published(handle) {
       const data = await rpc("read_published_business_page", { p_handle: handle });
       return data ? publishedSchema.parse(data) : null;
+    },
+    async listPublished() {
+      return z.array(publishedSchema).parse(await rpc("list_published_business_pages", {}) ?? []);
     },
   };
 }
