@@ -1,5 +1,14 @@
 # Strelva interface and Managed Websites context
 
+## October 8 private creator maintenance identity #287
+
+Migration 35 protects current verified identity only around the existing creator
+maintenance command; it selects no royalty rate, taper schedule or provider
+configuration. [Private handoff](docs/operations/creator-maintenance-identity-2026-10-08.md)
+records original takeover/taper eligibility, preserved creator/history, isolated
+concurrent loss proof and guarded inverse. Proposed packet 17 stays private;
+combined release reconciliation and all original outside/provider gates remain open.
+
 ## October 8 private integration #601
 
 `prepare/launch-integration-601-20261008` reconciles prepared `1902c15c` onto

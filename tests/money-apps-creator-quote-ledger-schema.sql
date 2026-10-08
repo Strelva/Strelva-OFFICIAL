@@ -172,4 +172,8 @@ select pg_temp.mcq_assert((select bool_and(s.source_revision_id=i.revision_id an
 select pg_temp.mcq_assert((select to_jsonb(l)=b.listing and to_jsonb(i)=b.installation from public.creator_listings l join mcq_installed frozen on l.source_revision_id=frozen.revision_id join public.offering_installations i on i.id=frozen.id cross join mcq_maintenance_before b),'maintenance receipts never reattribute original creator, source revision or Version');
 select pg_temp.mcq_assert((select jsonb_agg(to_jsonb(r) order by r.id) from public.revenue_splits r where r.invoice_line_id not like 'maintenance_%')=(select splits from mcq_maintenance_before),'all original periods and loss/recovery receipts remain byte-identical');
 select pg_temp.mcq_assert(not has_function_privilege('authenticated','public.record_creator_royalty_maintenance(uuid,uuid,text,text,text,text,timestamptz)','EXECUTE') and not has_table_privilege('service_role','public.creator_royalty_terms','INSERT'),'maintenance terms are service-only supplied-actor commands, not table writes');
+\if :{?creator_maintenance_retain}
+commit;
+\else
 rollback;
+\endif

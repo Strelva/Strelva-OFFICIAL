@@ -1431,6 +1431,18 @@
           "rollbackSha256": "d3dc5319710eea6bcac335c408b00470876fddf26da0c5b744ac327bff2d1802"
         }
       ]
+    },
+    {
+      "batch": "17",
+      "status": "private creator maintenance identity #287; not production-authorized",
+      "items": [
+        {
+          "file": "20261020090035_creator_maintenance_identity.sql",
+          "sha256": "7db6f291676eda524a30925f401b668166fc5dcb0e39c58d696db85132038f5a",
+          "rollback": "rollback-20261020090035_creator_maintenance_identity.sql",
+          "rollbackSha256": "cc9ba4ddea95daccb838b99acd2121a2d1dd2344d8958ad6819d47ea83e9492c"
+        }
+      ]
     }
   ]
 }

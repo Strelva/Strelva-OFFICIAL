@@ -183,6 +183,12 @@ fixtures and public-key/read-only checks. See
 current gates. The optional Sandbox adapter does not authorize installing its SDK,
 changing resource limits, enabling custom apps or using a paid provider.
 
+The isolated creator maintenance identity check is
+`bash scripts/check-creator-maintenance-identity.sh`; it covers original future
+royalty eligibility, populated guarded inverse/reapply and controlled current
+verification/membership races. See
+[its private handoff](docs/operations/creator-maintenance-identity-2026-10-08.md).
+
 ## Done means proven
 
 - Code: the test that covers the change, plus `pnpm typecheck`.
