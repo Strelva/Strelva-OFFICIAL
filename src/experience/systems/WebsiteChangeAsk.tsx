@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
+import { z } from "zod";
 import { Button } from "@/components/ui/Button";
 import { TextArea } from "@/components/ui/TextInput";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
@@ -24,31 +25,52 @@ export function WebsiteChangeAsk({ workspaceId, systemId, siteName, onFiled, onC
   const [words, setWords] = useState("");
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState<{ tone: "status" | "alert"; text: string } | null>(null);
-  const [idempotencyKey, setIdempotencyKey] = useState(() => `site-change:${crypto.randomUUID()}`);
+  const inFlight = useRef(false);
+  const attempt = useRef<string | null>(null);
+  const [unconfirmed, setUnconfirmed] = useState(false);
 
   async function file(event: FormEvent) {
     event.preventDefault();
     const text = words.trim();
-    if (text.length < 3 || sending) return;
+    if (inFlight.current || (!attempt.current && text.length < 3)) return;
+    inFlight.current = true;
+    const checking = attempt.current !== null;
+    const payload = attempt.current ?? JSON.stringify({ action: "ask", workspaceId, systemId, request: text, idempotencyKey: `site-change:${crypto.randomUUID()}` });
+    attempt.current = payload;
     setSending(true);
     setNotice(null);
     try {
       const response = await request("/api/workspace/site-changes", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "ask", workspaceId, systemId, request: text, idempotencyKey }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: payload,
       });
-      const body = await response.json().catch(() => null) as { requestId?: string; error?: string } | null;
-      if (!response.ok || !body?.requestId) {
-        setNotice({ tone: "alert", text: `${body?.error || "That couldn't be filed."} Nothing was sent; your words are still here.` });
+      const body: unknown = await response.json().catch(() => null);
+      const filed = z.object({ requestId: z.string().uuid() }).safeParse(body);
+      const error = z.object({ error: z.string() }).safeParse(body);
+      if (!response.ok || !filed.success) {
+        // These initial route refusals precede ServiceRequestService.execute.
+        // A later refusal cannot settle an earlier unknown attempt. In particular,
+        // 403/409/5xx can come from the request-list read after filing succeeded.
+        const refusedBeforeFiling = !checking && [400, 401, 404, 429].includes(response.status);
+        if (refusedBeforeFiling) {
+          attempt.current = null;
+          setUnconfirmed(false);
+          setNotice({ tone: "alert", text: `${error.success ? error.data.error : "That request was refused."} Your words are still here; correct the problem before filing again.` });
+        } else {
+          setUnconfirmed(true);
+          setNotice({ tone: "alert", text: `The request couldn't be confirmed. It may have been filed. ${error.success ? `${error.data.error} ` : ""}Your words are preserved. Check this same request or reload this System to inspect Requests before filing another change.` });
+        }
         return;
       }
+      attempt.current = null;
+      setUnconfirmed(false);
       setWords("");
-      setIdempotencyKey(`site-change:${crypto.randomUUID()}`);
       setNotice({ tone: "status", text: "Filed for Strelva. It's at Asked; Strelva agrees scope and timing with you next. Nothing on the site changed." });
-      onFiled(body.requestId);
+      onFiled(filed.data.requestId);
     } catch {
-      setNotice({ tone: "alert", text: "That couldn't be filed. Nothing was sent; your words are still here." });
+      setUnconfirmed(true);
+      setNotice({ tone: "alert", text: "The request couldn't be confirmed. It may have been filed. Your words are preserved. Check this same request or reload this System to inspect Requests before filing another change." });
     } finally {
+      inFlight.current = false;
       setSending(false);
     }
   }
@@ -56,10 +78,10 @@ export function WebsiteChangeAsk({ workspaceId, systemId, siteName, onFiled, onC
   return <Panel id={`${systemId}-ask`} title="Ask for a change" count={0} intro={`Tell Strelva what should change on ${siteName}. It becomes a Request you can follow below.`}>
     <form className="mt-3 grid gap-2" onSubmit={file}>
       <TextArea label="What should change?" value={words} maxLength={3000} rows={4}
-        disabled={sending} onChange={event => setWords(event.target.value)} placeholder="New office hours in the footer, starting Monday." />
+        disabled={sending || unconfirmed} onChange={event => { if (!inFlight.current && !attempt.current) setWords(event.target.value); }} placeholder="New office hours in the footer, starting Monday." />
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" size="sm" disabled={sending || words.trim().length < 3}>{sending ? "Filing…" : "File the request"}</Button>
-        <Button type="button" size="sm" variant="ghost" disabled={sending} onClick={onClose}>Close</Button>
+        <Button type="submit" size="sm" disabled={sending || (!unconfirmed && words.trim().length < 3)}>{sending ? (unconfirmed ? "Checking…" : "Filing…") : unconfirmed ? "Check this request" : "File the request"}</Button>
+        <Button type="button" size="sm" variant="ghost" disabled={sending || unconfirmed} onClick={onClose}>Close</Button>
       </div>
       {notice ? <p role={notice.tone} className="text-sm">{notice.text}</p> : null}
     </form>

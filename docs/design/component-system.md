@@ -1222,3 +1222,7 @@ this handoff without changing other consumers. Reduced-motion loading indicators
 use the existing motion utility. Focused unit and Chromium keyboard/recovery
 checks cover these transitions. This is local rendered proof; screen-reader,
 physical-device, other-browser and live-provider operation remain unproven.
+
+### Website change request recovery
+
+`WebsiteChangeAsk` files a service Request; it does not change a live website. A synchronous in-flight guard admits one dispatch per attempt. A network failure, malformed acknowledgement or generic refusal can follow a successful write, so the UI preserves an immutable body and idempotency key and offers an explicit **Check this request**. It keeps the words visible and locked until reconciliation; it never automatically retries or claims the request was unsent. Only an initial route refusal known to precede filing (400/401/404/429) unlocks correction. A later refusal cannot settle an earlier unknown attempt. Reloading the System lets the customer inspect its Requests. Authority and service command digest remain server-owned.
