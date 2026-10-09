@@ -124,6 +124,15 @@ test("independently owned businesses install and update definitions without copy
     expect(installed.payload.records).toEqual([]);
     expect(JSON.stringify(installed)).not.toContain("Private source business record");
     expect((await customer.context.request.get(`/api/bounded-work?productId=applications&workId=${sourceApp.id}`)).status()).toBe(403);
+    // Real provider-created, never-released target: exact draft controls only.
+    const makerPage = await builder.context.newPage();
+    await makerPage.goto(`/workspace?workspaceId=${customerSpace}&view=system&system=${target.systemId}`);
+    await expect(makerPage.getByRole("tab", { name: "Edit", exact: true })).toBeVisible();
+    const makerApplication = makerPage.getByRole("tab", { name: "Edit", exact: true }).locator("xpath=ancestor::section[1]");
+    await expect(makerApplication.getByText("Edit proposed app", { exact: true })).toBeVisible();
+    await expect(makerApplication.getByRole("button", { name: "Check proposed change", exact: true })).toBeVisible();
+    await expect(makerApplication.getByRole("button", { name: "Publish", exact: true })).toHaveCount(0);
+    await expect(makerApplication.getByRole("tab", { name: "Sharing", exact: true })).toHaveCount(0);
     installed = await releaseVersion(customer.context.request, target);
     installed = await command(customer.context.request, target.workId, { kind: "submit", expectedReleaseVersion: 1, expectedRecordsRevision: 0,
       record: { id: "customer-record", values: { problem: "Customer business record" } } });
@@ -158,6 +167,32 @@ test("independently owned businesses install and update definitions without copy
     expect(installed.payload.release.version).toBe(2);
     expect(installed.payload.release.spec.title).toBe("Harbor repairs");
     expect(installed.payload.release.spec.fields[0].label).toBe("Repair detail");
+    // Customer manager controls in the actual System application surface.
+    const ownerPage = await customer.context.newPage();
+    await ownerPage.goto(`/workspace?workspaceId=${customerSpace}&view=system&system=${target.systemId}`);
+    await expect(ownerPage.getByRole("tab", { name: "Review", exact: true })).toBeVisible();
+    await expect(ownerPage.getByRole("tab", { name: "Sharing", exact: true })).toBeVisible();
+    await expect(ownerPage.getByRole("tab", { name: "Edit", exact: true })).toHaveCount(0);
+    await ownerPage.getByRole("tab", { name: "Review", exact: true }).click();
+    const ownerApplication = ownerPage.getByRole("tab", { name: "Review", exact: true }).locator("xpath=ancestor::section[1]");
+    await ownerApplication.getByText("Review changes", { exact: true }).click();
+    await expect(ownerApplication.getByRole("button", { name: "Publish", exact: true })).toBeVisible();
+    await expect(ownerApplication.getByText("Edit proposed app", { exact: true })).toHaveCount(0);
+    await expect(ownerApplication.getByRole("button", { name: /^(Check proposed change|Run checks again|Check source version)$/ })).toHaveCount(0);
+    await expect(ownerApplication.getByText("Source design and updates", { exact: true })).toHaveCount(0);
+    await ownerApplication.getByText("Restore an earlier live version", { exact: true }).click();
+    await expect(ownerApplication.getByRole("button", { name: "Restore released version", exact: true })).toBeVisible();
+    await expect(ownerApplication.getByRole("button", { name: "Restore released version", exact: true })).toBeDisabled();
+    // Publication ends implicit creator access; native Version authority remains separate.
+    await makerPage.reload();
+    await expect(makerPage.getByText("Working definition and local changes", { exact: true })).toBeVisible();
+    await expect(makerPage.getByRole("tablist", { name: "Application workspace", exact: true })).toHaveCount(0);
+    await expect(makerPage.getByRole("tab", { name: /^(Edit|Review|Sharing)$/ })).toHaveCount(0);
+    await ownerPage.goto(`/workspace?workspaceId=${customerSpace}&view=applications`);
+    await expect(ownerPage.getByText("Ask your provider to create or copy an internal tool.", { exact: true })).toBeVisible();
+    await expect(ownerPage.getByRole("form", { name: "Application setup", exact: true })).toHaveCount(0);
+    await expect(ownerPage.getByText("Start from an existing app", { exact: true })).toHaveCount(0);
+
     definition = { ...definition, title: "Source changed its name" };
     const third = await publishSource();
     current = await view();

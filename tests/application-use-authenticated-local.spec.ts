@@ -48,6 +48,7 @@ test("a verified staff recipient uses one released version while a candidate cha
   const owner = await signedInContext(browser, admin, "application-owner");
   const staff = await signedInContext(browser, admin, "application-staff");
   let maker: Awaited<ReturnType<typeof ordinaryAgencyMaker>> | undefined;
+  let primaryFailure: unknown;
   try {
     const workspaceId = await ordinaryCustomerBusiness(owner, "Local agency-built tool customer");
     const refused = await post(owner.context.request, "/api/bounded-work", { action: "create", productId: "applications", workspaceId,
@@ -122,7 +123,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: testInfo.outputPath("application-use-mobile.png"), fullPage: true });
 
-    // Add the next fields and view through the owner editor. The live app
+    // Add the next fields and view through the named maker editor. The live app
     // remains unchanged until the separate review and Publish action below.
     const makerEditPage = await maker.context.newPage();
     await makerEditPage.goto(`/agency-applications/${app.id}`);
@@ -183,16 +184,25 @@ test("a verified staff recipient uses one released version while a candidate cha
     // Review and publish through the owner application surface. The exact
     // review remains beside the live app, and the staff link stays on v1 until
     // the owner publishes this checked proposal.
+    const makerChecksPage = await maker.context.newPage();
+    await makerChecksPage.goto(`/agency-applications/${app.id}`);
+    const makerChecks = makerChecksPage.locator("details").filter({ has: makerChecksPage.locator("summary").filter({ hasText: /^Review changes$/ }) });
+    if (!await makerChecks.evaluate(element => (element as HTMLDetailsElement).open)) await makerChecks.locator("summary").click();
+    await expect(makerChecks.getByText("Not checked yet. Check this proposal to verify existing records.", { exact: true })).toBeVisible();
+    await makerChecks.getByRole("button", { name: "Check proposed change", exact: true }).click();
+    await expect(makerChecks.getByText("Passed: Existing records fit this version", { exact: true })).toBeVisible();
+    await expect(makerChecks.getByRole("button", { name: "Publish", exact: true })).toHaveCount(0);
+    await makerChecksPage.close();
     const makerReviewPage = await owner.context.newPage();
     await makerReviewPage.goto(`/workspace?workspaceId=${workspaceId}&work=${app.id}`);
-    await makerReviewPage.getByRole("tab", { name: "Edit", exact: true }).click();
-    const review = makerReviewPage.locator("details").filter({ hasText: "Review changes" });
+    await makerReviewPage.getByRole("tab", { name: "Review", exact: true }).click();
+    const review = makerReviewPage.locator("details").filter({ has: makerReviewPage.locator("summary").filter({ hasText: /^Review changes$/ }) });
+    if (!await review.evaluate(element => (element as HTMLDetailsElement).open)) await review.locator("summary").click();
     await expect(review).toBeVisible();
     await expect(review.getByText('Field added: "Internal note" (text, optional).', { exact: true })).toBeVisible();
     await expect(review.getByText('Field changed: "Priority"; options change from standard, urgent to standard, urgent, vip.', { exact: true })).toBeVisible();
     await expect(review.getByText('View added: detail showing "Problem", "Internal note".', { exact: true })).toBeVisible();
-    await expect(review.getByText("Not checked yet. Check this proposal to verify existing records.", { exact: true })).toBeVisible();
-    await review.getByRole("button", { name: "Check proposed change", exact: true }).click();
+    await expect(review.getByRole("button", { name: "Check proposed change", exact: true })).toHaveCount(0);
     await expect(review.getByText("Checks for proposed version 2", { exact: true })).toBeVisible();
     await expect(review.getByText("Passed: Existing records fit this version", { exact: true })).toBeVisible();
     await expect(review.getByText(/Record compatibility check passed for this proposal/)).toBeVisible();
@@ -202,8 +212,9 @@ test("a verified staff recipient uses one released version while a candidate cha
     // the rail is hidden, the review uses the viewport, and the drawer can be
     // opened and closed without displacing the work.
     await makerReviewPage.reload({ waitUntil: "domcontentloaded" });
-    await makerReviewPage.getByRole("tab", { name: "Edit", exact: true }).click();
+    await makerReviewPage.getByRole("tab", { name: "Review", exact: true }).click();
     await expect(makerReviewPage.getByText("Review changes", { exact: true })).toBeVisible();
+    if (!await review.evaluate(element => (element as HTMLDetailsElement).open)) await review.locator("summary").click();
     const mobileNavigation = makerReviewPage.getByRole("dialog", { name: "Strelva workspace navigation", exact: true });
     await expect(mobileNavigation).not.toBeVisible();
     const reviewMainBox = await makerReviewPage.locator("main[data-frame-main]").boundingBox();
@@ -239,18 +250,26 @@ test("a verified staff recipient uses one released version while a candidate cha
 
     // Removing a used choice creates a candidate, but the real rehearsal must
     // fail before Publish can change the live release.
-    const ownerRemovalPage = await owner.context.newPage();
-    await ownerRemovalPage.goto(`/workspace?workspaceId=${workspaceId}&work=${app.id}`);
-    await ownerRemovalPage.getByRole("tab", { name: "Edit", exact: true }).click();
-    await ownerRemovalPage.getByText("Edit proposed app", { exact: true }).click();
-    await ownerRemovalPage.getByLabel("Option 1 for Priority", { exact: true }).fill("normal");
-    await ownerRemovalPage.getByRole("button", { name: "Save new draft", exact: true }).click();
-    const removalReview = ownerRemovalPage.locator("details").filter({ hasText: "Review changes" });
+    const makerRemovalPage = await maker.context.newPage();
+    await makerRemovalPage.goto(`/agency-applications/${app.id}`);
+    await makerRemovalPage.getByRole("tab", { name: "Edit", exact: true }).click();
+    await makerRemovalPage.getByText("Edit proposed app", { exact: true }).click();
+    await makerRemovalPage.getByLabel("Option 1 for Priority", { exact: true }).fill("normal");
+    await makerRemovalPage.getByRole("button", { name: "Save new draft", exact: true }).click();
+    const removalReview = makerRemovalPage.locator("details").filter({ hasText: "Review changes" });
     await expect(removalReview.getByText('Field changed: "Priority"; options change from standard, urgent, vip to normal, urgent, vip.', { exact: true })).toBeVisible();
     await removalReview.getByRole("button", { name: "Check proposed change", exact: true }).click();
     await expect(removalReview.getByText("Failed: Existing records fit this version", { exact: true })).toBeVisible();
-    await expect(removalReview.getByRole("button", { name: "Publish", exact: true })).toBeDisabled();
-    await ownerRemovalPage.close();
+    await expect(removalReview.getByRole("button", { name: "Publish", exact: true })).toHaveCount(0);
+    const failedOwnerReviewPage = await owner.context.newPage();
+    await failedOwnerReviewPage.goto(`/workspace?workspaceId=${workspaceId}&work=${app.id}`);
+    await failedOwnerReviewPage.getByRole("tab", { name: "Review", exact: true }).click();
+    const failedOwnerReview = failedOwnerReviewPage.locator("details").filter({ has: failedOwnerReviewPage.locator("summary").filter({ hasText: /^Review changes$/ }) });
+    if (!await failedOwnerReview.evaluate(element => (element as HTMLDetailsElement).open)) await failedOwnerReview.locator("summary").click();
+    await expect(failedOwnerReview.getByText("Failed: Existing records fit this version", { exact: true })).toBeVisible();
+    await expect(failedOwnerReview.getByRole("button", { name: "Publish", exact: true })).toBeDisabled();
+    await failedOwnerReviewPage.close();
+    await makerRemovalPage.close();
 
     // The new release includes a hidden native field, but the recipient's
     // released form view does not. Server and browser boundaries reject it.
@@ -299,10 +318,15 @@ test("a verified staff recipient uses one released version while a candidate cha
     await page.screenshot({ path: testInfo.outputPath("application-use-revoked.png"), fullPage: true });
 
     expect(apiPaths.some(path => /chat|agent|generate|workspace/.test(path))).toBe(false);
+  } catch (error) {
+    primaryFailure = error;
+    throw error;
   } finally {
-    await maker?.context.close();
-    await owner.context.close();
-    await staff.context.close();
+    const cleanup = await Promise.allSettled([maker?.context.close(), owner.context.close(), staff.context.close()]);
+    if (primaryFailure === undefined) {
+      const failed = cleanup.find(result => result.status === "rejected");
+      if (failed?.status === "rejected") throw failed.reason;
+    }
   }
 });
 
@@ -471,7 +495,7 @@ test("ordinary agency template becomes a private native app, then a live app wit
     await expect(review.getByRole("button", { name: "Publish", exact: true })).toHaveCount(0);
     const customerPage = await owner.context.newPage();
     await customerPage.goto(`/workspace?workspaceId=${workspaceId}&work=${app.id}`);
-    await customerPage.getByRole("tab", { name: "Edit", exact: true }).click();
+    await customerPage.getByRole("tab", { name: "Review", exact: true }).click();
     const customerReview = customerPage.locator("details").filter({ has: customerPage.locator("summary").filter({ hasText: /^Review changes$/ }) });
     if (!await customerReview.evaluate(element => (element as HTMLDetailsElement).open)) await customerReview.locator("summary").click();
     await expect(customerReview.getByRole("button", { name: "Publish", exact: true })).toBeEnabled();
