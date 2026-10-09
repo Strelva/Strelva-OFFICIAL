@@ -69,7 +69,7 @@ async function geometry(page: Page, parent: Locator, width: number) {
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   if (width >= 768) return;
   const boxes = [];
-  for (const control of await parent.locator("button:visible, select:visible, input:not([type=checkbox]):visible, label:has(input[type=checkbox]):visible").all()) {
+  for (const control of await parent.locator("button:visible, select:visible, textarea:visible, input:not([type=checkbox]):visible, label:has(input[type=checkbox]):visible").all()) {
     const box = await control.boundingBox(); expect(box).not.toBeNull();
     expect(box!.width).toBeGreaterThanOrEqual(44); expect(box!.height).toBeGreaterThanOrEqual(44); boxes.push(box!);
   }
