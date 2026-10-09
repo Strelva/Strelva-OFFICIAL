@@ -5,14 +5,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGetConnection = vi.hoisted(() => vi.fn());
 const mockSaveConnection = vi.hoisted(() => vi.fn());
+const mockSaveConnectionMutation = vi.hoisted(() => vi.fn());
 const redis = vi.hoisted(() => ({
   get: vi.fn(), set: vi.fn(), hincrby: vi.fn(), expire: vi.fn(), hgetall: vi.fn(),
 }));
-vi.mock("@/lib/connections", () => ({ getConnection: mockGetConnection, saveConnection: mockSaveConnection }));
+vi.mock("@/lib/connections", () => ({ getConnection: mockGetConnection, saveConnection: mockSaveConnection, saveConnectionMutation: mockSaveConnectionMutation }));
 vi.mock("@/platform/infra/redis", () => ({ getRedis: () => redis }));
 
 import {
   getGoogleGrant,
+  markGoogleGrantNeedsReauth,
   getGoogleLocation,
   getValidGoogleAccessToken,
   googleLocationIdFromName,
@@ -55,6 +57,7 @@ beforeEach(() => {
   setAccountBindingsDb({ rpc: async (name, args) => rpc(name, args) });
   mockGetConnection.mockResolvedValue(redisConnection);
   mockSaveConnection.mockResolvedValue(undefined);
+  mockSaveConnectionMutation.mockResolvedValue(undefined);
   redis.get.mockResolvedValue({ accountId: "accounts/9", locationId: "77" });
 });
 
@@ -68,7 +71,7 @@ describe("reading the grant", () => {
   it("reads native workspace grants and fails closed without a tenant Redis fallback", async () => {
     const scope = `workspace-${WORKSPACE}`;
     vi.stubEnv("STRELVA_GOOGLE_BINDINGS", "1");
-    rpc.mockImplementation((name) => ({ data: name === "read_native_workspace_google_binding" ? bindingRow({ originTenantId: null, originTenantStableId: null }) : null, error: null }));
+    rpc.mockImplementation((name) => ({ data: name === "read_native_workspace_google_binding" ? bindingRow({ originTenantId: null, originTenantStableId: null }) : name === "mutate_google_binding_generation" ? "2026-10-08T00:00:01Z" : null, error: null }));
     expect(await getGoogleGrant(scope)).toMatchObject({ source: "binding", workspaceId: WORKSPACE, bindingId: BINDING });
     expect(rpc).toHaveBeenCalledWith("read_native_workspace_google_binding", { p_workspace_id: WORKSPACE });
     expect(mockGetConnection).not.toHaveBeenCalled();
@@ -90,7 +93,7 @@ describe("reading the grant", () => {
 
   it("with the store on, reads the binding first, decrypts it and uses its location", async () => {
     vi.stubEnv("STRELVA_GOOGLE_BINDINGS", "1");
-    rpc.mockImplementation((name) => ({ data: name === "read_google_binding_for_tenant" ? bindingRow() : null, error: null }));
+    rpc.mockImplementation((name) => ({ data: name === "read_google_binding_for_tenant" ? bindingRow() : name === "mutate_google_binding_generation" ? "2026-10-08T00:00:01Z" : null, error: null }));
     const grant = await getGoogleGrant("mooney");
     expect(grant).toMatchObject({ source: "binding", bindingId: BINDING, workspaceId: WORKSPACE, refreshToken: "refresh-from-binding" });
     expect(mockGetConnection).not.toHaveBeenCalled();
@@ -144,28 +147,60 @@ describe("reading the grant", () => {
 });
 
 describe("refreshing tokens", () => {
+  it("refuses a refreshed token when a disconnect superseded its original grant", async () => {
+    vi.stubEnv("STRELVA_GOOGLE_BINDINGS", "");
+    let release!: (response: unknown) => void;
+    vi.stubGlobal("fetch", vi.fn(() => new Promise(resolve => { release = resolve; })));
+    const grant = (await getGoogleGrant("mooney"))!;
+    const originalToken = grant.accessToken;
+    const refresh = getValidGoogleAccessToken(grant);
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
+    mockSaveConnectionMutation.mockRejectedValueOnce(new Error("Connection mutation was superseded or revoked."));
+    release({ ok: true, json: async () => ({ access_token: "stale-fresh", refresh_token: "stale-rotated" }) });
+    expect(await refresh).toBeNull();
+    expect(grant.accessToken).toBe(originalToken);
+    expect(mockSaveConnection).not.toHaveBeenCalled();
+    expect(mockSaveConnectionMutation).toHaveBeenCalledWith(redisConnection, expect.any(Object), grant.mutationStartedAt);
+  });
+  it("does not mark a revoked connection needs_reauth through a retained grant", async () => {
+    vi.stubEnv("STRELVA_GOOGLE_BINDINGS", "");
+    const grant = (await getGoogleGrant("mooney"))!;
+    mockSaveConnectionMutation.mockRejectedValueOnce(new Error("Connection mutation was superseded or revoked."));
+    await expect(markGoogleGrantNeedsReauth(grant, "invalid grant")).rejects.toThrow(/superseded/);
+    expect(mockSaveConnection).not.toHaveBeenCalled();
+    expect(mockSaveConnectionMutation).toHaveBeenCalledWith(redisConnection, { status: "needs_reauth" }, grant.mutationStartedAt);
+  });
   it("refreshes native grants through the same encrypted store without a Redis tenant copy", async () => {
     vi.stubEnv("STRELVA_GOOGLE_BINDINGS", "1");
-    rpc.mockImplementation((name) => ({ data: name === "read_native_workspace_google_binding" ? bindingRow({ originTenantId: null, originTenantStableId: null }) : null, error: null }));
+    rpc.mockImplementation((name) => ({ data: name === "read_native_workspace_google_binding" ? bindingRow({ originTenantId: null, originTenantStableId: null }) : name === "mutate_google_binding_generation" ? "2026-10-08T00:00:01Z" : null, error: null }));
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ access_token: "fresh", expires_in: 3600, refresh_token: "rotated" }) })));
     const grant = (await getGoogleGrant(`workspace-${WORKSPACE}`))!;
     expect(await getValidGoogleAccessToken(grant, Date.parse("2026-10-08T00:00:00Z"))).toBe("fresh");
-    expect(rpc).toHaveBeenCalledWith("update_workspace_account_binding_tokens", expect.objectContaining({ p_binding_id: BINDING }));
+    expect(rpc).toHaveBeenCalledWith("mutate_google_binding_generation", expect.objectContaining({ p_binding_id: BINDING }));
     expect(mockGetConnection).not.toHaveBeenCalled(); expect(mockSaveConnection).not.toHaveBeenCalled();
   });
   it("stores a refreshed and rotated token in the binding, encrypted, and the rotated refresh token in Redis", async () => {
     vi.stubEnv("STRELVA_GOOGLE_BINDINGS", "1");
-    rpc.mockImplementation((name) => ({ data: name === "read_google_binding_for_tenant" ? bindingRow() : null, error: null }));
+    rpc.mockImplementation((name) => ({ data: name === "read_google_binding_for_tenant" ? bindingRow() : name === "mutate_google_binding_generation" ? "2026-10-08T00:00:01Z" : null, error: null }));
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ access_token: "fresh", expires_in: 3600, refresh_token: "rotated" }) })));
     const grant = (await getGoogleGrant("mooney"))!;
     expect(await getValidGoogleAccessToken(grant, Date.parse("2026-10-08T00:00:00Z"))).toBe("fresh");
-    const call = rpc.mock.calls.find(([name]) => name === "update_workspace_account_binding_tokens")!;
-    expect(String(call[1].p_access_ciphertext)).toMatch(/^enc:v1:/);
-    expect(decryptSecret(String(call[1].p_refresh_ciphertext))).toBe("rotated");
+    const call = rpc.mock.calls.find(([name]) => name === "mutate_google_binding_generation")!;
+    expect(String((call[1].p_mutation as Record<string,unknown>).accessTokenCiphertext)).toMatch(/^enc:v1:/);
+    expect(decryptSecret(String((call[1].p_mutation as Record<string,unknown>).refreshTokenCiphertext))).toBe("rotated");
     expect(JSON.stringify(call[1])).not.toContain("\"fresh\"");
-    expect(mockSaveConnection).toHaveBeenCalledWith(expect.objectContaining({ refreshToken: "rotated", accessToken: "access-from-redis" }));
+    expect(mockSaveConnectionMutation).toHaveBeenCalledWith(redisConnection, { refreshToken: "rotated" }, expect.any(String));
   });
 
+  it("refuses a refreshed native token after the binding generation was revoked", async () => {
+    vi.stubEnv("STRELVA_GOOGLE_BINDINGS", "1");
+    rpc.mockImplementation(name => ({ data: name === "read_native_workspace_google_binding" ? bindingRow() : null, error: name === "mutate_google_binding_generation" ? { message: "account_binding_superseded_or_revoked" } : null }));
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ access_token: "stale-native" }) })));
+    const grant = (await getGoogleGrant(`workspace-${WORKSPACE}`))!;
+    expect(await getValidGoogleAccessToken(grant)).toBeNull();
+    expect(grant.accessToken).toBe("access-from-binding");
+    expect(mockSaveConnection).not.toHaveBeenCalled();
+  });
   it("reuses a stored access token that is still good", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const grant = (await getGoogleGrant("mooney"))!;
@@ -176,11 +211,11 @@ describe("refreshing tokens", () => {
 
   it("marks the binding needs_reauth when Google refuses the refresh token", async () => {
     vi.stubEnv("STRELVA_GOOGLE_BINDINGS", "1");
-    rpc.mockImplementation((name) => ({ data: name === "read_google_binding_for_tenant" ? bindingRow() : null, error: null }));
+    rpc.mockImplementation((name) => ({ data: name === "read_google_binding_for_tenant" ? bindingRow() : name === "mutate_google_binding_generation" ? "2026-10-08T00:00:01Z" : null, error: null }));
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: false, text: async () => '{"error":"invalid_grant"}' })));
     const grant = (await getGoogleGrant("mooney"))!;
     expect(await getValidGoogleAccessToken(grant, Date.parse("2026-10-08T00:00:00Z"))).toBeNull();
-    expect(rpc).toHaveBeenCalledWith("set_workspace_account_binding_status", expect.objectContaining({ p_binding_id: BINDING, p_status: "needs_reauth" }));
+    expect(rpc).toHaveBeenCalledWith("mutate_google_binding_generation", expect.objectContaining({ p_binding_id: BINDING, p_expected_updated_at: "2026-10-06T00:00:00Z", p_mutation: expect.objectContaining({ status: "needs_reauth" }) }));
   });
 });
 

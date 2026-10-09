@@ -137,6 +137,22 @@ export async function readBindingTarget(tenantId: string, db?: AccountBindingsDb
     (data) => (data === null || data === undefined ? null : bindingTargetSchema.parse(data)), db ?? accountBindingsDb());
 }
 
+/** Atomic mutation of the exact grant read before an external operation. */
+export async function mutateGoogleBinding(
+  bindingId: string, expectedUpdatedAt: string,
+  mutation: { accessToken?: string; expiresAt?: string | null; rotatedRefreshToken?: string | null; status?: AccountBindingStatus; error?: string | null; checkedAt?: string | null },
+  db?: AccountBindingsDb | null,
+): Promise<string> {
+  return call("mutate_google_binding_generation", {
+    p_binding_id: bindingId, p_expected_updated_at: expectedUpdatedAt,
+    p_mutation: {
+      ...(mutation.accessToken !== undefined ? { accessTokenCiphertext: encryptForBinding(mutation.accessToken), tokenExpiresAt: mutation.expiresAt ?? null } : {}),
+      ...(mutation.rotatedRefreshToken ? { refreshTokenCiphertext: encryptForBinding(mutation.rotatedRefreshToken) } : {}),
+      ...(mutation.status ? { status: mutation.status, error: mutation.error?.slice(0,500) ?? null, checkedAt: mutation.checkedAt ?? null } : {}),
+    },
+  }, data => z.string().parse(data), db ?? accountBindingsDb());
+}
+
 export async function updateGoogleBindingTokens(
   bindingId: string, tokens: { accessToken: string; expiresAt: string | null; rotatedRefreshToken?: string | null }, db?: AccountBindingsDb | null,
 ): Promise<void> {

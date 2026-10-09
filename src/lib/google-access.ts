@@ -20,7 +20,7 @@
  * only refresh path.
  */
 
-import { getConnection, saveConnection } from "./connections";
+import { getConnection, saveConnection, saveConnectionMutation } from "./connections";
 import { publishingWorkspaceId } from "@/platform/infra/publishing-scope";
 import { decryptSecret } from "@/platform/infra/crypto/secrets";
 import { refreshGoogleTokens } from "./google-token";
@@ -47,6 +47,8 @@ export interface GoogleLocationRef {
 
 export interface GoogleGrant {
   source: "binding" | "redis";
+  /** Captured before reading authority, never after an external await. */
+  mutationStartedAt?: string;
   tenantId: string;
   status: GoogleGrantStatus;
   /** Undefined: connected before scope tracking. connectionHasWriteScope
@@ -56,6 +58,7 @@ export interface GoogleGrant {
   refreshToken: string | null;
   expiresAt: string | null;
   bindingId: string | null;
+  bindingUpdatedAt?: string;
   workspaceId: string | null;
   /** From the binding; null means "read Redis google-meta". */
   location: GoogleLocationRef | null;
@@ -109,7 +112,7 @@ function grantFromBinding(tenantId: string, binding: GoogleBindingWithSecrets): 
     scopes: binding.scopes ?? undefined,
     accessToken: decryptSecret(binding.accessTokenCiphertext) ?? null,
     refreshToken: decryptSecret(binding.refreshTokenCiphertext) ?? null,
-    expiresAt: binding.tokenExpiresAt, bindingId: binding.id, workspaceId: binding.workspaceId,
+    bindingUpdatedAt: binding.updatedAt, expiresAt: binding.tokenExpiresAt, bindingId: binding.id, workspaceId: binding.workspaceId,
     location: primary ? { accountId: primary.accountId, locationId: primary.locationId } : null,
     connection: null,
   };
@@ -125,6 +128,7 @@ function reasonOf(error: unknown, store: GoogleBindingsPort): GoogleFallbackReas
 
 /** The tenant's Google grant: the binding first, Redis as the fallback. */
 export async function getGoogleGrant(tenantId: string): Promise<GoogleGrant | null> {
+  const mutationStartedAt = new Date().toISOString();
   const nativeWorkspace = publishingWorkspaceId(tenantId);
   const store = await bindingStore();
   if (store.googleBindingsEnabled()) {
@@ -132,7 +136,7 @@ export async function getGoogleGrant(tenantId: string): Promise<GoogleGrant | nu
       const binding = await store.readGoogleBindingForTenant(tenantId);
       if (binding) {
         try {
-          return grantFromBinding(tenantId, binding);
+          return { ...grantFromBinding(tenantId, binding), mutationStartedAt };
         } catch {
           if (!nativeWorkspace) await noteFallback(tenantId, "decrypt_failed");
         }
@@ -145,7 +149,7 @@ export async function getGoogleGrant(tenantId: string): Promise<GoogleGrant | nu
   }
   if (nativeWorkspace) return null;
   const connection = await getConnection(tenantId, "google");
-  return connection ? grantFromConnection(connection) : null;
+  return connection ? { ...grantFromConnection(connection), mutationStartedAt } : null;
 }
 
 /** The location id in a Google resource name. Business Information v1 returns
@@ -176,55 +180,63 @@ export async function getGoogleLocation(tenantId: string, grant?: GoogleGrant | 
  * is left for its caller to mark, as before.
  */
 export async function getValidGoogleAccessToken(grant: GoogleGrant, now = Date.now()): Promise<string | null> {
+  if (grant.status !== "connected") return null;
+  const mutationStartedAt = grant.mutationStartedAt ?? new Date(now).toISOString();
   if (grant.accessToken && (!grant.expiresAt || now + EXPIRY_BUFFER_MS < new Date(grant.expiresAt).getTime())) {
     return grant.accessToken;
   }
   if (!grant.refreshToken) return null;
+  const connection = grant.connection ?? (!publishingWorkspaceId(grant.tenantId) ? await getConnection(grant.tenantId, "google").catch(() => null) : null);
   const outcome = await refreshGoogleTokens(grant.refreshToken);
   if (!outcome.ok) {
     if (outcome.reason === "invalid_grant" && grant.bindingId) {
-      await (await bindingStore()).setGoogleBindingStatus(grant.bindingId, "needs_reauth", "Google refused the refresh token.", new Date(now).toISOString()).catch(() => {});
+      await mutateGrantBinding(grant, { status: "needs_reauth", error: "Google refused the refresh token.", checkedAt: new Date(now).toISOString() }).catch(() => {});
     }
     return null;
   }
   const { accessToken, expiresIn, refreshToken: rotated } = outcome.tokens;
   const expiresAt = new Date(now + (expiresIn ?? 3600) * 1000).toISOString();
-  grant.accessToken = accessToken;
-  grant.expiresAt = expiresAt;
-  if (rotated) grant.refreshToken = rotated;
   if (grant.source === "binding" && grant.bindingId) {
-    await (await bindingStore()).updateGoogleBindingTokens(grant.bindingId, { accessToken, expiresAt, rotatedRefreshToken: rotated }).catch((error) => {
-      console.warn(`[google-access] could not store the refreshed token for ${grant.tenantId}: ${error instanceof Error ? error.message : "error"}`);
-    });
+    try { await mutateGrantBinding(grant, { accessToken, expiresAt, rotatedRefreshToken: rotated }); }
+    catch { return null; }
   }
   // Redis keeps working during the move: a rotated refresh token reaches it
   // too, and a Redis-sourced grant gets its fresh access token back.
-  const connection = grant.connection ?? (rotated && !publishingWorkspaceId(grant.tenantId) ? await getConnection(grant.tenantId, "google").catch(() => null) : null);
   if (connection && (grant.source === "redis" || rotated)) {
-    await saveConnection({
-      ...connection,
-      ...(grant.source === "redis" ? { accessToken, expiresAt } : {}),
-      ...(rotated ? { refreshToken: rotated } : {}),
-    }).catch(() => {});
+    try {
+      await saveConnectionMutation(connection, {
+        ...(grant.source === "redis" ? { accessToken, expiresAt } : {}),
+        ...(rotated ? { refreshToken: rotated } : {}),
+      }, mutationStartedAt);
+    } catch { return null; } // Never return refreshed authority after revocation.
+
   }
+  grant.accessToken = accessToken;
+  grant.expiresAt = expiresAt;
+  if (rotated) grant.refreshToken = rotated;
   return accessToken;
+}
+
+async function mutateGrantBinding(grant: GoogleGrant, mutation: Parameters<GoogleBindingsPort["mutateGoogleBinding"]>[2]): Promise<void> {
+  if (!grant.bindingId || !grant.bindingUpdatedAt) throw new Error("Google grant generation is unavailable.");
+  grant.bindingUpdatedAt = await (await bindingStore()).mutateGoogleBinding(grant.bindingId, grant.bindingUpdatedAt, mutation);
 }
 
 /** A dead grant: the owner must reconnect. Marks every store that holds it. */
 export async function markGoogleGrantNeedsReauth(grant: GoogleGrant, reason: string): Promise<void> {
   if (grant.bindingId) {
-    await (await bindingStore()).setGoogleBindingStatus(grant.bindingId, "needs_reauth", reason, new Date().toISOString()).catch(() => {});
+    await mutateGrantBinding(grant, { status: "needs_reauth", error: reason, checkedAt: new Date().toISOString() });
   }
   const connection = grant.connection ?? (publishingWorkspaceId(grant.tenantId) ? null : await getConnection(grant.tenantId, "google").catch(() => null));
   if (connection && connection.status === "connected") {
-    await saveConnection({ ...connection, status: "needs_reauth" });
+    await saveConnectionMutation(connection, { status: "needs_reauth" }, grant.mutationStartedAt ?? new Date().toISOString());
   }
 }
 
 /** A good read from Google: the listing's health counts from here. */
 export async function noteGoogleReadSucceeded(grant: GoogleGrant, now = Date.now()): Promise<void> {
   if (!grant.bindingId) return;
-  await (await bindingStore()).setGoogleBindingStatus(grant.bindingId, "connected", null, new Date(now).toISOString()).catch(() => {});
+  await mutateGrantBinding(grant, { status: "connected", error: null, checkedAt: new Date(now).toISOString() });
 }
 
 export type BindingWriteOutcome = "written" | "disabled" | "unlinked" | "refused_plaintext" | "failed";

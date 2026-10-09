@@ -166,6 +166,7 @@ export interface GoogleBindingLocation {
 
 export interface GoogleBindingWithSecrets {
   id: string;
+  updatedAt: string;
   workspaceId: string;
   status: BindingStatus;
   scopes: string[] | null;
@@ -177,6 +178,7 @@ export interface GoogleBindingWithSecrets {
 
 export interface GoogleBindingsPort {
   googleBindingsEnabled(): boolean;
+  mutateGoogleBinding(bindingId: string, expectedUpdatedAt: string, mutation: { accessToken?: string; expiresAt?: string | null; rotatedRefreshToken?: string | null; status?: BindingStatus; error?: string | null; checkedAt?: string | null }): Promise<string>;
   readBindingTarget(tenantId: string): Promise<{ workspaceId: string; tenantStableId: string } | null>;
   readGoogleBindingForTenant(tenantId: string): Promise<GoogleBindingWithSecrets | null>;
   setGoogleBindingStatus(bindingId: string, status: BindingStatus, error: string | null, checkedAt: string | null): Promise<unknown>;

@@ -3,16 +3,18 @@ vi.mock("@/platform/infra/redis", () => ({ getRedis: () => null }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => null }));
 import { setClientRecordDb, type ClientRecordDb } from "@/platform/client-records/mirror";
 import { readThroughFlag } from "@/platform/client-records/move";
-import { saveConnection, getConnection, deleteConnection } from "@/lib/connections";
+import { saveConnection, saveConnectionMutation, getConnection, deleteConnection } from "@/lib/connections";
 import { recordOrder, getOrders, getOrderSummary } from "@/lib/orders";
 const rows = new Map<string,{ recordId:string; payload:Record<string,unknown>; capturedAt:string }>();
 let fail: string | null = null;
+const tombstones = new Map<string,string>();
 const db: ClientRecordDb = { rpc(name,args) {
  if (name === fail) return Promise.resolve({ data:null,error:{message:"offline"} });
  if (name === "client_record_parity_streak") return Promise.resolve({data:{days:7},error:null});
  const key = `${args.p_store}|${args.p_record_id}`;
  if (name === "record_tenant_client_record") {
-  if (args.p_mode === "remove") { rows.delete(key); return Promise.resolve({data:{status:"removed"},error:null}); }
+  if (args.p_mode === "remove") { tombstones.set(key,String(args.p_captured_at)); rows.delete(key); return Promise.resolve({data:{status:"removed"},error:null}); }
+  if (String(args.p_captured_at) <= (tombstones.get(key) ?? "") || String(args.p_captured_at) < (rows.get(key)?.capturedAt ?? "")) return Promise.resolve({data:{status:"kept"},error:null});
   if (rows.has(key) && args.p_mode === "keep_first") return Promise.resolve({data:{status:"kept"},error:null});
   rows.set(key,{recordId:String(args.p_record_id),payload:args.p_payload as Record<string,unknown>,capturedAt:String(args.p_captured_at)});
   return Promise.resolve({data:{status:"recorded"},error:null});
@@ -21,7 +23,7 @@ const db: ClientRecordDb = { rpc(name,args) {
  return Promise.resolve({data:null,error:{message:name}});
 } };
 beforeEach(()=>{
- rows.clear(); fail=null; setClientRecordDb(db);
+ rows.clear(); tombstones.clear(); fail=null; setClientRecordDb(db);
  vi.stubEnv("STRELVA_CLIENT_RECORDS_DUAL_WRITE","1"); vi.stubEnv("DUAL_WRITE_PG","1");
  vi.stubEnv("STRELVA_CLIENT_RECORDS_READ","orders,provider_connections");
  vi.stubEnv("SECRETS_ENC_KEY",Buffer.alloc(32,7).toString("hex"));
@@ -34,6 +36,24 @@ describe("qualified durable client-record authority",()=>{
   expect((await getConnection("acme","google"))?.accessToken).toBe("token");
   await deleteConnection("acme","google");
   expect(await getConnection("acme","google")).toBeNull();
+ });
+ it("rejects retained mutations after revoke and permits a distinct reconnect",async()=>{
+  vi.useFakeTimers();
+  try {
+   vi.setSystemTime(new Date("2026-10-08T00:00:00Z"));
+   await saveConnection({tenantId:"acme",provider:"google",accessToken:"old",refreshToken:"old-refresh",status:"connected"});
+   const startedAt=new Date().toISOString();
+   const retained=(await getConnection("acme","google"))!;
+   vi.advanceTimersByTime(1000);
+   await deleteConnection("acme","google");
+   vi.advanceTimersByTime(1000);
+   await expect(saveConnectionMutation(retained,{accessToken:"stale-refreshed"},startedAt)).rejects.toThrow(/superseded|revoked/);
+   await expect(saveConnectionMutation(retained,{status:"needs_reauth"},startedAt)).rejects.toThrow(/superseded|revoked/);
+   expect(await getConnection("acme","google")).toBeNull();
+   await saveConnection({tenantId:"acme",provider:"google",accessToken:"new",refreshToken:"new-refresh",status:"connected"});
+   await expect(saveConnectionMutation(retained,{accessToken:"stale-refreshed"},startedAt)).rejects.toThrow(/superseded|revoked/);
+   expect((await getConnection("acme","google"))?.accessToken).toBe("new");
+  } finally { vi.useRealTimers(); }
  });
  it("captures concurrent/restarted order beacons once without Redis",async()=>{
   const input={externalId:"provider-order",amountCents:2500,currency:"USD",items:[],verification:"site-signature" as const};

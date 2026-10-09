@@ -18,13 +18,16 @@ function encodeConnection(c: Connection): Connection {
   };
 }
 
+const storedConnections = new WeakMap<Connection, Connection>();
 function decodeConnection(c: Connection): Connection {
-  return {
+  const decoded = {
     ...c,
     accessToken: decryptSecret(c.accessToken),
     refreshToken: decryptSecret(c.refreshToken) ?? undefined,
     apiKey: decryptSecret(c.apiKey) ?? undefined,
   };
+  storedConnections.set(decoded, c);
+  return decoded;
 }
 
 function connectionKey(tenantId: string, provider: IntegrationProvider): string {
@@ -97,6 +100,34 @@ async function saveConnectionAt(connection: Connection, capturedAt: string): Pro
   if (!redis) throw new Error("Connection storage is unavailable");
   await redis.set(connectionKey(connection.tenantId, connection.provider), encoded);
   await mirrorRecord("provider_connections", connection.tenantId, connection.provider, encoded);
+}
+
+/** Refresh/status mutations preserve their pre-read time and cannot recreate a
+ * removed cache value. Reconnects use saveConnection, not this mutation path. */
+export async function saveConnectionMutation(expected: Connection, patch: Partial<Connection>, capturedAt: string): Promise<void> {
+  const next = { ...expected, ...patch };
+  const encoded = encodeConnection(next);
+  const durable = await durableRecordAuthority("provider_connections");
+  if (durable) {
+    const status = await writeDurableRecord("provider_connections", next.tenantId, next.provider, encoded, capturedAt);
+    if (status === "kept") throw new Error("Connection mutation was superseded or revoked.");
+  }
+  const redis = getRedis();
+  const raw = storedConnections.get(expected);
+  if (!durable && (!redis || !raw)) throw new Error("Connection mutation authority is unavailable.");
+  if (redis && raw) {
+    // Compare the exact stored generation, including encrypted tokens. A
+    // disconnect or reconnect between the read and EVAL cannot be overwritten.
+    const changed = await redis.eval<number>(`local value=redis.call('GET',KEYS[1]); if not value then return 0 end
+local function equal(a,b) if type(a)~=type(b) then return false end; if type(a)~='table' then return a==b end; for k,v in pairs(a) do if not equal(v,b[k]) then return false end end; for k,v in pairs(b) do if a[k]==nil then return false end end; return true end
+if not equal(cjson.decode(value),cjson.decode(ARGV[1])) then return 0 end
+redis.call('SET',KEYS[1],ARGV[2]); return 1`, [connectionKey(next.tenantId, next.provider)], [JSON.stringify(raw), JSON.stringify(encoded)]).catch(error => { if (!durable) throw error; return 0; });
+    if (!durable && changed !== 1) throw new Error("Connection mutation was superseded or revoked.");
+  }
+  if (durable) {
+    const current = await getConnection(next.tenantId, next.provider);
+    if (!current || current.status !== next.status || current.accessToken !== next.accessToken || current.refreshToken !== next.refreshToken) throw new Error("Connection mutation was superseded or revoked.");
+  }
 }
 
 export async function updateLastSynced(
