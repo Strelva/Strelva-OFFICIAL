@@ -79,15 +79,15 @@ export function BusinessAgencyStatus({
   collection: OfferingCollection;
   onOpen: (id?: string) => void;
 }) {
-  const providerInstallations = installations.filter((installation) => installation.responsibility.kind === "provider_requested");
-  if (!providerInstallations.length) return null;
+  const agencyInstallations = installations.filter((installation) => installation.responsibility.kind === "provider_requested");
+  if (!agencyInstallations.length) return null;
   const deliveryByInstallation = new Map(deliveries.map((delivery) => [delivery.installationId, delivery]));
   return <section className={styles.providerSummary} aria-labelledby="home-provider-status">
     <header><h3 id="home-provider-status">Agency requests</h3><span>Actual delivery status</span></header>
     {state.status === "loading" ? <p role="status">Checking agency delivery status…</p> : state.status === "error" ? <div className={styles.providerUnavailable}>
       <p role="alert">Agency delivery status is unavailable. Acceptance cannot be inferred from the offering record.</p>
       <button type="button" onClick={() => onOpen()}>Open agency details</button>
-    </div> : <ul>{providerInstallations.map((installation) => {
+    </div> : <ul>{agencyInstallations.map((installation) => {
       const delivery = deliveryByInstallation.get(installation.id);
       return <li key={installation.id}>
         <span><strong>{definitionName(collection, installation)}</strong>{delivery ? <small>{delivery.status === "requested" ? "Agency requested · waiting for acceptance" : delivery.status === "accepted" ? "Agency accepted" : "Agency delivery revoked"}</small> : <small>Agency requested. No delivery status has been returned yet.</small>}

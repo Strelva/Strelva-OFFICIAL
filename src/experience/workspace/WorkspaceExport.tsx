@@ -59,11 +59,11 @@ export function WorkspaceExport({ workspaceId, schema3 = false, request = fetch 
     <Card padding="lg" className="mt-8">
       <h2 className="text-lg font-medium">{schema3 ? "Your complete stored record" : "A bounded snapshot"}</h2>
       <ul className="mt-4 grid gap-3 text-sm leading-6 text-gray-muted">
-        {schema3 ? <><li>Includes business facts, Systems and Version history, linked-site content, inquiries, bookings, orders, rewards, settings, and billing records stored by Strelva.</li><li>Media and onboarding uploads include download references. Provider records Strelva has never imported remain with that provider.</li><li>Passwords, connection tokens, card details, booking management links, and Strelva’s internal notes are excluded.</li><li>Large archives are prepared in the background. The owner can download the archive here for seven days, even while email is paused.</li><li>This export does not end service or delete records. Prepare an exit separately to review billing, sites, provider handover, and retained history.</li></> : <>
+        {schema3 ? <><li>Includes business facts, Systems and Version history, linked-site content, inquiries, bookings, orders, rewards, settings, and billing records stored by Strelva.</li><li>Media and onboarding uploads include download references. Provider records Strelva has never imported remain with that provider.</li><li>Passwords, connection tokens, card details, booking management links, and Strelva’s internal notes are excluded.</li><li>Large archives are prepared in the background. The owner can download the archive here for seven days, even while email is paused.</li><li>This export does not end service or delete records. Prepare an exit separately to review billing, sites, agency handover, and retained history.</li></> : <>
           <li>Includes current workspace identity and supported portable records.</li>
           <li>Onboarding uploads are represented by size, digest, extraction status, and an authenticated download reference. Uploaded bytes stay out of the JSON file.</li>
-          <li>Custom application source and artifacts, calendar connections and event receipts, inquiry and follow-up records, and offering/provider records are outside this snapshot.</li>
-          <li>Credentials, access tokens, command digests, provider handover, managed-site content, and internal learning are excluded.</li>
+          <li>Custom application source and artifacts, calendar connections and event receipts, inquiry and follow-up records, and offering/agency records are outside this snapshot.</li>
+          <li>Credentials, access tokens, command digests, agency handover, managed-site content, and internal learning are excluded.</li>
           <li>Does not close an account, delete work, end service, or set a retention period. Exports above 2 MB stop without creating a partial file or success receipt.</li>
         </>}
       </ul>

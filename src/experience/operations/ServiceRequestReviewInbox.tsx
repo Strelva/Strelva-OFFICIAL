@@ -12,7 +12,7 @@ function requestName(item: ServiceRequest): string {
   return typeof name === "string" && name.trim() ? name : item.businessId;
 }
 
-function providerResponseKey(item: ServiceRequest, decision: "accepted" | "declined"): string {
+function agencyResponseKey(item: ServiceRequest, decision: "accepted" | "declined"): string {
   return `service-request-response:${item.id}:${item.revision}:${decision}`;
 }
 
@@ -72,7 +72,7 @@ export function ServiceRequestInbox({ providerWorkspaceId, surface = "admin" }: 
       const response = await transport("/api/service-requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "respond", requestId: item.id, expectedRevision: item.revision, decision, idempotencyKey: providerResponseKey(item, decision) }),
+        body: JSON.stringify({ action: "respond", requestId: item.id, expectedRevision: item.revision, decision, idempotencyKey: agencyResponseKey(item, decision) }),
       });
       const body = await response.json().catch(() => null) as ResponseBody | null;
       if (!response.ok || !body?.request) throw new Error(body?.error?.message || "The agency response could not be saved.");

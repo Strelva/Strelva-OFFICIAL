@@ -123,7 +123,7 @@ export class ServiceRequestService {
 
   list(actor: ServiceRequestActor, query: ServiceRequestListQuery): Promise<ServiceRequest[]> {
     if ("businessId" in query) return this.store.list(actor, { businessId: parseUuid(query.businessId, "Choose a valid business workspace.") });
-    if ("providerWorkspaceId" in query) return this.store.list(actor, { providerWorkspaceId: parseUuid(query.providerWorkspaceId, "Choose a valid provider workspace.") });
+    if ("providerWorkspaceId" in query) return this.store.list(actor, { providerWorkspaceId: parseUuid(query.providerWorkspaceId, "Choose a valid agency workspace.") });
     return this.store.list(actor, { providerKind: "strelva" });
   }
 

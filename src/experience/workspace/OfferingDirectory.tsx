@@ -267,27 +267,30 @@ export function BusinessOfferingSummary({
   state,
   work,
   onOpen,
+  agencyDeliveryState,
   providerDeliveryState,
   systemsReleased = false,
 }: {
   state: WorkspaceOfferingState;
   work: readonly WorkspaceWork[];
   onOpen: (id?: string) => void;
+  agencyDeliveryState?: BusinessAgencyDeliveryState;
+  /** @deprecated Use agencyDeliveryState. */
   providerDeliveryState?: BusinessAgencyDeliveryState;
   /** STRELVA_SYSTEMS_RELEASE. Off (the default): the pre-Systems "offerings" words on Home. */
   systemsReleased?: boolean;
 }) {
-  const fetchedProviderDeliveryState = useBusinessAgencyDeliveries(state);
+  const fetchedAgencyDeliveryState = useBusinessAgencyDeliveries(state);
   const panelTitle = systemsReleased ? "Set up for this business" : "Installed offerings";
   if (state.status === "unavailable") return null;
   if (state.status === "loading") return <section className={styles.homePanel} aria-labelledby="home-offerings"><header><Settings2 size={17} aria-hidden="true" /><h2 id="home-offerings">{panelTitle}</h2></header><p role="status">{systemsReleased ? "Loading…" : "Loading offerings…"}</p></section>;
   if (state.status === "error") return <section className={styles.homePanel} aria-labelledby="home-offerings"><header><Settings2 size={17} aria-hidden="true" /><h2 id="home-offerings">{panelTitle}</h2></header><p>{systemsReleased ? "These records are unavailable." : "Offering records are unavailable."} Your saved work is unchanged.</p><button type="button" onClick={() => onOpen()}>{systemsReleased ? "Open ready-made systems" : "Open offerings"}</button></section>;
   const current = state.collection.installations.filter((installation) => installation.status !== "retired");
-  const providerState = providerDeliveryState ?? fetchedProviderDeliveryState;
-  const providerDeliveries = providerState.status === "ready" ? providerState.deliveries : [];
+  const agencyState = agencyDeliveryState ?? providerDeliveryState ?? fetchedAgencyDeliveryState;
+  const agencyDeliveries = agencyState.status === "ready" ? agencyState.deliveries : [];
   return <section className={styles.homePanel} aria-labelledby="home-offerings">
     <header><Settings2 size={17} aria-hidden="true" /><h2 id="home-offerings">{systemsReleased ? "Ready-made systems" : "Business offerings"}</h2><span>{current.length}</span></header>
     {current.length ? <ul>{current.map((installation) => <li key={installation.id}><button type="button" onClick={() => onOpen(installation.id)}><span><strong>{definitionFor(state.collection, installation)?.name ?? installation.definitionId}</strong><small>{installation.status === "draft" ? "Draft setup · publication required" : installation.nativeResources.map((resource) => work.find((item) => item.id === resource.id)?.title ?? resource.kind.replaceAll("_", " ")).join(" · ") || "No connected work"}</small></span><ArrowRight size={14} aria-hidden="true" /></button></li>)}</ul> : <div className={styles.homeEmpty}><p>{systemsReleased ? "Nothing ready-made is set up for this business." : "No offerings are installed for this business."} Saved work remains available on its own.</p><button type="button" onClick={() => onOpen()}>{systemsReleased ? "Explore ready-made systems" : "Explore offerings"}</button></div>}
-    <BusinessAgencyStatus state={providerState} deliveries={providerDeliveries} installations={current} collection={state.collection} onOpen={onOpen} />
+    <BusinessAgencyStatus state={agencyState} deliveries={agencyDeliveries} installations={current} collection={state.collection} onOpen={onOpen} />
   </section>;
 }

@@ -53,7 +53,7 @@ describe("service request route", () => {
     expect(mocks.list).toHaveBeenCalledWith({ userId: user.id, verifiedEmail: "owner@example.test" }, { businessId });
   });
 
-  it("exposes the Strelvan agency inbox through the same private read route", async () => {
+  it("exposes the Strelva agency inbox through the same private read route", async () => {
     const response = await GET(new Request("https://app.strelva.com/api/service-requests?providerKind=strelva"));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ requests: [requestRecord] });

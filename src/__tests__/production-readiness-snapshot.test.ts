@@ -163,7 +163,7 @@ describe("production readiness snapshot", () => {
     const options = deps({ db: fixture.db, env: {}, redis: fakeRedis({}).redis }).value;
     const report = await runReadinessSnapshot({ jacobsYes: true }, options);
     expect(report.postgres.agencyReadiness).toEqual({ providerRows: 3, providersBySource: { tenant_conversion: 1, operator: 1, business_choice: 1 }, strelvaAgencyDesignationRows: 1, accountsByPayerKind: { business: 1, agency: 1 }, batch7aPresent: false });
-    expect(report.silentRollout.stopConditions).toContain("Strelvan agency designation exists before batch 7A is verified; stop and reconcile the agency provider model.");
+    expect(report.silentRollout.stopConditions).toContain("Strelva agency designation exists before batch 7A is verified; stop and reconcile the agency provider model.");
     options.appliedVersions = async () => ["20261009151000", "20261009152000", "20261009153000", "20261009154000"];
     const after = await runReadinessSnapshot({ jacobsYes: true }, options);
     expect(after.postgres.agencyReadiness.batch7aPresent).toBe(true);

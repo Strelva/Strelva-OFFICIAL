@@ -51,11 +51,11 @@ function failure(error: unknown) {
   if (error instanceof OfferingNotFoundError) return json({ error: { code: "delivery_not_found", message: error.message } }, 404);
   if (error instanceof OfferingConflictError) return json({ error: { code: "delivery_conflict", message: error.message } }, 409);
   if (error instanceof OfferingStoreError) return json({ error: { code: "source_unavailable", message: error.message } }, 503);
-  return json({ error: { code: "source_unavailable", message: "Provider delivery is unavailable right now." } }, 503);
+  return json({ error: { code: "source_unavailable", message: "Agency delivery is unavailable right now." } }, 503);
 }
 
 export async function GET(request: Request) {
-  if (!workspaceReleaseEnabled()) return json({ error: { code: "release_closed", message: "Provider delivery is not enabled." } }, 503);
+  if (!workspaceReleaseEnabled()) return json({ error: { code: "release_closed", message: "Agency delivery is not enabled." } }, 503);
   try {
     const current = await actor();
     if (!current) return json({ error: { code: "unauthenticated", message: "Sign in with a confirmed email." } }, 401);
@@ -84,9 +84,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!workspaceReleaseEnabled()) return json({ error: { code: "release_closed", message: "Provider delivery is not enabled." } }, 503);
+  if (!workspaceReleaseEnabled()) return json({ error: { code: "release_closed", message: "Agency delivery is not enabled." } }, 503);
   if (request.headers.get("origin") !== new URL(request.url).origin || request.headers.get("sec-fetch-site") === "cross-site") {
-    return json({ error: { code: "invalid_origin", message: "Open Strelva directly to manage provider delivery." } }, 403);
+    return json({ error: { code: "invalid_origin", message: "Open Strelva directly to manage agency delivery." } }, 403);
   }
   if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) {
     return json({ error: { code: "invalid_content_type", message: "Send a JSON request." } }, 415);

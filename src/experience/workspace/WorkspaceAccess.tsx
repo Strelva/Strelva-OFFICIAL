@@ -53,7 +53,7 @@ export function AccessPanel({ snapshot, currentKind, currentAccess, currentRole,
   // Local handoff/revoke state belongs to the exact workspace + selected work.
   // Remounting on that boundary prevents a created token or a pending spinner
   // from leaking into another work item while an old request resolves.
-  if (currentAccess === "provider_seat") return <div className="mx-auto max-w-3xl"><h1 className="font-display text-[36px]">Agency agency access.</h1><p className="mt-3 text-gray-muted">Your agency has an active agency seat and has assigned you to this business. You can work on its website. The business controls ownership and access to client records.</p></div>;
+  if (currentAccess === "provider_seat") return <div className="mx-auto max-w-3xl"><h1 className="font-display text-[36px]">Agency access.</h1><p className="mt-3 text-gray-muted">Your agency has an active agency seat and has assigned you to this business. You can work on its website. The business controls ownership and access to customer records.</p></div>;
   if (currentAccess === "delegated_read") return <DelegatedAccessSurface key={contextKey} />;
   if (currentKind === "personal") return <CreateAgency key={contextKey} postAction={postAction} isActive={isActive} onCreated={onAgencyCreated} />;
   if (currentKind === "customer") return <CustomerAccess key={contextKey} snapshot={snapshot} currentRole={currentRole} postAction={postAction} isActive={isActive} onChanged={onChanged} setNotice={setNotice} />;
