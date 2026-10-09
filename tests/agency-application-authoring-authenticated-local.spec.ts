@@ -1,5 +1,4 @@
 import { localSql } from "./support/journeys";
-import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { localEnvironment, signedInContext } from "./support/local-auth";
