@@ -127,7 +127,7 @@ interface WritePlan<T> {
   undoesReceiptId?: string;
   idempotencyKey?: string;
   retryFailed?: boolean;
-  write(): Promise<GoogleResult<T>>;
+  write(client: GoogleListingClient): Promise<GoogleResult<T>>;
   /** Read Google back after the write. */
   verify(written: T): Promise<{ readback: "matched" | "differs" | "failed" | "held_by_google"; after?: Record<string, unknown> }>;
   providerRef?(written: T): string | null;
@@ -198,7 +198,12 @@ async function governedWrite<T>(ctx: ListingContext, plan: WritePlan<T>): Promis
     return { status: "failed", receipt: settled, accessPending: false, message: MESSAGES.snapshot_expired };
   }
   let written: GoogleResult<T>;
-  try { written = await plan.write(); }
+  try {
+    const dispatchClient = ctx.client.withWriteAuthority?.(async () => {
+      if (!(await providerCleared()) || snapshotExpired()) throw new Error("Google write authority ended before dispatch.");
+    }) ?? ctx.client;
+    written = await plan.write(dispatchClient);
+  }
   catch {
     await ctx.onWriteUnconfirmed?.();
     return { status: "write_unconfirmed", receipt, message: receiptHeadline(receipt) };
@@ -268,7 +273,7 @@ export async function postReviewReply(ctx: ListingContext, input: {
   return governedWrite(ctx, {
     action, targetRef: input.reviewId, authority: input.authority, idempotencyKey: input.idempotencyKey, retryFailed: input.retryFailed,
     before: { reply: previous }, after: { reply: text },
-    write: () => ctx.client.updateReply(ctx.location, input.reviewId, text),
+    write: client => client.updateReply(ctx.location, input.reviewId, text),
     verify: async () => {
       const live = await readReview(ctx, input.reviewId);
       if (!live) return { readback: "failed" };
@@ -295,7 +300,7 @@ export async function withdrawReviewReply(ctx: ListingContext, input: {
   return governedWrite(ctx, {
     action: "reply_delete", targetRef: input.reviewId, authority: input.authority, idempotencyKey: input.idempotencyKey, retryFailed: input.retryFailed,
     before: { reply: previous }, after: { reply: null },
-    write: () => ctx.client.deleteReply(ctx.location, input.reviewId),
+    write: client => client.deleteReply(ctx.location, input.reviewId),
     verify: async () => {
       const live = await readReview(ctx, input.reviewId);
       if (!live) return { readback: "failed" };
@@ -331,7 +336,7 @@ async function patchFromRecord(ctx: ListingContext, input: {
   return governedWrite(ctx, {
     action: input.action, targetRef: null, authority: input.authority, idempotencyKey: input.idempotencyKey, retryFailed: input.retryFailed,
     before: snapshot, after: input.body,
-    write: () => ctx.client.patchLocation(ctx.location, input.mask, input.body),
+    write: client => client.patchLocation(ctx.location, input.mask, input.body),
     verify: async () => {
       const live = await ctx.client.getLocation(ctx.location, [...input.mask, "metadata"]);
       if (!live.ok) return { readback: "failed" };
@@ -412,7 +417,7 @@ export async function createListingPost(ctx: ListingContext, input: {
   return governedWrite(ctx, {
     action: "post_create", targetRef: null, authority: input.authority, idempotencyKey: input.idempotencyKey, retryFailed: input.retryFailed,
     before: null, after: body,
-    write: () => ctx.client.createPost(ctx.location, body),
+    write: client => client.createPost(ctx.location, body),
     verify: async (created) => {
       const live = await ctx.client.getPost(created.name);
       if (!live.ok) return { readback: "failed" };
@@ -440,7 +445,7 @@ export async function undoListingChange(ctx: ListingContext, input: {
     case "delete_reply":
       return governedWrite(ctx, {
         ...common, action: "reply_delete", before: original.after, after: { reply: null },
-        write: () => ctx.client.deleteReply(ctx.location, undo.reviewId),
+        write: client => client.deleteReply(ctx.location, undo.reviewId),
         verify: async () => {
           const live = await readReview(ctx, undo.reviewId);
           return { readback: !live ? "failed" : live.reviewReply?.comment ? "differs" : "matched" };
@@ -450,7 +455,7 @@ export async function undoListingChange(ctx: ListingContext, input: {
     case "restore_reply":
       return governedWrite(ctx, {
         ...common, providerPayloadExpiresAt:original.providerPayloadExpiresAt, afterOrigin:"provider", action: "reply_update", before: original.after, after: { reply: undo.previous },
-        write: () => ctx.client.updateReply(ctx.location, undo.reviewId, undo.previous),
+        write: client => client.updateReply(ctx.location, undo.reviewId, undo.previous),
         verify: async () => {
           const live = await readReview(ctx, undo.reviewId);
           return { readback: !live ? "failed" : normalize(live.reviewReply?.comment) === normalize(undo.previous) ? "matched" : "differs" };
@@ -460,7 +465,7 @@ export async function undoListingChange(ctx: ListingContext, input: {
     case "delete_post":
       return governedWrite(ctx, {
         ...common, action: "post_delete", before: original.after, after: null,
-        write: () => ctx.client.deletePost(undo.postName),
+        write: client => client.deletePost(undo.postName),
         verify: async () => {
           const live = await ctx.client.getPost(undo.postName);
           return { readback: !live.ok && live.kind === "not_found" ? "matched" : live.ok ? "differs" : "failed" };
@@ -471,7 +476,7 @@ export async function undoListingChange(ctx: ListingContext, input: {
       return governedWrite(ctx, {
         ...common, providerPayloadExpiresAt:original.providerPayloadExpiresAt, afterOrigin:"provider", action: original.action as "hours_patch" | "info_patch", before: original.after, after: undo.snapshot,
         // A field Google didn't have is cleared: it stays in the mask, out of the body.
-        write: () => ctx.client.patchLocation(ctx.location, undo.updateMask,
+        write: client => client.patchLocation(ctx.location, undo.updateMask,
           Object.fromEntries(Object.entries(undo.snapshot).filter(([, value]) => value !== null))),
         verify: async () => {
           const live = await ctx.client.getLocation(ctx.location, [...undo.updateMask, "metadata"]);

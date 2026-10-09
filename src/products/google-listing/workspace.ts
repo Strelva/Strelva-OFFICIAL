@@ -109,7 +109,12 @@ export async function tenantListingContext(tenantId: string, workspaceId: string
   const control = await readListingControl(workspaceId, locationId);
   const token = await deps.accessToken(grant);
   if (!token) throw new Error("Reconnect Google to continue.");
-  return { workspaceId, bindingId: grant.bindingId ?? null, lifecycle: control.paused ? "paused" : "live", location: { accountId: location.accountId, locationId }, client: paceGoogleWrites(deps.client(token), workspaceId, locationId), receipts: deps.receipts() };
+  return { workspaceId, bindingId: grant.bindingId ?? null, lifecycle: control.paused ? "paused" : "live", location: { accountId: location.accountId, locationId }, client: paceGoogleWrites(deps.client(token), workspaceId, locationId, undefined, async () => {
+    const current = await deps.grant(tenantId);
+    if (!current || current.status !== "connected" || current.bindingId !== grant.bindingId || current.accessToken !== grant.accessToken || current.refreshToken !== grant.refreshToken) throw new Error("Google grant changed before dispatch.");
+    const liveBinding = await readGoogleBindingForTenant(tenantId);
+    if (grant.bindingId && (!liveBinding || liveBinding.id !== grant.bindingId || liveBinding.workspaceId !== workspaceId || liveBinding.status !== "connected" || !liveBinding.locations.some(value => value.locationId === locationId) || (grant.bindingUpdatedAt && Date.parse(liveBinding.updatedAt) !== Date.parse(grant.bindingUpdatedAt)))) throw new Error("Google location authority ended before dispatch.");
+  }), receipts: deps.receipts() };
 }
 
 export type GoogleExecutionResult = { accepted: boolean; verified?: boolean; receiptId?: string; reason?: string };
@@ -145,9 +150,9 @@ export async function executeGoogleListingEvent(input: { tenantId: string; event
     const original = ctx.client;
     ctx.client = {...original,patchLocation:async (...args) => {await recheck();return original.patchLocation(...args);},updateReply:async (...args)=>{await recheck();return original.updateReply(...args);}};
   }
-  if (input.actorId.startsWith("make-real-service:")) ctx.authorizeService = async () => {
+  ctx.authorizeService = async () => {
     const current = await deps.authorize(input);
-    if (!current.allowed) throw new Error("Google service authority ended before dispatch.");
+    if (!current.allowed || (input.actorId.startsWith("make-real-service:") && current.bindingId !== ctx.bindingId)) throw new Error("Google service authority ended before dispatch.");
   };
   ctx.onWriteAccepted = async () => (await deps.events()).markExecutionExternalAccepted(input.event.id);
   ctx.onWriteUnconfirmed = async () => (await deps.events()).markExecutionExternalUnconfirmed(input.event.id);

@@ -38,3 +38,24 @@ describe("Google rejected-write pacing", () => {
     expect(classifyGoogleFailure(403, "SERVICE_DISABLED")).toBe("setup_pending");
   });
 });
+
+it.each(["updateReply","deleteReply","patchLocation","createPost","deletePost"] as const)("rechecks authority after profile pacing before %s",async(method)=>{
+ let valid=true;const raw=vi.fn(async()=>({ok:true,data:null}));
+ const pacing={limited:vi.fn().mockResolvedValueOnce(true).mockResolvedValue(false),wait:vi.fn(async()=>{valid=false;})};
+ const authorize=vi.fn(async()=>{if(!valid)throw new Error("revoked");});
+ const client=paceGoogleWrites({[method]:raw} as unknown as GoogleListingClient,"workspace","location",pacing).withWriteAuthority!(authorize);
+ const call=client[method] as (...args:unknown[])=>Promise<unknown>;
+ expect(await call({accountId:"account",locationId:"location"},"target",{})).toMatchObject({ok:false,kind:"auth",status:403});
+ expect(raw).not.toHaveBeenCalled();expect(authorize).toHaveBeenCalledTimes(1);
+});
+it("rechecks authority after definitive provider rejection and preserves accepted observations",async()=>{
+ let valid=true;const raw=vi.fn(async()=>({ok:false,kind:"rate_limited",status:429,detail:"rate"}));
+ const pacing={limited:async()=>false,wait:async()=>{valid=false;}};
+ const authorize=vi.fn(async()=>{if(!valid)throw new Error("revoked");});
+ const client=paceGoogleWrites({updateReply:raw} as unknown as GoogleListingClient,"workspace","location",pacing).withWriteAuthority!(authorize);
+ expect(await client.updateReply({accountId:"account",locationId:"location"},"review","reply")).toMatchObject({ok:false,kind:"auth"});
+ expect(raw).toHaveBeenCalledTimes(1);expect(authorize).toHaveBeenCalledTimes(2);
+ valid=true;raw.mockImplementationOnce(async()=>{valid=false;return {ok:true,data:null} as never;});
+ expect(await client.updateReply({accountId:"account",locationId:"location"},"review","reply")).toMatchObject({ok:true});
+ expect(raw).toHaveBeenCalledTimes(2);expect(authorize).toHaveBeenCalledTimes(3);
+});

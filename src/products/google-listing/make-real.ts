@@ -71,9 +71,13 @@ function createGoogleMakeRealPorts(service?:LiveMakeRealServiceContext):GoogleMa
   const state=await ports.inspect(actor,businessId,request);
   if(state.receipt?.id!==receiptId)throw new Error("Google undo receipt changed.");
   const actorId=googleServiceActor(service);
-  const recheck=async()=>{await checkGoogleMakeRealService({workspaceId:businessId,actorId,request,context:service,mode:"undo"});};
-  await recheck();
+  await checkGoogleMakeRealService({workspaceId:businessId,actorId,request,context:service,mode:"undo"});
   const ctx=await tenantListingContext(request.tenantId,businessId,request.locationId);
+  const recheck=async()=>{
+   const current=await checkGoogleMakeRealService({workspaceId:businessId,actorId,request,context:service,mode:"undo"});
+   if(current.bindingId!==ctx.bindingId)throw new Error("Google undo binding changed.");
+  };
+  await recheck();
   const original=await ctx.receipts.get(receiptId,businessId);
   if(!original || original.authority.kind!=="owner_approval" || original.authority.approvalRef!==request.eventId)throw new Error("Google undo instruction changed.");
   ctx.authorizeService=recheck;

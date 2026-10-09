@@ -30,7 +30,7 @@ export interface PublishingAuthorityDeps {
   workspaceReleased?: typeof workspaceReleaseFlagEnabled;
 }
 const defaults: PublishingAuthorityDeps = { target: readBindingTarget, owner: resolveOwnerRecipient, session: getSessionUser, permission: hasTenantPermission, linked: readLinkedSite, record: readBusinessRecord, released: tenantReleaseFlagEnabled, viewer: currentReleaseViewer, workspaceOwner: resolveOwnerRecipient, workspaceReleased: workspaceReleaseFlagEnabled };
-export type PublishingAuthorityResult = { allowed: false; reason: string } | { allowed: true; viewer: ReleaseViewer; actor: WorkspaceActor | null };
+export type PublishingAuthorityResult = { allowed: false; reason: string } | { allowed: true; viewer: ReleaseViewer; actor: WorkspaceActor | null; bindingId?: string };
 
 /** A signed Needs-you owner link is checked at the route and again against
  * the live owner here. Sessionless `user` and arbitrary actor IDs are denied.
@@ -44,11 +44,13 @@ export async function authorizePublishingEvent(input: { tenantId: string; event:
   if (target?.workspaceId !== workspaceId.data) return deny("publishing_scope_changed");
   let actor: WorkspaceActor | null = null;
   let viewer: ReleaseViewer;
+  let bindingId: string | undefined;
   if (input.actorId.startsWith("make-real-service:")) {
     if (input.event.metadata?.kind !== "workspace_google_listing_draft") return deny("publishing_approval_required");
     try {
       const service = await (await import("@/products/google-listing/make-real-service-authority")).authorizeGoogleServiceEvent(input);
       actor = { userId: service.userId, verifiedEmail: service.verifiedEmail };
+      bindingId = service.bindingId;
     } catch { return deny("publishing_service_authority_ended"); }
     viewer = { operator: false, tester: false };
   } else if (input.actorId.startsWith("owner-link:")) {
@@ -66,5 +68,5 @@ export async function authorizePublishingEvent(input: { tenantId: string; event:
     viewer = await deps.viewer();
   }
   if (!(nativeWorkspace ? await deps.workspaceReleased?.("publishing", nativeWorkspace, viewer) : await deps.released("publishing", input.tenantId, viewer))) return deny("publishing_release_off");
-  return { allowed: true, actor, viewer };
+  return { allowed: true, actor, viewer, ...(bindingId ? { bindingId } : {}) };
 }

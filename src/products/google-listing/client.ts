@@ -36,6 +36,8 @@ export interface GooglePost {
 export interface GoogleLocationRef { accountId: string; locationId: string }
 
 export interface GoogleListingClient {
+  /** Bind a fresh authority check inside each paced mutation attempt. */
+  withWriteAuthority?(authorize: () => Promise<void>): GoogleListingClient;
   listReviews(location: GoogleLocationRef, pageToken?: string): Promise<GoogleResult<{ reviews: GoogleReview[]; nextPageToken?: string }>>;
   getReview(location: GoogleLocationRef, reviewId: string): Promise<GoogleResult<GoogleReview>>;
   updateReply(location: GoogleLocationRef, reviewId: string, comment: string): Promise<GoogleResult<{ comment?: string }>>;

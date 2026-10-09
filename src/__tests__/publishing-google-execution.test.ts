@@ -179,3 +179,17 @@ describe("Google location Version approval dispatch", () => {
     expect(client.createPost).toHaveBeenCalledTimes(1);
   });
 });
+
+it("refuses an old client when the authorized binding is replaced during pacing",async()=>{
+ const {paceGoogleWrites}=await vi.importActual<typeof import("@/products/google-listing/pacing")>("@/products/google-listing/pacing");
+ const bindingA="5e000000-0000-4000-8000-000000000020",bindingB="5e000000-0000-4000-8000-000000000021";
+ let current=bindingA;
+ const rawCreate=vi.fn(async()=>({ok:true as const,data:{name:"post"}}));
+ const pacing={limited:vi.fn().mockResolvedValueOnce(true).mockResolvedValue(false),wait:async()=>{current=bindingB;}};
+ const receipts=createMemoryReceiptStore();
+ const ctx={workspaceId,bindingId:bindingA,location,lifecycle:"live" as const,client:paceGoogleWrites({...client,createPost:rawCreate},workspaceId,location.locationId,pacing),receipts};
+ const authorize=vi.fn(async()=>({allowed:true as const,bindingId:current,actor,viewer:{operator:false,tester:false}}));
+ const result=await executeGoogleListingEvent({tenantId:"fixture",event,actorId:"make-real-service:session:decision",attemptId:"reconnect"},{authorize,context:async()=>ctx,maintenance:vi.fn(),events:async()=>({markExecutionExternalAccepted:m.mark,markExecutionExternalUnconfirmed:m.unconfirmed}) as never,noteAccess:vi.fn()});
+ expect(result).toMatchObject({accepted:false});expect(rawCreate).not.toHaveBeenCalled();expect(receipts.all()[0]).toMatchObject({status:"failed",undo:null});
+ expect(authorize).toHaveBeenCalledTimes(4);
+});
