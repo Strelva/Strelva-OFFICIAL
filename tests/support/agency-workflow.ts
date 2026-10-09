@@ -358,7 +358,7 @@ export async function agencyWorkflow(browser: Browser, testInfo: TestInfo, neutr
     await claim.setViewportSize({ width: 1440, height: 1000 });
     await claim.goto(`/workspace/site?workspaceId=${businessId}&entry=rebuild&workId=${workId}`);
     await expect(claim.getByText("This revision has been published.", { exact: true })).toBeVisible();
-    const publicReadBack = claim.getByText(/Published, but we could not confirm it yet/);
+    const publicReadBack = claim.getByText("Published, but readback failed. Verification is required before calling this confirmed; checking does not republish the site.", { exact: true });
     await expect(claim.getByText(pathSites ? "This publication uses a hosted address. Ask Northside Web Care about a custom domain." : "Ask Northside Web Care about domain setup and verification.", { exact: true })).toBeVisible();
     if (pathSites) await expect(claim.getByRole("heading", { name: "Return to the previous website" })).toHaveCount(0);
     const receipt = claim.getByText(/Published receipt recorded/).first();
