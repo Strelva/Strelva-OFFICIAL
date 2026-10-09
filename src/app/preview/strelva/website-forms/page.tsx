@@ -6,9 +6,9 @@ import { WebsiteFormsRecoveryFixture } from "@/experience/websites/WebsiteFormsR
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Fictional website form recovery", robots: { index: false, follow: false } };
 
-export default async function WebsiteFormsPreview({ searchParams }: { searchParams: Promise<{ version?: string }> }) {
+export default async function WebsiteFormsPreview({ searchParams }: { searchParams: Promise<{ version?: string; managed?: string }> }) {
   if (!strelvaUiPreviewEnabled() || process.env.NODE_ENV !== "development") notFound();
-  const { version } = await searchParams;
+  const { version, managed } = await searchParams;
   if (version !== "1" && version !== "2") notFound();
-  return <WebsiteFormsRecoveryFixture version={version === "2" ? 2 : 1} />;
+  return <WebsiteFormsRecoveryFixture version={version === "2" ? 2 : 1} managed={version === "2" && managed === "1"} />;
 }

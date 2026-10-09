@@ -9,7 +9,7 @@ function loopback(info: TestInfo) {
   return url.origin;
 }
 
-async function fixture(page: Page, info: TestInfo, version: 1 | 2, width: number, enlarged = false) {
+async function fixture(page: Page, info: TestInfo, version: 1 | 2, width: number, enlarged = false, managed = false) {
   const origin = loopback(info), endpoint = `/api/websites/${workId}`;
   let current = formsRecord(version), failRead = false;
   let held: Route | undefined;
@@ -35,7 +35,7 @@ async function fixture(page: Page, info: TestInfo, version: 1 | 2, width: number
     return route.continue();
   });
   await page.setViewportSize({ width, height: 900 });
-  await page.goto(`/preview/strelva/website-forms?version=${version}`);
+  await page.goto(`/preview/strelva/website-forms?version=${version}${managed ? "&managed=1" : ""}`);
   if (enlarged) await page.addStyleTag({ content: "html { font-size: 200% !important; }" });
   const forms = page.getByRole("region", { name: "Website visitor forms", exact: true });
   await expect(forms).toBeVisible();
@@ -56,6 +56,40 @@ async function fixture(page: Page, info: TestInfo, version: 1 | 2, width: number
     },
   };
 }
+
+test.describe("managed publication permission", () => {
+test.use({ hasTouch: true });
+test("managed v2 publication permission loss hides pending forms and requires saved-state reconciliation after regain", async ({ page }, info) => {
+  const f = await fixture(page, info, 2, 390, false, true);
+  await f.update.focus(); await page.keyboard.press("Enter");
+  await expect.poll(() => f.posts.length).toBe(1);
+  await page.getByRole("button", { name: "Remove fictional publication permission", exact: true }).click();
+  await expect(f.forms).toBeHidden();
+  await expect(f.inquiry).toHaveValue("catering");
+  await expect(f.source).toHaveValue("fictional-bakery");
+  await page.getByRole("button", { name: "Restore fictional publication permission", exact: true }).click();
+  await expect(f.forms).toBeVisible();
+  await expect(f.inquiry).toHaveValue("catering");
+  await expect(f.source).toHaveValue("fictional-bakery");
+  await expect(f.update).toBeDisabled();
+  const outside = page.getByRole("button", { name: "Outside website control", exact: true });
+  await outside.focus(); await f.complete("valid");
+  const reload = page.getByRole("button", { name: "Reload current state", exact: true });
+  await expect(reload).toBeVisible(); await expect(outside).toBeFocused();
+  await expect(f.update).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Publish approved website", exact: true })).toBeDisabled();
+  const previousReads = f.reads.length;
+  await reload.focus(); await page.keyboard.press("Enter");
+  await expect(reload).toHaveCount(0);
+  expect(f.reads).toHaveLength(previousReads + 1);
+  await expect(f.forms.getByRole("button", { name: "Choose forms", exact: true })).toBeEnabled();
+  await f.forms.getByRole("button", { name: "Choose forms", exact: true }).click();
+  await expect(f.inquiry).toHaveValue("catering");
+  await expect(page.getByRole("button", { name: "Publish approved website", exact: true })).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath("managed-permission-reconciled.png"), fullPage: true });
+  await scope(info, f.blocked, f.posts);
+});
+});
 
 async function geometry(page: Page, forms: Locator, width: number) {
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
