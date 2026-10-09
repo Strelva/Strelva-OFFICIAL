@@ -52,6 +52,7 @@ export function inventoryJourneyArtifacts({ work: input, artifactDir, proofFiles
       return;
     }
     if (!stat.isFile()) { issues.push('non-regular-file'); return; }
+    if (stat.nlink !== 1) { files.push({ path: name, state: 'refused' }); issues.push('non-single-link-file'); return; }
     chmodSync(path, 0o600);
     const sha256 = digest(path), trace = /\.zip$/i.test(name) ? validateZip(path) : undefined;
     const after = lstatSync(path);

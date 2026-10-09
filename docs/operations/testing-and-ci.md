@@ -677,6 +677,8 @@ parsing or no-login redaction. Reads are bounded to 64 MiB and reject symlink
 leaves/ancestors, nonregular files, changed descriptors and linked files. Redacted
 reports are published atomically with mode 0600 in the private owned directory;
 existing proof is preserved unless replacing the admitted raw report entry.
+Artifact inventory refuses files with multiple hardlinks before chmod, hashing
+or archive validation, leaving any outside name for those bytes unchanged.
 A dispatched child killed by output overflow remains a failed dispatched window,
 with its original status/signal and a fixed error code. An ENOENT launch remains
 not-run; neither distinction qualifies native cases or outside delivery.

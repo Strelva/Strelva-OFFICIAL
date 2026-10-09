@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, linkSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { test } from 'node:test';
@@ -211,4 +211,18 @@ test('primary profile CLI refuses an unowned symlink report before closed-manife
   const result = spawnSync(process.execPath,[join(root,'scripts/full-model-journey-profile.mjs'),'validate','full-native',report],{ cwd:root,encoding:'utf8',env:{ PATH:'/usr/bin:/bin' } });
   assert.equal(result.status,1); assert.match(result.stderr,/Owned regular evidence file required/); assert.equal(result.stdout,'');
   assert.equal(readFileSync(outsideReport,'utf8'),'{}');
+});
+
+
+test('artifact inventory refuses an outside hardlink before chmod, hash or ZIP validation', t => {
+  const { work,output } = fixture(t), outside = mkdtempSync(join(tmpdir(),'outside-hardlink.'));
+  t.after(() => rmSync(outside,{ recursive:true,force:true }));
+  const target = join(outside,'original.zip'), artifact = join(output,'trace.zip'), before = zip();
+  writeFileSync(target,before,{ mode:0o644 }); chmodSync(target,0o644); linkSync(target,artifact);
+  let archiveCalls = 0;
+  const result = inventoryJourneyArtifacts({ work,proofFiles:[artifact],validateZip:() => { archiveCalls++; return 'valid'; } });
+  assert.equal(result.integrityValidated,false); assert.equal(result.fullReleaseQualified,false);
+  assert.deepEqual(result.issues,['non-single-link-file']); assert.deepEqual(result.files,[{ path:'window/trace.zip',state:'refused' }]);
+  assert.equal(archiveCalls,0); assert.equal(statSync(target).mode & 0o777,0o644); assert.deepEqual(readFileSync(target),before);
+  assert.equal(statSync(target).nlink,2); assert.throws(() => readOwnedJourneyFile(work,artifact),/Owned regular evidence/);
 });
