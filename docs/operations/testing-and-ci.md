@@ -641,3 +641,33 @@ A green run here is local proof only, never a production claim.
 
 
 Isolated worktrees can set `STRELVA_BUILD_CACHE=off` with `pnpm exec next build --webpack` to disable persistent Webpack caching when disk is constrained. The full compilation and checks still run. For version parity outside the normal sibling layout, set `STRELVA_MARKETING_ROOT` to the actual independent marketing checkout; the default remains the sibling repository. Neither setting grants provider, production or cleanup authority.
+
+## Private full-model artifact retention
+
+`check-full-model-journeys.sh` keeps each run in its fresh private directory and
+each primary variant's raw Playwright artifacts under `artifacts-<variant>`.
+Before either supplementary window starts, `retention-<variant>` retains the
+closed primary child's exact exit status, source end, post-stack observation and
+SHA-256/size inventory. `retention-final-<variant>` captures the final source and
+stack while the owned services remain alive, including after failed windows. A
+failed primary exit remains failed when cleanup2 or no-login2 passes or fails;
+the original native34 identities and all eight release requirements stay intact.
+
+Cleanup, no-login and the independent seven-case authority window share
+`scripts/journey-evidence-retention.mjs`. Report rejection never skips their
+terminal source/stack observation. Retained ZIPs are tested for central directory
+and member CRC with existing `/usr/bin/unzip -tqq`, without extraction or a
+download. Missing advertised attachments, changed files, invalid ZIPs, or an
+unavailable validator leave integrity unqualified. Original invalid bytes remain
+private for diagnosis; hashes alone do not validate an archive. Do not overwrite
+these directories to retry or replace older failed proof.
+
+No-login creates private admission records before runtime parsing. An admission
+refusal records `not-run`, its fixed two-case identities and the failed stage,
+without configuration values. This is distinct from a dispatched failed browser
+window and from two failed browser cases. Structured no-login reports/logs retain
+the existing redaction contract; raw traces remain private. Nothing here proves
+mail delivery, providers, commercial approval, client qualification or release.
+
+Lightweight regression command (no services, browser or provider calls):
+`node --test scripts/tests/journey-evidence-retention.node-test.mjs scripts/tests/no-login-runner-hook.node-test.mjs scripts/tests/no-login-journey-window.node-test.mjs scripts/tests/tenant-cleanup-journey-window.node-test.mjs scripts/private-authority-journey-window.test.mjs scripts/tests/full-model-journey-profile.node-test.mjs`.

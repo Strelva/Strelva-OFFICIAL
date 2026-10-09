@@ -1,7 +1,8 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { retainJourneyEnd, withJourneyAdmission } from './journey-evidence-retention.mjs';
 import { journeyProfile, parseLocalStackEnv, preflight, validateReport } from './full-model-journey-profile.mjs';
 import { assertCleanupEnvironment } from './tenant-cleanup-journey-window.mjs';
 
@@ -107,52 +108,57 @@ export function noLoginChildEnvironment(parent, runtime) {
 export function runNoLoginWindow(rootInput, workInput) {
   const root = realpathSync(rootInput), work = realpathSync(workInput), native = journeyProfile('full-native'), profile = noLoginWindowProfile();
   if (!basename(work).startsWith('strelva-full-journeys.')) throw new Error('An owned full-native proof directory is required.');
-  preflight(profile, root);
-  for (const file of ['.env', '.env.local', '.env.development', '.env.development.local']) if (existsSync(join(root, file))) throw new Error('No-login window refuses checkout environment files.');
-  const owned = parseLocalStackEnv(readFileSync(join(work, 'env'), 'utf8'));
-  const runtime = parseNoLoginRuntime(readFileSync(join(work, 'runtime.env'), 'utf8'));
-  assertNoLoginEnvironment(process.env, owned, runtime);
-  const childEnv = noLoginChildEnvironment(process.env, runtime);
-  assertNoLoginAuthConfiguration(readFileSync(join(owned.STRELVA_AUTH_STACK_DIR, 'supabase/config.toml'), 'utf8'));
-  if (native.specs.reduce((sum, item) => sum + item.count, 0) !== 34
-    || JSON.stringify(native) !== JSON.stringify(JSON.parse(readFileSync(join(work, 'manifest-native.json'), 'utf8')))) throw new Error('Unchanged exact native manifest is required.');
-  const captureSource = () => JSON.parse(execFileSync(process.execPath, [join(root, 'scripts/full-model-journey-profile.mjs'), 'source', 'full-native', root],
-    { cwd: root, env: childEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 16 * 1024 * 1024 }));
-  const source = captureSource();
-  if (JSON.stringify(source) !== JSON.stringify(JSON.parse(readFileSync(join(work, 'source.json'), 'utf8')))) throw new Error('Source changed after the native runner pin.');
-  let nativeReportState = { state: 'not-run', required: 34, fullReleaseQualified: false };
-  if (existsSync(join(work, 'results-native.json'))) {
-    try { nativeReportState = { state: 'passed', ...validateReport(JSON.parse(readFileSync(join(work, 'results-native.json'), 'utf8')), native) }; }
-    catch { nativeReportState = { state: 'failed', required: 34, fullReleaseQualified: false, evidence: '../results-native.json' }; }
-  }
-  const output = join(work, 'no-login-local');
-  if (existsSync(output)) throw new Error('No-login evidence already exists; use a new owned proof directory.');
-  mkdirSync(output, { mode: 0o700 });
-  const save = (name, data) => writeFileSync(join(output, name), JSON.stringify(redactNoLoginEvidence(data, runtime), null, 2), { mode: 0o600 });
-  save('manifest.json', profile); save('source.json', source); save('native-contract.json', native); save('native-report-state.json', nativeReportState);
-  const qualify = () => JSON.parse(execFileSync(process.execPath,
-    [join(root, 'scripts/full-model-stack-qualification.mjs'), 'verify', root, join(work, 'env')], { cwd: root, env: childEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 16 * 1024 * 1024 }));
-  save('stack-before.json', qualify());
-  const rawResult = join(output, 'results-raw.json');
-  const browser = spawnSync('pnpm', ['exec', 'playwright', 'test', fixedSpec, '--workers=1', '--retries=0', '--reporter=line,json', `--output=${join(output, 'artifacts')}`], {
-    cwd: root, encoding: 'utf8', env: { ...childEnv, PLAYWRIGHT_JSON_OUTPUT_FILE: rawResult }, maxBuffer: 16 * 1024 * 1024,
+  return withJourneyAdmission(work, 'no-login-local', profile, (output, update) => {
+    preflight(profile, root);
+    for (const file of ['.env', '.env.local', '.env.development', '.env.development.local']) if (existsSync(join(root, file))) throw new Error('No-login window refuses checkout environment files.');
+    update('runtime-admission');
+    const owned = parseLocalStackEnv(readFileSync(join(work, 'env'), 'utf8'));
+    const runtime = parseNoLoginRuntime(readFileSync(join(work, 'runtime.env'), 'utf8'));
+    assertNoLoginEnvironment(process.env, owned, runtime);
+    const childEnv = noLoginChildEnvironment(process.env, runtime);
+    assertNoLoginAuthConfiguration(readFileSync(join(owned.STRELVA_AUTH_STACK_DIR, 'supabase/config.toml'), 'utf8'));
+    if (native.specs.reduce((sum, item) => sum + item.count, 0) !== 34
+      || JSON.stringify(native) !== JSON.stringify(JSON.parse(readFileSync(join(work, 'manifest-native.json'), 'utf8')))) throw new Error('Unchanged exact native manifest is required.');
+    const captureSource = () => JSON.parse(execFileSync(process.execPath, [join(root, 'scripts/full-model-journey-profile.mjs'), 'source', 'full-native', root],
+      { cwd: root, env: childEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 16 * 1024 * 1024 }));
+    const source = captureSource();
+    if (JSON.stringify(source) !== JSON.stringify(JSON.parse(readFileSync(join(work, 'source.json'), 'utf8')))) throw new Error('Source changed after the native runner pin.');
+    let nativeReportState = { state: 'not-run', required: 34, fullReleaseQualified: false };
+    if (existsSync(join(work, 'results-native.json'))) {
+      try { nativeReportState = { state: 'passed', ...validateReport(JSON.parse(readFileSync(join(work, 'results-native.json'), 'utf8')), native) }; }
+      catch { nativeReportState = { state: 'failed', required: 34, fullReleaseQualified: false, evidence: '../results-native.json' }; }
+    }
+    const save = (name, data) => writeFileSync(join(output, name), JSON.stringify(redactNoLoginEvidence(data, runtime), null, 2), { mode: 0o600 });
+    save('manifest.json', profile); save('source.json', source); save('native-contract.json', native); save('native-report-state.json', nativeReportState);
+    const qualify = () => JSON.parse(execFileSync(process.execPath,
+      [join(root, 'scripts/full-model-stack-qualification.mjs'), 'verify', root, join(work, 'env')], { cwd: root, env: childEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 16 * 1024 * 1024 }));
+    save('stack-before.json', qualify());
+    const rawResult = join(output, 'results-raw.json');
+    update('browser');
+    const browser = spawnSync('pnpm', ['exec', 'playwright', 'test', fixedSpec, '--workers=1', '--retries=0', '--reporter=line,json', `--output=${join(output, 'artifacts')}`], {
+      cwd: root, encoding: 'utf8', env: { ...childEnv, PLAYWRIGHT_JSON_OUTPUT_FILE: rawResult }, maxBuffer: 16 * 1024 * 1024,
+    });
+    writeFileSync(join(output, 'browser.log'), redactNoLoginEvidence(`${browser.stdout || ''}\n${browser.stderr || ''}`, runtime), { mode: 0o600 });
+    update('terminal-evidence', !browser.error);
+    // Redact structured evidence before inventory and retain terminal observations
+    // even when the report is missing, malformed or rejected.
+    let report, evidence;
+    try { ({ report, evidence } = noLoginReportEvidence(readFileSync(rawResult, 'utf8'), runtime));
+      writeFileSync(rawResult, JSON.stringify(evidence, null, 2), { mode: 0o600 }); save('results.json', evidence);
+    } catch { save('report-failure.json', { reason: 'browser-report-missing', fullReleaseQualified: false }); }
+    const terminal = retainJourneyEnd({ work, output, sourceBefore: source, captureSource, qualify, browser,
+      artifactDir: join(output, 'artifacts'), reportPath: join(output, 'results.json'), proofFiles: [output] });
+    let receipt;
+    try {
+      if (!report) throw new Error('Malformed browser report.');
+      receipt = validateReport(report, profile);
+    } catch { throw new Error(`No-login report rejected; retain ${output}.`); }
+    if (browser.error || browser.status !== 0) throw new Error(`No-login browser failed; retain ${output}.`);
+    if (!terminal.retentionValidated) throw new Error('No-login terminal evidence is unqualified.');
+    const heldReceipt = { ...receipt, emailDelivery: 'held', providerActions: 'held', realSentMailQualified: false };
+    save('receipt.json', heldReceipt);
+    return heldReceipt;
   });
-  writeFileSync(join(output, 'browser.log'), redactNoLoginEvidence(`${browser.stdout || ''}\n${browser.stderr || ''}`, runtime), { mode: 0o600 });
-  let receipt;
-  try {
-    const { report, evidence } = noLoginReportEvidence(readFileSync(rawResult, 'utf8'), runtime);
-    writeFileSync(rawResult, JSON.stringify(evidence, null, 2), { mode: 0o600 });
-    save('results.json', evidence);
-    if (!report) throw new Error('Malformed browser report.');
-    receipt = validateReport(report, profile);
-  } catch { throw new Error(`No-login report rejected; retain ${output}.`); }
-  if (browser.error || browser.status !== 0) throw new Error(`No-login browser failed; retain ${output}.`);
-  save('stack-after.json', qualify());
-  const after = captureSource(); save('source-end.json', after);
-  if (JSON.stringify(source) !== JSON.stringify(after)) throw new Error('Source changed during no-login proof; no qualification retained.');
-  const heldReceipt = { ...receipt, emailDelivery: 'held', providerActions: 'held', realSentMailQualified: false };
-  save('receipt.json', heldReceipt);
-  return heldReceipt;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -20,11 +20,12 @@ test('the executable runner retains exact native34 and keeps cleanup2 and no-log
 test('fixed no-login preflight and run hook precede service shutdown and preserve prior native failure', () => {
   const text = readFileSync(runner, 'utf8');
   const preflight = 'node scripts/no-login-journey-window.mjs preflight "$root"';
-  const cleanup = 'run_clean node scripts/tenant-cleanup-journey-window.mjs run "$root" "$work" > "$work/cleanup-window.log" 2>&1 || status=1';
-  const noLogin = 'run_clean node scripts/no-login-journey-window.mjs run "$root" "$work" > "$work/no-login-window.log" 2>&1 || status=1';
+  const cleanup = 'run_clean node scripts/tenant-cleanup-journey-window.mjs run "$root" "$work" > "$work/cleanup-window.log" 2>&1 || { [[ "$status" != 0 ]] || status=1; }';
+  const noLogin = 'run_clean node scripts/no-login-journey-window.mjs run "$root" "$work" > "$work/no-login-window.log" 2>&1 || { [[ "$status" != 0 ]] || status=1; }';
   assert.equal(text.split(preflight).length - 1, 1); assert.equal(text.split(noLogin).length - 1, 1);
   assert.ok(text.indexOf(preflight) < text.indexOf('docker info'));
-  assert.ok(text.includes(`if [[ "$profile" == full-native ]]; then\n    ${cleanup}\n    ${noLogin}\n  fi\n  stop_app; stop_redis`));
+  assert.ok(text.includes(`if [[ "$profile" == full-native ]]; then\n    ${cleanup}\n    ${noLogin}\n  fi`));
+  assert.ok(text.includes(`  stop_app; stop_redis`));
   assert.ok(text.indexOf(noLogin) < text.lastIndexOf('stop_app; stop_redis'));
   assert.ok(!text.includes('status=0', text.indexOf(noLogin)));
   assert.ok(text.includes('node "$manifest" validate "$profile"'));

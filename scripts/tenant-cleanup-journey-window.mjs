@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { retainJourneyEnd } from './journey-evidence-retention.mjs';
 import { journeyProfile, parseLocalStackEnv, preflight, sourceInventory, validateReport } from './full-model-journey-profile.mjs';
 
 export function cleanupWindowProfile() {
@@ -66,13 +67,13 @@ export function runCleanupWindow(rootInput, workInput) {
     maxBuffer: 16 * 1024 * 1024,
   });
   writeFileSync(join(output, 'browser.log'), `${browser.stdout || ''}\n${browser.stderr || ''}`, { mode: 0o600 });
+  const terminal = retainJourneyEnd({ work, output, sourceBefore: source, captureSource: () => sourceInventory(root), qualify,
+    artifactDir: join(output, 'artifacts'), reportPath: resultPath, proofFiles: [output], browser });
   let receipt;
   try { receipt = validateReport(JSON.parse(readFileSync(resultPath, 'utf8')), profile); }
   catch (error) { throw new Error(`Cleanup recovery report rejected; retain ${output}: ${error.message}`); }
   if (browser.error || browser.status !== 0) throw new Error(`Cleanup recovery browser failed; retain ${output}.`);
-  save('stack-after.json', qualify());
-  const after = sourceInventory(root); save('source-end.json', after);
-  if (JSON.stringify(source) !== JSON.stringify(after)) throw new Error('Source changed during cleanup recovery; no qualification retained.');
+  if (!terminal.retentionValidated) throw new Error('Cleanup recovery terminal evidence is unqualified.');
   save('receipt.json', receipt);
   return receipt;
 }

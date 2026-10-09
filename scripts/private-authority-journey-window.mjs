@@ -3,6 +3,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, realpathSync, statSync } from 'node:fs';
 import { join, resolve, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { retainJourneyEnd } from './journey-evidence-retention.mjs';
 import { journeyProfile, parseLocalStackEnv, preflight, sourceInventory, validateReport } from './full-model-journey-profile.mjs';
 
 export const privateAuthorityTitles = [
@@ -80,12 +81,11 @@ export function runPrivateAuthorityWindow(rootInput, workInput) {
     cwd: root, encoding: 'utf8', env: { ...browserEnv, PLAYWRIGHT_JSON_OUTPUT_FILE: resultPath }, maxBuffer: 32 * 1024 * 1024,
   });
   writeFileSync(join(output, 'browser.log'), `${browser.stdout || ''}\n${browser.stderr || ''}`, { mode: 0o600, flag: 'wx' });
-  // Preserve post-state even after failed Auth cases, while app and Redis are alive.
-  let after, postError;
-  try { after = qualify(); save('stack-after.json', after); } catch (error) { postError = error; save('stack-after-failure.json', { error: error.message, fullReleaseQualified: false }); }
-  const sourceAfter = sourceInventory(root); save('source-end.json', sourceAfter);
-  if (postError) throw postError;
-  if (JSON.stringify(before) !== JSON.stringify(after) || JSON.stringify(source) !== JSON.stringify(sourceAfter)) throw new Error('Authority source/catalog/identity changed; retained evidence is unqualified.');
+  const terminal = retainJourneyEnd({ work, output, sourceBefore: source, captureSource: () => sourceInventory(root), qualify, browser,
+    artifactDir: join(output, 'artifacts'), reportPath: resultPath, proofFiles: [output] });
+  if (!terminal.retentionValidated) throw new Error('Authority terminal evidence is unqualified.');
+  const after = JSON.parse(readFileSync(join(output, 'stack-after.json'), 'utf8'));
+  if (JSON.stringify(before) !== JSON.stringify(after)) throw new Error('Authority catalog/identity changed; retained evidence is unqualified.');
   const validated = validateReport(JSON.parse(readFileSync(resultPath, 'utf8')), profile);
   if (browser.error || browser.status !== 0) throw new Error(`Authority browser failed; retain ${output}.`);
   const result = { ...validated, primaryWindows: profile.primaryWindows, nativeExecuted: true, productionQualification: false, fullReleaseQualified: false };
