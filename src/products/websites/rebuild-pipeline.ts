@@ -42,12 +42,35 @@ function chunks(text: string, keepContacts = false): string[] {
     if (contact) while (end < contact.end && index + 1 < tokens.length) { index++; end = tokens[index]!.index! + tokens[index]![0].length; }
     words.push(normalized.slice(token.index!,end));
   } const result: string[] = []; let current = ""; for (const word of words) { if ((current + " " + word).trim().length > 290 && current) { result.push(current); current = ""; } current = (current + " " + word).trim(); } if (current) result.push(current.slice(0, 300)); return result; }
+/** Keep supplied line boundaries while packing short details into bounded facts. */
+function coalescedDescriptionClaims(description: string): string[][] {
+  const text = description.split(/\r\n?|\n/).map(clean).filter(Boolean).join("\n");
+  const spans = descriptionContactSpans(text).sort((a,b) => a.start-b.start);
+  const tokens = [...text.matchAll(/\S+/g)];
+  const groups: string[][] = [[]]; let current = ""; let previousEnd = 0;
+  for (let index = 0; index < tokens.length; index++) {
+    const token = tokens[index]!; let end = token.index! + token[0].length;
+    const contact = spans.find(span => span.start >= token.index! && span.start < end);
+    if (contact) while (end < contact.end && index+1 < tokens.length) { index++; end = tokens[index]!.index! + tokens[index]![0].length; }
+    const word = text.slice(token.index!,end);
+    const separator = text.slice(previousEnd,token.index).includes("\n") ? "\n" : " ";
+    if (current && (current+separator+word).length > 290) {
+      groups.at(-1)!.push(current); current = "";
+      if (separator === "\n") groups.push([]);
+    }
+    current += (current ? separator : "") + word;
+    previousEnd = end;
+  }
+  if (current) groups.at(-1)!.push(current.slice(0,300));
+  return groups.filter(group => group.length);
+}
+
 const sourceQuote = (sourceId: string, quote: string): SourceRef => ({ sourceId, quote: clean(quote).slice(0, 300) });
 
 export function extractBusinessFacts(input: WebsiteRebuildInput, crawl?: CrawlResult): BusinessFacts {
   const result: BusinessFacts = { name: "", nameFactId: "", facts: {}, services: [], people: [], contact: [], hours: [], locations: [], reviews: [], claims: [], brandColors: [], oldPaths: [], sourcePages: [] };
-  const insert = (text: string, kind: Fact["kind"], source?: SourceRef, pageFacts?: string[]) => {
-    text = clean(text).slice(0, 300); if (!text) return "";
+  const insert = (text: string, kind: Fact["kind"], source?: SourceRef, pageFacts?: string[], keepLines = false) => {
+    text = (keepLines ? text.split(/\r\n?|\n/).map(clean).join("\n").trim() : clean(text)).slice(0, 300); if (!text) return "";
     const id = factId(text, kind); const existing = result.facts[id];
     if (!existing && Object.keys(result.facts).length >= 500) return "";
     if (existing && source && !existing.sources.some((item) => item.sourceId === source.sourceId) && existing.sources.length < 3) existing.sources.push(source);
@@ -57,17 +80,20 @@ export function extractBusinessFacts(input: WebsiteRebuildInput, crawl?: CrawlRe
     if (!list.includes(id)) list.push(id); return id;
   };
   if ("description" in input) {
-    const lines = input.description.split(/\r\n?|\n/).map(line => chunks(line,true));
+    let lines = input.description.split(/\r\n?|\n/).map(line => chunks(line,true));
+    // The source writer retains at most 180 home blocks. Packing a larger
+    // description preserves all its prose and evidence within those bounds.
+    if (lines.flat().length > 150) lines = coalescedDescriptionClaims(input.description);
     const contacts = descriptionContacts(input.description);
     const plannedIds = new Set([factId(clean(input.businessName).slice(0,300),"claim"),
-      ...lines.flat().map(text => factId(clean(text).slice(0,300),"claim")),
+      ...lines.flat().map(text => factId(text.slice(0,300),"claim")),
       ...contacts.map(text => factId(clean(text).slice(0,300),"contact"))]);
     if (plannedIds.size > 500) throw new WebsiteDescriptionCapacityError();
     result.name = input.businessName; result.nameFactId = insert(input.businessName, "claim");
     // Whitespace inside a line is presentation; a supplied line boundary is
     // contact-offer context. Keep the claim IDs grouped for later corrections.
     result.descriptionClaimLines = lines
-      .map(line => line.map(span => insert(span,"claim")).filter(Boolean))
+      .map(line => line.map(span => insert(span,"claim",undefined,undefined,true)).filter(Boolean))
       .filter(line => line.length > 0);
     for (const contact of contacts) insert(contact, "contact");
     return result;
@@ -120,6 +146,30 @@ export function extractBusinessFacts(input: WebsiteRebuildInput, crawl?: CrawlRe
   return result;
 }
 
+/** Recover the retained layout, then derive render lists from current facts. */
+export function currentDescriptionBusinessFacts(input: Extract<WebsiteRebuildInput,{ description:string }>, document: SiteDocument): BusinessFacts {
+  const flat = extractBusinessFacts({ ...input,description:clean(input.description) });
+  let baseline: BusinessFacts;
+  try { baseline = extractBusinessFacts(input); }
+  catch (error) {
+    if (!(error instanceof WebsiteDescriptionCapacityError) || !flat.claims.some(id => id !== flat.nameFactId && document.facts[id])) throw error;
+    baseline = flat;
+  }
+  if (flat.claims.some(id => id !== flat.nameFactId && !baseline.claims.includes(id) && document.facts[id])) baseline = flat;
+  const existing = (ids:string[]) => ids.filter(id => document.facts[id]);
+  const contacts: string[] = []; const visited = new Set<string>();
+  const addContact = (id:string) => { if (document.facts[id]?.kind === "contact" && !contacts.includes(id)) contacts.push(id); };
+  const visit = (id:string) => {
+    if (visited.has(id)) return; visited.add(id);
+    const node = document.nodes[id]; if (!node) return;
+    node.factIds.forEach(addContact); node.children.forEach(visit);
+  };
+  document.pages.forEach(page => visit(page.root));
+  Object.keys(document.facts).sort().forEach(addContact);
+  return { ...baseline,name:document.siteName,facts:document.facts,claims:existing(baseline.claims),contact:contacts,
+    services:existing(baseline.services),people:existing(baseline.people),hours:existing(baseline.hours),locations:existing(baseline.locations),reviews:existing(baseline.reviews) };
+}
+
 function canonicalPagePath(url: string): string { const path = new URL(url).pathname.replace(/\.(?:html?|php|aspx?)$/i, "").replace(/\/+$/, ""); const normalized = path.split("/").map((part) => part.toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-|-$/g, "")).join("/") || "/"; return safeSitePathSchema.safeParse(normalized).success ? normalized : `/pages${normalized}`; }
 export function writeSourceContent(facts: BusinessFacts): RebuildContent {
   const bindings = descriptionContactBindings(facts);
@@ -132,11 +182,11 @@ export function writeSourceContent(facts: BusinessFacts): RebuildContent {
     return { id: `block_${id}`, type: ["service", "person", "contact", "hours", "location", "review"].includes(fact.kind) ? fact.kind as ContentBlock["type"] : "paragraph", text: fact.text, factIds: [id, ...contactIds] };
   };
   const pages: RebuildPageContent[] = []; const used = new Set<string>();
-  for (const source of facts.sourcePages.slice(0, 10)) { let path = canonicalPagePath(source.url); if (used.has(path)) continue; if (pages.length === 0) path = "/"; used.add(path); pages.push({ path, title: (source.title || facts.name).slice(0, 70), sourceIds: [source.sourceId], blocks: source.factIds.map(block).slice(0, 180) }); }
-  if (!pages.length) pages.push({ path: "/", title: facts.name.slice(0, 70), sourceIds: [], blocks: Object.keys(facts.facts).map(block).slice(0, 180) });
-  if (!used.has("/contact")) pages.push({ path: "/contact", title: "Contact", sourceIds: [], blocks: [...facts.contact, ...facts.locations, ...facts.hours].map(block).slice(0, 100) });
+  for (const source of facts.sourcePages.slice(0, 10)) { let path = canonicalPagePath(source.url); if (used.has(path)) continue; if (pages.length === 0) path = "/"; used.add(path); pages.push({ path, title: (source.title || facts.name).slice(0, 70), sourceIds: [source.sourceId], blocks: source.factIds.filter(id => facts.facts[id]).map(block).slice(0, 180) }); }
+  if (!pages.length) pages.push({ path: "/", title: facts.name.slice(0, 70), sourceIds: [], blocks: [...new Set([facts.nameFactId,...facts.claims,...facts.services,...facts.people,...facts.contact,...facts.hours,...facts.locations,...facts.reviews,...Object.keys(facts.facts).sort()])].filter(id => facts.facts[id]).map(block).slice(0,180) });
+  if (!used.has("/contact")) pages.push({ path: "/contact", title: "Contact", sourceIds: [], blocks: [...facts.contact, ...facts.locations, ...facts.hours].filter(id => facts.facts[id]).map(block).slice(0, 100) });
   const home = pages.find((page) => page.path === "/")!;
-  for (const id of [facts.nameFactId, ...facts.services.slice(0, 30), ...facts.reviews.slice(0, 12)]) if (!home.blocks.some((entry) => entry.factIds.includes(id))) home.blocks.push(block(id));
+  for (const id of [facts.nameFactId, ...facts.services.slice(0, 30), ...facts.reviews.slice(0, 12)].filter(id => facts.facts[id])) if (!home.blocks.some((entry) => entry.factIds.includes(id))) home.blocks.push(block(id));
   return { pages, writer: "source" };
 }
 

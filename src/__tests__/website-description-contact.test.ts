@@ -57,23 +57,31 @@ describe("supplied contact details in a new website description", () => {
     expect(result.facts.contact).toEqual([]); expect(descriptionContactBindings(result.facts)).toEqual([]);
     expect(renderSiteDocumentHtml(result.document, "/contact", { preview: true })).not.toMatch(/href="(?:mailto:|tel:)/);
   });
-  it("refuses a valid-length description that would silently lose supplied contacts at the fact limit", async () => {
-    const description = Array.from({ length:505 },(_,index) => `d${String(index).padStart(3,"0")}`).join("\n") + "\nEmail orders@example.test.";
+  it.each([false,true])("retains every supplied short line and contact within the existing fact bound (numeric lines: %s)", async numeric => {
+    const details = Array.from({ length:numeric ? 500 : 505 },(_,index) => numeric ? String(index) : `d${String(index).padStart(3,"0")}`);
+    const description = details.join("\n") + "\nEmail orders@example.test.";
     expect(websiteRebuildInputSchema.safeParse({ ...input,description }).success).toBe(true);
     expect(descriptionContacts(description)).toEqual(["orders@example.test"]);
-    const error = await runWebsiteRebuild({ ...input,description }).then(() => null,error => error as Error);
-    expect(error?.message).toContain("too many separate details");
+    const result = await runWebsiteRebuild({ ...input,description });
+    expect(Object.keys(result.facts.facts).length).toBeLessThan(20);
+    expect(result.facts.contact.map(id => result.facts.facts[id]!.text)).toEqual(["orders@example.test"]);
+    expect(descriptionContactBindings(result.facts)).toHaveLength(1);
+    const retained = result.facts.descriptionClaimLines!.map(group => group.map(id => result.facts.facts[id]!.text).join(" ")).join("\n");
+    expect(retained.replace(/\s+/g," ").trim()).toBe(description.replace(/\s+/g," ").trim());
+    const html = renderSiteDocumentHtml(result.document,"/",{ preview:true });
+    for (const detail of details) expect(html).toContain(detail);
+    expect(html).toContain('href="mailto:orders@example.test"');
+    expect(Object.values(result.facts.facts).every(fact => fact.origin === "owner_stated" && !fact.sources.length)).toBe(true);
   });
-  it("retains canonical repeated occurrences and bindings at the exact fact limit", () => {
+  it("retains repeated contact occurrences when short lines are coalesced", () => {
     const description = Array.from({ length:497 },(_,index) => `d${String(index).padStart(3,"0")}`).join("\n") + "\nEmail orders@example.test.\nEmail orders@example.test.";
     const facts = extractBusinessFacts({ ...input,description });
-    expect(Object.keys(facts.facts)).toHaveLength(500); expect(facts.contact).toHaveLength(1);
-    expect(facts.descriptionClaimLines).toHaveLength(499);
-    expect(facts.descriptionClaimLines!.at(-1)).toEqual(facts.descriptionClaimLines!.at(-2));
-    expect(descriptionContactBindings(facts)).toHaveLength(1);
-    const binding = descriptionContactBindings(facts)[0]!;
-    expect(facts.facts[binding.claimId]!.text).toBe("Email orders@example.test.");
-    expect(facts.facts[binding.contactId]!).toMatchObject({ text:"orders@example.test",origin:"owner_stated",sources:[] });
+    expect(Object.keys(facts.facts).length).toBeLessThan(20); expect(facts.contact).toHaveLength(1);
+    const bindings = descriptionContactBindings(facts); expect(bindings).toHaveLength(2);
+    for (const binding of bindings) {
+      expect(facts.facts[binding.claimId]!.text.slice(binding.start,binding.end)).toBe("orders@example.test");
+      expect(facts.facts[binding.contactId]!).toMatchObject({ text:"orders@example.test",origin:"owner_stated",sources:[] });
+    }
   });
   it("retains repeated line occurrences before deduplicating canonical contact bindings", async () => {
     const cue = "We bake bread ".repeat(20) + "Email";

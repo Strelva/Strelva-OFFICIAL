@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { createWebsiteRebuildService } from "@/products/websites/rebuild-service";
 import type { resolvePublishedWebsiteCapabilities } from "@/products/websites/published-capabilities";
-import { extractBusinessFacts, runWebsiteRebuild, writeSourceContent, type RebuildOptions } from "@/products/websites/rebuild-pipeline";
+import { extractBusinessFacts, currentDescriptionBusinessFacts, runWebsiteRebuild, writeSourceContent, type RebuildOptions } from "@/products/websites/rebuild-pipeline";
+import { descriptionContactBindings } from "@/products/websites/rebuild-contact";
 import { composeRebuildSite } from "@/products/websites/rebuild-composer";
 import { siteDocumentHash, siteDocumentSchema, unresolvedSiteFacts, } from "@/products/websites/site-document";
 import { renderSiteDocumentHtml, buildSiteDocumentExport } from "@/products/websites/site-export";
@@ -141,13 +142,33 @@ describe("website rebuild service lifecycle and durable recovery", () => {
     expect(renderSiteDocumentHtml(published.document,"/contact")).toContain(`href="${oldHref}"`);
     expect(h.documents.manage).toHaveBeenLastCalledWith(actor,{ workspaceId, workId: record.workId });
   });
-  it("reports extraction failure instead of a complete-looking preview when description details exceed capacity", async () => {
-    const description = Array.from({ length:505 },(_,index) => `d${String(index).padStart(3,"0")}`).join("\n") + "\nEmail orders@example.test.";
-    const h = harness(); const record = await h.create({ ...brief,description });
-    expect(record.rebuild.status).toBe("failed"); expect(record.rebuild.candidate).toBeNull();
-    expect(record.rebuild.lastError).toContain("too many separate details");
-    expect(record.rebuild.input).toMatchObject({ description });
-    expect((await h.service.read(actor,record.workId)).rebuild.lastError).toEqual(record.rebuild.lastError);
+  it("preserves 500 short input lines through publication, length-changing contact correction, removal and recomposition", async () => {
+    const details = Array.from({ length:500 },(_,index) => `d${String(index).padStart(3,"0")}`);
+    const description = details.join("\n") + "\nWe do not offer delivery\nEmail orders@example.test or call 716-555-0100.";
+    const h = harness(); let record = await h.create({ ...brief,description });
+    expect(record.rebuild.status).toBe("review_ready"); expect(record.rebuild.input).toMatchObject({ description });
+    expect(Object.keys(record.rebuild.candidate!.document.facts).length).toBeLessThan(20);
+    for (const id of unresolvedSiteFacts(record.rebuild.candidate!.document)) record = await h.service.resolveFact(actor,record.workId,id,{ ...selection(record),action:"confirm" });
+    record = await h.launch(record); const published = clone(h.publications.get(record.rebuild.tenantId!)!);
+    const [id] = Object.entries(record.rebuild.candidate!.document.facts).find(([,fact]) => fact.kind === "contact" && fact.text === "orders@example.test")!;
+    const edited = await h.service.resolveFact(actor,record.workId,id,{ ...selection(record),action:"edit",text:"pickup+local@example.test" });
+    const current = currentDescriptionBusinessFacts({ ...brief,description },edited.rebuild.candidate!.document);
+    for (const document of [edited.rebuild.candidate!.document,await composeRebuildSite(current,writeSourceContent(current))]) {
+      const html = renderSiteDocumentHtml(document,"/",{ preview:true });
+      for (const detail of details) expect(html).toContain(detail);
+      expect(html).toContain("We do not offer delivery"); expect(html).toContain('href="mailto:pickup+local@example.test"'); expect(html).toContain('href="tel:7165550100"'); expect(html).not.toContain("orders@example.test");
+    }
+    const removed = await h.service.resolveFact(actor,edited.workId,id,{ ...selection(edited),action:"remove" });
+    current.facts = clone(removed.rebuild.candidate!.document.facts);
+    for (const document of [removed.rebuild.candidate!.document,await composeRebuildSite(current,writeSourceContent(current))]) {
+      const html = renderSiteDocumentHtml(document,"/",{ preview:true });
+      for (const detail of details) expect(html).toContain(detail);
+      expect(html).toContain("We do not offer delivery"); expect(html).toContain('href="tel:7165550100"'); expect(html).not.toContain("pickup+local@example.test"); expect(html).not.toContain("orders@example.test");
+    }
+    expect(edited.rebuild.input).toEqual(record.rebuild.input); expect(removed.rebuild.input).toEqual(record.rebuild.input);
+    expect(edited.rebuild.approvedCandidateRevision).toBeNull(); expect(removed.rebuild.approvedCandidateRevision).toBeNull();
+    expect(h.publications.get(record.rebuild.tenantId!)!).toEqual(published);
+    expect(renderSiteDocumentHtml(published.document,"/contact")).toContain('href="mailto:orders@example.test"');
   });
   it.each([false,true])("keeps repeated line/chunk occurrences coherent across contact correction and recomposition (duplicate contact claim: %s)", async repeated => {
     const cue = "We bake bread ".repeat(20) + "Email";
@@ -157,7 +178,7 @@ describe("website rebuild service lifecycle and durable recovery", () => {
     record = await h.launch(record); const published = clone(h.publications.get(record.rebuild.tenantId!)!);
     const [id] = Object.entries(record.rebuild.candidate!.document.facts).find(([,fact]) => fact.kind === "contact")!;
     const edited = await h.service.resolveFact(actor,record.workId,id,{ ...selection(record),action:"edit",text:"pickup+local@example.test" });
-    const current = extractBusinessFacts({ ...brief,description }); current.facts = clone(edited.rebuild.candidate!.document.facts);
+    const current = currentDescriptionBusinessFacts({ ...brief,description },edited.rebuild.candidate!.document);
     for (const document of [edited.rebuild.candidate!.document,await composeRebuildSite(current,writeSourceContent(current))]) {
       const html = renderSiteDocumentHtml(document,"/",{ preview:true });
       expect(html).toContain('href="mailto:pickup+local@example.test"'); expect(html).toContain("pickup+local@example.test."); expect(html).not.toContain("orders@example.test");
@@ -165,18 +186,29 @@ describe("website rebuild service lifecycle and durable recovery", () => {
     expect(edited.rebuild.input).toEqual(record.rebuild.input); expect(edited.rebuild.approvedCandidateRevision).toBeNull();
     expect(h.publications.get(record.rebuild.tenantId!)!).toEqual(published);
   });
-  it.each([false,true])("keeps contact correction coherent for a retained document extracted before line grouping (over grouped capacity: %s)", async overCapacity => {
-    const description = overCapacity ? Array.from({ length:505 },(_,index) => `d${String(index).padStart(3,"0")}`).join("\n") + "\nEmail orders@example.test." : "We bake bread\nEmail orders@example.test.";
+  it.each([false,true])("keeps contact correction coherent for a retained document extracted before line grouping (many short lines: %s)", async manyLines => {
+    const description = manyLines ? Array.from({ length:505 },(_,index) => `d${String(index).padStart(3,"0")}`).join("\n") + "\nEmail orders@example.test." : "We bake bread\nEmail orders@example.test.";
     const h = harness();
     // Model an already retained pre-fix document; immutable intake still keeps
     // the owner's lines while the old extractor combined its claim chunks.
     h.pipeline.mockImplementationOnce((input,options) => runWebsiteRebuild("description" in input ? { ...input,description:input.description.replace(/\s+/g," ") } : input,options));
     const record = await h.create({ ...brief, description });
     const [factId] = Object.entries(record.rebuild.candidate!.document.facts).find(([,fact]) => fact.kind === "contact")!;
+    expect(descriptionContactBindings(currentDescriptionBusinessFacts({ ...brief,description },record.rebuild.candidate!.document))).toHaveLength(1);
     const edited = await h.service.resolveFact(actor,record.workId,factId,{ ...selection(record), action:"edit", text:"pickup@example.test" });
     const html = renderSiteDocumentHtml(edited.rebuild.candidate!.document,"/",{ preview:true });
     expect(html).toContain("Email pickup@example.test."); expect(html).not.toContain("orders@example.test");
     expect(edited.rebuild.input).toEqual(record.rebuild.input);
+    const current = currentDescriptionBusinessFacts({ ...brief,description },edited.rebuild.candidate!.document);
+    expect(descriptionContactBindings(current)).toHaveLength(1);
+    const reordered = { ...edited.rebuild.candidate!.document,facts:Object.fromEntries(Object.entries(edited.rebuild.candidate!.document.facts).reverse()) };
+    expect(currentDescriptionBusinessFacts({ ...brief,description },reordered).contact).toEqual(current.contact);
+    expect(renderSiteDocumentHtml(await composeRebuildSite(current,writeSourceContent(current)),"/",{ preview:true })).not.toContain("orders@example.test");
+    const removed = await h.service.resolveFact(actor,edited.workId,factId,{ ...selection(edited),action:"remove" });
+    const afterRemoval = currentDescriptionBusinessFacts({ ...brief,description },removed.rebuild.candidate!.document);
+    expect(afterRemoval.contact).toEqual([]); expect(descriptionContactBindings(afterRemoval)).toEqual([]);
+    const removedHtml = renderSiteDocumentHtml(await composeRebuildSite(afterRemoval,writeSourceContent(afterRemoval)),"/",{ preview:true });
+    expect(removedHtml).not.toContain("orders@example.test"); expect(removedHtml).not.toContain("pickup@example.test");
   });
   it("preserves separate input line context through publication, contact correction and recomposition", async () => {
     const description = "We do not offer delivery\nEmail orders@example.test or call 716-555-0100.";
