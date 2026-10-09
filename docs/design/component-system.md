@@ -74,7 +74,9 @@ same command. A matching historical receipt recovers a lost response without
 another POST. Current authority is rechecked by the server. Workspace changes
 abort old observations; error focus preserves navigation when the user moved.
 The browser imports a pure shared DTO/schema owner, without database/provider
-modules. Twenty-two focused component/contract tests passed locally, alongside
+modules. Receipt confirmation and history recovery bind the server-authenticated actor and
+exact PostgreSQL microseconds, accepting equivalent timezone offsets.
+Twenty-five focused component/contract tests passed locally, alongside
 scoped lint and bounded types. A genuine signed-in one-case Auth/UI/PostgreSQL
 journey is prepared and listed, but has not executed. Desktop/mobile rendered
 proof, current catalog/native proof and provider/commercial qualification remain

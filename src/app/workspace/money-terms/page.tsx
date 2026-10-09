@@ -12,5 +12,5 @@ export default async function RecordedMoneyTermsPage({ searchParams }: { searchP
   let graph;
   try { graph = await readGovernedMoney(actor, workspaceId); }
   catch { return <main className="mx-auto max-w-3xl px-6 py-12"><h1 className="font-display text-3xl">Recorded money terms</h1><p role="alert" className="mt-6">Terms could not be loaded. Confirm your current business access and reload.</p></main>; }
-  return <main className="mx-auto max-w-3xl px-6 py-12 text-warm-black"><Link className="inline-flex min-h-12 items-center underline" href={`/workspace/billing?workspaceId=${encodeURIComponent(workspaceId)}`}>Back to billing</Link><h1 className="mt-6 font-display text-3xl">Recorded money terms</h1><CollectionTerms key={workspaceId} graph={graph} /></main>;
+  return <main className="mx-auto max-w-3xl px-6 py-12 text-warm-black"><Link className="inline-flex min-h-12 items-center underline" href={`/workspace/billing?workspaceId=${encodeURIComponent(workspaceId)}`}>Back to billing</Link><h1 className="mt-6 font-display text-3xl">Recorded money terms</h1><CollectionTerms key={workspaceId} graph={graph} actorId={actor.userId} /></main>;
 }

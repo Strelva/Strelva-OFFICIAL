@@ -17,7 +17,7 @@ test("current business owner accepts an exact recorded price and period through 
     const reader = await signedInContext(browser, admin, "governed-reader"); contexts.push(reader.context);
     const operator = await signedInContext(browser, admin, "governed-operator"); contexts.push(operator.context);
     const workspaceId = await nativeWorkspace(owner.context.request); await nativeWorkspace(reader.context.request); await nativeWorkspace(operator.context.request);
-    const invited = await moneyPost(owner.context.request, "/api/workspace-invitations", { workspaceId, recipientEmail: reader.email, role: "member" }, 201);
+    const invited = await moneyPost(owner.context.request, "/api/workspace-invitations", { workspaceId, recipientEmail: reader.email, role: "admin" }, 201);
     await moneyPost(reader.context.request, `/api/workspace-invitations/accept/${invited.token}`, {});
     const page = await owner.context.newPage(); await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto(`/workspace/money-terms?workspaceId=${workspaceId}`);

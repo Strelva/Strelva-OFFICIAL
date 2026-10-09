@@ -4,19 +4,19 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { SelectInput, TextInput } from "@/components/ui/TextInput";
 import { formatMoney } from "@/platform/connect/money-format";
-import { governedCollectionReceiptSchema, governedMoneyGraphSchema, type GovernedMoneyGraph } from "@/platform/connect/governed-money-contract";
+import { governedCollectionReceiptSchema, governedMoneyGraphSchema, sameRecordedMoneyInstant, type GovernedMoneyGraph } from "@/platform/connect/governed-money-contract";
 
 type Command = { action: "accept_collection_terms"; workspaceId: string; lineId: string; priceVersion: string; amountCents: number; currency: string; installationId: string | null; periodStart: string; periodEnd: string };
 type Phase = "ready" | "pending" | "loading" | "uncertain" | "blocked";
 function message(value: unknown) { return value && typeof value === "object" && "error" in value && typeof value.error === "string" ? value.error : "The accepted terms could not be confirmed. Reload to check what was recorded."; }
-function matches(value: unknown, command: Command) {
+function matches(value: unknown, command: Command, actorId: string) {
   const receipt = governedCollectionReceiptSchema.safeParse(value);
   if (!receipt.success) return false;
   const item = receipt.data;
-  return item.lineId === command.lineId && item.workspaceId === command.workspaceId && item.priceVersion === command.priceVersion && item.amountCents === command.amountCents && item.currency === command.currency && item.installationId === command.installationId && Date.parse(item.periodStart ?? "") === Date.parse(command.periodStart) && Date.parse(item.periodEnd ?? "") === Date.parse(command.periodEnd);
+  return item.acceptedBy === actorId && item.lineId === command.lineId && item.workspaceId === command.workspaceId && item.priceVersion === command.priceVersion && item.amountCents === command.amountCents && item.currency === command.currency && item.installationId === command.installationId && sameRecordedMoneyInstant(item.periodStart, command.periodStart) && sameRecordedMoneyInstant(item.periodEnd, command.periodEnd);
 }
-export function CollectionTerms(props: { graph: GovernedMoneyGraph; request?: typeof fetch }) { return <ScopedCollectionTerms key={props.graph.workspaceId} {...props} />; }
-function ScopedCollectionTerms({ graph: initial, request = fetch }: { graph: GovernedMoneyGraph; request?: typeof fetch }) {
+export function CollectionTerms(props: { graph: GovernedMoneyGraph; actorId: string; request?: typeof fetch }) { return <ScopedCollectionTerms key={`${props.graph.workspaceId}:${props.actorId}`} {...props} />; }
+function ScopedCollectionTerms({ graph: initial, actorId, request = fetch }: { graph: GovernedMoneyGraph; actorId: string; request?: typeof fetch }) {
   const [graph, setGraph] = useState(initial), [phase, setPhase] = useState<Phase>("ready"), [error, setError] = useState(""), [notice, setNotice] = useState("");
   const [priceVersion, setPriceVersion] = useState(""), [installationId, setInstallationId] = useState(""), [start, setStart] = useState(""), [end, setEnd] = useState("");
   const attempt = useRef<Command | null>(null), inflight = useRef<AbortController | null>(null), alive = useRef(true), feedback = useRef<HTMLParagraphElement | null>(null);
@@ -37,7 +37,7 @@ function ScopedCollectionTerms({ graph: initial, request = fetch }: { graph: Gov
       if (next.workspaceId !== initial.workspaceId || next.terms.some(term => term.workspaceId !== initial.workspaceId)) throw Error("The terms belong to another workspace. Sign in and reload.");
       if (controller.signal.aborted || !alive.current) return;
       setGraph(next);
-      if (attempt.current && next.terms.some(term => matches(term, attempt.current!))) { attempt.current = null; setNotice("Your exact terms and period are recorded. No card was charged."); }
+      if (attempt.current && next.terms.some(term => matches(term, attempt.current!, actorId))) { attempt.current = null; setNotice("Your exact terms and period are recorded. No card was charged."); }
       setPhase("ready"); focusFeedback(origin);
     } catch (cause) { if (!controller.signal.aborted && alive.current) { setPhase("blocked"); setError(cause instanceof Error ? cause.message : "Terms could not be loaded."); focusFeedback(origin); } }
     finally { if (!controller.signal.aborted && alive.current) inflight.current = null; }
@@ -57,7 +57,7 @@ function ScopedCollectionTerms({ graph: initial, request = fetch }: { graph: Gov
       const response = await request("/api/workspace/money-preparation", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(command), signal: controller.signal });
       const body: unknown = await response.json().catch(() => null);
       if (!response.ok) throw Error(message(body));
-      if (!body || typeof body !== "object" || !("receipt" in body) || !("collectionDispatch" in body) || body.collectionDispatch !== "not_configured" || !matches(body.receipt, command)) throw Error("The acceptance receipt did not match the exact terms. Reload before continuing.");
+      if (!body || typeof body !== "object" || !("receipt" in body) || !("collectionDispatch" in body) || body.collectionDispatch !== "not_configured" || !matches(body.receipt, command, actorId)) throw Error("The acceptance receipt did not match the exact terms. Reload before continuing.");
       if (controller.signal.aborted || !alive.current) return;
       attempt.current = null;
       const receipt = governedCollectionReceiptSchema.parse(body.receipt);

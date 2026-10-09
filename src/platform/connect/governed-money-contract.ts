@@ -8,6 +8,12 @@ function micros(value: string) {
   const fraction = /\.(\d+)(?=Z$|[+-]\d{2}:\d{2}$)/.exec(value)?.[1] ?? "";
   return BigInt(seconds) * BigInt(1000000) + BigInt(fraction.padEnd(6, "0"));
 }
+/** Exact PostgreSQL microsecond instants, preserving equivalent offsets. */
+export function sameRecordedMoneyInstant(left: string | null, right: string | null) {
+  if (left === null || right === null) return left === right;
+  if (!timestamp.safeParse(left).success || !timestamp.safeParse(right).success) return false;
+  return micros(left) === micros(right);
+}
 /** Human-supplied recorded terms only. No prices, rates or mandate defaults. */
 export const operatorMoneyCommandSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("record_agreement"), workspaceId: id, kind: z.enum(["agency", "creator"]), version: text, rateReference: text, rateBps: z.number().int().min(0).max(10000), ...dates }).strict(),
