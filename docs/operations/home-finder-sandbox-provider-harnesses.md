@@ -32,6 +32,23 @@ assertion errors and stdout/stderr, and produces no HTML/JSON/DOM report.
 Sensitive comparisons use booleans; failures expose no buyer/request/token or
 listing address. Do not override reporters or enable capture for these cases.
 
+The parsed admission is recursively frozen. After the dispatch claim is burned,
+and after Auth/search/native setup, both cases recheck actual app actor and
+current direct customer-owner authority through authenticated, no-cache reads
+of `/api/workspace/businesses` (actual actor ID and selected business) and
+`/api/workspace/needs-you/policy?workspaceId=...` (fresh direct member role).
+The policy endpoint restricts to customer direct members and needs both
+Workspace and Needs you releases; absent routes/flags, admin-only, provider-seat
+or agency-only authority fail closed. The general workspace GET is deliberately
+unused because it may ensure/create a personal workspace.
+
+Both revalidate the immutable approval window as the last synchronous check
+before the inquiry click/build POST. Expiry or lost authority leaves the claim
+permanently consumed and dispatch does not occur. This is a fresh pre-dispatch
+observation, not a transaction lock across the external effect; native/product
+write gates retain their own responsibility. No service-role actor impersonation
+or cached admission role substitutes for these reads.
+
 Before any provider effect, Auth `getUser()` verifies the actual loaded cookie
 session, confirmed email and exact approved owner. Declared identity or a
 post-build receipt cannot substitute. The session is not refreshed or created.
@@ -121,12 +138,13 @@ remain unverified here.
 
 ## Checks and next action
 
-All 18 admission unit tests passed. Admission tests cover production/hosted control-plane refusal, expiry,
+All 20 admission unit tests passed. Admission tests cover production/hosted control-plane refusal, expiry,
 future approval, missing billing authority, mutable image, missing permission
 and unbounded/zero spend. A syntactically valid input cannot release the held
 provider profile. Filesystem/dispatch tests additionally cover private file and symlink refusal,
 permanent same-scope replay refusal, reporter isolation and actual cookie-session
-verification through a mocked Auth client. Scoped lint passed. Discovery-only checks found 430 ordinary tests with neither
+verification through a mocked Auth client, approval expiry after setup with its
+claim still consumed, and fresh app actor/business/owner refusal after demotion. Scoped lint passed. Discovery-only checks found 430 ordinary tests with neither
 provider case, and exactly two tests in the isolated provider config. No browser, server, provider, native DB,
 SDK build or paid session was started. Root typecheck and actual execution are
 still pending.

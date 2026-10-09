@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, chmodSync, symlinkSync, rmSync, readFileSync, readdirSync as requireFiles } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assertPrivatePath, readPrivateJson, claimProviderDispatch, assertProviderReporter, verifyProviderOwner, sandboxProofAdmissionSchema, parseProviderProofAdmission, requireProviderProofAdmission } from "../../tests/support/provider-harness-admission";
+import { assertPrivatePath, readPrivateJson, claimProviderDispatch, assertProviderReporter, verifyProviderOwner, verifyProviderWorkspaceOwner, assertProviderApprovalWindow, sandboxProofAdmissionSchema, parseProviderProofAdmission, requireProviderProofAdmission } from "../../tests/support/provider-harness-admission";
 import { journeyProfile, preflight } from "../../scripts/full-model-journey-profile.mjs";
 const authMock = vi.hoisted(() => ({ getUser: vi.fn(), create: vi.fn() }));
 vi.mock("@supabase/ssr", () => ({ createServerClient: authMock.create }));
@@ -111,4 +111,35 @@ it("verifies the loaded cookie session with Auth before trusting its declared ow
   await expect(verifyProviderOwner(context, admission)).rejects.toThrow("does not match");
   authMock.getUser.mockResolvedValue({ error: null, data: { user: { id, email: admission.ownerEmail } } });
   await expect(verifyProviderOwner(context, admission)).rejects.toThrow("does not match");
+});
+
+it("freezes the admission and refuses approval that expires during setup after burning a claim", () => {
+  const immutable = parseProviderProofAdmission(sandboxProofAdmissionSchema, admission, now);
+  expect(Object.isFrozen(immutable)).toBe(true);
+  expect(Object.isFrozen(immutable.actions)).toBe(true);
+  const fixture = privateFixture();
+  try {
+    const scope = { kind: "sandbox-application", authorizationReference: "fictional timed approval", dispatchJournalDirectory: fixture.directory };
+    const claim = claimProviderDispatch(scope, id);
+    expect(() => assertProviderApprovalWindow(immutable, Date.parse(admission.expiresAt))).toThrow("expired");
+    claim.close();
+    expect(() => claimProviderDispatch(scope, id)).toThrow("operator review required");
+  } finally { rmSync(fixture.directory, { recursive: true }); }
+});
+it("rechecks actual app actor and direct owner role, refusing demotion, different business or actor", async () => {
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "http://127.0.0.1:54321");
+  vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "fictional-public-unit-key");
+  authMock.create.mockReturnValue({ auth: { getUser: authMock.getUser } });
+  authMock.getUser.mockResolvedValue({ error: null, data: { user: { id, email: admission.ownerEmail, email_confirmed_at: "2026-10-08" } } });
+  const response = (data: unknown) => ({ status: () => 200, json: async () => data });
+  const get = vi.fn();
+  const context = { cookies: vi.fn(async () => []), request: { get } };
+  get.mockResolvedValueOnce(response({ actorId: id, businesses: [{ id }] })).mockResolvedValueOnce(response({ role: "owner" }));
+  await verifyProviderWorkspaceOwner(context, admission);
+  get.mockResolvedValueOnce(response({ actorId: id, businesses: [{ id }] })).mockResolvedValueOnce(response({ role: "admin" }));
+  await expect(verifyProviderWorkspaceOwner(context, admission)).rejects.toThrow("direct business-owner");
+  get.mockResolvedValueOnce(response({ actorId: id, businesses: [] }));
+  await expect(verifyProviderWorkspaceOwner(context, admission)).rejects.toThrow("actor/business");
+  get.mockResolvedValueOnce(response({ actorId: "27417000-0000-4000-8000-000000000002", businesses: [{ id }] }));
+  await expect(verifyProviderWorkspaceOwner(context, admission)).rejects.toThrow("actor/business");
 });

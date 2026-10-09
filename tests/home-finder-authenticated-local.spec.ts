@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { z } from "zod";
 import { homeFinderBindingSchema, homeFinderSearchResultSchema } from "@/products/home-finder/contracts";
-import { homeFinderProofAdmissionSchema, requireProviderProofAdmission, claimProviderDispatch, loadProviderOwnerState, verifyProviderOwner, assertProviderReporter } from "./support/provider-harness-admission";
+import { homeFinderProofAdmissionSchema, requireProviderProofAdmission, claimProviderDispatch, loadProviderOwnerState, verifyProviderOwner, assertProviderReporter, verifyProviderWorkspaceOwner, assertProviderApprovalWindow } from "./support/provider-harness-admission";
 
 // Licensed content and buyer contact data must not enter default trace/video artifacts.
 test.use({ trace: "off", video: "off", screenshot: "off" });
@@ -58,9 +58,12 @@ test("authorized nonproduction Home Finder proves licensed client search and one
         claim!.recordRequest(observedRequestId); // request event, before response observation
       } catch { requestRecordFailed = true; }
     });
-    const sent = page.waitForResponse(r => new URL(r.url()).pathname === `/api/home-finder/${scope.bindingId}` && r.request().method() === "POST");
-    await frame.getByRole("button", { name: "Send inquiry", exact: true }).click();
-    const submitted = await sent;
+    await verifyProviderWorkspaceOwner(owner, scope);
+    assertProviderApprovalWindow(scope); // last synchronous check before the effect
+    const [submitted] = await Promise.all([
+      page.waitForResponse(r => new URL(r.url()).pathname === `/api/home-finder/${scope.bindingId}` && r.request().method() === "POST"),
+      frame.getByRole("button", { name: "Send inquiry", exact: true }).click(),
+    ]);
     const request = z.object({ submissionId: z.string().uuid(), consent: z.literal(true), listing: z.object({ id: z.string() }).passthrough(), buyer: z.object({ name: z.string(), email: z.string() }).passthrough() }).passthrough().parse(submitted.request().postDataJSON());
     expect(!requestRecordFailed && observedRequestId === request.submissionId).toBe(true);
     expect(request.listing.id === scope.listingId && request.buyer.name === scope.buyer.name && request.buyer.email === scope.buyer.email).toBe(true);

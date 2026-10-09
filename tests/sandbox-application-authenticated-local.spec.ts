@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { z } from "zod";
 import { localSql } from "./support/journeys";
-import { requireProviderProofAdmission, sandboxProofAdmissionSchema, claimProviderDispatch, loadProviderOwnerState, verifyProviderOwner, assertProviderReporter } from "./support/provider-harness-admission";
+import { requireProviderProofAdmission, sandboxProofAdmissionSchema, claimProviderDispatch, loadProviderOwnerState, verifyProviderOwner, assertProviderReporter, verifyProviderWorkspaceOwner, assertProviderApprovalWindow } from "./support/provider-harness-admission";
 
 // One paid attempt maximum. No fake SDK, dependency install, publication or automatic retry.
 test.use({ trace: "off", video: "off", screenshot: "off" });
@@ -28,6 +28,8 @@ test("authorized nonproduction sandbox build records actual cleanup and exact bi
       scope.image, scope.policyVersion, scope.ownerUserId, scope.ownerEmail, scope.runtimeQualificationId);
     expect(qualified).toEqual({ qualified: true, id: scope.runtimeQualificationId });
     claim = claimProviderDispatch(scope, `${scope.workId}:${scope.candidateVersion}`);
+    await verifyProviderWorkspaceOwner(owner, scope);
+    assertProviderApprovalWindow(scope); // expired approval leaves its claim burned
     const built = await owner.request.post(path, { maxRetries: 0, maxRedirects: 0, headers: { origin: scope.appOrigin }, data: { action: "build", input: { expectedCandidateRevision: scope.candidateRevision } } });
     // HTTP failure/unknown creation is retained and requires operator lookup; never retry here.
     expect(built.status()).toBe(200);

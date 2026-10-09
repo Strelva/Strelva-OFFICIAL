@@ -43,9 +43,8 @@ export function parseProviderProofAdmission<T>(schema: z.ZodType<T>, raw: unknow
   if (!parsed.success) throw new Error("Provider proof held: invalid admission inputs (details withheld).");
   const value = parsed.data;
   const clock = common.pick({ approvedAt: true, expiresAt: true }).parse(value);
-  if (Date.parse(clock.approvedAt) > now || Date.parse(clock.expiresAt) <= now || Date.parse(clock.expiresAt) <= Date.parse(clock.approvedAt))
-    throw new Error("Provider proof is held: approval is expired or not current.");
-  return value;
+  assertProviderApprovalWindow(clock, now);
+  return freezeAdmission(value);
 }
 export function requireProviderProofAdmission<T>(kind: string, schema: z.ZodType<T>): T {
   const path = process.env.STRELVA_PROVIDER_PROOF_ADMISSION;
@@ -134,4 +133,35 @@ export function loadProviderOwnerState(path: string) {
 export function assertProviderReporter(config: Pick<FullConfig, "reporter">) {
   if (config.reporter.length !== 1 || !config.reporter[0]?.[0].replaceAll("\\", "/").endsWith("/tests/support/provider-redacted-reporter.ts"))
     throw new Error("Provider proof held: only the isolated redacted reporter is permitted.");
+}
+
+function freezeAdmission<T>(value: T): T {
+  if (value !== null && typeof value === "object") {
+    for (const child of Object.values(value)) freezeAdmission(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+export function assertProviderApprovalWindow(scope: { approvedAt: string; expiresAt: string }, now = Date.now()) {
+  const approved = Date.parse(scope.approvedAt), expires = Date.parse(scope.expiresAt);
+  if (!Number.isFinite(approved) || !Number.isFinite(expires) || approved > now || expires <= now || expires <= approved)
+    throw new Error("Provider proof is held: approval is expired or not current.");
+}
+
+/** Read current direct customer-owner authority through the real app session.
+ * The business route binds actual actor ID; policy GET restricts to direct
+ * customer members and returns the freshly read role. No fixture/service actor.
+ * This harness intentionally refuses agency-only/admin/provider-seat scopes. */
+export async function verifyProviderWorkspaceOwner(context: Pick<BrowserContext, "cookies"> & { request: Pick<BrowserContext["request"], "get"> },
+  scope: { appOrigin: string; workspaceId: string; ownerUserId: string; ownerEmail: string }) {
+  await verifyProviderOwner(context, scope);
+  const options = { headers: { "cache-control": "no-cache" }, maxRetries: 0, maxRedirects: 0 };
+  const businessResponse = await context.request.get("/api/workspace/businesses", options);
+  if (businessResponse.status() !== 200) throw new Error("Provider proof held: current business actor unavailable.");
+  const business = z.object({ actorId: z.string().uuid(), businesses: z.array(z.object({ id: z.string().uuid() }).passthrough()) }).safeParse(await businessResponse.json());
+  if (!business.success || business.data.actorId !== scope.ownerUserId || !business.data.businesses.some(row => row.id === scope.workspaceId))
+    throw new Error("Provider proof held: current app actor/business does not match approved owner scope.");
+  const policyResponse = await context.request.get(`/api/workspace/needs-you/policy?workspaceId=${scope.workspaceId}`, options);
+  if (policyResponse.status() !== 200 || !z.object({ role: z.literal("owner") }).passthrough().safeParse(await policyResponse.json()).success)
+    throw new Error("Provider proof held: current direct business-owner authority required.");
 }
