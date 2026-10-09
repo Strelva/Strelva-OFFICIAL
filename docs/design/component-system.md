@@ -82,6 +82,25 @@ journey is prepared and listed, but has not executed. Desktop/mobile rendered
 proof, current catalog/native proof and provider/commercial qualification remain
 unproven; this entry records source behavior rather than final interface approval.
 
+## Operator written money operations, October 9, prepared local source
+
+`OperatorMoney` composes the owned Button, Card, TextInput and SelectInput in the
+operator frame. Signed-in current operators enter explicit written price or
+agreement references, amount/currency or rate, and dates. Blank rates do not
+become zero. Payout review exposes the immutable source, recipient, amount and
+recorded profile; recording authorization and dispatch remain separate actions.
+An unavailable approved profile removes authorization and dispatch, and disabled
+execution removes dispatch. These states make no provider/commercial approval.
+
+Acknowledgments match the actual requesting operator, payout and profile.
+Unknown responses freeze the exact command and disable new work until current
+readback; any retry preserves the same command. An accepted historical transfer
+is observed without another POST. Current read refusal leaves controls locked.
+Actor/workspace changes abort old observations. The shared navigation entry is
+visible only when the server's Workspace and Revenue splits flags are enabled.
+Forty-one focused tests in five files pass locally, with scoped lint and bounded
+types. Real operator Auth/browser/provider proof remains unrun.
+
 ## Start with tokens and atoms
 
 ### Systems mutation recovery, October 8, local

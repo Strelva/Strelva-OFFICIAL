@@ -48,6 +48,12 @@ describe("current operator payout dispatch", () => {
     await executeApprovedPayout(id, { db: p.database, stripe: p.stripe });
     expect(p.read).not.toHaveBeenCalled(); expect(p.create).not.toHaveBeenCalled(); expect(p.database.rpc.mock.calls.map(call => call[0])).toEqual(["prepare_approved_split_transfer", "record_split_transfer"]);
   });
+  it("returns the exact payout/profile and actual requesting actor after verified receipt persistence", async () => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1"); vi.stubEnv("STRELVA_REVENUE_SPLITS", "1"); vi.stubEnv("STRELVA_CONNECT", "1"); vi.stubEnv("STRELVA_CONNECT_PROFILE_VERSION", "approved-v1"); vi.stubEnv("STRELVA_CONNECT_FEES_COLLECTOR", "stripe"); vi.stubEnv("STRELVA_CONNECT_LOSSES_COLLECTOR", "stripe");
+    const p = ports();
+    await expect(executeGovernedPayout(authority.actor, { payoutId: id, profileVersion: "approved-v1" }, { db: p.database, stripe: p.stripe })).resolves.toEqual({ transferId: "tr_Accepted", payoutId: id, profileVersion: "approved-v1", requestedBy: userId });
+    expect(p.database.rpc.mock.calls.at(-1)?.[0]).toBe("record_split_transfer");
+  });
   it("checks actual execution/profile flags again after the async pre-effect boundary", async () => {
     for (const withdrawn of ["STRELVA_WORKSPACE_RELEASE", "STRELVA_REVENUE_SPLITS", "STRELVA_CONNECT", "STRELVA_SPLIT_PAYOUT_EXECUTION", "STRELVA_CONNECT_PROFILE_VERSION"]) {
       vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1"); vi.stubEnv("STRELVA_REVENUE_SPLITS", "1"); vi.stubEnv("STRELVA_CONNECT", "1"); vi.stubEnv("STRELVA_SPLIT_PAYOUT_EXECUTION", "1"); vi.stubEnv("STRELVA_CONNECT_PROFILE_VERSION", "approved-v1"); vi.stubEnv("STRELVA_CONNECT_FEES_COLLECTOR", "stripe"); vi.stubEnv("STRELVA_CONNECT_LOSSES_COLLECTOR", "stripe");

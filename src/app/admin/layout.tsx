@@ -1,3 +1,4 @@
+import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { redirect } from "next/navigation";
 import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { getAllTenants } from "@/lib/tenants";
@@ -27,6 +28,7 @@ export default async function AdminLayout({
   ]);
   const tenants = allTenants.map((t) => ({ id: t.id, siteName: t.siteName }));
   const activeClients = allTenants.filter((t) => t.active !== false).length;
+  const moneyEnabled = workspaceReleaseEnabled() && process.env.STRELVA_REVENUE_SPLITS === "1";
   const operatorName = actor.name?.split(" ")[0] || "Operator";
 
   return (
@@ -38,11 +40,11 @@ export default async function AdminLayout({
         Skip to content
       </a>
 
-      <AdminMobileNav operatorName={operatorName} badges={{ clients: activeClients }} />
+      <AdminMobileNav moneyEnabled={moneyEnabled} operatorName={operatorName} badges={{ clients: activeClients }} />
 
       <div className="md:grid md:grid-cols-[236px_1fr]">
         <div className="hidden md:block">
-          <AdminRail operatorName={operatorName} badges={{ clients: activeClients }} />
+          <AdminRail moneyEnabled={moneyEnabled} operatorName={operatorName} badges={{ clients: activeClients }} />
         </div>
         <main id="main-content" className="min-h-screen px-5 py-6 md:px-8 md:py-7">
           {children}

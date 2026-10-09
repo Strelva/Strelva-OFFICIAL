@@ -62,9 +62,10 @@ export async function registerGovernedCreatorListing(actor: WorkspaceActor, raw:
 export async function executeGovernedPayout(actor: WorkspaceActor, raw: unknown, deps: ConnectDependencies = {}) {
   const input = governedPayoutCommandSchema.parse(raw);
   if (connectProfile().version !== input.profileVersion) throw new WorkspaceConflictError("The approved Connect profile changed. Reload before continuing.");
-  return executeApprovedPayout(input.payoutId, { ...deps, payoutAuthority: { actor, profileVersion: input.profileVersion }, beforeProviderMutation: async () => {
+  const receipt = await executeApprovedPayout(input.payoutId, { ...deps, payoutAuthority: { actor, profileVersion: input.profileVersion }, beforeProviderMutation: async () => {
     await deps.beforeProviderMutation?.();
     if (!workspaceReleaseEnabled() || process.env.STRELVA_REVENUE_SPLITS !== "1" || process.env.STRELVA_CONNECT !== "1" || process.env.STRELVA_SPLIT_PAYOUT_EXECUTION !== "1") throw new WorkspaceStoreError("Payout execution is not enabled.");
     if (connectProfile().version !== input.profileVersion) throw new WorkspaceConflictError("The approved Connect profile changed. Reload before continuing.");
   } });
+  return { ...receipt, payoutId: input.payoutId, profileVersion: input.profileVersion, requestedBy: actor.userId };
 }
