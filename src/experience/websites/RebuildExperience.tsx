@@ -74,6 +74,7 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
   const [record, setRecord] = useState<RebuildView | null>(initialRecord ?? null);
   const [loading, setLoading] = useState(Boolean(workId && !initialRecord));
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [allowAgencyPublish, setAllowAgencyPublish] = useState(false);
@@ -124,11 +125,12 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
     return () => clearTimeout(timer);
   }, [record?.candidate, previewLoaded, previewAttempt]);
   async function run(operation: () => Promise<RebuildView>, success: string) {
-    if (busy || readOnly || loading) return false;
+    if (inFlight.current || busy || readOnly || loading) return false;
+    inFlight.current = true;
     setBusy(true); setError(""); setNotice("");
     try { const next = await operation(); if (mounted.current) { setRecord(next); setNotice(success); setEditing(null); onSaved?.(next.workId); } return true; }
     catch (cause) { if (mounted.current) setError(cause instanceof Error ? cause.message : "The change could not be saved. Your review is preserved."); return false; }
-    finally { if (mounted.current) setBusy(false); }
+    finally { inFlight.current = false; if (mounted.current) setBusy(false); }
   }
   const decisions = record ? flaggedFacts(record) : [];
   const decisionIds = new Set(decisions.map(([id]) => id));

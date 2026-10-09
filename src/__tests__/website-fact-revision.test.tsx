@@ -115,6 +115,34 @@ describe("ordinary website fact revision", () => {
     expect(container.querySelector("details")!.textContent).not.toContain("Guaranteed results");
     expect(button("Edit fact").disabled).toBe(true); expect(mutate).not.toHaveBeenCalled();
   });
+  it("accepts one submission in a React batch and releases the lock for an explicit retry after rejection", async () => {
+    const record = approved(); const next = changed(record); const onSaved = vi.fn();
+    let resolve!: (value: RebuildView) => void;
+    let reject!: (error: Error) => void;
+    const mutate = vi.fn(() => new Promise<RebuildView>((done, fail) => { resolve = done; reject = fail; }));
+    await mount(record, mutate, { onSaved });
+    const field = await edit(); const form = container.querySelector("details form")!;
+    await act(async () => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    expect(mutate).toHaveBeenCalledOnce();
+    expect(field.value).toBe(correction); expect(field.disabled).toBe(true);
+    expect(button("Save correction").disabled).toBe(true); expect(onSaved).not.toHaveBeenCalled();
+    await act(async () => reject(new Error("The connection interrupted this save. Try again.")));
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("connection interrupted");
+    expect(field.value).toBe(correction); expect(field.disabled).toBe(false);
+    expect(document.activeElement).toBe(field); expect(onSaved).not.toHaveBeenCalled();
+    await save();
+    expect(mutate).toHaveBeenCalledTimes(2);
+    expect(mutate).toHaveBeenLastCalledWith(record, "edit", { factId: "bread", text: correction });
+    await act(async () => resolve(next));
+    expect(onSaved).toHaveBeenCalledExactlyOnceWith(next.workId);
+    expect(container.textContent).not.toContain("This exact preview is approved.");
+    expect(button("Approve this preview").disabled).toBe(true);
+    expect(document.activeElement).toBe(button("Edit fact"));
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+  });
   it("sends the exact ordinary candidate identity through the existing HTTP transport and preserves a conflict", async () => {
     const record = approved();
     const fetch = vi.fn(async () => new Response(JSON.stringify({ error: "This website changed. Reload its current preview." }), { status: 409 }));
