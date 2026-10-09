@@ -3,8 +3,18 @@
 export function startRetainedNativeChild(name, { spawn, args, env, retain, command = "psql", timeoutMs = 15000, graceMs = 500, closeLimitMs = 2000 }) {
   const child = spawn(command, args, { stdio: ["pipe", "pipe", "pipe"], env });
   let stdout = "", stderr = "", closed = false, childError = null, timedOut = false, terminationRequested = false;
-  let escalation, closeLimit;
-  const log = () => retain(`${name}.log`, `${stdout}\n${stderr}`);
+  let escalation, closeLimit, retentionFailed = false;
+  // Retention happens inside child event callbacks. Disk failures must reach
+  // the awaited result rather than escape the callback and bypass finally.
+  const safeRetain = (file, value) => {
+    try { retain(file, value); }
+    catch {
+      retentionFailed = true;
+      childError ||= "Private native child retention failed";
+      terminate();
+    }
+  };
+  const log = () => safeRetain(`${name}.log`, `${stdout}\n${stderr}`);
   child.stdout.on("data", chunk => { stdout += chunk; log(); });
   child.stderr.on("data", chunk => { stderr += chunk; log(); });
   child.stdin.on("error", error => { childError ||= error.message; log(); });
@@ -23,14 +33,17 @@ export function startRetainedNativeChild(name, { spawn, args, env, retain, comma
       if (closed) return;
       terminate();
       clearTimeout(timeout); clearTimeout(escalation);
-      retain(`${name}-closure-unconfirmed.json`, JSON.stringify({ closed: false, timedOut, terminationRequested, error: childError, pid: child.pid ?? null }));
+      safeRetain(`${name}-closure-unconfirmed.json`, JSON.stringify({ closed: false, timedOut, terminationRequested, error: childError, pid: child.pid ?? null }));
       reject(new Error(`${name}: owned child closure was not observed after bounded termination`));
     }, timeoutMs + graceMs + closeLimitMs);
     child.on("error", error => { childError = error.message; log(); });
     child.on("close", (code, signal) => {
       closed = true; clearTimeout(timeout); clearTimeout(escalation); clearTimeout(closeLimit); log();
       const result = { code, signal, error: childError, timedOut, terminationRequested, closed, stdout: stdout.trim(), stderr };
-      retain(`${name}-process.json`, JSON.stringify(result, null, 2)); resolve(result);
+      safeRetain(`${name}-process.json`, JSON.stringify(result, null, 2));
+      // The final process-receipt write can itself fail after result creation.
+      if (retentionFailed) { result.error ||= childError; result.retentionFailed = true; }
+      resolve(result);
     });
   });
   // A holder/worker may be registered before the harness reaches its await.
