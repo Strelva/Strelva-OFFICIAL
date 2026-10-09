@@ -27,12 +27,25 @@ function ScopedSystemVersionManagement({ workspaceId, systemId, versionId, readO
   const [path, setPath] = useState(""), [value, setValue] = useState('"Local value"'), [account, setAccount] = useState(""), [kind, setKind] = useState("booking_calendar"), [release, setRelease] = useState("");
   const inFlight = useRef(false), pending = useRef<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null), errorRef = useRef<HTMLParagraphElement>(null), noticeRef = useRef<HTMLParagraphElement>(null), permissionRef = useRef<HTMLParagraphElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null), focusOwner = useRef<Element | null>(null);
   const recoverFocus = useRef(false);
   useEffect(() => {
+    const moved = (event: FocusEvent) => {
+      if (focusOwner.current && event.target !== focusOwner.current && event.target !== document.body) focusOwner.current = null;
+    };
+    document.addEventListener("focusin",moved);
+    return () => document.removeEventListener("focusin",moved);
+  }, []);
+  function beginFocusRecovery() {
+    focusOwner.current = containerRef.current?.contains(document.activeElement) ? document.activeElement : null;
+  }
+  useEffect(() => {
     if (!recoverFocus.current) return;
-    if (!view && !error) { headingRef.current?.focus(); return; }
+    if (!focusOwner.current) { recoverFocus.current = false; return; }
+    if (!view && !error) { focusOwner.current = headingRef.current; headingRef.current?.focus(); return; }
     recoverFocus.current = false;
-    (error ? errorRef.current : readOnly || !view?.canManage ? permissionRef.current : noticeRef.current ?? headingRef.current)?.focus();
+    const target = error ? errorRef.current : readOnly || !view?.canManage ? permissionRef.current : noticeRef.current ?? headingRef.current;
+    focusOwner.current = target; target?.focus(); focusOwner.current = null;
   }, [view,error,readOnly,attempt]);
   useEffect(() => {
     const controller = new AbortController();
@@ -48,6 +61,7 @@ function ScopedSystemVersionManagement({ workspaceId, systemId, versionId, readO
   async function save(change: Record<string, unknown>) {
     if (!view || readOnly || !view.canManage || inFlight.current) return;
     pending.current ??= JSON.stringify({ workspaceId, systemId, versionId, rowRevision: view.rowRevision, ...change });
+    beginFocusRecovery();
     inFlight.current = true; setBusy(true); setError(""); setNotice("");
     try {
       const response = await request("/api/workspace/versions/manage", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: pending.current });
@@ -68,11 +82,11 @@ function ScopedSystemVersionManagement({ workspaceId, systemId, versionId, readO
     finally { inFlight.current = false; setBusy(false); }
   }
   const locked = busy || Boolean(pending.current);
-  return <div className="space-y-4 text-sm">
+  return <div ref={containerRef} className="space-y-4 text-sm">
     <h3 ref={headingRef} tabIndex={-1} className="font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">Version draft</h3>
     {!view && !error ? <p role="status">Reading the Version’s draft…</p> : null}
     {error ? <p ref={errorRef} tabIndex={-1} role="alert" className="text-critical focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">{error}</p> : null}
-    {error ? <Button size="sm" variant="secondary" disabled={busy} onClick={() => { recoverFocus.current = true; pending.current = null; setView(null); setError(""); setNativeConflict(null); setNativeChoices({}); setAttempt(previous => previous + 1); }}>Reload the draft</Button> : null}
+    {error ? <Button size="sm" variant="secondary" disabled={busy} onClick={() => { beginFocusRecovery(); recoverFocus.current = true; pending.current = null; setView(null); setError(""); setNativeConflict(null); setNativeChoices({}); setAttempt(previous => previous + 1); }}>Reload the draft</Button> : null}
     {notice ? <p ref={noticeRef} tabIndex={-1} role="status" className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">{notice}</p> : null}
     {nativeConflict ? <div className="space-y-3"><p>Local work overlaps this source update.</p>{nativeConflict.conflicts.map(c=><div key={c.path}><p className="break-words">{c.path}: local {JSON.stringify(c.local)} · source {JSON.stringify(c.source)}</p><SelectInput label={`Keep which ${c.path}?`} disabled={locked || readOnly || !view?.canManage} value={nativeChoices[c.path]??""} options={[{value:"",label:"Choose what to keep"},{value:"local",label:"Keep local"},{value:"source",label:"Use source"}]} onChange={e=>setNativeChoices(current=>({...current,[c.path]:e.target.value as "local"|"source"}))}/></div>)}<Button size="sm" disabled={locked || readOnly || !view?.canManage || nativeConflict.conflicts.some(c=>!nativeChoices[c.path])} onClick={()=>void save({action:"prepare_release",nativeResolutions:nativeConflict.conflicts.map(c=>({path:c.path,choice:nativeChoices[c.path]}))})}>Stage the chosen native draft</Button></div>:null}{nativeReview ? <a className="inline-flex min-h-11 items-center text-brand underline" href={nativeReview}>Review in this business’s Needs you</a> : null}
     {view ? <>{view.nativeRuntime ? <p role="status">Native {view.nativeRuntime.kind==="website_section"?"website":"inquiry"}: {view.nativeRuntime.status==="verified"?"accepted publication verified":view.nativeRuntime.status==="unverified"?"current publication needs verification":"draft awaiting native review"}.</p> : null}<details><summary className="cursor-pointer text-gray-muted">Working definition and local changes</summary><pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify(view.workingDefinition, null, 2)}</pre><p className="mt-2 text-gray-muted">Local changes: {view.overrides.map(item => item.path === "*" ? "Restored release" : item.path).join(", ") || "None"}</p><p className="text-gray-muted">Accounts: {view.bindings.map(item => item.kind).join(", ") || "None"}</p></details>

@@ -18,6 +18,25 @@ async function render(request: typeof fetch, readOnly = false) {
 function prepare(node: HTMLElement) { return [...node.querySelectorAll("button")].find(button => button.textContent === "Prepare this draft for release")!; }
 describe("Version draft management acknowledgment", () => {
   it.each([
+    ["write", false], ["write", true], ["refresh", false], ["refresh", true],
+  ] as const)("preserves deliberate outside focus when the pending %s finishes with refusal=%s", async (phase, refused) => {
+    let reads = 0; let finish!: (response: Response) => void;
+    const request = vi.fn<typeof fetch>(async (_input,init) => {
+      if (init?.method === "POST") return phase === "write" ? new Promise<Response>(resolve => { finish = resolve; }) : Response.json({ outcome: "prepared", rowRevision: 3, receipt: null });
+      if (++reads === 1 || phase === "write") return Response.json(view);
+      return new Promise<Response>(resolve => { finish = resolve; });
+    });
+    const node = await render(request); const outside = document.createElement("button"); outside.textContent = "Other System"; document.body.append(outside);
+    prepare(node).focus(); await act(async () => prepare(node).click());
+    if (phase === "refresh") { expect(document.activeElement?.textContent).toBe("Version draft"); expect(prepare(node)).toBeUndefined(); }
+    outside.focus();
+    await act(async () => finish(refused ? Response.json({ error: "Current request is unavailable" }, { status: 503 }) : Response.json(phase === "write" ? { outcome: "prepared", rowRevision: 3, receipt: null } : view)));
+    expect(document.activeElement).toBe(outside);
+    if (refused) expect(node.querySelector('[role="alert"]')?.textContent).toContain("unavailable");
+    if (phase === "refresh" && refused) expect(prepare(node)).toBeUndefined();
+    expect(request.mock.calls.filter(([,init]) => init?.method === "POST")).toHaveLength(1);
+  });
+  it.each([
     ["Save local value", "override"], ["Bind account", "bind"], ["Restore into draft", "restore"],
   ])("recovers focus after %s without keeping the old controls during refresh", async (label, action) => {
     const connectionId = crypto.randomUUID();

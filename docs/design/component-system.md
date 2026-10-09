@@ -75,6 +75,9 @@ write or uncertain acknowledgment. A user-triggered refresh moves keyboard focus
 to its mounted Version draft heading, then the saved result or current permission
 reason when the read completes. Write/read refusal focuses its retained error;
 explicit reload uses the same heading handoff. Initial reads do not take focus.
+Recovery owns focus only while the user stays on its initiating control or
+recovery heading. Moving to another control cancels the handoff, including before
+a delayed write response, so background success or refusal preserves navigation.
 `SystemVersionImprovements` lets the exact
 Version's admitted manager prepare a native draft for review, while owner
 authority remains necessary to approve publication. Conflict choices respect
