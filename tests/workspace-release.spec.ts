@@ -789,7 +789,7 @@ test("keeps delegated customer work read-only while customer-owned work retains 
   await expect(page.getByRole("button", { name: "Retry assessment" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Sharing & access", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Customer work shared read-only." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Client work shared read-only." })).toBeVisible();
   await expect(page.getByRole("button", { name: "Create private handoff" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Revoke/ })).toHaveCount(0);
   await expect(page.getByText("You own this workspace.")).toHaveCount(0);
