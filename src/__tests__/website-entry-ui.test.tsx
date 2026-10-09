@@ -8,7 +8,7 @@ import { managedSiteNavigation, websiteEntryPath } from "@/experience/websites/s
 import { WorkspaceSitePreview } from "@/experience/websites/WorkspaceSitePreview";
 import { WebsiteCutoverUndo, WebsiteDomainRequest } from "@/experience/websites/WebsiteRecoveryControls";
 import { fixtureRebuild } from "@/experience/websites/rebuild-fixture";
-import type { RebuildTransport } from "@/experience/websites/rebuild-transport";
+import { RebuildUnconfirmedError, type RebuildTransport, type RebuildView } from "@/experience/websites/rebuild-transport";
 import { requestDraftKey, writeRequestDraft, readRequestDraft } from "@/experience/workspace/request-draft";
 import { workspaceReturnTarget } from "@/platform/workspaces/location";
 
@@ -125,4 +125,184 @@ it("carries the same-tab business request into canonical website intake without 
   expect(node.textContent).not.toContain("Another actor's private request.");
   expect(readRequestDraft(window.sessionStorage, key)).toBe("Make a website for our second office.");
   window.sessionStorage.removeItem(key); window.sessionStorage.removeItem(foreign);
+});
+
+
+describe("saved website navigation reflects current records", () => {
+  function current(status: RebuildView["status"], revision = 18, workId = fixtureRebuild().workId): RebuildView {
+    return { ...fixtureRebuild(), workspaceId: WS, workId, title: "Fictional bakery", status, revision, approved: status === "approved" || status === "published" };
+  }
+  const selectedLabel = () => node.querySelector("select")!.selectedOptions[0]!.textContent;
+  const props = (transport: RebuildTransport, record: RebuildView) => ({ workspaceId: WS, connectedEnabled: false, rebuildEnabled: true, path: "rebuild" as const, canManage: true, initialWorkId: record.workId, rebuilds: [record], transport });
+  function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(yes => { resolve = yes; }); return { promise, resolve }; }
+
+  it("updates the stale building label from the current ready-for-review read without navigating or moving focus", async () => {
+    const old = current("building", 0); const loaded = current("review"); const pending = deferred<RebuildView>();
+    const read = vi.fn(() => pending.promise); const transport: RebuildTransport = { read, start: vi.fn(), mutate: vi.fn() };
+    await mount(createElement(WebsiteEntry, props(transport, old)));
+    const select = node.querySelector("select")!; select.focus(); const href = window.location.href;
+    const replace = vi.spyOn(window.history, "replaceState");
+    await act(async () => pending.resolve(loaded));
+    expect(selectedLabel()).toBe("Fictional bakery · review");
+    expect(read).toHaveBeenCalledWith(WS, old.workId, expect.any(AbortSignal)); expect(read).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(select); expect(window.location.href).toBe(href); expect(replace).not.toHaveBeenCalled(); replace.mockRestore();
+  });
+
+  it("keeps actual published work published rather than inferring draft state from its private preview", async () => {
+    const old = current("building", 0); const published = current("published", 24);
+    const transport: RebuildTransport = { read: vi.fn(async () => published), start: vi.fn(), mutate: vi.fn() };
+    await mount(createElement(WebsiteEntry, props(transport, old)));
+    expect(selectedLabel()).toBe("Fictional bakery · published");
+    expect(node.textContent).toContain("This revision has been published.");
+  });
+
+  it("retains the acknowledged creation view when navigation remounts before a failed saved-state read", async () => {
+    const created = current("review", 18);
+    const start = vi.fn(async () => created); const read = vi.fn(async () => { throw new Error("The saved website could not be read."); });
+    const transport: RebuildTransport = { start, read, mutate: vi.fn() };
+    await mount(createElement(WebsiteEntry, { workspaceId: WS, connectedEnabled: false, rebuildEnabled: true, path: "rebuild", canManage: true, transport }));
+    await input(node.querySelector("input")!, "https://fictional.example.test");
+    await act(async () => node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    expect(start).toHaveBeenCalledTimes(1); expect(read).toHaveBeenCalledWith(WS, created.workId, expect.any(AbortSignal));
+    expect(selectedLabel()).toBe("Fictional bakery · review"); expect(node.querySelector("select")!.value).toBe(created.workId); expect(node.querySelector('[role="alert"]')?.textContent).toContain("could not be read");
+    expect(node.querySelector("select")!.options).toHaveLength(2);
+  });
+
+  it("updates the option after a saved decision without adding navigation or resetting the selected control", async () => {
+    const old = current("review", 18); const next = { ...current("review", 19), title: "Corrected fictional bakery" };
+    const mutate = vi.fn(async () => next); const transport: RebuildTransport = { read: vi.fn(async () => old), start: vi.fn(), mutate };
+    await mount(createElement(WebsiteEntry, props(transport, old)));
+    const select = node.querySelector("select")!; select.focus(); const replace = vi.spyOn(window.history, "replaceState");
+    await act(async () => button("Confirm").click());
+    expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: WS, workId: old.workId, revision: 18 }), "confirm", expect.objectContaining({ factId: expect.any(String) }));
+    expect(selectedLabel()).toBe("Corrected fictional bakery · review"); expect(node.querySelector("select")).toBe(select); expect(document.activeElement).toBe(select);
+    expect(replace).toHaveBeenCalledTimes(1); replace.mockRestore();
+  });
+
+  it("updates from the explicit current-state recovery read and never derives approval from the failed mutation", async () => {
+    const old = current("review", 18); const approved = current("approved", 20);
+    const read = vi.fn().mockResolvedValueOnce(old).mockResolvedValueOnce(approved);
+    const mutate = vi.fn(async () => { throw new RebuildUnconfirmedError(); });
+    const transport: RebuildTransport = { read, start: vi.fn(), mutate };
+    await mount(createElement(WebsiteEntry, props(transport, old)));
+    await act(async () => button("Confirm").click()); expect(selectedLabel()).toBe("Fictional bakery · review");
+    const replace = vi.spyOn(window.history, "replaceState");
+    await act(async () => button("Reload current state").click());
+    expect(selectedLabel()).toBe("Fictional bakery · approved"); expect(read).toHaveBeenLastCalledWith(WS, old.workId); expect(mutate).toHaveBeenCalledTimes(1); expect(replace).not.toHaveBeenCalled(); replace.mockRestore();
+  });
+
+  it("does not roll the saved option backward when an older view arrives", async () => {
+    const saved = current("published", 24); const old = current("review", 18);
+    const transport: RebuildTransport = { read: vi.fn(async () => old), start: vi.fn(), mutate: vi.fn() };
+    await mount(createElement(WebsiteEntry, props(transport, saved)));
+    expect(selectedLabel()).toBe("Fictional bakery · published");
+    expect(node.querySelector('[role="alert"]')?.textContent).toContain("The current saved website could not be confirmed");
+    expect(node.textContent).not.toContain("Resolve the flagged facts before approving.");
+  });
+
+  it("can explicitly retry a refused lower initial read and adopt a newer current private revision", async () => {
+    const saved = current("published", 24); const newer = current("review", 25);
+    const read = vi.fn().mockResolvedValueOnce(current("review", 18)).mockResolvedValueOnce(newer);
+    const transport: RebuildTransport = { read, start: vi.fn(), mutate: vi.fn() };
+    await mount(createElement(WebsiteEntry, props(transport, saved)));
+    expect(node.querySelector('[role="alert"]')?.textContent).toContain("could not be confirmed");
+    const select = node.querySelector("select")!; select.focus(); const replace = vi.spyOn(window.history, "replaceState");
+    await act(async () => button("Try loading again").click());
+    expect(selectedLabel()).toBe("Fictional bakery · review"); expect(node.querySelector('[role="alert"]')).toBeNull();
+    expect(node.textContent).toContain("Resolve the flagged facts before approving."); expect(read).toHaveBeenCalledTimes(2); expect(document.activeElement).toBe(select); expect(replace).not.toHaveBeenCalled(); replace.mockRestore();
+  });
+
+  it("refuses a lower progress view before adoption and continues to a newer current read", async () => {
+    vi.useFakeTimers();
+    try {
+      const building = { ...current("building", 1), candidate: null };
+      const newerBuilding = { ...building, revision: 3, title: "Current build title" };
+      const read = vi.fn().mockResolvedValueOnce(building).mockResolvedValueOnce(newerBuilding).mockResolvedValueOnce({ ...building, revision: 2, title: "Stale build title" }).mockResolvedValueOnce(current("review", 4));
+      const transport: RebuildTransport = { read, start: vi.fn(), mutate: vi.fn() };
+      await mount(createElement(WebsiteEntry, props(transport, building)));
+      await act(async () => vi.advanceTimersByTimeAsync(2500));
+      expect(selectedLabel()).toBe("Current build title · building");
+      await act(async () => vi.advanceTimersByTimeAsync(2500));
+      expect(node.querySelector('[role="alert"]')?.textContent).toContain("could not be confirmed");
+      expect(selectedLabel()).toBe("Current build title · building"); expect(node.textContent).not.toContain("Stale build title");
+      await act(async () => vi.advanceTimersByTimeAsync(2500));
+      expect(selectedLabel()).toBe("Fictional bakery · review"); expect(node.querySelector('[role="alert"]')).toBeNull(); expect(read).toHaveBeenCalledTimes(4);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("refuses a foreign progress view without raising the known revision for the selected work", async () => {
+    vi.useFakeTimers();
+    try {
+      const building = { ...current("building", 1), candidate: null };
+      const foreign = { ...current("review", 99, "55555555-5555-4555-8555-555555555555"), title: "Foreign progress title" };
+      const read = vi.fn().mockResolvedValueOnce(building).mockResolvedValueOnce(foreign).mockResolvedValueOnce(current("review", 2));
+      const transport: RebuildTransport = { read, start: vi.fn(), mutate: vi.fn() };
+      await mount(createElement(WebsiteEntry, props(transport, building)));
+      await act(async () => vi.advanceTimersByTimeAsync(2500));
+      expect(node.querySelector('[role="alert"]')?.textContent).toContain("could not be confirmed"); expect(node.textContent).not.toContain("Foreign progress title"); expect(selectedLabel()).toBe("Fictional bakery · building");
+      await act(async () => vi.advanceTimersByTimeAsync(2500));
+      expect(selectedLabel()).toBe("Fictional bakery · review"); expect(node.querySelector('[role="alert"]')).toBeNull(); expect(read).toHaveBeenCalledTimes(3);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("keeps the entered correction, write lock and outside focus when current recovery returns a lower revision", async () => {
+    const old = current("review", 18); const read = vi.fn().mockResolvedValueOnce(old).mockResolvedValueOnce(current("review", 17)).mockResolvedValueOnce(current("review", 19));
+    const mutate = vi.fn(async () => { throw new RebuildUnconfirmedError(); }); const transport: RebuildTransport = { read, start: vi.fn(), mutate };
+    await mount(createElement(WebsiteEntry, props(transport, old)));
+    await act(async () => button("Edit").click()); const field = node.querySelector("textarea")!;
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(field, "Retained fictional correction"); field.dispatchEvent(new Event("input", { bubbles: true })); });
+    await act(async () => button("Save correction").click());
+    const select = node.querySelector("select")!; select.focus();
+    await act(async () => button("Reload current state").click());
+    expect(field.value).toBe("Retained fictional correction"); expect(node.querySelector("textarea")).toBe(field); expect(field.disabled).toBe(true);
+    expect(button("Save correction").disabled).toBe(true); expect(node.querySelector('[role="alert"]')?.textContent).toContain("could not be loaded"); expect(document.activeElement).toBe(select); expect(mutate).toHaveBeenCalledTimes(1);
+    await act(async () => button("Reload current state").click());
+    expect(node.querySelector('[role="alert"]')).toBeNull(); expect(node.textContent).toContain("Saved state refreshed"); expect(document.activeElement).toBe(select); expect(mutate).toHaveBeenCalledTimes(1);
+  });
+
+  it("withholds a lower saved-mutation view and offers an exact current read instead of relabeling or navigating", async () => {
+    const old = current("review", 18); const read = vi.fn().mockResolvedValueOnce(old).mockResolvedValueOnce(current("approved", 20));
+    const mutate = vi.fn(async () => ({ ...current("review", 17), title: "Stale saved result" })); const transport: RebuildTransport = { read, start: vi.fn(), mutate };
+    await mount(createElement(WebsiteEntry, props(transport, old))); const replace = vi.spyOn(window.history, "replaceState");
+    await act(async () => button("Confirm").click());
+    expect(selectedLabel()).toBe("Fictional bakery · review"); expect(node.textContent).not.toContain("Stale saved result"); expect(button("Reload current state")).toBeDefined(); expect(replace).not.toHaveBeenCalled();
+    await act(async () => button("Reload current state").click());
+    expect(selectedLabel()).toBe("Fictional bakery · approved"); expect(mutate).toHaveBeenCalledTimes(1); expect(replace).not.toHaveBeenCalled(); replace.mockRestore();
+  });
+
+  it("ignores old work reads through A to B to A selection generations", async () => {
+    const a = current("building", 0); const b = { ...current("building", 0, "55555555-5555-4555-8555-555555555555"), title: "Second fictional bakery" };
+    const oldA = deferred<RebuildView>(); const oldB = deferred<RebuildView>(); const freshA = deferred<RebuildView>();
+    const read = vi.fn().mockImplementationOnce(() => oldA.promise).mockImplementationOnce(() => oldB.promise).mockImplementationOnce(() => freshA.promise);
+    const transport: RebuildTransport = { read, start: vi.fn(), mutate: vi.fn() };
+    await mount(createElement(WebsiteEntry, { ...props(transport, a), rebuilds: [a, b] }));
+    const select = node.querySelector("select")!;
+    await act(async () => { select.value = b.workId; select.dispatchEvent(new Event("change", { bubbles: true })); });
+    await act(async () => { select.value = a.workId; select.dispatchEvent(new Event("change", { bubbles: true })); });
+    await act(async () => freshA.resolve(current("published", 24)));
+    await act(async () => { oldA.resolve({ ...current("review", 30), title: "Stale first selection" }); oldB.resolve({ ...b, status: "approved", revision: 50 }); });
+    expect(read.mock.calls[0]![2].aborted).toBe(true); expect(read.mock.calls[1]![2].aborted).toBe(true);
+    expect(select.value).toBe(a.workId); expect(selectedLabel()).toBe("Fictional bakery · published"); expect([...select.options].some(option => option.textContent?.includes("Stale first selection"))).toBe(false);
+  });
+
+  it("resets its option scope for another workspace and ignores the old pending read", async () => {
+    const old = current("building", 0); const pending = deferred<RebuildView>(); const otherWorkspace = "22222222-2222-4222-8222-222222222222";
+    const next = { ...current("published", 24), workspaceId: otherWorkspace, title: "Another workspace website" };
+    const read = vi.fn().mockImplementationOnce(() => pending.promise).mockResolvedValueOnce(next);
+    const transport: RebuildTransport = { read, start: vi.fn(), mutate: vi.fn() };
+    await mount(createElement(WebsiteEntry, props(transport, old)));
+    await act(async () => root!.render(createElement(WebsiteEntry, { ...props(transport, next), workspaceId: otherWorkspace })));
+    await act(async () => pending.resolve({ ...current("review", 100), title: "Prior workspace title" }));
+    expect(selectedLabel()).toBe("Another workspace website · published"); expect(node.textContent).not.toContain("Prior workspace title"); expect(read.mock.calls[0]![2].aborted).toBe(true);
+  });
+
+  it.each(["workspace", "work"] as const)("does not adopt a current view for a foreign %s into navigation", async kind => {
+    const old = current("building", 0); const foreign = { ...current("review", 20), ...(kind === "workspace" ? { workspaceId: "22222222-2222-4222-8222-222222222222" } : { workId: "55555555-5555-4555-8555-555555555555" }), title: "Unrelated title" };
+    const transport: RebuildTransport = { read: vi.fn(async () => foreign), start: vi.fn(), mutate: vi.fn() };
+    await mount(createElement(WebsiteEntry, props(transport, old)));
+    expect(selectedLabel()).toBe("Fictional bakery · building"); expect([...node.querySelector("select")!.options].some(option => option.textContent?.includes("Unrelated title"))).toBe(false);
+    expect(node.querySelector('[role="alert"]')?.textContent).toContain("The current saved website could not be confirmed");
+    expect(node.textContent).not.toContain("Unrelated title");
+  });
+
 });

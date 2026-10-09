@@ -1228,7 +1228,30 @@ composition is reused, with semantic sections and actual System links.
 from the selected business's active seats. No platform designation orders or
 selects a provider. Historical requests remain inspectable; platform support is
 separate. `WebsiteEntry` keeps the owned SelectInput and intake controls, and reads
-same-tab actor/business draft text without deleting it. Source/UI contract tests
+same-tab actor/business draft text without deleting it. Its saved-work selector reports the latest accepted
+rebuild view's title and lifecycle status, including initial/progress reads, saved
+changes and explicit current-state recovery. The optional `RebuildExperience`
+`onCurrentRecord` callback reports accepted views separately from the existing
+work-ID-only `onSaved` navigation callback. Creation reports its known view before
+navigation remounts; subsequent reporting never navigates, moves focus or clears
+review drafts. Workspace/work selection generations reject obsolete reports,
+and the optional exact-work `minimumRecordRevision` protects both the displayed
+record and its option metadata. Foreign or lower initial/progress/recovery views
+are refused before adoption, and acknowledged mutations advance the known work
+minimum. A refused saved-mutation view retains uncertainty and exact current-read
+recovery. Failed recovery preserves existing drafts, locks and focus; a newer
+valid read can recover. Automatic progress/domain reads own only their respective read errors. A
+successful background read clears that owned poll error, preserving command,
+validation and failed-current-recovery errors and their explicit read action.
+While a mutation or explicit recovery read is pending, or a write remains
+unconfirmed, automatic progress/domain reads continue without adopting a new
+view or option metadata. Acknowledged mutation adoption and the explicit exact
+current-state read remain available to reconcile the initiated view; background
+reads never replace its frozen draft. Other consumers that omit this optional
+guard retain their existing adoption/polling contract. Work revisions remain separate from candidate
+revisions, approval and publication. A private-preview
+heading does not override a current published work status or imply withdrawal.
+These component checks do not establish browser, native authority or delivery proof. Source/UI contract tests
 are local proof; rendered desktop/mobile, native authority and combined release
 checks remain pending the coordinated verification window.
 

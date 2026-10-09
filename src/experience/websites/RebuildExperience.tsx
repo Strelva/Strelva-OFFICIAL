@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Check, CircleAlert, ExternalLink, Globe, Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { TextArea, TextInput, SelectInput } from "@/components/ui/TextInput";
@@ -30,6 +30,10 @@ export interface RebuildExperienceProps {
   initialRecord?: RebuildView;
   transport?: RebuildTransport;
   onSaved?: (workId: string) => void;
+  /** Current accepted view, including reads; reporting does not navigate or grant authority. */
+  onCurrentRecord?: (record: RebuildView) => void;
+  /** Known work revision for this exact entry; candidate revisions are independent. */
+  minimumRecordRevision?: number;
 }
 export function flaggedFacts(record: RebuildView) {
   return Object.entries(record.candidate?.facts ?? {}).filter(([, fact]) => fact.origin !== "owner_confirmed" && (fact.highRisk || !fact.verification?.supported));
@@ -98,8 +102,25 @@ function WebsiteFactEditor({ text, origin, disabled, onSave, onRemove }: {
 export function RebuildExperience(props: RebuildExperienceProps) {
   return <ScopedRebuildExperience key={`${props.workspaceId}:${props.workId ?? props.initialRecord?.workId ?? "new"}`} {...props} />;
 }
-function ScopedRebuildExperience({ workspaceId, workId, readOnly = false, managed = false, allowIntake = false, operator = false, canPublish = false, agency = false, initialRequest = "", initialRecord, transport = serverRebuildTransport, onSaved }: RebuildExperienceProps) {
+function ScopedRebuildExperience({ workspaceId, workId, readOnly = false, managed = false, allowIntake = false, operator = false, canPublish = false, agency = false, initialRequest = "", initialRecord, transport = serverRebuildTransport, onSaved, onCurrentRecord, minimumRecordRevision }: RebuildExperienceProps) {
   const [record, setRecord] = useState<RebuildView | null>(initialRecord ?? null);
+  const acceptedRecord = useRef(initialRecord ?? null);
+  const guardedCurrentRecords = minimumRecordRevision !== undefined;
+  const knownMinimum = useRef(minimumRecordRevision ?? -1);
+  useEffect(() => { knownMinimum.current = Math.max(knownMinimum.current, minimumRecordRevision ?? -1); }, [minimumRecordRevision]);
+  const setCurrentRecord = useCallback((next: RebuildView, mutation = false) => {
+    if (guardedCurrentRecords) {
+      const expectedWorkId = workId ?? acceptedRecord.current?.workId;
+      const minimum = Math.max(knownMinimum.current, acceptedRecord.current?.revision ?? -1);
+      if (next.workspaceId !== workspaceId || (expectedWorkId && next.workId !== expectedWorkId) || next.revision < minimum) {
+        if (mutation) throw new RebuildUnconfirmedError("The current saved website could not be confirmed.");
+        throw new Error("The current saved website could not be confirmed. Reload again to check it.");
+      }
+      acceptedRecord.current = next;
+    }
+    setRecord(next);
+  }, [guardedCurrentRecords, workspaceId, workId]);
+
   const connectionOwner = useRef({ workspaceId, workId: record?.workId });
   connectionOwner.current = { workspaceId, workId: record?.workId };
   const [loading, setLoading] = useState(Boolean(workId && !initialRecord));
@@ -112,7 +133,17 @@ function ScopedRebuildExperience({ workspaceId, workId, readOnly = false, manage
   const cutoverRestored = useRef<WebsiteCutoverUndoReceipt | null>(null);
   const [restoredReceipt, setRestoredReceipt] = useState<WebsiteCutoverUndoReceipt | null>(null);
   const inFlight = useRef(false);
-  const [error, setError] = useState("");
+  type ErrorSource = "action" | "progress-read" | "domain-read";
+  const [errorState, setErrorState] = useState<{ message: string; source: ErrorSource }>({ message: "", source: "action" });
+  const error = errorState.message;
+  const setError = useCallback((message: string) => setErrorState({ message, source: "action" }), []);
+  const reportPollError = useCallback((source: ErrorSource, message: string) => {
+    if (!guardedCurrentRecords) { setError(message); return; }
+    setErrorState(current => current.message && current.source !== source ? current : { message, source });
+  }, [guardedCurrentRecords, setError]);
+  const clearPollError = useCallback((source: ErrorSource) => {
+    setErrorState(current => current.source === source ? { message: "", source: "action" } : current);
+  }, []);
   const [needsReload, setNeedsReload] = useState(false);
   const [connectionReadRevision, setConnectionReadRevision] = useState(0);
   const unresolved = useRef(false);
@@ -162,24 +193,27 @@ function ScopedRebuildExperience({ workspaceId, workId, readOnly = false, manage
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; connectionFocus.current?.cancel(); decisionFocus.current?.cancel(); removedContactFocus.current?.cancel(); reloadFocus.current?.cancel(); }; }, []);
   useEffect(() => {
+    if (record && record.workspaceId === workspaceId && (!workId || record.workId === workId)) onCurrentRecord?.(record);
+  }, [record, workspaceId, workId, onCurrentRecord]);
+  useEffect(() => {
     if (!workId || initialRecord) return;
     const controller = new AbortController();
     setLoading(true);
-    transport.read(workspaceId, workId, controller.signal).then(next => { if (!controller.signal.aborted) { setRecord(next); setError(""); } }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "This website could not be loaded."); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    transport.read(workspaceId, workId, controller.signal).then(next => { if (!controller.signal.aborted) { setCurrentRecord(next); setError(""); } }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "This website could not be loaded."); }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [attempt, initialRecord, transport, workId, workspaceId]);
+  }, [attempt, initialRecord, transport, workId, workspaceId, setCurrentRecord, setError]);
   useEffect(() => {
     if (!record || record.status !== "building") return;
     const controller = new AbortController();
-    const timer = setInterval(() => { transport.read(workspaceId, record.workId, controller.signal).then(next => { if (!controller.signal.aborted) setRecord(next); }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Progress could not be refreshed."); }); }, 2500);
+    const timer = setInterval(() => { transport.read(workspaceId, record.workId, controller.signal).then(next => { if (!controller.signal.aborted) { if (!guardedCurrentRecords || (!inFlight.current && !unresolved.current)) setCurrentRecord(next); if (guardedCurrentRecords) clearPollError("progress-read"); } }).catch(cause => { if (!controller.signal.aborted) reportPollError("progress-read", cause instanceof Error ? cause.message : "Progress could not be refreshed."); }); }, 2500);
     return () => { clearInterval(timer); controller.abort(); };
-  }, [record, transport, workspaceId]);
+  }, [record, transport, workspaceId, setCurrentRecord, guardedCurrentRecords, clearPollError, reportPollError]);
   useEffect(() => {
     if (!record || !record.publishedUrl || !record.domain || record.domain.status === "verified") return;
     const controller = new AbortController();
-    const timer = setInterval(() => { transport.read(workspaceId, record.workId, controller.signal).then(next => { if (!controller.signal.aborted) setRecord(next); }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Domain status could not be refreshed."); }); }, 60000);
+    const timer = setInterval(() => { transport.read(workspaceId, record.workId, controller.signal).then(next => { if (!controller.signal.aborted) { if (!guardedCurrentRecords || (!inFlight.current && !unresolved.current)) setCurrentRecord(next); if (guardedCurrentRecords) clearPollError("domain-read"); } }).catch(cause => { if (!controller.signal.aborted) reportPollError("domain-read", cause instanceof Error ? cause.message : "Domain status could not be refreshed."); }); }, 60000);
     return () => { clearInterval(timer); controller.abort(); };
-  }, [record, transport, workspaceId]);
+  }, [record, transport, workspaceId, setCurrentRecord, guardedCurrentRecords, clearPollError, reportPollError]);
   useEffect(() => {
     const renderedHash = previewRef.current?.contentDocument?.querySelector('meta[name="strelva-site-hash"]')?.getAttribute("content");
     const loaded = Boolean(renderedHash);
@@ -199,7 +233,7 @@ function ScopedRebuildExperience({ workspaceId, workId, readOnly = false, manage
     setBusy(true); setError(""); setNotice("");
     try {
       const next = await operation();
-      if (mounted.current && sameScope(scope)) { recovery.cancel(); if (publishes && next.status === "published") { cutoverRestored.current = null; setRestoredReceipt(null); } setRecord(next); setNotice(success); setEditing(null); onSaved?.(next.workId); return true; }
+      if (mounted.current && sameScope(scope)) { recovery.cancel(); if (publishes && next.status === "published") { cutoverRestored.current = null; setRestoredReceipt(null); } setCurrentRecord(next, true); setNotice(success); setEditing(null); onCurrentRecord?.(next); onSaved?.(next.workId); return true; }
       if (record && mounted.current && sameWorkScope(scope)) { requireReload(true); setError("Access changed while saving. Reload the current saved state before continuing."); reloadFocus.current?.cancel(); reloadFocus.current = recovery; }
       else recovery.cancel();
       return false;
@@ -226,7 +260,7 @@ function ScopedRebuildExperience({ workspaceId, workId, readOnly = false, manage
     try {
       const next = await transport.read(work.workspaceId, work.workId);
       if (next.workspaceId !== work.workspaceId || next.workId !== work.workId) throw new Error("The current saved website could not be confirmed. Reload again to check it.");
-      if (mounted.current && sameScope(scope)) { setRecord(next); setConnectionReadRevision(value => value + 1); requireReload(false); if (cutoverRestored.current) { cutoverBlockedRef.current = false; setCutoverBlocked(false); } setError(""); setEditing(null); setNotice(domainRequestBlockedRef.current ? "The saved website was refreshed. The domain request still needs its exact saved request checked." : cutoverBlockedRef.current ? "The saved website was refreshed. The routing undo still needs its exact command receipt." : cutoverRestored.current ? "Saved preview and history refreshed. The previous website remains restored." : "Saved state refreshed. Review the current preview before continuing."); }
+      if (mounted.current && sameScope(scope)) { setCurrentRecord(next); setConnectionReadRevision(value => value + 1); requireReload(false); if (cutoverRestored.current) { cutoverBlockedRef.current = false; setCutoverBlocked(false); } setError(""); setEditing(null); setNotice(domainRequestBlockedRef.current ? "The saved website was refreshed. The domain request still needs its exact saved request checked." : cutoverBlockedRef.current ? "The saved website was refreshed. The routing undo still needs its exact command receipt." : cutoverRestored.current ? "Saved preview and history refreshed. The previous website remains restored." : "Saved state refreshed. Review the current preview before continuing."); }
     } catch {
       if (mounted.current && sameScope(scope)) setError("The current saved website could not be loaded. Reload again to check what was saved.");
     } finally {
@@ -349,7 +383,7 @@ function ScopedRebuildExperience({ workspaceId, workId, readOnly = false, manage
             catch (cause) { recovery.cancel(); removedContactFocus.current = null; throw cause; }
           },"Contact removed in a new private preview. Review and approve it before publishing.") : undefined} />)}
         </details> : null}
-        {candidate && (canConnectForms || busy || needsReload) && transport === serverRebuildTransport ? <div hidden={!canConnectForms}><WebsiteConnectionSelector key={`${record.workId}:${record.revision}:${connectionReadRevision}`} headingRef={connectionHeadingRef} onFocusRecovery={recovery => { connectionFocus.current?.cancel(); connectionFocus.current = recovery; }} workspaceId={workspaceId} workId={record.workId} revision={record.revision} version={2} candidateRevision={candidate.revision} candidateContentHash={candidate.contentHash} selected={record.capabilitySelection} readOnly={readOnly || !canConnectForms} onUnconfirmed={recovery => { if (!mounted.current || connectionOwner.current.workspaceId !== workspaceId || connectionOwner.current.workId !== record.workId) { recovery?.cancel(); return; } requireReload(true); setNotice(""); setError("The visitor form change could not be confirmed. Reload the current saved website before continuing."); if (recovery) { reloadFocus.current?.cancel(); reloadFocus.current = recovery; } }} hasForms={candidate.hasForms} hosted canWrite={() => !cutoverBlockedRef.current && !domainRequestBlockedRef.current && !inFlight.current && !unresolved.current} disabled={disabled} onBusyChange={value => { if (!mounted.current || connectionOwner.current.workspaceId !== workspaceId || connectionOwner.current.workId !== record.workId) return; if (value) connectionAttemptScope.current = { ...currentScope.current }; inFlight.current = value; setBusy(value); }} onSaved={value => { if (!mounted.current || !connectionAttemptScope.current || !sameScope(connectionAttemptScope.current)) throw new Error("Access changed while saving visitor forms."); const next = parseRebuildView(value); setRecord(next); setNotice("Visitor forms saved in a new preview. Review and approve it before publishing."); onSaved?.(next.workId); }} /></div> : null}
+        {candidate && (canConnectForms || busy || needsReload) && transport === serverRebuildTransport ? <div hidden={!canConnectForms}><WebsiteConnectionSelector key={`${record.workId}:${record.revision}:${connectionReadRevision}`} headingRef={connectionHeadingRef} onFocusRecovery={recovery => { connectionFocus.current?.cancel(); connectionFocus.current = recovery; }} workspaceId={workspaceId} workId={record.workId} revision={record.revision} version={2} candidateRevision={candidate.revision} candidateContentHash={candidate.contentHash} selected={record.capabilitySelection} readOnly={readOnly || !canConnectForms} onUnconfirmed={recovery => { if (!mounted.current || connectionOwner.current.workspaceId !== workspaceId || connectionOwner.current.workId !== record.workId) { recovery?.cancel(); return; } requireReload(true); setNotice(""); setError("The visitor form change could not be confirmed. Reload the current saved website before continuing."); if (recovery) { reloadFocus.current?.cancel(); reloadFocus.current = recovery; } }} hasForms={candidate.hasForms} hosted canWrite={() => !cutoverBlockedRef.current && !domainRequestBlockedRef.current && !inFlight.current && !unresolved.current} disabled={disabled} onBusyChange={value => { if (!mounted.current || connectionOwner.current.workspaceId !== workspaceId || connectionOwner.current.workId !== record.workId) return; if (value) connectionAttemptScope.current = { ...currentScope.current }; inFlight.current = value; setBusy(value); }} onSaved={value => { if (!mounted.current || !connectionAttemptScope.current || !sameScope(connectionAttemptScope.current)) throw new Error("Access changed while saving visitor forms."); const next = parseRebuildView(value); setCurrentRecord(next, true); setNotice("Visitor forms saved in a new preview. Review and approve it before publishing."); onSaved?.(next.workId); }} /></div> : null}
         {record.audit ? <section className={styles.domain} aria-labelledby="rebuild-audit-heading"><h2 id="rebuild-audit-heading">Before and after</h2><p>HTML checks compare the original homepage with the planned rebuilt homepage. Checked {new Date(record.audit.checkedAt).toLocaleString()}.</p><div className={styles.records}><table><caption>HTML scores out of 100 · original → rebuilt</caption><thead><tr><th>Category</th><th>Scores</th><th aria-label="Change">+/−</th></tr></thead><tbody>{record.audit.after.categories.map(after => { const before = record.audit!.before.categories.find(item => item.slug === after.slug); const change = before ? after.score - before.score : null; return <tr key={after.slug}><th scope="row">{after.name}</th><td className="whitespace-nowrap">{before?.score ?? "Unavailable"} → {after.score}</td><td>{change === null ? "Unavailable" : change > 0 ? `+${change}` : change}</td></tr>; })}</tbody></table></div><div className="mt-4 space-y-3">{record.audit.after.categories.map(after => <details key={after.slug}><summary className="cursor-pointer py-2 text-sm text-warm-black">{after.name} · item by item</summary><ul className="mt-3 divide-y divide-gray-border">{after.checks.map((check, index) => { const before = record.audit!.before.categories.find(item => item.slug === after.slug)?.checks.find(item => item.name === check.name); return <li key={`${check.name}:${index}`} className="py-3 text-sm text-gray-muted"><strong className="text-warm-black">{check.name}</strong><p>{before?.status ?? "Not measured"} → {check.status}</p><p>{check.message}</p></li>; })}</ul></details>)}</div><p>These HTML results do not establish a complete live-site audit. Not measured here:</p><ul className="list-disc space-y-2 pl-5 text-sm text-gray-muted">{record.audit.unavailable.map(item => <li key={item}>{item}</li>)}</ul></section> : null}
         {operator && candidate ? <details className={styles.domain}><summary className="cursor-pointer py-2 text-base font-medium text-warm-black">All recorded fact checks</summary><p className={styles.meta}>Recorded confidence describes source support. It does not independently prove a claim.</p><ul className="mt-4 divide-y divide-gray-border">{Object.entries(candidate.facts).map(([id, fact]) => <li key={id} className="py-3 text-sm text-gray-muted"><p className="text-warm-black">{fact.text}</p><p>{fact.origin.replace(/_/g, " ")} · {fact.highRisk ? "Sensitive claim" : "Ordinary fact"} · {fact.verification ? `${fact.verification.supported ? "Source supported" : "Flagged"}, confidence ${fact.verification.confidence.toFixed(2)}` : "No verification recorded"}</p></li>)}</ul></details> : null}
         {record.history.length ? <section className={styles.domain} aria-labelledby="rebuild-history-heading"><h2 id="rebuild-history-heading">Revision history</h2><ol className="mt-4 divide-y divide-gray-border">{record.history.slice().reverse().map((entry, index) => <li key={`${entry.revision}:${entry.kind}:${index}`} className="py-3 text-sm text-gray-muted">Revision {entry.revision} · {entry.kind.replace(/_/g, " ")} · <time dateTime={entry.at}>{new Date(entry.at).toLocaleString()}</time></li>)}</ol></section> : null}

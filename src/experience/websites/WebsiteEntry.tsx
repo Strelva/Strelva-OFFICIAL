@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { SelectInput } from "@/components/ui/TextInput";
 import { ConnectSiteExperience, type ConnectableSite } from "@/experience/connected-sites/ConnectSiteExperience";
 import { RebuildExperience } from "./RebuildExperience";
@@ -11,21 +11,40 @@ import type { WebsiteEntryPath } from "./site-navigation";
 const noDraftSubscription = () => () => undefined;
 
 /** Both prepared entry paths stay available without selecting a launch default. */
-export function WebsiteEntry({ workspaceId, connectedEnabled, rebuildEnabled, path, canManage, operator = false, canPublish = false, sites = [], rebuilds = [], initialWorkId, actorEmail, agency = false, appBase = "", entryBase, transport }: {
-  workspaceId: string; connectedEnabled: boolean; rebuildEnabled: boolean; path: WebsiteEntryPath | null;
+type WebsiteEntryProps = { workspaceId: string; connectedEnabled: boolean; rebuildEnabled: boolean; path: WebsiteEntryPath | null;
   canManage: boolean; canPublish?: boolean; actorEmail?: string; agency?: boolean; operator?: boolean; sites?: ConnectableSite[]; rebuilds?: RebuildView[]; initialWorkId?: string;
   appBase?: string; entryBase?: string; transport?: RebuildTransport;
-}) {
+};
+export function WebsiteEntry(props: WebsiteEntryProps) {
+  return <ScopedWebsiteEntry key={props.workspaceId} {...props} />;
+}
+function ScopedWebsiteEntry({ workspaceId, connectedEnabled, rebuildEnabled, path, canManage, operator = false, canPublish = false, sites = [], rebuilds = [], initialWorkId, actorEmail, agency = false, appBase = "", entryBase, transport }: WebsiteEntryProps) {
   const requestDraft = useSyncExternalStore(noDraftSubscription, () => {
     if (!actorEmail) return "";
     try { return readRequestDraft(window.sessionStorage, requestDraftKey({ actorEmail, workspaceId })); }
     catch { return ""; }
   }, () => "");
-  const [workId, setWorkId] = useState(initialWorkId);
-  const [saved, setSaved] = useState(rebuilds.map(item => ({ workId: item.workId, title: item.title, status: item.status })));
+  const [selection, setSelection] = useState({ workId: initialWorkId, generation: 0 });
+  const { workId, generation } = selection;
+  const [saved, setSaved] = useState(rebuilds.map(item => ({ workId: item.workId, title: item.title, status: item.status, revision: item.revision })));
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const scope = useRef(selection);
+  const updateCurrentRecord = useCallback((record: RebuildView) => {
+    if (!mounted.current || scope.current.generation !== generation || record.workspaceId !== workspaceId || (workId && record.workId !== workId)) return;
+    setSaved(items => {
+      const current = items.find(item => item.workId === record.workId);
+      if (current && (record.revision < current.revision || record.revision === current.revision && record.title === current.title && record.status === current.status)) return items;
+      const next = { workId: record.workId, title: record.title, status: record.status, revision: record.revision };
+      return current ? items.map(item => item.workId === record.workId ? next : item) : [...items, next];
+    });
+  }, [workspaceId, workId, generation]);
   const href = (entry: WebsiteEntryPath, work?: string) => `${entryBase ?? `${appBase}/workspace/site`}?${new URLSearchParams({ workspaceId, entry, ...(work ? { workId: work } : {}) })}`;
   const chooseWork = (id?: string) => {
-    setWorkId(id);
+    if (scope.current.workId !== id) {
+      scope.current = { workId: id, generation: scope.current.generation + 1 };
+      setSelection(scope.current);
+    }
     window.history.replaceState(window.history.state, "", href("rebuild", id));
   };
   return <div className="text-warm-black">
@@ -38,8 +57,8 @@ export function WebsiteEntry({ workspaceId, connectedEnabled, rebuildEnabled, pa
     {path === "connect" && connectedEnabled ? <ConnectSiteExperience workspaceId={workspaceId} canManage={canManage} initialSites={sites} appBase={appBase} /> : null}
     {path === "rebuild" && rebuildEnabled ? <div className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-10 md:px-8">
       {saved.length ? <div className="max-w-2xl"><SelectInput label="Saved website work" value={workId ?? ""} options={[{ value: "", label: "Start a new website request" }, ...saved.map(item => ({ value: item.workId, label: `${item.title} · ${item.status}` }))]} onChange={event => chooseWork(event.target.value || undefined)} /></div> : null}
-      <RebuildExperience initialRequest={!workId ? requestDraft : ""} agency={agency} key={workId ?? (requestDraft ? "new:carried" : "new")} workspaceId={workspaceId} workId={workId} managed operator={operator} canPublish={canPublish} allowIntake readOnly={!canManage} transport={transport}
-        onSaved={id => { if (!saved.some(item => item.workId === id)) setSaved(items => [...items, { workId: id, title: "Saved website request", status: "building" }]); chooseWork(id); }} />
+      <RebuildExperience initialRequest={!workId ? requestDraft : ""} agency={agency} key={workId ?? (requestDraft ? "new:carried" : "new")} workspaceId={workspaceId} workId={workId} managed operator={operator} canPublish={canPublish} allowIntake readOnly={!canManage} transport={transport} onCurrentRecord={updateCurrentRecord} minimumRecordRevision={saved.find(item => item.workId === workId)?.revision ?? -1}
+        onSaved={id => { setSaved(items => items.some(item => item.workId === id) ? items : [...items, { workId: id, title: "Saved website request", status: "building", revision: -1 }]); chooseWork(id); }} />
     </div> : null}
   </div>;
 }
