@@ -9,7 +9,8 @@ export function cleanupConnectionArgs(raw: string): string[] {
   if (!Array.isArray(parsed) || !parsed.every(value => typeof value === "string") || parsed.length % 2 !== 0) throw new Error("cleanup_psql_requires_json_connection_pairs");
   const options = new Map<string, string>();
   for (let index = 0; index < parsed.length; index += 2) {
-    const flag: string = parsed[index], value: string = parsed[index + 1];
+    const flag = parsed[index], value = parsed[index + 1];
+    if (typeof flag !== "string" || typeof value !== "string") throw new Error("cleanup_psql_requires_json_connection_pairs");
     if (!["-h", "-p", "-U", "-d"].includes(flag) || options.has(flag)) throw new Error("cleanup_psql_duplicate_or_unsupported_option");
     options.set(flag, value);
   }
@@ -25,7 +26,9 @@ export function cleanupConnectionArgs(raw: string): string[] {
 export function cleanupProcessEnvironment(input: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   // PGHOSTADDR/PGSERVICE/PGOPTIONS can override a seemingly local -h. This
   // fixture uses local trust auth and passes every connection field explicitly.
-  return Object.fromEntries(Object.entries(input).filter(([name]) => !/^(PG|PSQL)/i.test(name)));
+  const sanitized = { ...input };
+  for (const name of Object.keys(sanitized)) if (/^(PG|PSQL)/i.test(name)) delete sanitized[name];
+  return sanitized;
 }
 
 export function tenantCleanupPostgres(raw: string) {

@@ -15,6 +15,6 @@ describe("cleanup proof connection authority", () => {
     expect(() => cleanupConnectionArgs(JSON.stringify(["-h", "localhost", "-d", "strelva_test"]))).toThrow();
   });
   it("strips service, host-address, options and all other libpq/psql environment overrides", () => {
-    expect(cleanupProcessEnvironment({ PATH: "/owned/bin", PGHOSTADDR: "remote", PGSERVICE: "remote", PGOPTIONS: "override", PGPASSWORD: "fixture", PSQLRC: "/tmp/commands", HOME: "/owned" })).toEqual({ PATH: "/owned/bin", HOME: "/owned" });
+    expect(cleanupProcessEnvironment({ NODE_ENV: "test", PATH: "/owned/bin", PGHOSTADDR: "remote", PGSERVICE: "remote", PGOPTIONS: "override", PGPASSWORD: "fixture", PSQLRC: "/tmp/commands", HOME: "/owned" })).toEqual({ NODE_ENV: "test", PATH: "/owned/bin", HOME: "/owned" });
   });
 });

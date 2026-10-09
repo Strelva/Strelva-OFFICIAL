@@ -103,6 +103,76 @@ select '6c000000-0000-4000-8000-000000000053',workspace_id,purpose,action,on_beh
 update gs_fixture set session='6c000000-0000-4000-8000-000000000053';
 select pg_temp.gs_denied();
 rollback to expired;
+
+-- Owner-session approval: a logged resume borrows the existing admin identity,
+-- while the actual owner remains the independent approver of record.
+create temporary table gs_owner_resume(session uuid,decision uuid) on commit drop;
+insert into gs_owner_resume(session)
+select (public.strelva_service_reader('6c000000-0000-4000-8000-000000000010','make_real_resume')->>'sessionId')::uuid;
+select pg_temp.pa_assert((select on_behalf_user_id='6c000000-0000-4000-8000-000000000001' from public.strelva_service_actions where id=(select session from gs_owner_resume)),'resume actually borrows verified admin');
+insert into public.users(id,email,verified_at) values('6c000000-0000-4000-8000-000000000055','gs-actual-owner@example.test',clock_timestamp());
+insert into public.workspace_memberships(workspace_id,user_id,role,created_by)
+values('6c000000-0000-4000-8000-000000000010','6c000000-0000-4000-8000-000000000055','owner','6c000000-0000-4000-8000-000000000055');
+insert into public.system_possibilities(id,business_workspace_id,status,revision,candidate_revision,body,created_by)
+select '6c000000-0000-4000-8000-000000000054','6c000000-0000-4000-8000-000000000010','ready',1,1,
+ jsonb_build_object('effects',jsonb_build_array(jsonb_build_object('id','google-owner-effect','kind','publish','channel','google_listing','request',request))),
+ '6c000000-0000-4000-8000-000000000055' from gs_fixture;
+update gs_owner_resume set decision=(public.open_owner_decision('6c000000-0000-4000-8000-000000000010',jsonb_build_object(
+ 'kind','system.change_live','route','owner_decides','title','Google owner session fixture','approveEffect','Publish exact Google draft','notYetEffect','Nothing changes',
+ 'sourceLifecycle','make_real','sourceId','6c000000-0000-4000-8000-000000000054@1','revisionHash',repeat('c',64),'urgent',false,'adminMayDecide',false))->>'id')::uuid;
+select pg_temp.pa_assert((public.claim_owner_decision('6c000000-0000-4000-8000-000000000010',decision,repeat('c',64),'approve','session',
+ '6c000000-0000-4000-8000-000000000055','gs-actual-owner@example.test',null)->>'status')='claimed','actual owner session claims current approval') from gs_owner_resume;
+select pg_temp.pa_assert((select decided_by_kind='owner_session' and decided_by='6c000000-0000-4000-8000-000000000055'
+ from public.owner_decisions where id=(select decision from gs_owner_resume)),'owner remains approver of record');
+select public.create_make_real_activation('6c000000-0000-4000-8000-000000000010','6c000000-0000-4000-8000-000000000055','gs-actual-owner@example.test',
+ jsonb_build_object('version',1,'id','gs-owner-resume-activation','businessId','6c000000-0000-4000-8000-000000000010',
+ 'possibilityId','6c000000-0000-4000-8000-000000000054','candidateRevision',1,'actorId','6c000000-0000-4000-8000-000000000055',
+ 'status','in_progress','revision',0,'pinned','[]'::jsonb,'introduced','[]'::jsonb,'connections','[]'::jsonb,
+ 'approvals',jsonb_build_array(jsonb_build_object('effectId','google-owner-effect','approvalId',decision::text,'approvedBy','6c000000-0000-4000-8000-000000000055','at','2026-10-08T00:00:00Z')),
+ 'checks','[]'::jsonb,'history','[]'::jsonb,'createdAt','2026-10-08T00:00:00Z','updatedAt','2026-10-08T00:00:00Z',
+ 'steps',jsonb_build_array(jsonb_build_object('id','google-owner-effect','kind','effect','target','google-owner-effect','label','Publish approved Google draft',
+ 'dependsOn','[]'::jsonb,'effectKind','publish','reversibility','compensable','idempotencyKey','gs-owner-resume-effect','status','pending','effect','none','attempts',0)))) from gs_owner_resume;
+create function pg_temp.gs_resume_check(mode text default 'approve',activation text default 'gs-owner-resume-activation') returns jsonb language sql as $$
+ select public.check_google_make_real_service_authority('6c000000-0000-4000-8000-000000000010',r.session,r.decision,f.request,mode,
+ '6c000000-0000-4000-8000-000000000054',activation) from gs_owner_resume r cross join gs_fixture f
+$$;
+create function pg_temp.gs_resume_denied(mode text default 'approve',activation text default 'gs-owner-resume-activation') returns void language plpgsql as $$ begin
+ begin perform pg_temp.gs_resume_check(mode,activation);
+ exception when others then if sqlerrm='google_service_denied' then return;end if;raise;end;
+ raise exception 'unlogged_or_wrong_owner_resume_allowed';
+end $$;
+-- An actual session and activation do not authorize unlogged work.
+select pg_temp.gs_resume_denied();
+savepoint isolated_run;
+select public.record_strelva_service_action('6c000000-0000-4000-8000-000000000010',session,'run','activation:gs-owner-resume-activation','Fictional resumed owner-approved plan') from gs_owner_resume;
+select pg_temp.pa_assert(pg_temp.gs_resume_check()->>'userId'='6c000000-0000-4000-8000-000000000001','logged run admits borrowed admin');
+select pg_temp.gs_resume_denied('undo');
+rollback to isolated_run;
+savepoint isolated_resume;
+select public.record_strelva_service_action('6c000000-0000-4000-8000-000000000010',session,'resume','activation:gs-owner-resume-activation','Fictional restart') from gs_owner_resume;
+select pg_temp.pa_assert(pg_temp.gs_resume_check('inspect')->>'userId'='6c000000-0000-4000-8000-000000000001','logged resume admits exact activation');
+rollback to isolated_resume;
+savepoint isolated_reconcile;
+select public.record_strelva_service_action('6c000000-0000-4000-8000-000000000010',session,'reconcile','activation:gs-owner-resume-activation','Fictional receipt reconciliation') from gs_owner_resume;
+select pg_temp.pa_assert(pg_temp.gs_resume_check()->>'userId'='6c000000-0000-4000-8000-000000000001','logged reconcile keeps owner approval');
+rollback to isolated_reconcile;
+-- A rollback instruction for another activation does not authorize this undo.
+select public.record_strelva_service_action('6c000000-0000-4000-8000-000000000010',session,'rollback','activation:gs-other-activation','Fictional unrelated rollback') from gs_owner_resume;
+select pg_temp.gs_resume_denied('undo');
+select public.record_strelva_service_action('6c000000-0000-4000-8000-000000000010',session,'rollback','activation:gs-owner-resume-activation','Fictional explicit rollback instruction') from gs_owner_resume;
+select pg_temp.pa_assert(pg_temp.gs_resume_check('undo')->>'userId'='6c000000-0000-4000-8000-000000000001','only exact logged rollback admits undo');
+select pg_temp.gs_resume_denied('undo','gs-other-activation');
+savepoint owner_recipient_independence;
+update public.business_owner_recipient_trust set email='another-current-recipient@example.test' where workspace_id='6c000000-0000-4000-8000-000000000010';
+select pg_temp.pa_assert(pg_temp.gs_resume_check()->>'userId'='6c000000-0000-4000-8000-000000000001','actual owner session authority does not impersonate current email recipient');
+rollback to owner_recipient_independence;
+savepoint approving_owner_removed;
+delete from public.workspace_memberships where workspace_id='6c000000-0000-4000-8000-000000000010' and user_id='6c000000-0000-4000-8000-000000000055';
+select pg_temp.pa_assert(public.platform_service_session_holds((select s from public.strelva_service_actions s where id=(select session from gs_owner_resume))),'borrowed admin session itself remains current');
+select pg_temp.gs_resume_denied();
+select pg_temp.gs_resume_denied('undo');
+rollback to approving_owner_removed;
+
 select public.record_agency_verification('pa-operator@strelva.example.test','6c000000-0000-4000-8000-000000000020','google','unverified','{}','Fixture');
 select pg_temp.gs_denied();
 rollback;

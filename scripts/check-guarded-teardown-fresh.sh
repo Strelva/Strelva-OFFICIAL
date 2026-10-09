@@ -31,6 +31,11 @@ psql "${psql_args[@]}" --file="$repo_root/tests/guarded-tenant-teardown-schema.s
 printf 'PASS final guarded teardown against %s ordered actual forward migrations.\n' "$count"
 if [[ "${STRELVA_GOOGLE_REVIEW_RETENTION_SQL_PROOF:-0}" == 1 ]]; then
  psql "${psql_args[@]}" --file="$repo_root/tests/google-review-content-retention-schema.sql"
+ if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261021100900_google_review_content_retention.sql" > "$cluster_root/review-retention-inverse.log" 2>&1; then
+  printf 'Forward-only review retention inverse unexpectedly succeeded.\n' >&2; exit 1
+ fi
+ rg -q 'google_review_content_retention_forward_only' "$cluster_root/review-retention-inverse.log" || { cat "$cluster_root/review-retention-inverse.log" >&2; exit 1; }
+ printf 'PASS review content retention inverse refuses forward-only recovery.\n'
  printf 'PASS populated review retention upgrade and native archive expiry/purge.\n'
 fi
 if [[ "${STRELVA_RUNTIME_GENERATION_SQL_PROOF:-0}" == 1 ]]; then
