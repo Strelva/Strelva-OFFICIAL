@@ -153,10 +153,18 @@ test("scheduling, generated applications and two-source investigation persist wi
     expect(installedCopy.payload.records).toEqual([]);
     expect(installedCopy.payload.spec.fields).toEqual(reusableDefinition.fields);
     expect(JSON.stringify(installedCopy)).not.toContain("Kitchen renovation");
-    const lineage = await admin.from("system_versions").select("source_system_id,installed_source_revision_id")
-      .eq("id", copiedVersion.versionId).single();
+    // Version tables remain private to native functions. Read the persisted
+    // lineage through the existing RPC, which rechecks this exact real owner.
+    const lineage = await admin.rpc("read_system_version", {
+      p_user_id: owner.userId, p_verified_email: owner.email, p_version_id: copiedVersion.versionId,
+    });
     expect(lineage.error).toBeNull();
-    expect(lineage.data).toMatchObject({ source_system_id: reusable.source.systemId, installed_source_revision_id: revision.source.revisionId });
+    expect(lineage.data).toMatchObject({
+      id: copiedVersion.versionId,
+      version: { businessId: workspaceId, systemId: copiedVersion.systemId },
+      source: { businessId: maker.agencyId, systemId: reusable.source.systemId },
+      sourceRevisionId: revision.source.revisionId,
+    });
     const originalResponse = await owner.context.request.get(`/api/bounded-work?productId=applications&workId=${app.id}`);
     expect(originalResponse.status(), await originalResponse.text()).toBe(200);
     expect((await originalResponse.json()).payload.records).toEqual(app.payload.records);

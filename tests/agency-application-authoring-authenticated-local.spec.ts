@@ -255,6 +255,14 @@ test("a named agency operator revises one assigned application and returns it fo
     await expect(agencyPage.getByText("The customer has not granted draft editing", { exact: false })).toBeVisible();
     await expect(agencyPage.getByRole("button", { name: "Save new draft", exact: true })).toHaveCount(0);
 
+    // Opening the operator route can reload another tab in the dev proof app.
+    // Reopen this owner's exact saved request after the operator's no-grant
+    // refusal, rather than relying on earlier in-memory delivery selection.
+    await customerPage.goto(`/workspace?workspaceId=${businessId}&view=help`, { waitUntil: "domcontentloaded" });
+    await expect(customerPage.getByRole("heading", { name: "What do you need?", exact: true })).toBeVisible();
+    await customerPage.getByRole("button", { name: /Prepare the exact permit request application/ }).click();
+    await customerPage.getByRole("button", { name: "Review delivery options", exact: true }).click();
+    await expect(customerPage.getByText("Application draft editing", { exact: true })).toBeVisible();
     await customerPage.getByRole("button", { name: "Grant draft editing to named operator", exact: true }).click();
     await expect(customerPage.getByText("The named agency operator can now revise this exact application draft.", { exact: false })).toBeVisible();
     const grantResponse = await getJson(operator.context.request, `/api/agency-application-draft-access?workId=${appId}`) as unknown as GrantResponse;

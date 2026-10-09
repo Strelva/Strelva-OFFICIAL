@@ -235,7 +235,7 @@ test("customer grants one managed website draft, agency prepares it, and custome
     await customerPage.getByRole("button", { name: /Accepted for review/ }).first().click();
     await customerPage.getByRole("button", { name: "Review delivery options", exact: true }).click();
     await expect(customerPage.getByRole("heading", { name: "Agency website preparation", exact: true })).toBeVisible();
-    await customerPage.getByRole("button", { name: "Grant draft preparation", exact: true }).click();
+    await customerPage.getByRole("button", { name: "Allow website draft changes", exact: true }).click();
     await expect(customerPage.getByText("Draft preparation is enabled for the named operator.", { exact: false })).toBeVisible({ timeout: 30_000 });
     customerEditorHref = await customerPage.getByRole("link", { name: "Review and publish in website editor", exact: true }).getAttribute("href") ?? "";
     expect(customerEditorHref).toContain(`/client/${tenantId}/dashboard/site`);
@@ -283,7 +283,7 @@ test("customer grants one managed website draft, agency prepares it, and custome
     await customerPage.getByRole("textbox", { name: "Customer review", exact: true }).fill("Reviewed and published the returned website draft.");
     await customerPage.getByRole("button", { name: "Confirm completed delivery", exact: true }).click();
     await expect(customerPage.getByText("The completed delivery is confirmed and linked to this request.", { exact: true })).toBeVisible();
-    await customerPage.getByRole("button", { name: "Revoke draft preparation", exact: true }).click();
+    await customerPage.getByRole("button", { name: "Remove draft access", exact: true }).click();
     await expect(customerPage.getByText("Draft preparation is revoked", { exact: false })).toBeVisible();
 
     await agencyPage.goto(`/agency-websites/${bindingId}`, { waitUntil: "domcontentloaded" });

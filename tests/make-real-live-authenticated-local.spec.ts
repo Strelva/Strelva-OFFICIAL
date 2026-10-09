@@ -53,15 +53,24 @@ test("a real owner reviews and makes native inquiry/app changes live, proves rec
     const content = createSupabaseRevisionContent(actor, admin);
     const live = createSystemStoreLiveSystems({ actor, store, content });
     const possibilities = createSupabasePossibilityRepository(actor, admin);
+    const releaseFlagsPath = `/api/admin/tenants/${encodeURIComponent(tenantId)}/release-flags`;
+    // Release flags are platform-operator actions. The HTTP producer records
+    // and consumes the actual signed operator's exact one-use approval;
+    // service_role intentionally cannot call the internal setter directly.
+    await post(owner.context.request, releaseFlagsPath, { kind: "flag", flag: "systems", state: "on",
+      reason: "Disposable authenticated native publication proof", expectedRevision: 0 }, 403);
     for (const flag of ["systems", "make_real_live:internal_app", "make_real_live:inquiry_form"]) {
-      const current = await admin.rpc("read_workspace_release_flags", { p_workspace_id: businessId });
-      expect(current.error).toBeNull();
-      const flags = current.data as { flags: Record<string, { revision: number }> };
-      const enabled = await admin.rpc("set_workspace_release_flag", {
-        p_operator_email: operator.email, p_workspace_id: businessId, p_flag: flag,
-        p_state: "on", p_reason: "Disposable authenticated native publication proof", p_expected_revision: flags.flags[flag]?.revision ?? 0,
+      const currentResponse = await operator.context.request.get(releaseFlagsPath);
+      expect(currentResponse.status(), await currentResponse.text()).toBe(200);
+      const current = await currentResponse.json() as { linked: boolean; workspaceId: string; flags: Array<{ flag: string; revision: number }> };
+      expect(current.linked).toBe(true);
+      expect(current.workspaceId).toBe(businessId);
+      const enabled = await post(operator.context.request, releaseFlagsPath, {
+        kind: "flag", flag, state: "on", reason: "Disposable authenticated native publication proof",
+        expectedRevision: current.flags.find(item => item.flag === flag)?.revision ?? 0,
       });
-      expect(enabled.error).toBeNull();
+      expect(enabled.workspaceId).toBe(businessId);
+      expect(enabled.flags.find((item: { flag: string }) => item.flag === flag)?.row).toBe("on");
     }
 
     async function baseline(name: string, body: Record<string, unknown>, kind = "other") {
