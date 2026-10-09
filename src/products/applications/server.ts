@@ -196,7 +196,6 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     const input = applicationRehearseInputSchema.parse(raw);
     const db = durableDb(store);
     const permission = await load(store, actor, id);
-    await requireSystemChanger(store, actor, permission.work.workspaceId);
     await ensureCandidateEditor(store, actor, permission.work);
     if (db) {
       await durableRpc(db, "rehearse_application_candidate", {
@@ -219,7 +218,6 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     const input = applicationPublishInputSchema.parse(raw);
     const db = durableDb(store);
     const permission = await load(store, actor, id);
-    await requireSystemChanger(store, actor, permission.work.workspaceId);
     await ensureManager(store, actor, permission.work);
     if (db) {
       await durableRpc(db, "publish_application_candidate", {
@@ -243,7 +241,6 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     const input = applicationRollbackInputSchema.parse(raw);
     const db = durableDb(store);
     const permission = await load(store, actor, id);
-    await requireSystemChanger(store, actor, permission.work.workspaceId);
     await ensureManager(store, actor, permission.work);
     if (db) {
       await durableRpc(db, "rollback_application_release", {
@@ -339,7 +336,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     // before translation so stale dashboard links retain their conflict UX.
     if (durableDb(store)) {
       const loaded = await load(store, actor, id);
-      if (command.kind !== "submit") await requireSystemChanger(store, actor, loaded.work.workspaceId);
+      if (!["submit", "install", "rehearse"].includes(command.kind)) await requireSystemChanger(store, actor, loaded.work.workspaceId);
       if (command.kind !== "submit" && command.kind !== "revise" && command.kind !== "rehearse") await ensureManager(store, actor, loaded.work);
       assertLegacyApplicationRevision(loaded.state, command);
       if (command.kind === "revise") return revise(actor, id, { expectedDesignRevision: loaded.state.candidate.designRevision, spec: command.spec });

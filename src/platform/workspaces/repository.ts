@@ -1,3 +1,5 @@
+import { markCreatorDraftSnapshot } from "./creator-draft-snapshot";
+import { systemsReleasedFor } from "@/platform/systems-release";
 import { z } from "zod";
 import { createHash, randomBytes } from "node:crypto";
 import { getSupabase } from "@/platform/infra/db/client";
@@ -327,6 +329,18 @@ async function delegatedWorkIds(userId: string, workspaceId?: string): Promise<s
   return (data ?? []).map((row) => asString((row as DbRow).customer_work_id)).filter(Boolean);
 }
 
+/** Exact created native app authority; SQL rechecks current provider/staff and customer decisions. */
+export async function createdAgencyApplicationWorkIds(a: WorkspaceActor, workspaceId: string): Promise<string[]> {
+  if (!await systemsReleasedFor(a, workspaceId)) return [];
+  const { data, error } = await rpc("agency_created_application_work_ids", {
+    p_workspace_id: workspaceId, p_user_id: a.userId, p_verified_email: a.verifiedEmail,
+  });
+  if (error) workspaceDbFailure(error, "Created application authority is unavailable");
+  const parsed = z.array(z.string().uuid()).safeParse(data);
+  if (!parsed.success) throw new WorkspaceStoreError("Created application authority is unavailable");
+  return parsed.data;
+}
+
 /**
  * An accepted agency assignment grants access to its exact customer work row
  * for the duration of that assignment. It does not make the agency a member
@@ -371,7 +385,7 @@ export async function listWork(input: WorkspaceActor, workspaceId: string): Prom
   const role = await directRole(a.userId, workspaceId);
   let query = db().from("saved_product_work").select("*").eq("workspace_id", workspaceId);
   if (!role) {
-    const ids = await delegatedWorkIds(a.userId, workspaceId);
+    const ids = [...new Set([...await delegatedWorkIds(a.userId, workspaceId), ...await createdAgencyApplicationWorkIds(a, workspaceId)])];
     const seat = await providerSeatWorkspaceAccess(a, workspaceId);
     if (!seat && !ids.length) throw new WorkspaceAccessError();
     if (!seat) query = query.in("id", ids);
@@ -384,7 +398,14 @@ export async function listWork(input: WorkspaceActor, workspaceId: string): Prom
   }
   const { data, error } = await query.order("updated_at", { ascending: false }).limit(MAX_WORK_PER_WORKSPACE);
   if (error) workspaceDbFailure(error, "Saved work is unavailable");
-  return (data ?? []).map((row) => mapWork(row as DbRow));
+  const works = (data ?? []).map((row) => mapWork(row as DbRow));
+  if (role) return works;
+  const safe = await Promise.all(works.map(async work => {
+    if (work.productId !== "applications" || work.resourceKind !== "application") return work;
+    try { return await getWork(a, work.id); }
+    catch (error) { if (error instanceof WorkspaceAccessError) return null; throw error; }
+  }));
+  return safe.filter((work): work is SavedWork => work !== null);
 }
 
 export async function getWork(input: WorkspaceActor, id: string): Promise<SavedWork | null> {
@@ -395,6 +416,16 @@ export async function getWork(input: WorkspaceActor, id: string): Promise<SavedW
   const work = mapWork(data as DbRow);
   if (await directRole(a.userId, work.workspaceId)) return work;
   if (isWebsiteWork(work) && await providerSeatWorkspaceAccess(a, work.workspaceId)) return work;
+  if (work.productId === "applications" && work.resourceKind === "application" && work.createdBy === a.userId) {
+    if (await systemsReleasedFor(a, work.workspaceId)) {
+      const rpc = db() as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: DbFailure }> };
+      const snapshot = await rpc.rpc("read_agency_created_application", {
+        p_workspace_id: work.workspaceId, p_user_id: a.userId, p_verified_email: a.verifiedEmail, p_work_id: id,
+      });
+      if (snapshot.error) workspaceDbFailure(snapshot.error, "Saved work is unavailable");
+      if (snapshot.data) return markCreatorDraftSnapshot(mapWork(snapshot.data as DbRow));
+    }
+  }
   const delegated = await delegatedWorkIds(a.userId, work.workspaceId);
   if (delegated.includes(id) || await assignedAgencyWorkAccess(a.userId, a.verifiedEmail, work.workspaceId, id)) return work;
   throw new WorkspaceAccessError();

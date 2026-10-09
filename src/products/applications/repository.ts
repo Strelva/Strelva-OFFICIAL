@@ -1,3 +1,4 @@
+import { isCreatorDraftSnapshot } from "@/platform/workspaces/creator-draft-snapshot";
 import { getSupabase } from "@/platform/infra/db/client";
 import {
   WorkspaceAccessError,
@@ -312,6 +313,7 @@ export async function load(store: BoundedStore, actor: WorkspaceActor, id: strin
   const db = durableDb(store);
   const work = await store.read(actor, id);
   if (!work || work.productId !== "applications" || work.resourceKind !== "application") throw new WorkspaceAccessError();
+  if (isCreatorDraftSnapshot(work)) return { work, state: parseStateFromPayload(work.payload) };
   if (db) {
     const state = await readDurable(db, work);
     return { work, state };

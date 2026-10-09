@@ -52,6 +52,8 @@ export type WorkspaceExperimentComparison = TrackerExperimentComparison & Requir
 export type WorkspaceExperiment = WorkspaceLegacyExperiment | WorkspaceExperimentComparison;
 
 export interface WorkspaceWork<TPayload = WorkspaceWorkPayload> {
+  /** Current exact-work agency creator may propose/rehearse; never publish or write records. */
+  creatorDraft?: boolean;
   operation?: { status: string; reason?: string };
   workPlan?: { summary: string; status: "ready" | "needs_scoping"; outputCount?: number };
   document?: Pick<import("@/products/documents/contracts").WorkspaceDocument, "title" | "revision">;
@@ -133,6 +135,8 @@ export interface WorkspaceProduct {
 }
 
 export interface WorkspaceSnapshot {
+  /** Current server-resolved maker authority; writes independently recheck it. */
+  canMakeSystems?: boolean;
   ownerBrand?: OwnerBrand;
   actor: { email: string; localPreview: boolean };
   workspaces: WorkspaceSummary[];

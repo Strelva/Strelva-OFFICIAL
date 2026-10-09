@@ -19,7 +19,7 @@ import { agencySignupReleaseEnabled } from "@/platform/agency-signup-release";
 import type { ProductDefinition } from "@/platform/products";
 import { workspaceDiscoveryProducts, workspaceExecutables } from "@/capability-registry";
 import {
-  acceptHandoff, createAgencyWorkspace, createHandoff, ensurePersonalWorkspace, getWork,
+  acceptHandoff, createAgencyWorkspace, createdAgencyApplicationWorkIds, makeSystemsAuthority, createHandoff, ensurePersonalWorkspace, getWork,
   listPendingAssessments, inspectHandoff, listAgencyDelegations, listAgencyHandoffs, listWork,
   listWorkDelegations, listWorkspaces, revokeDelegation, revokeHandoff,
   WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError,
@@ -310,13 +310,18 @@ export async function GET(request: Request) {
     // Inquiry work is intentionally absent while its explicit exposure flag is
     // off for this workspace. The route still enforces the flag per site.
     if (inquiriesReleased) products.push({ id: "inquiries", name: "Inquiry work", description: "Keep customer requests moving with a clear, inspectable thread.", availability: "available" });
+    const creatorDraftIds = selected.access === "provider_seat"
+      ? await createdAgencyApplicationWorkIds(current, selected.id) : [];
+    const makerAuthority = systemsReleased ? await makeSystemsAuthority(current, selected.id) : null;
     const snapshot: WorkspaceSnapshot = {
+      canMakeSystems: makerAuthority === "provider" || makerAuthority === "agency",
       ownerBrand: await resolveOwnerBrand(selected.id),
       actor: { email: current.verifiedEmail, localPreview: false },
       workspaces: workspaces.map(({ id, kind, name, access, role }) => ({ id, kind, name, access, role })), workspaceId: selected.id,
       workspaceExitState,
       workspaceExitReadStatus,
-      work: work.map((item) => presentWorkspaceWork(item, { access: workAccess(selected) })),
+      work: work.map((item) => ({ ...presentWorkspaceWork(item, { access: workAccess(selected) }),
+        ...(creatorDraftIds.includes(item.id) ? { creatorDraft: true } : {}) })),
       pendingAssessments: selected.access === "member" ? await listPendingAssessments(current, selected.id) : [],
       managedWork: managedPresence.managedWork,
       ...(managedPresence.unavailable ? { managedWorkUnavailable: true } : {}),

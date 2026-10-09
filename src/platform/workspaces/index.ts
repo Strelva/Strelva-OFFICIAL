@@ -18,6 +18,8 @@ export {
   assertCanSaveWork,
   assertWorkspaceMember,
   createAgencyWorkspace,
+  createdAgencyApplicationWorkIds,
+  makeSystemsAuthority,
   createHandoff,
   ensurePersonalWorkspace,
   getWork,

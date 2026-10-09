@@ -178,6 +178,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
     && (current.role === "owner" || current.role === "admin");
   const readOnly = current?.access === "delegated_read" || current?.access === "provider_seat";
   const workspaceMutationReadOnly = readOnly || workspaceExitBlocks;
+  const applicationCreationBlocked = workspaceExitBlocks || snapshot.canMakeSystems !== true;
   const offeringUnavailableReason = current?.kind !== "customer"
     ? `Choose a customer business workspace to view its ${systemsReleased ? "systems" : "installations"}. Personal and agency workspaces remain separate.`
     : readOnly
@@ -493,7 +494,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
   </div>;
 
   function startProduct(id: "websites" | "onboarding" | "applications" | "scheduling" | "investigations" | "operations") {
-    if (workspaceMutationReadOnly || !onHorizontal || !products.some(item => item.id === id && item.availability === "available")) return;
+    if ((id === "applications" ? applicationCreationBlocked : workspaceMutationReadOnly) || !onHorizontal || !products.some(item => item.id === id && item.availability === "available")) return;
     let request = requestText;
     try { request = readRequestDraft(window.sessionStorage, draftKey) || request; } catch { /* Use the current request. */ }
     if (request.trim()) {
@@ -574,7 +575,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
             {renderProductBody()}
           </div>
         </> : <>
-          <WorkspaceTemplateLibrary key={`${snapshot.actor.email}:${snapshot.workspaceId}`} workspaceId={snapshot.workspaceId} actorEmail={snapshot.actor.email} businessName={current?.name || "Your business"} canCreate={!workspaceMutationReadOnly && Boolean(onHorizontal) && products.some(item => item.id === "applications" && item.availability === "available")} onRequest={openRequest} onCreated={onCreatedApp} />
+          <WorkspaceTemplateLibrary key={`${snapshot.actor.email}:${snapshot.workspaceId}`} workspaceId={snapshot.workspaceId} actorEmail={snapshot.actor.email} businessName={current?.name || "Your business"} canCreate={!applicationCreationBlocked && Boolean(onHorizontal) && products.some(item => item.id === "applications" && item.availability === "available")} onRequest={openRequest} onCreated={onCreatedApp} />
           {systemsReleased ? <PackageCatalog key={snapshot.workspaceId} workspaceId={snapshot.workspaceId} canGrantInstall={!workspaceMutationReadOnly && current?.role === "owner"} canInstall={!workspaceMutationReadOnly && ["owner", "admin"].includes(current?.role || "")} /> : null}
           <details open={moreToolsOpen} onToggle={event => setMoreToolsOpen(event.currentTarget.open)} className="mt-8 border-t border-gray-border pt-4"><summary className="cursor-pointer py-4 text-base font-medium">More tools and managed services</summary>
           <WorkspaceOfferingDirectory state={offerings.state} businessName={current?.name || "This business"} work={snapshot.work} managedSites={sites} products={products} selectedId={null} onSelect={openOffering} onOpenWork={openWork} onOpenProduct={openProduct} onRequestSetup={(entry) => navigate("help", `I want setup help for ${entry.offering?.name ?? entry.title} for ${current?.name ?? "this business"}. ${entry.offering?.installationNote || entry.product?.description || entry.description}`)} onRetryConflict={offerings.retryConflict} onRetry={offerings.reload} onCommand={offerings.command} onWebsiteCommand={offerings.websiteCommand} />
