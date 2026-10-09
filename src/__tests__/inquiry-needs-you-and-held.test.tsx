@@ -115,7 +115,7 @@ describe("held spam on the workspace Inquiries page", () => {
   it("explains a refusal in the owner's words", () => {
     expect(heldErrorMessage(403, null)).toBe("Only the business owner can decide on held messages. Nothing changed.");
     expect(heldErrorMessage(404, null)).toBe("This message is no longer here.");
-    expect(heldErrorMessage(503, { error: "The decision couldn't be saved. Nothing changed." })).toBe("The decision couldn't be saved. Nothing changed.");
+    expect(heldErrorMessage(503, { error: "The decision couldn't be saved. Nothing changed." })).toBe("The decision couldn't be confirmed. Reload these inquiries to inspect its current state before deciding again.");
   });
 });
 

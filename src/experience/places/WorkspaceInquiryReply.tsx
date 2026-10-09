@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { z } from "zod";
+import { beginFocusRecovery, type FocusRecovery } from "@/experience/websites/focus-recovery";
 import { Button } from "@/components/ui/Button";
 import { TextArea, TextInput } from "@/components/ui/TextInput";
 import { InquiryBookingOfferComposer } from "./InquiryBookingOfferComposer";
@@ -17,6 +19,12 @@ export const REPLY_OUTCOME: Record<WorkspaceReplyStatus, string> = {
   unknown: "The send couldn't be confirmed. Strelva must check the receipt before another attempt.",
 };
 
+// Validate the existing public outcome type without importing server/node code.
+const replyOutcome = z.object({
+  status: z.custom<WorkspaceReplyStatus>(value => typeof value === "string" && Object.hasOwn(REPLY_OUTCOME, value)),
+  providerMessageId: z.string().nullable(), acceptedAt: z.string().nullable(), retryable: z.literal(false),
+});
+
 export function WorkspaceInquiryReply({ workspaceId, rowId, name, email, bookingOffers = false, member = false }: { workspaceId: string; rowId: string; name: string; email: string; bookingOffers?: boolean; member?: boolean }) {
   const [open, setOpen] = useState(false);
   const [subject, setSubject] = useState("Re: Your inquiry");
@@ -28,6 +36,19 @@ export function WorkspaceInquiryReply({ workspaceId, rowId, name, email, booking
   const openerRef = useRef<HTMLButtonElement>(null);
   const subjectRef = useRef<HTMLInputElement>(null);
   const wasOpen = useRef(false);
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const outcomeRef = useRef<HTMLParagraphElement>(null);
+  const checkRef = useRef<HTMLButtonElement>(null);
+  const inFlight = useRef(false);
+  const settled = useRef(false);
+  const attempt = useRef<{ id: string; payload: string } | null>(null);
+  const focusRecovery = useRef<FocusRecovery | null>(null);
+  useEffect(() => () => focusRecovery.current?.cancel(), []);
+  useEffect(() => {
+    if (saving || !focusRecovery.current) return;
+    focusRecovery.current.recover(outcome ? outcomeRef.current : requestId ? checkRef.current : subjectRef.current, true);
+    focusRecovery.current = null;
+  }, [error, outcome, requestId, saving]);
   useEffect(() => {
     if (open && !wasOpen.current) subjectRef.current?.focus();
     else if (!open && wasOpen.current) openerRef.current?.focus();
@@ -35,33 +56,47 @@ export function WorkspaceInquiryReply({ workspaceId, rowId, name, email, booking
   }, [open]);
   if (!open) return <Button ref={openerRef} size="md" variant="secondary" onClick={() => setOpen(true)}>Reply to {name}</Button>;
   async function send() {
-    const id = requestId ?? crypto.randomUUID();
-    setRequestId(id); setSaving(true); setError(null);
+    if (inFlight.current || settled.current || (!attempt.current && (!subject.trim() || !body.trim()))) return;
+    inFlight.current = true;
+    const checking = attempt.current !== null;
+    const current = attempt.current ?? { id: crypto.randomUUID(), payload: "" };
+    if (!checking) current.payload = JSON.stringify({ workspaceId, rowId, requestId: current.id, subject, body });
+    attempt.current = current;
+    focusRecovery.current?.cancel();
+    focusRecovery.current = beginFocusRecovery(sectionRef.current);
+    setRequestId(current.id); setSaving(true); setError(null);
     try {
       const response = await fetch("/api/workspace/inquiries/reply", {
-        method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspaceId, rowId, requestId: id, subject, body }),
+        method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: current.payload,
       });
-      const result = await response.json().catch(() => null) as { outcome?: WorkspaceReplyOutcome; error?: string } | null;
-      if (!response.ok || !result?.outcome || !Object.hasOwn(REPLY_OUTCOME, result.outcome.status)) {
-        setError(result?.error ?? "The reply couldn't be confirmed. Keep this draft and check before trying again.");
-        // These explicit refusals happen before a send claim. Keep the draft editable.
-        if ([400, 403, 404, 409].includes(response.status)) setRequestId(null);
-      } else setOutcome(result.outcome);
-    } catch { setError("The reply couldn't be confirmed. Keep this draft and check before trying again."); }
-    finally { setSaving(false); }
+      const result: unknown = await response.json().catch(() => null);
+      const parsed = z.object({ outcome: replyOutcome }).safeParse(result);
+      const refusal = z.object({ error: z.string() }).safeParse(result);
+      if (!response.ok || !parsed.success) {
+        // These initial route refusals and the exact member commitment refusal
+        // are known to precede a durable claim (SQL refuses before insertion).
+        // Even a 400 can be claim-schema validation after SQL acquired the claim.
+        // No later denial settles an earlier unknown attempt.
+        const ownerApprovalRefusal = response.status === 409 && refusal.success && refusal.data.error === "Prices, dates and promises need the business owner’s approval.";
+        if (!checking && ([401, 429].includes(response.status) || ownerApprovalRefusal)) {
+          attempt.current = null; setRequestId(null);
+          setError(refusal.success ? refusal.data.error : "The reply was refused before sending. Your draft is still here.");
+        } else setError(`The reply couldn't be confirmed. Keep this exact draft and check this reply before sending anything else.${refusal.success && !/\bnothing (?:was )?(?:sent|changed)\b/i.test(refusal.data.error) ? ` ${refusal.data.error}` : ""}`);
+      } else { settled.current = true; setOutcome(parsed.data.outcome); }
+    } catch { setError("The reply couldn't be confirmed. Keep this exact draft and check this reply before sending anything else."); }
+    finally { inFlight.current = false; setSaving(false); }
   }
   return (
-    <div className="mt-4 grid gap-4">
+    <div ref={sectionRef} className="mt-4 grid gap-4">
       <p className="text-sm break-all">To {email}</p>
-      <TextInput ref={subjectRef} label="Subject" value={subject} onChange={(event) => setSubject(event.target.value)} maxLength={200} disabled={saving || requestId !== null} />
-      <TextArea label={`Your reply to ${name}`} value={body} onChange={(event) => setBody(event.target.value)} maxLength={5000} disabled={saving || requestId !== null} />
-      {bookingOffers ? <InquiryBookingOfferComposer workspaceId={workspaceId} rowId={rowId} disabled={saving || requestId !== null} append={text => { const next = body ? `${body}\n\n${text}` : text; if (next.length > 5000) return false; setBody(next); return true; }} /> : null}
+      <TextInput ref={subjectRef} label="Subject" value={subject} onChange={(event) => { if (!inFlight.current && !attempt.current) setSubject(event.target.value); }} maxLength={200} disabled={saving || requestId !== null} />
+      <TextArea label={`Your reply to ${name}`} value={body} onChange={(event) => { if (!inFlight.current && !attempt.current) setBody(event.target.value); }} maxLength={5000} disabled={saving || requestId !== null} />
+      {bookingOffers ? <InquiryBookingOfferComposer workspaceId={workspaceId} rowId={rowId} disabled={saving || requestId !== null} append={text => { if (inFlight.current || attempt.current) return false; const next = body ? `${body}\n\n${text}` : text; if (next.length > 5000) return false; setBody(next); return true; }} /> : null}
       <p className="text-xs text-gray-muted">{member ? "You can send an ordinary reply for inquiries assigned or routed to you. Prices, dates and promises need the owner’s approval. A sent reply cannot be undone." : "Sending approves this exact message, including any price, date or promise. A sent reply cannot be undone."}</p>
-      {outcome ? <p role="status" className="text-sm">{REPLY_OUTCOME[outcome.status]}</p> : (
+      {outcome ? <p ref={outcomeRef} tabIndex={-1} role="status" className="text-sm">{REPLY_OUTCOME[outcome.status]}</p> : (
         <div className="flex flex-wrap gap-3">
-          <Button loading={saving} disabled={!subject.trim() || !body.trim()} onClick={() => void send()}>{requestId ? "Check this reply" : member ? "Send reply" : "Approve and send reply"}</Button>
-          {!requestId ? <Button variant="ghost" onClick={() => setOpen(false)}>Close draft</Button> : null}
+          <Button ref={checkRef} loading={saving} disabled={saving || (!requestId && (!subject.trim() || !body.trim()))} onClick={() => void send()}>{requestId ? "Check this reply" : member ? "Send reply" : "Approve and send reply"}</Button>
+          {!requestId ? <Button variant="ghost" disabled={saving} onClick={() => { if (!inFlight.current && !attempt.current) setOpen(false); }}>Close draft</Button> : null}
         </div>
       )}
       {error ? <p role="alert" className="text-sm text-critical">{error}</p> : null}
