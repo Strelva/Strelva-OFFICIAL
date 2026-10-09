@@ -84,19 +84,38 @@ export function inventoryJourneyArtifacts({ work: input, artifactDir, proofFiles
 
 /** Both terminal observations are attempted independently, including on child
  * failure. Errors are fixed codes; command output and credentials are not saved. */
-export function retainJourneyEnd({ work, output, sourceBefore, captureSource, qualify, artifactDir, proofFiles = [], reportPath, browser, validateZip, runnerExit }) {
+export function retainJourneyEnd({ work, output, sourceBefore, captureSource, qualify, artifactDir, proofFiles = [], reportPath, browser, validateZip, runnerExit, diskHeadroom = false }) {
   privateDirectory(output);
   let after, sourceState = 'unavailable', stackState = 'unavailable';
   try { after = captureSource(); save(output, 'source-end.json', after); sourceState = JSON.stringify(sourceBefore) === JSON.stringify(after) ? 'matched' : 'changed'; }
   catch { save(output, 'source-end-failure.json', { reason: 'source-capture-failed', fullReleaseQualified: false }); }
   try { const stack = qualify(); save(output, 'stack-after.json', stack); stackState = stack?.qualified === true ? 'captured' : 'unqualified'; }
   catch { save(output, 'stack-after-failure.json', { reason: 'stack-qualification-failed', fullReleaseQualified: false }); }
+  // The raw admission history keeps growing between windows. Each retained
+  // phase pins its own bounded, owned snapshot rather than the mutable raw log.
+  let diskHeadroomState = 'not-requested';
+  if (diskHeadroom) {
+    diskHeadroomState = 'unavailable';
+    try {
+      const snapshot = join(output, 'disk-headroom.jsonl');
+      writeOwnedJourneyFile(work, snapshot, readOwnedJourneyFile(work, join(work, 'disk-headroom.jsonl')));
+      proofFiles = [...proofFiles, snapshot];
+      diskHeadroomState = 'retained';
+    } catch {
+      save(output, 'disk-headroom-failure.json', { reason: 'disk-admission-snapshot-unavailable', fullReleaseQualified: false });
+      proofFiles = [...proofFiles, join(output, 'disk-headroom-failure.json')];
+    }
+  }
   let inventory;
   try { inventory = inventoryJourneyArtifacts({ work, artifactDir, reportPath, validateZip, proofFiles: [...proofFiles, join(output, sourceState === 'unavailable' ? 'source-end-failure.json' : 'source-end.json'), join(output, stackState === 'unavailable' ? 'stack-after-failure.json' : 'stack-after.json')] }); }
   catch { inventory = { schema: 1, files: [], issues: ['inventory-capture-failed'], integrityValidated: false, fullReleaseQualified: false }; }
+  if (diskHeadroom && diskHeadroomState !== 'retained') {
+    inventory.issues.push('disk-admission-snapshot-unavailable');
+    inventory.integrityValidated = false;
+  }
   save(output, 'artifact-inventory.json', inventory);
   const errorCode = typeof browser?.error?.code === 'string' && /^[A-Z0-9_]{1,80}$/.test(browser.error.code) ? browser.error.code : browser?.error ? 'child-process-error' : null;
-  const terminal = { browserErrorCode:errorCode, browserAttempted: Boolean(browser), browserStarted: browserWasStarted(browser), browserExit: browser?.status ?? null, browserSignal: browser?.signal ?? null, ...(runnerExit !== undefined ? { runnerExit } : {}), browserLaunchFailed: Boolean(browser?.error && !browserWasStarted(browser)), sourceState, stackState, integrityValidated: inventory.integrityValidated,
+  const terminal = { ...(diskHeadroom ? { diskHeadroomState } : {}), browserErrorCode:errorCode, browserAttempted: Boolean(browser), browserStarted: browserWasStarted(browser), browserExit: browser?.status ?? null, browserSignal: browser?.signal ?? null, ...(runnerExit !== undefined ? { runnerExit } : {}), browserLaunchFailed: Boolean(browser?.error && !browserWasStarted(browser)), sourceState, stackState, integrityValidated: inventory.integrityValidated,
     retentionValidated: sourceState === 'matched' && stackState === 'captured' && inventory.integrityValidated, fullReleaseQualified: false };
   save(output, 'terminal-state.json', terminal);
   return terminal;
@@ -132,7 +151,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     const work = privateDirectory(workInput), output = join(work, `retention-${phase}`);
     mkdirSync(output, { mode: 0o700 });
     const os = Object.fromEntries(['PATH', 'HOME', 'USER', 'LOGNAME', 'TMPDIR'].filter(key => process.env[key]).map(key => [key, process.env[key]]));
-    const terminal = retainJourneyEnd({ work, output, sourceBefore: JSON.parse(readOwnedJourneyFile(work,join(work,'source.json'))), captureSource: () => sourceInventory(root),
+    const terminal = retainJourneyEnd({ work, output, diskHeadroom: true, sourceBefore: JSON.parse(readOwnedJourneyFile(work,join(work,'source.json'))), captureSource: () => sourceInventory(root),
       qualify: () => JSON.parse(execFileSync(process.execPath, [join(root, 'scripts/full-model-stack-qualification.mjs'), 'verify', root, join(work, 'env')], { cwd: root, env: { ...os, LC_ALL: 'C' }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 16 * 1024 * 1024 })),
       ...(phase.startsWith('final-') ? {} : { artifactDir: join(work, `artifacts-${phase}`), reportPath: join(work, `results-${phase}.json`), proofFiles: [join(work, `browser-${phase}.log`), join(work, 'source.json'), join(work, `manifest-${phase}.json`), join(work, 'schema.json'), join(work, 'stack-qualification.json')] }),
       ...(phase.startsWith('final-') ? { runnerExit: Number(exitInput) } : { browser: { status: Number(exitInput) } }) });

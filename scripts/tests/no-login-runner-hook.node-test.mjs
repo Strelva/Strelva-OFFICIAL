@@ -24,7 +24,9 @@ test('fixed no-login preflight and run hook precede service shutdown and preserv
   const noLogin = 'run_clean node scripts/no-login-journey-window.mjs run "$root" "$work" > "$work/no-login-window.log" 2>&1 || { [[ "$status" != 0 ]] || status=1; }';
   assert.equal(text.split(preflight).length - 1, 1); assert.equal(text.split(noLogin).length - 1, 1);
   assert.ok(text.indexOf(preflight) < text.indexOf('docker info'));
-  assert.ok(text.includes(`if [[ "$profile" == full-native ]]; then\n    ${cleanup}\n    ${noLogin}\n  fi`));
+  for (const [stage, command] of [['cleanup', cleanup], ['no-login', noLogin]]) {
+    assert.ok(text.includes(`if disk_headroom "${stage}-$variant"; then\n      ${command}\n    else\n      [[ "$status" != 0 ]] || status=1\n    fi`));
+  }
   assert.ok(text.includes(`  stop_app; stop_redis`));
   assert.ok(text.indexOf(noLogin) < text.lastIndexOf('stop_app; stop_redis'));
   assert.ok(!text.includes('status=0', text.indexOf(noLogin)));

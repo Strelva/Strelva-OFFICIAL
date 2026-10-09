@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { chmodSync, linkSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -89,6 +90,8 @@ test('executable primary failure flow preserves child7 through rejected report a
   const script = `set -euo pipefail
 work='$WORK' root=fixture profile=full-native variant=native manifest=fixture
 base_env=(PATH=/usr/bin:/bin) variant_arg=() specs=(fixture)
+# These original flows intentionally exercise admitted disk headroom.
+disk_headroom() { return 0; }
 run_clean() { if [[ "$1" == node ]]; then echo "supplement:$2" >> "$work/order"; return 2; fi; return 7; }
 node() { return 1; }
 env() { echo "retain:\${@: -2:1}" >> "$work/order"; return 1; }
@@ -110,6 +113,8 @@ test('browser0 plus rejected report retains browser0 and aggregate1 without inve
   const script = `set -euo pipefail
 work='$WORK' root=fixture profile=full-native variant=native manifest=fixture
 base_env=(PATH=/usr/bin:/bin) variant_arg=() specs=(fixture)
+# These original flows intentionally exercise admitted disk headroom.
+disk_headroom() { return 0; }
 run_clean() { return 0; }
 node() { return 1; }
 env() { echo "retain:\${@: -2:1}:\${@: -1}" >> "$work/order"; return 0; }
@@ -123,6 +128,90 @@ ${flow}`.replace('$WORK', work);
   const terminal = retainJourneyEnd({ work, output: join(work, 'window'), sourceBefore: {}, captureSource: () => ({}), qualify: () => ({ qualified: true }), runnerExit: 1 });
   assert.equal(terminal.browserAttempted, false); assert.equal(terminal.browserExit, null); assert.equal(terminal.runnerExit, 1);
 });
+
+for (const browserStatus of [7, 0]) {
+  for (const refused of [['cleanup-native'], ['no-login-native'], ['cleanup-native', 'no-login-native']]) {
+    test(`supplementary disk refusal ${refused.join('+')} preserves browser${browserStatus} and retains before shutdown`, t => {
+      const { work } = fixture(t), root = resolve(import.meta.dirname, '../..');
+      const runner = readFileSync(join(root, 'scripts/check-full-model-journeys.sh'), 'utf8');
+      const start = runner.indexOf('  status=0 browser_status=0\n'), end = runner.indexOf('\ndone', start);
+      assert.ok(start >= 0 && end > start);
+      const flow = runner.slice(start, end);
+      const script = `set -euo pipefail
+work='$WORK' root=fixture profile=full-native variant=native manifest=fixture
+base_env=(PATH=/usr/bin:/bin) variant_arg=() specs=(fixture)
+refused_a='${refused[0]}' refused_b='${refused[1] || ''}'
+disk_headroom() { echo "disk:$1" >> "$work/order"; [[ "$1" != "$refused_a" && "$1" != "$refused_b" ]]; }
+run_clean() { if [[ "$1" == node ]]; then echo "supplement:$2" >> "$work/order"; return 0; fi; return ${browserStatus}; }
+node() { return 0; }
+env() { echo "retain:\${@: -2:1}:\${@: -1}" >> "$work/order"; return 0; }
+stop_app() { echo stop-app >> "$work/order"; }
+stop_redis() { echo stop-redis >> "$work/order"; }
+${flow}`.replace('$WORK', work);
+      const result = spawnSync('/bin/bash', ['-c', script], { env: { PATH: '/usr/bin:/bin' }, encoding: 'utf8', timeout: 5000 });
+      assert.equal(result.error, undefined); assert.equal(result.signal, null);
+      const expectedStatus = browserStatus || 1;
+      assert.equal(result.status, expectedStatus, result.stderr);
+      const expectedOrder = ['disk:primary-native', `retain:native:${browserStatus}`, 'disk:cleanup-native'];
+      if (!refused.includes('cleanup-native')) expectedOrder.push('supplement:scripts/tenant-cleanup-journey-window.mjs');
+      expectedOrder.push('disk:no-login-native');
+      if (!refused.includes('no-login-native')) expectedOrder.push('supplement:scripts/no-login-journey-window.mjs');
+      expectedOrder.push(`retain:final-native:${expectedStatus}`, 'stop-app', 'stop-redis');
+      assert.deepEqual(readFileSync(join(work, 'order'), 'utf8').trim().split('\n'), expectedOrder);
+    });
+  }
+}
+
+
+test('disk admission snapshots pin each phase while raw history grows through final retention', t => {
+  const { work } = fixture(t), raw = join(work, 'disk-headroom.jsonl');
+  const initial = '{"stage":"primary-native","status":"admitted","availableBytes":"10737418240"}\n';
+  const later = '{"stage":"cleanup-native","status":"refused","availableBytes":"10737418239"}\n';
+  writeFileSync(raw, initial, { mode: 0o600 });
+  const snapshots = [];
+  for (const [phase, bytes] of [['native', initial], ['final-native', initial + later]]) {
+    writeFileSync(raw, bytes, { mode: 0o600 });
+    const output = join(work, `retention-${phase}`); mkdirSync(output, { mode: 0o700 });
+    const terminal = retainJourneyEnd({ work, output, sourceBefore: {}, captureSource: () => ({}),
+      qualify: () => ({ qualified: true }), diskHeadroom: true, runnerExit: 1 });
+    assert.equal(terminal.diskHeadroomState, 'retained');
+    assert.equal(terminal.runnerExit, 1); assert.equal(terminal.fullReleaseQualified, false);
+    const snapshot = join(output, 'disk-headroom.jsonl');
+    const inventory = JSON.parse(readOwnedJourneyFile(work, join(output, 'artifact-inventory.json')));
+    const retained = inventory.files.find(file => file.path === `retention-${phase}/disk-headroom.jsonl`);
+    assert.equal(retained.state, 'retained'); assert.equal(retained.bytes, Buffer.byteLength(bytes));
+    assert.equal(retained.sha256, createHash('sha256').update(bytes).digest('hex'));
+    assert.equal(inventory.integrityValidated, true);
+    assert.equal(readOwnedJourneyFile(work, snapshot), bytes); assert.equal(statSync(snapshot).mode & 0o777, 0o600);
+    assert.ok(!inventory.files.some(file => file.path === 'disk-headroom.jsonl'));
+    snapshots.push({ snapshot, retained });
+  }
+  writeFileSync(raw, initial + later + '{"stage":"later-window","status":"admitted"}\n');
+  for (const { snapshot, retained } of snapshots) {
+    const afterAppend = inventoryJourneyArtifacts({ work, proofFiles: [snapshot] });
+    assert.equal(afterAppend.integrityValidated, true);
+    assert.equal(afterAppend.files[0].sha256, retained.sha256);
+  }
+});
+for (const kind of ['symbolic', 'outside-hardlink']) test(`disk admission snapshot refuses ${kind} evidence before outside read or chmod`, t => {
+  const { work, output } = fixture(t), outside = mkdtempSync(join(tmpdir(), 'outside-disk-admission.'));
+  t.after(() => rmSync(outside, { recursive: true, force: true }));
+  const target = join(outside, 'disk-headroom.jsonl'), raw = join(work, 'disk-headroom.jsonl');
+  writeFileSync(target, 'outside-only', { mode: 0o644 }); chmodSync(target, 0o644);
+  if (kind === 'symbolic') symlinkSync(target, raw); else linkSync(target, raw);
+  const terminal = retainJourneyEnd({ work, output, sourceBefore: {}, captureSource: () => ({}),
+    qualify: () => ({ qualified: true }), diskHeadroom: true, runnerExit: 7 });
+  assert.equal(terminal.diskHeadroomState, 'unavailable');
+  assert.equal(terminal.retentionValidated, false); assert.equal(terminal.runnerExit, 7);
+  const inventory = JSON.parse(readOwnedJourneyFile(work, join(output, 'artifact-inventory.json')));
+  assert.ok(inventory.issues.includes('disk-admission-snapshot-unavailable'));
+  assert.ok(!inventory.files.some(file => file.path.endsWith('/disk-headroom.jsonl')));
+  assert.throws(() => readFileSync(join(output, 'disk-headroom.jsonl')));
+  assert.equal(statSync(target).mode & 0o777, 0o644); assert.equal(readFileSync(target, 'utf8'), 'outside-only');
+  const unowned = inventoryJourneyArtifacts({ work, proofFiles: [target] });
+  assert.equal(unowned.integrityValidated, false); assert.deepEqual(unowned.issues, ['outside-owned-directory']);
+});
+
 test('captured unqualified stack is retained but cannot qualify terminal evidence', t => {
   const { work, output } = fixture(t);
   const terminal = retainJourneyEnd({ work, output, sourceBefore: {}, captureSource: () => ({}), qualify: () => ({ qualified: false }), browser: { status: 0 } });

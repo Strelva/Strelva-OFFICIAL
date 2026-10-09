@@ -36,6 +36,14 @@ base_env=("PATH=$PATH" "HOME=$HOME" "USER=${USER:-}" "LOGNAME=${LOGNAME:-}" "TMP
 work="$(mktemp -d "${TMPDIR:-/tmp}/strelva-full-journeys.XXXXXX")"
 cli=(npx --yes supabase@2.117.0)
 owned_stack="" app_pid="" redis_pid="" runtime_env="$work/runtime.env"
+# Proposed 10 GiB floor: caller may increase, never silently disable/lower it.
+disk_minimum_bytes="${STRELVA_FULL_MODEL_MIN_FREE_BYTES:-10737418240}"
+stack_disk_path=""
+disk_headroom() {
+  local paths=("$root" "$work")
+  [[ -z "$stack_disk_path" ]] || paths+=("$stack_disk_path")
+  env -i "${base_env[@]}" node "$root/scripts/full-model-disk-headroom.mjs" "$1" "$disk_minimum_bytes" "${paths[@]}" >> "$work/disk-headroom.jsonl"
+}
 stop_app() {
   if [[ -n "$app_pid" ]]; then
     pkill -TERM -P "$app_pid" 2>/dev/null || true
@@ -92,14 +100,17 @@ trap 'exit 143' TERM
 if [[ -n "$reuse" ]]; then
   reuse="$(cd "$reuse" && pwd)"
   [[ -f "$reuse/env" ]] || { echo 'Reuse needs the directory containing the owned env file.' >&2; exit 1; }
+  disk_headroom reuse
   cp "$reuse/env" "$work/env"
 else
+  disk_headroom bootstrap
   env -i "${base_env[@]}" CI=true STRELVA_LOCAL_AUTH_PROOF=1 RUNNER_TEMP="$work" GITHUB_ENV="$work/env" \
     GITHUB_RUN_ID="full-journeys-$(date +%s)-$$" GITHUB_RUN_ATTEMPT=1 SUPABASE_CLI='npx --yes supabase@2.117.0' \
     bash scripts/prepare-launch-auth-stack.sh > "$work/stack.log" 2>&1
 fi
 # Allowlisted, loopback values are quoted before use. A reused env is not code.
 node "$manifest" stack-env "$profile" "$work/env" > "$work/stack.env"
+stack_disk_path="$(node -e 'const fs=require("fs"); const line=fs.readFileSync(process.argv[1],"utf8").split("\n").find(x=>x.startsWith("STRELVA_AUTH_STACK_DIR=")); process.stdout.write(line.slice(line.indexOf("=")+1))' "$work/env")"
 if [[ -z "$reuse" ]]; then
   owned_stack="$(node -e 'const fs=require("fs"); const line=fs.readFileSync(process.argv[1],"utf8").split("\n").find(x=>x.startsWith("STRELVA_AUTH_STACK_DIR=")); process.stdout.write(line.slice(line.indexOf("=")+1))' "$work/env")"
 fi
@@ -124,6 +135,7 @@ variants=(additive-off)
 [[ "$profile" != full-native ]] || variants=(native)
 [[ "$profile" != full-dark ]] || variants+=(master-off)
 for variant in "${variants[@]}"; do
+  disk_headroom "start-$variant"
   variant_arg=(); [[ "$variant" != master-off ]] || variant_arg=(master-off)
   node "$manifest" manifest "$profile" ignored ${variant_arg[@]+"${variant_arg[@]}"} > "$work/manifest-$variant.json"
   node "$manifest" env "$profile" ignored ${variant_arg[@]+"${variant_arg[@]}"} > "$work/profile.env"
@@ -149,6 +161,7 @@ for variant in "${variants[@]}"; do
   specs=()
   while IFS= read -r file; do specs+=("$file"); done < <(node "$manifest" specs "$profile")
   status=0 browser_status=0
+  disk_headroom "primary-$variant"
   if [[ "$profile" == full-native ]]; then
     run_clean bash -c 'set -a; source "$1"; set +a; shift; exec "$@"' bash "$work/package-reviewer-test.env" \
       env STRELVA_PRIVATE_SOURCE_NATIVE_PROOFS=1 STRELVA_PRIVATE_SOURCE_PROOF_DIR="$work" \
@@ -165,8 +178,16 @@ for variant in "${variants[@]}"; do
   # Independent closed recovery evidence never changes a failed native status.
   # Keep the original 34-case contract and this owned app/Redis alive.
   if [[ "$profile" == full-native ]]; then
-    run_clean node scripts/tenant-cleanup-journey-window.mjs run "$root" "$work" > "$work/cleanup-window.log" 2>&1 || { [[ "$status" != 0 ]] || status=1; }
-    run_clean node scripts/no-login-journey-window.mjs run "$root" "$work" > "$work/no-login-window.log" 2>&1 || { [[ "$status" != 0 ]] || status=1; }
+    if disk_headroom "cleanup-$variant"; then
+      run_clean node scripts/tenant-cleanup-journey-window.mjs run "$root" "$work" > "$work/cleanup-window.log" 2>&1 || { [[ "$status" != 0 ]] || status=1; }
+    else
+      [[ "$status" != 0 ]] || status=1
+    fi
+    if disk_headroom "no-login-$variant"; then
+      run_clean node scripts/no-login-journey-window.mjs run "$root" "$work" > "$work/no-login-window.log" 2>&1 || { [[ "$status" != 0 ]] || status=1; }
+    else
+      [[ "$status" != 0 ]] || status=1
+    fi
   fi
   env -i "${base_env[@]}" node scripts/journey-evidence-retention.mjs "$root" "$work" "$profile" "final-$variant" "$status" || { [[ "$status" != 0 ]] || status=1; }
   stop_app; stop_redis
