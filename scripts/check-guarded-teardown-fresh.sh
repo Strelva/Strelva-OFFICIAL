@@ -53,6 +53,9 @@ psql "${psql_args[@]}" --file="$repo_root/tests/guarded-tenant-teardown-schema.s
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/tenant-teardown-evidence-owners.sql"
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/tenant-newsletter-teardown-hold.sql"
 printf 'PASS final guarded teardown against %s ordered actual forward migrations.\n' "$count"
+if [[ -n "${STRELVA_TEARDOWN_DATABASE_TYPES_OUT:-}" ]]; then
+ pnpm exec tsx scripts/generate-database-types.ts --host "$cluster_socket" --port "$cluster_port" --out "$STRELVA_TEARDOWN_DATABASE_TYPES_OUT"
+fi
 if [[ "${STRELVA_GOOGLE_REVIEW_RETENTION_SQL_PROOF:-0}" == 1 ]]; then
  psql "${psql_args[@]}" --file="$repo_root/tests/google-review-content-retention-schema.sql"
  if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261021100900_google_review_content_retention.sql" > "$cluster_root/review-retention-inverse.log" 2>&1; then

@@ -16439,6 +16439,33 @@ export type Database = {
           },
         ]
       }
+      tenant_newsletter_teardown_function_journal: {
+        Row: {
+          after_acl: Json | null
+          after_definition: string | null
+          before_acl: unknown[] | null
+          before_definition: string | null
+          owner_id: unknown
+          signature: string
+        }
+        Insert: {
+          after_acl?: Json | null
+          after_definition?: string | null
+          before_acl?: unknown[] | null
+          before_definition?: string | null
+          owner_id: unknown
+          signature: string
+        }
+        Update: {
+          after_acl?: Json | null
+          after_definition?: string | null
+          before_acl?: unknown[] | null
+          before_definition?: string | null
+          owner_id?: unknown
+          signature?: string
+        }
+        Relationships: []
+      }
       tenant_report_state: {
         Row: {
           cadence: string | null
@@ -32065,6 +32092,18 @@ export type Database = {
         Returns: Json
       }
       tenant_cleanup_teardown_blockers: {
+        Args: {
+          p_tenant_id: string
+        }
+        Returns: {
+          booking_grants: number
+          bookings: number
+          newsletter_issues: number
+          publications: number
+          reservations: number
+        }[]
+      }
+      tenant_cleanup_teardown_blockers_before_newsletter: {
         Args: {
           p_tenant_id: string
         }

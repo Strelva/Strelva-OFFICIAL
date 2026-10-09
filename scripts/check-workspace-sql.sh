@@ -1724,6 +1724,8 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022120000_age
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/agency-created-application-authority-contract.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022123000_private_definition_versions.sql"
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/private-definition-versions-contract.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022130000_tenant_newsletter_teardown_hold.sql"
+psql "${psql_args[@]}" --file="$repo_root/scripts/sql/tenant-newsletter-teardown-hold.sql"
 # Full legacy teardown behavior is proved by check-guarded-teardown-fresh.sh.
 # This historical fixture deliberately lacks parts of the pre-workspace schema.
 # Qualify #272 against the final booking functions in a disposable clone so
