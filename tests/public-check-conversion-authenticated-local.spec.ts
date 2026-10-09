@@ -78,7 +78,21 @@ test("a real anonymous URL check survives Auth and becomes private business evid
     const retainedHtml = await retained.text();
     expect(retainedHtml).toContain("Site Health Report");
     expect(retainedHtml).toContain(new URL(sourceUrl).hostname);
+    // The public shell loads its actual private API before it can render the
+    // signed-out handoff. Observe that authorization boundary, rather than
+    // racing the cold shell/hydration/request against the heading assertion.
+    const anonymousWorkspaceResponse = publicPage.waitForResponse(response =>
+      new URL(response.url()).pathname === "/api/workspace" && response.request().method() === "GET");
     await publicPage.getByRole("link", { name: "Save to my work", exact: true }).click();
+    const privateResponse = await anonymousWorkspaceResponse;
+    expect(privateResponse.status(), "An anonymous report cannot grant private workspace access.").toBe(401);
+    expect(privateResponse.headers()["cache-control"]).toContain("private");
+    expect(privateResponse.headers()["cache-control"]).toContain("no-store");
+    const privateDenial = await privateResponse.json();
+    const errorOnly = privateDenial !== null && typeof privateDenial === "object"
+      && Object.keys(privateDenial).length === 1 && typeof privateDenial.error === "string";
+    expect(errorOnly, "Anonymous denial returns no private workspace fields.").toBe(true);
+    measurements.anonymousWorkspace = { status: privateResponse.status(), privateNoStore: true, privateDataReturned: false };
     await expect(publicPage.getByRole("heading", { name: "Sign in to open your private work.", exact: true })).toBeVisible();
     const signInHandoff = publicPage.getByRole("main").getByRole("link", { name: "Sign in", exact: true });
     await expect(signInHandoff).toHaveAttribute("href", `/sign-in?next=${encodeURIComponent(`/workspace?save=${report.reportId}`)}`);
