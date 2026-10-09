@@ -8,11 +8,11 @@ const forward='20261022173000_neutral_creator_version_money.sql',inverse=`rollba
 const inventory=JSON.parse(read('scripts/sql/historical-forward-inventory.json'));
 const ports=[...read(`supabase/migrations/${forward}`).matchAll(/create function public\.([a-z_]+)\(/g)].map(item=>item[1]!);
 describe('exact additive neutral money composition',()=>{
- it('admits only the exact sorted unique352 ledger and retains actual physical forward coverage',()=>{
+ it('admits only the exact sorted unique354 ledger and retains actual physical forward coverage',()=>{
   const physical=readdirSync('supabase/migrations').filter(name=>/^\d{14}_.*\.sql$/.test(name)).sort();
-  expect(inventory.forwardCount).toBe(352);expect(inventory.forwardFiles).toEqual(physical);expect(physical).toHaveLength(352);expect(new Set(physical).size).toBe(352);expect(physical.at(-1)).toBe('20261022182000_booking_settings_atomic_patch.sql');
+  expect(inventory.forwardCount).toBe(354);expect(inventory.forwardFiles).toEqual(physical);expect(physical).toHaveLength(354);expect(new Set(physical).size).toBe(354);expect(physical.at(-1)).toBe('20261022182000_booking_settings_atomic_patch.sql');
   const versions=physical.map(name=>name.slice(0,14));expect(exactForwardLedger(inventory,versions)).toEqual(versions);
-  expect(()=>exactForwardLedger(inventory,versions.slice(0,-1))).toThrow();expect(()=>exactForwardLedger(inventory,[...versions.slice(0,-1),'20990000000000'])).toThrow();expect(()=>exactForwardLedger(inventory,[...versions].reverse())).toThrow();
+  expect(()=>exactForwardLedger(inventory,versions.slice(0,-1))).toThrow();expect(()=>exactForwardLedger(inventory,physical.filter(name=>!name.startsWith('20261021140200_')&&!name.startsWith('20261022175100_')).map(name=>name.slice(0,14)))).toThrow();expect(()=>exactForwardLedger(inventory,[...versions.slice(0,-1),'20990000000000'])).toThrow();expect(()=>exactForwardLedger(inventory,[...versions].reverse())).toThrow();
  });
  it('pins actual forward and retained-history inverse bytes without a qualification claim',()=>{
   verifyReleaseInventory(process.cwd());const manifest=JSON.parse(read('scripts/release-safety/batches.json'));const batch=manifest.proposed.find((item:{id:string})=>item.id==='neutral-creator-version-money');expect(batch.items).toHaveLength(1);
@@ -30,8 +30,8 @@ describe('exact additive neutral money composition',()=>{
   expect(exposure).toContain('installed not in(0,8)');expect(exposure).toContain('has_any_column_privilege');expect(exposure).toContain('neutral source money retained history exposed directly');expect(exposure).toContain('installed not in(0,6)');
  });
  it('keeps fixed native qualification counts and binds creator coordinator to new canonical checks before and after original inverse/reapply',()=>{
-  const authority=read('scripts/private-authority-journey-window.mjs');expect(authority).toContain('migrations?.length !== 352');expect(authority).toContain('ledger?.length !== 352');
-  const checkout=read('scripts/check-checkout-final-admission-races.mjs');expect(checkout).toContain('inventory.forwardCount !== 352');expect(checkout).toContain('JSON.stringify(installedLedger) !== JSON.stringify(expectedLedger)');
+  const authority=read('scripts/private-authority-journey-window.mjs');expect(authority).toContain('migrations?.length !== 354');expect(authority).toContain('ledger?.length !== 354');
+  const checkout=read('scripts/check-checkout-final-admission-races.mjs');expect(checkout).toContain('inventory.forwardCount !== 354');expect(checkout).toContain('JSON.stringify(installedLedger) !== JSON.stringify(expectedLedger)');
   const creator=read('scripts/check-governed-creator-exit-races.mjs');expect(creator).toContain("'scripts/sql/neutral-creator-version-money-contract.sql'");expect(creator).toContain("'scripts/sql/private-source-current-contract.sql'");expect(creator).toContain("run('neutral-source-contract'");expect(creator).toContain("run('reapplied-neutral-source-contract'");
  });
 });
