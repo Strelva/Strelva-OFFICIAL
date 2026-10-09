@@ -56,7 +56,7 @@ function ScopedWebsiteEntry({ workspaceId, connectedEnabled, rebuildEnabled, pat
     </nav> : null}
     {path === "connect" && connectedEnabled ? <ConnectSiteExperience workspaceId={workspaceId} canManage={canManage} initialSites={sites} appBase={appBase} /> : null}
     {path === "rebuild" && rebuildEnabled ? <div className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-10 md:px-8">
-      {saved.length ? <div className="max-w-2xl"><SelectInput label="Saved website work" value={workId ?? ""} options={[{ value: "", label: "Start a new website request" }, ...saved.map(item => ({ value: item.workId, label: `${item.title} · ${item.status}` }))]} onChange={event => chooseWork(event.target.value || undefined)} /></div> : null}
+      {saved.length ? <div className="max-w-2xl"><SelectInput className="max-sm:min-h-11" label="Saved website work" value={workId ?? ""} options={[{ value: "", label: "Start a new website request" }, ...saved.map(item => ({ value: item.workId, label: `${item.title} · ${item.status}` }))]} onChange={event => chooseWork(event.target.value || undefined)} /></div> : null}
       <RebuildExperience initialRequest={!workId ? requestDraft : ""} agency={agency} key={workId ?? (requestDraft ? "new:carried" : "new")} workspaceId={workspaceId} workId={workId} managed operator={operator} canPublish={canPublish} allowIntake readOnly={!canManage} transport={transport} onCurrentRecord={updateCurrentRecord} minimumRecordRevision={saved.find(item => item.workId === workId)?.revision ?? -1}
         onSaved={id => { setSaved(items => items.some(item => item.workId === id) ? items : [...items, { workId: id, title: "Saved website request", status: "building", revision: -1 }]); chooseWork(id); }} />
     </div> : null}
