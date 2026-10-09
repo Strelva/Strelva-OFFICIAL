@@ -69,7 +69,14 @@ test("a real anonymous URL check survives Auth and becomes private business evid
     await expect(publicPage.getByRole("link", { name: "Save to my work", exact: true })).toHaveAttribute("href", `/workspace?save=${report.reportId}`);
     const retained = await anonymous.request.get(`/api/audit/report/${report.reportId.slice(6)}`);
     expect(retained.status()).toBe(200);
-    expect(await retained.text()).toContain(title!.details!);
+    // The one-page export renders scores and priority fixes, not every check.
+    // The interactive report must retain the actual measured source title.
+    const titleCategory = report.categories.find(category => category.checks.some(check => check.name === "Title tag"))!;
+    await publicPage.getByRole("button").filter({ has: publicPage.getByRole("heading", { name: titleCategory.name, exact: true }) }).click();
+    await expect(publicPage.getByText(title!.details!, { exact: true })).toBeVisible();
+    const retainedHtml = await retained.text();
+    expect(retainedHtml).toContain("Site Health Report");
+    expect(retainedHtml).toContain(new URL(sourceUrl).hostname);
     await publicPage.getByRole("link", { name: "Save to my work", exact: true }).click();
     await expect(publicPage).toHaveURL(url => url.pathname === "/sign-in" && url.searchParams.get("next") === `/workspace?save=${report.reportId}`);
 

@@ -64,7 +64,7 @@ describe("independently released website entry", () => {
     const transport: RebuildTransport = { read, start: vi.fn(async () => record), mutate: vi.fn(async () => record) };
     await mount(createElement(WebsiteEntry, { workspaceId: WS, connectedEnabled: true, rebuildEnabled: true, path: "rebuild", canManage: true, initialWorkId: record.workId, rebuilds: [record], transport }));
     expect(read).toHaveBeenCalledWith(WS, record.workId, expect.any(AbortSignal));
-    expect(node.textContent).toContain("Strelva will handle launch and your domain."); expect(node.textContent).not.toContain("Publish approved website");
+    expect(node.textContent).toContain("No agency publication authority is shown here."); expect(node.textContent).not.toContain("Publish approved website");
     await act(async () => root!.render(createElement(WebsiteEntry, { key: "member", workspaceId: WS, connectedEnabled: false, rebuildEnabled: true, path: "rebuild", canManage: false, transport })));
     expect(button("Build a private preview").disabled).toBe(true);
   });
