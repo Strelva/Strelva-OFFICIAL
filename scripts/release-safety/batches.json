@@ -1799,6 +1799,19 @@
           "rollbackStatus": "Prepared exact canonical two-signature inverse after ACCESS EXCLUSIVE journal lock; retains all original writer/history bytes; 31 native refusal probes and populated inverse/reapply UNRUN"
         }
       ]
+    },
+    {
+      "id": "checkout-final-new-session-admission",
+      "status": "Prepared current merchant/request/agency actor admission before new Checkout POST; source/mock contracts pass; native wait/inverse/actual Auth/provider qualification pending; no production authority",
+      "items": [
+        {
+          "file": "20261022171000_checkout_final_admission.sql",
+          "sha256": "05eb86b74ed0ac2d77d28376eec273ecc6790f9b2db76dbdc5773dee85b2c718",
+          "rollback": "rollback-20261022171000_checkout_final_admission.sql",
+          "rollbackSha256": "65259470b5d88bfc4c1da5d7519abd48234a3ce41da4230a6faaa13fc5640ec0",
+          "rollbackStatus": "Prepared canonical owner/body/full props/args/ACL/overload refusal before dropping only additive admission; accepted effects/history survive; native UNRUN"
+        }
+      ]
     }
   ]
 }

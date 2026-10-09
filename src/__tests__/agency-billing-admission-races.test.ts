@@ -8,6 +8,20 @@ const merchant={workspace_id:agency,stripe_account_id:"acct_Agency",configuratio
 beforeEach(()=>vi.stubEnv("STRELVA_CONNECT","1"));
 afterEach(()=>vi.unstubAllEnvs());
 describe("exact agency authority immediately before new effects",()=>{
+ it("carries actual session actor and accepted owner email into the final native Checkout transaction",async()=>{
+  const rpc=vi.fn(async(name:string,args:Record<string,unknown>)=>{
+   if(name==="read_connected_account")return {data:merchant,error:null};
+   if(name==="reserve_business_payment")return {data:{id},error:null};
+   if(name==="prepare_business_checkout")return {data:{},error:null};
+   if(name==="assert_business_checkout_admission"){
+    expect(args).toEqual({p_payment_id:id,p_account:"acct_Agency",p_generation:7,p_actor_id:actor.userId,p_verified_email:actor.verifiedEmail,p_accepted_email:"accepting-owner@example.test"});return {data:true,error:null};
+   }
+   return {data:{...invoice,kind:"pay_link"},error:null};
+  });
+  const create=vi.fn(async()=>({id:"cs_Accepted",url:"https://checkout.stripe.com/accepted"}));
+  await expect(fulfillAgencyInvoice(actor,id,"http://localhost:3017",{db:{rpc},stripe:{checkout:{sessions:{create}}} as unknown as Stripe})).resolves.toMatchObject({id});
+  expect(create).toHaveBeenCalledTimes(1);expect(rpc.mock.calls.some(([name])=>name==="assert_agency_billing_mutation")).toBe(true);
+ });
  it.each(["manager membership removed","manager verification withdrawn","accepting owner removed","payer changed"])("stops price and subscription after customer readback: %s",async reason=>{
   let release!:()=>void, entered!:()=>void, live=true;
   const wait=new Promise<void>(resolve=>{release=resolve;}), started=new Promise<void>(resolve=>{entered=resolve;});

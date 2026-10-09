@@ -32,6 +32,8 @@ const nullableRpcArguments: Readonly<Record<string, readonly string[]>> = {
   rotate_tenant_track_signing_key: ["p_public_key"],
   // Takeover intentionally supplies no creator agreement/reference.
   record_creator_maintenance_from_workspace: ["p_agreement", "p_rate"],
+  // Public Checkout has no agency actor; pay-link admission requires all three.
+  assert_business_checkout_admission: ["p_actor_id", "p_verified_email", "p_accepted_email"],
 };
 
 function arg(name: string): string | undefined {

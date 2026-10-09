@@ -32,7 +32,7 @@ export async function fulfillAgencyInvoice(actor:WorkspaceActor,intentId:string,
  const merchant=await getConnectedMerchant(intent.agency_workspace_id,db);
  const admissionArgs={p_intent_id:intent.id,p_actor_id:actor.userId,p_verified_email:actor.verifiedEmail,p_accepted_email:intent.accepted_email,p_account_id:merchant.stripe_account_id,p_generation:merchant.generation};
  const assertAdmission=async()=>{await rpc("assert_agency_billing_mutation",admissionArgs,db);};
- const mutationDeps={...deps,beforeProviderMutation:assertAdmission};
+ const mutationDeps={...deps,beforeProviderMutation:assertAdmission,checkoutAuthority:{actor,acceptedEmail:intent.accepted_email??null}};
  let objectId:string;let url:string|null;
  if(intent.kind==="pay_link") {
   const result=await createDirectCheckout({workspaceId:intent.agency_workspace_id,idempotencyKey:`agency-invoice:${intent.id}`,purpose:"pay_link",amountCents:intent.amount_cents,currency:intent.currency,referenceId:intent.id,

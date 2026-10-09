@@ -28,7 +28,7 @@ export function connectProfile(): ConnectProfile {
  return profile.data;
 }
 export function stripeClient() { if (!process.env.STRIPE_SECRET_KEY) throw new WorkspaceStoreError("Payments provider is unavailable."); return new Stripe(process.env.STRIPE_SECRET_KEY); }
-export interface ConnectDependencies { db?:RpcDb|null; stripe?:Stripe; beforeProviderMutation?:()=>Promise<void>; }
+export interface ConnectDependencies { db?:RpcDb|null; stripe?:Stripe; beforeProviderMutation?:()=>Promise<void>; checkoutAuthority?:{actor:WorkspaceActor;acceptedEmail:string|null}; }
 export async function manageConnectedAccount(actor:WorkspaceActor,workspaceId:string,action:"read"|"reserve"|"disconnect",db:RpcDb|null=connectDb()) {
  return moneyRpc<ConnectedAccount|null>("manage_connected_account",{p_workspace_id:z.string().uuid().parse(workspaceId),p_user_id:actor.userId,p_verified_email:actor.verifiedEmail,p_action:action},db);
 }
@@ -73,13 +73,19 @@ export async function onboardConnectedAccount(actor:WorkspaceActor,input:{worksp
  return {url:link.url,accountId};
 }
 export interface DirectCheckoutInput {workspaceId:string;idempotencyKey:string;purpose:"checkout"|"deposit"|"quote"|"agent"|"agency_rebill"|"pay_link";amountCents:number;currency:string;successUrl:string;cancelUrl:string;referenceId?:string;}
+/** Final new-session admission. Accepted provider observations use their original receipt ports. */
+export async function assertBusinessCheckoutAdmission(paymentId:string,merchant:ConnectedAccount,deps:ConnectDependencies={}) {
+ const db=deps.db===undefined?connectDb():deps.db;
+ const admitted=await moneyRpc("assert_business_checkout_admission",{p_payment_id:paymentId,p_account:merchant.stripe_account_id,p_generation:merchant.generation,p_actor_id:deps.checkoutAuthority?.actor.userId??null,p_verified_email:deps.checkoutAuthority?.actor.verifiedEmail??null,p_accepted_email:deps.checkoutAuthority?.acceptedEmail??null},db);
+ if(admitted!==true)throw new WorkspaceStoreError("Current payment authority could not be confirmed.");
+}
 export async function createDirectCheckout(input:DirectCheckoutInput,deps:ConnectDependencies={}) {
  const db=deps.db===undefined?connectDb():deps.db; const merchant=await getConnectedMerchant(input.workspaceId,db);
  const payment=await moneyRpc<{id:string}>("reserve_business_payment",{p_workspace_id:input.workspaceId,p_key:input.idempotencyKey,p_purpose:input.purpose,p_amount:input.amountCents,p_currency:input.currency,p_reference:input.referenceId??null},db);
  await moneyRpc("claim_business_payment_channel",{p_payment_id:payment.id,p_channel:"checkout"},db);
  const stripe=deps.stripe??stripeClient();
  const prepared=await moneyRpc<{sessionId?:string}>("prepare_business_checkout",{p_payment_id:payment.id},db);
- if(!prepared?.sessionId)await deps.beforeProviderMutation?.();
+ if(!prepared?.sessionId){await deps.beforeProviderMutation?.();await assertBusinessCheckoutAdmission(payment.id,merchant,{...deps,db});}
  const session=prepared?.sessionId?await stripe.checkout.sessions.retrieve(prepared.sessionId,{stripeAccount:merchant.stripe_account_id!}):await stripe.checkout.sessions.create({mode:"payment",line_items:[{price_data:{currency:input.currency,unit_amount:input.amountCents,product_data:{name:input.purpose==="quote"?"Accepted quote":input.purpose==="deposit"?"Booking deposit":"Business payment"}},quantity:1}],success_url:input.successUrl,cancel_url:input.cancelUrl,metadata:{businessPaymentId:payment.id},payment_intent_data:{application_fee_amount:0,metadata:{businessPaymentId:payment.id}}},{stripeAccount:merchant.stripe_account_id!,idempotencyKey:`payment:${payment.id}`});
  await moneyRpc("record_business_payment_event",{p_account_id:merchant.stripe_account_id,p_event_id:`checkout:${session.id}`,p_object_id:session.id,p_payment_id:payment.id,p_kind:"checkout_created",p_amount:0},db);
  return {paymentId:payment.id,sessionId:session.id,url:session.url};

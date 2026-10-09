@@ -526,6 +526,8 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022130000_ten
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/tenant-newsletter-teardown-hold.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022170000_creator_maintenance_operations.sql"
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/creator-maintenance-operations-contract.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022171000_checkout_final_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/scripts/sql/checkout-final-admission-contract.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/function-exposure-schema.sql"
 node --import tsx "$repo_root/scripts/check-readonly-rpcs.mjs" "postgresql:///postgres?host=$cluster_socket&port=$cluster_port"
 psql "${psql_args[@]}" --file="$repo_root/tests/guarded-tenant-teardown-schema.sql"

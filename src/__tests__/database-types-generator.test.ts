@@ -111,4 +111,9 @@ describe("generate-database-types render", () => {
     }
     expect(generated).toContain("Returns: Json");
   });
+  it("requires exact Checkout merchant/payment inputs while allowing explicit absent public agency context", () => {
+    const generated=render({...catalog,functions:[{name:"assert_business_checkout_admission",oid:8,retset:false,rettype:T.bool,argnames:["p_payment_id","p_account","p_generation","p_actor_id","p_verified_email","p_accepted_email"],argmodes:null,alltypes:null,argtypes:[T.uuid,T.text,T.int4,T.uuid,T.text,T.text],ndefaults:0}]});
+    for(const name of ["p_actor_id","p_verified_email","p_accepted_email"])expect(generated).toContain(`${name}: string | null`);
+    expect(generated).toContain("p_payment_id: string\n");expect(generated).toContain("p_account: string\n");expect(generated).toContain("p_generation: number\n");expect(generated).not.toContain("p_actor_id?:");expect(generated).toContain("Returns: boolean");
+  });
 });

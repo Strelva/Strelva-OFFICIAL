@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { connectEnabled, getConnectedMerchant, moneyRpc } from "@/platform/connect";
+import { assertBusinessCheckoutAdmission, connectEnabled, getConnectedMerchant, moneyRpc, type ConnectedAccount } from "@/platform/connect";
 import { workspaceIdForTenant } from "@/platform/business-billing";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -148,6 +148,7 @@ export async function POST(req: NextRequest) {
   let paymentId: string | undefined;
   let paymentKey: string | undefined;
   let existingSession: string | undefined;
+  let checkoutMerchant: ConnectedAccount | undefined;
   if (connectedCheckout) {
     if (!connectEnabled()) return NextResponse.json({error:"Business payments are not enabled."},{status:503});
     // Existing customers are activated separately after merchant/KYC/provider verification.
@@ -158,6 +159,7 @@ export async function POST(req: NextRequest) {
       const workspaceId = await workspaceIdForTenant(tenant);
       if (!workspaceId) return NextResponse.json({error:"The business merchant is unavailable."},{status:503});
       const merchant = await getConnectedMerchant(workspaceId);
+      checkoutMerchant=merchant;
       merchantAccount = merchant.stripe_account_id!;
       const subtotal = lineItems.reduce((sum,item)=>sum+item.price_data.unit_amount*item.quantity,0);
       const payment = await moneyRpc<{id:string}>("reserve_business_payment", {p_workspace_id:workspaceId,p_key:key,p_purpose:"checkout",p_amount:subtotal+(subtotal>=4500?0:599),p_currency:"usd",p_reference:createHash("sha256").update(JSON.stringify(lineItems)).digest("hex")});
@@ -167,6 +169,7 @@ export async function POST(req: NextRequest) {
     } catch {return NextResponse.json({error:"The business merchant could not be confirmed."},{status:503});}
   }
   try {
+    if(paymentId && checkoutMerchant && !existingSession) await assertBusinessCheckoutAdmission(paymentId,checkoutMerchant);
     const session = existingSession ? await stripe.checkout.sessions.retrieve(existingSession,{stripeAccount:merchantAccount}) : await stripe.checkout.sessions.create({
       ...(paymentId ? {metadata:{businessPaymentId:paymentId},payment_intent_data:{application_fee_amount:0,metadata:{businessPaymentId:paymentId}}} : {}),
       mode,

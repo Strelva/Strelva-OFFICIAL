@@ -89,3 +89,8 @@ begin
  if (reader is null)<>(writer is null) or (reader is null)<>(j is null) then raise exception 'creator maintenance operations incomplete exposure boundary';end if;
  if reader is not null and (not has_function_privilege('service_role',reader,'EXECUTE') or not has_function_privilege('service_role',writer,'EXECUTE') or has_function_privilege('anon',reader,'EXECUTE') or has_function_privilege('anon',writer,'EXECUTE') or has_function_privilege('authenticated',reader,'EXECUTE') or has_function_privilege('authenticated',writer,'EXECUTE') or has_table_privilege('service_role',j,'SELECT') or has_table_privilege('anon',j,'SELECT') or has_table_privilege('authenticated',j,'SELECT')) then raise exception 'creator maintenance operations lost exact private service-only boundary';end if;
 end $$;
+
+-- Public Checkout final admission has no anonymous or request-session RPC.
+do $$declare f regprocedure:=to_regprocedure('public.assert_business_checkout_admission(uuid,text,bigint,uuid,text,text)');begin
+ if f is not null and (not has_function_privilege('service_role',f,'EXECUTE') or has_function_privilege('anon',f,'EXECUTE') or has_function_privilege('authenticated',f,'EXECUTE')) then raise exception 'Checkout admission lost private service-only boundary';end if;
+end$$;
