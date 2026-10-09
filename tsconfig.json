@@ -67,7 +67,9 @@
     ".next-w6-ui/types/**/*.ts",
     ".next-w6-ui/dev/types/**/*.ts",
     ".next-full-model-journeys/types/**/*.ts",
-    ".next-full-model-journeys/dev/types/**/*.ts"
+    ".next-full-model-journeys/dev/types/**/*.ts",
+    ".next-private-authority-journeys/types/**/*.ts",
+    ".next-private-authority-journeys/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
