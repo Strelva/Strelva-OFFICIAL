@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { extractBusinessFacts, isHighRiskWebsiteClaim, runWebsiteRebuild } from "@/products/websites/rebuild-pipeline";
 import { renderSiteDocumentHtml } from "@/products/websites/site-export";
+import { descriptionContacts, descriptionContactBindings } from "@/products/websites/rebuild-contact";
 import { siteDocumentSchema } from "@/products/websites/site-document";
 
 const description = "We bake sourdough bread for Saturday pickup. Email orders@example.test or call 716-555-0100 to place an order.";
@@ -35,6 +36,26 @@ describe("supplied contact details in a new website description", () => {
     const nativeHtml = renderSiteDocumentHtml(result.document, "/contact", { tenant: "fictional-juniper" });
     expect(nativeHtml).toContain('data-site-inquiry="fictional-juniper"'); expect(nativeHtml).toContain("site-lead-runtime.mjs");
     expect(nativeHtml).not.toContain("This inquiry form is not connected yet.");
+  });
+  it.each(["\n", "\r\n", "\n\n", ". "])("keeps contact offer context separate from unrelated negative copy across %j", async separator => {
+    const description = `We do not offer delivery${separator}Email orders@example.test or call 716-555-0100.`;
+    expect(descriptionContacts(description)).toEqual(["orders@example.test", "716-555-0100"]);
+    const result = await runWebsiteRebuild({ ...input, description });
+    expect(result.facts.contact.map(id => result.facts.facts[id]!.text)).toEqual(["orders@example.test", "716-555-0100"]);
+    expect(descriptionContactBindings(result.facts)).toHaveLength(2);
+    for (const path of ["/", "/contact"]) {
+      const html = renderSiteDocumentHtml(result.document, path, { preview: true });
+      expect(html).toContain('href="mailto:orders@example.test"'); expect(html).toContain('href="tel:7165550100"');
+    }
+  });
+  it.each([
+    "We bake bread\nDo not email orders@example.test or call 716-555-0100.",
+    "We do not offer delivery Email orders@example.test or call 716-555-0100.",
+    "Email orders@example.test is retired\nOur previous phone: 716-555-0100.",
+  ])("continues refusing actually negated contact offers across input lines: %s", async description => {
+    const result = await runWebsiteRebuild({ ...input, description });
+    expect(result.facts.contact).toEqual([]); expect(descriptionContactBindings(result.facts)).toEqual([]);
+    expect(renderSiteDocumentHtml(result.document, "/contact", { preview: true })).not.toMatch(/href="(?:mailto:|tel:)/);
   });
   it("keeps an ordinary description unchanged when no explicit contact is supplied", async () => {
     const description = "We bake sourdough bread for Saturday pickup.";

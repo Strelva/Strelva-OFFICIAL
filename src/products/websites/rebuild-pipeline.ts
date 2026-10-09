@@ -16,7 +16,7 @@ export const websiteRebuildInputSchema = z.union([
 export type WebsiteRebuildInput = z.infer<typeof websiteRebuildInputSchema>;
 export type RebuildStage = "crawl" | "extract" | "write" | "compose" | "verify";
 export interface RebuildEvent { stage: RebuildStage; status: "running" | "completed" | "failed"; message: string; at: string; counts?: Record<string, number> }
-export interface BusinessFacts { name: string; nameFactId: string; category?: string; facts: Record<string, Fact>; services: string[]; people: string[]; contact: string[]; hours: string[]; locations: string[]; reviews: string[]; claims: string[]; brandColors: string[]; oldPaths: string[]; sourcePages: Array<{ sourceId: string; url: string; title: string; factIds: string[]; contentTruncated?: boolean }> }
+export interface BusinessFacts { name: string; nameFactId: string; category?: string; facts: Record<string, Fact>; services: string[]; people: string[]; contact: string[]; hours: string[]; locations: string[]; reviews: string[]; claims: string[]; descriptionClaimLines?: string[][]; brandColors: string[]; oldPaths: string[]; sourcePages: Array<{ sourceId: string; url: string; title: string; factIds: string[]; contentTruncated?: boolean }> }
 export interface ContentBlock { id: string; type: "heading" | "paragraph" | "service" | "person" | "contact" | "hours" | "location" | "review"; text: string; factIds: string[] }
 export interface RebuildPageContent { path: string; title: string; sourceIds: string[]; blocks: ContentBlock[] }
 export interface RebuildContent { pages: RebuildPageContent[]; writer: "source" | "model"; modelLabel?: string }
@@ -53,8 +53,12 @@ export function extractBusinessFacts(input: WebsiteRebuildInput, crawl?: CrawlRe
   };
   if ("description" in input) {
     result.name = input.businessName; result.nameFactId = insert(input.businessName, "claim");
-    for (const span of chunks(input.description,true)) insert(span, "claim");
-    for (const contact of descriptionContacts(clean(input.description))) insert(contact, "contact");
+    // Whitespace inside a line is presentation; a supplied line boundary is
+    // contact-offer context. Keep the claim IDs grouped for later corrections.
+    result.descriptionClaimLines = input.description.split(/\r\n?|\n/)
+      .map(line => chunks(line,true).map(span => insert(span,"claim")).filter(Boolean))
+      .filter(line => line.length > 0);
+    for (const contact of descriptionContacts(input.description)) insert(contact, "contact");
     return result;
   }
   if (!crawl?.pages.length) throw new Error("The crawl has no readable pages.");

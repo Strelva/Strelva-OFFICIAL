@@ -141,6 +141,41 @@ describe("website rebuild service lifecycle and durable recovery", () => {
     expect(renderSiteDocumentHtml(published.document,"/contact")).toContain(`href="${oldHref}"`);
     expect(h.documents.manage).toHaveBeenLastCalledWith(actor,{ workspaceId, workId: record.workId });
   });
+  it("preserves separate input line context through publication, contact correction and recomposition", async () => {
+    const description = "We do not offer delivery\nEmail orders@example.test or call 716-555-0100.";
+    const h = harness(); let record = await h.create({ ...brief, description });
+    expect(Object.values(record.rebuild.candidate!.document.facts).filter(fact => fact.kind === "contact").map(fact => fact.text)).toEqual(["orders@example.test", "716-555-0100"]);
+    for (const id of unresolvedSiteFacts(record.rebuild.candidate!.document)) record = await h.service.resolveFact(actor,record.workId,id,{ ...selection(record), action: "confirm" });
+    record = await h.launch(record); const published = clone(h.publications.get(record.rebuild.tenantId!)!);
+    const [factId] = Object.entries(published.document.facts).find(([,fact]) => fact.kind === "contact" && fact.text === "orders@example.test")!;
+    const edited = await h.service.resolveFact(actor,record.workId,factId,{ ...selection(record), action: "edit", text: "pickup@example.test" });
+    expect(edited.rebuild.input).toEqual(record.rebuild.input);
+    expect(edited.rebuild.approvedCandidateRevision).toBeNull(); expect(edited.rebuild.status).toBe("review_ready");
+    expect(edited.rebuild.candidate!.contentHash).not.toBe(record.rebuild.candidate!.contentHash);
+    const current = extractBusinessFacts({ ...brief, description }); current.facts = clone(edited.rebuild.candidate!.document.facts);
+    const recomposed = await composeRebuildSite(current,writeSourceContent(current));
+    for (const document of [edited.rebuild.candidate!.document,recomposed]) {
+      const home = renderSiteDocumentHtml(document,"/",{ preview:true });
+      expect(home).toContain("We do not offer delivery"); expect(home).toContain("Email pickup@example.test"); expect(home).not.toContain("orders@example.test");
+      for (const path of ["/", "/contact"]) {
+        const html = renderSiteDocumentHtml(document,path,{ preview:true });
+        expect(html).toContain('href="mailto:pickup@example.test"'); expect(html).toContain('href="tel:7165550100"');
+      }
+    }
+    expect(h.publications.get(record.rebuild.tenantId!)!).toEqual(published);
+    expect(renderSiteDocumentHtml(published.document,"/contact")).toContain('href="mailto:orders@example.test"');
+    const [claimId] = Object.entries(edited.rebuild.candidate!.document.facts).find(([,fact]) => fact.kind === "claim" && fact.text.startsWith("Email"))!;
+    await expect(h.service.resolveFact(actor,record.workId,claimId,{ ...selection(edited), action:"edit", text:"Do not email pickup@example.test or call 716-555-0100." })).rejects.toThrow("Edit the separate email or phone fact first");
+    const [deliveryId] = Object.entries(edited.rebuild.candidate!.document.facts).find(([,fact]) => fact.text === "We do not offer delivery")!;
+    const ordinaryEdit = await h.service.resolveFact(actor,edited.workId,deliveryId,{ ...selection(edited), action:"edit", text:"We do not offer shipping" });
+    current.facts = clone(ordinaryEdit.rebuild.candidate!.document.facts);
+    expect(renderSiteDocumentHtml(await composeRebuildSite(current,writeSourceContent(current)),"/contact",{ preview:true })).toContain('href="mailto:pickup@example.test"');
+    const removed = await h.service.resolveFact(actor,ordinaryEdit.workId,factId,{ ...selection(ordinaryEdit), action:"remove" });
+    current.facts = clone(removed.rebuild.candidate!.document.facts); current.contact = current.contact.filter(id => id !== factId);
+    const removedHome = renderSiteDocumentHtml(await composeRebuildSite(current,writeSourceContent(current)),"/",{ preview:true });
+    expect(removedHome).toContain("We do not offer shipping"); expect(removedHome).toContain('href="tel:7165550100"'); expect(removedHome).not.toContain("pickup@example.test");
+    expect(h.publications.get(record.rebuild.tenantId!)!).toEqual(published);
+  });
   it.each([
     ["Email orders@example.test for orders. Email support@example.test for support.", "orders@example.test", "support@example.test"],
     ["Call 716-555-0100 for orders. Call (716) 555-0199 for support.", "716-555-0100", "716.555.0199"],

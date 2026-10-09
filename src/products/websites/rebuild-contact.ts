@@ -57,15 +57,24 @@ export function descriptionContacts(description: string): string[] {
   return [...contacts.values()];
 }
 
-/** Owner description order supplies context even when a cue is in the prior chunk. */
+/** Keep original input lines separate, but join chunks within the same line. */
 export function descriptionContactBindings(facts: BusinessFacts): Array<{ claimId: string; contactId: string; start: number; end: number }> {
   if (facts.sourcePages.length) return [];
   const claims = facts.claims.filter(id => id !== facts.nameFactId && facts.facts[id]?.kind === "claim" && facts.facts[id]!.sources.length === 0);
-  let description = "";
+  const lineByClaim = new Map<string, number>();
+  facts.descriptionClaimLines?.forEach((line,index) => line.forEach(id => {
+    if (!lineByClaim.has(id)) lineByClaim.set(id,index);
+  }));
+  let description = ""; let previousLine: number | undefined;
   const ranges = claims.map(claimId => {
+    const line = lineByClaim.get(claimId);
+    // Older retained checkpoints have no line metadata and retain their
+    // original chunk order. New intake separates only actual supplied lines.
+    if (description) description += line !== undefined && previousLine !== undefined && line !== previousLine ? "\n" : " ";
     const start = description.length;
-    description += facts.facts[claimId]!.text + " ";
-    return { claimId, start, end: description.length - 1 };
+    description += facts.facts[claimId]!.text;
+    previousLine = line;
+    return { claimId, start, end: description.length };
   });
   const bindings: Array<{ claimId: string; contactId: string; start: number; end: number }> = [];
   for (const span of descriptionContactSpans(description)) {
