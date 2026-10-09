@@ -88,10 +88,10 @@ describe("owner journey copy and links", () => {
     expect(historyPage).toContain("getSiteSnapshots(tenant, 60)");
     expect(historyPage).toContain('snapshots.status === "fulfilled"');
     expect(historyPage).toContain("<SiteSafetyPanel snapshots={snapshots.value} />");
-    expect(safetyPanel).toContain("Revert to a last good version");
-    expect(safetyPanel).toContain("Save a version now");
+    expect(safetyPanel).toContain("Restore from History");
+    expect(safetyPanel).toContain("Save to History");
     // Per-row restore over the whole version history, not just the latest.
-    expect(safetyPanel).toContain("Restore this version");
+    expect(safetyPanel).toContain("Restore this saved state");
     expect(snapshotRoute).toContain("restoreSiteSnapshot");
     expect(snapshotRoute).toContain("Saved a full-site backup");
     expect(snapshotRoute).toContain("Restored full site from");

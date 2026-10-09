@@ -37,7 +37,7 @@ export type PossibilityTryState =
  */
 export function PossibilityTry({ state }: { state: PossibilityTryState }) {
   if (state.kind === "expired") return <Shell><h1 className="font-display text-2xl">This link has expired.</h1><p className="mt-3 text-sm text-gray-muted">Links in Strelva&apos;s emails last 14 days. The next email has a fresh one. Nothing changed.</p></Shell>;
-  if (state.kind === "changed") return <Shell><h1 className="font-display text-2xl">This changed since we emailed you.</h1><p className="mt-3 text-sm text-gray-muted">Strelva is refreshing it. The latest version comes in the next email. Nothing live changed.</p></Shell>;
+  if (state.kind === "changed") return <Shell><h1 className="font-display text-2xl">This changed since we emailed you.</h1><p className="mt-3 text-sm text-gray-muted">Strelva is refreshing it. The latest possibility comes in the next email. Nothing live changed.</p></Shell>;
   const { view } = state;
   return <Shell>
     <p className="text-xs font-semibold uppercase tracking-wide text-gray-muted">Try it · not live</p>

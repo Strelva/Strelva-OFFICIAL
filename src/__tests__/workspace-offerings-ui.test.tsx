@@ -243,7 +243,7 @@ describe("workspace offering experience", () => {
     }, installationId);
     expect(html).toContain("This offering changed while you were editing.");
     expect(html).toContain("revision 2");
-    expect(html).toContain("Review the current version, then save your draft to retry");
+    expect(html).toContain("Review the current saved state, then save your draft to retry");
     expect(html).toContain("Latest saved: Saved by editor A");
     expect(html).toContain("Your draft: Saved by editor A");
   });

@@ -242,7 +242,7 @@ describe("offering editor conflict recovery", () => {
     expect(save.disabled).toBe(true);
     expect(pending.filter((item) => item.url.endsWith("/api/offerings"))).toHaveLength(1);
 
-    const refresh = [...container.querySelectorAll<HTMLButtonElement>('button[type="button"]')].find((button) => button.textContent?.includes("Refresh latest version"));
+    const refresh = [...container.querySelectorAll<HTMLButtonElement>('button[type="button"]')].find((button) => button.textContent?.includes("Refresh History"));
     expect(refresh).toBeDefined();
     act(() => refresh!.click());
     expect(pending[3]!.url).toContain("/api/offerings?businessId=");

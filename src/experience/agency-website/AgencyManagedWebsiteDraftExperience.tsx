@@ -159,7 +159,7 @@ export function AgencyManagedWebsiteDraftExperience({ bindingId, section = "hero
       {status === "ready" && grant && active && state ? <section className="mt-8 space-y-5" aria-labelledby="managed-website-draft-title">
         <div className="rounded-xl border border-gray-border bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div><h2 id="managed-website-draft-title" className="text-base font-medium text-warm-black">{section} draft</h2><p className="mt-1 text-xs text-gray-muted">Version {state.revision}. If the client changes this section, reload it before saving.</p></div>
+            <div><h2 id="managed-website-draft-title" className="text-base font-medium text-warm-black">{section} draft</h2><p className="mt-1 text-xs text-gray-muted">Saved draft {state.revision}. If the client changes this section, reload it before saving.</p></div>
             {customerWebsiteHref ? <Link className="min-h-11 inline-flex items-center rounded-lg px-3 text-sm text-warm-black underline underline-offset-4" href={customerWebsiteHref}>Open client website editor</Link> : <span className="text-xs text-gray-muted">Client editor link unavailable</span>}
           </div>
           {section === "hero" ? <div className="mt-5 grid gap-4">

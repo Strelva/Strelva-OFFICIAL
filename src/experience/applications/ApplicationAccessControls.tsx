@@ -228,10 +228,10 @@ export function ApplicationAccessControls({ workId, status, hasRelease, canManag
     <section aria-labelledby="application-access-heading" className="space-y-5 border-t border-gray-border pt-6">
       <div className="space-y-2">
         <h2 id="application-access-heading" className="font-display text-xl">Give someone a link</h2>
-        <p className="text-sm leading-6 text-gray-fg">Choose what this person can open and change. The link stays the same when you publish another version.</p>
+        <p className="text-sm leading-6 text-gray-fg">Choose what this person can open and change. The link stays the same when you publish another release.</p>
       </div>
       {!hasRelease || status === "retired" ? (
-        <p role="status" className="rounded-lg border border-dashed border-gray-border bg-surface-inset px-4 py-3 text-sm text-gray-muted">Make a version available before giving someone a link.</p>
+        <p role="status" className="rounded-lg border border-dashed border-gray-border bg-surface-inset px-4 py-3 text-sm text-gray-muted">Make a release available before giving someone a link.</p>
       ) : (
         <form className="space-y-5" onSubmit={event => void issue(event)}>
           <TextInput label="Recipient email" type="email" value={recipientEmail} maxLength={254} required disabled={disabled || busy} onChange={event => setRecipientEmail(event.target.value)} />

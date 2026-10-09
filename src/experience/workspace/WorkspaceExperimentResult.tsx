@@ -65,7 +65,7 @@ function LegacyExperimentResult({ work, onOpenTracker }: { work: WorkspaceWork; 
         <div><dt className="text-gray-muted">Previous approach</dt><dd className="mt-1 font-medium">{minutes(legacyExperiment.baselineMinutes)}</dd></div>
         <div><dt className="text-gray-muted">Reported difference</dt><dd className="mt-1 font-medium">{signedMinutes(legacyExperiment.differenceMinutes)}</dd></div>
         <div><dt className="text-gray-muted">Provider cost</dt><dd className="mt-1 font-medium">{legacyExperiment.providerCostUsd === null ? "Not recorded" : `$${legacyExperiment.providerCostUsd.toFixed(2)}`}</dd></div>
-        <div><dt className="text-gray-muted">Tracker version</dt><dd className="mt-1 font-medium">{legacyExperiment.targetRevision}</dd></div>
+        <div><dt className="text-gray-muted">Tracker History entry</dt><dd className="mt-1 font-medium">{legacyExperiment.targetRevision}</dd></div>
         <div><dt className="text-gray-muted">Recorded</dt><dd className="mt-1 font-medium">{recordedDate(legacyExperiment.recordedAt)}</dd></div>
       </dl>
       <section className="space-y-3">
@@ -85,7 +85,7 @@ function LegacyExperimentResult({ work, onOpenTracker }: { work: WorkspaceWork; 
         <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-gray-muted">{legacyExperiment.evidence}</p>
       </section>
       {trackerHref ? <Link className="inline-flex min-h-11 items-center rounded-lg border border-gray-border px-4 text-sm font-medium text-warm-black" href={trackerHref} onNavigate={onOpenTracker && work.sourceWorkId ? (event) => { event.preventDefault(); onOpenTracker(work.sourceWorkId!); } : undefined}>Open current tracker</Link> : null}
-      <p className="border-t border-gray-border pt-4 text-xs leading-relaxed text-gray-muted">Operator reported evidence captured for this tracker version. It is immutable and has not been promoted into a business capability or verified savings claim.</p>
+      <p className="border-t border-gray-border pt-4 text-xs leading-relaxed text-gray-muted">Operator reported evidence captured for this tracker History entry. It is immutable and has not been promoted into a business capability or verified savings claim.</p>
     </article>
   );
 }

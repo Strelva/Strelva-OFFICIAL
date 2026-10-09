@@ -99,10 +99,10 @@ function statusLabel(website: Website): string {
 function statusMessage(website: Website): string {
   if (isLocalExportReady(website)) return "Your approved website is ready to download. It has not been published.";
   if (website.status === "draft") return "Your website draft is saved while the next preview is being prepared.";
-  if (website.status === "preview_ready") return `Preview version ${website.candidate?.revision ?? "current"} is ready for your review.`;
-  if (website.status === "approved") return `Preview version ${website.approvedCandidateRevision ?? "current"} is approved. Prepare launch when you are ready.`;
+  if (website.status === "preview_ready") return `Saved preview ${website.candidate?.revision ?? "current"} is ready for your review.`;
+  if (website.status === "approved") return `Saved preview ${website.approvedCandidateRevision ?? "current"} is approved. Prepare launch when you are ready.`;
   if (website.status === "launch_pending") return "Launch preparation is still pending. Check the saved status before trying again.";
-  if (website.status === "published") return `Your website is published from preview version ${website.launch.candidateRevision ?? website.approvedCandidateRevision ?? "current"}.`;
+  if (website.status === "published") return `Your website is published from saved preview ${website.launch.candidateRevision ?? website.approvedCandidateRevision ?? "current"}.`;
   if (website.lastError?.stage === "artifact") return "We could not generate the preview. Your website draft is saved; try again.";
   if (website.lastError?.stage === "launch") return "We could not prepare launch. Your approved preview is saved; try launch preparation again.";
   return "The saved website needs attention before its next step can continue.";
@@ -135,7 +135,7 @@ function ArtifactPreview({ artifact }: { artifact: NonNullable<Website["candidat
       <div className={styles.previewTop}>
         <div>
           <strong>{artifact.spec.siteName}</strong>
-          <span>Generated site preview · version {artifact.revision}</span>
+          <span>Saved website preview {artifact.revision}</span>
         </div>
         <div className={styles.previewActions}>
           <a href={artifact.preview.href} target="_blank" rel="noopener noreferrer" className={styles.previewLink}>
@@ -152,7 +152,7 @@ function ArtifactPreview({ artifact }: { artifact: NonNullable<Website["candidat
         />
       </div>
       <p className={styles.previewMeta}>
-        Preview version {artifact.revision} · {pageCount} {pageCount === 1 ? "page" : "pages"}
+        Saved preview {artifact.revision} · {pageCount} {pageCount === 1 ? "page" : "pages"}
       </p>
     </article>
   );
@@ -261,10 +261,10 @@ function WebsiteSession({
         workId: record.workId,
         expectedRevision: record.website.revision,
         brief,
-      }), next => `Private website preview generated as version ${next.website.candidate?.revision ?? next.website.revision}. Review it before approving.`);
+      }), next => `Saved website preview ${next.website.candidate?.revision ?? next.website.revision}. Review it before approving.`);
       return;
     }
-    await run("Preview generation", () => transport.create({ workspaceId, requestId, brief }), next => `Private website preview generated as version ${next.website.candidate?.revision ?? next.website.revision}.`);
+    await run("Preview generation", () => transport.create({ workspaceId, requestId, brief }), next => `Saved website preview ${next.website.candidate?.revision ?? next.website.revision}.`);
   }
 
   async function approve() {
@@ -276,7 +276,7 @@ function WebsiteSession({
       expectedRevision: record.website.revision,
       candidateRevision: candidate.revision,
       candidateContentHash: candidate.contentHash,
-    }), next => `Preview version ${next.website.approvedCandidateRevision ?? candidate.revision} is approved. Prepare launch when you are ready.`);
+    }), next => `Saved preview ${next.website.approvedCandidateRevision ?? candidate.revision} is approved. Prepare launch when you are ready.`);
   }
 
   async function prepareLaunch() {

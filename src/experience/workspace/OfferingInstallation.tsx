@@ -126,8 +126,8 @@ export function OfferingInstallationView({
     </header>
     {conflictMatchesInstallation ? <div className={styles.conflict} role="alert">
       <strong>{mutationConflict.message}</strong>
-      <p>{conflictInput?.authoritativeRevision != null ? `The latest saved version is revision ${conflictInput.authoritativeRevision}. Review the current version, then save your draft to retry. Nothing was submitted automatically.` : "The latest saved version could not be loaded. Refresh it before retrying; nothing was submitted automatically."}</p>
-      {conflictNeedsRefresh && onRetryConflict ? <button className={styles.secondary} type="button" onClick={onRetryConflict}>Refresh latest version</button> : null}
+      <p>{conflictInput?.authoritativeRevision != null ? `The latest History entry is ${conflictInput.authoritativeRevision}. Review the current saved state, then save your draft to retry. Nothing was submitted automatically.` : "The latest History entry could not be loaded. Refresh it before retrying; nothing was submitted automatically."}</p>
+      {conflictNeedsRefresh && onRetryConflict ? <button className={styles.secondary} type="button" onClick={onRetryConflict}>Refresh History</button> : null}
       {definition?.configurationFields.length ? <div className={styles.conflictComparison}>
         <strong>Review saved values against your draft</strong>
         {definition.configurationFields.map((field) => <div key={field.id}>
