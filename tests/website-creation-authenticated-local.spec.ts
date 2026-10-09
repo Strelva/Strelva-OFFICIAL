@@ -42,7 +42,13 @@ for (const width of [1440, 390]) {
       expect(sitesOrigin.protocol).toBe("http:");
       expect(sitesOrigin.hostname).toBe("sites.localhost");
       expect(sitesOrigin.port).toBe(new URL(env.app).port);
-      for (const person of [owner, stranger, maker]) expect((await person.context.request.get("/api/workspace")).status()).toBe(200);
+      const browserOrigins = new Set([env.app, new URL(env.url).origin, sitesOrigin.origin]);
+      for (const person of [owner, stranger, maker]) {
+        // A compatibility System frame must not turn this local journey into
+        // an outside-provider or production-site read.
+        await person.context.route("**/*", route => browserOrigins.has(new URL(route.request().url()).origin) ? route.continue() : route.abort());
+        expect((await person.context.request.get("/api/workspace")).status()).toBe(200);
+      }
       workspaceId = await ordinaryCustomerBusiness(owner, "Website creation proof");
       agencyId = (await ordinaryAgencyMaker(browser, admin, owner, workspaceId, maker)).agencyId;
       const page = await owner.context.newPage();
