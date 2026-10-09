@@ -78,6 +78,9 @@ test("a real anonymous URL check survives Auth and becomes private business evid
     expect(retainedHtml).toContain("Site Health Report");
     expect(retainedHtml).toContain(new URL(sourceUrl).hostname);
     await publicPage.getByRole("link", { name: "Save to my work", exact: true }).click();
+    await expect(publicPage.getByRole("heading", { name: "Sign in to open your private work.", exact: true })).toBeVisible();
+    await expect(publicPage.getByRole("link", { name: "Sign in", exact: true })).toHaveAttribute("href", `/sign-in?next=${encodeURIComponent(`/workspace?save=${report.reportId}`)}`);
+    await publicPage.getByRole("link", { name: "Sign in", exact: true }).click();
     await expect(publicPage).toHaveURL(url => url.pathname === "/sign-in" && url.searchParams.get("next") === `/workspace?save=${report.reportId}`);
 
     owner = await signedInContext(browser, admin, "public-check-conversion"); // Real local Auth, no session stub.

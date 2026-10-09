@@ -66,8 +66,9 @@ test("an accepted member runs exact zero-cost work as themselves, then revocatio
     const outsiderAgency = await post(outsider.context.request, "/api/workspace", {
       action: "create_agency", name: "Unassigned outsider agency",
     }, 201);
-    // A real agency identity without a seat/assignment grants no customer access.
-    await post(owner.context.request, "/api/operational-assignments", {
+    // An outsider cannot sponsor work belonging to the owner's workspace.
+    // An owner offering an exact assignment is itself a grant, not a denial.
+    await post(outsider.context.request, "/api/operational-assignments", {
       action: "offer", workId: responsibility.id,
       assignment: { assigneeEmail: outsider.email, assigneeKind: "agency", agencyWorkspaceId: outsiderAgency.workspaceId,
         expiresAt: new Date(Date.now() + 86_400_000).toISOString(), idempotencyKey: "outsider-agency-offer" },

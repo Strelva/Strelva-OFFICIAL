@@ -199,7 +199,7 @@ test("an owner can discover, create, and reopen ongoing work in the workspace", 
     await page.getByLabel("Saved check", { exact: true }).selectOption({ label: "Saved supplier check" });
     await page.getByRole("button", { name: "Start running it", exact: true }).click();
     await expect(page).toHaveURL(/standingId=/);
-    await expect(page.getByRole("heading", { name: "UI supplier check", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "UI supplier check", level: 1, exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Runs", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Decisions", exact: true })).toBeVisible();
     await page.screenshot({ path: "/tmp/strelva-standing-owner-desktop.png", fullPage: true });
@@ -214,7 +214,7 @@ test("an owner can discover, create, and reopen ongoing work in the workspace", 
     await expect(page.getByText("Paused", { exact: true }).first()).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();
-    await expect(page.getByRole("heading", { name: "UI supplier check", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "UI supplier check", level: 1, exact: true })).toBeVisible();
     await expect(page.getByText("Paused", { exact: true }).first()).toBeVisible();
     await page.screenshot({ path: "/tmp/strelva-standing-owner-phone.png", fullPage: true });
     await page.close();
