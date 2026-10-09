@@ -47,6 +47,7 @@ PYURL
  count=$((count+1))
 done < <(printf '%s\n' "$repo_root"/supabase/migrations/20*.sql | sort)
 psql "${psql_args[@]}" --file="$repo_root/tests/guarded-tenant-teardown-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/scripts/sql/tenant-teardown-evidence-owners.sql"
 printf 'PASS final guarded teardown against %s ordered actual forward migrations.\n' "$count"
 if [[ "${STRELVA_GOOGLE_REVIEW_RETENTION_SQL_PROOF:-0}" == 1 ]]; then
  psql "${psql_args[@]}" --file="$repo_root/tests/google-review-content-retention-schema.sql"
