@@ -247,9 +247,85 @@ Changing a production environment remains a separate authorized release action.
 
 ## CI (`.github/workflows/ci.yml`)
 
+### Qualification profile (F02, October 9)
+
+`scripts/qualification-profile.json` is the shared preflight declaration:
+Node **22** (any patch; the observed exact version is printed), pnpm **10.34.5**,
+Next/eslint-config-next **16.3.8**, sharp **0.35.5**, Playwright **1.59.1** and its
+bundled Chromium **147.0.7727.15 / revision 1217**, including the headless shell.
+External `PLAYWRIGHT_CHANNEL` overrides cannot qualify this browser profile.
+One heavy job and one browser worker are the declared resource profile; F03's
+resource admission/serialization owns enforcement, rather than this preflight.
+
+The default `configured-pg17` requires **all four same-major PG17 binaries**
+(`initdb`, `pg_ctl`, `postgres`, `psql`) from one installation. This matches only
+the major in `supabase/config.toml`; disposable SQL shims do **not** prove
+managed-role privileges, Auth/PostgREST or a hosted Supabase target. Missing
+server binaries or any wrong version fails before lint/build/SQL. Preflight
+only calls `--version`; it never opens a database or reads provider credentials.
+
+```bash
+pnpm check:qualification                         # full preflight, including browser files
+pnpm check:qualification --stage toolchain       # before frozen install
+pnpm check:qualification --stage dependencies    # installed versions; no SQL/browser execution
+pnpm check:qualification --stage sql             # also same-major server tools; no SQL execution
+pnpm check:qualification --profile historical-pg18 --postgres-bin /opt/homebrew/opt/postgresql@18/bin
+```
+
+PG18 receipts retain the explicit `historical-pg18` name and local-shim limits.
+They never become configured-PG17 or managed-PG17 evidence. To deliberately
+run the whole local CI harness under that historical profile, use
+`STRELVA_QUALIFICATION_PROFILE=historical-pg18 pnpm check:ci`; obtain the normal
+resource grant first. The October 9 lane machine has PG18.6 and Node26; Node22,
+PG17 and the pinned browser files are absent. Its real preflight is therefore
+blocked. No Homebrew installation, new dependency or silent PG18 fallback is
+part of this change. Hosted PG17 availability still needs a fresh workflow run.
+
+### Supply-chain gate (F08, October 9)
+
+`pnpm check:supply-chain` verifies immutable Action revisions against
+`scripts/supply-chain-policy.json`, then runs raw **all** and **production**
+dependency audits and inventories the installed licenses. Missing/muted audit
+data cannot pass. High/critical production findings always block. The retained
+development-only [braces advisory](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)
+has no upstream patch as of October 9; its existing exception names Jacob,
+its prior decision and a **2026-10-23 expiry**. Critical findings cannot use it.
+Global `pnpm.auditConfig` ignores are removed so they cannot hide production
+findings or bypass expiry. Plain `pnpm audit` deliberately reports the exception.
+No package or lockfile dependency version is changed.
+
+License output separates permissive, notice-required, source-obligation and
+review-required packages; it is an inventory, not legal approval to redistribute.
+CC-BY notices and MPL/LGPL source obligations stay explicit. Current custom GSAP
+terms and FSL Sentry CLI terms block commercial qualification until their exact
+usage/distribution is reviewed. [GSAP's standard terms](https://gsap.com/community/standard-license/),
+[Sentry CLI's license](https://github.com/getsentry/sentry-cli/blob/2.58.5/LICENSE)
+and [sharp's install/license notes](https://sharp.pixelplumbing.com/install/)
+are the sources; no blanket commercial exception is inferred from installation.
+
+Security uses the direct MIT [Gitleaks 8.30.1 release](https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1),
+with the official GHCR multi-platform manifest digest recorded in the policy.
+The paid org Action wrapper is not used. All existing Actions are pinned to
+official repository commits, following [GitHub's immutable pin guidance](https://docs.github.com/en/actions/reference/security/secure-use).
+Workflow triggers and existing tag/deploy authority are unchanged.
+
+```bash
+pnpm check:supply-chain --policy-only
+pnpm check:secrets --self-test       # pinned Docker image; no Auth stack
+pnpm check:secrets                   # full Git history, redacted; no raw scanner output
+pnpm check:secrets --native --self-test
+```
+
+The explicit `--native` mode records the installed scanner version/executable
+hash as **local diagnostic** evidence; it does not qualify the upstream image.
+The self-test generates fictional Stripe/cron/internal-secret assignments and
+requires all three to be detected. No values, raw matches or scanner diagnostics
+are printed. Upstream default rules are enabled; secret variable names are no
+longer broad allowlists. Findings retain only rule/file/line/commit metadata.
+
 `build` job: install with the repository's exact `pnpm@10.34.5` → lint → typecheck → product
 boundaries → ontology invariants → isolated workspace SQL → vitest+coverage →
-`pnpm audit --audit-level high` → build → Playwright browsers → **Smoke tests** (bypass OFF)
+`pnpm check:supply-chain` → build → Playwright browsers → **Smoke tests** (bypass OFF)
 → **Workspace browser acceptance** → **Surface smoke** (bypass ON, seeds
 `tests/fixtures/tenants.fixture.json` → `./dev-tenants.json`). CI has **no DB and no Redis**
 and never touches prod. Browser steps are conditional on a non-draft pull request; the
