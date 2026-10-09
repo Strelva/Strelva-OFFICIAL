@@ -74,7 +74,7 @@ export function AgencyTeamView({ workspaceId }: { workspaceId: string }) {
 
   return <div aria-busy={busy || undefined} className="space-y-6">
     <div className="flex flex-wrap items-start justify-between gap-4">
-      <p className={`${note} max-w-xl`}>Assigned staff with a confirmed email can act as client operators while the agency has an active provider seat and they remain on this team. Clients can end the agency’s access.</p>
+      <p className={`${note} max-w-xl`}>Assigned staff with a confirmed email can act as client operators while the agency has an active agency seat and they remain on this team. Clients can end the agency’s access.</p>
       <Button variant="secondary" size="sm" disabled={busy} onClick={reload}>Reload team</Button>
     </div>
     {!team.canManage ? <p className={note}>Only agency owners and admins can invite people or change client assignments.</p> : null}
@@ -97,7 +97,7 @@ export function AgencyTeamView({ workspaceId }: { workspaceId: string }) {
       <p className={`${note} my-4`}>{selectedStaff.length} people · {selectedClients.length} clients. Up to 200 assignments at once. The whole selection succeeds or nothing changes.</p>
       <div className="flex flex-wrap gap-3">{[true, false].map(active => <Button key={String(active)} variant={active ? "primary" : "secondary"} disabled={disabled || !selectedStaff.length || !selectedClients.length || selectedStaff.length * selectedClients.length > 200} onClick={() => void mutate({ action: "assign", workspaceId, userIds: selectedStaff, clientIds: selectedClients, active }, active ? "Selected client assignments added." : "Selected client assignments removed.")}>{active ? "Assign selected" : "Unassign selected"}</Button>)}</div>
     </details> : null}
-    {!team.clients.length ? <p className={note}>No clients have an active provider seat. A client must choose this agency before staff can be assigned.</p> : null}
+    {!team.clients.length ? <p className={note}>No clients have an active agency seat. A client must choose this agency before staff can be assigned.</p> : null}
     {!team.members.length ? <p className={note}>No team members are listed for this agency.</p> : <ul aria-label="Agency team" className="divide-y divide-gray-border border-y border-gray-border">{team.members.map(member => {
       const clients = team.clients.filter(client => client.staff.some(staff => staff.userId === member.userId));
       const protectedMember = member.role === "owner" || member.userId === team.actorUserId;

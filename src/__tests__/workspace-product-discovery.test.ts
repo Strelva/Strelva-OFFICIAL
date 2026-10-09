@@ -96,7 +96,7 @@ describe("workspace product discovery", () => {
     expect(html).not.toContain("Inquiry navigation");
   });
 
-  it("carries a start request into the inquiry New view", () => {
+  it("carries an ask into the inquiry New view", () => {
     const html = renderToStaticMarkup(createElement(InquiryWorkspaceExperience, {
       adapter: createPreviewInquiryAdapter("business"),
       basePath: "/workspace",

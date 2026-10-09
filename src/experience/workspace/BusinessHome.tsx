@@ -3,6 +3,8 @@
 import { useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { ArrowRight, Check, Circle, FileText, LayoutGrid, LoaderCircle, Plus, ShieldCheck, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { actorPresentation } from "@/platform/presentation/actor";
+import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
 import { StrelvaShell, pinnedApps, pinnedSystems, pinnedWebsites, type StrelvaSection } from "@/experience/app-frame/StrelvaShell";
 import { SystemList } from "@/experience/systems/SystemList";
 import { SYSTEMS_LABEL, SYSTEMS_LIST_LABEL, type SystemView } from "@/experience/systems/model";
@@ -127,7 +129,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   // An incomplete list would misplace a System; show none until it loads.
   const systems = systemsReleased && !systemsLoading ? knownSystems : [];
   const current = snapshot.workspaces.find(space => space.id === snapshot.workspaceId);
-  const providerSeat = current?.access === "provider_seat";
+  const agencySeat = current?.access === "provider_seat";
   const readOnly = current?.access === "delegated_read" || current?.access === "provider_seat";
   const customer = current?.kind === "customer";
   const name = current?.name || "Your business";
@@ -136,7 +138,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   const deliveries = useBusinessDeliveries(deliveryScope);
   const deliveryItems = deliveries.state.status === "ready" ? deliveries.state.items : [];
   const deliveryAttention = deliveryItems.filter(item => item.attention);
-  // STRELVA_NEEDS_YOU_RELEASE: Needs you and Strelva handled come from the
+  // STRELVA_NEEDS_YOU_RELEASE: Needs you and What changed come from the
   // policy model. Request decisions arrive there as items, so the delivery
   // list no longer adds its own.
   const needsYouReleased = snapshot.releases?.needsYou === true && customer && !readOnly;
@@ -165,7 +167,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   const requestRows = businessRequestRows(deliveryItems, snapshot.work, item => deliveryProviderName(item, agencyNames));
   const handled = requestRows.filter(row => row.stage === "done").slice(0, 5);
   const inProgress = requestRows.filter(row => row.stage === "in_progress" || row.stage === "asked");
-  // With Systems released, Strelva handled is the receipt feed, not done Requests,
+  // With Systems released, What changed is the receipt feed, not done Requests,
   // and In progress also lists every Make real that is running or partly live.
   const receipts = systemsReleased ? snapshot.systems?.handled ?? [] : [];
   const making = systemsReleased ? snapshot.systems?.activations ?? [] : [];
@@ -199,9 +201,9 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   }
 
   const attentionRows = home.attention.map(({ work, reason }) => <li key={work.id}><button type="button" aria-label={`Open ${work.title}`} className={styles.row} onClick={() => onOpen(work.id)}><span><strong>{work.title}</strong><small>{reason}</small></span><ArrowRight size={16} aria-hidden="true" /></button></li>);
-  const receiptList = <ul className={styles.list} aria-label="What Strelva did this week">{receipts.slice(0, 7).map(receipt => <li key={receipt.id}><span className={styles.row}><span><strong>{receipt.sentence}</strong><small>{new Date(receipt.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {receipt.undo}</small></span></span></li>)}</ul>;
+  const receiptList = <ul className={styles.list} aria-label="This week’s changes">{receipts.slice(0, 7).map(receipt => <li key={receipt.id}><span className={styles.row}><span><strong>{receipt.sentence}</strong>{actorPresentation(receipt.actor).credit ? <small>{actorPresentation(receipt.actor).credit}</small> : null}<small>{new Date(receipt.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {receipt.undo}</small></span></span></li>)}</ul>;
 
-  // ---- Strelva is working (ink-moss): what is moving now, then what Strelva handled.
+  // ---- Strelva is working (ink-moss): what is moving now, then recorded changes.
   const lead = making[0];
   const otherMaking = making.slice(lead ? 1 : 0);
   const leadRequest = lead ? undefined : inProgress[0];
@@ -209,7 +211,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   const progressChecking = busy || deliveryPending;
   const anyWork = Boolean(lead || leadRequest);
   const working = <section className={`${styles.working} ${styles.reveal}`} style={{ "--i": 1 } as CSSProperties} aria-labelledby="home-progress">
-    <p className={styles.eyebrow} data-tone="aurora"><span className={styles.dot} aria-hidden="true" data-live={anyWork || undefined} />{anyWork ? "Strelva is working" : "Strelva"}</p>
+    <p className={styles.eyebrow} data-tone="aurora"><span className={styles.dot} aria-hidden="true" data-live={anyWork || undefined} />{anyWork ? "In progress" : "This week"}</p>
     <h2 id="home-progress" className={styles.srOnly}>In progress</h2>
     {lead ? <div className={styles.lead}>
       <h3>{lead.partlyLive ? `${lead.title}: Partly live` : lead.title}</h3>
@@ -240,8 +242,8 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
     {needsYouReleased ? <StrelvaHandledSection state={needsYou.state} pending={needsYou.pending} notices={needsYou.receiptNotices} onUndo={needsYou.undo}
       fallback={receipts.length ? receiptList : handled.length && !systemsReleased ? <ul className={styles.list}>{handled.map(row => requestRow(row))}</ul> : undefined} />
       : <section className={styles.handled} aria-labelledby="home-handled">
-        <header className={styles.handledHeader}><h2 id="home-handled">Strelva handled</h2>{systemsReleased ? <span>This week</span> : null}</header>
-        {systemsReleased ? (receipts.length ? receiptList : <p className={styles.muted}>Nothing this week. When Strelva changes something for you, it shows here with what changed and how to undo it.</p>)
+        <header className={styles.handledHeader}><h2 id="home-handled">{STRELVA_HANDLED_LABEL}</h2>{systemsReleased ? <span>This week</span> : null}</header>
+        {systemsReleased ? (receipts.length ? receiptList : <p className={styles.muted}>Nothing this week. When something changes for you, it shows here with what changed and how to undo it.</p>)
           : progressChecking ? <p role="status" className={styles.muted}>Checking what finished…</p> : handled.length ? <ul className={styles.list}>{handled.map(row => requestRow(row))}</ul> : <p className={styles.muted}>Nothing finished yet. When Strelva or your agency finishes something, it appears here with what changed.</p>}
         {customer && sites.length ? <a className={styles.textAction} href={`${appBase}/workspace/recaps?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Weekly and monthly recaps<ArrowRight size={16} aria-hidden="true" /></a> : null}
       </section>}
@@ -279,8 +281,8 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
     <section className={`${styles.dusk} ${styles.reveal}`} aria-labelledby="business-start-title">
       <div className={styles.duskMain}>
         <p className={styles.duskLine}>{readOnly ? systemsReleased ? "Shared with you" : "Shared workspace" : line}{(readOnly || line) ? " · " : ""}{name}</p>
-        <h1 id="business-start-title" className="font-display">{providerSeat ? "Your client’s website work." : readOnly ? "Review what was shared." : greeting}</h1>
-        {readOnly ? <p className={styles.duskNote}>{providerSeat ? `Your agency has assigned you to ${name}. Open a saved website to continue working.` : `${name} shared this with your agency to review.`}</p> : composer}
+        <h1 id="business-start-title" className="font-display">{agencySeat ? "Your client’s website work." : readOnly ? "Review what was shared." : greeting}</h1>
+        {readOnly ? <p className={styles.duskNote}>{agencySeat ? `Your agency has assigned you to ${name}. Open a saved website to continue working.` : `${name} shared this with your agency to review.`}</p> : composer}
       </div>
       {chips.length || systemsLine ? <ul className={styles.chips} aria-label="Right now">
         {chips.map(chip => <li key={chip.id} data-tone={chip.tone}><span className={styles.dot} aria-hidden="true" />{chip.text}</li>)}
@@ -315,7 +317,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
       {!business ? <p className={styles.contextLine} aria-label="Current Strelva context"><span>Working in <strong>{name}</strong></span>{savedResultCount ? <span>{savedResultCount} saved {savedResultCount === 1 ? "result" : "results"}</span> : null}{sites.length ? <span>{sites.length} connected {sites.length === 1 ? "website" : "websites"}</span> : null}</p> : null}
     </section> : null}
 
-    {unassignedSites.length ? <details className={styles.details} aria-label="Websites available to your account"><summary>Websites available to your account <span>{unassignedSites.length}</span></summary><p className={styles.muted}>{current?.kind !== "customer" ? "These websites are available through your account. Assign them from the appropriate customer business." : siteAssignmentsKnown ? "These websites are not yet assigned to this business." : "Business assignments could not be confirmed."}</p>{current?.kind !== "customer" ? <ul className={styles.list}>{unassignedSites.map(site => <li key={site.id}><a className={styles.row} href={site.href}><span><strong>{site.title}</strong><small>Account-authorized website</small></span><ArrowRight size={16} /></a></li>)}</ul> : <WebsiteAssignmentHandoff businessName={name} state={managedWorkUnavailable ? { status: "unavailable", reason: "Linked website access is unavailable right now." } : offerings} sites={unassignedSites} onRetry={onRetryWebsiteAssignments} onCommand={onWebsiteCommand} />}</details> : null}
+    {unassignedSites.length ? <details className={styles.details} aria-label="Websites available to your account"><summary>Websites available to your account <span>{unassignedSites.length}</span></summary><p className={styles.muted}>{current?.kind !== "customer" ? "These websites are available through your account. Assign them from the appropriate client business." : siteAssignmentsKnown ? "These websites are not yet assigned to this business." : "Business assignments could not be confirmed."}</p>{current?.kind !== "customer" ? <ul className={styles.list}>{unassignedSites.map(site => <li key={site.id}><a className={styles.row} href={site.href}><span><strong>{site.title}</strong><small>Account-authorized website</small></span><ArrowRight size={16} /></a></li>)}</ul> : <WebsiteAssignmentHandoff businessName={name} state={managedWorkUnavailable ? { status: "unavailable", reason: "Linked website access is unavailable right now." } : offerings} sites={unassignedSites} onRetry={onRetryWebsiteAssignments} onCommand={onWebsiteCommand} />}</details> : null}
 
     <details className={styles.details} aria-label="Usage and connected services"><summary>Usage and connected services</summary><div className={styles.connections}>{customer && !readOnly ? <WorkspaceAllowanceSummary businessId={snapshot.workspaceId} enabled compact onOpenSettings={() => onNavigate("settings")} /> : null}<BusinessOfferingSummary state={offerings} work={snapshot.work} onOpen={onOfferings} systemsReleased={systemsReleased} /></div></details>
   </div>;

@@ -1,5 +1,6 @@
 "use client";
 
+import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
 import { ResponsibilityExperience, StandingResponsibilityPicker } from "@/experience/operations/ResponsibilityExperience";
 import { InquiryRunning } from "./InquiryRunning";
 import type { WorkspaceWork } from "./contracts";
@@ -50,7 +51,7 @@ export function WorkspaceOngoing({
       <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-muted">Each one is named by what it keeps true. Strelva acts within the access you have given, asks when it can’t, and records every run.</p>
     </header>}
 
-    {!finiteJobOpen && monthlyRecap ? <p className="rounded-2xl border border-gray-border bg-white p-4 text-sm text-warm-black">Strelva sends you a monthly recap. Each send, hold or failure is recorded in Strelva handled.</p> : null}
+    {!finiteJobOpen && monthlyRecap ? <p className="rounded-2xl border border-gray-border bg-white p-4 text-sm text-warm-black">Strelva sends you a monthly recap. Each send, hold or failure is recorded in {STRELVA_HANDLED_LABEL}.</p> : null}
     {finiteJobOpen ? null : <InquiryRunning key={workspaceId} workspaceId={workspaceId} enabled={inquiriesEnabled} />}
 
     {finiteJobOpen ? null : <StandingResponsibilityPicker

@@ -91,7 +91,7 @@ export function ServerVisibility({ workspaceId, canManage, initial, suggestedHan
         <div className="flex flex-wrap items-center gap-3">
           <Button type="button" variant="secondary" onClick={() => void copy()}>{copied ? "Copied" : "Copy block"}</Button>
           {target.checkable ? <Button type="button" variant="secondary" loading={busy === "check"} disabled={busy !== null && busy !== "check"} onClick={() => void runCheck()}>Check {target.label}</Button> : null}
-          <span className="text-xs text-gray-muted">Version {target.block.hash}</span>
+          <span className="text-xs text-gray-muted">History reference {target.block.hash}</span>
         </div>
         {check && check.siteId === target.id ? <p role="status" className="text-sm">{CHECK_MESSAGE[check.status]}</p> : null}
       </>}

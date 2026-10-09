@@ -97,7 +97,7 @@ describe("platform product catalog", () => {
     expect(PRODUCT_CATALOG.map((product) => String(product.id))).not.toContain("applications");
   });
 
-  it("keeps monitoring scoped to managed operations instead of claiming a customer product", () => {
+  it("keeps monitoring scoped to managed operations instead of claiming a client product", () => {
     const monitoring = getProductDefinition("domain_monitoring");
     expect(monitoring.operations.every((operation) => operation.support === "internal_only")).toBe(true);
     expect(monitoring.controls.access).toEqual(["operator"]);

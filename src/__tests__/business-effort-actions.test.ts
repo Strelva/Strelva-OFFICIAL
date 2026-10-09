@@ -66,7 +66,7 @@ describe("recordBusinessEffortAction", () => {
 
   it("reports an unknown business from the SQL boundary", async () => {
     mockRpc.mockResolvedValue({ data: null, error: { code: "P0001", message: "business_effort_business_not_found" } });
-    expect(await recordBusinessEffortAction(input)).toEqual({ ok: false, message: "That customer business was not found." });
+    expect(await recordBusinessEffortAction(input)).toEqual({ ok: false, message: "That client business was not found." });
     expect(mockRevalidate).not.toHaveBeenCalled();
   });
 

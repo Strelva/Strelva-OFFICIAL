@@ -6,15 +6,16 @@ by Jacob (Oct 2 places, Oct 4 Systems model, Oct 6 one build to 1.0.0). Nothing
 here is shipped. Each area links the spec that makes it buildable.
 
 **A business opens one place and finds its real things working: its website,
-its inquiries, its bookings, its tools. Strelva runs them, and the owner only
-sees the few decisions that are theirs.** The owner never has to open it for any
+its inquiries, its bookings, its tools. Its agency or the platform runs the
+agreed work, and the owner sees the few decisions that are theirs.** The owner never has to open it for any
 of that to stay true.
 
 This page is the map. [ADR 0011](../../../docs/adr/0011-organize-strelva-around-systems-connections-possibilities-versions.md)
 is the decision, [systems-transition.md](./systems-transition.md) maps today's
 code onto it, and [strelva-1.0.0.md](./strelva-1.0.0.md) is the feature list.
-Where they disagree with this page on the customer model, this page wins and
-the others get corrected.
+[GLOSSARY.md](../../GLOSSARY.md) owns words. This page maps the product model;
+ADR 0012 and the October 9 approved decisions amend its older role and actor
+claims. The other specs get corrected against those decisions.
 
 ## The model in one picture
 
@@ -28,26 +29,45 @@ Business  ─ owns ─  Business record (name, hours, services, people, contacts
    │      Connections   what it reads, acts on, appears in
    │      Possibilities working alternatives beside it → Make real
    │      Versions      the same System adapted per location or client
-   │      History       every past release, with undo
+   │      History       past restorable states; undo where available
    │      Health        separate from Draft / Live / Paused
    │
    ├─ Requests ........... asked-for work with an end
-   ├─ Running ............ what Strelva keeps true, one sentence each
+   ├─ Running ............ what is kept true, one sentence each
    ├─ Needs you .......... only the owner's decisions, in the app or by email
-   └─ Strelva handled .... receipts of what Strelva did, with undo
+   └─ What changed .... receipts naming who acted; undo where available
 ```
 
-Ask Strelva is the one way in. **Strelva** is the only name that acts on screen:
-"Strelva updated your hours", "Strelva needs your call".
+Ask Strelva is the one way in. **Whoever acted is named on screen and in the
+receipt.** For example: "Acme Marketing updated your hours", with the agency
+display name and **Runs on Strelva** platform credit. "Strelva" names the actor
+only when the platform itself acted. Strelva's own agency shows **Strelva Agency**
+and the same credit, under the same rules as every agency.
+
+**What changed** is the decided place name (October 9).
+Keep the label behind one constant. System, Connection, Possibility, Make real,
+Version, History, Health, Requests, Running, Needs you and Ask Strelva also name
+concepts whose exact on-screen labels remain open for Jacob (UI plan D2).
+Agency screens say **clients**; owner screens say **your business** or its name;
+the public are **their customers** or **end customers**.
 
 ## The people
 
 | Role | Who | Can | Never |
 | --- | --- | --- | --- |
-| Owner | The client (gldf's owner, The Mooney Firm) | Pay, decide, launch, publish, exit, invite | Has to sign in for things to keep working |
+| Owner | The business's owner role | Decide, launch, publish, exit, invite | Has to sign in for things to keep working |
 | Member | Staff the owner invites | Use Systems (take a booking, answer an inquiry) | Manage, pause or revise a System they weren't given |
-| Agency | Strelva at 1.0.0; partners later | Make, operate and adapt Systems for clients | Become owner, pay, exit, or see a client it wasn't delegated |
-| Operator | A Strelva super-admin | Run every client from one queue, convert clients | Act without a receipt; write outside without approval |
+| Agency | Anyone who makes and runs Systems for clients, including Strelva's agency with no extra powers | Make, operate and adapt delegated Systems; pay for a client when chosen per business | See a client that has not delegated to it; gain owner authority from being an agency |
+| Payer | Chosen per business: the business or its agency | Pay under the business's chosen billing arrangement | Gain owner or operating authority by paying |
+| Platform operator | Strelva staff acting for the platform | Logged support, incident and release work | Sell to, serve or convert a client using platform powers; client work uses the ordinary agency path |
+
+Current managed clients are clients of **Strelva Agency**, delegated through the
+ordinary agency path. While owner entry is off, Strelva Agency acts only within
+each client's existing contract; anything beyond it goes to Jacob to handle
+with the client manually. The business remains the payer, with unchanged billing
+and grandfathered terms. Only real contracted clients convert with agency basis
+`existing_contract`; test/demo tenants never convert on that basis. These are
+selected boundaries, not evidence that production conversions have occurred.
 
 ## Area by area
 
@@ -71,7 +91,7 @@ Each row: what it is today, what it becomes, and which noun it is.
 | **Bookings** | Two stores; ~25% | One store; hours and services read from the record; confirmations, reminders, pause that keeps existing bookings | [bookings spec](../capabilities/bookings/bookings-spec-2026-10-01.md) |
 | **Google listing** | Tenant-side Google tokens in Redis; review replies and posts per tenant | "The Mooney Firm on Google": reviews, replies, hours, info and posts through approval and receipts, with a Version per location. Hours come from the business record | [publishing spec](../capabilities/publishing/publishing-spec-2026-10-06.md) |
 | **Newsletter** | `newsletter.ts` sends around `email/send.ts`; gldf and rohlax sign-ups already in Postgres | Its own System. Subscribers are business contacts; each send is an issued output that never rewrites | [publishing spec](../capabilities/publishing/publishing-spec-2026-10-06.md) |
-| **Internal tools** | Native apps shipped, unused; any member can create | Strelva builds from a sentence (owners file a Request). Tracker merges in. Records point at business contacts; submit emails the assigned person | [systems-catalog](./specs/systems-catalog.md) |
+| **Internal tools** | Native apps shipped, unused; any member can create | An agency builds from a sentence (owners file a Request). Tracker merges in. Records point at business contacts; submit emails the assigned person | [systems-catalog](./specs/systems-catalog.md) |
 
 Not Systems at 1.0.0 ([systems-catalog](./specs/systems-catalog.md)):
 
@@ -106,11 +126,11 @@ and more; origins `saved_work` or a tenant `stable_id`) behind
 
 | Area | Today | At 1.0.0 | Noun | Spec |
 | --- | --- | --- | --- | --- |
-| Asking for something | Tenant agent with ~24 inline tools; workspace composer needs special phrasing for managed work | Ask Strelva in the workspace: answers, drafts changes, opens Possibilities, files Requests, on the same permissions | Ask Strelva | [ask-strelva](./specs/ask-strelva.md) |
-| Finite work | Service requests, delivery commitments | Requests: Asked → Needs you → In progress → Ready for your review → Done | Request | [needs-you](./specs/needs-you.md) |
-| Ongoing work | Standing responsibilities, crons | Running: "Your hours match Google every day", "Every lead is answered within a day" | Running | [needs-you](./specs/needs-you.md) |
-| Decisions | Approvals in five stores, no policy for what reaches the owner | One policy per System and change type. Most changes Strelva just does and reports. The rest reach the owner in the app **and** by email, with one-tap answers | Needs you | [needs-you](./specs/needs-you.md) |
-| Proof of work | Receipts on some writes; Google writes have none | Strelva handled: every outside write has a receipt, read-back and undo where undo exists | Strelva handled | [needs-you](./specs/needs-you.md), [operator](./specs/operator.md) |
+| Asking for something | Tenant agent with ~24 inline tools; workspace composer needs special phrasing for managed work | Ask Strelva in the workspace: an ask before anything exists; answers, drafts changes, opens Possibilities, files Requests, on the same permissions | Ask Strelva | [ask-strelva](./specs/ask-strelva.md) |
+| Finite work | Requests sent to an agency, delivery commitments | Requests: Asked → Needs you → In progress → Ready for your review → Done | Request | [needs-you](./specs/needs-you.md) |
+| Ongoing work | Standing responsibilities, crons | Running: "Your hours match Google every day", "Every inquiry is answered within a day" | Running | [needs-you](./specs/needs-you.md) |
+| Decisions | Approvals in five stores, no policy for what reaches the owner | One policy per System and change type. Most changes the authorized actor does and reports. The rest reach the owner in the app **and** by email, with one-tap answers | Needs you | [needs-you](./specs/needs-you.md) |
+| Proof of work | Receipts on some writes; Google writes have none | What changed: every outside write names its actor and has a receipt, read-back and undo where undo exists | What changed | [needs-you](./specs/needs-you.md), [operator](./specs/operator.md) |
 
 ### Getting in, running it, paying for it
 
@@ -118,18 +138,22 @@ and more; origins `saved_work` or a tenant `stable_id`) behind
 | --- | --- | --- | --- |
 | Owner entry | Sign-in hard-codes `/dashboard`; 22 dashboard pages | Client admin hosts land in the workspace; every dashboard page has a home or a redirect; old links keep working | [owner-entry](./specs/owner-entry.md) |
 | Agency | Agency home pages through 8 clients | Every client on one home; Queue, Library, Team; Versions per client | [agency-and-versions](./specs/agency-and-versions.md) |
-| Operator | Six queues in Redis and Postgres | One queue across every business and System, with minutes per business measured | [operator](./specs/operator.md) |
-| Money | Stripe per tenant; grandfathered clients; no workspace link | Billing follows the business: one flat plan (price open), custom and grandfathered states kept, Stripe carries `workspaceId` | [money-and-data](./specs/money-and-data.md) |
+| Platform operator | Six queues in Redis and Postgres mixing platform and agency work | Logged platform support, incidents and release; client delivery uses the ordinary agency queue (engineering follow-up) | [operator](./specs/operator.md) |
+| Money | Stripe per tenant; grandfathered clients; no workspace link | Billing follows the business, with the business or agency as payer: one flat plan (price open), custom and grandfathered states kept, Stripe carries `workspaceId` | [money-and-data](./specs/money-and-data.md) |
 | Client data | Leads, bookings config, orders, rewards, OAuth, analytics config in Redis | Postgres is the record; Redis is a cache again. Export and exit include everything | [money-and-data](./specs/money-and-data.md) |
 | Client repos | 9 repos on `/api/v1` | Unchanged. Systems resolve behind the slug; additions only | [Reborn §0](./strelva-reborn.md) |
 | Public front door | Audit, AI visibility | Evidence that opens a Possibility (a rebuild) for a new business. Not a System | [systems-catalog](./specs/systems-catalog.md) |
 
-## What leaves the customer's view
+<a id="what-leaves-the-customers-view"></a>
 
-These stay as machinery underneath. The customer never navigates them:
+## What leaves the business screen
+
+These stay as machinery underneath. The business never navigates them:
 offerings, installations, the product catalog, "Apps" and "Work" as nouns,
 "Capability", "Version" meaning time, and the words AI, agent, automation,
-workflow and task. Old links (`view=apps`, `view=work`, `view=products`,
+workflow and task. **Provider** means an outside system (Google, Resend,
+Stripe or a calendar); a person or agency serving a business is the **Agency**.
+Old links (`view=apps`, `view=work`, `view=products`,
 `view=customers`, `/dashboard`) keep resolving.
 
 ## Rules that hold everywhere
@@ -153,14 +177,19 @@ workflow and task. Old links (`view=apps`, `view=work`, `view=products`,
 The eight specs were drafted separately on October 6. Reading them together
 turned up problems no single plan had. Each is from code reading unless marked.
 
-1. **Conversion leaves a business with no owner and no provider.** It makes
+1. **Conversion leaves a business with no owner and no agency access.** It makes
    the Strelva operator an `admin` member, so:
    - nobody can invite the real owner (`create_workspace_invitation` needs an owner);
    - the hosted-site monthly report goes to the first `owner`, which is no one;
    - Strelva's agency home lists none of its own clients, because it reads
      `workspace_delegations` and conversion writes none.
 
-   Fix once, not three times: an operator-issued owner invitation
+   **Changed by ADR 0013 / decision 2:** client conversion and service must
+   use the ordinary agency path, without platform-admin membership. Engineering
+   must reconcile the conversion, invitations and agency scope. The older fix
+   below is implementation history, not the selected access design.
+
+   Earlier fix: an operator-issued owner invitation
    ([owner-entry](./specs/owner-entry.md)), a `workspace_providers` mark that
    grants nothing ([agency-and-versions](./specs/agency-and-versions.md)), and
    the one owner-recipient rule from Reborn §1 for every notice. *Built and
@@ -178,9 +207,12 @@ turned up problems no single plan had. Each is from code reading unless marked.
    opens with it; it never decides. Make real's durable runner resumes and
    reconciles with the same actor, the owner staying approver of record.
    It reads through the business's verified owner, else its verified admin
-   (the Strelva operator after conversion), because the existing RPCs are the
+   (historically the Strelva operator after conversion), because the existing RPCs are the
    only read path; reads that are per person (money waiting on the payer)
    still reach only that person. Nothing applied to production.
+   **Changed by ADR 0013 / decision 2:** the fallback through a platform admin
+   must not provide client-service authority. Engineering must review the cron
+   and Make real read/resume path against ordinary agency scope.
 3. **Owner email may reach nobody today.** Client email is sent only when
    `EMAIL_SENDING_ENABLED` is `"true"` or a per-client override is set. If it
    is off in production, review approve links and weekly reports have gone
@@ -217,7 +249,7 @@ assumption and names what changes if the answer differs.
 | Decision | Working assumption |
 | --- | --- |
 | What 1.0.0 is on the outside | Existing clients moved in, and Strelva can take a new business through the same path |
-| Partner agencies | Out of 1.0.0; Strelva is the only agency and uses the agency surface |
+| Agencies | ADR 0012 includes agencies at 1.0.0; Strelva's agency follows the same access and verification rules |
 | Website entry for a new business | Open: paste-URL rebuild or connected sites |
 | The word "Systems" on screen; ADR 0011 accepted | Open; screens show things by their own names |
 | Plan price | Open; one flat plan |
@@ -237,17 +269,17 @@ a production step. These are the ones that change more than one spec:
 | Can owners loosen Strelva's defaults | Back up to the default, never past it | needs-you |
 | Approving in Ask Strelva chat | Never; text in a review could fake a confirm | ask-strelva, needs-you |
 | Turning on client email | Per business, `strelva` test business first, then gldf | needs-you, systems-catalog, owner-entry |
-| How Strelva reaches its clients | Keep the admin membership; add a provider mark that grants nothing | agency-and-versions, operator |
-| One queue or two | One queue, shown in `/admin` and as the agency Queue | operator, agency-and-versions |
+| How Strelva's agency reaches its clients | Ordinary delegated agency path, no extra powers (ADR 0012; decision 2); reconcile existing admin-based implementation | agency-and-versions, operator |
+| Agency and platform queues | Client work uses the ordinary agency path; platform support, incidents and release stay separate and logged (decision 2); engineering design pending | operator, agency-and-versions |
 | Twin Trees | Ask the owner: one business with two locations (default), or two (`--separate-business`) | agency-and-versions, money-and-data |
 | Existing clients' terms | Kept; the flat plan is for new businesses | money-and-data |
-| When to set the price | After 30 days of measured operator minutes on converted clients | money-and-data |
+| When to set the price | After 30 days of measured agency delivery minutes on converted clients | money-and-data |
 | Can owners build Systems | No at 1.0.0; they file a Request | systems-catalog, ADR 0011 |
 | Google listing as its own System | Yes, with blog inside the website | publishing |
 | Approving a record change also approves its Google write | Needs Jacob's yes; narrows the AGENTS.md rule | publishing, needs-you |
 
 ## What would prove this model
 
-Owners and Strelva's own operators get to a working System faster, decisions
-reach owners who never log in and get answered, and operator minutes per
+Owners and agencies get to a working System faster, decisions
+reach owners who never log in and get answered, and agency delivery minutes per
 business go down as clients move in. None of that is measured yet.

@@ -1,5 +1,12 @@
 # The rest of the Systems a business starts with
 
+> **Changed by ADR 0013 / decision 2.** Platform operators do not make or change Systems
+> for clients. The super-admin maker role, conversion-admin recipient assumption and
+> operator client-recovery flows below (§3.1.1, §3.4.4, §4, §6–8) are older implementation
+> and need engineering follow-up through the ordinary agency path. Strelva's agency has the
+> same delegated scope as every agency. Automated platform sends/checks remain platform
+> behavior and name Strelva in their receipts.
+
 Status: wave 6 launch code built and locally verified,
 2026-10-07, branch `w6/catalog`. This does not authorize production rollout or
 the open commercial decisions. The “today” statements below describe the
@@ -19,7 +26,7 @@ owner to read the report; a converted business without one is reported as
 | §3.2 Store, rewards and subscribers | Website Store Connection with no checkout authority; frozen tenant store/rewards; additive newsletter contact mirror and dry-run backfill. Exact gldf/rohlax subscribe bodies are tested with flags on and off. | Live converted-client parity, newsletter backfill and current store/rewards counts. |
 | §3.3 Wellness | Schedule/roster project as Bookings views; tenant routes remain in place; members stay frozen. | Current wellness usage and converted-client parity. |
 | §3.4 Analytics and reports | Workspace traffic and Search Console evidence distinguish unavailable/stale reads from zero. One recipient rule; send/suppression/failure receipts, operator recovery and monthly Running text. Typed Postgres analytics/report state preserves Redis fallback and monotonic sent markers. | Actual Google access, reviewed live recipient dry run, state backfill and one delivered recap receipt. |
-| §3.5 Documents and bounded histories | Private files stay outside Systems. Append-only full revision tables plus 20 recent document receipts and bounded onboarding/application windows; paginated history respects exact-work access. Engine and SQL regressions take 1,000 document edits plus latest Undo, 600 onboarding changes and application versions past their prior cap. Rendered document states cover editable/read-only, loading, empty, history error/retry, flag off and denied access. | Apply migrations after checking current workspace row counts. |
+| §3.5 Documents and bounded histories | Private files stay outside Systems. Append-only full revision tables plus 20 recent document receipts and bounded onboarding/application windows; paginated history respects exact-work access. Engine and SQL regressions take 1,000 document edits plus latest Undo, 600 onboarding changes and application History past its prior cap. Rendered document states cover editable/read-only, loading, empty, history error/retry, flag off and denied access. | Apply migrations after checking current workspace row counts. |
 | §3.6 Checks and merges | Saved checks become watched-System health with last-checked/stale evidence; tracker becomes `internal_app`; documents, onboarding and checks stay outside Home Systems. Agency website drafts remain website Possibilities. | Release activation and live health evidence. |
 
 No catalog change touches `/api/v1`, `custom-repo-starter`, the storefront
@@ -101,7 +108,7 @@ No fresh production read was made.
 - The Bookings System (another spec) owns schedule and roster. This spec only
   says they are views of it.
 - Reports belong to **Running**, not to any System page, and each send leaves a
-  receipt in **Strelva handled**.
+  receipt in **What changed**.
 
 ## 3. What it does at 1.0.0
 
@@ -137,7 +144,7 @@ No fresh production read was made.
    `src/lib/email/send.ts`. The email names the tool, the record title and the
    one next step. If the person has no account, the email still goes out, with
    no record data beyond the title (decision 9.3). One email per submit, with
-   a receipt in Strelva handled.
+   a receipt in What changed.
 9. The System page shows the live tool first, with records, and History
    (releases from `application_releases`) beside it.
 
@@ -181,7 +188,7 @@ No fresh production read was made.
    `src/products/websites/site-report.ts`) uses the same rule. Today it reads
    the first `owner` membership with a confirmed email, which a converted
    client does not have: the conversion operator joins as `admin`.
-5. Each send, suppression or failure is a receipt in Strelva handled
+5. Each send, suppression or failure is a receipt in What changed
    ("Strelva sent your September recap to pat@…"). It is not a Needs you item.
 6. Report cadence and last-sent markers move to Postgres (§5).
 7. Running shows one line per business: "Strelva sends you a monthly recap."
@@ -204,7 +211,7 @@ No fresh production read was made.
    latest edit keeps working. (Corrected while building: keeping only one
    receipt would have emptied that card.)
 4. The same pattern is applied to onboarding (`history ... .max(500)`) and to
-   application version and release history (`APPLICATION_VERSION_HISTORY_LIMIT
+   application revision and release history (`APPLICATION_VERSION_HISTORY_LIMIT
    = 100`). Those hit the limit later, and their error messages already name
    the limit.
 
@@ -294,7 +301,7 @@ Workspace products already live in Postgres; nothing there moves.
 **Retires or freezes:** custom application building (§9.1), `src/experience/delivery`
 fixture shell, product learning from release scope, the Customers view, the
 separate assessment presentation, and "Tracker" and "Experimental" as
-customer labels.
+on-screen labels.
 
 **Tenant model vs workspace model:** internal tools, documents, onboarding and
 checks are workspace-only and have no live clients to protect. Store,
@@ -329,7 +336,7 @@ copies them.
 
 | What fails | What the person sees | Undo |
 | --- | --- | --- |
-| Assigned-person email suppressed or fails | Record saved. Strelva handled: "Couldn't email Sam about Acme Co. Strelva will retry." Operator queue gets it after 3 failures | Email can't be unsent |
+| Assigned-person email suppressed or fails | Record saved. What changed: "Couldn't email Sam about Acme Co. Strelva will retry." Operator queue gets it after 3 failures | Email can't be unsent |
 | Contact upsert conflicts (email matches one contact, phone another) | Record saved with the email match; operator queue gets a merge item | Record edit is undoable |
 | Non-builder tries to make a tool | 403, "Ask Strelva to build this", with a Request button | — |
 | Plan generation fails or no model is configured | "Strelva couldn't draft this yet" and a Request is filed | Nothing was created |
@@ -389,8 +396,8 @@ copies them.
 | --- | --- | --- |
 | Cut custom-application builds | Yes, as freeze | Decision 9.1 |
 | Cut `src/experience/delivery` | Yes, delete | Only `/preview/strelva/{agency,client,start}` and its own two tests import it. The live Home is `src/experience/workspace/BusinessHome.tsx` |
-| Cut product learning | Yes, out of release scope; keep the code behind its flag | Super-admin only, flag off, not customer-facing. It is Strelva's own research tool, so deleting it loses data collection |
-| Cut the Customers page | Yes | It left navigation Oct 5 (`workspace-places.ts`). It only listed where people reach the business, and the single customer record it needs is not built. Contacts live in the business record |
+| Cut product learning | Yes, out of release scope; keep the code behind its flag | Super-admin only, flag off, not business-facing. It is Strelva's own research tool, so deleting it loses data collection |
+| Cut the Customers page | Yes | It left navigation Oct 5 (`workspace-places.ts`). It only listed where people reach the business, and the single business contact record it needs is not built. Contacts live in the business record |
 | Merge tracker into internal tools | Yes | Same job (records with a form or list). Tracker brings assignees and record links that internal tools need for 3.1.6–8 |
 | Merge saved checks into System health | Yes | §3.6. A check has no meaning without the System it watches |
 | Merge assessment into the website audit | Yes | Both are issued outputs that open a rebuild Possibility; neither is a System |

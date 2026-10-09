@@ -1,8 +1,8 @@
 /**
  * Provider delivery confirmation as a Needs you item (`request.scope`).
  *
- * Pending: the provider accepted the delivery, the assigned work is
- * completed, and the customer hasn't confirmed it. Approve runs the
+ * Pending: the agency accepted the delivery, the assigned work is
+ * completed, and the business hasn't confirmed it. Approve runs the
  * lifecycle's own `decide` command (`decide_provider_delivery`, decision
  * `confirmed`) through `ProviderDeliveryService`. Not yet changes nothing:
  * asking for changes needs the owner's note, so it stays on the delivery
@@ -16,7 +16,7 @@ import { itemDetail, itemTitle, memberActor, proposeAsMember, revisionOf, unchan
 
 export interface ProviderDeliveryPorts {
   list(actor: WorkspaceActor, businessId: string): Promise<ProviderDelivery[]>;
-  /** Whether the provider's assigned work is completed, so the customer can confirm. */
+  /** Whether the agency's assigned work is completed, so the business can confirm. */
   workCompleted(actor: WorkspaceActor, delivery: ProviderDelivery): Promise<boolean>;
   /** The lifecycle's own command: ProviderDeliveryService.execute({ action: "decide", ... }). */
   confirm(actor: WorkspaceActor, input: { deliveryId: string; expectedRevision: number; note: string }): Promise<ProviderDelivery>;
@@ -37,7 +37,7 @@ export function providerDeliveryItem(delivery: ProviderDelivery): ProposedItem |
     route: "owner_decides",
     title: itemTitle(`Confirm the delivered work: ${delivery.scope.join(", ")}`),
     detail: itemDetail(`Scope: ${delivery.scope.join("; ")}`),
-    approveEffect: "You confirm the provider delivered this work.",
+    approveEffect: "You confirm your agency delivered this work.",
     notYetEffect: "Nothing changes; open it to ask for changes.",
     sourceLifecycle: "provider_delivery",
     sourceId: delivery.id,

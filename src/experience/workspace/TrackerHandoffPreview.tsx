@@ -35,7 +35,7 @@ export function TrackerHandoffPreview({ preview }: { preview: TrackerPreview }) 
         </table>
       </div>
 
-      <p className="text-[12px] leading-relaxed text-gray-muted">Accepting creates a customer-owned copy. The source agency keeps no access unless you choose read-only access below.</p>
+      <p className="text-[12px] leading-relaxed text-gray-muted">Accepting creates your own copy. The source agency keeps no access unless you choose read-only access below.</p>
     </section>
   );
 }

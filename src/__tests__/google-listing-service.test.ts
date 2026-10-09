@@ -98,7 +98,7 @@ describe("review replies", () => {
     expect(result.status).toBe("posted");
     if (result.status !== "posted") return;
     expect(result.receipt).toMatchObject({ action: "reply_post", readback: "matched", before: { reply: null }, after: { reply: "Thank you, Dana." }, undo: { kind: "delete_reply" } });
-    expect(receiptHeadline(result.receipt, "Dana")).toBe("Strelva replied to Dana's review on Google.");
+    expect(receiptHeadline(result.receipt, "Dana")).toBe("Replied to Dana's review on Google.");
     expect(google.writes).toEqual(["updateReply:rev-dana"]);
   });
 
@@ -230,7 +230,7 @@ describe("hours and info from the business record", () => {
     const result = await syncHoursFromRecord(ctx, { hours, authority: OWNER });
     expect(result.status).toBe("posted");
     if (result.status !== "posted") return;
-    expect(result.message).toBe("Strelva updated your hours on Google.");
+    expect(result.message).toBe("Updated your hours on Google.");
     expect(result.receipt.undo).toMatchObject({ kind: "patch_snapshot", updateMask: ["regularHours", "specialHours"] });
     expect(google.location().specialHours?.specialHourPeriods).toHaveLength(1);
     expect((await undoListingChange(ctx, { receiptId: result.receipt.id, authority: UNDO })).status).toBe("posted");
@@ -401,5 +401,14 @@ describe("an agency writing for the business (#255)", () => {
     const { ctx } = context(undefined, { authorizeProvider });
     expect((await postReviewReply(ctx, { reviewId: "rev-dana", text: "Thank you, Dana.", authority: OWNER })).status).toBe("posted");
     expect(authorizeProvider).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("Google receipt actor presentation", () => {
+  it("names the recorded executor and carries agency credit in the string projection", () => {
+    expect(receiptHeadline({ status: "posted", action: "hours_patch", actor: { kind: "agency", displayName: "Acme Marketing" } })).toBe("Acme Marketing updated your hours on Google. Runs on Strelva.");
+    expect(receiptHeadline({ status: "posted", action: "hours_patch", actor: { kind: "operator", displayName: "Taylor" } })).toBe("Taylor (platform support) updated your hours on Google.");
+    expect(receiptHeadline({ status: "posted_unverified", action: "hours_patch", actor: { kind: "agency", displayName: "Acme Marketing" } })).toBe("Acme Marketing posted. Google hasn't shown it yet. Runs on Strelva.");
   });
 });

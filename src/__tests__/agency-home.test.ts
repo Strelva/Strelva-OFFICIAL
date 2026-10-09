@@ -231,7 +231,7 @@ describe("agency home", () => {
       expect(off).not.toMatch(/>Library<|>Team</);
       expect(off).not.toMatch(/possibilit|make[s]? it real/i);
       expect(off).toContain("Assigned website drafts");
-      expect(off).toContain("publishing stays with the customer");
+      expect(off).toContain("publishing stays with the client");
     }
     const on = render({ releases: { systems: true } });
     expect(on).toContain('role="tablist"');

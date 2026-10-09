@@ -193,8 +193,8 @@ describe("POST with a workspace link", () => {
     ["expired", 200, "This link expired"],
     ["sign_in", 200, "Sign in to decide this"],
     ["not_owner", 403, "This link isn't for this account"],
-    ["failed", 200, "Strelva couldn't finish this"],
-    ["done_unverified", 200, "Strelva is confirming it went through"],
+    ["failed", 200, "Could not finish this"],
+    ["done_unverified", 200, "Confirmation is still pending"],
   ])("maps %s to an honest page", async (status, code, text) => {
     const { signWorkspaceApproveToken } = await import("@/lib/approve-link");
     mockDecide.mockResolvedValueOnce({ status, item: item() });

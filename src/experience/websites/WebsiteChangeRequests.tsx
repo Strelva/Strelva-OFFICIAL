@@ -151,7 +151,7 @@ export function WebsiteChangeRequests({ workspaceId, systemId, siteLabel, editin
             {stage === "ready_for_review" ? canDecide ? <div className={styles.decide}>
               <Button size="sm" loading={busyStep === item.id} onClick={() => void step(item.id, { kind: "approved" })}>Approve the preview</Button>
               <Button size="sm" variant="secondary" disabled={busyStep === item.id} onClick={() => void step(item.id, { kind: "declined" })}>Not yet</Button>
-              <small>Approving lets Strelva deploy {preview ? "this preview" : "it"}. A deploy can be rolled back by redeploying the earlier version.</small>
+              <small>Approving lets Strelva deploy {preview ? "this preview" : "it"}. A deploy can be rolled back by redeploying the earlier release from History.</small>
             </div> : <p className={styles.muted}>Waiting on the owner to approve or decline the preview.</p> : null}
             {operator && item.status === "requested" ? <OperatorStep stage={stage} busy={busyStep === item.id} onRecord={(payload) => void step(item.id, payload)} /> : null}
           </li>;

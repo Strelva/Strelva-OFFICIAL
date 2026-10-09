@@ -27,7 +27,7 @@ export function businessEffortFailure(error: Failure): void {
   const detail = `${error.code ?? ""} ${error.message ?? ""}`;
   if (detail.includes("business_effort_access_denied")) throw new BusinessEffortAccessError();
   if (detail.includes("business_effort_invalid")) throw new BusinessEffortValidationError();
-  if (detail.includes("business_effort_business_not_found")) throw new BusinessEffortNotFoundError("That customer business was not found.");
+  if (detail.includes("business_effort_business_not_found")) throw new BusinessEffortNotFoundError("That client business was not found.");
   if (detail.includes("business_effort_entry_not_found")) throw new BusinessEffortNotFoundError("That entry was not found.");
   if (detail.includes("business_effort_conflict")) throw new BusinessEffortConflictError();
   throw new BusinessEffortUnavailableError();

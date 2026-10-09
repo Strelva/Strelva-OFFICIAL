@@ -10,7 +10,7 @@ import {
   WorkspaceOfferingDirectory,
   boundManagedWebsiteIds,
   boundOfferingResourceIds,
-  type PresentedProviderDelivery,
+  type PresentedAgencyDelivery,
   type WorkspaceOfferingState,
 } from "@/experience/workspace/WorkspaceOfferings";
 import type { WorkspaceWork } from "@/experience/workspace/contracts";
@@ -122,11 +122,11 @@ describe("workspace offering experience", () => {
     container.remove();
   });
 
-  it("shows local availability without claiming an installation or provider", () => {
+  it("shows local availability without claiming an installation or agency", () => {
     const html = renderDirectory({ status: "ready", collection, saving: false }, null);
     expect(html).toContain("Staff request application");
     expect(html).toContain("Local release");
-    expect(html).toContain("Availability does not grant access or promise a provider.");
+    expect(html).toContain("Availability does not grant access or promise an agency.");
     expect(html).not.toContain("Installed for this business");
   });
 
@@ -159,10 +159,10 @@ describe("workspace offering experience", () => {
     expect(html).toContain("Documents");
   });
 
-  it("starts with customer operation and offers an explicit provider request", () => {
+  it("starts with customer operation and offers an explicit agency request", () => {
     const html = renderDirectory({ status: "ready", collection, saving: false }, definition.id);
     expect(html).toContain("Your business operates it");
-    expect(html).toContain("Request a provider");
+    expect(html).toContain("Request an agency");
     expect(html).toContain('name="responsibility" checked=""');
   });
 
@@ -204,7 +204,7 @@ describe("workspace offering experience", () => {
     expect(inaccessible).not.toContain("Open Staff requests");
   });
 
-  it("mounts the provider lifecycle inside the installed offering", () => {
+  it("mounts the agency lifecycle inside the installed offering", () => {
     const installed: OfferingCollection = {
       ...collection,
       installations: [{
@@ -216,8 +216,8 @@ describe("workspace offering experience", () => {
       }],
     };
     const html = renderDirectory({ status: "ready", collection: installed, saving: false }, installationId);
-    expect(html).toContain("Strelva has been requested as the provider");
-    expect(html).toContain("Checking provider delivery");
+    expect(html).toContain("Strelva Agency has been requested as the agency");
+    expect(html).toContain("Checking agency delivery");
   });
 
   it("shows the refreshed revision for review while retaining the editor's draft", () => {
@@ -242,8 +242,8 @@ describe("workspace offering experience", () => {
       },
     }, installationId);
     expect(html).toContain("This offering changed while you were editing.");
-    expect(html).toContain("revision 2");
-    expect(html).toContain("Review the current version, then save your draft to retry");
+    expect(html).toContain("History entry is 2");
+    expect(html).toContain("Review the current saved state, then save your draft to retry");
     expect(html).toContain("Latest saved: Saved by editor A");
     expect(html).toContain("Your draft: Saved by editor A");
   });
@@ -295,7 +295,7 @@ describe("workspace offering experience", () => {
     expect(released).toContain("managed website");
   });
 
-  it("shows provider delivery and customer decision from the business delivery list", () => {
+  it("shows agency delivery and customer decision from the business delivery list", () => {
     const providerInstallation: OfferingCollection["installations"][number] = {
       id: installationId,
       businessId,
@@ -313,7 +313,7 @@ describe("workspace offering experience", () => {
       updatedBy: "owner",
       updatedAt: "2026-09-15T12:00:00.000Z",
     };
-    const baseDelivery: PresentedProviderDelivery = {
+    const baseDelivery: PresentedAgencyDelivery = {
       id: "88888888-8888-4888-8888-888888888888",
       businessId,
       installationId,
@@ -338,19 +338,19 @@ describe("workspace offering experience", () => {
       canAccept: false,
     };
     const providerCollection = { ...collection, installations: [providerInstallation] };
-    const renderSummary = (delivery: PresentedProviderDelivery, status: "ready" | "error" = "ready") => renderToStaticMarkup(createElement(BusinessOfferingSummary, {
+    const renderSummary = (delivery: PresentedAgencyDelivery, status: "ready" | "error" = "ready") => renderToStaticMarkup(createElement(BusinessOfferingSummary, {
       state: { status: "ready", collection: providerCollection, saving: false },
       work: [],
       onOpen: () => undefined,
-      providerDeliveryState: status === "ready" ? { status, deliveries: [delivery] } : { status, message: "Provider list unavailable" },
+      providerDeliveryState: status === "ready" ? { status, deliveries: [delivery] } : { status, message: "Agency list unavailable" },
     }));
 
-    expect(renderSummary(baseDelivery)).toContain("Provider requested · waiting for acceptance");
-    expect(renderSummary(baseDelivery)).toContain("Customer decision: pending");
-    expect(renderSummary({ ...baseDelivery, status: "accepted", customerDecision: "confirmed" })).toContain("Provider accepted");
-    expect(renderSummary({ ...baseDelivery, status: "accepted", customerDecision: "confirmed" })).toContain("Customer decision: confirmed");
-    expect(renderSummary({ ...baseDelivery, status: "revoked", customerDecision: "changes_requested" })).toContain("Provider delivery revoked");
-    expect(renderSummary({ ...baseDelivery, status: "revoked", customerDecision: "changes_requested" })).toContain("Customer decision: changes requested");
+    expect(renderSummary(baseDelivery)).toContain("Agency requested · waiting for acceptance");
+    expect(renderSummary(baseDelivery)).toContain("Your decision: pending");
+    expect(renderSummary({ ...baseDelivery, status: "accepted", customerDecision: "confirmed" })).toContain("Agency accepted");
+    expect(renderSummary({ ...baseDelivery, status: "accepted", customerDecision: "confirmed" })).toContain("Your decision: confirmed");
+    expect(renderSummary({ ...baseDelivery, status: "revoked", customerDecision: "changes_requested" })).toContain("Agency delivery revoked");
+    expect(renderSummary({ ...baseDelivery, status: "revoked", customerDecision: "changes_requested" })).toContain("Your decision: changes requested");
     expect(renderSummary(baseDelivery, "error")).toContain("Acceptance cannot be inferred from the offering record.");
   });
 });

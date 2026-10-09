@@ -68,7 +68,9 @@ const bare = (host: string | undefined) => host?.replace(/^www\./, "");
 
 function provider(installation: OfferingInstallation | undefined): string | undefined {
   if (!installation) return undefined;
-  return installation.responsibility.kind === "provider_requested" ? installation.responsibility.providerName : undefined;
+  return installation.responsibility.kind === "provider_requested"
+    ? installation.responsibility.providerKind === "strelva" ? "Strelva Agency" : installation.responsibility.providerName
+    : undefined;
 }
 
 const CONNECTION_STATUS = { connected: "connected", disconnected: "not_connected", stale: "unknown" } as const;
@@ -160,7 +162,7 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
     const stored = versionBySystem.get(entry.ref.systemId);
     if (stored) {
       const sourceBusiness = stored.source.businessId === snapshot.workspaceId ? null : agencyNames.get(stored.source.businessId);
-      const sourceLabel = stored.source.hidden ? "this business's shared setup" : stored.source.name ?? (sourceBusiness ? `a source kept by ${sourceBusiness}` : "a source your provider keeps");
+      const sourceLabel = stored.source.hidden ? "this business's shared setup" : stored.source.name ?? (sourceBusiness ? `a source kept by ${sourceBusiness}` : "a source your agency keeps");
       const waiting = stored.latestRevision !== null && stored.latestRevision > stored.baselineRevision && !stored.declined.includes(stored.latestRevision);
       versions.push({ id: `${stored.id}:source`, relation: "source", context: stored.context.label, title: stored.source.name ?? "Source",
         lineage: `${stored.context.label} is adapted from ${sourceLabel}.${waiting ? " An improvement is waiting for a decision." : ""} Records and accounts stay here.` });
@@ -180,7 +182,7 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
       health: { state: entry.health.status, summary: work?.unavailableReason || entry.health.summary, lastVerifiedAt: entry.health.lastVerifiedAt, ...(entry.health.signals ? { signals: entry.health.signals } : {}) },
       ...(publishing && (kind === "website" || kind === "newsletter") ? { publishing: true } : {}),
       surface: surface ?? { kind: "work", workId: entry.savedWorkId ?? entry.ref.systemId, productId: "unknown" },
-      operatedBy: kind === "website" && site ? site.relationship === "enterprise" ? "Your enterprise team" : "Strelva" : provider(installation),
+      operatedBy: kind === "website" && site ? site.relationship === "enterprise" ? "Your enterprise team" : "Strelva Agency" : provider(installation),
       ...(kind === "bookings" && entry.views?.length ? { views: bookingViews(entry.views, entry.tenantId ? siteById.get(entry.tenantId) : undefined) } : {}),
       ...(kind === "website" && domain ? auditsFor(domain, snapshot.work) : {}),
       connections: [], possibilities: [], versions,
@@ -257,10 +259,10 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
       if (system) system.activations = [...(system.activations ?? []), view];
     }
   }
-  // History: the System's own changes and Strelva handled receipts for it, newest first, last five.
+  // History: the System's own changes and What changed receipts for it, newest first, last five.
   const history = new Map<string, SystemHistoryRow[]>();
-  for (const row of ready?.history ?? []) history.set(row.systemId, [...(history.get(row.systemId) ?? []), { id: row.id, sentence: row.sentence, at: row.at, releaseRef: row.releaseRef, implementationKind: row.implementationKind }]);
-  for (const receipt of ready?.handled ?? []) if (receipt.systemId) history.set(receipt.systemId, [...(history.get(receipt.systemId) ?? []), { id: receipt.id, sentence: receipt.sentence, at: receipt.at }]);
+  for (const row of ready?.history ?? []) history.set(row.systemId, [...(history.get(row.systemId) ?? []), { id: row.id, sentence: row.sentence, actor: row.actor, at: row.at, releaseRef: row.releaseRef, implementationKind: row.implementationKind }]);
+  for (const receipt of ready?.handled ?? []) if (receipt.systemId) history.set(receipt.systemId, [...(history.get(receipt.systemId) ?? []), { id: receipt.id, sentence: receipt.sentence, actor: receipt.actor, at: receipt.at }]);
   for (const [id, rows] of history) {
     const system = byId.get(id);
     if (system) system.history = rows.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 5);

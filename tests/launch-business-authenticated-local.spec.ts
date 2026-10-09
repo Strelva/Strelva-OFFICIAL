@@ -132,8 +132,8 @@ for (const width of [1440, 390]) {
     await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await page.screenshot({path:testInfo.outputPath(`delivery-${width}.png`),fullPage:true});
     await page.goto(`/workspace?workspaceId=${businessId}`);
-    // Accepted work leaves "Needs you" and is listed as done under "Strelva handled".
-    const handledCard=page.getByRole("region",{name:"Strelva handled",exact:true})
+    // Accepted work leaves "Needs you" and is listed as done under "What changed".
+    const handledCard=page.getByRole("region",{name:"What changed",exact:true})
       .locator(`a[href="/workspace/delivery/${requestId}"]`);
     await expect(handledCard.getByText(/^Done/)).toBeVisible();
     await expect(deliveryCard).toHaveCount(0);

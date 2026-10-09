@@ -67,7 +67,7 @@ test("with every 1.0 flag off, a converted business's owner sees the workspace a
     await expect(currentWorkspace).toHaveValue(businessId);
     await expect(currentWorkspace.locator("option:checked")).toHaveText("Quiet Harbor");
     await expect(home.getByRole("region", { name: "Needs you" }).getByText("Nothing needs a decision right now.")).toBeVisible();
-    await expect(home.getByRole("region", { name: "Strelva handled" }).getByText("Nothing finished yet.", { exact: false })).toBeVisible();
+    await expect(home.getByRole("region", { name: "What changed" }).getByText("Nothing finished yet.", { exact: false })).toBeVisible();
     await expect(home.getByRole("button", { name: /^(?:Confirm|Approve|Not yet|Make it live|Undo):/ })).toHaveCount(0);
     expect(decisionReads).toEqual([]);
 

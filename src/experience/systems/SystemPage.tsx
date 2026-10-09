@@ -1,4 +1,6 @@
 "use client";
+import { actorPresentation } from "@/platform/presentation/actor";
+import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
 import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 
 import { WorkspaceInquirySystem } from "@/experience/places/WorkspaceInquirySystem";
@@ -181,7 +183,7 @@ function HistoryPanel({ system }: { system: SystemView }) {
     return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   };
   return <Panel id={`${system.id}-history`} title="History" count={0} intro="The last changes, newest first.">
-    <ul className={styles.panelList}>{rows.map(row => <li key={row.id}><span>{row.sentence}</span><small><time dateTime={row.at}>{when(row.at)}</time></small></li>)}</ul>
+    <ul className={styles.panelList}>{rows.map(row => <li key={row.id}><span>{row.sentence}</span>{actorPresentation(row.actor).credit ? <small>{actorPresentation(row.actor).credit}</small> : null}<small><time dateTime={row.at}>{when(row.at)}</time></small></li>)}</ul>
   </Panel>;
 }
 
@@ -225,7 +227,7 @@ function SystemSurface({ system, workspaceId, readOnly, useReadOnly = readOnly, 
   return <p className="p-6 text-sm text-gray-muted">This system opens in its own view. <Link className="underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&work=${encodeURIComponent(workId)}`}>Open it</Link></p>;
 }
 
-/** The listing's own surface: its health in words and Strelva handled. */
+/** The listing's own surface: its health in words and What changed. */
 function ListingSurface({ surface }: { surface: Extract<SystemView["surface"], { kind: "listing" }> }) {
   const when = (at: string) => {
     const date = new Date(at);
@@ -233,10 +235,10 @@ function ListingSurface({ surface }: { surface: Extract<SystemView["surface"], {
   };
   return <div className="p-6">
     <p role={surface.unavailable ? "alert" : "status"} className="text-sm">{surface.healthMessage}</p>
-    <h2 className="mt-6 text-sm font-semibold">Strelva handled</h2>
-    {surface.receipts.length ? <ul className={styles.panelList} aria-label="What Strelva did on Google">
+    <h2 className="mt-6 text-sm font-semibold">{STRELVA_HANDLED_LABEL}</h2>
+    {surface.receipts.length ? <ul className={styles.panelList} aria-label="Changes on Google">
       {surface.receipts.map(receipt => <li key={receipt.id}><span>{receipt.headline}</span><small>{when(receipt.at)}</small></li>)}
-    </ul> : <p className="mt-2 text-sm text-gray-muted">Nothing yet. Replies, hours and posts Strelva sends to Google show here, each with what changed and how to undo it.</p>}
+    </ul> : <p className="mt-2 text-sm text-gray-muted">Nothing yet. Replies, hours and posts sent to Google show here, each with what changed and how to undo it.</p>}
   </div>;
 }
 

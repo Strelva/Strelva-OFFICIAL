@@ -191,7 +191,7 @@ const SIGNALS: readonly Signal[] = [
 
 const ROUTE_ORDER = ["onboarding", "websites", "applications", "scheduling", "investigations", "operations", "document", "inquiries", "tracker", "assessment", "website"] as const;
 
-function normalizeRequest(value: string): string {
+function normalizeAsk(value: string): string {
   // Preserve the person's wording, punctuation and line breaks for the native
   // or model-backed flow. Matching operates on whitespace-insensitive regexes.
   return value.trim();
@@ -330,16 +330,16 @@ function helpPlan(request: string, context: WorkspaceStartContext, routes: reado
     route: "help",
     request,
     context,
-    title: multiOutcome ? "A plan that keeps the whole request" : "Let’s narrow that down together.",
+    title: multiOutcome ? "A plan that keeps the whole ask" : "Let’s narrow that down together.",
     summary: multiOutcome
-      ? "We’ll prepare one plan for the full request. You can review it before work starts."
-      : "This request does not match a workspace flow yet. You can send it to Strelva with its context so the team can explain the next step.",
+      ? "We’ll prepare one plan for the full ask. You can review it before work starts."
+      : "This ask does not match a workspace flow yet. You can send it to Strelva with its context so the team can explain the next step.",
     parts: [],
     ...(reason ? { reason } : {}),
     helpRequest: request,
     matchedRoutes: [...routes],
     selectedPartIds: [],
-    nextAction: multiOutcome ? "Review a plan for these outcomes." : "Ask Strelva to help narrow this request down.",
+    nextAction: multiOutcome ? "Review a plan for these outcomes." : "Ask Strelva to help narrow this ask down.",
     canContinue: !reason,
   };
 }
@@ -369,8 +369,8 @@ function requestsWebsiteService(request: string): boolean {
   // Negated or explicitly self-service requests stay on the existing planning path.
   if (requestsSelfService(request)) return false;
   if (/\bstrelva\b[^.!?;\n]{0,40}\b(?:do not|don['’]t|not|never|cannot|can['’]t)\b[^.!?;\n]{0,30}\b(?:build|create|make|design|deliver)\b/i.test(request)) return false;
-  const providerFirst = /\bstrelva[\s,]*(?:(?:can|could|would|will)\s+(?:you\s+)?)?(?:please\s+)?(?:build|create|make|design|deliver)\b/i.test(request);
-  return providerFirst || /\b(?:have|hire|ask|pay|get|want|need|like)\b[^.!?;\n]{0,40}\bstrelva\b[^.!?;\n]{0,40}\b(?:build|create|make|design|deliver)\b|\b(?:agency[- ]built|done[- ]for[- ](?:me|us|you)|24[- ]hour|24 hours?)\b/i.test(request);
+  const agencyFirst = /\bstrelva[\s,]*(?:(?:can|could|would|will)\s+(?:you\s+)?)?(?:please\s+)?(?:build|create|make|design|deliver)\b/i.test(request);
+  return agencyFirst || /\b(?:have|hire|ask|pay|get|want|need|like)\b[^.!?;\n]{0,40}\bstrelva\b[^.!?;\n]{0,40}\b(?:build|create|make|design|deliver)\b|\b(?:agency[- ]built|done[- ]for[- ](?:me|us|you)|24[- ]hour|24 hours?)\b/i.test(request);
 }
 
 function websiteServicePlan(request: string, context: WorkspaceStartContext): WorkspaceStartPlan {
@@ -405,7 +405,7 @@ function blockedReason(context: WorkspaceStartContext, route: Exclude<WorkspaceS
 }
 
 export function planWorkspaceStart(requestOrInput: string | WorkspaceStartInput, suppliedContext: WorkspaceStartContext = {}): WorkspaceStartPlan {
-  const request = normalizeRequest(typeof requestOrInput === "string" ? requestOrInput : requestOrInput.request);
+  const request = normalizeAsk(typeof requestOrInput === "string" ? requestOrInput : requestOrInput.request);
   const context = typeof requestOrInput === "string" ? suppliedContext : requestOrInput.context || suppliedContext;
   if (!request) return emptyPlan();
   if (requestsWebsiteService(request)) return websiteServicePlan(request, context);

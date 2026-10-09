@@ -22,7 +22,7 @@ async function memberWorkspace(actor: { userId: string; verifiedEmail: string },
 }
 
 /**
- * Needs you and Strelva handled for one business: the owner's open
+ * Needs you and What changed for one business: the owner's open
  * decisions, oldest first, and the last week of what Strelva did. Direct
  * members only; the SQL rechecks membership on every read.
  */

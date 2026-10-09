@@ -472,7 +472,7 @@ change. Three passes ran 326, 360 and 140 page loads, and each fix was rechecked
   with `systems=on`. Mooney was also loaded with `needsYou=on`,
   `makeReal=partly|live`, `publishing=on|pending|disconnected|none` and
   `ask=on|off|error|forbidden|unsaved`. That covers Needs you, Systems,
-  Strelva handled, In progress, From your site and Ask Strelva.
+  What changed, In progress, From your site and Ask Strelva.
 - **Flags off:** `systems=off` for mooney, agency-systems and twin-trees. The
   legacy scenarios free, paid, managed, business, agency, enterprise, empty,
   read-only, unavailable, signed-out, website-audit and recovery.
@@ -550,7 +550,7 @@ email's one-tap link with the same signer (`buildWorkspaceApproveUrl`).
 The three steps that were `test.fixme` are real tests since `w4/journey-gaps`
 (October 6). Like the rest, they have not yet run against a stack:
 
-- Strelva handled lists the approved booking decision, says Strelva confirmed
+- What changed lists the approved booking decision, says Strelva confirmed
   it, and says why it isn't a one-tap undo
   (`20261009130000_strelva_handled_decisions.sql`).
 - A visitor's request-mode booking goes through `/api/booking` on

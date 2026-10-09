@@ -58,7 +58,7 @@ test("a visible request edit replaces the previously submitted request across to
   await page.goto("/preview/strelva?scenario=business");
   const composer = page.getByLabel("What do you want to accomplish?", { exact: true });
   await composer.fill("Organize customer onboarding.");
-  await page.getByRole("button", { name: "Continue with this request", exact: true }).click();
+  await page.getByRole("button", { name: "Continue with this ask", exact: true }).click();
   const edited = "Organize supplier onboarding.\n- Insurance certificate\n- Signed agreement";
   await page.getByLabel("What do you want to accomplish?", { exact: true }).fill(edited);
   await page.getByRole("button", { name: "Get or build an app", exact: true }).click();
@@ -74,7 +74,7 @@ test("supplier onboarding keeps the original request and explicit checklist", as
   await page.goto("/preview/strelva?scenario=business");
   const request = "Organize supplier onboarding.\n- Insurance certificate\n- Signed agreement";
   await page.getByLabel("What do you want to accomplish?", { exact: true }).fill(request);
-  await page.getByRole("button", { name: "Continue with this request", exact: true }).click();
+  await page.getByRole("button", { name: "Continue with this ask", exact: true }).click();
   await page.getByRole("region", { name: "Onboarding requirements", exact: true }).getByRole("button", { name: "Organize onboarding", exact: true }).click();
   await expect(page.getByText(request, { exact: true })).toBeVisible();
   await expect(page.getByLabel("Subject", { exact: true })).toHaveValue("supplier");

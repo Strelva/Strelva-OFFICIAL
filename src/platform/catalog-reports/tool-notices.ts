@@ -1,3 +1,4 @@
+import { actorCopy } from "@/platform/presentation/actor";
 import { z } from "zod";
 import { callReleaseFlagsRpc, workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 import { releaseFlagMayBeOn } from "@/platform/release-flags/resolve";
@@ -24,7 +25,7 @@ export function handledToolNotice(row: ToolNoticeReceipt): HandledReceipt {
       : row.status === "pending" ? `The submission to ${tool} is saved; its notification is not confirmed.`
         : row.status === "skipped" ? `The submission to ${tool} is saved; no owner or assigned-person email is available.`
           : `The submission to ${tool} is saved; email sending is paused.`;
-  return { id: `tool-notice:${row.id}`, store: "internal_tool_notices", systemId: null, sentence, at: row.at, changed: null,
+  return { id: `tool-notice:${row.id}`, store: "internal_tool_notices", systemId: null, sentence: actorCopy(sentence, null), at: row.at, changed: null,
     evidence: row.status === "sent" ? { providerAccepted: true, readBack: "not_checked" } : null,
     undo: { state: "not_undoable", reason: row.status === "sent" ? "A sent email cannot be unsent." : "The saved record is unchanged by notification delivery." } };
 }

@@ -156,7 +156,7 @@ describe("business home", () => {
 
     expect(html).toContain("Needs you");
     expect(html).toContain("Review urgency field");
-    expect(html).toContain("Strelva handled");
+    expect(html).toContain("What changed");
     expect(html).toContain("In progress");
     expect(html).toContain("All requests");
     expect(html).toContain("Files and results");
@@ -176,7 +176,7 @@ describe("business home", () => {
     expect(html).not.toContain("$0");
   });
 
-  it("with Systems released, Strelva handled is the receipt feed and In progress lists Make real", () => {
+  it("with Systems released, What changed is the receipt feed and In progress lists Make real", () => {
     const base = snapshot([work("Opening checklist")]);
     const props = { sites: [], unassignedSites: [], siteAssignmentsKnown: true, offerings: offeringState, busy: false,
       onOpen: noop, onStart: noop, onRequest: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account", systemsReleased: true };
@@ -202,7 +202,7 @@ describe("business home", () => {
     }));
     expect(html).toContain("Needs you");
     expect(html).toContain("Open Opening checklist");
-    expect(html).not.toContain("Strelva handled");
+    expect(html).not.toContain("What changed");
     expect(html).not.toContain("All requests");
   });
 });

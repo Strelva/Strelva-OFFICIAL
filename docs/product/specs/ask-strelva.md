@@ -1,5 +1,12 @@
 # Ask Strelva in the workspace
 
+> **Changed by ADR 0013 / decisions 1–2 and 8.** Text typed before work exists is an ask;
+> asked-for finite work is a Request, and a Request sent to an agency is not accepted until
+> scope and deadline are agreed. Answers and receipts name whoever acted; agency names carry
+> "Runs on Strelva". Client work entered on behalf of an owner must use the ordinary agency
+> path. Engineering must reconcile the existing operator/member permission and owner-email
+> entry paths with that boundary; naming a different actor alone grants no access.
+
 Status: implemented locally on `w6/owner-ask`, October 7, 2026. Not
 migrated or deployed; all release flags off. Proof and remaining stop points
 are in [the stream handoff](../streams/w6-owner-ask.md).
@@ -58,12 +65,13 @@ The Mooney Firm adds estate-planning consults. Two ways this arrives:
   in the workspace. They type: "We now do estate planning consults. Add it and
   let people book one."
 - **The owner never signs in** (the common case: 1 sign-in in 30 days). They
-  email Strelva. Today that reply lands at `REPLY_TO_EMAIL` or
-  `hello@strelva.com` (`src/lib/email/send.ts`). A Strelva operator opens the
+   email their agency. For Strelva's own agency, that reply lands at `REPLY_TO_EMAIL` or
+  `hello@strelva.com` (`src/lib/email/send.ts`). A team member of the business's agency opens the
   Mooney workspace and types the same sentence into Ask Strelva, marked as
   asked by the owner by email.
 
-Either way, Strelva:
+In this example, Acme Marketing serves the firm through the ordinary agency
+path. Ask Strelva returns:
 
 1. Answers what it read: the firm's services today, from the business record.
 2. Drafts one change: "Estate planning consult" added to the firm's services.
@@ -75,8 +83,9 @@ Either way, Strelva:
    is not live.
 
 The owner gets one email with the change and a one-tap Approve / Not yet. They
-tap Approve. Strelva publishes, reads it back, and the receipt appears in
-**Strelva handled**: "Strelva added Estate planning consult to attymooney.com."
+tap Approve. Acme Marketing publishes, reads it back, and the receipt appears in
+**What changed**: "Acme Marketing added Estate planning consult to attymooney.com", with
+"Runs on Strelva" credit. Automatic platform work instead names Strelva.
 The booking Possibility waits until someone opens it and chooses **Make real**.
 
 ## 2. In the model
@@ -220,10 +229,10 @@ Ask Strelva hands each draft to the Needs you policy with the System, the
 change type and today's governance reason code (`AiGovernanceReasonCode` in
 `src/lib/ai-governance.ts`). The policy answers one of:
 
-- **Strelva does it** and reports it in Strelva handled (today: governance
+- **The authorized actor does it**, is named, and reports it in What changed (today: governance
   `publish`, `maybeAutoApprove` for low-risk sections, content autonomy
   `auto`, review-reply `auto` mode).
-- **Strelva reviews it** first (today: `reviewAudience: "operator"` in
+- **The serving agency reviews it** first (today: `reviewAudience: "operator"` in
   `src/lib/needs-you.ts`).
 - **The owner decides**: it appears in Needs you and goes out by email with the
   signed one-tap link (`src/lib/approve-link.ts`, `/api/approve`).
@@ -250,7 +259,7 @@ Make real).
 - Credentials: it never asks for, stores or repeats a password or key.
 
 Each refusal names where the thing is done instead ("Domains are in Business
-details" or "I filed it for Strelva").
+details" or "I sent the Request to {agency display name}").
 
 ### Never happens
 
@@ -283,7 +292,7 @@ details" or "I filed it for Strelva").
 
 - `src/platform/workspaces/permissions.ts`, `workspace_require` SQL helper.
 - `src/platform/systems/from-existing.ts`, `systems` tables.
-- `src/platform/service-requests` (provider `strelva`) for Requests.
+- `src/platform/service-requests` (legacy `provider_kind` value `strelva`) for Requests sent to Strelva's agency.
 - `src/platform/possibilities` and `src/platform/make-real` for Possibilities.
 - `src/platform/work-economics/provider-evidence.ts` for trusted provider
   receipts where a billing gateway gives exact cost.
@@ -325,7 +334,7 @@ retires, built from the same implementations.
 | `get_metrics` | Merged | `read_performance` | Website | Read |
 | `explain_traffic` | Merged | `read_performance` | Website | Read |
 | `show_report` | Merged | `read_performance` (card) | Website | Read |
-| `get_activity` | Merged | `read_history` | Any System (History, Strelva handled) | Read |
+| `get_activity` | Merged | `read_history` | Any System (History, What changed) | Read |
 | `show_connections` | Kept, renamed | `read_connections` | The System's Connections | Read |
 | `get_reviews` | Kept, renamed | `read_reviews` | Google Business Connection, reviews | Read |
 | — | New | `read_requests` | Requests for this workspace | Read |

@@ -32,7 +32,7 @@ a client. Do not grant admin membership as an onboarding workaround.
 2. Have the owner review the exact improvement by email, even without an account.
    [NOT BUILT — tracked in #273]
 3. For a website supported by Strelva's publication path, publish through the
-   verified provider path after the required owner approval.
+   verified agency path after the required owner approval.
    [NOT BUILT — tracked in #263]
 4. Read the resulting release or publication receipt. Check the actual live
    target before reporting a website improvement as live. Integrated Version

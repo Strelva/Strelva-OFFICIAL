@@ -35,7 +35,7 @@ Google. The owner never signs in.
   `auto` mode, the reply posts itself after the 12-hour window
   (`AUTO_POST_DELAY_MS`), and the owner only sees the receipt.
 - In the workspace, if anyone opens it, the firm's Google listing shows the
-  review, the reply, and the receipt under **Strelva handled**.
+  review, the reply, and the receipt under **What changed**.
 
 **The Mooney Firm, holiday hours.** The owner emails "we're closed the
 Friday after Thanksgiving". Strelva changes the business record once. The

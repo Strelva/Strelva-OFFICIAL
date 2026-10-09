@@ -13,7 +13,7 @@ verify your agency.
 3. Wait for that effect to be verified before using it. Building and previewing
    remain available while you wait. [NOT BUILT — tracked in #255]
 
-A verified agency still needs an active provider relationship and the client's
+A verified agency still needs an active agency relationship and the client's
 approval for the action. Payment-provider requirements and account permissions
 still apply. Strelva's own agency follows the same verification path.
 

@@ -68,13 +68,13 @@ function AuthorityEditor({ workId, canManage: requestedManage, sources }: Props)
       {contextError ? <p className="text-gray-muted">{contextError}</p> : null}
       {context && !context.grants.length ? <p className="text-gray-muted">No additional sources have been approved here.</p> : null}
       {context?.grants.length ? <ul className="divide-y divide-gray-border">{context.grants.map(grant => <li key={grant.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
-        <div className="min-w-0"><p className="break-words">{grant.title}</p><p className="text-xs text-gray-muted">{grant.status === "revoked" ? "Access removed" : Date.parse(grant.expiresAt) <= Date.now() ? "Access expired" : `Allowed until ${date(grant.expiresAt)}`} · Version {grant.sourceRevision}</p></div>
+        <div className="min-w-0"><p className="break-words">{grant.title}</p><p className="text-xs text-gray-muted">{grant.status === "revoked" ? "Access removed" : Date.parse(grant.expiresAt) <= Date.now() ? "Access expired" : `Allowed until ${date(grant.expiresAt)}`} · History entry {grant.sourceRevision}</p></div>
         {canManage && grant.status === "active" ? <Button variant="secondary" disabled={busy} onClick={() => void change("context", { kind: "revoke_source", expectedRevision: context.revision, grantId: grant.id })}>Remove access</Button> : null}
       </li>)}</ul> : null}
       {context?.facts.length ? <ul className="space-y-3">{context.facts.map(fact => <li key={fact.id} className="border-l-2 border-gray-border pl-3"><p>{fact.key}: {fact.value}</p><p className="text-xs text-gray-muted">{fact.status} · {fact.evidenceKind} · Captured {date(fact.capturedAt)}</p><p className="mt-1 text-xs text-gray-muted">Source evidence: {fact.excerpt}</p></li>)}</ul> : null}
       {canManage && context && sources.some(source => source.id !== workId) ? <details><summary className="cursor-pointer">Allow another source</summary><form className="mt-3 space-y-3" onSubmit={event => { event.preventDefault(); const form = new FormData(event.currentTarget); void change("context", { kind: "grant_source", expectedRevision: context.revision, sourceWorkId: form.get("source"), scope: ["read", "use_in_work"], purpose: "Use this source to complete the selected work", expiresAt: sevenDays() }); }}>
         <label className="block">Saved source<select name="source" className={control} required>{sources.filter(source => source.id !== workId).map(source => <option key={source.id} value={source.id}>{source.title ?? "Untitled work"}</option>)}</select></label>
-        <p className="text-xs text-gray-muted">Allow this exact source version for seven days. A changed version needs fresh approval.</p>
+        <p className="text-xs text-gray-muted">Allow this exact saved state for seven days. A changed state needs fresh approval.</p>
         <Button type="submit" variant="secondary" disabled={busy}>Allow source for this work</Button>
       </form></details> : null}
     </section> : null}

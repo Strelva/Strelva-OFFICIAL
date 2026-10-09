@@ -575,7 +575,7 @@ if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
   STRELVA_VERSIONS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
     pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/system-versions-store-contract.test.ts src/__tests__/agency-versions-server.test.ts
 fi
-# Needs you and Strelva handled: decision policy, owner decisions and the
+# Needs you and What changed: decision policy, owner decisions and the
 # handled read model, on the same fictional cluster (needs the business record,
 # tenant links and Systems above).
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007120000_needs_you.sql"
@@ -731,7 +731,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql
 psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
-# Journey gaps (wave 4): Strelva handled lists decided owner decisions
+# Journey gaps (wave 4): What changed lists decided owner decisions
 # (replaces read_strelva_handled), and Make real by signed owner link for an
 # owner with no account (replaces record_strelva_service_action). The Needs
 # you and service actor contracts rerun against the replacements.
