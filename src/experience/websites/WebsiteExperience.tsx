@@ -1,5 +1,6 @@
 "use client";
 
+import { useWebsiteAttempt } from "./website-attempt";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { ArrowRight, Check, CircleAlert, ExternalLink, History, Loader2, RefreshCw, Rocket, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -210,17 +211,13 @@ function WebsiteSession({
   const [loading, setLoading] = useState(Boolean(workId));
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
-  const [busy, setBusy] = useState(false);
-  const inFlight = useRef(false);
-  const unresolved = useRef(false);
-  const [needsReload, setNeedsReload] = useState(false);
+  const websiteAttempt = useWebsiteAttempt<Parameters<WebsiteExperienceTransport["create"]>[0]>(String(readOnly));
+  const { busy, setBusy, inFlight, unresolved, needsReload, command: creationAttempt, mounted: mountedRef } = websiteAttempt;
   const [connectionReadRevision, setConnectionReadRevision] = useState(0);
   const recoveryRootRef = useRef<HTMLElement>(null);
   const reloadRef = useRef<HTMLButtonElement>(null);
   const reviewHeadingRef = useRef<HTMLHeadingElement>(null);
   const reloadFocus = useRef<FocusRecovery | null>(null);
-  const permission = useRef({ readOnly, revision: 0 });
-  permission.current = { readOnly, revision: permission.current.revision + Number(permission.current.readOnly !== readOnly) };
   useEffect(() => {
     if (busy) return;
     connectionFocus.current?.recover(connectionHeadingRef.current);
@@ -230,16 +227,8 @@ function WebsiteSession({
   }, [record, busy, needsReload]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const requestId = useRef(createWebsiteRequestId()).current;
-  const creationAttempt = useRef<Parameters<WebsiteExperienceTransport["create"]>[0] | null>(null);
-  const mountedRef = useRef(true);
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false; reloadFocus.current?.cancel();
-    };
-  }, []);
+  useEffect(() => () => reloadFocus.current?.cancel(), []);
 
   useEffect(() => {
     if (!workId) return;
@@ -265,18 +254,15 @@ function WebsiteSession({
   const dirty = Boolean(record && savedFields && (Object.keys(EMPTY_BRIEF) as Array<keyof BriefFields>).some((key) => fields[key] !== savedFields[key]));
   const canSubmitBrief = Boolean(brief.businessName && brief.description);
 
-  async function run(label: string, operation: () => Promise<WebsiteRecord>, success: (next: WebsiteRecord) => string, acknowledge: (next: WebsiteRecord) => WebsiteRecord, checkCreation = false) {
-    if (inFlight.current || (unresolved.current && !checkCreation) || busy || readOnly) return;
-    const wasUnknown = unresolved.current;
-    const started = permission.current.revision;
-    inFlight.current = true;
+  async function run(label: string, operation: () => Promise<WebsiteRecord>, success: (next: WebsiteRecord) => string, acknowledge: (next: WebsiteRecord) => WebsiteRecord, checkCreation = false, submitted?: Parameters<WebsiteExperienceTransport["create"]>[0]) {
+    const ticket = websiteAttempt.begin(!readOnly, checkCreation, submitted);
+    if (!ticket) return;
     reloadFocus.current?.cancel(); reloadFocus.current = beginFocusRecovery(recoveryRootRef.current);
-    setBusy(true); setError(""); setNotice("");
+    setError(""); setNotice("");
     try {
       const next = acknowledge(await operation());
       if (!mountedRef.current) return;
-      if (permission.current.revision !== started) throw new Error("Your access changed while the website result was being checked.");
-      unresolved.current = false; setNeedsReload(false); creationAttempt.current = null;
+      websiteAttempt.accept(ticket); creationAttempt.current = null;
       setRecord(next); setFields(fieldsFromBrief(next.website.brief));
       if (next.website.status === "failed") setError(next.website.lastError?.message ?? "The website operation failed. Its saved status remains available.");
       else setNotice(success(next));
@@ -286,25 +272,23 @@ function WebsiteSession({
       const reason = cause instanceof Error ? cause.message : `${label} could not be confirmed.`;
       // Only the route's initial unauthenticated refusal proves no action ran.
       // A later denial cannot settle a previously unknown creation attempt.
-      if (!wasUnknown && cause instanceof WebsiteExperienceError && cause.status === 401 && permission.current.revision === started) {
+      if (cause instanceof WebsiteExperienceError && cause.status === 401 && websiteAttempt.refuse(ticket)) {
         creationAttempt.current = null; setError(reason);
       } else {
-        unresolved.current = true; setNeedsReload(true);
-        const access = permission.current.revision !== started ? "Your access changed. " : cause instanceof WebsiteExperienceError && cause.status === 401 ? `${reason} ` : "";
+        websiteAttempt.requireReload(true);
+        const access = !websiteAttempt.current(ticket) ? "Your access changed. " : cause instanceof WebsiteExperienceError && cause.status === 401 ? `${reason} ` : "";
         setError(record ? `${access}The website change could not be confirmed. Check the current saved website before continuing.` : `${access}Your website request could not be confirmed. Check this same request before starting another.`);
       }
     } finally {
-      inFlight.current = false;
-      if (mountedRef.current) setBusy(false);
+      websiteAttempt.finish();
     }
   }
 
   async function createPreview(check = false) {
-    const input = check ? creationAttempt.current : { workspaceId, requestId, brief: structuredClone(brief) };
+    const input = check ? creationAttempt.current : { workspaceId, requestId: createWebsiteRequestId(), brief: structuredClone(brief) };
     if (!input) return;
     if (!check && (inFlight.current || unresolved.current || readOnly)) return;
-    creationAttempt.current = input;
-    await run("Preview generation", () => transport.create(input), next => next.website.status === "draft" ? "Your website draft is saved. Generate a private preview when ready." : `Saved website preview ${next.website.candidate?.revision ?? next.website.revision}.`, next => websiteMutationAcknowledgement(next, "create", input), check);
+    await run("Preview generation", () => transport.create(structuredClone(input)), next => next.website.status === "draft" ? "Your website draft is saved. Generate a private preview when ready." : `Saved website preview ${next.website.candidate?.revision ?? next.website.revision}.`, next => websiteMutationAcknowledgement(next, "create", input), check, input);
   }
 
   async function createOrRevise() {
@@ -333,30 +317,28 @@ function WebsiteSession({
   }
 
   async function reload() {
-    if (!record || inFlight.current || busy) return;
-    const started = permission.current.revision;
+    if (!record) return;
     const work = { workspaceId: record.workspaceId, workId: record.workId };
     if (work.workspaceId !== workspaceId || (workId && work.workId !== workId)) return;
-    inFlight.current = true;
+    const ticket = websiteAttempt.begin(true, true);
+    if (!ticket) return;
     reloadFocus.current?.cancel(); reloadFocus.current = beginFocusRecovery(recoveryRootRef.current);
-    setBusy(true);
     try {
       const next = await transport.read(work, new AbortController().signal);
-      if (!mountedRef.current || permission.current.revision !== started) return;
+      if (!mountedRef.current || !websiteAttempt.current(ticket)) return;
       if (next.workspaceId !== work.workspaceId || next.workId !== work.workId) throw new Error("The current saved website could not be confirmed.");
       currentWebsiteRecord(next, work.workspaceId, work.workId);
       const retainDraft = unresolved.current;
-      unresolved.current = false; setNeedsReload(false); setConnectionReadRevision(value => value + 1); setError("");
+      websiteAttempt.accept(ticket); setConnectionReadRevision(value => value + 1); setError("");
       setRecord(next);
       if (!retainDraft) setFields(fieldsFromBrief(next.website.brief));
       setNotice("Saved status refreshed.");
     } catch {
-      if (!mountedRef.current || permission.current.revision !== started) return;
+      if (!mountedRef.current || !websiteAttempt.current(ticket)) return;
       setError("The current saved website could not be loaded. Reload again to check what was saved.");
     } finally {
-      inFlight.current = false;
-      if (mountedRef.current) setBusy(false);
-      if (permission.current.revision !== started) { reloadFocus.current?.cancel(); reloadFocus.current = null; }
+      websiteAttempt.finish();
+      if (!websiteAttempt.current(ticket)) { reloadFocus.current?.cancel(); reloadFocus.current = null; }
     }
   }
 
@@ -407,7 +389,7 @@ function WebsiteSession({
             {dirty && !readOnly ? <p className={styles.notice}>Save this wording as a new preview before approving it. The current saved revision stays unchanged.</p> : null}
           </div>
 
-          <WebsiteConnections headingRef={connectionHeadingRef} onFocusRecovery={recovery => { connectionFocus.current?.cancel(); connectionFocus.current = recovery; }} key={`${record.workId}:${record.website.revision}:${connectionReadRevision}`} record={record} readOnly={readOnly} onUnconfirmed={recovery => { if (!mountedRef.current || connectionOwner.current.workspaceId !== workspaceId || connectionOwner.current.workId !== record.workId) { recovery?.cancel(); return; } unresolved.current = true; setNeedsReload(true); setNotice(""); setError("The visitor form change could not be confirmed. Reload the current saved website before continuing."); connectionFocus.current?.cancel(); connectionFocus.current = null; if (recovery) { reloadFocus.current?.cancel(); reloadFocus.current = recovery; } }} disabled={readOnly || busy || dirty || needsReload} onBusyChange={value => { if (!mountedRef.current || connectionOwner.current.workspaceId !== workspaceId || connectionOwner.current.workId !== record.workId) return; inFlight.current = value; setBusy(value); }} onSaved={(next) => { if (!mountedRef.current || connectionOwner.current.workspaceId !== workspaceId || connectionOwner.current.workId !== next.workId) throw new Error("The current saved website could not be confirmed."); currentWebsiteRecord(next, workspaceId, record.workId); setRecord(next); setNotice("Website forms updated. Review and approve the new preview."); onSaved?.(next.workId); }} />
+          <WebsiteConnections headingRef={connectionHeadingRef} onFocusRecovery={recovery => { connectionFocus.current?.cancel(); connectionFocus.current = recovery; }} key={`${record.workId}:${record.website.revision}:${connectionReadRevision}`} record={record} readOnly={readOnly} onUnconfirmed={recovery => { if (!mountedRef.current || connectionOwner.current.workspaceId !== workspaceId || connectionOwner.current.workId !== record.workId) { recovery?.cancel(); return; } websiteAttempt.requireReload(true); setNotice(""); setError("The visitor form change could not be confirmed. Reload the current saved website before continuing."); connectionFocus.current?.cancel(); connectionFocus.current = null; if (recovery) { reloadFocus.current?.cancel(); reloadFocus.current = recovery; } }} disabled={readOnly || busy || dirty || needsReload} onBusyChange={value => { if (!mountedRef.current || connectionOwner.current.workspaceId !== workspaceId || connectionOwner.current.workId !== record.workId) return; setBusy(value); }} onSaved={(next) => { if (!mountedRef.current || connectionOwner.current.workspaceId !== workspaceId || connectionOwner.current.workId !== next.workId) throw new Error("The current saved website could not be confirmed."); currentWebsiteRecord(next, workspaceId, record.workId); setRecord(next); setNotice("Website forms updated. Review and approve the new preview."); onSaved?.(next.workId); }} />
 
           {website!.candidate ? (
             <section className={styles.previewSection} aria-labelledby="website-preview-heading">

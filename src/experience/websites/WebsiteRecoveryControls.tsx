@@ -6,6 +6,7 @@ import { TextInput } from "@/components/ui/TextInput";
 import { normalizeTenantDomain } from "@/platform/infra/domain-normalization";
 import { websiteDomainRequestSchema, websiteCutoverUndoReceiptSchema, type WebsiteDomainRequest as DomainReceipt, type WebsiteCutoverUndoReceipt } from "@/products/websites/client";
 import { beginFocusRecovery, type FocusRecovery } from "./focus-recovery";
+import { useWebsiteAttempt } from "./website-attempt";
 import type { RebuildView } from "./rebuild-transport";
 
 /** Prepare authority for one hostname before the operator changes its domain. */
@@ -15,20 +16,15 @@ export function WebsiteDomainRequest(props: DomainRequestProps) {
 }
 function DomainRequestSession({ workId, workspaceId, request = fetch, readOnly = false, disabled = false, canPrepare, onBlockedChange }: DomainRequestProps) {
   const [domain, setDomain] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [unknown, setUnknown] = useState(false);
   const [saved, setSaved] = useState<DomainReceipt | null>(null);
   const [notice, setNotice] = useState<{ error: boolean; text: string } | null>(null);
   const requestId = useRef(crypto.randomUUID());
-  const inFlight = useRef(false);
-  const attempt = useRef<{ workId: string; workspaceId?: string; requestId: string; domain: string; hostname: string } | null>(null);
+  const websiteAttempt = useWebsiteAttempt<{ workId: string; workspaceId?: string; requestId: string; domain: string; hostname: string }>(`${readOnly}:${disabled}`);
+  const { busy, needsReload: unknown, inFlight, command: attempt, mounted } = websiteAttempt;
   const scopeRef = useRef<HTMLElement>(null), checkRef = useRef<HTMLButtonElement>(null), receiptRef = useRef<HTMLParagraphElement>(null);
   const domainRef = useRef<HTMLInputElement>(null);
   const focus = useRef<FocusRecovery | null>(null);
-  const mounted = useRef(true);
-  const permission = useRef({ readOnly, disabled, revision: 0 });
-  permission.current = { readOnly, disabled, revision: permission.current.revision + Number(permission.current.readOnly !== readOnly || permission.current.disabled !== disabled) };
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; focus.current?.cancel(); }; }, []);
+  useEffect(() => () => focus.current?.cancel(), []);
   useEffect(() => { if (!busy) { focus.current?.recover(unknown ? checkRef.current : notice ? receiptRef.current : domainRef.current, true); focus.current = null; } }, [busy, unknown, saved, notice]);
 
   function receipt(value: unknown, command: NonNullable<typeof attempt.current>) {
@@ -40,33 +36,33 @@ function DomainRequestSession({ workId, workspaceId, request = fetch, readOnly =
     if (inFlight.current || (!check && (attempt.current || readOnly || disabled || !domain.trim() || canPrepare?.() === false))) return;
     const command = check ? attempt.current : { workId, workspaceId, requestId: requestId.current, domain: domain.trim(), hostname: normalizeTenantDomain(domain.trim())?.replace(/:\d+$/, "") ?? domain.trim().toLowerCase() };
     if (!command) return;
-    const wasUnknown = unknown, started = permission.current.revision;
-    attempt.current = command; inFlight.current = true; onBlockedChange?.(true);
+    const ticket = websiteAttempt.begin(true, check, command);
+    if (!ticket) return;
+    onBlockedChange?.(true);
     focus.current?.cancel(); focus.current = beginFocusRecovery(scopeRef.current);
-    setBusy(true); setNotice(null);
+    setNotice(null);
     try {
       const path = `/api/websites/${encodeURIComponent(command.workId)}/domain/request`;
       const response = await request(check ? `${path}?${new URLSearchParams({ requestId: command.requestId, ...(command.workspaceId ? { workspaceId: command.workspaceId } : {}) })}` : path, check ? { method: "GET", credentials: "same-origin", cache: "no-store" } : { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestId: command.requestId, domain: command.domain }) });
       const body = await response.json().catch(() => null);
       if (!response.ok) {
         const reason = typeof body?.error === "string" ? body.error : "The saved domain request could not be checked.";
-        if (!check && !wasUnknown && (response.status === 401 || response.status === 409 && reason === "Enter a valid domain you control.")) {
-          attempt.current = null; throw Object.assign(new Error(reason), { refused: true });
+        if (!check && (response.status === 401 || response.status === 409 && reason === "Enter a valid domain you control.") && websiteAttempt.refuse(ticket)) {
+          throw Object.assign(new Error(reason), { refused: true });
         }
         throw new Error(reason);
       }
       if (check && !body?.request) throw new Error("No matching saved request was found. This does not confirm whether the earlier request was saved.");
       const next = receipt(check ? body.request : body, command);
-      if (!mounted.current) return;
-      if (permission.current.revision !== started) throw new Error("Your access changed while this domain request was being checked.");
-      setSaved(next); setUnknown(false); onBlockedChange?.(false);
+      if (!websiteAttempt.accept(ticket)) return;
+      setSaved(next); onBlockedChange?.(false);
       setNotice({ error: false, text: next.decisionId ? "Saved domain request found. The owner has already decided this request." : !next.current || Date.parse(next.expiresAt) <= Date.now() ? "Saved domain request found. This request is no longer current." : "Domain request saved for the owner. Domain setup waits for their approval." });
     } catch (cause) {
       if (!mounted.current) return;
       const refused = cause instanceof Error && "refused" in cause;
-      if (!refused) setUnknown(true); else onBlockedChange?.(false);
+      if (!refused) websiteAttempt.requireReload(true); else onBlockedChange?.(false);
       setNotice({ error: true, text: `${cause instanceof Error ? cause.message : "The domain request could not be confirmed."}${refused ? "" : " Check this exact saved request before preparing another."}` });
-    } finally { inFlight.current = false; if (mounted.current) setBusy(false); }
+    } finally { websiteAttempt.finish(); }
   }
   return <section ref={scopeRef} className="grid gap-3" aria-label="Owner domain request" aria-busy={busy || undefined}>
     <form className="grid gap-3" onSubmit={event => { event.preventDefault(); void submit(); }}>
@@ -87,17 +83,13 @@ export function WebsiteCutoverUndo(props: CutoverUndoProps) {
 function CutoverUndoSession({ record, request = fetch, readOnly = false, disabled = false, available = true, canSubmit, onBlockedChange, onRestored }: CutoverUndoProps) {
   const [domainRestored, setDomainRestored] = useState(false);
   const [fallbackVerified, setFallbackVerified] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [unknown, setUnknown] = useState(false);
   const [saved, setSaved] = useState<WebsiteCutoverUndoReceipt | null>(null);
   const [error, setError] = useState("");
-  const inFlight = useRef(false);
-  const attempt = useRef<{ workId: string; body: { workspaceId: string; tenantId: string; candidateRevision: number; candidateContentHash: string; commandId: string; domainRestored: true; fallbackVerified: true } } | null>(null);
+  const websiteAttempt = useWebsiteAttempt<{ workId: string; body: { workspaceId: string; tenantId: string; candidateRevision: number; candidateContentHash: string; commandId: string; domainRestored: true; fallbackVerified: true } }>(`${readOnly}:${disabled}:${available}`);
+  const { busy, needsReload: unknown, inFlight, command: attempt, mounted } = websiteAttempt;
   const scopeRef = useRef<HTMLElement>(null), checkRef = useRef<HTMLButtonElement>(null), receiptRef = useRef<HTMLParagraphElement>(null);
-  const focus = useRef<FocusRecovery | null>(null), mounted = useRef(true);
-  const permission = useRef({ readOnly, disabled, available, revision: 0 });
-  permission.current = { readOnly, disabled, available, revision: permission.current.revision + Number(permission.current.readOnly !== readOnly || permission.current.disabled !== disabled || permission.current.available !== available) };
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; focus.current?.cancel(); }; }, []);
+  const focus = useRef<FocusRecovery | null>(null);
+  useEffect(() => () => focus.current?.cancel(), []);
   useEffect(() => { if (!busy) { focus.current?.recover(unknown ? checkRef.current : receiptRef.current, true); focus.current = null; } }, [busy, unknown, saved, error]);
   const eligible = Boolean(available && record.tenantId && record.candidate && record.publishedUrl);
   if (!eligible && !attempt.current && !saved) return null;
@@ -105,30 +97,30 @@ function CutoverUndoSession({ record, request = fetch, readOnly = false, disable
     if (inFlight.current || readOnly || disabled || saved || canSubmit?.() === false || (!check && (attempt.current || !eligible || !domainRestored || !fallbackVerified))) return;
     const command = check ? attempt.current : { workId: record.workId, body: { workspaceId: record.workspaceId, tenantId: record.tenantId!, candidateRevision: record.candidate!.revision, candidateContentHash: record.candidate!.contentHash, commandId: crypto.randomUUID(), domainRestored: true as const, fallbackVerified: true as const } };
     if (!command) return;
-    const started = permission.current.revision, wasUnknown = unknown;
-    attempt.current = command; inFlight.current = true; onBlockedChange?.(true);
+    const ticket = websiteAttempt.begin(true, check, command);
+    if (!ticket) return;
+    onBlockedChange?.(true);
     focus.current?.cancel(); focus.current = beginFocusRecovery(scopeRef.current);
-    setBusy(true); setError("");
+    setError("");
     try {
       const response = await request(`/api/websites/${encodeURIComponent(command.workId)}/cutover-undo`, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(command.body) });
       const result = await response.json().catch(() => null);
       if (!response.ok) {
         const reason = typeof result?.error === "string" ? result.error : "The undo result could not be confirmed.";
         // Only the initial route authentication refusal proves the command was not invoked.
-        if (!wasUnknown && response.status === 401) { attempt.current = null; throw Object.assign(new Error(reason), { refused: true }); }
+        if (response.status === 401 && websiteAttempt.refuse(ticket)) { throw Object.assign(new Error(reason), { refused: true }); }
         throw new Error(reason);
       }
       const parsed = websiteCutoverUndoReceiptSchema.safeParse(result?.receipt);
       if (!parsed.success || parsed.data.receiptId !== command.body.commandId || parsed.data.workId !== command.workId || parsed.data.tenantId !== command.body.tenantId || parsed.data.revision !== command.body.candidateRevision || parsed.data.contentHash !== command.body.candidateContentHash) throw new Error("The undo result could not be confirmed.");
-      if (!mounted.current) return;
-      if (permission.current.revision !== started) throw new Error("Your access changed while the undo result was being checked.");
-      setSaved(parsed.data); setUnknown(false); if (onRestored) onRestored(parsed.data); else onBlockedChange?.(false);
+      if (!websiteAttempt.accept(ticket)) return;
+      setSaved(parsed.data); if (onRestored) onRestored(parsed.data); else onBlockedChange?.(false);
     } catch (cause) {
       if (!mounted.current) return;
       const refused = cause instanceof Error && "refused" in cause;
-      if (!refused) setUnknown(true); else onBlockedChange?.(false);
+      if (!refused) websiteAttempt.requireReload(true); else onBlockedChange?.(false);
       setError(`${cause instanceof Error ? cause.message : "The previous website result could not be confirmed."}${refused ? "" : " Check this exact undo command before starting another."}`);
-    } finally { inFlight.current = false; if (mounted.current) setBusy(false); }
+    } finally { websiteAttempt.finish(); }
   }
   return <section ref={scopeRef} className="mt-6 grid gap-3" aria-labelledby="cutover-undo-heading" aria-busy={busy || undefined}>
     <h3 id="cutover-undo-heading" className="text-base font-medium">Return to the previous website</h3>

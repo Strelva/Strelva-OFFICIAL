@@ -54,7 +54,9 @@ describe("independently released website entry", () => {
     const field = node.querySelector("input")!;
     await input(field, "https://synthetic.example.test");
     await act(async () => node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
-    expect(node.querySelector('[role="alert"]')?.textContent).toContain("couldn't open"); expect(field.value).toBe("https://synthetic.example.test");
+    expect(node.querySelector('[role="alert"]')?.textContent).toContain("Check this same request"); expect(field.value).toBe("https://synthetic.example.test");
+    expect(field.disabled).toBe(true);
+    expect(button("Check this website request")).toBeDefined();
     expect(start).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: WS, url: "https://synthetic.example.test", requestId: expect.any(String) }));
     expect(node.textContent).not.toContain("Publish approved website");
   });

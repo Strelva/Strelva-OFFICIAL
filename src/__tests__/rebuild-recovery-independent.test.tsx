@@ -43,35 +43,25 @@ it('can read the actual committed current candidate without replay after history
   expect(current.rebuild.candidate!.document.facts[factId]!.text).toBe(corrected);
   expect(current.rebuild.revision).toBeGreaterThan(prior.revision);
   expect(mutationCount).toBe(1);
-  // The actual service invalidates approval, but failed post-save enrichment
-  // leaves the review showing the prior approval and no saved-state read.
   expect(node.textContent).not.toContain('This exact preview is approved.');
-  expect(find('Publish approved website')?.disabled).toBe(true);
-  expect(field.value).toBe(corrected);
-  expect(node.querySelector('[role="alert"]')?.textContent).toContain('could not be confirmed');
-  expect(document.activeElement).toBe(find('Reload current state'));
-  await act(async () => find('Reload current state')!.click());
-  expect(field.value).toBe(corrected);
-  expect(node.querySelector('[role="alert"]')?.textContent).toContain('could not be loaded');
-  expect(node.querySelector('[role="alert"]')?.textContent?.match(/Your inputs/g)).toHaveLength(1);
-  expect(find('Save correction')?.disabled).toBe(true);
-  expect(find('Publish approved website')?.disabled).toBe(true);
-  await act(async () => { factArticle.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); find('Publish approved website')!.click(); });
+  expect(find('Publish approved website')).toBeUndefined();
+  expect(node.textContent).toContain(corrected);
+  expect(node.querySelector('[role="alert"]')).toBeNull();
+  expect(find('Reload current state')).toBeUndefined();
+  expect(find('Edit fact')?.disabled).toBe(false);
+  expect(node.textContent).toContain('Saved History is unavailable');
+  await act(async () => find('Reload saved History')!.click());
+  expect(node.querySelector('[role="alert"]')).toBeNull();
+  expect(find('Edit fact')?.disabled).toBe(false);
+  expect(node.textContent).toContain(corrected);
   expect(mutationCount).toBe(1);
   badHistory = false;
   const reopened = await serverRebuildTransport.read(prior.workspaceId, prior.workId);
-  await act(async () => { find('Reload current state')!.click(); find('Reload current state')!.click(); });
-  expect(find('Reload current state')).toBeUndefined();
-  expect(find('Publish approved website')).toBeUndefined();
-  expect(find('Edit fact')?.disabled).toBe(false);
-  expect(document.activeElement).toBe(node.querySelector('#rebuild-decisions-heading'));
-  expect(node.textContent).toContain(corrected);
   expect(reopened.approved).toBe(false);
   expect(reopened.candidate!.facts[factId]!.text).toBe(corrected);
-  expect(mutationCount).toBe(1);
-  // The production HTTP generic503 is truthful. This separate client failure
-  // never reaches it, and the component exposes no action to invoke this read.
+  // Owning acknowledgement failures still use generic503 uncertainty.
+  // Optional History parsing is independent and never reaches this mapper.
   expect(await rebuildHttpFailure(new Error('after save')).json()).toEqual({ error: 'The rebuild operation could not be confirmed. Reopen its saved status before retrying.' });
-  expect(reads).toBe(4);
+  expect(reads).toBe(3);
   expect(mutationCount).toBe(1);
 });

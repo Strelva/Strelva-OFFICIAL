@@ -80,3 +80,4 @@ export { websiteDomainRequestSchema, websiteCutoverUndoReceiptSchema, type Websi
 export { parseWebsiteReportView, type WebsiteReportView } from "./report-view";
 
 export { legacyArchiveSummarySchema, type LegacyArchiveSummary } from "./legacy-archive-contracts";
+export { normalizeWebsiteRebuildUrl } from "./rebuild-url";

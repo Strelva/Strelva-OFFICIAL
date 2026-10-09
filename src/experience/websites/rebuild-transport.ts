@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { websiteCapabilitySelectionSchema } from "@/products/websites/contracts";
-import { legacyArchiveSummarySchema as legacyArchiveSummaryViewSchema, rebuildSkippedPathSchema, websiteRebuildSchema } from "@/products/websites/client";
+import { legacyArchiveSummarySchema as legacyArchiveSummaryViewSchema, normalizeWebsiteRebuildUrl, rebuildSkippedPathSchema, websiteRebuildSchema } from "@/products/websites/client";
 
 const factSchema = z.object({ text: z.string(), kind: z.string(), highRisk: z.boolean(), origin: z.string(), sources: z.array(z.object({ sourceId: z.string(), quote: z.string() })), verification: z.object({ supported: z.boolean(), confidence: z.number() }).optional() });
 const auditCheckSchema = z.object({ name: z.string(), status: z.string(), score: z.number(), message: z.string() });
@@ -27,7 +27,7 @@ export const rebuildViewSchema = z.object({
 });
 type CompleteRebuildView = z.infer<typeof rebuildViewSchema>;
 type ArchiveViewFields = "legacyArchives" | "legacyArchivesNextCursor" | "legacyArchivesUnavailable";
-export type RebuildView = Omit<CompleteRebuildView, ArchiveViewFields> & Partial<Pick<CompleteRebuildView, ArchiveViewFields>>;
+export type RebuildView = Omit<CompleteRebuildView, ArchiveViewFields> & Partial<Pick<CompleteRebuildView, ArchiveViewFields>> & { historyUnavailable?: boolean; domainUnavailable?: boolean };
 export interface RebuildTransport {
   read(workspaceId: string, workId: string, signal?: AbortSignal): Promise<RebuildView>;
   start(input: { workspaceId: string; requestId: string; url?: string; description?: string; businessName?: string }): Promise<RebuildView>;
@@ -54,10 +54,15 @@ function refusedMutation(error: unknown, action: Parameters<RebuildTransport["mu
   // publication can also produce400 after their separate authority writes.
   return error.status === 400 && !["approve", "launch"].includes(action);
 }
-async function request(path: string, options?: RequestInit): Promise<RebuildView> {
+async function request(path: string, options?: RequestInit, submitted?: Parameters<RebuildTransport["start"]>[0]): Promise<RebuildView> {
   const response = await fetch(path, { credentials: "same-origin", cache: "no-store", ...options });
   const body = await response.json().catch(() => null);
   if (!response.ok) throw new RebuildTransportError(typeof body?.error === "string" ? body.error : "This website could not be opened. Try again.", response.status);
+  if (submitted) {
+    const envelope = rebuildEnvelopeSchema.parse(body), saved = envelope.rebuild.input;
+    const url = submitted.url ? normalizeWebsiteRebuildUrl(submitted.url) : null;
+    if (envelope.workspaceId !== submitted.workspaceId || saved.requestId !== submitted.requestId || ("url" in saved ? saved.url !== url : saved.businessName !== submitted.businessName || saved.description !== submitted.description)) throw new RebuildUnconfirmedError();
+  }
   return parseRebuildView(body);
 }
 const rebuildEnvelopeSchema = z.object({ workId: z.string(), workspaceId: z.string(), rebuild: websiteRebuildSchema, agencyPublishPermission: rebuildViewSchema.shape.agencyPublishPermission });
@@ -73,18 +78,31 @@ export function archivedHistoryView(history: unknown, record: Pick<RebuildView,"
     return { legacyArchives: envelope.legacyArchives, legacyArchivesNextCursor: envelope.legacyArchivesNextCursor, legacyArchivesUnavailable: envelope.legacyArchivesUnavailable };
   } catch { return { legacyArchives: [], legacyArchivesNextCursor: null, legacyArchivesUnavailable: true }; }
 }
-async function withDomain(record: RebuildView): Promise<RebuildView> {
+async function withDomain(record: RebuildView, signal?: AbortSignal): Promise<RebuildView> {
   const read = async (route: string) => {
-    const response = await fetch(`/api/websites/${encodeURIComponent(record.workId)}/${route}?${new URLSearchParams({ workspaceId: record.workspaceId })}`, { cache: "no-store", credentials: "same-origin" });
+    const response = await fetch(`/api/websites/${encodeURIComponent(record.workId)}/${route}?${new URLSearchParams({ workspaceId: record.workspaceId })}`, { cache: "no-store", credentials: "same-origin", signal });
     if (!response.ok) return null;
     return response.json();
   };
   const [domain, history] = await Promise.all([record.candidate && record.publishedUrl ? read("domain").catch(() => null) : null, read("history").catch(() => null)]);
-  return { ...record, ...archivedHistoryView(history,record), domain: domain ? rebuildViewSchema.shape.domain.parse(domain.domain ?? null) : record.domain, documentRevisions: history ? rebuildViewSchema.shape.documentRevisions.parse(history.revisions) : record.documentRevisions };
+  const historyResult = z.object({ workspaceId: z.string().uuid(), workId: z.string().uuid(), revisions: rebuildViewSchema.shape.documentRevisions }).safeParse(history);
+  const historyCurrent = historyResult.success && historyResult.data.workspaceId === record.workspaceId && historyResult.data.workId === record.workId;
+  // The domain endpoint has no identity envelope; its exact work/workspace GET
+  // owns scope. Require its domain field rather than interpreting malformed data
+  // as a confirmed absence. Neither supplemental failure changes acceptance.
+  const domainResult = z.object({ domain: rebuildViewSchema.shape.domain }).safeParse(domain);
+  const needsDomain = Boolean(record.candidate && record.publishedUrl);
+  return { ...record, ...archivedHistoryView(history,record),
+    domain: domainResult.success ? domainResult.data.domain : null, domainUnavailable: needsDomain && !domainResult.success,
+    documentRevisions: historyCurrent ? historyResult.data.revisions : [], historyUnavailable: !historyCurrent };
 }
 export const serverRebuildTransport: RebuildTransport = {
-  async read(workspaceId, workId, signal) { return withDomain(await request(`/api/websites/${encodeURIComponent(workId)}/rebuild?${new URLSearchParams({ workspaceId })}`, { signal })); },
-  start(input) { return request("/api/websites/rebuild", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }); },
+  async read(workspaceId, workId, signal) {
+    const record = await request(`/api/websites/${encodeURIComponent(workId)}/rebuild?${new URLSearchParams({ workspaceId })}`, { signal });
+    if (record.workspaceId !== workspaceId || record.workId !== workId) throw new Error("The current saved website could not be confirmed.");
+    return withDomain(record, signal);
+  },
+  start(input) { return request("/api/websites/rebuild", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }, input); },
   async mutate(record, action, extra) {
     try {
       const facts = action === "confirm" || action === "edit" || action === "remove";
@@ -98,11 +116,11 @@ export const serverRebuildTransport: RebuildTransport = {
         const response = await fetch(`/api/websites/${encodeURIComponent(record.workId)}/domain`, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         const value = await response.json().catch(() => null);
         if (!response.ok) throw new RebuildTransportError(value?.error ?? "The domain could not be checked.", response.status);
-        return { ...record, domain: rebuildViewSchema.shape.domain.parse(value.domain ?? null) };
+        return { ...record, domain: z.object({ domain: rebuildViewSchema.shape.domain }).parse(value).domain, domainUnavailable: false };
       }
       const next = await request(`/api/websites/${encodeURIComponent(record.workId)}/${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (next.workspaceId !== record.workspaceId || next.workId !== record.workId) throw new RebuildUnconfirmedError();
-      return await withDomain({ ...next, agencyPublishPermission: next.agencyPublishPermission === undefined ? record.agencyPublishPermission : next.agencyPublishPermission });
+      if (next.workspaceId !== record.workspaceId || next.workId !== record.workId || next.revision < record.revision || (facts && (next.revision === record.revision || next.approved || !next.candidate || next.candidate.revision < (record.candidate?.revision ?? 0)))) throw new RebuildUnconfirmedError();
+      return { ...next, historyUnavailable: true, domainUnavailable: Boolean(next.publishedUrl), agencyPublishPermission: next.agencyPublishPermission === undefined ? record.agencyPublishPermission : next.agencyPublishPermission };
     } catch (error) {
       if (refusedMutation(error, action)) throw error;
       throw new RebuildUnconfirmedError(error instanceof RebuildTransportError && [403,409].includes(error.status) ? error.message : undefined);
