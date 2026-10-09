@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it } from "vitest";
+import { listOfferingDefinitions, resolveOfferingSurfaces } from "@/platform/offerings/definitions";
 import type { OfferingCollection } from "@/platform/offerings";
 import {
   BusinessOfferingSummary,
@@ -68,6 +69,33 @@ function renderDirectory(state: WorkspaceOfferingState, selectedId: string | nul
 }
 
 describe("workspace offering experience", () => {
+
+  it("keeps an installed inquiry resource visible without a misleading Open destination", () => {
+    const inquiryId = "96000000-0000-4000-8000-000000000030";
+    const resources = [{ kind: "inquiry_workspace" as const, id: inquiryId }];
+    const installed: OfferingCollection = {
+      ...collection, definitions: listOfferingDefinitions(),
+      installations: [{
+        id: installationId, businessId, definitionId: "customer_inquiry_intake", definitionVersion: "1.0.0",
+        status: "active", revision: 1, configuration: {}, nativeResources: resources,
+        responsibility: { kind: "customer_operated", providerName: "Fictional Harbor" },
+        acceptedScope: ["handle_inquiries"],
+        surfaces: resolveOfferingSurfaces("customer_inquiry_intake", "1.0.0", resources, ["inquiry_workspace"], businessId, "active"),
+        installedBy: "fictional-owner", installedAt: "2026-10-09T12:00:00.000Z",
+        updatedBy: "fictional-owner", updatedAt: "2026-10-09T12:00:00.000Z",
+      }],
+    };
+    const html = renderDirectory({ status: "ready", collection: installed, saving: false }, installationId, []);
+    expect(html).toContain("Customer inquiry intake");
+    expect(html).toContain("Where people use it");
+    expect(html).toContain("Inquiry workspace");
+    expect(html).toContain("Unavailable");
+    expect(html).not.toContain("inquiryWorkspaceId");
+    expect(html).not.toMatch(/<a[^>]+href[^>]*>Open/);
+    expect([...boundOfferingResourceIds({ status: "ready", collection: installed, saving: false })]).toEqual([inquiryId]);
+    expect(html).toContain("Retire this system");
+  });
+
   it("keeps scoped work sharing from implying business-wide offering access", () => {
     const html = renderDirectory({ status: "unavailable", reason: "This work-share does not include business-wide offering access." }, null);
     expect(html).toContain("Ready-made systems are set up for a business.");

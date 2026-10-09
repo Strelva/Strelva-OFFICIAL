@@ -407,3 +407,40 @@ passes; JSON parse and equality of every preexisting entry/status pass;
 `pnpm exec vitest run src/__tests__/release-safety-tools.test.ts` passes **40 tests**;
 `git diff --check` passes. Raw initial/final inventory and suite logs are retained.
 Foundation F01 must preserve this registration during later source convergence.
+
+
+## Adjacent inquiry-link result
+
+The initial two affected suites failed exactly the new emission/UI assertions:
+**2 failed / 21 passed**. Canonical surface resolution fabricated a resource-UUID
+query that strict workspace location did not consume; the real installed offering
+component rendered Open for it. Removed only that href construction, returning
+`null`. Resource validation, active installation identity/revision, persisted read,
+retirement and history code remain. Existing Unavailable fallback is reused.
+Final affected suites pass **23 tests / 2 files**; no production/API mapping or
+UUID-to-tenant alias was added. Runtime source is **2 additions / 5 deletions**.
+
+A separate closed fictional fixture renders the actual OfferingInstallationView
+and canonical definition at 1440/390: **2 browser cases pass**, with Unavailable,
+no surface link or misleading Open, retained installation, keyboard focus and no
+foreign/API request or page error. Both screenshots were inspected. Two existing
+union recovery cases also reran only to retain final warning screenshots for
+320px V1 and 390px V2; their scope/geometry/identity assertions pass and the final
+stacked warning screenshots were inspected. These reruns are not additional unique
+case counts. No fixture route remains after teardown; no real Auth was exercised.
+
+Changed UI inventory entries describe the retry and withheld inquiry destination.
+Canonical evidence delta proposed to the integration owner: source integration
+now has combined local behavior, conditioned PostgreSQL 18 and inventory evidence;
+required SQL runners, hosted ACL/Auth, historical-kind/live migration qualification
+and exact inquiry routing remain separate obligations. PRODUCT_MODEL and shared
+state remain untouched. No full-delivery/adoption/economic claim follows.
+
+
+Adjacent repair freeze checks: `pnpm typecheck`, `pnpm check:boundaries`,
+`pnpm check:ontology`, ESLint on changed definitions/tests/browser fixture files,
+and `git diff --check` pass after fixture route teardown. No new dependency,
+permission, SQL, provider/Auth or `/api/v1` contract changed. No custom-client or
+agency permission runner is required by the href deletion. Full lint's merged
+source result plus all changed-file checks are retained. Clean build remains held
+for the coordinator's next resource window.

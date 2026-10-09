@@ -343,7 +343,7 @@ describe("offering installation interface", () => {
     }))).rejects.toThrow(/attachment|business/i);
   });
 
-  it("installs the customer inquiry intake against the business-owned workspace and resolves its destination", async () => {
+  it("installs customer inquiry intake while withholding an unqualified exact destination", async () => {
     const service = new OfferingService(new MemoryOfferingStore());
     const installation = await service.execute(owner, installCommand({
       definitionId: "customer_inquiry_intake",
@@ -354,9 +354,12 @@ describe("offering installation interface", () => {
       surfaceIds: ["inquiry_workspace"],
     }));
     expect(installation.status).toBe("active");
+    expect(installation.nativeResources).toEqual([{ kind: "inquiry_workspace", id: INQUIRY_A }]);
+    expect(installation.revision).toBe(1);
+    expect(await service.read(owner, BUSINESS_A, installation.id)).toEqual(installation);
     expect(installation.surfaces).toEqual([expect.objectContaining({
       id: "inquiry_workspace",
-      href: `/workspace?workspaceId=${BUSINESS_A}&view=inquiries&inquiryWorkspaceId=${INQUIRY_A}`,
+      href: null,
     })]);
     await expect(service.execute(owner, installCommand({
       definitionId: "customer_inquiry_intake",
