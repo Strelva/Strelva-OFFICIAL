@@ -14,12 +14,14 @@ export const workspacePortLoaders = {
   responsibilityProof: () => import("@/products/operations/server"),
   bookingProof: () => import("@/platform/bookings/agent-proof"),
   clientRecords: async () => {
-    const [mirror, move] = await Promise.all([
+    const [mirror, move, rewards] = await Promise.all([
       import("@/platform/client-records/mirror"),
       import("@/platform/client-records/move"),
+      import("@/platform/client-records/rewards"),
     ]);
     return {
       mutateProviderConnection: mirror.mutateProviderConnection,
+      mutateRewardRecord: rewards.mutateRewardRecord,
       mirrorClientRecord: mirror.mirrorClientRecord,
       mirrorClientRecordRemoval: mirror.mirrorClientRecordRemoval,
       readThroughFlag: move.readThroughFlag,

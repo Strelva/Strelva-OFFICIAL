@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ redis: { hgetall: vi.fn(), hincrby: vi.fn(), hset: vi.fn() }, mirror: vi.fn() }));
 vi.mock("@/platform/infra/redis", () => ({ getRedis: () => mocks.redis }));
-vi.mock("@/lib/client-records", () => ({ mirrorRecord: mocks.mirror, readRecord: (_store: string, _tenant: string, _id: string, read: () => Promise<unknown>) => read() }));
+vi.mock("@/lib/client-records", () => ({ durableRecordAuthority: async () => false, mirrorRecord: mocks.mirror, readRecord: (_store: string, _tenant: string, _id: string, read: () => Promise<unknown>) => read() }));
 import { adjustStars } from "@/lib/rewards/memberRepositoryKv";
 const member = { email: "member@example.test", starsAvailable: "100", starsLifetime: "100", tier: "snapper", tierOverride: "", badges: "[]", createdAt: "2026-10-07T12:00:00Z" };
 beforeEach(() => { vi.resetAllMocks(); mocks.redis.hgetall.mockResolvedValue(member); mocks.redis.hincrby.mockResolvedValue(150); });

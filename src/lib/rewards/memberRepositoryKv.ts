@@ -1,13 +1,15 @@
 /**
- * KV-backed rewards member repository (Strelva-owned).
+ * Rewards member repository with per-store qualified Postgres authority.
  *
  * Mirrors the Redis hash layout GLDF has today, but tenant-scoped under
- * reb:rewards:{tenant}:*. Every function is async and throws
- * KvNotConfiguredError when Upstash env vars are unset — rewardsProxy.ts
- * catches that and falls through to the legacy GLDF call.
+ * reb:rewards:{tenant}:*. Unselected stores retain the frozen Redis path.
+ * Selected qualified stores mutate Postgres first; cache loss never retries an
+ * accepted financial change. Native admin balance and reason commit together.
  */
 
-import { mirrorRecord, readRecord, readRecords } from "../client-records";
+import { randomUUID } from "node:crypto";
+import { workspacePorts, type VerifiedActor } from "../workspace-ports";
+import { durableRecordAuthority, mirrorRecord, readRecord, readRecords } from "../client-records";
 import { getKv, keys, KvNotConfiguredError } from "./kv";
 import { DEFAULT_REWARDS_CONFIG } from "./types";
 import type {
@@ -103,10 +105,18 @@ function assertKv() {
   return kv;
 }
 
-export async function saveMember(tenant: string, member: Member): Promise<void> {
-  const kv = assertKv();
+export async function saveMember(tenant: string, member: Member, config: RewardsConfig = DEFAULT_REWARDS_CONFIG): Promise<void> {
   const email = member.email.trim().toLowerCase();
   const normalized: Member = { ...member, email };
+  if (await durableRecordAuthority("reward_members")) {
+    const result = await (await workspacePorts().clientRecords()).mutateRewardRecord(tenant, email, {
+      operation: "save", commandId: randomUUID(), member: memberToHash(normalized), tierThreshold: config.tierThresholdSuper,
+    });
+    if (result.status !== "saved" || !result.member) throw new Error("rewards_save_unconfirmed");
+    await cacheDurableMember(tenant, email, result.member);
+    return;
+  }
+  const kv = assertKv();
   await kv.hset(keys.member(tenant, email), memberToHash(normalized));
   await kv.sadd(keys.membersSet(tenant), email);
   await mirrorRecord("reward_members", tenant, email, memberToHash(normalized));
@@ -160,7 +170,18 @@ export async function adjustStars(
   delta: number,
   config: RewardsConfig = DEFAULT_REWARDS_CONFIG
 ): Promise<Member | null> {
-  if (!Number.isInteger(delta)) throw new Error("delta must be an integer");
+  if (!Number.isSafeInteger(delta)) throw new Error("delta must be a safe integer");
+  if (await durableRecordAuthority("reward_members")) {
+    const result = await (await workspacePorts().clientRecords()).mutateRewardRecord(tenant, email.trim().toLowerCase(), {
+      operation: "adjust", commandId: randomUUID(), delta, tierThreshold: config.tierThresholdSuper,
+    });
+    if (result.status === "missing") return null;
+    if (result.status === "insufficient") throw new InsufficientStarsError(result.available!, result.requested!);
+    const member = result.member && hashToMember(result.member);
+    if (result.status !== "adjusted" || !member) throw new Error("rewards_adjustment_unconfirmed");
+    await cacheDurableMember(tenant, member.email, result.member!);
+    return member;
+  }
   const kv = assertKv();
   const normalizedEmail = email.trim().toLowerCase();
   const memberKey = keys.member(tenant, normalizedEmail);
@@ -246,9 +267,9 @@ export async function logTransaction(
   email: string,
   type: TransactionType,
   amount: number,
-  reason: string
+  reason: string,
+  actor?: VerifiedActor
 ): Promise<StarsTransaction> {
-  const kv = assertKv();
   const txn: StarsTransaction = {
     id: `txn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     type,
@@ -256,6 +277,15 @@ export async function logTransaction(
     reason,
     timestamp: new Date().toISOString(),
   };
+  if (await durableRecordAuthority("reward_transactions")) {
+    const result = await (await workspacePorts().clientRecords()).mutateRewardRecord(tenant, email.trim().toLowerCase(), {
+      operation: "log", commandId: txn.id, transaction: txn, actor,
+    });
+    if (result.status !== "logged") throw new Error("rewards_transaction_unconfirmed");
+    await cacheDurableTransaction(tenant, email.trim().toLowerCase(), txn);
+    return txn;
+  }
+  const kv = assertKv();
   await kv.lpush(keys.txns(tenant, email), JSON.stringify(txn));
   const normalizedEmail = email.trim().toLowerCase();
   await mirrorRecord("reward_transactions", tenant, txn.id, { ...txn, email: normalizedEmail }, txn.timestamp);
@@ -282,3 +312,61 @@ async function getRedisTransactions(tenant: string, email: string, limit: number
 }
 
 export { KvNotConfiguredError };
+
+/** Cache failures follow an accepted durable mutation and cannot make it retryable. */
+async function cacheDurableMember(tenant: string, email: string, payload: Record<string, unknown>): Promise<void> {
+  try {
+    const kv = getKv();
+    if (!kv) return;
+    await kv.hset(keys.member(tenant, email), payload);
+    await kv.sadd(keys.membersSet(tenant), email);
+  } catch { console.error("[rewards] durable member accepted; cache unavailable", { tenant }); }
+}
+async function cacheDurableTransaction(tenant: string, email: string, txn: StarsTransaction): Promise<void> {
+  try {
+    const kv = getKv();
+    if (kv) await kv.eval("if not redis.call('LPOS', KEYS[1], ARGV[1]) then redis.call('LPUSH', KEYS[1], ARGV[1]) end return 1", [keys.txns(tenant, email)], [JSON.stringify(txn)]);
+  }
+  catch { console.error("[rewards] durable transaction accepted; cache unavailable", { tenant }); }
+}
+
+/** The admin producer commits its balance and caller-supplied reason together. */
+export async function adjustStarsWithTransaction(
+  tenant: string, email: string, delta: number, reason: string, actor?: VerifiedActor,
+  commandId: string = randomUUID(), config: RewardsConfig = DEFAULT_REWARDS_CONFIG,
+): Promise<{ member: Member; transaction: StarsTransaction } | null> {
+  if (!Number.isSafeInteger(delta) || delta === 0) throw new Error("delta must be a non-zero safe integer");
+  if (!reason.trim()) throw new Error("reason is required");
+  const normalizedEmail = email.trim().toLowerCase();
+  const memberAuthority = await durableRecordAuthority("reward_members");
+  // Qualify each selected store; never disguise a requested unavailable cutover.
+  await durableRecordAuthority("reward_transactions");
+  if (!memberAuthority) {
+    const member = await adjustStars(tenant, normalizedEmail, delta, config);
+    if (!member) return null;
+    try {
+      const transaction = await logTransaction(tenant, normalizedEmail, delta > 0 ? "admin-credit" : "admin-debit", Math.abs(delta), reason, actor);
+      return { member, transaction };
+    } catch {
+      // The legacy balance may already be accepted. A command ID cannot make
+      // this Redis-era two-write path idempotent; require history reconciliation.
+      throw new Error("rewards_legacy_adjustment_unconfirmed");
+    }
+  }
+  if (!actor) throw new Error("rewards_actor_required");
+  const transaction: StarsTransaction = {
+    id: `txn_${commandId}`, type: delta > 0 ? "admin-credit" : "admin-debit",
+    amount: Math.abs(delta), reason, timestamp: new Date().toISOString(),
+  };
+  const result = await (await workspacePorts().clientRecords()).mutateRewardRecord(tenant, normalizedEmail, {
+    operation: "adjust", commandId, delta, tierThreshold: config.tierThresholdSuper, transaction, actor,
+  });
+  if (result.status === "missing") return null;
+  if (result.status === "insufficient") throw new InsufficientStarsError(result.available!, result.requested!);
+  const member = result.member && hashToMember(result.member);
+  if (result.status !== "adjusted" || !member || !result.transaction) throw new Error("rewards_adjustment_unconfirmed");
+  const accepted = result.transaction as StarsTransaction;
+  await cacheDurableMember(tenant, normalizedEmail, result.member!);
+  await cacheDurableTransaction(tenant, normalizedEmail, accepted);
+  return { member, transaction: accepted };
+}

@@ -34,7 +34,24 @@ export interface ClientRecordCopy {
   capturedAt: string;
 }
 
+export interface RewardMutationInput {
+  operation: "save" | "adjust" | "log";
+  commandId: string;
+  member?: Record<string, string>;
+  delta?: number;
+  tierThreshold?: number;
+  transaction?: { id: string; type: string; amount: number; reason: string; timestamp: string };
+  actor?: VerifiedActor;
+}
+export interface RewardMutationResult {
+  status: "saved" | "adjusted" | "logged" | "missing" | "insufficient";
+  member?: Record<string, unknown>;
+  transaction?: { id: string; type: string; amount: number; reason: string; timestamp: string };
+  available?: number;
+  requested?: number;
+}
 export interface ClientRecordsPort {
+  mutateRewardRecord(tenant: string, email: string, input: RewardMutationInput): Promise<RewardMutationResult>;
   mutateProviderConnection(tenant:string,provider:string,expected:Record<string,unknown>,payload:Record<string,unknown>,capturedAt:string):Promise<string>;
   clientRecordReadSource(store: ClientRecordStoreName): Promise<"redis" | "postgres">;
   writeClientRecord(store: ClientRecordStoreName, tenant: string, record: ClientRecordCopy | { recordId: string; remove: true; capturedAt?: string }, via: "dual_write", mode?: "replace" | "keep_first"): Promise<{ status: string; reason?: string }>;
