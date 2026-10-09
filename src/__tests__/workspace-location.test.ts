@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { accountReturnTarget, replaceWorkspaceLocation, workspaceHistoryState, workspaceReturnTarget } from "@/platform/workspaces/location";
+import { accountReturnTarget, navigateWorkspace, readWorkspaceLocation, workspaceLocationHref, replaceWorkspaceLocation, workspaceHistoryState, workspaceReturnTarget } from "@/platform/workspaces/location";
 
 it("preserves website creation and saved website destinations through sign-in", () => {
   expect(workspaceReturnTarget("/workspace?view=websites")).toBe("/workspace?view=websites");
@@ -125,3 +125,58 @@ it("preserves an exact custom application destination through sign-in", () => {
 });
 
 it("strips router state while preserving app state", () => { expect(workspaceHistoryState({ source: "workspace", __NA: true, __PRIVATE_NEXTJS_INTERNALS_TREE: ["stale"], _N: true })).toEqual({ source: "workspace" }); expect(workspaceHistoryState({ __NA: true })).toBeNull(); expect(workspaceHistoryState(null)).toBeNull(); expect(workspaceHistoryState([])).toBeNull(); });
+
+
+const systemId = "44444444-4444-4444-8444-444444444444";
+const staleSource = `/workspace?workspaceId=${workspaceId}&view=system&system=${systemId}&work=old&search=1&offering=old&template=old&standingId=${systemId}&assignmentId=${systemId}&tenantId=old&inquiryView=record&inquiryRecord=old&inquiryRequest=old&trackerWork=old&row=old&save=scan_public123`;
+it.each([
+  { view: "work" }, { view: "tracker" }, { view: "document" }, { view: "plan" }, { view: "applications" },
+  { view: "inquiries", tenantId: "harbor" }, { view: "products", offering: "staff" },
+  { view: "operations", standingId: systemId }, { view: "ask", system: systemId }, {},
+])("complete destination removes all incompatible detail: %j", destination => {
+  const href = workspaceLocationHref(staleSource, { workspaceId, ...destination });
+  expect(readWorkspaceLocation(new URL(href, "https://test.invalid").searchParams)).toEqual({ workspaceId, ...destination, save: "scan_public123" });
+  expect(workspaceReturnTarget(href)).toBe(href);
+});
+it("keeps preview context outside the location contract", () => {
+  expect(workspaceLocationHref(`${staleSource}&scenario=mooney&systems=on`, { workspaceId })).toBe(`/workspace?save=scan_public123&scenario=mooney&systems=on&workspaceId=${workspaceId}`);
+});
+it.each([
+  { view: "system", workspaceId }, { view: "system", system: systemId },
+  { view: "tracker", work: "/private" }, { view: "work", system: systemId },
+])("refuses an unencodable destination: %j", destination => {
+  expect(() => workspaceLocationHref("/workspace", destination)).toThrow("Invalid workspace destination");
+});
+it("reads aliases, view-less legacy responsibilities, and malformed detail consistently", () => {
+  expect(readWorkspaceLocation(new URLSearchParams(`standingId=${systemId}`))).toEqual({ view: "operations", standingId: systemId });
+  expect(readWorkspaceLocation(new URLSearchParams(`view=ongoing&standingId=${systemId}`))).toEqual({ view: "ongoing", standingId: systemId });
+  expect(readWorkspaceLocation(new URLSearchParams(`view=plan&system=${systemId}&standingId=${systemId}&search=1`))).toEqual({ view: "plan" });
+  expect(readWorkspaceLocation(new URLSearchParams("view=system&system=bad"))).toEqual({});
+});
+it("uses push for opens and replace for acknowledged saves, retaining custom history state", () => {
+  const previous = globalThis.window;
+  const history = { state: { __NA: true, source: "offering" }, pushState: vi.fn(), replaceState: vi.fn() };
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { location: { href: "https://test.invalid/workspace" }, history } });
+  try {
+    navigateWorkspace({ workspaceId, view: "tracker" });
+    navigateWorkspace({ workspaceId, view: "tracker", work: "saved" }, "replace");
+    expect(history.pushState).toHaveBeenCalledWith({ source: "offering" }, "", `/workspace?workspaceId=${workspaceId}&view=tracker`);
+    expect(history.replaceState).toHaveBeenCalledWith({ source: "offering" }, "", `/workspace?workspaceId=${workspaceId}&view=tracker&work=saved`);
+  } finally {
+    if (previous) Object.defineProperty(globalThis, "window", { configurable: true, value: previous });
+    else delete (globalThis as { window?: unknown }).window;
+  }
+});
+
+
+it("malformed System identity does not fall through to stale work", () => {
+  expect(readWorkspaceLocation(new URLSearchParams("view=system&system=invalid&work=saved"))).toEqual({});
+  expect(readWorkspaceLocation(new URLSearchParams(`workspaceId=${workspaceId}&view=system&system=${systemId}&work=%2Fprivate`))).toEqual({ workspaceId, view: "system", system: systemId });
+});
+it("a move cannot preserve a malformed or repeated public-save hint", () => {
+  for (const source of ["/workspace?save=invalid", "/workspace?save=scan_a&save=scan_b"]) {
+    const href = workspaceLocationHref(source, { workspaceId, view: "tracker" });
+    expect(workspaceReturnTarget(href)).toBe(href);
+    expect(new URL(href, "https://test.invalid").searchParams.has("save")).toBe(false);
+  }
+});

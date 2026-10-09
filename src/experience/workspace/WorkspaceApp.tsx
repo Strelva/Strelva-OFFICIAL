@@ -3,7 +3,7 @@
 import { requestDraftKey, writeRequestDraft } from "./request-draft";
 import { prepareWebsiteRequestDraft } from "@/lib/website-request-draft";
 import { WebsiteAuditPage } from "@/products/website-audit";
-import { replaceWorkspaceLocation, workspaceHistoryState, workspaceReturnTarget } from "@/platform/workspaces/location";
+import { navigateWorkspace, readWorkspaceLocation, replaceWorkspaceLocation, workspaceHistoryState, workspaceReturnTarget } from "@/platform/workspaces/location";
 
 import {
   ArrowRight,
@@ -112,8 +112,9 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   const requestedWorkspaceRef = useRef<string | null>(null);
 
   const loadWorkspace = useCallback(async (workspaceId?: string, preserveNotice = false) => {
-    const locationWorkspaceId = new URLSearchParams(window.location.search).get("workspaceId");
-    const selectedId = workspaceId || locationWorkspaceId;
+    const locationWorkspaceId = readWorkspaceLocation(new URLSearchParams(window.location.search)).workspaceId;
+    const selectedId = workspaceId || locationWorkspaceId || null;
+    setReturnTarget(workspaceReturnTarget(`/workspace${window.location.search}`) || "/workspace");
     // A response-triggered refresh from the previous render must not replace a
     // newer workspace selection. Explicit workspace changes set this ref before
     // starting their request; ordinary navigation reads the current URL.
@@ -138,7 +139,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
       setSelectedWorkId(selection.selectedWorkId);
       setOpen(leaveWork({ missingWork: selection.missingWork, standingId: selection.selectedStandingId, assignmentId: selection.selectedAssignmentId, inquiryTenantId: selection.inquiryTenantId, showAssessment: selection.showAssessment }));
       if (!preserveNotice) { setHome(selection.home); setView(selection.view); }
-      replaceWorkspaceLocation(data.workspaceId, params.get("standingId") ? undefined : params.get("work") || undefined);
+      replaceWorkspaceLocation(data.workspaceId, readWorkspaceLocation(params).work);
     } catch (cause) {
       if (requestId !== requestRef.current) return;
       setSnapshot(null);
@@ -151,7 +152,6 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
 
   useEffect(() => {
     const restore = () => {
-      setReturnTarget(workspaceReturnTarget(`/workspace${window.location.search}`) || "/workspace");
       void loadWorkspace();
     };
     restore();
@@ -164,7 +164,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     const hashToken = params.get("handoff");
     if (hashToken) {
       sessionStorage.setItem("strelva:workspace-handoff", hashToken);
-      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+      window.history.replaceState(workspaceHistoryState(window.history.state), "", `${window.location.pathname}${window.location.search}`);
     }
     const token = hashToken || sessionStorage.getItem("strelva:workspace-handoff");
     if (!token) return;
@@ -267,11 +267,13 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   }
 
   function workspaceIdForNavigation(fallback: string): string {
-    return new URLSearchParams(window.location.search).get("workspaceId") || fallback;
+    return readWorkspaceLocation(new URLSearchParams(window.location.search)).workspaceId || fallback;
   }
 
+  const callbackLocation = typeof window === "undefined" ? "" : JSON.stringify(readWorkspaceLocation(new URLSearchParams(window.location.search)));
   function acceptsWorkspaceCallback(workspaceId: string): boolean {
-    return activeWorkspaceRef.current === workspaceId && requestedWorkspaceRef.current === workspaceId;
+    return activeWorkspaceRef.current === workspaceId && requestedWorkspaceRef.current === workspaceId
+      && callbackLocation === JSON.stringify(readWorkspaceLocation(new URLSearchParams(window.location.search)));
   }
 
   /** Every transition that leaves the current work resets all of its context, then sets only what the next view needs. */
@@ -285,26 +287,8 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     const productId = chosen?.productId ?? receiptProductId;
     const workspaceId = snapshot.workspaceId;
     chooseWork(id);
-    const url = new URL(window.location.href);
-    url.searchParams.set("workspaceId", workspaceId);
-    url.searchParams.set("work", id);
-    clearEmbeddedRouteParams(url);
-    url.searchParams.set("view", viewForWork(productId));
-    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
+    navigateWorkspace({ workspaceId, work: id, view: viewForWork(productId) });
     void loadWorkspace(workspaceId);
-  }
-
-  function clearEmbeddedRouteParams(url: URL) {
-    url.searchParams.delete("template");
-    url.searchParams.delete("standingId");
-    url.searchParams.delete("assignmentId");
-    url.searchParams.delete("tenantId");
-    url.searchParams.delete("inquiryView");
-    url.searchParams.delete("inquiryRequest");
-    url.searchParams.delete("inquiryRecord");
-    url.searchParams.delete("trackerWork");
-    url.searchParams.delete("row");
-    url.searchParams.delete("offering");
   }
 
   function chooseInquiry(tenantId: string, context?: WorkspaceStartContinuation) {
@@ -315,52 +299,32 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     setNotice(null);
   }
 
-  function startTracker(context?: WorkspaceStartContinuation) {
-    if (workspaceExitBlocks) return;
-    const workspaceId = workspaceIdForNavigation(snapshot!.workspaceId);
-    leaveCurrentWork({ start: context?.route === "tracker" ? { view: "tracker", continuation: context } : null });
+  function startWork(nextView: View, start: OpenWorkContext["start"], showAssessment = false) {
+    if (!snapshot || workspaceExitBlocks) return;
+    leaveCurrentWork({ start, showAssessment });
     setSelectedWorkId(null);
     setHome(false);
-    setView("tracker");
+    setView(nextView);
     setNotice(null);
-    const url = new URL(window.location.href);
-    url.searchParams.set("workspaceId", workspaceId);
-    url.searchParams.set("view", "tracker");
-    url.searchParams.delete("work");
-    clearEmbeddedRouteParams(url);
-    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
+    navigateWorkspace({ workspaceId: workspaceIdForNavigation(snapshot.workspaceId), view: nextView });
+  }
+
+  function startAssessment(context?: WorkspaceStartContinuation) {
+    if (workspaceExitBlocks) return;
+    setRetryWork(null);
+    startWork("work", context?.route === "assessment" ? { view: "work", continuation: context } : null, true);
+  }
+
+  function startTracker(context?: WorkspaceStartContinuation) {
+    startWork("tracker", context?.route === "tracker" ? { view: "tracker", continuation: context } : null);
   }
 
   function startDocument(context?: WorkspaceStartContinuation) {
-    if (workspaceExitBlocks) return;
-    const workspaceId = workspaceIdForNavigation(snapshot!.workspaceId);
-    leaveCurrentWork({ start: context?.route === "document" ? { view: "document", continuation: context } : null });
-    setSelectedWorkId(null);
-    setHome(false);
-    setView("document");
-    setNotice(null);
-    const url = new URL(window.location.href);
-    url.searchParams.set("workspaceId", workspaceId);
-    url.searchParams.set("view", "document");
-    url.searchParams.delete("work");
-    clearEmbeddedRouteParams(url);
-    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
+    startWork("document", context?.route === "document" ? { view: "document", continuation: context } : null);
   }
 
   function startPlan(requestText: string) {
-    if (workspaceExitBlocks) return;
-    const workspaceId = workspaceIdForNavigation(snapshot!.workspaceId);
-    leaveCurrentWork({ start: { view: "plan", request: requestText } });
-    setSelectedWorkId(null);
-    setHome(false);
-    setView("plan");
-    setNotice(null);
-    const url = new URL(window.location.href);
-    url.searchParams.set("workspaceId", workspaceId);
-    url.searchParams.set("view", "plan");
-    url.searchParams.delete("work");
-    clearEmbeddedRouteParams(url);
-    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
+    startWork("plan", { view: "plan", request: requestText });
   }
 
   function startHorizontal(productId: HorizontalView, context?: WorkspaceStartContinuation) {
@@ -375,30 +339,25 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
       return;
     }
     if (productId === "applications" && context?.request) { startPlan(context.request); return; }
-    leaveCurrentWork({ start: context?.request ? { view: productId, request: context.request } : null });
-    setSelectedWorkId(null); setHome(false); setView(productId); setNotice(null);
-    const workspaceId = workspaceIdForNavigation(snapshot!.workspaceId);
-    const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.set("workspaceId", workspaceId); url.searchParams.set("view", productId); url.searchParams.delete("work");
-    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
+    startWork(productId, context?.request ? { view: productId, request: context.request } : null);
   }
   function openOngoing() {
     if (!snapshot) return;
     leaveCurrentWork();
     setSelectedWorkId(null); setHome(false); setView("operations"); setNotice(null);
   }
-  function openClientWork(workspaceId: string, workId: string) {
+  function switchWorkspace(workspaceId: string, workId?: string) {
     requestedWorkspaceRef.current = workspaceId;
-    const url = new URL(window.location.href);
-    clearEmbeddedRouteParams(url);
-    url.searchParams.set("workspaceId", workspaceId);
-    url.searchParams.set("work", workId);
-    url.searchParams.set("view", "work");
-    url.searchParams.delete("search");
-    url.searchParams.delete("offering");
-    window.history.replaceState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
-    setHome(false);
+    leaveCurrentWork();
+    setSelectedWorkId(null);
+    setHome(!workId);
     setView("work");
+    navigateWorkspace({ workspaceId, work: workId, view: workId ? "work" : undefined });
     void loadWorkspace(workspaceId);
+  }
+
+  function openClientWork(workspaceId: string, workId: string) {
+    switchWorkspace(workspaceId, workId);
   }
   function openStanding(standingId: string) {
     if (!snapshot) return;
@@ -407,21 +366,22 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     setHome(false);
     setView("operations");
     setNotice(null);
-    const workspaceId = workspaceIdForNavigation(snapshot.workspaceId);
-    const url = new URL(window.location.href);
-    clearEmbeddedRouteParams(url);
-    url.searchParams.set("workspaceId", workspaceId);
-    url.searchParams.set("view", "operations");
-    url.searchParams.set("standingId", standingId);
-    url.searchParams.delete("work");
-    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
+    navigateWorkspace({ workspaceId: workspaceIdForNavigation(snapshot.workspaceId), view: "operations", standingId });
   }
-  function horizontalSaved(workId: string) {
+
+  function workSaved(workId: string, savedView: View) {
     if (!snapshot || !acceptsWorkspaceCallback(snapshot.workspaceId)) return;
     const workspaceId = snapshot.workspaceId;
-    leaveCurrentWork(); setSelectedWorkId(workId); const url = new URL(window.location.href); url.searchParams.set("workspaceId", workspaceId); url.searchParams.set("work", workId); url.searchParams.set("view", view); url.searchParams.delete("standingId"); url.searchParams.delete("assignmentId");
-    window.history.replaceState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`); void loadWorkspace(workspaceId, true);
+    leaveCurrentWork();
+    setSelectedWorkId(workId);
+    setHome(false);
+    setView(savedView);
+    navigateWorkspace({ workspaceId, work: workId, view: savedView }, "replace");
+    void loadWorkspace(workspaceId, true);
   }
+
+  function horizontalSaved(workId: string) { workSaved(workId, view); }
+
   function goHome() {
     leaveCurrentWork();
     setHome(true);
@@ -429,53 +389,9 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     if (snapshot) void loadWorkspace(undefined, true);
   }
 
-  function handleTrackerSaved(workId: string) {
-    if (!snapshot || !acceptsWorkspaceCallback(snapshot.workspaceId)) return;
-    const workspaceId = snapshot.workspaceId;
-    leaveCurrentWork();
-    setSelectedWorkId(workId);
-    setHome(false);
-    setView("tracker");
-    const url = new URL(window.location.href);
-    url.searchParams.set("workspaceId", workspaceId);
-    url.searchParams.set("view", "tracker");
-    url.searchParams.set("work", workId);
-    clearEmbeddedRouteParams(url);
-    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
-    void loadWorkspace(workspaceId, true);
-  }
-
-  function handleDocumentSaved(workId: string) {
-    if (!snapshot || !acceptsWorkspaceCallback(snapshot.workspaceId)) return;
-    const workspaceId = snapshot.workspaceId;
-    leaveCurrentWork();
-    setSelectedWorkId(workId);
-    setHome(false);
-    setView("document");
-    const url = new URL(window.location.href);
-    url.searchParams.set("workspaceId", workspaceId);
-    url.searchParams.set("view", "document");
-    url.searchParams.set("work", workId);
-    clearEmbeddedRouteParams(url);
-    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
-    void loadWorkspace(workspaceId, true);
-  }
-
-  function handlePlanSaved(workId: string) {
-    if (!snapshot || !acceptsWorkspaceCallback(snapshot.workspaceId)) return;
-    const workspaceId = snapshot.workspaceId;
-    leaveCurrentWork();
-    setSelectedWorkId(workId);
-    setHome(false);
-    setView("plan");
-    const url = new URL(window.location.href);
-    url.searchParams.set("workspaceId", workspaceId);
-    url.searchParams.set("view", "plan");
-    url.searchParams.set("work", workId);
-    clearEmbeddedRouteParams(url);
-    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
-    void loadWorkspace(workspaceId, true);
-  }
+  function handleTrackerSaved(workId: string) { workSaved(workId, "tracker"); }
+  function handleDocumentSaved(workId: string) { workSaved(workId, "document"); }
+  function handlePlanSaved(workId: string) { workSaved(workId, "plan"); }
 
   const trackerContent: React.ReactNode | undefined = snapshot && view === "tracker"
     ? snapshot.actor.localPreview
@@ -498,7 +414,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   function clearPublicSaveQuery() {
     const url = new URL(window.location.href);
     url.searchParams.delete("save");
-    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.replaceState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
   }
 
   async function savePublicResult() {
@@ -512,6 +428,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
       );
       if (activeWorkspaceRef.current !== snapshot.workspaceId) return;
       const normalizedWork = normalizeWorkspaceWork(body.work, { access: currentWorkspace?.kind === "personal" ? "owned" : "member" });
+      if (normalizedWork.workspaceId !== snapshot.workspaceId) throw new Error("The saved result could not be confirmed for this workspace.");
       setSnapshot((current) => {
         if (!current || current.workspaceId !== normalizedWork.workspaceId) return current;
         const work = current.work.some((item) => item.id === normalizedWork.id)
@@ -521,7 +438,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
       });
       leaveCurrentWork();
       setSelectedWorkId(normalizedWork.id);
-      replaceWorkspaceLocation(normalizedWork.workspaceId, normalizedWork.id);
+      navigateWorkspace({ workspaceId: normalizedWork.workspaceId, work: normalizedWork.id, view: "work" }, "replace");
       setHome(false);
       setView("work");
       setPublicSaveResultId(null);
@@ -569,7 +486,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
         onHome={goHome}
         onChoose={chooseWork}
         onCreatedApp={id => openWorkFromPlan(id, "applications")}
-        onNew={(context) => { if (workspaceExitBlocks) return; leaveCurrentWork({ showAssessment: true, start: context?.route === "assessment" ? { view: "work", continuation: context } : null }); setRetryWork(null); const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.set("workspaceId", workspaceIdForNavigation(snapshot.workspaceId)); url.searchParams.set("view", "work"); url.searchParams.delete("work"); window.history.replaceState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`); setHome(false); setView("work"); setNotice(null); }}
+        onNew={startAssessment}
         onPlan={startPlan}
         onOngoing={openOngoing}
         onHorizontal={startHorizontal}
@@ -594,7 +511,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
         tracker={trackerContent}
         plan={planContent}
         document={documentContent}
-        onWorkspace={(id) => { requestedWorkspaceRef.current = id; replaceWorkspaceLocation(id); const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.delete("work"); url.searchParams.delete("view"); window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`); leaveCurrentWork(); setHome(true); setView("work"); void loadWorkspace(id); }}
+        onWorkspace={switchWorkspace}
         onOpenClientWork={openClientWork}
         notice={<>
         {pendingRequest ? <div role="status" className="mx-4 mt-4 flex flex-wrap items-center gap-4 rounded-xl border border-gray-border p-4 text-sm"><span>An assessment may still need to finish saving.</span>
@@ -682,7 +599,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
               {canShowWorkBudget ? <WorkBudgetPanel workspaceId={snapshot.workspaceId} workId={selectedWork.id} productId="ai_visibility" resourceKind={selectedWork.resourceKind} /> : null}
             </>
           ) : selectedWork?.productId === "research" && selectedWork.resourceKind === "experiment" ? (
-            <WorkspaceExperimentResult work={selectedWork} onOpenTracker={handleTrackerSaved} />
+            <WorkspaceExperimentResult work={selectedWork} onOpenTracker={id => openWorkFromPlan(id, "tracker")} />
           ) : selectedWork ? <p className="mx-auto max-w-2xl text-[14px] text-gray-muted">This saved work is unavailable in this release. Its stored record remains unchanged.</p> : null}
       </WorkspaceLayout>
       </div>
@@ -698,7 +615,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
             replaceWorkspaceLocation(workspaceId, workId);
             const url = new URL(window.location.href);
             url.hash = "";
-            window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+            window.history.replaceState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}`);
             sessionStorage.removeItem("strelva:workspace-handoff");
             setHandoffToken(null);
             setHandoffPreview(null);
@@ -707,7 +624,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
           onClose={() => {
             const url = new URL(window.location.href);
             url.hash = "";
-            window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+            window.history.replaceState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}`);
             sessionStorage.removeItem("strelva:workspace-handoff");
             setHandoffToken(null);
             setHandoffPreview(null);

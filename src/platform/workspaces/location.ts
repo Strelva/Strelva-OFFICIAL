@@ -6,8 +6,83 @@ const ID = /^[a-z0-9_-]{1,128}$/i;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 const RECORD_ID = /^[a-z0-9_.:-]{1,200}$/i;
 const INVITATION_TOKEN = /^[A-Za-z0-9_-]{43}$/;
-const VIEWS = new Set(["system", "requests", "customers", "apps", "work", "ongoing", "settings", "products", "access", "help", "inquiries", "tracker", "document", "plan", "start", "websites", "custom-applications", "onboarding", "applications", "scheduling", "investigations", "operations", "product-learning", "ask"]);
+const VIEWS = new Set(["needs-you", "system", "requests", "customers", "apps", "work", "ongoing", "settings", "products", "access", "help", "inquiries", "tracker", "document", "plan", "start", "websites", "custom-applications", "onboarding", "applications", "scheduling", "investigations", "operations", "product-learning", "ask"]);
 const INQUIRY_VIEWS = new Set(["home", "new", "shape", "work", "plan", "preview", "rehearsal", "receipt", "search", "record", "why", "responsibility", "connections", "onboarding", "account", "attention", "patterns"]);
+
+/** Complete navigation hints. No data, request contents, or authority belong here. */
+export interface WorkspaceLocation {
+  /** A malformed saved-work hint must not fall back to an unrelated result. */
+  unavailableWork?: true;
+  workspaceId?: string;
+  view?: string;
+  work?: string;
+  system?: string;
+  search?: string;
+  standingId?: string;
+  assignmentId?: string;
+  tenantId?: string;
+  inquiryView?: string;
+  inquiryRequest?: string;
+  inquiryRecord?: string;
+  row?: string;
+  offering?: string;
+  template?: string;
+  save?: string;
+}
+const LOCATION_KEYS = ["workspaceId", "view", "work", "system", "search", "standingId", "assignmentId", "tenantId", "inquiryView", "inquiryRequest", "inquiryRecord", "row", "offering", "template", "save", "trackerWork"] as const;
+
+/** Read old links leniently, but never carry a detail into an incompatible place. */
+export function readWorkspaceLocation(params: URLSearchParams): WorkspaceLocation {
+  const location: WorkspaceLocation = {};
+  for (const key of LOCATION_KEYS) {
+    const value = params.get(key);
+    if (!value || params.getAll(key).length !== 1 || key === "trackerWork") continue;
+    const valid = key === "workspaceId" || key === "system" || key === "standingId" || key === "assignmentId" ? UUID.test(value)
+      : key === "view" ? VIEWS.has(value)
+      : key === "inquiryView" ? INQUIRY_VIEWS.has(value)
+      : key === "row" ? RECORD_ID.test(value)
+      : key === "search" ? value === "1"
+      : key === "save" ? /^(scan_[a-z0-9]{1,251}|audit_[a-f0-9]{32})$/i.test(value)
+      : ID.test(value);
+    if (valid) location[key] = value;
+  }
+  if (params.has("work") && !location.work) location.unavailableWork = true;
+  // Legacy responsibility links did not always include a view. Their identity wins.
+  if ((location.standingId || location.assignmentId) && !location.view) location.view = "operations";
+  if (location.view !== "operations" && location.view !== "ongoing") { delete location.standingId; delete location.assignmentId; }
+  if (["system", "ask", "start", "products", "requests", "settings", "help", "needs-you"].includes(location.view || "") || location.standingId || location.assignmentId) { delete location.work; delete location.unavailableWork; }
+  if (location.view !== "system" && location.view !== "ask") delete location.system;
+  if (location.view === "system" && (!location.system || !location.workspaceId)) { delete location.view; delete location.system; }
+  if (location.view !== "work" && location.view !== "apps") delete location.search;
+  if (location.view !== "products") { delete location.offering; delete location.template; }
+  if (location.view !== "tracker" || !location.work) delete location.row;
+  if (location.view !== "inquiries") { delete location.tenantId; delete location.inquiryView; delete location.inquiryRequest; delete location.inquiryRecord; }
+  return location;
+}
+
+/** Encode only a complete destination; source-specific detail cannot survive a move. */
+export function workspaceLocationHref(source: string, destination: WorkspaceLocation): string {
+  const url = new URL(source, "https://workspace.invalid");
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(destination)) if (value !== undefined && key !== "unavailableWork") params.set(key, value);
+  const location = readWorkspaceLocation(params);
+  for (const [key, value] of Object.entries(destination)) {
+    if (value !== undefined && key !== "unavailableWork" && location[key as keyof WorkspaceLocation] !== value) {
+      throw new Error("Invalid workspace destination.");
+    }
+  }
+  // Keep non-location context (such as isolated preview selectors) and a valid pending public save.
+  if (!readWorkspaceLocation(url.searchParams).save) url.searchParams.delete("save");
+  for (const key of LOCATION_KEYS) if (key !== "save") url.searchParams.delete(key);
+  for (const [key, value] of Object.entries(location)) if (key !== "unavailableWork") url.searchParams.set(key, value);
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+/** Opens and workspace switches push; saving and load-time reconciliation replace. */
+export function navigateWorkspace(destination: WorkspaceLocation, entry: "push" | "replace" = "push") {
+  const href = workspaceLocationHref(window.location.href, destination);
+  window.history[entry === "push" ? "pushState" : "replaceState"](workspaceHistoryState(window.history.state), "", href);
+}
 
 /** Keep app-owned history data without replaying Next router markers. */
 export function workspaceHistoryState(state: unknown): Record<string, unknown> | null {
@@ -148,12 +223,16 @@ export function workspaceInvitationReturnTarget(value: string | null): string | 
 }
 
 export function replaceWorkspaceLocation(workspaceId: string, workId?: string) {
-  const url = new URL(window.location.href);
-  url.searchParams.set("workspaceId", workspaceId);
-  if (workId) {
-    url.searchParams.set("work", workId);
-    url.searchParams.delete("offering");
+  const current = readWorkspaceLocation(new URL(window.location.href).searchParams);
+  const sameWorkspace = !current.workspaceId || current.workspaceId === workspaceId;
+  if (workId && (!sameWorkspace || current.work !== workId)) {
+    navigateWorkspace({ workspaceId, view: "work", work: workId }, "replace");
+    return;
   }
-  else url.searchParams.delete("work");
-  window.history.replaceState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
+  // Keep malformed work visible as unavailable rather than quietly repairing it to Home.
+  if (sameWorkspace && current.unavailableWork) return;
+  const location = sameWorkspace ? current : {};
+  location.workspaceId = workspaceId;
+  if (!workId) delete location.work;
+  navigateWorkspace(location, "replace");
 }

@@ -1224,6 +1224,12 @@ registry states do not claim that no Systems exist. Website assignment handoff,
 stopped reads and delegated/provider-seat views are retained. Existing work-row
 composition is reused, with semantic sections and actual System links.
 
+Workspace navigation now consumes the platform location owner for compatible
+System/work/detail hints and complete destinations. Business switches and opens
+preserve Back; acknowledged saves replace creation entries. Location remains a
+navigation hint, with existing server authority and UI read-only gates. Local
+fixture evidence and integration limits are in the [October 9 location handoff](../architecture/deepening-2026-10-09/workspace-location.md).
+
 `WorkspaceHelpForm` and `OfferingInstallView` require an explicit agency choice
 from the selected business's active seats. No platform designation orders or
 selects a provider. Historical requests remain inspectable; platform support is
