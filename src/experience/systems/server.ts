@@ -61,6 +61,7 @@ import {
   storedPossibilityViews,
   storedTargets,
   syncRebuildPossibilities,
+  syncPublicSourceRebuildPossibilities,
   syncAskPageSetPossibilities,
   syncAskInquiryFollowUpPossibilities,
 } from "./stored-possibilities";
@@ -407,7 +408,7 @@ export function withVersions(projection: WorkspaceSystems, lineage: { hiddenSour
     ...projection,
     systems: projection.systems.filter((system) => !hidden.has(system.ref.systemId)),
     connections: projection.connections.filter((connection) => !hidden.has(connection.sourceId) && !(connection.targetSystemId && hidden.has(connection.targetSystemId))),
-    possibilities: projection.possibilities.map((possibility) => ({ ...possibility, affects: possibility.affects.filter((id) => !hidden.has(id)) })),
+    possibilities: projection.possibilities.map((possibility) => ({ ...possibility, affects: possibility.affects.filter((id) => !hidden.has(id)), ...(possibility.sourceSystemIds ? { sourceSystemIds: possibility.sourceSystemIds.filter(id => !hidden.has(id)) } : {}) })),
     versions: lineage.versions,
   };
 }
@@ -458,8 +459,20 @@ export async function withStoredPossibilities(projection: WorkspaceSystems, inpu
     repo, live, businessId: deps.businessId, targets, revisions, actorId: deps.actor.userId,
     at: new Date(input.now).toISOString(), canWrite: deps.canWrite === true,
   });
+  const publicSourceTargets = input.candidates.flatMap(candidate => {
+    if (candidate.origin !== "rebuild" || candidate.tenantId || !candidate.sourceHost || targetSite(candidate, input.listing, input.siteDomains)) return [];
+    const sources = input.listing.systems.filter(item => item.system.kind === "website" && item.connectedSite
+      && bareHostname(item.connectedSite.siteUrl) === candidate.sourceHost);
+    // Ambiguous references require an explicit choice; never select one arbitrarily.
+    return sources.length === 1 ? [{ candidate, source: sources[0]! }] : [];
+  });
+  const publicSourceStored = await syncPublicSourceRebuildPossibilities({
+    repo, businessId: deps.businessId, targets: publicSourceTargets, stored: rebuilds,
+    actorId: deps.actor.userId, at: new Date(input.now).toISOString(), canWrite: deps.canWrite === true,
+    read: workId => readWebsiteRebuild(deps.actor, workId),
+  });
   const websiteStored = await syncAskPageSetPossibilities({
-    repo, live, stored: rebuilds, actorId: deps.actor.userId, at: new Date(input.now).toISOString(),
+    repo, live, stored: publicSourceStored, actorId: deps.actor.userId, at: new Date(input.now).toISOString(),
     canWrite: deps.canWrite === true, read: workId => readWebsiteRebuild(deps.actor, workId),
   });
   const { askInquiryFollowUpStillCurrent } = await import("@/products/inquiries/server");

@@ -18,7 +18,7 @@ const rebuildSchema = z.object({ workId: z.string().uuid(), workspaceId: z.strin
 }) });
 const systemsSchema = z.object({ systems: z.object({ status: z.literal("ready"), systems: z.array(z.object({
   ref: z.object({ systemId: z.string() }), connectedSite: z.object({ siteUrl: z.string() }).optional(),
-})), possibilities: z.array(z.object({ id: z.string().uuid(), workId: z.string(), affects: z.array(z.string()), status: z.enum(["exploring", "ready"]), stored: z.literal(true) })) }) });
+})), possibilities: z.array(z.object({ id: z.string().uuid(), workId: z.string(), affects: z.array(z.string()), status: z.enum(["exploring", "ready"]), stored: z.literal(true), sourceSystemIds: z.array(z.string()).optional() })) }) });
 
 function publicSource() {
   const url = new URL(process.env.STRELVA_PUBLIC_CHECK_PROOF_URL || "https://example.org/");
@@ -128,6 +128,8 @@ test("a real anonymous URL check survives Auth and becomes private business evid
     expect(projection.systems.some(system => system.ref.systemId === site.systemId)).toBe(true);
     const possibility = projection.possibilities.find(item => item.workId === workId);
     expect(possibility, "A saved rebuild alone does not prove System/Possibility conversion.").toBeDefined();
+    expect(possibility!.sourceSystemIds).toContain(site.systemId);
+    expect(possibility!.status).toBe("exploring");
     expect(possibility!.affects, "An unverified third-party reference is not a publication target.").not.toContain(site.systemId);
     const compare = await owner.context.request.get(`/api/workspace/systems/possibilities?${new URLSearchParams({ workspaceId: businessId, possibilityId: possibility!.id })}`);
     expect(compare.status(), await compare.text()).toBe(200);
@@ -143,8 +145,8 @@ test("a real anonymous URL check survives Auth and becomes private business evid
     const sources = z.object({ sites: z.array(z.object({ systemId: z.string(), verifiedAt: z.string().nullable() })) }).parse(await stillUnverified.json());
     expect(sources.sites.find(item => item.systemId === site.systemId)?.verifiedAt).toBeNull();
     measurements.conversion = { savedWorkId: stored.id, systemId: site.systemId, possibilityId: possibility!.id, status: possibility!.status, auditScope: prepared.rebuild.audit?.scope, unavailable: prepared.rebuild.audit?.unavailable };
-    await page.goto(`/workspace?${new URLSearchParams({ workspaceId: businessId, view: "work" })}`);
-    await expect(page.locator(`a[href*="system=${site.systemId}"]`).first()).toBeVisible();
+    await page.goto(`/workspace?${new URLSearchParams({ workspaceId: businessId, view: "system", system: site.systemId })}`);
+    await expect(page.getByRole("heading", { name: "Possibilities", exact: true })).toBeVisible();
     for (const width of [390, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

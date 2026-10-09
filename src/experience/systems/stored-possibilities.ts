@@ -34,7 +34,7 @@ import { createIsolatedAdapter } from "@/platform/make-real/isolated-adapters";
 import { customerActivationView } from "@/platform/make-real/view";
 import type { BusinessSystems, SystemListing } from "@/platform/systems/from-existing";
 import type { SystemRevision } from "@/platform/systems/contracts";
-import { siteDocumentSchema, unresolvedSiteFacts, type WebsiteRebuildCandidate, type WebsiteRebuildRecord } from "@/products/websites/index";
+import { siteDocumentSchema, siteDocumentHash, unresolvedSiteFacts, type WebsiteRebuildCandidate, type WebsiteRebuildRecord } from "@/products/websites/index";
 import { followUpTryView } from "@/products/inquiries/server";
 import { publicBookingScheduleSchema } from "@/products/scheduling/contracts";
 import type {
@@ -91,9 +91,78 @@ export function rebuildPossibilityInput(target: StoredTarget, revisions: Readonl
   };
 }
 
+/** A connected public source is evidence, never an existing publication target. */
+export interface PublicSourceTarget { candidate: WebsiteRebuildCandidate; source: SystemListing }
+
+export function publicSourceRebuildInput(target: PublicSourceTarget, record: WebsiteRebuildRecord): PossibilityInput | null {
+  const { candidate, source } = target;
+  const document = record.rebuild.candidate;
+  const sourceSite = source.connectedSite;
+  if (!sourceSite || source.system.kind !== "website" || source.system.lifecycle === "paused" || candidate.origin !== "rebuild" || candidate.tenantId
+    || record.workspaceId !== source.system.businessId || record.workId !== candidate.workId
+    || record.rebuild.tenantId || !record.rebuild.sourceAudit || !("url" in record.rebuild.input) || !document
+    || document.revision !== candidate.candidateRevision || document.contentHash !== candidate.candidateContentHash
+    || ["failed", "published"].includes(record.rebuild.status)) return null;
+  const hostname = (value: string) => { try { return new URL(value.includes("://") ? value : `https://${value}`).hostname.toLowerCase().replace(/^www\./, ""); } catch { return null; } };
+  const host = hostname(sourceSite.siteUrl);
+  if (!host || hostname(record.rebuild.input.url) !== host || candidate.sourceHost !== host) return null;
+  const checked = siteDocumentSchema.safeParse(document.document);
+  if (!checked.success || siteDocumentHash(checked.data) !== document.contentHash) return null;
+  const key = "native-website";
+  return {
+    title: `A native website from ${host}`.slice(0, 160),
+    intent: `Prepare ${candidate.title} as a separate native website. ${host} stays unchanged; its public content is a source, not proof of control.`,
+    changes: [],
+    introduces: [{ key, name: candidate.title.slice(0, 120), purpose: "A separately owned native website prepared from public source content.",
+      extractedFrom: [{ businessId: source.system.businessId, systemId: source.system.id }],
+      candidate: { summary: "A private native website candidate; the external source stays unchanged.", content: {
+        kind: "ask-website-pages", rebuildWorkId: candidate.workId, candidateRevision: document.revision,
+        candidateContentHash: document.contentHash, document: checked.data,
+        publicSourceReference: { businessId: source.system.businessId, systemId: source.system.id, url: record.rebuild.input.url, host, verified: sourceSite.verified },
+      } },
+    }],
+    effects: [{ id: "publish-native-site", kind: "publish", channel: "hosted_website", system: { introducedKey: key },
+      description: "Publish the introduced native website only after owner review and current publication authority.",
+      request: { workId: candidate.workId, candidateRevision: document.revision, candidateContentHash: document.contentHash }, after: [] }],
+    checks: [{ id: "native-site-review", description: "The owner reviews the native candidate; no external source pages or domain are changed." }],
+  };
+}
+
+/** Writes use the ordinary repository actor checks; member reads never create or revise. */
+export async function syncPublicSourceRebuildPossibilities(deps: {
+  repo: SupabasePossibilityRepository; businessId: string; targets: readonly PublicSourceTarget[];
+  stored: ListedPossibility[]; actorId: string; at: string; canWrite: boolean;
+  read(workId: string): Promise<WebsiteRebuildRecord>;
+}): Promise<ListedPossibility[]> {
+  if (!deps.canWrite) return deps.stored;
+  let wrote = false;
+  for (const target of deps.targets) {
+    if (target.source.system.businessId !== deps.businessId) continue;
+    try {
+      const record = await deps.read(target.candidate.workId);
+      const input = publicSourceRebuildInput(target, record);
+      if (!input) continue;
+      const ref = rebuildSourceRef(target.candidate.workId);
+      const existing = deps.stored.find(row => row.sourceRef === ref)?.possibility;
+      if (!existing) {
+        await deps.repo.createFromSource(createPossibility(input, { id: randomUUID(), businessId: deps.businessId, actorId: deps.actorId, at: deps.at }), ref);
+        wrote = true;
+      } else if (!existing.activationId && ["exploring", "ready"].includes(existing.status) && !sameCandidate(existing, input)) {
+        const next = possibilityInputSchema.parse(input);
+        await deps.repo.save(reviseCandidate(existing, next, existing.revision, deps.actorId, deps.at), existing.revision);
+        wrote = true;
+      }
+    } catch (error) {
+      if (error instanceof WorkspaceAccessError) break;
+      // Unreadable or concurrently revised candidates never become inferred ready work.
+    }
+  }
+  return wrote ? deps.repo.listWithSources(deps.businessId) : deps.stored;
+}
+
 function sameCandidate(p: Possibility, input: PossibilityInput): boolean {
   const next = possibilityInputSchema.parse(input);
-  return canonicalJson({ changes: p.changes, effects: p.effects, checks: p.checks }) === canonicalJson({ changes: next.changes, effects: next.effects, checks: next.checks });
+  return canonicalJson({ title: p.title, intent: p.intent, changes: p.changes, introduces: p.introduces, connections: p.connections, effects: p.effects, checks: p.checks }) === canonicalJson(next);
 }
 
 /** Rehearse on isolated adapters and mark Ready when the rebuild is reviewed. */
@@ -191,7 +260,7 @@ export async function syncAskPageSetPossibilities(deps: {
         && checked.capabilities.booking.version === bookingSchedule.data.version
         && record.rebuild.publishedCapabilitySelection?.bookingGrantId === content.grantId
         && checked.pages.some(page => page.path === content.bookingPath);
-      const reviewed = ["review_ready", "approved"].includes(record.rebuild.status)
+      const reviewed = (content.publicSourceReference ? record.rebuild.status === "approved" && record.rebuild.approvedCandidateRevision === candidate.revision : ["review_ready", "approved"].includes(record.rebuild.status))
         && bookingMatches
         && unresolvedSiteFacts(checked).length === 0
         && Object.values(checked.nodes).every(node => !node.verification?.needsReview);
@@ -225,6 +294,10 @@ export function storedPossibilityViews(stored: readonly ListedPossibility[], can
       summary: askContent ? p.intent : candidate?.summary ?? p.intent,
       status: p.status,
       affects: [...new Set([...p.changes.map((c) => c.baseline.systemId), ...(typeof askContent?.contextSystemId === "string" ? [askContent.contextSystemId] : [])])],
+      ...(p.introduces.length ? { introduces: p.introduces.map(intro => intro.name) } : {}),
+      ...(p.introduces.some(intro => intro.candidate.content.publicSourceReference) ? {
+        sourceSystemIds: [...new Set(p.introduces.flatMap(intro => intro.candidate.content.publicSourceReference ? intro.extractedFrom.filter(ref => ref.businessId === p.businessId).map(ref => ref.systemId) : []))],
+      } : {}),
       evidence: candidate?.evidence ?? (workId ? summaries.evidence(workId) : null),
       previewHref: candidate?.previewHref ?? null,
       ...(tryHref ? { tryHref } : {}),

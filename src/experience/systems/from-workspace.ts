@@ -242,12 +242,13 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
     const view: SystemPossibility = {
       id: possibility.id, title: possibility.title, summary: possibility.summary, status: possibility.status,
       affects: possibility.affects.filter(id => byId.has(id)),
+      ...(possibility.introduces ? { introduces: possibility.introduces } : {}),
       ...(possibility.evidence ? { evidence: possibility.evidence } : {}),
       ...(possibility.previewHref && sameAppHref(possibility.previewHref) ? { previewSrc: sameAppHref(possibility.previewHref) || undefined } : {}),
       openHref: (possibility.tryHref && sameAppHref(possibility.tryHref)) || `/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&view=websites&work=${encodeURIComponent(possibility.workId)}`,
       ...(possibility.staleReason ? { staleReason: possibility.staleReason } : {}),
     };
-    for (const id of view.affects) byId.get(id)!.possibilities.push(view);
+    for (const id of new Set([...view.affects, ...(possibility.sourceSystemIds ?? []).filter(id => byId.has(id))])) byId.get(id)!.possibilities.push(view);
   }
 
   // Make real in progress or partly live, on every System it changes.

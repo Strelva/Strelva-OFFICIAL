@@ -194,3 +194,13 @@ it("projects registry HomeFinder to the native business management surface", asy
   expect([...container.querySelectorAll("a")].find(link => link.textContent?.includes("Open HomeFinder"))?.getAttribute("href")).toBe("/workspace/home-finder?workspaceId=workspace-a");
   expect(container.textContent).toContain("License evidence pending");
 });
+
+it("shows a sourced native introduction without making the external System a change target", async () => {
+  const state = await snapshot({ id: "evidence", workspaceId: "workspace-a", title: "Evidence", productId: "ai_visibility", resourceKind: "assessment", payload: null, input: {}, createdAt: "2026-10-08T00:00:00Z" });
+  state.systems!.systems = [{ ref: { businessId: state.workspaceId, systemId: SYSTEM }, name: "External reference", kind: "website", lifecycle: "draft", basis: "Unverified source", savedWorkId: null, tenantId: null, connectedSite: { siteUrl: "https://example.org/", siteHost: "example.org", verified: false, lastEventAt: null }, health: { status: "unknown", summary: "Control is unverified", lastVerifiedAt: null } }];
+  state.systems!.possibilities = [{ id: "new-native", title: "Private native copy", summary: "The source remains unchanged.", status: "exploring", affects: [], sourceSystemIds: [SYSTEM], introduces: ["Native website"], evidence: "HTML source only", previewHref: null, workId: "prepared-copy", stored: true }];
+  const projection = readBusinessSystems({ snapshot: state, sites: [] });
+  expect(projection.systems[0]!.possibilities[0]).toMatchObject({ id: "new-native", affects: [], introduces: ["Native website"] });
+  expect(projection.systems[0]!.health.summary).toBe("Control is unverified");
+  expect(projection.systems[0]!.surface).toMatchObject({ liveUrl: "https://example.org/" });
+});

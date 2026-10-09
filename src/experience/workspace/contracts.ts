@@ -324,6 +324,10 @@ export interface WorkspaceSystemConnection {
 }
 
 export interface WorkspaceSystemPossibility {
+  /** Read-only source lineage; these Systems are not mutation targets. */
+  sourceSystemIds?: string[];
+  /** Names of separate native Systems this candidate introduces. */
+  introduces?: string[];
   id: string;
   title: string;
   summary: string;

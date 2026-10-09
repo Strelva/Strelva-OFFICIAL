@@ -6,11 +6,14 @@ import type { ListedPossibility, SupabasePossibilityRepository } from "@/platfor
 import { createInMemoryLiveSystems } from "@/platform/make-real";
 import type { Activation } from "@/platform/make-real/contracts";
 import type { SystemListing } from "@/platform/systems/from-existing";
-import type { WebsiteRebuildCandidate } from "@/products/websites/index";
+import { siteDocumentSchema, siteDocumentHash, type WebsiteRebuildRecord, type WebsiteRebuildCandidate } from "@/products/websites/index";
 import {
   activationViews,
   makeRealReceipts,
   rebuildPossibilityInput,
+  publicSourceRebuildInput,
+  syncPublicSourceRebuildPossibilities,
+  syncAskPageSetPossibilities,
   rebuildSourceRef,
   revisionHistory,
   storedPossibilityViews,
@@ -173,5 +176,82 @@ describe("Make real on Home and the System page", () => {
     ]);
     expect(rows.map((r) => r.sentence)).toEqual(["Made live: the rebuilt attymooney.com", "Website content changed", "Strelva started running it"]);
     expect(rows.every((r) => !/version/i.test(r.sentence))).toBe(true);
+  });
+});
+
+
+function publicFixture() {
+  const base = fixture();
+  const document = siteDocumentSchema.parse({ version: 2, siteName: "Private copy", theme: { palette: "light", typeScale: "standard" }, pages: [{ path: "/", title: "Private copy", description: "", root: "hero" }], nodes: { hero: { id: "hero", type: "Hero", variant: "statement", props: { title: "Private copy" }, children: [], factIds: [] } }, facts: {}, assets: {}, redirects: [], provenance: { composer: "rules" } });
+  const source: SystemListing = { ...base.target.site, system: { ...base.target.site.system, lifecycle: "draft" }, references: { savedWorkId: null, tenantStableId: null, tenantId: null, connectedSiteId: randomUUID() }, connectedSite: { siteUrl: "https://attymooney.com/", siteHost: "attymooney.com", verified: false, lastEventAt: null } };
+  const choice = candidate({ tenantId: null, candidateContentHash: siteDocumentHash(document) });
+  const record: WebsiteRebuildRecord = { workId: choice.workId, workspaceId: BIZ, rebuild: { version: 2, revision: 3, title: choice.title, input: { requestId: "public-source-proof", url: "https://attymooney.com/" }, status: "review_ready", stages: [], checkpoint: null, sourceAudit: { categories: [] }, audit: null, pageMapping: [], skippedPaths: [], candidate: { revision: 3, contentHash: choice.candidateContentHash!, document, previewHref: "/api/websites/public/preview" }, approvedCandidateRevision: null, tenantId: null, launch: { receipt: null, readBack: null }, lastError: null, createdBy: ACTOR, createdAt: AT, history: [] } };
+  return { ...base, target: { candidate: choice, source }, record };
+}
+
+describe("public-source native introductions", () => {
+  it("preserves external identity and directs publication only to a new native introduction", () => {
+    const { target, record } = publicFixture();
+    const before = structuredClone(target.source);
+    const input = publicSourceRebuildInput(target, record)!;
+    expect(input.changes).toEqual([]);
+    expect(input.introduces).toEqual([expect.objectContaining({ extractedFrom: [{ businessId: BIZ, systemId: target.source.system.id }] })]);
+    expect(input.effects![0]!.system).toEqual({ introducedKey: "native-website" });
+    expect(input.effects![0]!.request).not.toHaveProperty("tenantId");
+    expect(input.introduces![0]!.candidate.content.publicSourceReference).toMatchObject({ systemId: target.source.system.id, verified: false });
+    expect(target.source).toEqual(before);
+    expect(publicSourceRebuildInput({ ...target, candidate: { ...target.candidate, sourceHost: "another.example" } }, record)).toBeNull();
+    expect(publicSourceRebuildInput(target, { ...record, workspaceId: randomUUID() })).toBeNull();
+    expect(publicSourceRebuildInput({ ...target, source: { ...target.source, system: { ...target.source.system, lifecycle: "paused" } } }, record)).toBeNull();
+    expect(publicSourceRebuildInput(target, { ...record, rebuild: { ...record.rebuild, candidate: { ...record.rebuild.candidate!, contentHash: "0".repeat(64) } } })).toBeNull();
+    expect(publicSourceRebuildInput(target, { ...record, rebuild: { ...record.rebuild, sourceAudit: null } })).toBeNull();
+  });
+
+  it("stores one private Exploring proposal and projects source lineage without mutation targets", async () => {
+    const { target, record } = publicFixture();
+    const repo = memoryRepo();
+    const deps = { repo, businessId: BIZ, targets: [target], stored: [], actorId: ACTOR, at: AT, canWrite: true, read: async () => record };
+    const stored = await syncPublicSourceRebuildPossibilities(deps);
+    expect(stored).toHaveLength(1);
+    expect(stored[0]!.possibility.status).toBe("exploring");
+    const writes = repo.writes;
+    const again = await syncPublicSourceRebuildPossibilities({ ...deps, stored });
+    expect(again.map(row => row.possibility.id)).toEqual(stored.map(row => row.possibility.id));
+    expect(repo.writes).toBe(writes);
+    expect(storedPossibilityViews(stored, [target.candidate])[0]).toMatchObject({ stored: true, affects: [], sourceSystemIds: [target.source.system.id], introduces: [target.candidate.title] });
+  });
+
+  it("does not write on member reads or after current repository access is withdrawn", async () => {
+    const { target, record } = publicFixture();
+    let read = false;
+    const deps = { repo: memoryRepo(), businessId: BIZ, targets: [target], stored: [], actorId: ACTOR, at: AT, canWrite: false, read: async () => { read = true; return record; } };
+    expect(await syncPublicSourceRebuildPossibilities(deps)).toEqual([]);
+    expect(read).toBe(false); expect(deps.repo.writes).toBe(0);
+    expect(await syncPublicSourceRebuildPossibilities({ ...deps, repo: memoryRepo({ deny: true }), canWrite: true })).toEqual([]);
+  });
+
+  it("requires exact owner approval before a public-source proposal becomes Ready", async () => {
+    const { target, record, live } = publicFixture();
+    const repo = memoryRepo();
+    const stored = await syncPublicSourceRebuildPossibilities({ repo, businessId: BIZ, targets: [target], stored: [], actorId: ACTOR, at: AT, canWrite: true, read: async () => record });
+    const deps = { repo, live: live.port, stored, actorId: ACTOR, at: AT, canWrite: true, read: async () => record };
+    expect((await syncAskPageSetPossibilities(deps))[0]!.possibility.status).toBe("exploring");
+    expect((await syncAskPageSetPossibilities({ ...deps, read: async () => ({ ...record, rebuild: { ...record.rebuild, status: "approved", approvedCandidateRevision: 2 } }) }))[0]!.possibility.status).toBe("exploring");
+    expect((await syncAskPageSetPossibilities({ ...deps, read: async () => ({ ...record, rebuild: { ...record.rebuild, status: "approved", approvedCandidateRevision: 3 } }) }))[0]!.possibility.status).toBe("ready");
+  });
+
+  it("refreshes changed introduction content while retaining its durable identity", async () => {
+    const { target, record } = publicFixture();
+    const repo = memoryRepo();
+    const deps = { repo, businessId: BIZ, targets: [target], stored: [], actorId: ACTOR, at: AT, canWrite: true, read: async () => record };
+    const stored = await syncPublicSourceRebuildPossibilities(deps);
+    const changedDocument = { ...record.rebuild.candidate!.document, siteName: "Revised private copy" };
+    const hash = siteDocumentHash(changedDocument);
+    const changed = { ...record, rebuild: { ...record.rebuild, candidate: { ...record.rebuild.candidate!, revision: 4, contentHash: hash, document: changedDocument } } };
+    const again = await syncPublicSourceRebuildPossibilities({ ...deps, stored, targets: [{ ...target, candidate: { ...target.candidate, candidateRevision: 4, candidateContentHash: hash } }], read: async () => changed });
+    expect(again[0]!.possibility.id).toBe(stored[0]!.possibility.id);
+    expect(again[0]!.possibility.candidateRevision).toBe(2);
+    expect(again[0]!.possibility.introduces[0]!.candidate.content.document).toMatchObject({ siteName: "Revised private copy" });
+    expect(again[0]!.possibility.status).toBe("exploring");
   });
 });
