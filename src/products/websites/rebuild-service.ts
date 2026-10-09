@@ -8,7 +8,7 @@ import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { websiteDocumentStore, createWebsiteDocumentStore, invalidatePublishedSiteDocument, type OwnerLinkWebsiteSession, type WebsiteDocumentStore, type WebsiteDocumentRevision, type WebsiteAgencyPublishPermission } from "./document-store";
 import { siteDocumentHash, siteDocumentSchema, siteIdSchema, catalogNodeSchema, unresolvedSiteFacts, type SiteDocument } from "./site-document";
-import { extractBusinessFacts, runWebsiteRebuild, isHighRiskWebsiteClaim, type RebuildCheckpoint, type RebuildOptions, type WebsiteRebuildInput } from "./rebuild-pipeline";
+import { extractBusinessFacts, runWebsiteRebuild, WebsiteDescriptionCapacityError, type BusinessFacts, isHighRiskWebsiteClaim, type RebuildCheckpoint, type RebuildOptions, type WebsiteRebuildInput } from "./rebuild-pipeline";
 import { normalizeRebuildUrl } from "./rebuild-crawl";
 import { prepareSitePatch, prepareSiteUndo } from "./site-operations";
 import { checkWebsiteHealth } from "./site-health";
@@ -218,12 +218,19 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     if (!fact) throw new WorkspaceConflictError("This fact is no longer in the current document.");
     const contactLink = fact.kind === "contact" ? rebuildContactLink(fact.text) : null;
     const contactHref = (value: unknown) => contactLink && (value === contactLink.href || value === `${contactLink.href.split(":")[0]}:${fact.text}`);
-    let descriptionFacts = "description" in loaded.rebuild.input ? extractBusinessFacts(loaded.rebuild.input) : null;
-    if (descriptionFacts && "description" in loaded.rebuild.input) {
+    let descriptionFacts: BusinessFacts | null = null;
+    if ("description" in loaded.rebuild.input) {
+      const flat = extractBusinessFacts({ ...loaded.rebuild.input,description:loaded.rebuild.input.description.replace(/\s+/g," ") });
+      try { descriptionFacts = extractBusinessFacts(loaded.rebuild.input); }
+      catch (error) {
+        // This is a previously saved candidate, not admission of a new intake.
+        // A retained flat-layout claim allows its old layout to remain editable.
+        if (!(error instanceof WebsiteDescriptionCapacityError) || !flat.claims.some(id => id !== flat.nameFactId && document.facts[id])) throw error;
+        descriptionFacts = flat;
+      }
       // Existing documents retain their original claim IDs across corrections.
       // An ID unique to the previous flat layout proves that retained layout;
       // use it without rewriting intake or manufacturing new contact evidence.
-      const flat = extractBusinessFacts({ ...loaded.rebuild.input,description:loaded.rebuild.input.description.replace(/\s+/g," ") });
       if (flat.claims.some(id => id !== flat.nameFactId && !descriptionFacts!.claims.includes(id) && document.facts[id])) descriptionFacts = flat;
     }
     const currentDescription = descriptionFacts ? { ...descriptionFacts, facts: document.facts } : null;

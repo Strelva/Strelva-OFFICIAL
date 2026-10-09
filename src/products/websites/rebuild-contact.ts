@@ -61,27 +61,34 @@ export function descriptionContacts(description: string): string[] {
 export function descriptionContactBindings(facts: BusinessFacts): Array<{ claimId: string; contactId: string; start: number; end: number }> {
   if (facts.sourcePages.length) return [];
   const claims = facts.claims.filter(id => id !== facts.nameFactId && facts.facts[id]?.kind === "claim" && facts.facts[id]!.sources.length === 0);
-  const lineByClaim = new Map<string, number>();
-  facts.descriptionClaimLines?.forEach((line,index) => line.forEach(id => {
-    if (!lineByClaim.has(id)) lineByClaim.set(id,index);
-  }));
-  let description = ""; let previousLine: number | undefined;
-  const ranges = claims.map(claimId => {
-    const line = lineByClaim.get(claimId);
-    // Older retained checkpoints have no line metadata and retain their
-    // original chunk order. New intake separates only actual supplied lines.
-    if (description) description += line !== undefined && previousLine !== undefined && line !== previousLine ? "\n" : " ";
-    const start = description.length;
-    description += facts.facts[claimId]!.text;
-    previousLine = line;
-    return { claimId, start, end: description.length };
-  });
+  const active = new Set(claims);
+  // Facts are canonical and deduplicated; their occurrences supply context.
+  // Preserve every supplied line/chunk occurrence before matching its spans.
+  const lines = facts.descriptionClaimLines ?? [claims];
+  let description = "";
+  const ranges: Array<{ claimId:string; start:number; end:number }> = [];
+  for (const line of lines) {
+    const ids = line.filter(id => active.has(id));
+    if (!ids.length) continue;
+    if (description) description += "\n";
+    for (const [index,claimId] of ids.entries()) {
+      if (index) description += " ";
+      const start = description.length;
+      description += facts.facts[claimId]!.text;
+      ranges.push({ claimId,start,end:description.length });
+    }
+  }
   const bindings: Array<{ claimId: string; contactId: string; start: number; end: number }> = [];
   for (const span of descriptionContactSpans(description)) {
     const href = rebuildContactLink(span.text)!.href.toLowerCase();
     const contactId = facts.contact.find(id => facts.facts[id]?.sources.length === 0 && rebuildContactLink(facts.facts[id]!.text)?.href.toLowerCase() === href);
     const range = ranges.find(range => span.start >= range.start && span.end <= range.end);
-    if (contactId && range) bindings.push({ claimId: range.claimId, contactId, start: span.start - range.start, end: span.end - range.start });
+    if (contactId && range) {
+      const binding = { claimId:range.claimId,contactId,start:span.start-range.start,end:span.end-range.start };
+      // A repeated occurrence can reference the same canonical claim span.
+      // Rewrite that span once, while retaining distinct spans/claim IDs.
+      if (!bindings.some(existing => existing.claimId === binding.claimId && existing.contactId === binding.contactId && existing.start === binding.start && existing.end === binding.end)) bindings.push(binding);
+    }
   }
   return bindings;
 }

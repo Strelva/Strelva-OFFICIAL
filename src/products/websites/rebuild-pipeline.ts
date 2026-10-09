@@ -26,6 +26,10 @@ export interface RebuildOptions { checkpoint?: RebuildCheckpoint; fetchPage?: Pa
 export type RebuildWriter = (facts: BusinessFacts, baseline: RebuildContent) => Promise<unknown>;
 export class WebsiteRebuildStageError extends Error { constructor(public readonly stage: RebuildStage, public readonly checkpoint: RebuildCheckpoint, public readonly cause: unknown) { super(cause instanceof Error ? cause.message : "Website rebuild failed. Retry this stage."); this.name = "WebsiteRebuildStageError"; } }
 
+export class WebsiteDescriptionCapacityError extends Error {
+  constructor() { super("Your description has too many separate details. Combine shorter lines and build a new preview; no contact details were dropped."); this.name = "WebsiteDescriptionCapacityError"; }
+}
+
 const clean = (text: string) => text.replace(/\s+/g, " ").trim();
 const factId = (text: string, kind: string) => `fact_${createHash("sha256").update(`${kind}:${text}`).digest("hex").slice(0, 20)}`;
 function chunks(text: string, keepContacts = false): string[] {
@@ -43,8 +47,9 @@ const sourceQuote = (sourceId: string, quote: string): SourceRef => ({ sourceId,
 export function extractBusinessFacts(input: WebsiteRebuildInput, crawl?: CrawlResult): BusinessFacts {
   const result: BusinessFacts = { name: "", nameFactId: "", facts: {}, services: [], people: [], contact: [], hours: [], locations: [], reviews: [], claims: [], brandColors: [], oldPaths: [], sourcePages: [] };
   const insert = (text: string, kind: Fact["kind"], source?: SourceRef, pageFacts?: string[]) => {
-    text = clean(text).slice(0, 300); if (!text || Object.keys(result.facts).length >= 500) return "";
+    text = clean(text).slice(0, 300); if (!text) return "";
     const id = factId(text, kind); const existing = result.facts[id];
+    if (!existing && Object.keys(result.facts).length >= 500) return "";
     if (existing && source && !existing.sources.some((item) => item.sourceId === source.sourceId) && existing.sources.length < 3) existing.sources.push(source);
     else if (!existing) result.facts[id] = { text, kind, highRisk: isHighRiskWebsiteClaim(text), origin: source ? "source" : "owner_stated", sources: source ? [source] : [] };
     if (pageFacts && !pageFacts.includes(id)) pageFacts.push(id);
@@ -52,13 +57,19 @@ export function extractBusinessFacts(input: WebsiteRebuildInput, crawl?: CrawlRe
     if (!list.includes(id)) list.push(id); return id;
   };
   if ("description" in input) {
+    const lines = input.description.split(/\r\n?|\n/).map(line => chunks(line,true));
+    const contacts = descriptionContacts(input.description);
+    const plannedIds = new Set([factId(clean(input.businessName).slice(0,300),"claim"),
+      ...lines.flat().map(text => factId(clean(text).slice(0,300),"claim")),
+      ...contacts.map(text => factId(clean(text).slice(0,300),"contact"))]);
+    if (plannedIds.size > 500) throw new WebsiteDescriptionCapacityError();
     result.name = input.businessName; result.nameFactId = insert(input.businessName, "claim");
     // Whitespace inside a line is presentation; a supplied line boundary is
     // contact-offer context. Keep the claim IDs grouped for later corrections.
-    result.descriptionClaimLines = input.description.split(/\r\n?|\n/)
-      .map(line => chunks(line,true).map(span => insert(span,"claim")).filter(Boolean))
+    result.descriptionClaimLines = lines
+      .map(line => line.map(span => insert(span,"claim")).filter(Boolean))
       .filter(line => line.length > 0);
-    for (const contact of descriptionContacts(input.description)) insert(contact, "contact");
+    for (const contact of contacts) insert(contact, "contact");
     return result;
   }
   if (!crawl?.pages.length) throw new Error("The crawl has no readable pages.");

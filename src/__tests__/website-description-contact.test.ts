@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractBusinessFacts, isHighRiskWebsiteClaim, runWebsiteRebuild } from "@/products/websites/rebuild-pipeline";
+import { extractBusinessFacts, isHighRiskWebsiteClaim, runWebsiteRebuild, websiteRebuildInputSchema } from "@/products/websites/rebuild-pipeline";
 import { renderSiteDocumentHtml } from "@/products/websites/site-export";
 import { descriptionContacts, descriptionContactBindings } from "@/products/websites/rebuild-contact";
 import { siteDocumentSchema } from "@/products/websites/site-document";
@@ -56,6 +56,33 @@ describe("supplied contact details in a new website description", () => {
     const result = await runWebsiteRebuild({ ...input, description });
     expect(result.facts.contact).toEqual([]); expect(descriptionContactBindings(result.facts)).toEqual([]);
     expect(renderSiteDocumentHtml(result.document, "/contact", { preview: true })).not.toMatch(/href="(?:mailto:|tel:)/);
+  });
+  it("refuses a valid-length description that would silently lose supplied contacts at the fact limit", async () => {
+    const description = Array.from({ length:505 },(_,index) => `d${String(index).padStart(3,"0")}`).join("\n") + "\nEmail orders@example.test.";
+    expect(websiteRebuildInputSchema.safeParse({ ...input,description }).success).toBe(true);
+    expect(descriptionContacts(description)).toEqual(["orders@example.test"]);
+    const error = await runWebsiteRebuild({ ...input,description }).then(() => null,error => error as Error);
+    expect(error?.message).toContain("too many separate details");
+  });
+  it("retains canonical repeated occurrences and bindings at the exact fact limit", () => {
+    const description = Array.from({ length:497 },(_,index) => `d${String(index).padStart(3,"0")}`).join("\n") + "\nEmail orders@example.test.\nEmail orders@example.test.";
+    const facts = extractBusinessFacts({ ...input,description });
+    expect(Object.keys(facts.facts)).toHaveLength(500); expect(facts.contact).toHaveLength(1);
+    expect(facts.descriptionClaimLines).toHaveLength(499);
+    expect(facts.descriptionClaimLines!.at(-1)).toEqual(facts.descriptionClaimLines!.at(-2));
+    expect(descriptionContactBindings(facts)).toHaveLength(1);
+    const binding = descriptionContactBindings(facts)[0]!;
+    expect(facts.facts[binding.claimId]!.text).toBe("Email orders@example.test.");
+    expect(facts.facts[binding.contactId]!).toMatchObject({ text:"orders@example.test",origin:"owner_stated",sources:[] });
+  });
+  it("retains repeated line occurrences before deduplicating canonical contact bindings", async () => {
+    const cue = "We bake bread ".repeat(20) + "Email";
+    const description = `${cue}\n${cue} orders@example.test.`;
+    expect(descriptionContacts(description)).toEqual(["orders@example.test"]);
+    const result = await runWebsiteRebuild({ ...input,description });
+    expect(descriptionContactBindings(result.facts)).toHaveLength(1);
+    const binding = descriptionContactBindings(result.facts)[0]!;
+    expect(result.facts.facts[binding.claimId]!.text.slice(binding.start,binding.end)).toBe("orders@example.test");
   });
   it("keeps an ordinary description unchanged when no explicit contact is supplied", async () => {
     const description = "We bake sourdough bread for Saturday pickup.";

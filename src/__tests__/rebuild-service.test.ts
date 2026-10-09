@@ -141,8 +141,32 @@ describe("website rebuild service lifecycle and durable recovery", () => {
     expect(renderSiteDocumentHtml(published.document,"/contact")).toContain(`href="${oldHref}"`);
     expect(h.documents.manage).toHaveBeenLastCalledWith(actor,{ workspaceId, workId: record.workId });
   });
-  it("keeps contact correction coherent for a retained document extracted before line grouping", async () => {
-    const description = "We bake bread\nEmail orders@example.test.";
+  it("reports extraction failure instead of a complete-looking preview when description details exceed capacity", async () => {
+    const description = Array.from({ length:505 },(_,index) => `d${String(index).padStart(3,"0")}`).join("\n") + "\nEmail orders@example.test.";
+    const h = harness(); const record = await h.create({ ...brief,description });
+    expect(record.rebuild.status).toBe("failed"); expect(record.rebuild.candidate).toBeNull();
+    expect(record.rebuild.lastError).toContain("too many separate details");
+    expect(record.rebuild.input).toMatchObject({ description });
+    expect((await h.service.read(actor,record.workId)).rebuild.lastError).toEqual(record.rebuild.lastError);
+  });
+  it.each([false,true])("keeps repeated line/chunk occurrences coherent across contact correction and recomposition (duplicate contact claim: %s)", async repeated => {
+    const cue = "We bake bread ".repeat(20) + "Email";
+    const description = `${cue}\n${cue} orders@example.test.\nEmail orders@example.test.${repeated ? "\nEmail orders@example.test." : ""}`;
+    const h = harness(); let record = await h.create({ ...brief,description });
+    for (const id of unresolvedSiteFacts(record.rebuild.candidate!.document)) record = await h.service.resolveFact(actor,record.workId,id,{ ...selection(record),action:"confirm" });
+    record = await h.launch(record); const published = clone(h.publications.get(record.rebuild.tenantId!)!);
+    const [id] = Object.entries(record.rebuild.candidate!.document.facts).find(([,fact]) => fact.kind === "contact")!;
+    const edited = await h.service.resolveFact(actor,record.workId,id,{ ...selection(record),action:"edit",text:"pickup+local@example.test" });
+    const current = extractBusinessFacts({ ...brief,description }); current.facts = clone(edited.rebuild.candidate!.document.facts);
+    for (const document of [edited.rebuild.candidate!.document,await composeRebuildSite(current,writeSourceContent(current))]) {
+      const html = renderSiteDocumentHtml(document,"/",{ preview:true });
+      expect(html).toContain('href="mailto:pickup+local@example.test"'); expect(html).toContain("pickup+local@example.test."); expect(html).not.toContain("orders@example.test");
+    }
+    expect(edited.rebuild.input).toEqual(record.rebuild.input); expect(edited.rebuild.approvedCandidateRevision).toBeNull();
+    expect(h.publications.get(record.rebuild.tenantId!)!).toEqual(published);
+  });
+  it.each([false,true])("keeps contact correction coherent for a retained document extracted before line grouping (over grouped capacity: %s)", async overCapacity => {
+    const description = overCapacity ? Array.from({ length:505 },(_,index) => `d${String(index).padStart(3,"0")}`).join("\n") + "\nEmail orders@example.test." : "We bake bread\nEmail orders@example.test.";
     const h = harness();
     // Model an already retained pre-fix document; immutable intake still keeps
     // the owner's lines while the old extractor combined its claim chunks.
