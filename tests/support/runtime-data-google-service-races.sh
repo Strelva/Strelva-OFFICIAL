@@ -67,6 +67,7 @@ SQL
   wait "$first_pid" || { cat "$race_dir/first-$case_name.log" >&2;return 1; }
   wait "$second_pid" || { cat "$race_dir/second-$case_name.log" >&2;return 1; }
   rg -q google-admission-denied-after-wait "$race_dir/second-$case_name.log" || { cat "$race_dir/second-$case_name.log" >&2;return 1; }
+  printf 'PASS observed provider admission lock wait then current %s authority refusal.\n' "$case_name"
   if [[ "$case_name" == recipient ]];then
    psql "${psql_args[@]}" -q -c "update public.business_owner_recipient_trust set email='gs-admission-tenant-owner@example.test' where workspace_id='e8211010-0000-4000-8000-000000000010'"
   elif [[ "$case_name" == member ]];then

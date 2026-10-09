@@ -31,6 +31,15 @@ if [[ "${STRELVA_RUNTIME_GENERATION_SQL_PROOF:-0}" == 1 ]]; then
  check_tenant_connection_generation_lifecycle
  printf 'PASS native grant generation, original receipt intent and tenant rename/reuse races.\n'
 fi
+if [[ "${STRELVA_GOOGLE_SERVICE_SQL_PROOF:-0}" == 1 ]]; then
+ psql "${psql_args[@]}" --file="$repo_root/tests/runtime-data-google-service-authority.sql"
+ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261021101000_google_make_real_service_authority.sql"
+ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021101000_google_make_real_service_authority.sql"
+ psql "${psql_args[@]}" --file="$repo_root/tests/runtime-data-google-service-authority.sql"
+ source "$repo_root/tests/support/runtime-data-google-service-races.sh"
+ check_google_service_authority_admission_wait
+ printf 'PASS signed Google service authority, inverse/reapply and observed admission wait revocations.\n'
+fi
 if [[ "${STRELVA_CLEANUP_AGENCY_SQL_PROOF:-0}" == 1 ]]; then
  psql "${psql_args[@]}" --set=keep_fixture=true --file="$repo_root/tests/tenant-cleanup-receipts-schema.sql"
  psql "${psql_args[@]}" --file="$repo_root/tests/tenant-cleanup-blockers-readonly.sql"

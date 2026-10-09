@@ -1730,6 +1730,13 @@
           "rollbackStatus": "Prepared guarded or forward-only inverse; native inverse/reapply and populated refusal qualification pending"
         },
         {
+          "file": "20261021101000_google_make_real_service_authority.sql",
+          "sha256": "5e5c50f53eb1381b462924374f565d379a5b7325de56e3ab6ab790fe323a7d20",
+          "rollback": "rollback-20261021101000_google_make_real_service_authority.sql",
+          "rollbackSha256": "119da9c183c3e27dc3c74f7707e989f55340ff9e41ffbc88cba5e3ef81d952d8",
+          "rollbackStatus": "Service helper removal fails closed and retains history; native inverse/reapply and admission race qualification pending"
+        },
+        {
           "file": "20261021132000_money_effect_admission.sql",
           "sha256": "4591c92190328b18dfa4ef5a6140a1f843b8bf4169dc4d0d1fc635cdacd3b6d3",
           "rollback": "rollback-20261021132000_money_effect_admission.sql",
