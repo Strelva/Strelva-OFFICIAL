@@ -1,5 +1,11 @@
 # Systems Home, the System page, Possibilities and Make real
 
+> **Changed by ADR 0013 / decision 1.** Every receipt names whoever acted. Agency work
+> shows its display name and "Runs on Strelva"; automatic platform effects and
+> reconciliation name Strelva. "Strelva handled" remains the place name, label open
+> (D-label), behind one constant. Past restorable states are History; Versions are
+> adaptations to another context, never past states.
+
 Status: draft spec, 2026-10-06. Not approved. Wave 2 (branch
 `w2/systems-live`, local only, nothing applied or turned on anywhere) built:
 Possibilities in Postgres with the stale rule in the same transaction, the
@@ -171,7 +177,8 @@ progress** has one line: "Making consult booking live: 3 of 4 done".
     sources: the System's revisions (`system_revisions`), its native releases
     (website document revisions, application releases, content versions), and
     Strelva handled receipts for this System. It is newest first. A row reads
-    "Strelva published the rebuilt site · Oct 9 · Restore". Restore uses the
+    "Acme Marketing published the rebuilt site · Oct 9 · Restore", with
+    "Runs on Strelva" credit; a platform publication instead names Strelva. Restore uses the
     native undo path and routes through needs-you behavior 15. It is never
     called "Version".
 14. **Paused says what keeps working.** "Paused. Bookings already made are
@@ -190,7 +197,7 @@ progress** has one line: "Making consult booking live: 3 of 4 done".
     or the rebuild pipeline). An agency can open one on work it was assigned.
     Owners and members ask Strelva to open one. Owners don't build at 1.0.0
     (systems-catalog default).
-17. **Customer states**:
+17. **Owner-visible states**:
     - **Exploring**: being built or checked.
     - **Ready**: rehearsed on the current candidate, every baseline current,
       every extraction conflict resolved. `markReady` already enforces all
@@ -262,9 +269,9 @@ progress** has one line: "Making consult booking live: 3 of 4 done".
 ## 4. States and rules
 
 **Activation status** (`src/platform/make-real/contracts.ts`) and what the
-customer reads:
+owner reads:
 
-| Stored | Customer sees |
+| Stored | Owner sees |
 | --- | --- |
 | `in_progress` | "Making consult booking live: 2 of 4 done" |
 | `needs_attention`, nothing switched, no effect accepted | "Nothing changed yet. Strelva is on it." |
@@ -274,7 +281,7 @@ customer reads:
 
 **Step states**, one line each, using the stored `stepStatus`:
 
-| Stored | Customer line | Meaning |
+| Stored | Owner line | Meaning |
 | --- | --- | --- |
 | `completed` with read-back confirmed | Done | Provider accepted it and Strelva saw it |
 | `completed` with read-back failed | Done, not yet confirmed | Accepted. Never retried (AGENTS.md outside writes); routes as `verify.failed` |
@@ -423,7 +430,7 @@ customer reads:
   | Channel | Wraps | Read-back | Undo |
   | --- | --- | --- | --- |
   | Hosted website | `websiteRebuildService.launch`: `documents.publish`, receipt `strelva-hosted` | `checkWebsiteHealth` | Earlier revision as a new candidate (`undo_needs_review`) |
-  | Tenant content section | `applySectionUpdate`, gated by `decideAiContentGovernance` | Read the section back | Restore the previous content version |
+  | Tenant content section | `applySectionUpdate`, gated by `decideAiContentGovernance` | Read the section back | Restore the previous content state from History |
   | Inquiry form | `executeInquiryPublication`, `inquiry_publication_claims` | Claim `accepted` vs `verification_failed` | Publish the previous config. Received inquiries are kept |
   | Booking page | `publish_public_website_booking_grant` | Read the grant back | `revoke_public_website_booking_grant`. Existing bookings are kept |
   | Internal app | `publishApplication` | Current release | `rollbackApplication` (`rollback_application_release`) |

@@ -18,7 +18,9 @@ Use **Share scorecard** on a retained public AI result. Anyone with that link
 can read it. It currently uses Strelva's brand.
 
 For a private saved agency assessment, select it, open **People & access**, enter
-**Customer email**, and select **Create private handoff**. Use **Copy link**.
+**Client email**, and select **Create private handoff**. Use **Copy link**.
+**Changed by ADR 0013 / decision 3:** "Client email" is the target label;
+the older control may still say "Customer email". Engineering must align it.
 Creating the link does not send email. The recipient must sign in with that
 email to accept their own copy and choose whether your agency keeps read-only
 access. This is not the no-account approval flow.

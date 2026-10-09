@@ -1,5 +1,13 @@
 # The agency surface and Versions
 
+> **Changed by ADR 0013 / decisions 1–2.** Every agency, including Strelva's, uses the
+> same delegated client scope and may be the payer when chosen per business. The privileged
+> admin-versus-partner matrix, super-admin Team, operator-prepared client Possibilities and
+> shared operator Queue below describe older implementation (§3.2/4/6, §4, §6.2, §9.1/4).
+> They need engineering follow-up through the ordinary agency path. In the Strelva-agency
+> example its display name is "Strelva" and agency copy carries "Runs on Strelva"; another
+> agency's display name replaces it. Receipts record whoever acted.
+
 Status: draft spec, 2026-10-06. Not approved. **Built and proven locally
 on branch `build/versions-agency` (Oct 6), applied nowhere:** the Versions
 tables and RPCs (`20261007150000`), `createSupabaseVersionStore` passing the
@@ -65,14 +73,14 @@ follow-up Possibilities bridge passed **7/7 local Playwright cases** at 1280px
 and 390px, including an isolated native application submission, exact prepared
 Make real, and mobile loading/error/read-only/empty/missing-account states;
 screenshots are retained in `.scratch/w6-round5/version-possibilities-*.png`. These
-are fictional local fixtures, not customer/provider operation. Preview query
+are fictional local fixtures, not business/agency operation. Preview query
 `version=full|loading|error|read-only|empty|missing-account` selects the Version
 state; `agency` retains the existing client/Library states. New fixtures send
 nothing and use no provider credentials.
 
 Remaining production/operating proof: apply and verify the Versions, authoring,
 management, owner-grant and native-application migrations with rollback files; convert clients and
-establish Strelva's provider marks under approval; resolve Twin Trees ownership;
+establish Strelva's agency relationship marks under approval; resolve Twin Trees ownership;
 exercise a real owner email approval and read-back/restore on a Strelva-owned
 two-location test business; measure human minutes before/after bulk review.
 No operator-time savings, owner engagement or successful production migration
@@ -139,7 +147,7 @@ No client's data, accounts or contacts ever move to another client.
 - **Requests** and **Running** are how Strelva's agency work is listed in the
   Queue. They are not Versions.
 - Agency website drafts (`src/platform/offerings/agency-website-draft*.ts`)
-  are **Possibilities** prepared by a provider for one client's System. They
+  are **Possibilities** prepared by an agency for one client's System. They
   are not Versions (`docs/product/systems-transition.md`, "Agency website
   drafts are Possibilities, not Versions").
 
@@ -152,7 +160,7 @@ that workspace.
 ### Agency surface
 
 1. **Clients loads every client in one server read.** One request returns,
-   for every customer workspace the actor serves: name, Systems in scope
+   for every client workspace the actor serves: name, Systems in scope
    with lifecycle and health, Needs you count and oldest age, open Requests
    count, last receipt time. The browser makes one call, not one per client.
    With 12 active tenants this is one page. Over 100 clients it paginates on
@@ -236,7 +244,7 @@ These keep the inquiry pattern vocabulary underneath
 
 ### Who can do what on a client's System
 
-| Action | Owner | Member | Strelva (admin member, 1.0.0) | Partner agency (after 1.0.0) |
+| Action | Owner | Member | Strelva (historical admin access) | Agency (historical delegated access) |
 | --- | --- | --- | --- | --- |
 | See Systems | All | All | All | Only delegated/assigned work (7a1ed5a5) |
 | See contacts, inquiries | Yes | Yes | Yes | No |
@@ -245,19 +253,22 @@ These keep the inquiry pattern vocabulary underneath
 | Release a Version to Live | Yes | No | Only under the owner's approval policy | Never alone |
 | Bind an account | Yes | No | Only accounts the business connected | No |
 | Grant lineage access to the source author | Yes | No | No | No |
-| Pause, exit, change provider, billing | Yes | No | No | No |
-| Become owner | n/a | No | Never | Never |
+| Pause, exit, change agency, billing | Yes | No | No | No |
+| Gain owner authority from agency status | n/a | No | No | No |
+| Pay when chosen as payer per business | If business is payer | No | Yes, as agency | Yes, as agency |
 
 Rules that never bend:
 
-- **An agency is never owner.** Conversion makes the operator `admin`, not
-  `owner` (`convert_tenant_to_business`,
-  `supabase/migrations/20261002120000_business_record.sql`). Nothing in this
-  spec changes that.
+- **Agency, owner and payer are separate roles.** An agency may pay for a
+  client when chosen per business. Agency status grants no owner authority;
+  the business retains its data and exit. Strelva's agency has no extra powers.
+  **Changed by ADR 0013 / decision 2:** the admin-based conversion and access
+  described below must be reconciled with the ordinary agency path.
 - **Being the source author grants nothing** on a Version. Strelva adopts on
   Mooney's intake because it is Mooney's admin member, not because it wrote
   the source. A partner agency with no assignment gets `VersionAccessError`.
-- **A provider record grants nothing.** "Operated by Strelva" is shown, but
+- **An agency relationship record grants nothing.** "Operated by {agency display name}"
+  and "Runs on Strelva" are shown, but
   access comes only from membership, delegation or assignment.
 - **Nothing crosses businesses implicitly.** Data, bindings, people and
   grants never copy from source to Version or between Versions.
@@ -365,8 +376,8 @@ days (number open), the Possibility stays unreleased and the Queue shows it.
    `loadAgencyClientSnapshots` and `MAX_AGENCY_CLIENT_LOADS`.
 5. **Who Strelva serves:** `workspace_providers (customer_workspace_id,
    provider_workspace_id, status, started_at, ended_at)`. It records the
-   provider relationship (ADR 0010 agency of record, provider switching).
-   It grants nothing. The client list = provider rows the actor's agency
+   agency relationship (ADR 0010 agency of record, agency switching).
+   It grants nothing. The client list = agency relationship rows the actor's agency
    holds, intersected with real access.
 6. **Improvement Possibility adapter:** turns an adopted improvement into a
    Possibility on the Version's System with Make real = Version release.
@@ -439,7 +450,7 @@ there is nothing live to break. The order:
 | Release lands, read-back fails | "Published; check didn't confirm" kept separate, not retried | Restore previous release (History) |
 | Owner email bounces or is never opened | Queue item "Owner hasn't seen this, 6 days" | Possibility stays unreleased |
 | Bulk review: 5 prepared, 1 fails to prepare | Per-client list: 4 ready, 1 "couldn't prepare: reason" | Each prepared Possibility can be withdrawn |
-| Owner revokes Strelva or switches provider | Strelva's rows disappear for that client; Versions stay the client's | Business keeps everything |
+| Owner revokes Strelva or switches agency | Strelva's rows disappear for that client; Versions stay the client's | Business keeps everything |
 | Source author unshares a source | Existing Versions keep their definition and releases; no new improvements | Re-share |
 
 Undoable: overrides (clear), unreleased adoptions (withdraw the
@@ -472,7 +483,10 @@ already accepted by a provider (per `AGENTS.md`).
 
 ## 9. Open decisions
 
-1. **How Strelva reaches clients.**
+1. **How Strelva reaches clients — changed by ADR 0013 / decision 2.**
+   The ordinary agency path is selected by ADR 0012; the older recommendation
+   below is superseded. Engineering must remove privileged platform-admin
+   client service and prove equivalent agency scope. Historical alternatives:
    - A: admin membership from conversion (today), plus a `workspace_providers`
      row for the list and the "Operated by" mark.
    - B: Strelva goes through the partner path (agency workspace, assignments
@@ -488,15 +502,18 @@ already accepted by a provider (per `AGENTS.md`).
    descend from (what `multiSiteAccountAsVersions` does). B: Camillus is the
    source, Fayetteville its Version. **Recommend A**: neither location is
    subordinate, and adding a third location is the same move.
-4. **Agency Queue vs operator queue.** Reborn §5 wants one operator queue in
+4. **Agency Queue vs operator queue — changed by ADR 0013 / decision 2.**
+   Client service cannot use platform operator authority. Reconcile the
+   shared projection and actions; the older recommendation below is not
+   authority to serve clients from `/admin`. Historical recommendation: Reborn §5 wants one operator queue in
    `/admin`. **Recommend one queue, two views**: the agency Queue reads the
    same source, filtered to the actor's clients. Otherwise it's a seventh queue.
 5. **Owner silence.** How long an improvement waits before the Queue
    escalates, and whether some improvement kinds (security fixes) can be
    covered by a standing owner policy. Needs the Needs you policy spec.
-6. **Partner agencies out of 1.0.0** (working assumption). If they come in:
+6. **Agencies are in 1.0.0** (ADR 0012 supersedes the earlier exclusion):
    ADR 0010 attribution, agency-of-record, and "agency told first" on
-   provider switch need `workspace_providers` plus a ledger. The access
+   agency switch need `workspace_providers` plus a ledger. The access
    rules above already hold for them.
 7. **The word "Versions" on screen** follows decision 4 of the shared brief.
    The panel today says "Versions".
@@ -532,7 +549,7 @@ Found while building (Oct 6, local):
   exists.** The batched read takes candidates from delegations, accepted
   agency assignments and `workspace_providers` (read only if the table is
   present; the response says `providersRead`). Admin membership alone is not
-  treated as a client, so the provider stream's migration is what lists them.
+  treated as a client, so the agency relationship stream's migration is what lists them.
 - **A same-business source is a real System row with `hidden`.** The Systems
   view and the batched read leave it out; it still holds revisions.
 - **The agency (partner) path is enforced in Postgres, not TypeScript.** The
