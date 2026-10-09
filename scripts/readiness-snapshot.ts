@@ -114,6 +114,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261021100700": "google_listing_receipt_payloads",
   "20261022090100": "tenant_deprovision_cleanup",
   "20261022120000": "agency_created_application_predecessors",
+  "20261022123000": "private_definition_function_receipts",
   "20261021110000": "enterprise_units",
   "20261021112000": "home_finder_bindings",
   "20261021112200": "home_finder_configuration_commands",

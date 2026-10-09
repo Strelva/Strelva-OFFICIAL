@@ -520,6 +520,8 @@ psql "${psql_args[@]}" --set=keep_fixture=true --file="$repo_root/tests/tenant-c
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-cleanup-blockers-readonly.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022120000_agency_created_application_authority.sql"
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/agency-created-application-authority-contract.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022123000_private_definition_versions.sql"
+psql "${psql_args[@]}" --file="$repo_root/scripts/sql/private-definition-versions-contract.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/guarded-tenant-teardown-schema.sql"
 
 # #251: final-schema support reads and contact repair require durable actor audit.

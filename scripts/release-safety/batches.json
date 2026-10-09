@@ -1770,6 +1770,13 @@
           "rollback": "rollback-20261022120000_agency_created_application_authority.sql",
           "rollbackSha256": "55ba7d7016a2799a8b52477a0fd5642672c91f863f45705d16ea392d194d59f8",
           "rollbackStatus": "Prepared guarded or forward-only inverse; native inverse/reapply and populated refusal qualification pending"
+        },
+        {
+          "file": "20261022123000_private_definition_versions.sql",
+          "sha256": "e913b3aedfb9bec59757501ea237aa2a49483908f3bee601e9726e39bf86dbdb",
+          "rollback": "rollback-20261022123000_private_definition_versions.sql",
+          "rollbackSha256": "082aebf140e7d604fede2870525facab7b99de8d4fb87a966023334f1ac4b60d",
+          "rollbackStatus": "Owner-issued/migrator-owner baseline preflight refuses unsupported ACL atomically; all13 successor body/ACL guards and exact predecessor ACL restoration; native qualification pending"
         }
       ]
     }

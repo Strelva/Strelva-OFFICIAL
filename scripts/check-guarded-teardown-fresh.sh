@@ -21,6 +21,9 @@ while IFS= read -r migration;do
  if [[ "${STRELVA_GOOGLE_REVIEW_RETENTION_SQL_PROOF:-0}" == 1 && "$(basename "$migration")" == 20261021100900_google_review_content_retention.sql ]]; then
   psql "${psql_args[@]}" --file="$repo_root/tests/google-review-content-retention-upgrade-before.sql"
  fi
+ if [[ "${STRELVA_PRIVATE_DEFINITION_SQL_PROOF:-0}" == 1 && "$(basename "$migration")" == 20261022123000_private_definition_versions.sql ]]; then
+  pg_dump --host="$cluster_socket" --port="$cluster_port" --username="$(id -un)" --dbname=postgres --schema-only --schema=public | python3 -c 'import sys; sys.stdout.writelines(line for line in sys.stdin if not line.startswith((r"\restrict ",r"\unrestrict ")))' > "$cluster_root/private-definition-before.sql"
+ fi
  psql "${psql_args[@]}" --file="$migration" >/dev/null
  if [[ "${STRELVA_GOOGLE_REVIEW_RETENTION_SQL_PROOF:-0}" == 1 && "$(basename "$migration")" == 20261021100900_google_review_content_retention.sql ]]; then
   psql "${psql_args[@]}" --file="$repo_root/tests/google-review-content-retention-upgrade-after.sql"
@@ -69,4 +72,15 @@ PY
  )
  STRELVA_TENANT_CLEANUP_PSQL="$cleanup_connection" pnpm exec vitest run src/__tests__/deprovision-concurrent-native.test.ts --maxWorkers=2
  printf 'PASS actual two-worker PostgreSQL and Redis cleanup recovery.\n'
+fi
+
+if [[ "${STRELVA_PRIVATE_DEFINITION_SQL_PROOF:-0}" == 1 ]]; then
+ psql "${psql_args[@]}" --file="$repo_root/scripts/sql/private-definition-versions-contract.sql"
+ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261022123000_private_definition_versions.sql"
+ pg_dump --host="$cluster_socket" --port="$cluster_port" --username="$(id -un)" --dbname=postgres --schema-only --schema=public | python3 -c 'import sys; sys.stdout.writelines(line for line in sys.stdin if not line.startswith((r"\restrict ",r"\unrestrict ")))' > "$cluster_root/private-definition-restored.sql"
+ cmp "$cluster_root/private-definition-before.sql" "$cluster_root/private-definition-restored.sql"
+ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022123000_private_definition_versions.sql"
+ psql "${psql_args[@]}" --file="$repo_root/scripts/sql/private-definition-versions-contract.sql"
+ pnpm exec tsx scripts/generate-database-types.ts --host "$cluster_socket" --port "$cluster_port" --out "$repo_root/.scratch/full-model-completion-2026-10-08/private-definition-database.types.ts"
+ printf 'PASS private definition forward/inverse/reapply, exact public schema ACL equality and READ ONLY contracts.\n'
 fi
