@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
+import { noLoginMakeRealDiscovery } from "./support/no-login-discovery";
 import {
   adminClient, bookingStatus, cleanup, convertTenant, ordinaryConversionAgency, decideByLink, decision, decisions, fixtureTenant, journeyEnvironment,
   makeOperator, oneTapLink, openLink, person, requestBooking, reviewedRebuild, runNeedsYouChase,
@@ -89,16 +90,21 @@ test("an owner without an account approves Make real by email link", async ({ br
   const operator = await person(browser, admin, "j10-email-makereal-operator");
   let tenantId = "";
   let businessId = "";
+  let workId = "";
+  let tenantStableId = "";
+  let chaseStartedAt = "";
+  let chase: Awaited<ReturnType<typeof runNeedsYouChase>> | undefined;
   try {
     await makeOperator(admin, operator);
     const ownerEmail = `local-j10-makereal-never-signs-in-${Date.now()}@example.test`;
     const tenant = await fixtureTenant(admin, { siteName: "Harbor Pilates", ownerEmail, ownerName: "Mara Quinn" });
     tenantId = tenant.tenantId;
+    tenantStableId = tenant.stableId;
     businessId = convertTenant(tenantId, operator.email, await ordinaryConversionAgency(operator));
     expect((await admin.from("users").select("id").eq("email", ownerEmail)).data).toEqual([]);
 
     // Strelva rebuilt the site; the reviewed rebuild is a Ready Possibility.
-    const workId = randomUUID();
+    workId = randomUUID();
     const work = await admin.from("saved_product_work").insert({
       id: workId, workspace_id: businessId, product_id: "websites", resource_kind: "website", title: "Harbor rebuild", created_by: operator.userId,
       payload: reviewedRebuild(workId, tenantId, operator.userId),
@@ -106,7 +112,9 @@ test("an owner without an account approves Make real by email link", async ({ br
     expect(work.error).toBeNull();
 
     // The hourly chase opens the Make real ask as Strelva (system); nobody signed in.
-    expect((await runNeedsYouChase({ request })).failed).toBe(0);
+    chaseStartedAt = new Date().toISOString();
+    chase = await runNeedsYouChase({ request });
+    expect(chase.failed).toBe(0);
     const open = (await decisions(admin, businessId, operator, false)).find((row) => row.sourceLifecycle === "make_real" && row.sourceId.startsWith(`website-rebuild:${workId}@`));
     expect(open?.state).toBe("open");
 
@@ -134,6 +142,18 @@ test("an owner without an account approves Make real by email link", async ({ br
     await expect(replayed.getByRole("heading", { name: "Already handled" })).toBeVisible();
     await replayed.context().close();
   } finally {
+    if (businessId && workId && chaseStartedAt) {
+      try {
+        const native = await noLoginMakeRealDiscovery(admin, { workspaceId: businessId, tenantId, tenantStableId, workId, chaseStartedAt });
+        await testInfo.attach("no-login-make-real-precleanup-discovery", {
+          body: JSON.stringify({ chase, native }), contentType: "application/json",
+        });
+      } catch {
+        await testInfo.attach("no-login-make-real-precleanup-discovery", {
+          body: JSON.stringify({ status: "diagnostic_unavailable" }), contentType: "application/json",
+        });
+      }
+    }
     await cleanup(admin, { tenantIds: tenantId ? [tenantId] : [], workspaceIds: businessId ? [businessId] : [], operatorEmail: operator.email, people: [operator] });
   }
 });

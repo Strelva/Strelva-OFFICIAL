@@ -63,7 +63,14 @@ export interface ChaseSummary {
   /** Deliveries recorded as suppressed: the owner was not told. */
   ownerNotTold: number;
   failed: number;
+  /** Authenticated cron diagnostics, bounded independently of the work processed. No recipient or session secrets. */
+  discovery?: {
+    workspaces: Array<{ workspaceId: string; serviceSession: "admitted" | "unavailable"; sources: SourceDiscovery[] }>;
+    omitted: number;
+  };
 }
+
+interface SourceDiscovery { lifecycle: string; complete: boolean; proposed: number }
 
 const DIGEST_HOUR = 7;
 
@@ -79,11 +86,13 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
   const adapterFor = (lifecycle: string) => deps.adapters.find(adapter => adapter.lifecycle === lifecycle);
 
   /** Open (or keep) an item for every pending ask the adapters can read. */
-  async function sync(ctx: AdapterContext): Promise<{ opened: OwnerDecision[]; complete: boolean }> {
+  async function sync(ctx: AdapterContext): Promise<{ opened: OwnerDecision[]; complete: boolean; sources: SourceDiscovery[] }> {
     const opened: OwnerDecision[] = [];
+    const sources: SourceDiscovery[] = [];
     let complete = true;
     for (const adapter of deps.adapters) {
       const proposal = await adapter.propose(ctx).catch(() => ({ items: [], complete: false }));
+      sources.push({ lifecycle: adapter.lifecycle, complete: proposal.complete, proposed: proposal.items.length });
       complete &&= proposal.complete;
       for (const item of proposal.items) {
         opened.push(ctx.service && deps.store.openAsService
@@ -91,7 +100,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
           : await deps.store.open(ctx.workspaceId, item));
       }
     }
-    return { opened, complete };
+    return { opened, complete, sources };
   }
 
   /**
@@ -429,14 +438,26 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
   async function chase(): Promise<ChaseSummary> {
     const now = deps.now();
     const summary: ChaseSummary = { lapsed: 0, reminded: 0, digests: 0, urgent: 0, ownerNotTold: 0, failed: 0 };
+    const discovery: NonNullable<ChaseSummary["discovery"]> = { workspaces: [], omitted: 0 };
+    summary.discovery = discovery;
     // Open items for converted businesses even when nobody visits Home or
     // signs in: workspace sources are read as Strelva (system).
     const sessions = new Map<string, AdapterContext>();
-    const linked = await deps.store.linkedTenants(null).catch(() => []);
+    const linked = await deps.store.linkedTenants(null).catch(() => { summary.failed += 1; return []; });
     const native = await deps.bookingWorkspaces?.().catch(() => { summary.failed += 1; return []; }) ?? [];
     const pending = await deps.pendingWorkspaces?.().catch(() => { summary.failed += 1; return []; }) ?? [];
     for (const workspaceId of new Set([...linked.map(link => link.workspaceId), ...native, ...pending])) {
-      await sync(await cronContext(workspaceId, sessions)).catch(() => { summary.failed += 1; });
+      const ctx = await cronContext(workspaceId, sessions);
+      try {
+        const result = await sync(ctx);
+        if (!result.complete) summary.failed += 1;
+        if (discovery.workspaces.length < 100) discovery.workspaces.push({
+          workspaceId, serviceSession: ctx.service ? "admitted" : "unavailable", sources: result.sources,
+        });
+        else discovery.omitted += 1;
+      } catch {
+        summary.failed += 1;
+      }
       if (deps.bookingCalendarHealth) {
         const health = await deps.bookingCalendarHealth(workspaceId, { now, appOrigin: deps.appOrigin, sendEmail: deps.sendEmail }).catch(() => ({ digests: 0, ownerNotTold: 0, failed: 1, complete: false }));
         summary.digests += health.digests; summary.ownerNotTold += health.ownerNotTold; summary.failed += health.failed;

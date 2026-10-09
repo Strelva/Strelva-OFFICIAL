@@ -196,6 +196,35 @@ beforeEach(() => {
 });
 
 describe("an owner who never signs in", () => {
+  it("reports an unreadable converted-business list instead of claiming no work", async () => {
+    const { mem, src, svc } = setup(async () => session({ workspaceId: WS }));
+    mem.store.linkedTenants = async () => { throw new Error("linked business read unavailable"); };
+    expect((await svc.chase()).failed).toBe(1);
+    expect(src.reads).toEqual([]);
+    expect(mem.items.size).toBe(0);
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("reports incomplete Make real discovery instead of a successful empty chase", async () => {
+    for (const admitted of [false, true]) {
+      const mem = memoryStore(clock, async () => admitted ? session({ workspaceId: WS }) : null);
+      const readyPlans = vi.fn(async () => { throw new Error("projection unavailable"); });
+      const start = vi.fn();
+      const adapter = makeRealAdapter({ enabled: async () => true, readyPlans, policies: async () => [], start });
+      const svc = createNeedsYouService({ store: mem.store, adapters: [adapter], appOrigin: "https://app.example.test", now: () => clock.now, sendEmail });
+      const result = await svc.chase();
+      expect(result.failed).toBe(1);
+      expect(result.discovery?.workspaces).toContainEqual({
+        workspaceId: WS, serviceSession: admitted ? "admitted" : "unavailable",
+        sources: [{ lifecycle: "make_real", complete: false, proposed: 0 }],
+      });
+      expect(mem.items.size).toBe(0);
+      expect(start).not.toHaveBeenCalled();
+      expect(sendEmail).not.toHaveBeenCalled();
+      expect(readyPlans).toHaveBeenCalledTimes(admitted ? 1 : 0);
+    }
+  });
+
   it("gets one morning email with an item from every workspace source, opened by Strelva (system)", async () => {
     const { mem, src, svc } = setup(async (workspaceId) => session({ workspaceId }));
     const summary = await svc.chase();
