@@ -1,7 +1,9 @@
+import { localSql } from "./support/journeys";
 import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { localEnvironment, signedInContext } from "./support/local-auth";
+import { ordinaryAgencyMaker, ordinaryCustomerBusiness } from "./support/ordinary-agency-maker";
 
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local Supabase Auth and Postgres.");
 test.setTimeout(240_000);
@@ -50,8 +52,8 @@ test("a named agency operator revises one assigned application and returns it fo
   const owner = await signedInContext(browser, admin, "agency-authoring-customer");
   const operator = await signedInContext(browser, admin, "agency-authoring-operator");
   const outsider = await signedInContext(browser, admin, "agency-authoring-outsider");
-  const businessId = randomUUID();
-  const agencyId = randomUUID();
+  let businessId = "";
+  let agencyId = "";
   let appId = "";
   let deliveryId = "";
   let grantId = "";
@@ -62,16 +64,20 @@ test("a named agency operator revises one assigned application and returns it fo
     for (const person of [owner, operator, outsider]) {
       expect((await person.context.request.get("/api/workspace")).status()).toBe(200);
     }
-    expect((await admin.from("workspaces").insert([
-      { id: businessId, kind: "customer", name: "Agency authoring customer", created_by: owner.userId },
-      { id: agencyId, kind: "agency", name: "Agency authoring studio", created_by: operator.userId },
-    ])).error).toBeNull();
-    expect((await admin.from("workspace_memberships").insert([
-      { workspace_id: businessId, user_id: owner.userId, role: "owner", created_by: owner.userId },
-      { workspace_id: agencyId, user_id: operator.userId, role: "owner", created_by: operator.userId },
-    ])).error).toBeNull();
+    businessId = await ordinaryCustomerBusiness(owner, "Agency authoring customer");
+    const selectedAgency = await ordinaryAgencyMaker(browser, admin, owner, businessId, operator);
+    agencyId = selectedAgency.agencyId;
+    // Ordinary HTTP agency creation, owner-selected provider and current staffing;
+    // no customer membership overlay or hand-written provider seats.
 
-    let app = await post(owner.context.request, "/api/bounded-work", {
+
+    const refused = await post(owner.context.request, "/api/bounded-work", {
+      action: "create", productId: "applications", workspaceId: businessId,
+      input: { title: "Customer cannot build", fields: [{ id: "request", label: "Request", type: "text", required: true }],
+        components: [{ kind: "form", fields: ["request"] }] },
+    }, 403);
+    expect(refused.code).toBe("make_systems_required");
+    let app = await post(operator.context.request, "/api/bounded-work", {
       action: "create",
       productId: "applications",
       workspaceId: businessId,
@@ -82,7 +88,34 @@ test("a named agency operator revises one assigned application and returns it fo
       },
     }, 201) as unknown as ApplicationResponse;
     appId = app.id;
-    app = await post(owner.context.request, "/api/bounded-work", {
+    const readOnly = localSql<{ allowed: boolean; ids: string[] }>(`begin read only;
+      select jsonb_build_object('allowed',public.agency_can_author_created_application(:'v1'::uuid,:'v2'::uuid,:'v3',:'v4'::uuid),
+      'ids',public.agency_created_application_work_ids(:'v1'::uuid,:'v2'::uuid,:'v3')); rollback;`, businessId, operator.userId, operator.email, appId);
+    expect(readOnly?.allowed).toBe(true);
+    expect(readOnly?.ids).toContain(appId);
+    await getJson(operator.context.request, `/api/bounded-work?productId=applications&workId=${appId}`);
+    await getJson(outsider.context.request, `/api/bounded-work?productId=applications&workId=${appId}`, 403);
+    const foreignBusiness = await ordinaryCustomerBusiness(outsider, "Unrelated private customer business");
+    const foreignWork = await post(outsider.context.request, "/api/documents", { action: "create", workspaceId: foreignBusiness,
+      input: { title: "Foreign private record", text: "The selected creator must not read another business's work" } });
+    const crossBusiness = await operator.context.request.get(`/api/bounded-work?productId=applications&workId=${String(foreignWork.workId)}`);
+    expect(crossBusiness.status()).toBe(403);
+    expect(await crossBusiness.text()).not.toContain("Foreign private record");
+    await post(operator.context.request, "/api/bounded-work", {
+      action: "command", productId: "applications", workId: appId,
+      command: { kind: "publish", expectedCandidateRevision: app.payload.designRevision, expectedReleaseVersion: null },
+    }, 403);
+    async function staff(active: boolean) {
+      const result = await admin.rpc("bulk_set_agency_client_staff", { p_user_id: operator.userId, p_verified_email: operator.email,
+        p_agency_workspace_id: agencyId, p_staff_user_ids: [operator.userId], p_workspace_ids: [businessId], p_active: active });
+      expect(result.error).toBeNull();
+    }
+    await staff(false);
+    await getJson(operator.context.request, `/api/bounded-work?productId=applications&workId=${appId}`, 403);
+    await post(operator.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: appId,
+      command: { kind: "rehearse", expectedRevision: app.payload.revision } }, 403);
+    await staff(true);
+    app = await post(operator.context.request, "/api/bounded-work", {
       action: "command", productId: "applications", workId: appId,
       command: { kind: "rehearse", expectedRevision: app.payload.revision },
     }) as unknown as ApplicationResponse;
@@ -90,6 +123,24 @@ test("a named agency operator revises one assigned application and returns it fo
       action: "command", productId: "applications", workId: appId,
       command: { kind: "publish", expectedCandidateRevision: app.payload.designRevision, expectedReleaseVersion: app.payload.release?.version ?? null },
     }) as unknown as ApplicationResponse;
+
+    const privateRecord = "Customer record stays private after first publication";
+    app = await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: appId,
+      command: { kind: "submit", expectedReleaseVersion: app.payload.release?.version, expectedRecordsRevision: 0,
+        record: { id: "customer-existing-record", values: { request: privateRecord } } } }) as unknown as ApplicationResponse;
+    const creatorAfterPublication = await operator.context.request.get(`/api/bounded-work?productId=applications&workId=${appId}`);
+    expect(creatorAfterPublication.status()).toBe(403);
+    expect(await creatorAfterPublication.text()).not.toContain(privateRecord);
+    const publishedReadOnly = localSql<{ allowed: boolean; ids: string[] }>(`begin read only;
+      select jsonb_build_object('allowed',public.agency_can_author_created_application(:'v1'::uuid,:'v2'::uuid,:'v3',:'v4'::uuid),
+      'ids',public.agency_created_application_work_ids(:'v1'::uuid,:'v2'::uuid,:'v3')); rollback;`, businessId, operator.userId, operator.email, appId);
+    expect(publishedReadOnly?.allowed).toBe(false);
+    expect(publishedReadOnly?.ids).not.toContain(appId);
+    const beforeRecordWrite = await getJson(owner.context.request, `/api/bounded-work?productId=applications&workId=${appId}`);
+    await post(operator.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: appId,
+      command: { kind: "submit", expectedReleaseVersion: app.payload.release?.version, expectedRecordsRevision: 1,
+        record: { id: "agency-cannot-submit", values: { request: "Denied customer record mutation" } } } }, 403);
+    expect(await getJson(owner.context.request, `/api/bounded-work?productId=applications&workId=${appId}`)).toEqual(beforeRecordWrite);
 
     const responsibility = await post(owner.context.request, "/api/operations", {
       action: "create",

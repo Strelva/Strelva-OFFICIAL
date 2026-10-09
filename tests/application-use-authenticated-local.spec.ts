@@ -1,3 +1,4 @@
+import { grantOrdinaryAgencyAppDraft } from "./support/ordinary-agency-app-draft";
 import { createClient } from "@supabase/supabase-js";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { localEnvironment, signedInContext } from "./support/local-auth";
@@ -68,7 +69,8 @@ test("a verified staff recipient uses one released version while a candidate cha
       },
     }, 201);
     app = await applicationCommand(maker.context.request, app.id, { kind: "rehearse", expectedRevision: app.payload.revision });
-    app = await applicationCommand(maker.context.request, app.id, { kind: "install", expectedRevision: app.payload.revision });
+    app = await applicationCommand(owner.context.request, app.id, { kind: "install", expectedRevision: app.payload.revision });
+    await grantOrdinaryAgencyAppDraft(owner, maker, workspaceId, app);
 
     // Issue and copy the stable link from the owner application surface. The
     // recipient never receives a workspace membership or an owner dashboard.
@@ -123,7 +125,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     // Add the next fields and view through the owner editor. The live app
     // remains unchanged until the separate review and Publish action below.
     const makerEditPage = await maker.context.newPage();
-    await makerEditPage.goto(`/workspace?workspaceId=${workspaceId}&work=${app.id}`);
+    await makerEditPage.goto(`/agency-applications/${app.id}`);
     await makerEditPage.getByRole("tab", { name: "Edit", exact: true }).click();
     await makerEditPage.getByText("Edit proposed app", { exact: true }).click();
     await makerEditPage.getByRole("button", { name: "Add field", exact: true }).click();
@@ -181,7 +183,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     // Review and publish through the owner application surface. The exact
     // review remains beside the live app, and the staff link stays on v1 until
     // the owner publishes this checked proposal.
-    const makerReviewPage = await maker.context.newPage();
+    const makerReviewPage = await owner.context.newPage();
     await makerReviewPage.goto(`/workspace?workspaceId=${workspaceId}&work=${app.id}`);
     await makerReviewPage.getByRole("tab", { name: "Edit", exact: true }).click();
     const review = makerReviewPage.locator("details").filter({ hasText: "Review changes" });
@@ -265,7 +267,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     // remains in the canonical records table and is visible under v1 again.
     const current = await owner.context.request.get(`/api/bounded-work?productId=applications&workId=${app.id}`);
     const currentPayload = await current.json();
-    app = await applicationCommand(maker.context.request, app.id, {
+    app = await applicationCommand(owner.context.request, app.id, {
       kind: "rollback_release",
       expectedDesignRevision: currentPayload.payload.candidate.designRevision,
       expectedReleaseVersion: currentPayload.payload.release.version,
@@ -332,7 +334,8 @@ test("a verified recipient edits a date record through a stale correction and re
       },
     }, 201);
     app = await applicationCommand(maker.context.request, app.id, { kind: "rehearse", expectedRevision: app.payload.revision });
-    app = await applicationCommand(maker.context.request, app.id, { kind: "install", expectedRevision: app.payload.revision });
+    app = await applicationCommand(owner.context.request, app.id, { kind: "install", expectedRevision: app.payload.revision });
+    await grantOrdinaryAgencyAppDraft(owner, maker, workspaceId, app);
 
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     await post(owner.context.request, `/api/apps/${app.id}/access`, {
@@ -465,22 +468,28 @@ test("ordinary agency template becomes a private native app, then a live app wit
     const review = page.locator("details").filter({ has: page.locator("summary").filter({ hasText: /^Review changes$/ }) });
     if (!await review.evaluate(element => (element as HTMLDetailsElement).open)) await review.locator("summary").click();
     await review.getByRole("button", { name: "Check proposed change", exact: true }).click();
-    await expect(review.getByRole("button", { name: "Publish", exact: true })).toBeEnabled();
-    await review.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(page.getByText(/Version 1 is live\./).first()).toBeVisible();
-    await page.getByRole("tab", { name: "Use", exact: true }).click();
-    const use = page.getByRole("tabpanel", { name: "Use", exact: true });
+    await expect(review.getByRole("button", { name: "Publish", exact: true })).toHaveCount(0);
+    const customerPage = await owner.context.newPage();
+    await customerPage.goto(`/workspace?workspaceId=${workspaceId}&work=${app.id}`);
+    await customerPage.getByRole("tab", { name: "Edit", exact: true }).click();
+    const customerReview = customerPage.locator("details").filter({ has: customerPage.locator("summary").filter({ hasText: /^Review changes$/ }) });
+    if (!await customerReview.evaluate(element => (element as HTMLDetailsElement).open)) await customerReview.locator("summary").click();
+    await expect(customerReview.getByRole("button", { name: "Publish", exact: true })).toBeEnabled();
+    await customerReview.getByRole("button", { name: "Publish", exact: true }).click();
+    await expect(customerPage.getByText(/Version 1 is live\./).first()).toBeVisible();
+    await customerPage.getByRole("tab", { name: "Use", exact: true }).click();
+    const use = customerPage.getByRole("tabpanel", { name: "Use", exact: true });
     await expect(use.getByText("This stays in preview", { exact: true })).toHaveCount(0);
-    await page.getByRole("tab", { name: "Sharing", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Give someone a link", exact: true })).toBeVisible();
+    await customerPage.getByRole("tab", { name: "Sharing", exact: true }).click();
+    await expect(customerPage.getByRole("heading", { name: "Give someone a link", exact: true })).toBeVisible();
     // No grant is created by choosing a template, previewing it, or publishing it.
     const links = await owner.context.request.get(`/api/apps/${app.id}/access`);
     expect(links.status(), await links.text()).toBe(200);
     expect((await links.json()).grants).toHaveLength(0);
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.reload();
-    await expect(page.getByRole("tab", { name: "Use", exact: true })).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.screenshot({ path: info.outputPath("agency-built-live-app-mobile.png"), fullPage: true });
+    await customerPage.setViewportSize({ width: 390, height: 844 });
+    await customerPage.reload();
+    await expect(customerPage.getByRole("tab", { name: "Use", exact: true })).toBeVisible();
+    expect(await customerPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await customerPage.screenshot({ path: info.outputPath("agency-built-live-app-mobile.png"), fullPage: true });
   } finally { await maker?.context.close(); await owner.context.close(); }
 });

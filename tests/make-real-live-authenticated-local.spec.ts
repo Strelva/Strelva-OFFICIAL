@@ -1,3 +1,5 @@
+import { grantOrdinaryAgencyAppDraft } from "./support/ordinary-agency-app-draft";
+import { ordinaryAgencyMaker, type CustomerPerson } from "./support/ordinary-agency-maker";
 import { randomUUID } from "node:crypto";
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { applicationSchema } from "@/products/applications/contracts";
@@ -42,6 +44,7 @@ test("a real owner reviews and makes native inquiry/app changes live, proves rec
   const admin = adminClient();
   let setup: Awaited<ReturnType<typeof convertedBusinessWithOwner>> | null = null;
   let member: Person | null = null;
+  let maker: (CustomerPerson & { agencyId: string }) | null = null;
   try {
     setup = await convertedBusinessWithOwner(browser, admin, "live-makereal");
     const { owner, operator, businessId, tenantId } = setup;
@@ -98,7 +101,10 @@ test("a real owner reviews and makes native inquiry/app changes live, proves rec
       return response.json();
     }
     async function appCommand(workId: string, command: unknown) {
-      return post(owner.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId, command });
+      const candidateCommand = typeof command === "object" && command !== null && "kind" in command
+        && ["revise", "rehearse"].includes(String(command.kind));
+      return post(candidateCommand && maker ? maker.context.request : owner.context.request,
+        "/api/bounded-work", { action: "command", productId: "applications", workId, command });
     }
     async function readInquiry(): Promise<InquirySurfaceResult> {
       const response = await owner.context.request.get(`/api/inquiry-workspace?tenantId=${tenantId}`);
@@ -118,11 +124,16 @@ test("a real owner reviews and makes native inquiry/app changes live, proves rec
 
     // Prepare two genuine native versions. The first versions are actually
     // published through their ordinary authenticated product paths.
-    let app = await post(owner.context.request, "/api/bounded-work", { action: "create", productId: "applications", workspaceId: businessId,
+    const refused = await post(owner.context.request, "/api/bounded-work", { action: "create", productId: "applications", workspaceId: businessId,
+      input: { title: "Owner cannot make tools", fields: [{ id: "problem", label: "Problem", type: "text", required: true }], components: [{ kind: "form", fields: ["problem"] }] } }, 403);
+    expect(refused.code).toBe("make_systems_required");
+    maker = await ordinaryAgencyMaker(browser, admin, owner, businessId);
+    let app = await post(maker.context.request, "/api/bounded-work", { action: "create", productId: "applications", workspaceId: businessId,
       input: { title: "Native service requests", fields: [{ id: "problem", label: "Problem", type: "text", required: true }],
         components: [{ kind: "form", fields: ["problem"] }, { kind: "list", fields: ["problem"] }] } }, 201);
     app = await appCommand(app.id, { kind: "rehearse", expectedRevision: app.payload.revision });
     app = await appCommand(app.id, { kind: "install", expectedRevision: app.payload.revision });
+    await grantOrdinaryAgencyAppDraft(owner, maker, businessId, app);
     expect(applicationSchema.parse(app.payload).release?.version).toBe(1);
     app = await appCommand(app.id, { kind: "submit", expectedReleaseVersion: 1, expectedRecordsRevision: 0,
       record: { id: "native-existing-record", values: { problem: "Keep this local customer record through publication and rollback" } } });
@@ -271,7 +282,7 @@ test("a real owner reviews and makes native inquiry/app changes live, proves rec
       await testInfo.attach("booking-pending-public-channel", { body: JSON.stringify(partial, null, 2), contentType: "application/json" });
     });
   } finally {
-    if (setup) await cleanup(admin, { tenantIds: [setup.tenantId], workspaceIds: [setup.businessId], operatorEmail: setup.operator.email,
-      people: [setup.operator, setup.owner, ...(member ? [member] : [])] });
+    if (setup) await cleanup(admin, { tenantIds: [setup.tenantId], workspaceIds: [setup.businessId, ...(maker ? [maker.agencyId] : [])], operatorEmail: setup.operator.email,
+      people: [setup.operator, setup.owner, ...(member ? [member] : []), ...(maker ? [maker] : [])] });
   }
 });

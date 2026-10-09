@@ -14,11 +14,11 @@ export async function ordinaryCustomerBusiness(owner: CustomerPerson, name: stri
 /** Genuine separate agency creator. No customer role overlay, super-admin or
  * raw SQL seats. OFF Team HTTP stays unavailable; actual private owner/team
  * commands prepare its native authority, not an OFF onboarding-UI claim. */
-export async function ordinaryAgencyMaker(browser: Browser, admin: SupabaseClient, owner: CustomerPerson, workspaceId: string) {
+export async function ordinaryAgencyMaker(browser: Browser, admin: SupabaseClient, owner: CustomerPerson, workspaceId: string, existingMaker?: CustomerPerson) {
   const before = await admin.rpc("workspace_make_systems_authority", { p_workspace_id: workspaceId, p_user_id: owner.userId });
   expect(before.error).toBeNull();
   expect(before.data).toBe("member");
-  const maker = await neutralSignUp(browser, "native-agency-maker");
+  const maker = existingMaker ?? await neutralSignUp(browser, "native-agency-maker");
   try {
     const created = await maker.context.request.post("/api/workspace", { headers: { origin: localEnvironment().app },
       data: { action: "create_agency", name: "Ordinary native-tool agency" } });

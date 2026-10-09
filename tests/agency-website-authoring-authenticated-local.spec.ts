@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { expect, test, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
 import { localEnvironment, signedInContext } from "./support/local-auth";
+import { ordinaryAgencyMaker, ordinaryCustomerBusiness } from "./support/ordinary-agency-maker";
 
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local Supabase Auth and Postgres.");
 test.setTimeout(240_000);
@@ -75,8 +76,8 @@ test("customer grants one managed website draft, agency prepares it, and custome
   const owner = await signedInContext(browser, admin, "agency-website-customer");
   const operator = await signedInContext(browser, admin, "agency-website-operator");
   const outsider = await signedInContext(browser, admin, "agency-website-outsider");
-  const businessId = randomUUID();
-  const agencyId = randomUUID();
+  let businessId = "";
+  let agencyId = "";
   const tenantId = `agency-website-proof-${randomUUID().replaceAll("-", "").slice(0, 16)}`;
   const tenantStableId = randomUUID();
   let bindingId = "";
@@ -95,14 +96,12 @@ test("customer grants one managed website draft, agency prepares it, and custome
     for (const identity of [owner, operator, outsider]) {
       expect((await identity.context.request.get("/api/workspace")).status()).toBe(200);
     }
-    expect((await admin.from("workspaces").insert([
-      { id: businessId, kind: "customer", name: "Website draft customer", created_by: owner.userId },
-      { id: agencyId, kind: "agency", name: "Website draft agency", created_by: operator.userId },
-    ])).error).toBeNull();
-    expect((await admin.from("workspace_memberships").insert([
-      { workspace_id: businessId, user_id: owner.userId, role: "owner", created_by: owner.userId },
-      { workspace_id: agencyId, user_id: operator.userId, role: "owner", created_by: operator.userId },
-    ])).error).toBeNull();
+    businessId = await ordinaryCustomerBusiness(owner, "Website draft customer");
+    const selectedAgency = await ordinaryAgencyMaker(browser, admin, owner, businessId, operator);
+    agencyId = selectedAgency.agencyId;
+    // Ordinary HTTP agency creation, owner-selected provider and current staffing;
+    // no customer membership overlay or hand-written provider seats.
+
     expect((await admin.from("tenants").insert({
       id: tenantId,
       stable_id: tenantStableId,
