@@ -1,10 +1,15 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 const forward=readFileSync("supabase/migrations/20261022170000_creator_maintenance_operations.sql","utf8");
 const inverse=readFileSync("supabase/migrations/rollback-20261022170000_creator_maintenance_operations.sql","utf8");
 const reader="public.read_creator_maintenance_operations(uuid,uuid,text)";
 const writer="public.record_creator_maintenance_from_workspace(uuid,uuid,uuid,uuid,text,text,text,text,timestamptz)";
+const sha256=(value:Buffer|string)=>createHash("sha256").update(value).digest("hex");
 const md5=(value:string)=>createHash("md5").update(value).digest("hex");
 function body(sql:string,name:string){const match=sql.match(new RegExp("create function public\\."+name+"\\(.*?as \\$\\$(.*?)\\$\\$;","s"));if(!match)throw Error("Owned source body unavailable");return match[1]!;}
 function pin(sql:string,signature:string,expectedBody:string){if(!sql.includes(`('${signature}','${md5(expectedBody)}',`))throw Error("Canonical source pin missing or changed");}
@@ -17,4 +22,21 @@ describe("creator maintenance SQL packet source contracts (not native execution)
  it("records canonical fully qualified signature literals rather than search-path-sensitive regprocedure display",()=>{const insert=forward.slice(forward.indexOf("insert into release_rollback_baseline.creator_maintenance_operations_catalog"));expect(insert).toContain("select source.signature");expect(insert).toContain("source.signature::regprocedure");expect(insert).not.toContain("p.oid::regprocedure::text");});
  it("captures owner/body/properties and normalized ACL, keeping original writer/receipts untouched on inverse",()=>{expect(forward).toContain("properties_hash text not null");expect(inverse).toContain("r.properties_hash");expect(inverse).toContain("r.acl_hash");expect(inverse).toContain("from aclexplode(acldefault('r',migrator))");expect(inverse).toContain("creator_maintenance_operations_journal_signatures");expect(inverse).not.toMatch(/(?:delete from|truncate|drop table) public\./i);expect(inverse).not.toMatch(/(?:drop|alter) function public\.record_creator_royalty_maintenance/i);expect(inverse).not.toContain("cascade");});
  it("prepares actual mutation-success barriers and rollback/native retained-history proof without executing them",()=>{const script=readFileSync("scripts/check-creator-maintenance-operations.sh","utf8");for(const contract of ["CM_MUTATION_PREPARED","probe-before","probe-after","history-before","history-after","predecessor.catalog","inverse.catalog","listen_addresses=''","creator-maintenance-operations-schema.sql","journal-column-grant","journal-policy","journal-owner","journal-schema","journal-signature-substitution","successor-body-and-journal","predecessor-inherited-owner","custom-default-function"])expect(script).toContain(contract);expect((script.match(/^probe [a-z]/gm)||[])).toHaveLength(31);});
+ it.each([0,17])("retains private diagnostics and exact raw exit %s before cleanup (pure shell/filesystem, no native SQL)",(raw)=>{
+  const script=readFileSync("scripts/check-creator-maintenance-operations.sh","utf8");const start=script.indexOf("preserve_and_cleanup(){"),end=script.indexOf("trap preserve_and_cleanup EXIT",start);expect(start).toBeGreaterThan(0);expect(end).toBeGreaterThan(start);
+  const fixture=realpathSync(mkdtempSync(join(tmpdir(),"strelva-creator-retention-contract."))),cluster=join(fixture,"cluster"),evidence=join(fixture,"evidence");mkdirSync(cluster,{mode:0o700});mkdirSync(evidence,{mode:0o700});writeFileSync(join(cluster,"fictional-failure.log"),"fictional native diagnostic\n");
+  try {
+   const shell='set -euo pipefail\nsource "$3/scripts/temp-postgres.sh"\ncluster_root="$1";cluster_data="$cluster_root/data";evidence_dir="$2";repo_root="$3"\n'+script.slice(start,end)+'trap preserve_and_cleanup EXIT\nexit "$4"\n';
+   const result=spawnSync("bash",["-c",shell,"retention-contract",cluster,evidence,process.cwd(),String(raw)],{env:{PATH:process.env.PATH,LC_ALL:"C"},encoding:"utf8"});expect(result.status).toBe(raw);expect(result.stderr).toBe("");
+   const receipt=JSON.parse(readFileSync(join(evidence,"receipt.json"),"utf8"));expect(receipt.rawExitCode).toBe(raw);expect(receipt.fullReleaseQualified).toBe(false);expect(receipt.providerEffects).toBe(false);expect(readFileSync(join(evidence,"fictional-failure.log"),"utf8")).toBe("fictional native diagnostic\n");expect(receipt.artifacts["fictional-failure.log"]).toBe(sha256("fictional native diagnostic\n"));for(const [name,hash] of Object.entries(receipt.source))expect(hash).toBe(sha256(readFileSync(name)));expect(receipt.source["scripts/sql/local-supabase-shim.sql"]).toBe(sha256(readFileSync("scripts/sql/local-supabase-shim.sql")));expect(readFileSync(join(evidence,"receipt.sha256"),"utf8")).toBe(sha256(readFileSync(join(evidence,"receipt.json")))+"  receipt.json\n");expect(statSync(evidence).mode&0o777).toBe(0o700);for(const name of ["fictional-failure.log","receipt.json","receipt.sha256"])expect(statSync(join(evidence,name)).mode&0o777).toBe(0o600);expect(existsSync(cluster)).toBe(false);
+  }finally{rmSync(fixture,{recursive:true,force:true});}
+ });
+ it.each(["private canonical", "shared parent", "ancestor symlink", "existing run", "noncanonical path"])("validates exact fresh private evidence path: %s",(kind)=>{
+  const script=readFileSync("scripts/check-creator-maintenance-operations.sh","utf8");const start=script.indexOf("validate_fresh_evidence_directory(){"),end=script.indexOf('evidence_dir="${1:',start);expect(start).toBeGreaterThan(0);expect(end).toBeGreaterThan(start);
+  const fixture=realpathSync(mkdtempSync(join(tmpdir(),"strelva-creator-directory-contract."))),parent=join(fixture,"parent");mkdirSync(parent,{mode:0o700});let evidence=join(parent,"evidence");
+  try {
+   if(kind==="shared parent")chmodSync(parent,0o755);if(kind==="ancestor symlink"){const link=join(fixture,"link");symlinkSync(parent,link,"dir");evidence=join(link,"evidence");}if(kind==="existing run")mkdirSync(evidence,{mode:0o700});if(kind==="noncanonical path")evidence=parent+"/../parent/evidence";
+   const result=spawnSync("bash",["-c",script.slice(start,end)+'validate_fresh_evidence_directory "$1"',"directory-contract",evidence],{env:{PATH:process.env.PATH,LC_ALL:"C"},encoding:"utf8"});expect(result.status).toBe(kind==="private canonical"?0:1);
+  }finally{rmSync(fixture,{recursive:true,force:true});}
+ });
 });
