@@ -1,5 +1,9 @@
 # E03 consumer delta against frozen union
 
+**Post-1.0 deferred:** consumer expansion is paused by Jacob's release convergence
+directive. This patch remains archival and unapplied. The repair is complete;
+consumer application is not a release prerequisite established by this lane.
+
 Source preparation only. The [unapplied patch](./capability-consumer-frozen-77fc4ea.patch)
 and [source/hash manifest](./capability-consumer-frozen-77fc4ea.json) bind six
 existing-file hunks and one proposed new helper. Consumer source comes from frozen
@@ -64,8 +68,9 @@ checks, not typecheck, route conformance, browser or runtime proof of the patch.
 The actual PR625 repair separately passed 74 focused tests, scoped ESLint and
 typecheck. No broad/native/Auth/build/browser/provider run was authorized.
 
-Next: root coordinates an own-branch union base and overlap before applying this
-patch. Reconfirm all before-blobs at that base. Then run focused real
+If explicitly resumed after integration and exact candidate CI are green, root
+first coordinates an own-branch union base and overlap before applying this patch.
+Reconfirm all before-blobs at that base. Then run focused real
 Workspace/Ask/MCP tests for equal projections, absent/rejected supplemental reads,
 foreign workspace/user, revoked authority, current-GET callback fences and unchanged
 public discovery/native admission. Retain optional History/domain failures and

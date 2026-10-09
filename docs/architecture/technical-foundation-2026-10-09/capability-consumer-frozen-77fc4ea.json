@@ -46,5 +46,6 @@
       "afterSha256": "fb313fa3a1b3d83a9cd1cf91331121b086ddbceef82a19b62cfdaad0cabe0a11"
     }
   ],
-  "patchSha256": "0c97355f2f86e5267e7bb20492d1b0657d78c8aa428b5b269b6b8c41d04d9e64"
+  "patchSha256": "0c97355f2f86e5267e7bb20492d1b0657d78c8aa428b5b269b6b8c41d04d9e64",
+  "releaseDisposition": "post_1_0_deferred_unapplied"
 }

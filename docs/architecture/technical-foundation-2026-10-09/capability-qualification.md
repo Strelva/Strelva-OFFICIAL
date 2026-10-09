@@ -4,6 +4,27 @@ Base: canonical `reborn-1.0`, exact `6ddc03f4d0f854997ff3f54481d5066625bf62fe`.
 The earlier `a130` plan is source history. Main/root plans and canonical strategic
 state are read-only. This is prepared implementation, with no release authority.
 
+## Release convergence disposition
+
+Jacob's release directive narrows this lane to the completed validator repair at
+`080ab594a18bb18ec0f7db6fc85f73b8eda39189`, on top of E08/E03 source
+`608ae57cf4daf9f1384cc397bd7a6c92fa738f85`. These exact commits are available for
+parent-owned candidate integration; this branch grants no canonical promotion.
+
+Explicit post-1.0 deferrals: Workspace/Ask/MCP/operator consumer adoption and its
+optional interfaces/UI; owner prerequisite readers and stronger qualification
+receipts; the repository-wide inline-flag ratchet; E04 descriptor/schema work and
+outside-write wiring, which also still needs A07 authority. The frozen consumer
+patch remains unapplied archival preparation. No demonstrated release dependency
+requires its expansion. Reopen only after integration and exact candidate CI are
+green and root explicitly assigns the scope.
+
+The 74 focused tests, typecheck and scoped lint qualified the repair locally
+before the resource holds. They do not satisfy exact frozen candidate CI, fresh
+and upgrade SQL, production migration-ledger reconciliation, preview/nine-client
+proof or the #616 release receipt. Root owns those release outcomes. No competing
+typecheck/broad/native job is active or authorized in this lane.
+
 ## Existing behavior and gap
 
 `src/capability-registry.ts` already adapts six distinct owners and lists each

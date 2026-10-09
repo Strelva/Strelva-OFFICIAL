@@ -1,5 +1,9 @@
 # E03 consumer adoption proposals — source preparation
 
+**Post-1.0 deferred:** Jacob's release convergence directive pauses consumer
+expansion. The historical preparation below grants no application authority.
+See the [lane disposition](./capability-qualification.md#release-convergence-disposition).
+
 Root authorized exact consumer source preparation against frozen union
 `77fc4ea49f61aecc901f92062d8646bd125f21ee` after the PR625 validator repair.
 The [frozen delta handoff](./capability-consumer-frozen-77fc4ea.md) and its patch
