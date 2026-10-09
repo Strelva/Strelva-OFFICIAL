@@ -237,7 +237,7 @@ type InquiryClaim = { id: string; status: string; tenantId: string; businessId: 
 export interface InquiryFormPorts {
   prepareFollowUp?(actor: WorkspaceActor, selection: Record<string, unknown>): Promise<void>;
   queue(input: z.infer<typeof inquiryFormRequestSchema> & { action: "make_live" | "undo"; idempotencyKey: string; actorId: string }): Promise<{ claim: InquiryClaim; acquired: boolean; reason?: string; eventId: string | null }>;
-  execute(input: { tenantId: string; eventId: string; claimId: string }): Promise<{ accepted: boolean; verified: boolean; reason?: string }>;
+  execute(input: { tenantId: string; eventId: string; claimId: string; actorId: string }): Promise<{ accepted: boolean; verified: boolean; reason?: string }>;
   claim(tenantId: string, claimId: string): Promise<InquiryClaim | null>;
 }
 
@@ -253,7 +253,7 @@ export function createInquiryFormAdapter(ports: InquiryFormPorts, ctx: LiveChann
     if (ACCEPTED_CLAIM.has(queued.claim.status)) return { accepted: true, claim: queued.claim };
     if (queued.claim.status === "failed") return { accepted: false, claim: queued.claim, reason: "An earlier attempt with this key was refused." };
     if (!queued.eventId) return { accepted: false, claim: queued.claim, reason: queued.reason ?? "The publication could not be queued." };
-    const result = await ports.execute({ tenantId: req.tenantId, eventId: queued.eventId, claimId: queued.claim.id });
+    const result = await ports.execute({ tenantId: req.tenantId, eventId: queued.eventId, claimId: queued.claim.id, actorId: ctx.actor.userId });
     return { accepted: result.accepted, claim: queued.claim, reason: result.reason };
   }
   return {

@@ -204,11 +204,13 @@ describe("live channel adapters", () => {
     // A replay with the same key finds the accepted claim and executes nothing again.
     await expect(adapter.perform({ businessId: BIZ, effect, idempotencyKey: "mr:form" })).resolves.toMatchObject({ status: "accepted", providerRef: "mooney|claim-1" });
     expect(ports.execute).toHaveBeenCalledTimes(1);
+    expect(ports.execute).toHaveBeenCalledWith({ tenantId: "mooney", eventId: "evt-claim-1", claimId: "claim-1", actorId: OWNER.userId });
     await expect(adapter.find({ businessId: BIZ, idempotencyKey: "mr:form", effect })).resolves.toEqual({ found: true, providerRef: "mooney|claim-1" });
     await expect(adapter.find({ businessId: BIZ, idempotencyKey: "mr:form" })).resolves.toBeNull();
     await expect(adapter.readBack({ businessId: BIZ, providerRef: "mooney|claim-1" })).resolves.toMatchObject({ ok: true });
     await expect(adapter.compensate!({ businessId: BIZ, providerRef: "mooney|claim-1", idempotencyKey: "mr:form:compensate" })).resolves.toMatchObject({ ok: true, detail: expect.stringMatching(/Inquiries already received are kept/) });
-    expect(ports.queue).toHaveBeenLastCalledWith(expect.objectContaining({ action: "undo", idempotencyKey: "mr:form:compensate" }));
+    expect(ports.queue).toHaveBeenLastCalledWith(expect.objectContaining({ action: "undo", idempotencyKey: "mr:form:compensate", actorId: OWNER.userId }));
+    expect(ports.execute).toHaveBeenLastCalledWith({ tenantId: "mooney", eventId: "evt-claim-2", claimId: "claim-2", actorId: OWNER.userId });
   });
 
   it("booking page: publishes the grant, finds it by capability, reads it back, revokes it", async () => {

@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createInquiryFormAdapter } from "@/platform/make-real/live-adapters";
+import type { DeclaredEffect } from "@/platform/possibilities/contracts";
 import { authorizeInquiryPublicationActor } from "@/products/inquiries/publication";
 import type { InquiryRepository, PublicationClaim } from "@/products/inquiries/repository";
 import type { UnifiedEvent } from "@/lib/types";
@@ -13,6 +15,38 @@ function input(actorId: string) {
 }
 afterEach(() => vi.unstubAllEnvs());
 describe("exact current owner publication authority", () => {
+  it("Make Real passes its current execution actor into the exact publication authority check", async () => {
+    const authorized = input(owner);
+    const execute = vi.fn(async (command: { tenantId: string; eventId: string; claimId: string; actorId: string }) => {
+      const permission = await authorizeInquiryPublicationActor({ ...authorized, ...command });
+      return { accepted: permission.allowed, verified: permission.allowed, reason: permission.reason };
+    });
+    const queue = vi.fn(async () => ({ claim, acquired: true, eventId: event.id }));
+    const adapter = createInquiryFormAdapter({ queue, execute, claim: async () => claim },
+      { actor: { userId: owner, verifiedEmail: "owner@example.test" }, enabled: async () => true });
+    const effect: DeclaredEffect = { id: "publish-form", kind: "publish", channel: "inquiry_form",
+      system: { systemId: "f6350000-0000-4000-8000-000000000003" }, description: "Publish the reviewed native form", after: [],
+      request: { tenantId: claim.tenantId, businessId: claim.businessId, requestId: claim.requestId,
+        capabilityId: claim.capabilityId, changeId: claim.changeId, version: claim.version } };
+    expect(await adapter.perform({ businessId: claim.businessId, effect, idempotencyKey: "actor-propagation" })).toMatchObject({ status: "accepted" });
+    expect(execute).toHaveBeenCalledWith({ tenantId: claim.tenantId, eventId: event.id, claimId: claim.id, actorId: owner });
+    expect(authorized.authorizationRpc).toHaveBeenCalledWith("authorize_inquiry_publication_actor", {
+      p_tenant_id: claim.tenantId, p_actor_id: owner, p_claim_id: claim.id, p_event_id: event.id,
+    });
+    // Propagating an actor does not replace the current database authority check.
+    authorized.authorizationRpc.mockResolvedValue(false);
+    expect(await adapter.perform({ businessId: claim.businessId, effect, idempotencyKey: "withdrawn" })).toMatchObject({ status: "rejected", reason: "permission_denied" });
+    execute.mockClear();
+    expect(await adapter.perform({ businessId: claim.businessId,
+      effect: { ...effect, request: { ...effect.request, actorId: "f6350000-0000-4000-8000-000000000099" } },
+      idempotencyKey: "forged-request-actor" })).toMatchObject({ status: "rejected" });
+    expect(execute).not.toHaveBeenCalled();
+  });
+  it("an omitted execution actor remains denied before current authority or publication", async () => {
+    const authorized = input(owner);
+    expect(await authorizeInquiryPublicationActor({ ...authorized, actorId: undefined })).toEqual({ allowed: false, reason: "permission_denied" });
+    expect(authorized.authorizationRpc).not.toHaveBeenCalled();
+  });
   it("requires the claim's direct owner and a current bounded database authorization", async () => {
     const authorized = input(owner);
     expect(await authorizeInquiryPublicationActor(authorized)).toEqual({ allowed: true });

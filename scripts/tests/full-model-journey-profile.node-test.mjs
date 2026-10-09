@@ -134,3 +134,17 @@ test('source pin includes untracked authored files and detects changed or delete
     assert.equal(sourceInventory(root).sourceFiles.find(file => file.file === 'src/implementation.ts').sha256, null);
   } finally { rmSync(root, { recursive: true }); }
 });
+
+test('native inquiry publication admission is explicit while both dark variants and provider preparation stay held', () => {
+  const native = journeyProfile('full-native');
+  assert.equal(native.env.STRELVA_INQUIRIES_RELEASE, '1');
+  assert.ok(releaseSwitches.includes('STRELVA_INQUIRIES_RELEASE'));
+  for (const profile of [journeyProfile('full-dark'), journeyProfile('full-dark', true), journeyProfile('full-provider')])
+    assert.equal(profile.env.STRELVA_INQUIRIES_RELEASE, '0');
+  assert.equal(native.specs.reduce((sum, item) => sum + item.count, 0), 34);
+  assert.equal(native.env.STRELVA_CLIENT_RECORDS_READ.split(',').length, 13);
+  assert.equal(native.providerActions, 'held');
+  for (const suffix of ['GOOGLE_MAKE_REAL_RELEASE', 'BOOKING_CALENDAR_BUSY', 'BOOKING_CALENDAR_MIRROR',
+    'BOOKING_PROVIDER_PROOF', 'NEWSLETTER_SENDER_RELEASE', 'AGENT_PAYMENTS'])
+    assert.equal(native.env[`STRELVA_${suffix}`], '0', suffix);
+});
