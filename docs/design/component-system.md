@@ -71,7 +71,11 @@ while one request is pending. A live acknowledgment also offers that reload;
 the page does not promise automatic progress refresh.
 
 `SystemVersionManagement` removes stale draft controls while reloading after a
-write or uncertain acknowledgment. `SystemVersionImprovements` lets the exact
+write or uncertain acknowledgment. A user-triggered refresh moves keyboard focus
+to its mounted Version draft heading, then the saved result or current permission
+reason when the read completes. Write/read refusal focuses its retained error;
+explicit reload uses the same heading handoff. Initial reads do not take focus.
+`SystemVersionImprovements` lets the exact
 Version's admitted manager prepare a native draft for review, while owner
 authority remains necessary to approve publication. Conflict choices respect
 the same read-only and pending state. These controls use the owned Button and

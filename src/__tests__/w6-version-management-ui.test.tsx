@@ -17,6 +17,75 @@ async function render(request: typeof fetch, readOnly = false) {
 }
 function prepare(node: HTMLElement) { return [...node.querySelectorAll("button")].find(button => button.textContent === "Prepare this draft for release")!; }
 describe("Version draft management acknowledgment", () => {
+  it.each([
+    ["Save local value", "override"], ["Bind account", "bind"], ["Restore into draft", "restore"],
+  ])("recovers focus after %s without keeping the old controls during refresh", async (label, action) => {
+    const connectionId = crypto.randomUUID();
+    const current = { ...view, bindingChoices: [{ kind: "booking_calendar", connectionId, label: "Business calendar" }] };
+    let reads = 0; let finish!: (response: Response) => void;
+    const request = vi.fn<typeof fetch>(async (_input, init) => {
+      if (init?.method === "POST") return Response.json({ outcome: "saved", rowRevision: 4, receipt: null });
+      if (++reads === 1) return Response.json(current);
+      return new Promise<Response>(resolve => { finish = resolve; });
+    });
+    const node = await render(request);
+    const fields = action === "override" ? [node.querySelector<HTMLInputElement>('input')!, "title"] as const
+      : [node.querySelectorAll<HTMLSelectElement>("select")[action === "bind" ? 0 : 1]!, action === "bind" ? connectionId : "1"] as const;
+    const field = fields[0]; field.closest("details")!.open = true;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(field instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype, "value")!.set!.call(field, fields[1]);
+      field.dispatchEvent(new Event(field instanceof HTMLSelectElement ? "change" : "input", { bubbles: true }));
+    });
+    const button = [...node.querySelectorAll("button")].find(button => button.textContent === label)!;
+    button.focus(); await act(async () => button.click());
+    expect(document.activeElement?.textContent).toBe("Version draft"); expect(prepare(node)).toBeUndefined();
+    const post = request.mock.calls.find(([,init]) => init?.method === "POST")![1]!;
+    expect(JSON.parse(String(post.body))).toMatchObject({ workspaceId, systemId, versionId, rowRevision: 3, action });
+    await act(async () => finish(Response.json({ ...current, rowRevision: 4 })));
+    expect(document.activeElement?.textContent).toContain("draft is saved"); expect(prepare(node).disabled).toBe(false);
+  });
+  it("keeps useful keyboard focus while a saved draft refreshes and then reports lost management authority", async () => {
+    let reads = 0; let finish!: (response: Response) => void;
+    const request = vi.fn<typeof fetch>(async (_input, init) => {
+      if (init?.method === "POST") return Response.json({ outcome: "prepared", rowRevision: 3, receipt: null });
+      if (++reads === 1) return Response.json(view);
+      return new Promise<Response>(resolve => { finish = resolve; });
+    });
+    const node = await render(request); const action = prepare(node); action.focus();
+    await act(async () => action.click());
+    expect(prepare(node)).toBeUndefined();
+    expect(document.activeElement?.textContent).toBe("Version draft");
+    await act(async () => finish(Response.json({ ...view, canManage: false })));
+    expect(prepare(node)).toBeUndefined();
+    expect(document.activeElement?.textContent).toContain("An owner or admin can change");
+    expect(node.textContent).toContain("An owner or admin can change");
+  });
+  it("focuses refresh refusal and keeps stale draft controls absent through explicit reload recovery", async () => {
+    let reads = 0; let finish!: (response: Response) => void;
+    const request = vi.fn<typeof fetch>(async (_input, init) => {
+      if (init?.method === "POST") return Response.json({ outcome: "prepared", rowRevision: 3, receipt: null });
+      if (++reads === 1) return Response.json(view);
+      return new Promise<Response>(resolve => { finish = resolve; });
+    });
+    const node = await render(request); prepare(node).focus(); await act(async () => prepare(node).click());
+    await act(async () => finish(Response.json({ error: "Current draft is unavailable" }, { status: 503 })));
+    expect(document.activeElement).toBe(node.querySelector('[role="alert"]')); expect(prepare(node)).toBeUndefined();
+    const reload = [...node.querySelectorAll("button")].find(button => button.textContent === "Reload the draft")!;
+    reload.focus(); await act(async () => reload.click());
+    expect(document.activeElement?.textContent).toBe("Version draft"); expect(prepare(node)).toBeUndefined();
+    await act(async () => finish(Response.json({ ...view, canManage: false })));
+    expect(document.activeElement?.textContent).toContain("An owner or admin can change"); expect(prepare(node)).toBeUndefined();
+  });
+  it("focuses an uncertain write error without restoring or resubmitting stale authority", async () => {
+    const request = vi.fn<typeof fetch>(async (_input, init) => {
+      if (init?.method === "POST") throw new Error("Reply lost. Reload the current draft.");
+      return Response.json(view);
+    });
+    const node = await render(request); prepare(node).focus(); await act(async () => prepare(node).click());
+    expect(document.activeElement).toBe(node.querySelector('[role="alert"]'));
+    expect(prepare(node).disabled).toBe(true); await act(async () => prepare(node).click());
+    expect(request.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
+  });
   it("does not expose a stale draft while recovering from an uncertain write", async () => {
     let reads = 0;
     let finish!: (response: Response) => void;
