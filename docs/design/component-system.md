@@ -1558,3 +1558,24 @@ addition to its existing closed read/static routes; foreign traffic and writes
 still fail. Bounded actual HTTP diagnostics completed the Deck recovery job and
 all four Home recovery phases, with Home's terminal asset-allowlist refusal
 retained. The final combined successor still requires the unchanged full 45 run.
+
+## Source package command recovery, October 9, prepared
+
+SourcePackageControls keeps the owned Button, SelectInput, TextArea and native
+details/summary. Its scope wrapper keys by workspace plus source System, drops
+old content on scope changes, aborts owned requests on unmount and ignores
+superseded reads. A synchronous guard freezes the exact pending qualification,
+review or listing input. Success receipts must identify that source/revision;
+automated and human evidence must belong to the same exact revision.
+
+A lost or malformed response holds new writes. Read current package performs a
+no-store GET only; it never replays a mutable listing or opposite review. An
+exact observed outcome, or a confirmed response followed by a current source
+read, resolves the hold. A structured4xx refusal still requires a successful
+current read before another command. Contradictory or foreign current state stays
+held. Read recovery places focus on the stable disclosure summary; changing the
+scope creates a fresh disclosure. Pending state is component-local, not a durable
+cross-navigation command receipt. Focused DOM tests establish these bounded
+behaviors; actual desktop/390px keyboard and Auth/native qualification remain
+unrun. The existing reviewer designation, policy, server authority and exit stop
+remain separate prerequisites.

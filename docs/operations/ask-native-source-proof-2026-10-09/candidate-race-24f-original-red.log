@@ -1,0 +1,77 @@
+
+ RUN  v4.1.11 /private/tmp/strelva-native-ask-independent-24f7-20261009
+
+(node:32899) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ × src/__tests__/independent-native-ask-candidate-race.test.ts > independent exact candidate post-writer read admission > refuses another candidate returned by revise's separate post-RPC read 15ms
+   → promise resolved "{ …(5) }" instead of rejecting
+ × src/__tests__/independent-native-ask-candidate-race.test.ts > independent exact candidate post-writer read admission > refuses another rehearsed candidate returned by rehearsal's separate post-RPC read 3ms
+   → promise resolved "{ …(5) }" instead of rejecting
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/independent-native-ask-candidate-race.test.ts > independent exact candidate post-writer read admission > refuses another candidate returned by revise's separate post-RPC read
+AssertionError: promise resolved "{ …(5) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "decisionSyncPending": false,
++   "routing": {
++     "decideAt": "/workspace?workspaceId=workspace-a",
++     "itemRef": "3db3db07-3e59-47af-aa42-d2ca7259b481",
++     "route": "owner_decides",
++   },
++   "rowRevision": null,
++   "versionId": null,
++   "workId": "7c2dbf35-84db-4e0e-acec-ae920e937074",
+  }
+
+ ❯ src/__tests__/independent-native-ask-candidate-race.test.ts:54:45
+     52|    return h.service.read(actor,id);
+     53|   });
+     54|   await expect(h.port.prepare(owner,h.input)).rejects.toBeInstanceOf(A…
+       |                                             ^
+     55|   expect(h.deps.rehearse).not.toHaveBeenCalled();
+     56|  });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/__tests__/independent-native-ask-candidate-race.test.ts > independent exact candidate post-writer read admission > refuses another rehearsed candidate returned by rehearsal's separate post-RPC read
+AssertionError: promise resolved "{ …(5) }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "decisionSyncPending": false,
++   "routing": {
++     "decideAt": "/workspace?workspaceId=workspace-a",
++     "itemRef": "2aa7724c-eb58-479d-9795-2f084bf48813",
++     "route": "owner_decides",
++   },
++   "rowRevision": null,
++   "versionId": null,
++   "workId": "281efec0-8f89-4307-b06e-3bfb82b1f447",
+  }
+
+ ❯ src/__tests__/independent-native-ask-candidate-race.test.ts:67:45
+     65|    return h.service.read(actor,id);
+     66|   });
+     67|   await expect(h.port.prepare(owner,h.input)).rejects.toBeInstanceOf(A…
+       |                                             ^
+     68|   expect(h.deps.sync).not.toHaveBeenCalled();
+     69|  });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  11:31:35
+   Duration  2.34s (transform 1.37s, setup 28ms, import 2.23s, tests 19ms, environment 0ms)

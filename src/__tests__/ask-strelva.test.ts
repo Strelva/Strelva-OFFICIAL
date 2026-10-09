@@ -26,7 +26,7 @@ import {
 import { AGENT_TOOL_CATALOG } from "@/lib/capabilities";
 import { createInMemoryPossibilityRepository } from "@/platform/possibilities";
 import { systemOriginId } from "@/platform/systems";
-import type { ExistingSystemsSnapshot } from "@/platform/systems/from-existing";
+import type { ExistingSystemsSnapshot, SystemListing } from "@/platform/systems/from-existing";
 import type { WorkspaceRole } from "@/platform/workspaces/types";
 
 const WS = "11111111-1111-4111-8111-111111111111";
@@ -173,8 +173,8 @@ describe("classifyAsk", () => {
 
 // ── Catalog parity ──────────────────────────────────────────────────────────
 describe("catalog parity", () => {
-  it("has 18 tools, each backed by tenant chat tools that exist", () => {
-    expect(ASK_TOOL_IDS).toHaveLength(18);
+  it("has 19 tools, each backed by tenant chat tools that exist", () => {
+    expect(ASK_TOOL_IDS).toHaveLength(19);
     const chat = Object.entries(AGENT_TOOL_CATALOG).filter(([, surfaces]) => (surfaces as readonly string[]).includes("chat")).map(([name]) => name);
     for (const toolId of ASK_TOOL_IDS) for (const name of ASK_TOOL_CATALOG[toolId].tenant) expect(chat).toContain(name);
   });
@@ -263,6 +263,20 @@ async function run(deps: AskTurnDeps, text: string, extra: Record<string, unknow
 }
 
 describe("startAskTurn", () => {
+  it("resolves the canonical stored app System and reaches the native tool instead of guessing its work-derived id", async () => {
+    const canonicalId = "dddddddd-0000-4000-8000-000000000001";
+    const native = vi.fn(async () => ({ workspaceId: WS, systemId: canonicalId, workId: NATIVE_WORK, designRevision: 0, versionId: null, rowRevision: null }));
+    const h = harness({ managedWebsites: [], script: async function* (tools) { yield { type: "text-delta", text: JSON.stringify(await tools.read_system!.execute({ view: "native_application" })) }; } });
+    const listing: SystemListing = { system: { id: canonicalId, businessId: WS, name: "Requests", purpose: null, kind: "internal_app", lifecycle: "draft", currentRevision: null, origin: { kind: "saved_work", ref: NATIVE_WORK }, changeNumber: 1, createdAt: at, updatedAt: at }, provenance: "stored", basis: null, references: { savedWorkId: NATIVE_WORK, tenantStableId: null, tenantId: null } };
+    h.deps.readSystemListings = async () => [listing];
+    h.deps.nativeSystems = { read: native, prepare: vi.fn() };
+    const result = await run(h.deps, "What fields does this app have?", { systemId: canonicalId });
+    expect(result.refused).toBeNull();
+    expect(native).toHaveBeenCalledWith(actor, { workspaceId: WS, systemId: canonicalId });
+    expect(result.text).toContain(NATIVE_WORK);
+    listing.system.businessId = OTHER_WS;
+    expect((await run(h.deps, "Read this app", { systemId: canonicalId })).refused?.status).toBe(404);
+  });
   let reviewReply: ReturnType<typeof vi.fn<(input: unknown) => Promise<unknown>>>;
   let updateSection: ReturnType<typeof vi.fn<(input: unknown) => Promise<unknown>>>;
   beforeEach(() => {

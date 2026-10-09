@@ -10,7 +10,7 @@ import type { AskRefusalCode } from "./contracts";
  *    website", "redo the site" or "add a booking page" become a Request to
  *    Strelva without any special wording (audit P1 #7).
  *
- * Anything else goes to the model with the 18 tools. Matching is on whole
+ * Anything else goes to the model with the ordinary tools. Matching is on whole
  * phrases, deliberately narrow; a miss falls through to the model, which has
  * no tool that can do any refused thing either.
  */

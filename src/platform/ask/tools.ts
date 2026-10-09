@@ -6,9 +6,11 @@ import { authorizeAskTool, type AskAuthoritySnapshot } from "./authority";
 import { ASK_TOOL_CATALOG, type AskChangeKind, type AskChangeOrigin, type AskToolId, type AskedOnBehalf, type AskResultKind } from "./contracts";
 import type { AskAuthorityReader, AskNeedsYouRouting, AskPossibilityPort, AskRequestPort, NeedsYouPort } from "./ports";
 import { AskPossibilityUnsupportedError, AskPreparedPossibilityError } from "./ports";
+import { askNativeChangeSchema, askNativeIdentitySchema, AskNativePreparationIncompleteError, AskNativeUnsupportedError, type AskNativeSystemPort } from "./native-systems";
+import { WorkspaceMakeSystemsError } from "@/platform/workspaces/types";
 
 /**
- * The 18 Ask Strelva tools (spec section 5, Tool inventory). Each one is a
+ * The Ask Strelva tools (spec section 5, Tool inventory). Each one is a
  * thin, authority-checked front over ONE implementation: the tenant chat
  * tools in src/lib/agent-shared.ts (passed in as `tenantTools`), or a
  * workspace port (Requests, Possibilities, Needs you).
@@ -49,6 +51,7 @@ export interface AskToolsContext {
   requests: AskRequestPort;
   possibilities: AskPossibilityPort;
   workspaceDrafts?: AskWorkspaceDraftPort;
+  nativeSystems?: AskNativeSystemPort;
   onReceipt: (item: AskReceiptItem) => void;
 }
 
@@ -77,6 +80,8 @@ function eventIdsOf(output: Output): string[] {
 
 export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
   let requestCount = 0;
+  let nativeReadRequired = false;
+  let lastNativeRead: z.infer<typeof askNativeIdentitySchema> | null = null;
 
   async function guarded(toolId: AskToolId, run: (snapshot: AskAuthoritySnapshot) => Promise<Output>, scope: "tenant" | "workspace" = "tenant"): Promise<Output> {
     let snapshot: AskAuthoritySnapshot;
@@ -131,9 +136,9 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
 
   const tools: Record<AskToolId, Tool> = {
     read_system: tool({
-      description: "Read the business record, recent/unanswered inquiries and confirmed bookings starting in the next 30 days, with pending/unknown evidence separate, or the website System: its pages and nodes (view site), a legacy section (section), the content outline (content), photos (photos), a preview link (preview), blog/video/product entries (entries), newsletter subscribers (subscribers), or open Possibilities and suggestions (possibilities).",
+      description: "Read the selected native internal app/Version definition and release history (native_application), the business record, recent/unanswered inquiries and confirmed bookings starting in the next 30 days, with pending/unknown evidence separate, or the website System: its pages and nodes (view site), a legacy section (section), the content outline (content), photos (photos), a preview link (preview), blog/video/product entries (entries), newsletter subscribers (subscribers), or open Possibilities and suggestions (possibilities).",
       inputSchema: z.object({
-        view: z.enum(["site", "section", "content", "photos", "preview", "entries", "subscribers", "possibilities", "business_record", "inquiries", "bookings"]),
+        view: z.enum(["site", "section", "content", "photos", "preview", "entries", "subscribers", "possibilities", "business_record", "inquiries", "bookings", "native_application"]),
         section: z.string().max(64).optional(),
         path: z.string().max(512).optional(),
         type: z.enum(["blog", "video", "product"]).optional(),
@@ -141,6 +146,15 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
       }),
       execute: (input) => guarded("read_system", async (snapshot) => {
         switch (input.view) {
+          case "native_application": {
+            if (!ctx.systemId || !ctx.nativeSystems) return refused("not_available", "Choose the native app System before reading its definition.");
+            lastNativeRead = null; nativeReadRequired = true;
+            const result = await ctx.nativeSystems.read(ctx.actor, { workspaceId: ctx.workspaceId, systemId: ctx.systemId });
+            if (result.workspaceId !== ctx.workspaceId || result.systemId !== ctx.systemId) throw new Error("The native read belongs to another System.");
+            lastNativeRead = askNativeIdentitySchema.parse(result);
+            nativeReadRequired = false;
+            return result;
+          }
           case "inquiries": return snapshot.inquiriesEnabled && ctx.workspaceDrafts?.readInquiries ? { inquiries: await ctx.workspaceDrafts.readInquiries(ctx.actor, ctx.workspaceId) } : refused("not_available", "Inquiries aren't enabled for this business.");
           case "bookings": return ctx.workspaceDrafts?.readBookings ? { bookings: await ctx.workspaceDrafts.readBookings(ctx.actor, ctx.workspaceId) } : refused("not_available", "Bookings are unavailable here.");
           case "business_record": return ctx.workspaceDrafts ? ctx.workspaceDrafts.readBusiness(ctx.actor, ctx.workspaceId) : refused("not_available", "The business record is unavailable here.");
@@ -164,7 +178,7 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
             return { possibilities, suggestions: (suggestions as Output).suggestions ?? [] };
           }
         }
-      }, ["business_record", "inquiries", "bookings"].includes(input.view) ? "workspace" : "tenant"),
+      }, ["business_record", "inquiries", "bookings", "native_application"].includes(input.view) ? "workspace" : "tenant"),
     }),
     read_performance: tool({
       description: "Read website traffic: totals and trend (metrics), why traffic changed (traffic), or the weekly report card (report).",
@@ -198,6 +212,35 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
       description: "Read this business's Requests to Strelva and where each stands.",
       inputSchema: z.object({}),
       execute: () => guarded("read_requests", async () => ({ requests: await ctx.requests.list(ctx.actor, ctx.workspaceId), sourceProof: "Source: Requests for this business" })),
+    }),
+    draft_system_change: tool({
+      description: "Draft one existing native app title or field-label change. Read read_system view native_application first and copy its exact workId, designRevision, nullable versionId and rowRevision. Fields/types/records/accounts/maintenance stay unchanged. The native maker or Version management authority is required; accepted/live output stays immutable until its exact Needs you decision. Never retry an uncertain result without a current read. Unsupported runtimes and larger changes become Requests.",
+      inputSchema: askNativeChangeSchema,
+      execute: input => guarded("draft_system_change", async () => {
+        if (!ctx.systemId || !ctx.nativeSystems) return refused("not_available", "Choose a supported native app System first.");
+        if (nativeReadRequired) return refused("current_read_required", "The previous preparation is uncertain. Read this app’s current state before another draft.");
+        if (!lastNativeRead || lastNativeRead.workId !== input.workId || lastNativeRead.designRevision !== input.designRevision || lastNativeRead.versionId !== input.versionId || lastNativeRead.rowRevision !== input.rowRevision) return refused("current_read_required", "Read this exact native app and copy its current identities before drafting a change.");
+        try {
+          lastNativeRead = null;
+          const prepared = await ctx.nativeSystems.prepare(ctx.actor, { workspaceId: ctx.workspaceId, systemId: ctx.systemId, ...input });
+          ctx.onReceipt({ kind: "draft", toolId: "draft_system_change", status: "drafted", ids: [prepared.workId], summary: "Native app change prepared; not live.", needsYou: prepared.routing });
+          return { success: true, agentResultStatus: "queued", ...prepared, needsYou: prepared.routing,
+            nextStep: "Not live. The exact saved change needs approval in Needs you. Nothing was approved or sent from this conversation." };
+        } catch (cause) {
+          if (cause instanceof AskNativeUnsupportedError || cause instanceof WorkspaceMakeSystemsError) {
+            const filed = await ctx.requests.file(ctx.actor, { workspaceId: ctx.workspaceId, systemId: ctx.systemId,
+              words: ctx.lastUserText, outcome: ctx.lastUserText, read: [], askedOnBehalf: ctx.askedOnBehalf,
+              topic: "native_app.unsupported_change", idempotencyKey: `${ctx.turnId}:native-app-request` });
+            ctx.onReceipt({ kind: "request", toolId: "draft_system_change", status: "filed", ids: [filed.id], summary: "Native app work requested at Asked." });
+            return { success: true, requestId: filed.id, agentResultStatus: "queued", nextStep: "Filed at Asked. Scope and timing still need agreement; nothing went live." };
+          }
+          nativeReadRequired = true;
+          const incomplete = cause instanceof AskNativePreparationIncompleteError;
+          ctx.onReceipt({ kind: "draft", toolId: "draft_system_change", status: "failed", ids: incomplete ? [cause.workId] : [], summary: "Native app preparation could not be confirmed; read current state before another change." });
+          return { success: false, agentResultStatus: "failed", currentReadRequired: true,
+            error: cause instanceof Error && cause.message.trim() ? cause.message : "Native app preparation could not be confirmed. Nothing was approved or put live." };
+        }
+      }),
     }),
     draft_website_change: tool({
       description: "Draft a website change. change=section: full new data for a legacy section (read it first). change=patch: RFC6902 ops on a v2 site (read_system view site first; include its revision and hash). change=visibility: show or hide a section. change=reorder: a new section order. Every change is a draft for the owner's yes; nothing goes live from here.",
@@ -388,13 +431,14 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
 /** The status line shown while an Ask tool runs. Says Strelva's words, never "AI". */
 export function askToolLabel(toolId: string): string {
   const labels: Record<string, string> = {
-    read_system: "Reading your site...",
+    read_system: "Reading your System...",
     read_performance: "Checking your traffic...",
     read_history: "Looking at recent changes...",
     read_connections: "Checking connections...",
     read_reviews: "Checking your reviews...",
     read_requests: "Checking your Requests...",
     draft_website_change: "Drafting the change...",
+    draft_system_change: "Preparing the app change...",
     undo_change: "Drafting an undo...",
     add_image: "Adding the image...",
     draft_entry: "Drafting the entry...",

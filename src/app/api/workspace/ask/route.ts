@@ -17,10 +17,12 @@ import {
 } from "@/platform/ask";
 import { loadTenantAskTools, tenantGoogleWriteGranted } from "@/platform/ask/tenant-tools-adapter";
 import { createAskWorkspaceDraftPort } from "./workspace-drafts-server";
+import { createAskNativeSystemPort } from "./native-systems-server";
 import { streamModelText } from "@/platform/infra/model-calls";
 import { createAskPossibilityPort } from "./possibilities-server";
 import { PostgresServiceRequestStore, ServiceRequestService } from "@/platform/service-requests";
 import { readExistingSystemsSnapshot } from "@/platform/systems/from-existing";
+import { createSupabaseSystemStore, listBusinessSystems } from "@/platform/systems";
 import { readWorkspaceExit } from "@/platform/workspace-exit";
 import { listWorkspaces } from "@/platform/workspaces";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
@@ -105,12 +107,14 @@ export async function POST(request: Request) {
         return exit.state?.status === "completed";
       },
       readSystems: (current, workspaceId) => readExistingSystemsSnapshot(current, workspaceId),
+      readSystemListings: async (current, workspaceId) => (await listBusinessSystems(current, workspaceId, { store: createSupabaseSystemStore() })).systems,
       loadTenantTools: loadTenantAskTools,
       googleWriteGranted: tenantGoogleWriteGranted,
       inquiriesEnabled: async (workspaceId) => inquiryReleaseEnabledForWorkspace(workspaceId, await releaseViewerFor(actor)),
       released: (current, workspaceId) => systemsReleasedFor(current, workspaceId),
       needsYou: needsYou.port,
       workspaceDrafts: createAskWorkspaceDraftPort({ sync: (current, workspaceId) => needsYouService().sync({ actor: current, workspaceId }), needsYouStore }),
+      nativeSystems: createAskNativeSystemPort({ sync: (current, workspaceId) => needsYouService().sync({ actor: current, workspaceId }), decisions: needsYouStore }),
       requests,
       possibilities: createAskPossibilityPort(actor, {
         ...(needsYouReleaseEnabled() ? { sync: (current, workspaceId) => needsYouService().sync({ actor: current, workspaceId }) } : {}),

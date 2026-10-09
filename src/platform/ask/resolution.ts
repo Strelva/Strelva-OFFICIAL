@@ -63,8 +63,8 @@ function named(sites: ResolvedSite[], text: string): ResolvedSite | null {
   return hits.length === 1 ? hits[0]! : null;
 }
 
-export function resolveAskTarget(snapshot: Snapshot, input: { systemId?: string | null; text?: string }): AskResolution {
-  const listings = systemsFromExisting(snapshot).systems;
+export function resolveAskTarget(snapshot: Snapshot, input: { systemId?: string | null; text?: string; listings?: readonly SystemListing[] }): AskResolution {
+  const listings = (input.listings ?? systemsFromExisting(snapshot).systems).filter(row => row.system.businessId === snapshot.businessId);
   const sites = linkedSites(snapshot, listings);
   if (input.systemId) {
     const listing = listings.find((item) => item.system.id === input.systemId);

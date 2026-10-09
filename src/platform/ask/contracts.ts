@@ -15,7 +15,7 @@ export type AskResultKind = "answer" | "draft" | "possibility" | "request" | "re
 export type AskAuthority = "read" | "draft";
 
 /**
- * The 18 tools at 1.0.0. `tenant` names the tenant chat tools each one runs
+ * The ordinary tool inventory. `tenant` names the tenant chat tools each one runs
  * (one implementation, src/lib/agent-shared.ts); `needsTenant` is true when it
  * acts on a linked managed website; `acts` marks tools that act through a
  * Connection and need its grant.
@@ -28,6 +28,7 @@ export const ASK_TOOL_CATALOG = {
   read_reviews: { authority: "read", needsTenant: true, tenant: ["get_reviews"] },
   read_requests: { authority: "read", needsTenant: false, tenant: [] },
   draft_website_change: { authority: "draft", needsTenant: true, tenant: ["patch_site", "update_section", "toggle_section_visibility", "reorder_sections"] },
+  draft_system_change: { authority: "draft", needsTenant: false, tenant: [] },
   undo_change: { authority: "draft", needsTenant: true, tenant: ["undo_last_change"] },
   add_image: { authority: "draft", needsTenant: true, tenant: ["upload_image"] },
   draft_entry: { authority: "draft", needsTenant: true, tenant: ["save_entry"] },

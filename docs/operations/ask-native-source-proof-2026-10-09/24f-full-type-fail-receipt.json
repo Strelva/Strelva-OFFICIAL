@@ -1,0 +1,14 @@
+{
+  "source": "24f7f3edd6fba113f6a81340eb61343c336d6600",
+  "exit": 2,
+  "sourceEqual": true,
+  "timedOut": false,
+  "elapsedSeconds": 40.304134130477905,
+  "deployment": false,
+  "fullReleaseQualified": false,
+  "diskEnd": {
+    "total": 494384795648,
+    "used": 491454935040,
+    "free": 2929860608
+  }
+}

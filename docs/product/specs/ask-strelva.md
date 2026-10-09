@@ -4,7 +4,7 @@ Status: implemented locally on `w6/owner-ask`, October 7, 2026. Not
 migrated or deployed; all release flags off. Proof and remaining stop points
 are in [the stream handoff](../streams/w6-owner-ask.md).
 
-The workspace route, 18-tool catalog, per-call authority, managed Requests,
+The workspace route, original 18-tool catalog, per-call authority, managed Requests,
 streamed receipts and saved conversations are built. Ask now hands drafts to
 the real Needs you policy and durable source adapters. Business facts use a
 typed, revision-pinned draft store; inquiry replies preserve the exact authored
@@ -309,7 +309,8 @@ details" or "I filed it for Strelva").
 
 Current tools: 6 from `agent-shared.ts` plus 24 inline in the route (30 on the
 chat surface), and 2 background-only in `agent-executor.ts`. At 1.0.0 they
-become 18. The tenant route keeps the old names until `/dashboard/chat`
+originally became 18. The prepared October 9 native app extension adds
+`draft_system_change`, bringing the source inventory to 19. The tenant route keeps the old names until `/dashboard/chat`
 retires, built from the same implementations.
 
 | Current tool | Fate | 1.0.0 tool | System it acts on | Authority |
@@ -343,6 +344,7 @@ retires, built from the same implementations.
 | `update_business_hours` (shared) | Changed | `draft_business_fact_change` | Business record; website and Google follow by Connection | Draft → owner (hours are high-risk facts) |
 | `reply_to_review` | Kept, renamed | `draft_review_reply` | Google Business (*acts*); other platforms saved only | Draft → approval, or policy for `auto` mode |
 | — | New | `draft_inquiry_reply` | Inquiries | Draft → inquiry review policy |
+| — | Prepared native extension | `draft_system_change` | Existing native internal app or Version: one title or field label | Draft → native rehearsal/Version preparation → exact Needs you decision |
 | `request_custom_change` | Merged | `create_request` | Any System, or a new one | Draft (files a Request at Asked) |
 | `create_suggestion` | Replaced | `open_possibility` | The System it changes | Draft |
 | `get_suggestions` | Merged | `read_system` (open Possibilities) | Any System | Read |
@@ -519,7 +521,7 @@ Inferences, to check:
   The Reborn snapshot SQL can count connections read-only.
 - Whether owners will use Ask Strelva at all. Measure signed-in asks per
   converted owner for 30 days after entry ships.
-- Whether 18 tools stay accurate in one prompt with System context. Run the
+- Whether the ordinary inventory, including the prepared native extension, stays accurate in one prompt with System context. Run the
   existing agent tests plus a fixed set of Mooney and gldf asks against both
   catalogs and compare.
 
@@ -546,3 +548,31 @@ Inferences, to check:
   cannot use that capability.
 - Legacy tenant activity text stays unchanged where existing filters depend
   on it. Workspace Ask labels and receipts use Strelva language.
+
+## Native app and Version source extension, October 9, prepared
+
+`read_system` with `view: native_application` resolves the selected canonical
+stored System through the current merged graph, then verifies its native work,
+workspace and optional Version runtime. It exposes definition, exact design and
+lineage revisions, and recent release metadata. It omits record values,
+maintenance identity and credentials; older native release archives remain owned
+by the app lifecycle.
+
+`draft_system_change` requires that turn's successful exact native read and a
+fresh authority check. Its closed input permits one title or existing field-label
+change, preserving IDs, types, components, records, accounts and maintenance.
+A native app uses its existing maker gate and revise/rehearse services; a Version
+uses its current management authority and override/prepared-release services.
+Arrays are one Version value, so a label change submits the unchanged field array
+with only that label changed. Source standards, compare conflicts and stale
+revisions remain the existing service's decision. The actual current Needs you
+item determines the route; chat never publishes or approves.
+
+A partial or uncertain preparation requires a current native read before another
+draft. A missing decision receipt cannot be called ready. An unsupported runtime
+or absent native maker capability becomes a Request in the person's original
+words at Asked. Full new-app creation, arbitrary code, record/type changes,
+provider writes and broader adaptation are not supplied by this bounded tool.
+The [source proof and native qualification plan](../../operations/ask-native-app-version-2026-10-09.md)
+records focused tests and remaining actual SQL/Auth/model/browser proof. This
+extension does not close P07 or full release.
