@@ -88,11 +88,13 @@ test("a named agency operator revises one assigned application and returns it fo
       },
     }, 201) as unknown as ApplicationResponse;
     appId = app.id;
-    const readOnly = localSql<{ allowed: boolean; ids: string[] }>(`begin read only;
+    const readOnly = localSql<{ allowed: boolean; ids: string[]; snapshot: unknown }>(`begin read only;
       select jsonb_build_object('allowed',public.agency_can_author_created_application(:'v1'::uuid,:'v2'::uuid,:'v3',:'v4'::uuid),
-      'ids',public.agency_created_application_work_ids(:'v1'::uuid,:'v2'::uuid,:'v3')); rollback;`, businessId, operator.userId, operator.email, appId);
+      'ids',public.agency_created_application_work_ids(:'v1'::uuid,:'v2'::uuid,:'v3'),
+      'snapshot',public.read_agency_created_application(:'v1'::uuid,:'v2'::uuid,:'v3',:'v4'::uuid)); rollback;`, businessId, operator.userId, operator.email, appId);
     expect(readOnly?.allowed).toBe(true);
     expect(readOnly?.ids).toContain(appId);
+    expect(readOnly?.snapshot).toMatchObject({ payload: { status: "draft", records: [], releases: [], release: null } });
     await getJson(operator.context.request, `/api/bounded-work?productId=applications&workId=${appId}`);
     await getJson(outsider.context.request, `/api/bounded-work?productId=applications&workId=${appId}`, 403);
     const foreignBusiness = await ordinaryCustomerBusiness(outsider, "Unrelated private customer business");
@@ -131,11 +133,13 @@ test("a named agency operator revises one assigned application and returns it fo
     const creatorAfterPublication = await operator.context.request.get(`/api/bounded-work?productId=applications&workId=${appId}`);
     expect(creatorAfterPublication.status()).toBe(403);
     expect(await creatorAfterPublication.text()).not.toContain(privateRecord);
-    const publishedReadOnly = localSql<{ allowed: boolean; ids: string[] }>(`begin read only;
+    const publishedReadOnly = localSql<{ allowed: boolean; ids: string[]; snapshot: unknown }>(`begin read only;
       select jsonb_build_object('allowed',public.agency_can_author_created_application(:'v1'::uuid,:'v2'::uuid,:'v3',:'v4'::uuid),
-      'ids',public.agency_created_application_work_ids(:'v1'::uuid,:'v2'::uuid,:'v3')); rollback;`, businessId, operator.userId, operator.email, appId);
+      'ids',public.agency_created_application_work_ids(:'v1'::uuid,:'v2'::uuid,:'v3'),
+      'snapshot',public.read_agency_created_application(:'v1'::uuid,:'v2'::uuid,:'v3',:'v4'::uuid)); rollback;`, businessId, operator.userId, operator.email, appId);
     expect(publishedReadOnly?.allowed).toBe(false);
     expect(publishedReadOnly?.ids).not.toContain(appId);
+    expect(publishedReadOnly?.snapshot).toBeNull();
     const beforeRecordWrite = await getJson(owner.context.request, `/api/bounded-work?productId=applications&workId=${appId}`);
     await post(operator.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: appId,
       command: { kind: "submit", expectedReleaseVersion: app.payload.release?.version, expectedRecordsRevision: 1,
