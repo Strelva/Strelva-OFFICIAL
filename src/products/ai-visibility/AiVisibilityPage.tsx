@@ -7,6 +7,7 @@ import { ArrowRight, Loader2 } from "lucide-react";
 import { AiVisibilityResultView } from "./AiVisibilityResultView";
 import type { AgencyAttribution } from "@/platform/infra/agency-attribution";
 import type { AiVisibilityResult } from "./contracts";
+import { workspaceHistoryState } from "@/platform/workspaces/location";
 
 type ScanState = "idle" | "scanning" | "done" | "error";
 
@@ -98,7 +99,7 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
           location.pathname = `/ai-visibility/${encodeURIComponent(data.scanId)}`;
           if (!agency) location.search = "";
         }
-        window.history.replaceState(window.history.state, "", `${location.pathname}${location.search}`);
+        window.history.replaceState(workspaceHistoryState(window.history.state), "", `${location.pathname}${location.search}`);
       }
       setShareUrl(data.shareUrl);
       setState("done");
@@ -113,7 +114,7 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
     if (embedded) location.searchParams.delete("scan");
     else { location.pathname = "/ai-visibility"; if (!agency) location.search = ""; }
     if (agency) location.searchParams.set("agency", agency.slug);
-    window.history.replaceState(window.history.state, "", `${location.pathname}${location.search}`);
+    window.history.replaceState(workspaceHistoryState(window.history.state), "", `${location.pathname}${location.search}`);
     setState("idle");
     setResult(null);
     setScanId(null);

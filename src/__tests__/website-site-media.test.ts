@@ -45,10 +45,11 @@ describe("website asset safety and immutable image export",()=>{
   it("answers Node's all:true lookup with the pinned IPv4 address list (audit finding 4)",async()=>{
     responses.push({status:200,body:png});
     await fetchWebsiteAsset("https://source.example/photo.png");
-    const options = network.request.mock.calls[0]![1] as {family?:number;lookup:(hostname:string,options:unknown,callback:(...args:unknown[])=>void)=>void};
+    const options = network.request.mock.calls[0]![1] as {family?:number;autoSelectFamily?:boolean;lookup:(hostname:string,options:unknown,callback:(...args:unknown[])=>void)=>void};
     const all = vi.fn(); options.lookup("source.example",{all:true},all);
     expect(all).toHaveBeenCalledWith(null,[{address:"203.0.113.10",family:4}]);
     expect(options.family).toBe(4);
+    expect(options.autoSelectFamily).toBe(false);
   });
   it("checks every redirect before opening another network connection",async()=>{
     responses.push({status:302,location:"https://attacker.example/private.png"});

@@ -13741,6 +13741,15 @@ export type Database = {
         }
         Returns: Json
       }
+      deprovision_tenant_guarded: {
+        Args: {
+          p_force?: boolean
+          p_require_inquiry_export?: boolean
+          p_retain_receipts?: boolean
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       deprovision_tenant_rows: {
         Args: {
           p_tenant_id: string

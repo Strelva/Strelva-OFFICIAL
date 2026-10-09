@@ -22,6 +22,7 @@ import { OwnerBrandIdentity } from "@/components/brand/OwnerBrandIdentity";
 import { STRELVA_BRAND } from "@/platform/infra/agency-brand";
 import type { AuditResult, CheckStatus, CategoryResult } from "@/lib/audit/types";
 import { topFixes } from "@/lib/audit/impact";
+import { workspaceHistoryState } from "@/platform/workspaces/location";
 
 type ScanState = "idle" | "scanning" | "done" | "error";
 
@@ -193,7 +194,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
       if (data.reportId && /^audit_[a-f0-9]{32}$/.test(data.reportId)) {
         const location = new URL(window.location.href);
         location.searchParams.set("report", data.reportId);
-        window.history.replaceState(window.history.state, "", `${location.pathname}${location.search}`);
+        window.history.replaceState(workspaceHistoryState(window.history.state), "", `${location.pathname}${location.search}`);
       }
       setResult(data);
       setState("done");
@@ -206,7 +207,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
   function handleReset() {
     const location = new URL(window.location.href);
     location.searchParams.delete("report");
-    window.history.replaceState(window.history.state, "", `${location.pathname}${location.search}`);
+    window.history.replaceState(workspaceHistoryState(window.history.state), "", `${location.pathname}${location.search}`);
     setReportId(null);
     setState("idle");
     setResult(null);
