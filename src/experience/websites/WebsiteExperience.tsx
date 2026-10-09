@@ -274,7 +274,9 @@ function WebsiteSession({
       if (!mountedRef.current) return;
       if (permission.current.revision !== started) throw new Error("Your access changed while the website result was being checked.");
       unresolved.current = false; setNeedsReload(false); creationAttempt.current = null;
-      setRecord(next); setFields(fieldsFromBrief(next.website.brief)); setNotice(success(next));
+      setRecord(next); setFields(fieldsFromBrief(next.website.brief));
+      if (next.website.status === "failed") setError(next.website.lastError?.message ?? "The website operation failed. Its saved status remains available.");
+      else setNotice(success(next));
       onSaved?.(next.workId);
     } catch (cause) {
       if (!mountedRef.current) return;
@@ -382,7 +384,7 @@ function WebsiteSession({
           <div className={styles.actions}><Button type="button" variant="secondary" onClick={() => { setError(""); setLoadFailed(false); setLoading(true); setLoadAttempt((attempt) => attempt + 1); }} icon={<RefreshCw size={16} />}>Try loading again</Button></div>
         </div>
       ) : !record ? (
-        <BriefForm fields={fields} setFields={setFields} onSubmit={() => void createOrRevise()} busy={busy || needsReload} readOnly={readOnly} submitLabel="Generate a private preview" canSubmit={canSubmitBrief} />
+        <BriefForm fields={fields} setFields={next => { if (!inFlight.current && !unresolved.current && !readOnly) setFields(next); }} onSubmit={() => void createOrRevise()} busy={busy} frozen={needsReload} readOnly={readOnly} submitLabel="Generate a private preview" canSubmit={canSubmitBrief} />
       ) : (
         <>
           <div className={styles.status} data-tone={website?.status === "failed" ? "attention" : undefined}>
@@ -391,7 +393,7 @@ function WebsiteSession({
           </div>
 
           <div className={styles.requestCard}>
-            <BriefForm fields={fields} setFields={setFields} onSubmit={() => void createOrRevise()} busy={busy || needsReload} readOnly={readOnly} submitLabel={canRetryPreview ? "Try generating again" : "Generate a new preview"} canSubmit={canSubmitBrief} compact />
+            <BriefForm fields={fields} setFields={next => { if (!inFlight.current && !unresolved.current && !readOnly) setFields(next); }} onSubmit={() => void createOrRevise()} busy={busy} frozen={needsReload} readOnly={readOnly} submitLabel={canRetryPreview ? "Try generating again" : "Generate a new preview"} canSubmit={canSubmitBrief} compact />
             <div className={styles.actions}>
               {!readOnly && canApprove ? <Button type="button" loading={busy} disabled={busy || needsReload} onClick={() => void approve()} icon={<Check size={16} />}>Approve this preview</Button> : null}
               {!readOnly && canPrepare ? <Button type="button" loading={busy} disabled={busy || needsReload} onClick={() => void prepareLaunch()} icon={<Rocket size={16} />}>Prepare launch</Button> : null}
@@ -429,6 +431,7 @@ function BriefForm({
   submitLabel,
   canSubmit,
   compact = false,
+  frozen = false,
 }: {
   fields: BriefFields;
   setFields: (next: BriefFields) => void;
@@ -438,22 +441,23 @@ function BriefForm({
   submitLabel: string;
   canSubmit: boolean;
   compact?: boolean;
+  frozen?: boolean;
 }) {
   const update = (key: keyof BriefFields) => (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setFields({ ...fields, [key]: event.target.value });
   return (
     <form className={styles.briefForm} onSubmit={(event) => { event.preventDefault(); onSubmit(); }}>
       <div className={styles.formGrid}>
-        <TextInput label="Business name" value={fields.businessName} onChange={update("businessName")} maxLength={160} required disabled={busy || readOnly} />
-        <TextInput label="Contact email (optional)" type="email" value={fields.contactEmail} onChange={update("contactEmail")} maxLength={254} disabled={busy || readOnly} />
+        <TextInput label="Business name" value={fields.businessName} onChange={update("businessName")} maxLength={160} required disabled={busy || readOnly} readOnly={frozen} />
+        <TextInput label="Contact email (optional)" type="email" value={fields.contactEmail} onChange={update("contactEmail")} maxLength={254} disabled={busy || readOnly} readOnly={frozen} />
       </div>
-      <TextArea label="What does the business do?" value={fields.description} onChange={update("description")} rows={compact ? 3 : 5} maxLength={4_000} required disabled={busy || readOnly} helperText="Describe the business in your own words. This stays attached to the saved work." />
+      <TextArea label="What does the business do?" value={fields.description} onChange={update("description")} rows={compact ? 3 : 5} maxLength={4_000} required disabled={busy || readOnly} readOnly={frozen} helperText="Describe the business in your own words. This stays attached to the saved work." />
       <div className={styles.formGrid}>
-        <TextInput label="Who should the site serve? (optional)" value={fields.audience} onChange={update("audience")} maxLength={1_000} disabled={busy || readOnly} />
-        <TextInput label="Primary customer goal (optional)" value={fields.primaryGoal} onChange={update("primaryGoal")} maxLength={1_000} disabled={busy || readOnly} />
+        <TextInput label="Who should the site serve? (optional)" value={fields.audience} onChange={update("audience")} maxLength={1_000} disabled={busy || readOnly} readOnly={frozen} />
+        <TextInput label="Primary customer goal (optional)" value={fields.primaryGoal} onChange={update("primaryGoal")} maxLength={1_000} disabled={busy || readOnly} readOnly={frozen} />
       </div>
-      <TextInput label="Primary call to action" value={fields.primaryCallToAction} onChange={update("primaryCallToAction")} maxLength={300} disabled={busy || readOnly} helperText="For example, Request an appointment or Contact us." />
-      <TextArea label="Additional notes (optional)" value={fields.notes} onChange={update("notes")} rows={compact ? 2 : 3} maxLength={4_000} disabled={busy || readOnly} />
-      {!readOnly ? <div className={styles.actions}><Button type="submit" loading={busy} disabled={!canSubmit} icon={<ArrowRight size={16} />}>{submitLabel}</Button></div> : null}
+      <TextInput label="Primary call to action" value={fields.primaryCallToAction} onChange={update("primaryCallToAction")} maxLength={300} disabled={busy || readOnly} readOnly={frozen} helperText="For example, Request an appointment or Contact us." />
+      <TextArea label="Additional notes (optional)" value={fields.notes} onChange={update("notes")} rows={compact ? 2 : 3} maxLength={4_000} disabled={busy || readOnly} readOnly={frozen} />
+      {!readOnly ? <div className={styles.actions}><Button type="submit" loading={busy} disabled={busy || frozen || !canSubmit} icon={<ArrowRight size={16} />}>{submitLabel}</Button></div> : null}
     </form>
   );
 }
