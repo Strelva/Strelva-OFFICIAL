@@ -208,7 +208,21 @@ test("independently owned businesses install and update definitions without copy
     expect(installed.payload.records).toEqual([{ id: "customer-record", values: { problem: "Customer business record" } }]);
     // Customer manager controls in the actual System application surface.
     const ownerPage = await customer.context.newPage();
-    await ownerPage.goto(`/workspace?workspaceId=${customerSpace}&view=system&system=${target.systemId}`);
+    // Diagnose the owner's actual browser read before checking its controls.
+    // A pending read fails within the existing five-second assertion window.
+    const ownerWorkRead = ownerPage.waitForResponse(response => {
+      const url = new URL(response.url());
+      return response.request().method() === "GET"
+        && url.origin === new URL(env.app).origin
+        && url.pathname === "/api/bounded-work"
+        && url.searchParams.get("productId") === "applications"
+        && url.searchParams.get("workId") === target.workId;
+    }, { timeout: 5_000 });
+    const [ownerWork] = await Promise.all([
+      ownerWorkRead,
+      ownerPage.goto(`/workspace?workspaceId=${customerSpace}&view=system&system=${target.systemId}`),
+    ]);
+    expect(ownerWork.status(), "The owner's exact application browser read must succeed before Review and Sharing render.").toBe(200);
     await expect(ownerPage.getByRole("tab", { name: "Review", exact: true })).toBeVisible();
     await expect(ownerPage.getByRole("tab", { name: "Sharing", exact: true })).toBeVisible();
     await expect(ownerPage.getByRole("tab", { name: "Edit", exact: true })).toHaveCount(0);
