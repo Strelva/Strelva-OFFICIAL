@@ -8,6 +8,8 @@ do $$declare owner_id uuid:=gen_random_uuid();ws uuid:=gen_random_uuid();p uuid;
  insert into public.users(id,email,verified_at) values(owner_id,'checkout-native-owner@example.test',now());
  insert into public.workspaces(id,kind,name,created_by) values(ws,'customer','Fictional final Checkout contract',owner_id);
  insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values(ws,owner_id,'owner',owner_id);
+ -- Privileged fictional native setup calls the real unpriced home initializer.
+ perform public.ensure_native_business_billing_home(ws);
  perform public.manage_connected_account(ws,owner_id,'checkout-native-owner@example.test','reserve');
  perform public.record_connected_account(ws,'acct_FinalCheckout',array['merchant'],'fictional-native','{}','{}',true);
  select c.generation into generation from public.connected_accounts c where c.workspace_id=ws;
