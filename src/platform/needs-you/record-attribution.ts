@@ -18,7 +18,6 @@ export function projectRecordActors(
       actor: row.actor ?? revision.actor,
     } : row;
   });
-  const latestSequence = Math.max(0, ...history.map(revision => revision.sequence));
   const start = since ? Date.parse(since) : Date.now() - 7 * 24 * 60 * 60 * 1000;
   // The legacy feed's source filter omits ordinary agency writes. Carry those
   // from the same actor-checked History read, without exposing before/after data.
@@ -28,7 +27,10 @@ export function projectRecordActors(
       store: "business_record_revisions", id: String(revision.sequence), at: revision.createdAt,
       actorKind: revision.actorKind, actorId: revision.actorId, actor: revision.actor,
       source: revision.source, changes: revision.changes.map(change => `${change.entity}:${change.id}`),
-      undo: revision.undoOf !== null ? "not_undoable" : revision.undoneBy !== null ? "undone" : revision.sequence < latestSequence ? "undo_needs_review" : "undo",
+      // Agency History can hide later contact edits. Its newest visible row
+      // cannot establish global recency; only the original feed supplies that.
+      undo: revision.undoOf !== null ? "not_undoable" : revision.undoneBy !== null ? "undone" : "undo_needs_review",
+      undoReason: "Undoing this change needs a review first.",
     });
   }
   return result;

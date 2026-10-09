@@ -41,7 +41,7 @@ describe("What changed recorded revision actors", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]!.changes).toEqual(["fact:hours"]);
     const receipt = handledReceiptSchema.parse(handledFromStore(rows[0]!));
-    expect(receipt).toMatchObject({ actorKind: "agency", actorId: revision.actorId, sentence: "Updated your hours in your business record", undo: { state: "undo" } });
+    expect(receipt).toMatchObject({ actorKind: "agency", actorId: revision.actorId, sentence: "Updated your hours in your business record", undo: { state: "undo_needs_review" } });
     expect(receipt.actor).toBeUndefined();
     expect(JSON.stringify(rows)).not.toContain('"value"');
   });
@@ -50,6 +50,22 @@ describe("What changed recorded revision actors", () => {
     database([{ ...row, actor: { kind: "agency", displayName: "Strelva Agency" }, undo: "undone" }], [revision]);
     const rows = await PostgresNeedsYouStore.handled(actor, workspaceId, since);
     expect(handledFromStore(rows[0]!)).toMatchObject({ sentence: "Strelva Agency updated your hours in your business record", undo: { state: "undone" } });
+  });
+
+  it("requires review when the latest visible agency revision has a later contact edit hidden from History", async () => {
+    // SQL excludes contact-touching revisions from agency History. Sequence 11
+    // exists, but the authorized read only returns the earlier profile edit.
+    database([], [{ ...revision, sequence: 10, revision: 10 }]);
+    const rows = await PostgresNeedsYouStore.handled(actor, workspaceId, since);
+    const receipt = handledReceiptSchema.parse(handledFromStore(rows[0]!));
+    expect(receipt.undo).toEqual({ state: "undo_needs_review", reason: "Undoing this change needs a review first." });
+  });
+
+  it("preserves one-tap Undo when the original feed supplies the global undo status", async () => {
+    database([row], [revision]);
+    const rows = await PostgresNeedsYouStore.handled(actor, workspaceId, since);
+    expect(rows).toHaveLength(1);
+    expect(handledFromStore(rows[0]!)?.undo).toEqual({ state: "undo" });
   });
 
   it("uses recorded executor kind ahead of source and never substitutes a decider", async () => {

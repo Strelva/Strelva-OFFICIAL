@@ -957,7 +957,10 @@ recorded actor kind/ID through the shared receipt decoder; a recorded name
 snapshot is retained, and an ID-only agency receipt stays neutral. The existing
 actor-checked History read supplies up to 200 recent revisions, including agency
 actions omitted by the legacy feed source filter. No current name lookup or
-new persisted snapshot is introduced. `STRELVA_HANDLED_LABEL` owns the decided **What changed** place label;
+new persisted snapshot is introduced. Supplemental History receipts require
+review before Undo: agency History can hide later contact edits, so the latest
+visible revision cannot establish a one-tap Undo. Receipts already in the original
+feed retain its server-computed Undo status. `STRELVA_HANDLED_LABEL` owns the decided **What changed** place label;
 legacy tool names and addresses keep resolving. Existing tokens and components are unchanged.
 Local behavior and verification are recorded in the actor-lane handoff; this is
 not deployment or visual acceptance evidence.

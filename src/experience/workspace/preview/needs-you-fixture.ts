@@ -5,6 +5,7 @@
  */
 import type { HandledReceipt, OwnerDecision } from "@/platform/needs-you/contracts";
 import { handledFromStore } from "@/platform/needs-you/handled";
+import { projectRecordActors } from "@/platform/needs-you/record-attribution";
 import { buildPolicyView, ownerChangeSchema, planOwnerChange, REFUSAL_WORDS, type PlannedWrite, type PolicyRows } from "@/platform/needs-you/policy-model";
 
 /** The Mooney Firm has made Google posts its own call; Strelva lets routine edits through after notice. */
@@ -73,6 +74,12 @@ const HANDLED: HandledReceipt[] = [
     actor: { kind: "platform" }, decidedByKind: "owner_link", approveEffect: "The booking is confirmed for this time.", systemId: null,
   })].flatMap(receipt => receipt ?? []),
   { actor: { kind: "agency", displayName: "Strelva Agency" }, id: "record:14", store: "business_record_revisions", systemId: null, sentence: "Strelva Agency updated your hours in your business record", at: "2026-10-06T14:10:00Z", changed: "hours", evidence: null, undo: { state: "undo" } },
+  // The supplemental History projection cannot prove global Undo recency.
+  ...projectRecordActors([], [{
+    sequence: 15, revision: 15, actorKind: "agency", actorId: "a0000000-0000-4000-8000-000000000003", source: "agency",
+    actor: { kind: "agency", displayName: "Strelva Agency" }, undoOf: null, undoneBy: null, createdAt: "2026-10-06T14:20:00Z",
+    changes: [{ entity: "fact", id: "phone", before: null, after: null }],
+  }], "2026-10-02T12:00:00Z").flatMap(row => handledFromStore(row) ?? []),
   { actor: { kind: "platform" }, id: "tenant_event:evt-9", store: "tenant_events", systemId: null, sentence: "Strelva replied to Dana's review on Google", at: "2026-10-05T21:02:00Z", changed: null, evidence: { providerAccepted: true, readBack: "verified" }, undo: { state: "not_undoable", reason: "Google has the reply; delete it on Google." } },
   { id: "tenant_event:evt-7", store: "tenant_events", systemId: null, sentence: "Updated your website: Friday hours", at: "2026-10-05T14:12:00Z", changed: "hours", evidence: null, undo: { state: "undo_needs_review", reason: "Undo drafts a revert for review before it goes live." } },
 ];

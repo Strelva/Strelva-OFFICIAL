@@ -7,7 +7,9 @@ import { BusinessHome } from "@/experience/workspace/BusinessHome";
 import { NeedsYouSection, StrelvaHandledSection } from "@/experience/workspace/NeedsYouSection";
 import type { NeedsYouState } from "@/experience/workspace/useNeedsYou";
 import type { HandledReceipt, OwnerDecision } from "@/platform/needs-you/contracts";
+import { handledReceiptSchema } from "@/platform/needs-you/contracts";
 import { handledFromStore } from "@/platform/needs-you/handled";
+import { projectRecordActors } from "@/platform/needs-you/record-attribution";
 import type { WorkspaceSnapshot } from "@/experience/workspace/contracts";
 
 const noop = () => undefined;
@@ -27,6 +29,18 @@ const needs = (state: NeedsYouState, extra?: { extraCount?: number }) => renderT
 const handled = (state: NeedsYouState) => renderToStaticMarkup(createElement(StrelvaHandledSection, { state, pending: null, notices: {}, onUndo: noop }));
 
 describe("Needs you on Home", () => {
+  it("shows review copy without Undo for a supplemental agency receipt from filtered History", () => {
+    const rows = projectRecordActors([], [{
+      sequence: 10, revision: 10, actorKind: "agency", actorId: "aaaaaaaa-0000-4000-8000-000000000003", source: "agency",
+      actor: { kind: "agency", displayName: "Strelva Agency" }, undoOf: null, undoneBy: null, createdAt: "2026-10-09T12:00:00Z",
+      changes: [{ entity: "fact", id: "hours", before: null, after: null }],
+    }], "2026-10-02T12:00:00Z");
+    const receipt = handledReceiptSchema.parse(handledFromStore(rows[0]!));
+    const html = handled(ready({ handled: [receipt] }));
+    expect(html).toContain("Strelva Agency updated your hours in your business record");
+    expect(html).toContain("Undoing this change needs a review first.");
+    expect(html).not.toContain('aria-label="Undo:');
+  });
   it("shows each owner decision with Approve and Not yet and what each does", () => {
     const html = needs(ready({ items: [item(), item({ id: "d0000000-0000-4000-8000-000000000002", title: "Put the booking page live", openHref: "/workspace?view=apps" })] }));
     expect(html).toContain("Reply to Jordan quoting the consult fee");

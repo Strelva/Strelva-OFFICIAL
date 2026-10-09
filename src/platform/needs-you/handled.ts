@@ -32,11 +32,11 @@ function recordSentence(changes: unknown, actor: RecordedActor | null): { senten
   return { sentence: actorSentence(actor, "updated your business record"), changed: entities.length ? `${entities.length} ${entities.length === 1 ? "item" : "items"}` : null };
 }
 
-function recordUndo(value: unknown): UndoState {
+function recordUndo(value: unknown, reason: string | null): UndoState {
   if (value === "undo") return { state: "undo" };
   if (value === "undone") return { state: "undone" };
   if (value === "not_undoable") return { state: "not_undoable", reason: "This was itself an undo." };
-  return { state: "undo_needs_review", reason: "Something changed after this, so undoing it needs a look first." };
+  return { state: "undo_needs_review", reason: reason ?? "Something changed after this, so undoing it needs a look first." };
 }
 
 /** Map one row of read_strelva_handled. Unknown stores are dropped, never guessed at. */
@@ -53,7 +53,7 @@ export function handledFromStore(row: Record<string, unknown>): HandledReceipt |
   switch (row.store) {
     case "business_record_revisions": {
       const { sentence, changed } = recordSentence(row.changes, actor);
-      return { ...attribution, id: `record:${id}`, store: "business_record_revisions", systemId: null, sentence, at, changed, evidence: null, undo: recordUndo(row.undo) };
+      return { ...attribution, id: `record:${id}`, store: "business_record_revisions", systemId: null, sentence, at, changed, evidence: null, undo: recordUndo(row.undo, str(row.undoReason)) };
     }
     case "website_document_receipts":
       return {
