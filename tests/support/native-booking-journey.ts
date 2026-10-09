@@ -28,16 +28,26 @@ export async function nativeBookingJourney(owner: Person, admin: SupabaseClient,
     expect(response.status(), await response.text()).toBe(status);
     return response.json();
   }
-  const serviceId = randomUUID();
   const record = await rpc("read_business_record", { p_workspace_id: workspaceId, p_user_id: owner.userId, p_verified_email: owner.email });
   const patch = { facts: {
     display_name: { value: "Native booking journey" },
     owner_recipient: { value: { email: owner.email, name: "Booking owner" } },
     hours: { value: { timezone: "UTC", weekly: Array.from({ length: 7 }, (_, day) => ({ day, opens: "09:00", closes: "17:00" })) } },
-  }, services: [{ op: "upsert", id: serviceId, name: "Site visit", durationMinutes: 60, active: true }] };
-  await rpc("patch_business_record", { p_workspace_id: workspaceId, p_user_id: owner.userId, p_verified_email: owner.email,
+  }, services: [{ op: "upsert", name: "Site visit", durationMinutes: 60, active: true }] };
+  const applied = await rpc("patch_business_record", { p_workspace_id: workspaceId, p_user_id: owner.userId, p_verified_email: owner.email,
     p_source: "owner", p_expected_revision: record.revision, p_patch: patch, p_command_id: randomUUID(),
     p_command_digest: createHash("sha256").update(JSON.stringify(patch)).digest("hex") });
+  // A supplied service ID names an existing entity. Creation omits it and
+  // uses the actual native producer's assigned ID from this actor-bound read.
+  const configuredRecord = await rpc("read_business_record", { p_workspace_id: workspaceId, p_user_id: owner.userId, p_verified_email: owner.email });
+  expect(configuredRecord).toMatchObject({ workspaceId, revision: applied.revision });
+  expect(configuredRecord.revision).toBeGreaterThan(record.revision);
+  const existingServiceIds = new Set(record.services.map((service: { id: string }) => service.id));
+  const createdServices = configuredRecord.services.filter((service: { id: string }) => !existingServiceIds.has(service.id));
+  expect(createdServices, "Exactly one service was created by this record command").toHaveLength(1);
+  expect(createdServices[0]).toMatchObject({ name: "Site visit", durationMinutes: 60, active: true, source: "owner" });
+  const serviceId: string = createdServices[0].id;
+  expect(serviceId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
   const factsResponse = await owner.context.request.get(`/api/workspace/needs-you?workspaceId=${workspaceId}`);
   expect(factsResponse.status(), await factsResponse.text()).toBe(200);
   const facts = (await factsResponse.json()).items.find((item: { sourceLifecycle: string; sourceId: string }) => item.sourceLifecycle === "business_facts" && item.sourceId === workspaceId);
