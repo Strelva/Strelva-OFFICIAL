@@ -5,7 +5,7 @@ process.env.PLAYWRIGHT_NO_COPY_PROMPT = "1";
 process.env.STRELVA_PROVIDER_PROOF_CONFIG = "held-provider-v1";
 export default defineConfig({
   testDir: "./tests",
-  testMatch: ["home-finder-authenticated-local.spec.ts", "sandbox-application-authenticated-local.spec.ts"],
+  testMatch: ["home-finder-authenticated-local.spec.ts", "sandbox-application-authenticated-local.spec.ts", "assistant-oauth-authenticated-local.spec.ts", "connect-agent-payment-authenticated-local.spec.ts", "native-planning-provider-authenticated-local.spec.ts"],
   workers: 1, fullyParallel: false, retries: 0, repeatEach: 1, maxFailures: 1,
   reporter: [["./tests/support/provider-redacted-reporter.ts"]],
   use: { trace: "off", screenshot: "off", video: "off" },

@@ -26,6 +26,7 @@ export interface WorkPlanGenerationInput {
   allowedOperations: readonly WorkPlanNativeOperation[];
   /** Resolved for the target workspace; absent preserves the original prompt. */
   linkedFieldsEnabled?: boolean;
+  approvedModelLabels?: readonly string[];
   /** Exact admission identity used to bind a provider billing receipt. */
   executionContext?: BudgetExecutionEvidenceContext & {
     kind: "model";
@@ -74,9 +75,17 @@ function promptFor(input: WorkPlanGenerationInput): string {
   ].join("\n\n");
 }
 
+/** The actual server-selected ordered fallback set must fit this request's
+ * restriction before any intent/evidence leaves the server. No provider override. */
+export function assertWorkPlanModelAdmission(models: readonly ModelConfig[], approved?: readonly string[]) {
+  if (approved !== undefined && (!models.length || JSON.stringify(models.map(model => model.label)) !== JSON.stringify(approved)))
+    throw new WorkPlanUnavailableError("The configured planning providers do not match the approved model restriction");
+}
+
 export async function defaultGenerate(input: WorkPlanGenerationInput): Promise<unknown | WorkPlanGenerationResult> {
   if (!planningEnabled()) throw new WorkPlanUnavailableError("Planning is not enabled");
   const models = configuredModels();
+  assertWorkPlanModelAdmission(models, input.approvedModelLabels);
   if (!models.length) throw new WorkPlanUnavailableError("No planning model is configured");
 
   // Both provider attempts share one deadline, keeping the route's bounded

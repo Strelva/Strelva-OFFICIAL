@@ -9,7 +9,7 @@ import { assertCanSaveWork, saveWork, type PersistedWorkPlanOutput, type Workspa
 import { createWorkPlanRequestSchema, WORK_PLAN_PRODUCT_ID, WORK_PLAN_RESOURCE_KIND, workPlanOutputExecutionReceiptSchema, workPlanOutputExecutionSchema, type WorkPlanEvidence, type WorkPlanOutputExecution, type WorkPlanRecord, type CreateWorkPlanRequest } from "./contracts";
 import { prepareWorkPlanContext, preparedWorkPlanContextSchema } from "./context";
 import { WorkPlanUnavailableError, WorkPlanFundingRequiredError, WorkPlanGenerationReplayError, WorkPlanInvalidOutputError } from "./errors";
-import { type WorkPlanGenerationInput, type WorkPlanGenerator, planningEnabled, configuredModels, defaultGenerate, unwrapGeneration } from "./generation";
+import { type WorkPlanGenerationInput, type WorkPlanGenerator, planningEnabled, configuredModels, assertWorkPlanModelAdmission, defaultGenerate, unwrapGeneration } from "./generation";
 import { normalizePlan } from "./domain";
 import { nativeOperationCatalog } from "./native-output";
 
@@ -58,6 +58,9 @@ export async function createWorkPlan(input: {
     throw new WorkPlanFundingRequiredError();
   }
 
+  if (!input.generate && request.planningEconomics?.approvedModelLabels)
+    assertWorkPlanModelAdmission(configuredModels(), request.planningEconomics.approvedModelLabels);
+
   const context = request.sourceWorkIds?.length
     ? await prepareWorkPlanContext({
       actor: input.actor,
@@ -75,6 +78,7 @@ export async function createWorkPlan(input: {
     userGoal: request.userGoal,
     evidence,
     allowedOperations: catalog,
+    ...(request.planningEconomics?.approvedModelLabels ? { approvedModelLabels: request.planningEconomics.approvedModelLabels } : {}),
     ...(systemsMaker ? { linkedFieldsEnabled: true } : {}),
   } satisfies WorkPlanGenerationInput;
   let generated: unknown;
