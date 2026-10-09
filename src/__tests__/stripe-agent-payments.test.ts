@@ -7,12 +7,13 @@ import { readAgentPaymentContext } from "@/platform/connect/agent-payment-contex
 const workspaceId = "00000000-0000-4000-8000-000000000010";
 const paymentId = "00000000-0000-4000-8000-000000000011";
 const identity = { merchantAccountId: "acct_Merchant", paymentId, amountCents: 1000, currency: "usd" };
-const input = { ...identity, sharedPaymentToken: "spt_Token", idempotencyKey: `payment:${paymentId}` };
+const input = { assertAdmission: vi.fn(async () => {}), ...identity, sharedPaymentToken: "spt_Token", idempotencyKey: `payment:${paymentId}` };
 const intent = { id: "pi_Agent", status: "processing", amount: 1000, amount_received: 0, currency: "usd", metadata: { businessPaymentId: paymentId } };
 const token = { id: "spt_Token", deactivated_at: null, usage_limits: { max_amount: 1000, currency: "usd", expires_at: 1001 } };
 const merchant = { workspace_id: workspaceId, stripe_account_id: identity.merchantAccountId, configurations: ["merchant"], profile_version: "approved", state: "ready", generation: 1, capabilities: {}, requirements: {} };
 const rpcDb = (read: (name: string) => unknown) => ({ rpc: vi.fn(async (name: string) => ({ data: read(name), error: null })) });
 beforeEach(() => {
+  input.assertAdmission.mockClear();
   vi.stubEnv("STRELVA_CONNECT", "1"); vi.stubEnv("STRELVA_AGENT_PAYMENTS", "1");
   vi.stubEnv("STRELVA_AGENT_PAYMENT_PROTOCOL", SPT_API_VERSION);
   vi.stubEnv("STRELVA_AGENT_PAYMENT_SELLER_TERMS_APPROVED", "1");
@@ -60,6 +61,25 @@ describe("documented Stripe direct-account shared payment token protocol", () =>
     const rawRequest = vi.fn(async () => { vi.stubEnv("STRELVA_AGENT_PAYMENT_SELLER_TERMS_APPROVED", "0"); return { ...token, lastResponse: { headers: {}, requestId: "req_Fictional", statusCode: 200 } }; });
     await expect(createStripeAgentPaymentProvider({ rawRequest }, () => 1000000).chargeWithSharedPaymentToken(input)).rejects.toThrow(/not qualified/);
     expect(rawRequest).toHaveBeenCalledTimes(1);
+  });
+  it.each(["merchant disconnected", "deposit cancelled", "request expired"])("stops the new POST when durable admission changes during token GET: %s", async reason => {
+    let release!: () => void; let started!: () => void;
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    const reading = new Promise<void>(resolve => { started = resolve; });
+    let live = true;
+    const rawRequest = vi.fn(async () => { started(); await pending; return { ...token, lastResponse: { headers: {}, requestId: "req_Fixture", statusCode: 200 } }; });
+    const database = { rpc: vi.fn(async (name: string) => ({
+      data: name === "read_connected_account" ? merchant : name === "reserve_agent_payment_request" ? { paymentId, amountCents: 1000, currency: "usd", status: "unpaid" } : null,
+      error: name === "assert_agent_payment_admission" && !live ? { message: "agent_payment_admission_denied" } : null,
+    })) };
+    const charge = requestAgentPayment({ workspaceId }, { paymentCapability: "f".repeat(64), sharedPaymentToken: "spt_Token" }, { db: database, previewApproved: true, provider: createStripeAgentPaymentProvider({ rawRequest }, () => 1000000) });
+    const rejected = expect(charge).rejects.toThrow();
+    await reading; live = false; release(); await rejected;
+    expect(database.rpc).toHaveBeenCalledWith("assert_agent_payment_admission", { p_payment_id: paymentId, p_account: "acct_Merchant", p_generation: 1 });
+    expect(database.rpc.mock.calls.some(([name]) => name === "bind_business_payment_provider")).toBe(false);
+    expect(reason).toBeTruthy();
+    expect(rawRequest).toHaveBeenCalledTimes(1);
+    expect(rawRequest).toHaveBeenCalledWith("GET", "/v1/shared_payment/granted_tokens/spt_Token", {}, expect.objectContaining({ stripeAccount: "acct_Merchant" }));
   });
   it("readback never accepts another intent's metadata or amount", async () => {
     const rawRequest = vi.fn().mockResolvedValue({ ...intent, amount: 1001 });

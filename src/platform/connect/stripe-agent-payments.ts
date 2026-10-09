@@ -55,6 +55,7 @@ export function createStripeAgentPaymentProvider(stripe: Pick<Stripe, "rawReques
       if (token.id !== input.sharedPaymentToken || token.deactivated_at !== null || token.usage_limits.currency !== input.currency
         || token.usage_limits.max_amount < input.amountCents || token.usage_limits.expires_at * 1000 <= now())
         throw new WorkspaceStoreError("The shared payment token is expired, revoked, or outside the accepted amount.");
+      await input.assertAdmission();
       return result(await stripe.rawRequest("POST", "/v1/payment_intents", {
         amount: input.amountCents, currency: input.currency, confirm: true,
         payment_method_data: { shared_payment_granted_token: input.sharedPaymentToken },

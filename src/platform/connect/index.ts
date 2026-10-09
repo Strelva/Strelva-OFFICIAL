@@ -28,7 +28,7 @@ export function connectProfile(): ConnectProfile {
  return profile.data;
 }
 export function stripeClient() { if (!process.env.STRIPE_SECRET_KEY) throw new WorkspaceStoreError("Payments provider is unavailable."); return new Stripe(process.env.STRIPE_SECRET_KEY); }
-export interface ConnectDependencies { db?:RpcDb|null; stripe?:Stripe; }
+export interface ConnectDependencies { db?:RpcDb|null; stripe?:Stripe; beforeProviderMutation?:()=>Promise<void>; }
 export async function manageConnectedAccount(actor:WorkspaceActor,workspaceId:string,action:"read"|"reserve"|"disconnect",db:RpcDb|null=connectDb()) {
  return moneyRpc<ConnectedAccount|null>("manage_connected_account",{p_workspace_id:z.string().uuid().parse(workspaceId),p_user_id:actor.userId,p_verified_email:actor.verifiedEmail,p_action:action},db);
 }
@@ -79,6 +79,7 @@ export async function createDirectCheckout(input:DirectCheckoutInput,deps:Connec
  await moneyRpc("claim_business_payment_channel",{p_payment_id:payment.id,p_channel:"checkout"},db);
  const stripe=deps.stripe??stripeClient();
  const prepared=await moneyRpc<{sessionId?:string}>("prepare_business_checkout",{p_payment_id:payment.id},db);
+ if(!prepared?.sessionId)await deps.beforeProviderMutation?.();
  const session=prepared?.sessionId?await stripe.checkout.sessions.retrieve(prepared.sessionId,{stripeAccount:merchant.stripe_account_id!}):await stripe.checkout.sessions.create({mode:"payment",line_items:[{price_data:{currency:input.currency,unit_amount:input.amountCents,product_data:{name:input.purpose==="quote"?"Accepted quote":input.purpose==="deposit"?"Booking deposit":"Business payment"}},quantity:1}],success_url:input.successUrl,cancel_url:input.cancelUrl,metadata:{businessPaymentId:payment.id},payment_intent_data:{application_fee_amount:0,metadata:{businessPaymentId:payment.id}}},{stripeAccount:merchant.stripe_account_id!,idempotencyKey:`payment:${payment.id}`});
  await moneyRpc("record_business_payment_event",{p_account_id:merchant.stripe_account_id,p_event_id:`checkout:${session.id}`,p_object_id:session.id,p_payment_id:payment.id,p_kind:"checkout_created",p_amount:0},db);
  return {paymentId:payment.id,sessionId:session.id,url:session.url};
@@ -86,6 +87,7 @@ export async function createDirectCheckout(input:DirectCheckoutInput,deps:Connec
 export async function createDirectSubscription(input:{workspaceId:string;idempotencyKey:string;customerId:string;priceId:string;purpose:string;businessWorkspaceId?:string;agencyInvoiceId?:string},deps:ConnectDependencies={}) {
  const merchant=await getConnectedMerchant(input.workspaceId,deps.db===undefined?connectDb():deps.db);
  if (!/^cus_[A-Za-z0-9]+$/.test(input.customerId)||!/^price_[A-Za-z0-9]+$/.test(input.priceId)||input.idempotencyKey.length<8) throw new WorkspaceStoreError("Subscription inputs are invalid.");
+ await deps.beforeProviderMutation?.();
  return (deps.stripe??stripeClient()).subscriptions.create({customer:input.customerId,items:[{price:input.priceId}],payment_behavior:"default_incomplete",metadata:{agencyWorkspaceId:input.workspaceId,businessWorkspaceId:input.businessWorkspaceId??"",purpose:input.purpose,...(input.agencyInvoiceId?{agencyInvoiceId:input.agencyInvoiceId}:{})}},{stripeAccount:merchant.stripe_account_id!,idempotencyKey:input.idempotencyKey});
 }
 /** Trusted callers only: identifiers must come from the signed account-scoped object. No customer-supplied account or payment id. */

@@ -30,18 +30,23 @@ export async function fulfillAgencyInvoice(actor:WorkspaceActor,intentId:string,
  const intent=await commandAgencyInvoice(actor,{action:"prepare",intentId},db);
  if(intent.provider_object_id) return intent;
  const merchant=await getConnectedMerchant(intent.agency_workspace_id,db);
+ const admissionArgs={p_intent_id:intent.id,p_actor_id:actor.userId,p_verified_email:actor.verifiedEmail,p_accepted_email:intent.accepted_email,p_account_id:merchant.stripe_account_id,p_generation:merchant.generation};
+ const assertAdmission=async()=>{await rpc("assert_agency_billing_mutation",admissionArgs,db);};
+ const mutationDeps={...deps,beforeProviderMutation:assertAdmission};
  let objectId:string;let url:string|null;
  if(intent.kind==="pay_link") {
   const result=await createDirectCheckout({workspaceId:intent.agency_workspace_id,idempotencyKey:`agency-invoice:${intent.id}`,purpose:"pay_link",amountCents:intent.amount_cents,currency:intent.currency,referenceId:intent.id,
-   successUrl:`${origin}/workspace/billing?workspaceId=${intent.business_workspace_id}&invoiceId=${intent.id}`,cancelUrl:`${origin}/workspace/billing?workspaceId=${intent.business_workspace_id}&invoiceId=${intent.id}`},deps);
+   successUrl:`${origin}/workspace/billing?workspaceId=${intent.business_workspace_id}&invoiceId=${intent.id}`,cancelUrl:`${origin}/workspace/billing?workspaceId=${intent.business_workspace_id}&invoiceId=${intent.id}`},mutationDeps);
   objectId=result.sessionId;url=result.url??null;
  } else {
   if(!intent.accepted_email) throw new WorkspaceStoreError("The accepted payer is unavailable.");
   const stripe=deps.stripe??stripeClient();const scope={stripeAccount:merchant.stripe_account_id!};
+  await assertAdmission();
   const customer=await stripe.customers.create({email:intent.accepted_email,metadata:{agencyInvoiceId:intent.id,businessWorkspaceId:intent.business_workspace_id}},{...scope,idempotencyKey:`agency-invoice:${intent.id}:customer`});
+  await assertAdmission();
   const price=await stripe.prices.create({currency:intent.currency,unit_amount:intent.amount_cents,recurring:{interval:"month"},product_data:{name:intent.description}},{...scope,idempotencyKey:`agency-invoice:${intent.id}:price`});
-  await rpc("record_agency_billing_terms",{p_intent_id:intent.id,p_account_id:merchant.stripe_account_id,p_customer_id:customer.id,p_price_id:price.id},db);
-  const subscription=await createDirectSubscription({workspaceId:intent.agency_workspace_id,idempotencyKey:`agency-invoice:${intent.id}:subscription`,customerId:customer.id,priceId:price.id,purpose:"agency_rebill",businessWorkspaceId:intent.business_workspace_id},{...deps,stripe});
+  await rpc("record_agency_billing_terms_authorized",{...admissionArgs,p_customer_id:customer.id,p_price_id:price.id},db);
+  const subscription=await createDirectSubscription({workspaceId:intent.agency_workspace_id,idempotencyKey:`agency-invoice:${intent.id}:subscription`,customerId:customer.id,priceId:price.id,purpose:"agency_rebill",businessWorkspaceId:intent.business_workspace_id},{...mutationDeps,stripe});
   objectId=subscription.id;
   const invoiceId=typeof subscription.latest_invoice==="string"?subscription.latest_invoice:subscription.latest_invoice?.id;
   const persisted=await rpc("record_agency_billing_checkout",{p_intent_id:intent.id,p_account_id:merchant.stripe_account_id,p_object_id:objectId,p_url:null},db);
