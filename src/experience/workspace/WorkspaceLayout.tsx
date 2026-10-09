@@ -32,7 +32,7 @@ import {
 } from "./WorkspaceOfferings";
 import type { WorkspaceStartContext, WorkspaceStartContinuation, WorkspaceStartTemplate, WorkspaceStartWebsiteHandoff } from "./workspace-start";
 import { viewForWork } from "./workspace-selection";
-import { workspaceHistoryState } from "@/platform/workspaces/location";
+import { navigateWorkspace, readWorkspaceLocation, workspaceHistoryState } from "@/platform/workspaces/location";
 import { withPreviewRouteContext, type PreviewRouteContext } from "./preview/route-context";
 import styles from "./workspace-surface.module.css";
 
@@ -93,7 +93,7 @@ interface Props {
 
 function initialSection(): StrelvaSection {
   if (typeof window === "undefined") return "home";
-  return sectionFromView(new URLSearchParams(window.location.search).get("view"));
+  return sectionFromView(readWorkspaceLocation(new URLSearchParams(window.location.search)).view);
 }
 
 /** A retired page's old address (`view=customers`) opens Home; drop it from the URL. */
@@ -107,17 +107,17 @@ function forgetRetiredView(): void {
 
 function initialStartOpen(): boolean {
   if (typeof window === "undefined") return false;
-  return new URLSearchParams(window.location.search).get("view") === "start";
+  return readWorkspaceLocation(new URLSearchParams(window.location.search)).view === "start";
 }
 
 function initialSystemId(): string | null {
   if (typeof window === "undefined") return null;
-  return new URLSearchParams(window.location.search).get("system");
+  return readWorkspaceLocation(new URLSearchParams(window.location.search)).system || null;
 }
 
 function initialOfferingId(): string | null {
   if (typeof window === "undefined") return null;
-  return new URLSearchParams(window.location.search).get("offering");
+  return readWorkspaceLocation(new URLSearchParams(window.location.search)).offering || null;
 }
 
 export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, managedWork = [], managedWorkUnavailable, home, agency, busy, selectedWork, workingTitle, workingSection = "work", atSectionRoot = false, onHome, onNew, onPlan, onOngoing, onAgency, onInquiry, onTracker, onWebsite, onDocument, onHorizontal, trackerTemplates, inquiryBusinesses = [], inquiry, tracker, plan, document, onCreatedApp, onChoose, onWorkspace, onOpenClientWork, notice, children, inquirySource, previewRouteContext }: Props) {
@@ -165,7 +165,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
     if (section === "products" && productId) productHeadingRef.current?.focus({ preventScroll: true });
   }, [offeringId, productId, section]);
   useEffect(() => {
-    if (section !== "work" || typeof window === "undefined" || new URLSearchParams(window.location.search).get("search") !== "1") return;
+    if (section !== "work" || typeof window === "undefined" || readWorkspaceLocation(new URLSearchParams(window.location.search)).search !== "1") return;
     const frame = window.requestAnimationFrame(() => searchInputRef.current?.focus());
     return () => window.cancelAnimationFrame(frame);
   }, [section]);
@@ -229,23 +229,8 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
     return workspaceWorkLabel(work);
   }
 
-  function clearEmbeddedParams(url: URL) {
-    url.searchParams.delete("standingId");
-    url.searchParams.delete("assignmentId");
-    url.searchParams.delete("tenantId");
-    url.searchParams.delete("inquiryView");
-    url.searchParams.delete("inquiryRequest");
-    url.searchParams.delete("inquiryRecord");
-    url.searchParams.delete("trackerWork");
-    url.searchParams.delete("row");
-    url.searchParams.delete("search");
-    url.searchParams.delete("offering");
-    url.searchParams.delete("template");
-    url.searchParams.delete("system");
-  }
-
   function workspaceIdForNavigation(): string {
-    return new URLSearchParams(window.location.search).get("workspaceId") || snapshot.workspaceId;
+    return readWorkspaceLocation(new URLSearchParams(window.location.search)).workspaceId || snapshot.workspaceId;
   }
 
   function openSearch() {
@@ -257,24 +242,12 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
     if (next === "access") { openAccess(); return; }
     setStartOpen(false); setSection(next); setProductId(null); setOfferingId(null); setQuery(""); setHelpRequest(next === "help" ? prefillHelp : undefined); setWebsiteHandoff(null);
     if (next === "ongoing") onOngoing(); else onHome();
-    const url = new URL(window.location.href);
-    clearEmbeddedParams(url);
-    if (next === "home") url.searchParams.delete("view"); else url.searchParams.set("view", next);
-    if (focusSearch && next === "work") url.searchParams.set("search", "1"); else url.searchParams.delete("search");
-    url.searchParams.delete("work");
-    url.searchParams.delete("offering");
-    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
+    navigateWorkspace({ workspaceId: workspaceIdForNavigation(), view: next === "home" ? undefined : next, search: focusSearch && next === "work" ? "1" : undefined });
   }
   function openSystem(id: string) {
     setStartOpen(false); setSection("system"); setSystemId(id); setProductId(null); setOfferingId(null); setQuery(""); setHelpRequest(undefined); setWebsiteHandoff(null);
     onHome();
-    const url = new URL(window.location.href);
-    clearEmbeddedParams(url);
-    url.searchParams.delete("work");
-    url.searchParams.set("view", "system");
-    url.searchParams.set("system", id);
-    url.searchParams.set("workspaceId", workspaceIdForNavigation());
-    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
+    navigateWorkspace({ workspaceId: workspaceIdForNavigation(), view: "system", system: id });
   }
 
   /** Ask Strelva on Home (systemId null) or about one System, optionally with words to start from. */
@@ -282,36 +255,20 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
     setStartOpen(false); setSection("ask"); setSystemId(forSystemId); setProductId(null); setOfferingId(null); setQuery(""); setHelpRequest(undefined); setWebsiteHandoff(null);
     setAskSeed(current => ({ text, session: current.session + 1 }));
     onHome();
-    const url = new URL(window.location.href);
-    clearEmbeddedParams(url);
-    url.searchParams.delete("work");
-    url.searchParams.set("view", "ask");
-    if (forSystemId) url.searchParams.set("system", forSystemId);
-    url.searchParams.set("workspaceId", workspaceIdForNavigation());
-    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
+    navigateWorkspace({ workspaceId: workspaceIdForNavigation(), view: "ask", system: forSystemId || undefined });
   }
 
   function openWork(id: string) {
     setStartOpen(false);
     onChoose(id);
     const selected = snapshot.work.find((work) => work.id === id);
-    const url = new URL(window.location.href); url.searchParams.set("work", id); url.searchParams.set("workspaceId", workspaceIdForNavigation());
-    clearEmbeddedParams(url);
-    url.searchParams.set("view", viewForWork(selected?.productId));
-    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
+    navigateWorkspace({ workspaceId: workspaceIdForNavigation(), view: viewForWork(selected?.productId), work: id });
   }
 
   function openInquiry(tenantId: string, context?: WorkspaceStartContinuation) {
     setStartOpen(false);
     onInquiry?.(tenantId, context);
-    const url = new URL(window.location.href);
-    url.searchParams.set("view", "inquiries");
-    url.searchParams.set("tenantId", tenantId);
-    url.searchParams.delete("work");
-    url.searchParams.delete("inquiryView");
-    url.searchParams.delete("inquiryRequest");
-    url.searchParams.delete("inquiryRecord");
-    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
+    navigateWorkspace({ workspaceId: workspaceIdForNavigation(), view: "inquiries", tenantId });
   }
 
   function openAccess() {
@@ -323,12 +280,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
     setHelpRequest(undefined);
     setWebsiteHandoff(null);
     onAgency();
-    const url = new URL(window.location.href);
-    clearEmbeddedParams(url);
-    url.searchParams.set("view", "access");
-    url.searchParams.delete("work");
-    url.searchParams.delete("offering");
-    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
+    navigateWorkspace({ workspaceId: workspaceIdForNavigation(), view: "access" });
   }
 
   function rememberRequest(request: string, route = "start") {
@@ -375,12 +327,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
     setHelpRequest(undefined);
     setWebsiteHandoff(null);
     onHome();
-    const url = new URL(window.location.href);
-    clearEmbeddedParams(url);
-    url.searchParams.set("view", "start");
-    url.searchParams.delete("work");
-    url.searchParams.delete("offering");
-    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
+    navigateWorkspace({ workspaceId: workspaceIdForNavigation(), view: "start" });
   }
 
   function openOffering(id?: string | null) {
@@ -392,22 +339,15 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
     setHelpRequest(undefined);
     setWebsiteHandoff(null);
     onHome();
-    const url = new URL(window.location.href);
-    clearEmbeddedParams(url);
-    url.searchParams.set("view", "products");
-    url.searchParams.delete("work");
-    if (id) url.searchParams.set("offering", id); else url.searchParams.delete("offering");
-    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
+    navigateWorkspace({ workspaceId: workspaceIdForNavigation(), view: "products", offering: id || undefined });
   }
 
   /** Opening a product leaves the offering: push a new entry so Back returns to the offering. */
   function openProduct(id: string) {
     setOfferingId(null);
     setProductId(id);
-    const url = new URL(window.location.href);
-    if (!url.searchParams.has("offering")) return;
-    url.searchParams.delete("offering");
-    window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
+    if (!readWorkspaceLocation(new URLSearchParams(window.location.search)).offering) return;
+    navigateWorkspace({ workspaceId: workspaceIdForNavigation(), view: "products" });
   }
 
   function continueStart(continuation: WorkspaceStartContinuation) {

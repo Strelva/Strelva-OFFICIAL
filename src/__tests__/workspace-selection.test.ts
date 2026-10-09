@@ -29,8 +29,8 @@ describe("workspace navigation selection", () => {
 
   it("retains access precedence and exact assignment or responsibility selection", () => {
     expect(resolve("view=access&work=saved", { ...empty, work: [work("applications")] }).view).toBe("agency");
-    expect(resolve("standingId=standing&work=missing")).toMatchObject({ view: "operations", selectedStandingId: "standing", missingWork: false });
-    expect(resolve("assignmentId=assignment")).toMatchObject({ view: "operations", selectedAssignmentId: "assignment", home: false });
+    expect(resolve("standingId=11111111-1111-4111-8111-111111111111&work=missing")).toMatchObject({ view: "operations", selectedStandingId: "11111111-1111-4111-8111-111111111111", missingWork: false });
+    expect(resolve("assignmentId=22222222-2222-4222-8222-222222222222")).toMatchObject({ view: "operations", selectedAssignmentId: "22222222-2222-4222-8222-222222222222", home: false });
   });
 
   it("honors inquiry availability and explicit tenant before defaults", () => {
@@ -38,4 +38,12 @@ describe("workspace navigation selection", () => {
     expect(selectWorkspaceLocation(new URLSearchParams("view=inquiries&tenantId=explicit"), data, { tenantId: "default" })).toMatchObject({ view: "inquiries", inquiryTenantId: "explicit" });
     expect(resolve("view=inquiries", empty).view).toBe("work");
   });
+});
+
+
+it.each(["work=%2Fprivate", "work=", "work=saved&work=other"])("malformed work does not open the first result: %s", query => {
+  expect(resolve(query, { ...empty, work: [work("documents")] })).toMatchObject({ missingWork: true, selectedWorkId: null, home: false, showAssessment: false });
+});
+it("incompatible System or offering detail cannot redirect work selection", () => {
+  expect(resolve("view=plan&system=44444444-4444-4444-8444-444444444444&standingId=11111111-1111-4111-8111-111111111111&offering=old")).toMatchObject({ view: "plan", selectedStandingId: null });
 });
