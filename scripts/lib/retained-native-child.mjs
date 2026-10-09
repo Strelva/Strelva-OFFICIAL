@@ -33,6 +33,10 @@ export function startRetainedNativeChild(name, { spawn, args, env, retain, timeo
       retain(`${name}-process.json`, JSON.stringify(result, null, 2)); resolve(result);
     });
   });
+  // A holder/worker may be registered before the harness reaches its await.
+  // Observe rejection immediately, while preserving the original rejecting
+  // promise for global cleanup to await and refuse qualification.
+  void completed.catch(() => {});
   log();
   return { child, completed, output: () => stdout, done: () => closed, terminate };
 }

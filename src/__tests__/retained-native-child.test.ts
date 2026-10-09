@@ -39,6 +39,23 @@ describe("retained native child lifecycle", () => {
     vi.useFakeTimers(); const owned = corrected(); const refused = expect(owned.completed).rejects.toThrow("closure was not observed"); owned.process.stderr.emit("data", "partial diagnostics retained\n");
     await vi.advanceTimersByTimeAsync(130); await refused; expect(owned.done()).toBe(false); expect(owned.artifacts.get("owned.log")).toContain("partial diagnostics retained"); expect(JSON.parse(owned.artifacts.get("owned-closure-unconfirmed.json")!)).toMatchObject({ closed: false, pid: 1234 });
   });
+  it("observes rejection immediately before the harness begins an eventual cleanup await", async () => {
+    vi.useFakeTimers(); const owned = corrected();
+    // No caller rejection observer exists during the entire timeout/closure
+    // window. Vitest rejects an unhandled rejection if the helper omits its
+    // immediate observer; the original promise must still reject on await.
+    await vi.advanceTimersByTimeAsync(130);
+    expect(owned.done()).toBe(false);
+    await expect(owned.completed).rejects.toThrow("closure was not observed");
+  });
+  it("pins exact sorted installed migration identities and history after inverse AND reapply", () => {
+    const source = readFileSync("scripts/check-checkout-final-admission-races.mjs", "utf8");
+    expect(source).toContain("jsonb_agg(version::text order by version::text)");
+    expect(source).toContain("JSON.stringify(installedLedger) !== JSON.stringify(expectedLedger)");
+    expect(source).toContain('run("history-after-inverse", history) !== retained');
+    expect(source).toContain('run("history-after-reapply", history) !== retained');
+    expect(source).toContain("JSON.stringify(ledgerAfter) !== JSON.stringify(installedLedger)");
+  });
   it("pins the actual holder/worker transaction and PostgreSQL pre/post-expiry witnesses before release", () => {
     const source = readFileSync("scripts/check-checkout-final-admission-races.mjs", "utf8");
     expect(source).toContain("w.pid=${workerPid}"); expect(source).toContain("${holding.pid}=any(pg_blocking_pids(w.pid))"); expect(source).toContain("l.transactionid::text=${literal(holding.transaction)}"); expect(source).toContain("l.relation='public.${relation}'::regclass and l.mode='RowShareLock'");

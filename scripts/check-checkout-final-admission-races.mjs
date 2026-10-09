@@ -86,12 +86,15 @@ const signature = "public.assert_business_checkout_admission(uuid,text,bigint,uu
 const forward = join(root, "supabase/migrations/20261022171000_checkout_final_admission.sql");
 const inverse = join(root, "supabase/migrations/rollback-20261022171000_checkout_final_admission.sql");
 const catalogSql = "select p.oid::regprocedure::text||'|'||md5(pg_get_functiondef(p.oid))||'|'||p.proowner||'|'||coalesce(p.proacl::text,'') from pg_proc p where p.pronamespace='public'::regnamespace order by 1";
-let status = "failed", error;
+let status = "failed", error, installedLedger;
 try {
-  // Catalog-source check and exact installed forward count bind this rehearsal.
+  // Catalog-source check and exact installed forward identity bind this rehearsal.
   await run("source-contract", `\\i ${root}/scripts/sql/checkout-final-admission-contract.sql`);
-  const count = await run("exact-forward-count", "select count(*) from supabase_migrations.schema_migrations");
-  if (count !== "344") throw new Error("Requires the exact qualified 344-migration clone; no prior 343 proof is reused.");
+  const expectedLedger = inventory.forwardFiles.map(file => /^([0-9]+)_/.exec(file)?.[1]).sort();
+  if (inventory.forwardCount !== 344 || expectedLedger.length !== 344 || expectedLedger.some(version => !version) || new Set(expectedLedger).size !== 344) throw new Error("Source inventory must contain the exact unique 344 forward versions");
+  installedLedger = JSON.parse(await run("exact-forward-ledger", "select coalesce(jsonb_agg(version::text order by version::text),'[]'::jsonb) from supabase_migrations.schema_migrations"));
+  retain("installed-forward-ledger.json", JSON.stringify({ expected: expectedLedger, installed: installedLedger }, null, 2));
+  if (JSON.stringify(installedLedger) !== JSON.stringify(expectedLedger)) throw new Error("Requires the exact sorted qualified 344-migration identity; a same-count substituted ledger is refused.");
   for (const kind of cases) {
     const f = await fixture(kind), label = kind.replaceAll(" ", "-"), app = `checkout-wait-${randomUUID()}`;
     fixtureWorkspaces.push(f.business, f.agency);
@@ -108,13 +111,15 @@ try {
     if (kind === "agency actor withdrawal" || kind === "agency owner withdrawal") { relation = "users"; const id = kind === "agency actor withdrawal" ? f.manager : f.owner; lock = `select 1 from public.users where id='${id}' for update;`; mutation = `update public.users set verified_at=null where id='${id}';`; }
     if (kind === "agency payer withdrawal") { relation = "accounts"; lock = `select 1 from public.accounts where workspace_id='${f.business}' for update;`; mutation = `update public.accounts set payer_kind='business',payer_workspace_id=null where workspace_id='${f.business}';`; }
     if (kind === "agency customer exit") mutation = `insert into public.workspace_exit_requests(workspace_id,requested_by,idempotency_key,command_digest,future_work,provider_participation,maintained_resource_action,state,completed_at) values('${f.business}','${f.owner}','fictional-checkout-exit-${f.payment}',repeat('4',64),'pause','keep','stop','{"status":"completed"}',clock_timestamp());`;
-    const holder = processSql(`${label}-holder`); holder.child.stdin.write(`begin;${lock}select 'CHECKOUT_LOCK_HELD|'||jsonb_build_object('pid',pg_backend_pid(),'transaction',pg_current_xact_id()::text);\n`);
+    const holder = processSql(`${label}-holder`);
+    let worker;
+    try {
+      holder.child.stdin.write(`begin;${lock}select 'CHECKOUT_LOCK_HELD|'||jsonb_build_object('pid',pg_backend_pid(),'transaction',pg_current_xact_id()::text);\n`);
     await waitUntil(() => holder.output().includes("CHECKOUT_LOCK_HELD|"), `${kind}: holder did not acquire the expected lock`);
     const holding = JSON.parse(holder.output().split("\n").find(line => line.startsWith("CHECKOUT_LOCK_HELD|")).slice("CHECKOUT_LOCK_HELD|".length));
     if (!Number.isInteger(holding.pid) || holding.pid <= 0 || !/^[0-9]+$/.test(holding.transaction)) throw new Error("Holder backend identity was invalid");
     retain(`${label}-holder-binding.json`, JSON.stringify({ ...holding, relation, app }, null, 2));
-    const worker = processSql(`${label}-admission`); worker.child.stdin.end(`set application_name=${literal(app)};select 'CHECKOUT_WORKER_PID|'||pg_backend_pid();${admission}\n`);
-    try {
+      worker = processSql(`${label}-admission`); worker.child.stdin.end(`set application_name=${literal(app)};select 'CHECKOUT_WORKER_PID|'||pg_backend_pid();${admission}\n`);
       let witness;
       await waitUntil(() => worker.output().includes("CHECKOUT_WORKER_PID|"), `${kind}: actual worker PID was not observed`);
       const workerPid = Number(worker.output().split("\n").find(line => line.startsWith("CHECKOUT_WORKER_PID|")).slice("CHECKOUT_WORKER_PID|".length));
@@ -143,8 +148,10 @@ try {
       if (await run(`${label}-receipt`, `select public.prepare_business_checkout('${f.payment}')->>'sessionId'`) !== session) throw new Error(`${kind}: accepted-effect recovery was lost`);
       console.log(`Checkout final admission after observed lock wait PASS: ${kind}; accepted receipt remains readable.`);
     } finally {
-      if (!holder.done()) { holder.child.stdin.end("rollback;\n"); await holder.completed; }
-      if (!worker.done()) { worker.terminate(); await worker.completed; }
+      const owned = [holder, worker].filter(Boolean);
+      for (const child of owned) if (!child.done()) child.terminate();
+      const closed = await Promise.allSettled(owned.map(child => child.completed));
+      if (closed.some(result => result.status !== "fulfilled") || owned.some(child => !child.done())) throw new Error(`${kind}: case child closure unconfirmed; global cleanup still required`);
     }
   }
   const baseline = await run("catalog-before-probes", catalogSql);
@@ -170,6 +177,9 @@ try {
   if (await run("history-after-inverse", history) !== retained) throw new Error("Legitimate inverse changed retained accepted payment/history bytes");
   await run("legitimate-reapply", `\\i ${forward}`);
   if (await run("catalog-after-reapply", catalogSql) !== baseline) throw new Error("Reapply changed original historical functions or the current gate contract");
+  if (await run("history-after-reapply", history) !== retained) throw new Error("Reapply changed retained accepted payment/history bytes");
+  const ledgerAfter = JSON.parse(await run("ledger-after-reapply", "select coalesce(jsonb_agg(version::text order by version::text),'[]'::jsonb) from supabase_migrations.schema_migrations"));
+  if (JSON.stringify(ledgerAfter) !== JSON.stringify(installedLedger)) throw new Error("Migration ledger identity changed during inverse/reapply");
   status = "passed";
 } catch (failure) { error = failure instanceof Error ? failure.message : String(failure); process.exitCode = 1; }
 finally {
@@ -178,6 +188,6 @@ finally {
   retain("source-end.json", JSON.stringify(sourceAfter, null, 2));
   const sourceUnchanged = JSON.stringify(sourceBefore) === JSON.stringify(sourceAfter);
   if (!sourceUnchanged) { status = "failed"; error ||= "Execution source changed between native start and all owned child CLOSEs"; process.exitCode = 1; }
-  retain("receipt.json", JSON.stringify({ status, error, allOwnedChildrenClosed: true, sourceUnchanged, nativeProviderQualified: false, fullStackQualifiedByHarness: false, cleanupOwner: "coordinator-owned disposable clone", sourceBefore, sourceAfter, artifacts: Object.fromEntries(outputs.map(name => [name, hash(readFileSync(join(evidence, name)))])) }, null, 2));
+  retain("receipt.json", JSON.stringify({ status, error, allOwnedChildrenClosed: true, sourceUnchanged, nativeProviderQualified: false, fullStackQualifiedByHarness: false, cleanupOwner: "coordinator-owned disposable clone", installedLedger, sourceBefore, sourceAfter, artifacts: Object.fromEntries(outputs.map(name => [name, hash(readFileSync(join(evidence, name)))])) }, null, 2));
   if (error) console.error("Checkout admission race qualification failed. Retained private receipt and logs identify the exact native failure.");
 }
