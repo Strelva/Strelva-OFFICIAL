@@ -324,7 +324,7 @@ begin
       raise exception 'legacy_google_creation_authority_invalid'; end if;
     -- Explicit owner EXECUTE is required even though ownership carries implicit
     -- administrative powers. A revoked owner ACL is drift, not a new baseline.
-    if (select count(*) from aclexplode(coalesce(fn.proacl,acldefault('f',baseline_owner))))<>case when expected.service_execute then 2 else 1 end
+    if (select count(*) from aclexplode(coalesce(fn.proacl,acldefault('f',baseline_owner))))<>(case when expected.service_execute then 2 else 1 end)
       or not exists(select 1 from aclexplode(coalesce(fn.proacl,acldefault('f',baseline_owner))) a where a.grantee=baseline_owner
         and a.grantor=baseline_owner and a.privilege_type='EXECUTE' and not a.is_grantable)
       or (expected.service_execute and not exists(select 1 from aclexplode(coalesce(fn.proacl,acldefault('f',baseline_owner))) a
