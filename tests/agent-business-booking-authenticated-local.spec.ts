@@ -25,7 +25,7 @@ function effects(workspaceId: string) {
     select jsonb_build_object(
       'bookings',(select count(*) from public.business_bookings where workspace_id=:'v1'::uuid),
       'access',(select count(*) from public.business_booking_access a join public.business_bookings b on b.id=a.booking_id where b.workspace_id=:'v1'::uuid),
-      'updates',(select count(*) from public.business_booking_updates u join public.business_bookings b on b.id=u.booking_id where b.workspace_id=:'v1'::uuid),
+      'updates',(select count(*) from public.business_booking_updates u join public.business_booking_history h on h.id=u.history_id join public.business_bookings b on b.id=h.booking_id where b.workspace_id=:'v1'::uuid),
       'history',(select count(*) from public.business_booking_history h join public.business_bookings b on b.id=h.booking_id where b.workspace_id=:'v1'::uuid),
       'confirmations',(select count(*) from public.business_booking_access a join public.business_bookings b on b.id=a.booking_id where b.workspace_id=:'v1'::uuid and a.confirmed_at is not null));`, workspaceId);
 }

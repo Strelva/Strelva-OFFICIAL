@@ -1,3 +1,4 @@
+import { localSqlFailure } from "./sql-diagnostic";
 /**
  * Shared steps for the 1.0 signed-in journeys (tests/*-authenticated-local.spec.ts).
  *
@@ -167,8 +168,12 @@ export function localSql<T>(sql: string, ...values: string[]): T {
   const url = process.env.STRELVA_LOCAL_DB_URL || "";
   if (!url || new URL(url).hostname !== "127.0.0.1") throw new Error("Set STRELVA_LOCAL_DB_URL to the disposable database (loopback only).");
   const vars = values.flatMap((value, index) => ["-v", `v${index + 1}=${value}`]);
-  const out = execFileSync("psql", [url, "-X", "-A", "-t", "-q", "-v", "ON_ERROR_STOP=1", ...vars], { input: sql, encoding: "utf8" }).trim();
-  return (out ? JSON.parse(out) : null) as T;
+  let out: string;
+  try {
+    out = execFileSync("psql", [url, "-X", "-A", "-t", "-q", "-v", "ON_ERROR_STOP=1", ...vars], { input: sql, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }).trim();
+  } catch (error) { throw localSqlFailure(error, url); }
+  try { return (out ? JSON.parse(out) : null) as T; }
+  catch { throw new Error("Local SQL fixture returned invalid JSON."); }
 }
 
 /** Simulate the historical read-cutover precondition on this disposable DB.
