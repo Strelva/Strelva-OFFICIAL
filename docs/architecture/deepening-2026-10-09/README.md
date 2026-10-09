@@ -73,10 +73,13 @@ The founder glossary requires lifetime System kind, while older contracts,
 stores, tests and SQL permit kind updates. No application update caller was
 found beyond stores/tests, but the service-role RPC still exists. Kind affects
 health and native eligibility, so renaming it a description does not reconcile
-the discrepancy. This PR changes neither meaning nor enforcement. A separate
-follow-up must select lifetime-kind enforcement or an explicit lifetime/mutable
-classification distinction before coordinated contract work. No migration or
-production authority follows from this record.
+the discrepancy. This PR changes neither meaning nor enforcement. Jacob selected
+lifetime `System.kind` on October 9: a proposal can gain onboarding through
+content, purpose and behavior while keeping its kind. A separate implementation
+stream will remove the mutable contract and prepare forward SQL enforcement,
+preserving existing rows and migration history. Local disposable proof is
+authorized; applying migrations to shared/production data or rolling out the
+change still requires the existing separate authorization.
 
 ## Remaining streams and integration order
 
@@ -89,6 +92,9 @@ production authority follows from this record.
   URL and Back contracts.
 - Opened-work composition: own shared rendering and imports, preserving
   distinct action permissions and mounted request identity.
+- Lifetime System kind: enforce the selected glossary contract in an isolated
+  follow-up; inventory native/health consumers and existing SQL writers, prepare
+  forward enforcement, and prove changed-kind refusal plus ordinary updates.
 
 Review each exact completed head and its proof before integration. Reconcile
 `agency/version-server.ts` without losing the reads stream's chooser hunk.
