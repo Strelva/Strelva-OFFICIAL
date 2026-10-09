@@ -19,7 +19,11 @@ beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new 
 afterEach(async () => { await act(async () => root?.unmount()); container?.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 async function mount(values: unknown[]) {
   const replies = [...values];
-  const fetcher = vi.fn(async (_input: RequestInfo | URL, _options?: RequestInit) => new Response(JSON.stringify(replies.length > 1 ? replies.shift() : replies[0])));
+  const fetcher = vi.fn(async (_input: RequestInfo | URL, _options?: RequestInit) => {
+    const reply = replies.length > 1 ? replies.shift() : replies[0];
+    if (reply instanceof Error) throw reply;
+    return reply instanceof Response ? reply : new Response(JSON.stringify(reply));
+  });
   vi.stubGlobal("fetch", fetcher);
   container = document.createElement("div"); document.body.append(container);
   root = createRoot(container, { onUncaughtError: error => uncaught.push(error) });
@@ -34,6 +38,11 @@ function refused() {
 }
 
 describe("actual default monthly report HTTP consumer", () => {
+  for (const kind of ["HTTP", "caught Error"] as const) for (const message of ["", "   "]) it(`gives completed ${kind} with ${message ? "whitespace" : "empty"} copy a truthful error and retry`, async () => {
+    await mount([kind === "HTTP" ? new Response(JSON.stringify({ error: message }), { status: 503 }) : new Error(message)]);
+    refused(); expect(container.querySelector('[role="status"]')).toBeNull();
+  });
+
   it("refuses a fully shaped different-month reply instead of showing its counts under the selected month", async () => {
     const value = current(); value.month = "2026-08"; value.inquiries.count = 99;
     await mount([value]);
