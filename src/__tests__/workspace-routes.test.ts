@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  brandRpc: vi.fn(), user: vi.fn(), rate: vi.fn(), score: vi.fn(), personal: vi.fn(), list: vi.fn(), work: vi.fn(), getWork: vi.fn(),
+  creatorDraftIds: vi.fn(), makerAuthority: vi.fn(), brandRpc: vi.fn(), user: vi.fn(), rate: vi.fn(), score: vi.fn(), personal: vi.fn(), list: vi.fn(), work: vi.fn(), getWork: vi.fn(),
   save: vi.fn(), createAgency: vi.fn(), handoff: vi.fn(), inspect: vi.fn(), accept: vi.fn(),
   revoke: vi.fn(), cancel: vi.fn(), handoffs: vi.fn(), agencyDelegations: vi.fn(), workDelegations: vi.fn(),
   pending: vi.fn(), operation: vi.fn(), saveAudit: vi.fn(), preflight: vi.fn(), runPrivate: vi.fn(), savePublicResult: vi.fn(), managedWork: vi.fn(), exitRead: vi.fn(), exitCompleted: vi.fn(), systems: vi.fn(), provided: vi.fn(),
@@ -18,7 +18,7 @@ vi.mock("@/platform/workspace-exit", () => ({ readWorkspaceExit: mocks.exitRead,
 vi.mock("@/platform/workspaces", async () => {
   const types = await import("@/platform/workspaces/types");
   const { WorkspaceOperationPendingError } = await import("@/platform/workspaces/operations");
-  return { ...types, WorkspaceOperationPendingError, operationRequest: mocks.operation, listPendingAssessments: mocks.pending, assertCanSaveWork: mocks.preflight, ensurePersonalWorkspace: mocks.personal, listWorkspaces: mocks.list,
+  return { ...types, createdAgencyApplicationWorkIds: mocks.creatorDraftIds, makeSystemsAuthority: mocks.makerAuthority, WorkspaceOperationPendingError, operationRequest: mocks.operation, listPendingAssessments: mocks.pending, assertCanSaveWork: mocks.preflight, ensurePersonalWorkspace: mocks.personal, listWorkspaces: mocks.list,
     listWork: mocks.work, getWork: mocks.getWork, saveWork: mocks.save, createAgencyWorkspace: mocks.createAgency,
     createHandoff: mocks.handoff, inspectHandoff: mocks.inspect, acceptHandoff: mocks.accept,
     revokeDelegation: mocks.revoke, revokeHandoff: mocks.cancel, listAgencyHandoffs: mocks.handoffs,
@@ -56,6 +56,8 @@ beforeEach(() => {
   mocks.user.mockResolvedValue({ id: "actor", email: "OWNER@example.com", email_confirmed_at: "2026-09-05" });
   mocks.brandRpc.mockResolvedValue({ data: null, error: null });
   mocks.rate.mockResolvedValue(false);
+  mocks.creatorDraftIds.mockResolvedValue([]);
+  mocks.makerAuthority.mockResolvedValue(null);
   mocks.pending.mockResolvedValue([]);
   mocks.personal.mockResolvedValue(workspace);
   mocks.list.mockResolvedValue([workspace]);
@@ -106,6 +108,48 @@ it("opens a provider client without publishing inquiry, Ask, decision or member 
   expect(mocks.systems).toHaveBeenCalledWith(expect.objectContaining({ canWrite: false }));
   expect(mocks.pending).not.toHaveBeenCalled();
   expect(mocks.workDelegations).not.toHaveBeenCalled();
+});
+
+describe("current maker authority snapshot", () => {
+  it.each(["provider", "agency", "member", null])("exposes make permission only for maker authority %s", async authority => {
+    mocks.makerAuthority.mockResolvedValue(authority);
+    const response = await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${workspaceId}`));
+    expect(response.status).toBe(200);
+    expect((await response.json()).canMakeSystems).toBe(authority === "provider" || authority === "agency");
+    expect(mocks.makerAuthority).toHaveBeenCalledWith(expect.objectContaining({ userId: "actor", verifiedEmail: "owner@example.com" }), workspaceId);
+    expect(mocks.creatorDraftIds).not.toHaveBeenCalled();
+  });
+  it("marks only returned creator drafts for a provider seat without granting member mutations", async () => {
+    mocks.list.mockResolvedValue([{ ...workspace, kind: "customer", access: "provider_seat", role: undefined }]);
+    mocks.work.mockResolvedValue([work, trackerWork]);
+    mocks.creatorDraftIds.mockResolvedValue([work.id]);
+    mocks.makerAuthority.mockResolvedValue("provider");
+    const response = await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${workspaceId}`));
+    expect(response.status).toBe(200);
+    const snapshot = await response.json();
+    expect(snapshot.canMakeSystems).toBe(true);
+    expect(snapshot.work.find((item: { id: string }) => item.id === work.id).creatorDraft).toBe(true);
+    expect(snapshot.work.find((item: { id: string }) => item.id === trackerWork.id).creatorDraft).toBeUndefined();
+    expect(snapshot.releases).toMatchObject({ needsYou: false, ask: false, inquiries: false });
+    expect(mocks.creatorDraftIds).toHaveBeenCalledWith(expect.objectContaining({ userId: "actor" }), workspaceId);
+    expect(mocks.systems).toHaveBeenCalledWith(expect.objectContaining({ canWrite: false }));
+  });
+  it.each(["maker", "creator"])("fails closed when %s authority storage is unavailable", async source => {
+    if (source === "creator") {
+      mocks.list.mockResolvedValue([{ ...workspace, kind: "customer", access: "provider_seat", role: undefined }]);
+      mocks.creatorDraftIds.mockRejectedValue(new WorkspaceStoreError("Created application authority is unavailable"));
+    } else mocks.makerAuthority.mockRejectedValue(new WorkspaceStoreError("Workspace authority is unavailable"));
+    const response = await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${workspaceId}`));
+    expect(response.status).toBe(503);
+    expect(await response.json()).not.toHaveProperty("work");
+  });
+  it("does not read maker authority while Systems is disabled", async () => {
+    vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "0");
+    const response = await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${workspaceId}`));
+    expect(response.status).toBe(200);
+    expect((await response.json()).canMakeSystems).toBe(false);
+    expect(mocks.makerAuthority).not.toHaveBeenCalled();
+  });
 });
 
 describe("release-one private workspace routes", () => {
