@@ -1,3 +1,4 @@
+import { websiteDomainRequestSchema } from "./recovery-contracts";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
@@ -63,6 +64,16 @@ export function createWebsiteDomainRequestService(ports: WebsiteDomainRequestPor
 export const websiteDomainRequestService = createWebsiteDomainRequestService({ store: websiteDomainRequestStore, change: changeHostedDomain, read: readHostedDomains,
   enabled: workspaceId => websiteRebuildReleaseEnabledForWorkspace(workspaceId),
   checkRouting: async request => (await checkWebsiteHealth({ workspaceId: request.workspaceId, workId: request.workId, tenantId: request.tenantId!, revision: request.publishedRevision, contentHash: request.publishedHash, url: `https://${request.hostname}/` })).status === "healthy" });
+
+/** Read one retained command receipt without preparing DNS or applying a domain. */
+export async function readWebsiteDomainRequest(actor: WorkspaceActor, workId: string, raw: unknown) {
+  const input = z.object({ workspaceId: z.string().uuid(), requestId: z.string().uuid() }).strict().parse(raw);
+  z.string().uuid().parse(workId);
+  if (!(await websiteRebuildReleasedFor(actor, input.workspaceId))) throw new WorkspaceConflictError("Website rebuilds are not enabled.");
+  await websiteDocumentStore.manage(actor, { workspaceId: input.workspaceId, workId });
+  const saved = (await websiteDomainRequestStore.list(input.workspaceId)).find(row => row.workspaceId === input.workspaceId && row.workId === workId && row.id === input.requestId);
+  return saved ? websiteDomainRequestSchema.parse(saved) : null;
+}
 
 export async function prepareWebsiteDomainRequest(actor: WorkspaceActor, workId: string, raw: unknown) {
   const input = z.object({ workspaceId: z.string().uuid(), requestId: z.string().uuid(), domain: z.string().trim().min(1).max(253) }).strict().parse(raw);

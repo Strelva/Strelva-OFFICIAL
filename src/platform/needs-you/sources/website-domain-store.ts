@@ -1,12 +1,12 @@
 import { z } from "zod";
+import { websiteDomainRequestSchema, type WebsiteDomainRequest } from "@/products/websites/recovery-contracts";
+export { websiteDomainRequestSchema, type WebsiteDomainRequest } from "@/products/websites/recovery-contracts";
 import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import type { SendEmailResult } from "@/platform/infra/email/send";
 import { customerEmailEnabled, emailSendingEnabled } from "@/platform/infra/email/enabled";
 import { getClientEmailOverride } from "@/platform/infra/email/client-override";
 
-const recordSchema = z.object({ type: z.string().min(1).max(40), name: z.string().min(1).max(253), value: z.string().min(1).max(1000) }).strict();
-const domainResultSchema = z.object({ hostname: z.string(), status: z.string(), checkedAt: z.string(), records: z.array(recordSchema), error: z.string().optional(), routing: z.enum(["verified", "unverified"]).optional(), registrationAttempt: z.enum(["not_submitted", "unknown", "confirmed", "rejected"]).optional() });
 /** A decided domain action must not become a retryable failed write when its
  * submission may have reached the provider. The durable claim is the evidence;
  * unknown never means the domain was attached. */
@@ -18,15 +18,6 @@ export class WebsiteDomainEffectUnconfirmedError extends WorkspaceStoreError {
     this.name = "WebsiteDomainEffectUnconfirmedError";
   }
 }
-export const websiteDomainRequestSchema = z.object({
-  id: z.string().uuid(), workspaceId: z.string().uuid(), workId: z.string().uuid(), tenantId: z.string().nullable(),
-  systemId: z.string().uuid().optional(),
-  publishedRevision: z.number().int().positive(), publishedHash: z.string().regex(/^[0-9a-f]{64}$/),
-  hostname: z.string(), records: z.array(recordSchema).min(1).max(20), revisionHash: z.string().regex(/^[0-9a-f]{64}$/),
-  createdAt: z.string(), expiresAt: z.string(), current: z.boolean(), decisionId: z.string().uuid().nullable(), result: domainResultSchema.nullable(),
-  receiptEmail: z.object({ status: z.enum(["accepted", "suppressed"]), reason: z.string().optional(), providerMessageId: z.string().optional(), acceptedAt: z.string().optional() }).nullable(),
-});
-export type WebsiteDomainRequest = z.infer<typeof websiteDomainRequestSchema>;
 type Rpc = { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message: string } | null }> };
 export function createWebsiteDomainRequestStore(client?: Rpc) {
   async function rpc(name: string, args: Record<string, unknown>) {
