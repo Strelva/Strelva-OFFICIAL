@@ -204,3 +204,24 @@ it("shows a sourced native introduction without making the external System a cha
   expect(projection.systems[0]!.health.summary).toBe("Control is unverified");
   expect(projection.systems[0]!.surface).toMatchObject({ liveUrl: "https://example.org/" });
 });
+
+
+it.each([
+  { creatorDraft: true, versionReadOnly: false, workspaceStopped: false, editable: true },
+  { creatorDraft: false, versionReadOnly: false, workspaceStopped: false, editable: false },
+  { creatorDraft: true, versionReadOnly: true, workspaceStopped: false, editable: false },
+  { creatorDraft: true, versionReadOnly: undefined, workspaceStopped: false, editable: false },
+  { creatorDraft: true, versionReadOnly: false, workspaceStopped: true, editable: false },
+])("limits provider System draft editing to exact unblocked creator work: %j", async ({ creatorDraft, versionReadOnly, workspaceStopped, editable }) => {
+  const service = createApplicationService(memoryBoundedStore());
+  const saved = await service.create(owner, "workspace-a", { title: "Provider draft", maintenanceOwner: owner.userId, fields: [{ id: "name", label: "Name", type: "text", required: true }], components: [{ kind: "form", fields: ["name"] }] });
+  const work = { ...source(saved), creatorDraft };
+  const state = await snapshot(work);
+  const { systems } = readBusinessSystems({ snapshot: state, sites: [] });
+  const request = vi.fn(async () => new Response(JSON.stringify(saved), { status: 200 }));
+  await mount(createElement(WorkspaceRequestContext.Provider, { value: request as typeof fetch }, createElement(SystemPage, { system: systems[0], systems, workspaceId: work.workspaceId, sources: [work], readOnly: true, useReadOnly: true, canEditApplications: true, versionReadOnly, workspaceStopped, systemHref: id => `?system=${id}`, onHome: noop, onAsk: noop })));
+  expect(container.textContent?.includes("Edit proposed app")).toBe(editable);
+  expect(Boolean(button("Check proposed change"))).toBe(editable);
+  expect(button("Publish")).toBeUndefined();
+  expect(request.mock.calls.length).toBeGreaterThan(0);
+});
