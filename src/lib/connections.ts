@@ -118,7 +118,7 @@ export async function saveConnectionMutation(expected: Connection, patch: Partia
   if (redis && raw) {
     // Compare the exact stored generation, including encrypted tokens. A
     // disconnect or reconnect between the read and EVAL cannot be overwritten.
-    const changed = await redis.eval<number>(`local value=redis.call('GET',KEYS[1]); if not value then return 0 end
+    const changed = await redis.eval<[string, string], number>(`local value=redis.call('GET',KEYS[1]); if not value then return 0 end
 local function equal(a,b) if type(a)~=type(b) then return false end; if type(a)~='table' then return a==b end; for k,v in pairs(a) do if not equal(v,b[k]) then return false end end; for k,v in pairs(b) do if a[k]==nil then return false end end; return true end
 if not equal(cjson.decode(value),cjson.decode(ARGV[1])) then return 0 end
 redis.call('SET',KEYS[1],ARGV[2]); return 1`, [connectionKey(next.tenantId, next.provider)], [JSON.stringify(raw), JSON.stringify(encoded)]).catch(error => { if (!durable) throw error; return 0; });

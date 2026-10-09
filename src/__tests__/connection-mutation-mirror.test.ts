@@ -10,7 +10,7 @@ vi.mock("@/lib/client-records",()=>({
 import { getConnection,saveConnectionMutation } from "@/lib/connections";
 beforeEach(()=>{
  vi.clearAllMocks();state.value={provider:"google",tenantId:"fixture",status:"connected",accessToken:"old",refreshToken:"old-refresh"};
- state.eval.mockImplementation(async(_script:unknown,_keys:unknown,args:string[])=>{
+ state.eval.mockImplementation(async(_script:unknown,_keys:unknown,args:[string, string])=>{
   if(JSON.stringify(state.value)!==args[0])return 0;
   state.value=JSON.parse(args[1]);return 1;
  });state.mirror.mockResolvedValue(undefined);

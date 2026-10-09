@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { readGoogleMakeRealReceipt } from "@/products/google-listing/make-real-receipts";
 import type { ListingReceipt } from "@/products/google-listing/contracts";
 const rootKey="google-draft:event";
-const receipt=(id:string,status:ListingReceipt["status"],key=rootKey)=>({
- id,status,idempotencyKey:key,intentDigest:"approved-intent",workspaceId:"workspace",bindingId:"binding",locationId:"location",action:"hours_patch",targetRef:"location",authority:{kind:"owner_instruction"},before:{hours:"old"},after:{hours:"new"},undoesReceiptId:null,
-} as ListingReceipt);
+const receipt=(id:string,status:ListingReceipt["status"],key=rootKey): ListingReceipt=>({
+ id,status,idempotencyKey:key,intentDigest:"approved-intent",workspaceId:"workspace",bindingId:"binding",locationId:"location",action:"hours_patch",targetRef:"location",authority:{kind:"owner_approval",actor:"owner"},before:{hours:"old"},after:{hours:"new"},undoesReceiptId:null, readback:null,providerRef:null,undo:null,undoneByReceiptId:null,error:null,createdAt:"2026-10-08T00:00:00.000Z",updatedAt:"2026-10-08T00:00:00.000Z",completedAt:null,
+});
 describe("Make Real receipt recovery",()=>{
  it.each(["posted","posting","posted_unverified","held_by_google"] as const)("recovers %s retry after a failed root without dispatch",async status=>{
   const root=receipt("root","failed"); const terminal=receipt("retry",status,`${rootKey}:retry:root`);

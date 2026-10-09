@@ -18,7 +18,10 @@ describe("standing-check durable history", () => {
   const service=createInvestigationService(store);
   const work=await service.create(owner,"workspace-a",{title:"Native comparison",intervalMinutes:60,sources});
   const checked=await service.run(owner,work.id,{expectedRevision:0,requestId:"native-timestamp"},new Date(Date.now()+60*60_000));
-  expect(checked.payload.runs[0].sources.map(source=>source.updatedAt)).toEqual(["2026-10-08T23:38:48.423Z","2026-10-08T23:38:48.423Z"]);
+  const run=checked.payload.runs[0];
+  expect(run).toBeDefined();
+  if (!run) throw new Error("Expected committed investigation run");
+  expect(run.sources.map(source=>source.updatedAt)).toEqual(["2026-10-08T23:38:48.423Z","2026-10-08T23:38:48.423Z"]);
  });
  it("survives 501 runs, failures, restart and old-key retries without truncating complete evidence", async () => {
   const store = memoryBoundedStore();
