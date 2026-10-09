@@ -61,7 +61,7 @@ test("native unpriced billing homes preserve payer authority and merchant prereq
     await moneyPost(reader.context.request, "/api/agency/pay-links", invoiceInput, 403);
     const readerPage = await reader.context.newPage();
     await readerPage.goto(`/workspace/billing?workspaceId=${agencyId}`);
-    await expect(readerPage.getByRole("alert")).toContainText("Only an agency owner or admin can read its billing.");
+    await expect(readerPage.getByRole("main").getByRole("alert")).toContainText("Only an agency owner or admin can read its billing.");
     await expect(readerPage.getByRole("button", { name: "Prepare client agreement", exact: true })).toHaveCount(0);
     await ownerPage.goto(`/workspace/payments?workspaceId=${workspaceId}`);
     await expect(ownerPage.getByRole("heading", { name: "Payments", exact: true })).toBeVisible();
@@ -72,10 +72,10 @@ test("native unpriced billing homes preserve payer authority and merchant prereq
     const removed = await admin.from("workspace_memberships").delete().eq("workspace_id", workspaceId).eq("user_id", owner.userId);
     expect(removed.error).toBeNull();
     await ownerPage.reload();
-    await expect(ownerPage.getByRole("alert")).toContainText("Payments could not be loaded.");
+    await expect(ownerPage.getByRole("main").getByRole("alert")).toContainText("Payments could not be loaded.");
     await expect(ownerPage.getByRole("button", { name: "Continue Stripe setup", exact: true })).toHaveCount(0);
     await ownerPage.goto(`/workspace/billing?workspaceId=${workspaceId}`);
-    await expect(ownerPage.getByRole("alert")).toContainText("Billing could not be loaded.");
+    await expect(ownerPage.getByRole("main").getByRole("alert")).toContainText("Billing could not be loaded.");
     await moneyPost(owner.context.request, "/api/work-economics/payer-transition", { action: "propose", workspaceId, successorKind: "business" }, 403);
     const removedAgency = await admin.from("workspace_memberships").delete().eq("workspace_id", agencyId).eq("user_id", agencyOwner.userId);
     expect(removedAgency.error).toBeNull();

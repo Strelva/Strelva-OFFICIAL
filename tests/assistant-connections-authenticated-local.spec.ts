@@ -49,6 +49,10 @@ for (const ending of ["owner disconnect", "owner authority withdrawal"] as const
       expect((await liveRead.json()).result.isError).toBe(false);
       const page = await owner.context.newPage();
       await page.goto(`/workspace?workspaceId=${workspaceId}&view=settings`);
+      const manage = page.getByRole("link", { name: "Manage assistant connections", exact: true });
+      await expect(manage).toHaveAttribute("href", `/connect?workspaceId=${workspaceId}`);
+      await manage.click();
+      await expect(page).toHaveURL(new RegExp(`/connect\\?workspaceId=${workspaceId}$`));
       const panel = page.locator("section", { has: page.getByRole("heading", { name: "Connected assistants", exact: true }) });
       await expect(panel.getByRole("heading", { name: fixture.clientName, exact: true })).toBeVisible();
       await expect(panel).toContainText("Connected");
