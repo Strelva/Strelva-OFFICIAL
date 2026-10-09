@@ -14774,6 +14774,17 @@ export type Database = {
         }
         Returns: undefined
       }
+      mutate_tenant_provider_connection: {
+        Args: {
+          p_captured_at: string
+          p_expected_payload: Json
+          p_payload: Json
+          p_payload_hash: string
+          p_provider: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       needs_you_change_kinds: {
         Args: never
         Returns: string[]
