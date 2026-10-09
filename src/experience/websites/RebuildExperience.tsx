@@ -5,7 +5,7 @@ import { Check, CircleAlert, ExternalLink, Globe, Loader2, ShieldCheck } from "l
 import { Button } from "@/components/ui/Button";
 import { TextArea, TextInput, SelectInput } from "@/components/ui/TextInput";
 import { createWebsiteRequestId } from "./contracts";
-import { serverRebuildTransport, parseRebuildView, type RebuildTransport, type RebuildView } from "./rebuild-transport";
+import { serverRebuildTransport, RebuildUnconfirmedError, parseRebuildView, type RebuildTransport, type RebuildView } from "./rebuild-transport";
 import { beginFocusRecovery, type FocusRecovery } from "./focus-recovery";
 import { WebsiteConnectionSelector } from "./WebsiteConnections";
 import { WebsiteRebuildReport } from "./WebsiteRebuildReport";
@@ -94,12 +94,31 @@ function WebsiteFactEditor({ text, origin, disabled, onSave, onRemove }: {
     </form> : <><p className={styles.factText}>{text}</p><Button ref={editRef} type="button" size="sm" variant="ghost" disabled={disabled} onClick={() => { setDraft(text); setEditing(true); }}>Edit fact</Button>{removeButton}</>}
   </article>;
 }
-export function RebuildExperience({ workspaceId, workId, readOnly = false, managed = false, allowIntake = false, operator = false, canPublish = false, agency = false, initialRequest = "", initialRecord, transport = serverRebuildTransport, onSaved }: RebuildExperienceProps) {
+export function RebuildExperience(props: RebuildExperienceProps) {
+  return <ScopedRebuildExperience key={`${props.workspaceId}:${props.workId ?? props.initialRecord?.workId ?? "new"}`} {...props} />;
+}
+function ScopedRebuildExperience({ workspaceId, workId, readOnly = false, managed = false, allowIntake = false, operator = false, canPublish = false, agency = false, initialRequest = "", initialRecord, transport = serverRebuildTransport, onSaved }: RebuildExperienceProps) {
   const [record, setRecord] = useState<RebuildView | null>(initialRecord ?? null);
   const [loading, setLoading] = useState(Boolean(workId && !initialRecord));
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
   const [error, setError] = useState("");
+  const [needsReload, setNeedsReload] = useState(false);
+  const unresolved = useRef(false);
+  const requireReload = (value: boolean) => {
+    unresolved.current = value;
+    setNeedsReload(value);
+    if (value) { decisionFocus.current?.cancel(); decisionFocus.current = null; removedContactFocus.current?.cancel(); removedContactFocus.current = null; }
+  };
+  const recoveryRootRef = useRef<HTMLElement>(null);
+  const reloadRef = useRef<HTMLButtonElement>(null);
+  const reloadFocus = useRef<FocusRecovery | null>(null);
+  const permissionKey = `${readOnly}:${canPublish}:${operator}`;
+  const currentScope = useRef({ workspaceId, workId, permissionKey, permissionRevision: 0 });
+  currentScope.current = { workspaceId, workId, permissionKey, permissionRevision: currentScope.current.permissionRevision + Number(currentScope.current.permissionKey !== permissionKey) };
+  const sameWorkScope = (scope: typeof currentScope.current) => currentScope.current.workspaceId === scope.workspaceId && currentScope.current.workId === scope.workId;
+  const sameScope = (scope: typeof currentScope.current) => currentScope.current.workspaceId === scope.workspaceId && currentScope.current.workId === scope.workId && currentScope.current.permissionRevision === scope.permissionRevision;
+
   const [notice, setNotice] = useState("");
   const [allowAgencyPublish, setAllowAgencyPublish] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -129,7 +148,7 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
   const decisionEditRecovery = useRef(false);
   const requestId = useRef(createWebsiteRequestId());
   const mounted = useRef(true);
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; connectionFocus.current?.cancel(); decisionFocus.current?.cancel(); removedContactFocus.current?.cancel(); }; }, []);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; connectionFocus.current?.cancel(); decisionFocus.current?.cancel(); removedContactFocus.current?.cancel(); reloadFocus.current?.cancel(); }; }, []);
   useEffect(() => {
     if (!workId || initialRecord) return;
     const controller = new AbortController();
@@ -161,12 +180,48 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
     return () => clearTimeout(timer);
   }, [record?.candidate, previewLoaded, previewAttempt]);
   async function run(operation: () => Promise<RebuildView>, success: string) {
-    if (inFlight.current || busy || readOnly || loading) return false;
+    if (inFlight.current || busy || readOnly || loading || unresolved.current) return false;
     inFlight.current = true;
+    const scope = { ...currentScope.current };
+    const recovery = beginFocusRecovery(recoveryRootRef.current);
     setBusy(true); setError(""); setNotice("");
-    try { const next = await operation(); if (mounted.current) { setRecord(next); setNotice(success); setEditing(null); onSaved?.(next.workId); } return true; }
-    catch (cause) { if (mounted.current) setError(cause instanceof Error ? cause.message : "The change could not be saved. Your review is preserved."); return false; }
+    try {
+      const next = await operation();
+      if (mounted.current && sameScope(scope)) { recovery.cancel(); setRecord(next); setNotice(success); setEditing(null); onSaved?.(next.workId); return true; }
+      if (record && mounted.current && sameWorkScope(scope)) { requireReload(true); setError("Access changed while saving. Reload the current saved state before continuing."); reloadFocus.current?.cancel(); reloadFocus.current = recovery; }
+      else recovery.cancel();
+      return false;
+    }
+    catch (cause) {
+      if (mounted.current && sameWorkScope(scope)) {
+        if (record && cause instanceof RebuildUnconfirmedError) { requireReload(true); reloadFocus.current?.cancel(); reloadFocus.current = recovery; }
+        else recovery.cancel();
+        setError(cause instanceof Error ? cause.message : "The change could not be saved. Your review is preserved.");
+      } else recovery.cancel();
+      return false;
+    }
     finally { inFlight.current = false; if (mounted.current) setBusy(false); }
+  }
+  async function reloadCurrentState() {
+    if (!record || inFlight.current || busy || loading) return;
+    const scope = { ...currentScope.current };
+    const work = { workspaceId: record.workspaceId, workId: record.workId };
+    if (work.workspaceId !== workspaceId || (workId && work.workId !== workId)) return;
+    inFlight.current = true;
+    reloadFocus.current?.cancel();
+    reloadFocus.current = beginFocusRecovery(recoveryRootRef.current);
+    setBusy(true); setNotice("");
+    try {
+      const next = await transport.read(work.workspaceId, work.workId);
+      if (next.workspaceId !== work.workspaceId || next.workId !== work.workId) throw new Error("The current saved website could not be confirmed. Reload again to check it.");
+      if (mounted.current && sameScope(scope)) { setRecord(next); requireReload(false); setError(""); setEditing(null); setNotice("Saved state refreshed. Review the current preview before continuing."); }
+    } catch {
+      if (mounted.current && sameScope(scope)) setError("The current saved website could not be loaded. Your inputs are retained. Reload again to check what was saved.");
+    } finally {
+      inFlight.current = false;
+      if (mounted.current) setBusy(false);
+      if (!sameScope(scope)) { reloadFocus.current?.cancel(); reloadFocus.current = null; }
+    }
   }
   useEffect(() => {
     if (busy) return;
@@ -179,9 +234,11 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
       removedContactFocus.current.recover(factsSummaryRef.current ?? reviewHeadingRef.current);
       removedContactFocus.current = null;
     }
-  }, [record, busy, editing]);
+    reloadFocus.current?.recover(needsReload ? reloadRef.current : reviewHeadingRef.current, true);
+    reloadFocus.current = null;
+  }, [record, busy, editing, needsReload]);
   function resolveDecision(factId: string, action: "confirm" | "remove" | "edit") {
-    if (!record || inFlight.current || busy || readOnly || loading) return;
+    if (!record || inFlight.current || busy || readOnly || loading || unresolved.current) return;
     const recovery = beginFocusRecovery(decisionsRef.current);
     decisionFocus.current = recovery;
     decisionEditRecovery.current = action === "edit";
@@ -192,7 +249,7 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
   const ordinaryFacts = Object.entries(record?.candidate?.facts ?? {}).filter(([id]) => !decisionIds.has(id));
   const startReady = descriptionMode ? Boolean(businessName.trim() && description.trim()) : Boolean(url.trim());
   const ready = useSyncExternalStore(() => () => {}, () => true, () => false);
-  const disabled = !ready || busy || readOnly || loading || record?.status === "building";
+  const disabled = !ready || busy || readOnly || loading || needsReload || record?.status === "building";
   useEffect(() => {
     if (cancelledFlaggedEdit.current) {
       const editButton = flaggedEditButtons.current.get(cancelledFlaggedEdit.current);
@@ -213,14 +270,14 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
   const safePreview = Boolean(previewHref?.startsWith("/") && !previewHref.startsWith("//"));
   const previousDocuments = record?.documentRevisions.filter(item => item.revision < (candidate?.revision ?? 0)).sort((a, b) => b.revision - a.revision) ?? [];
   const canCreate = !managed || operator || allowIntake;
-  return <section className={styles.root} aria-label="Website rebuild" aria-busy={busy || loading || undefined}>
+  return <section ref={recoveryRootRef} className={styles.root} aria-label="Website rebuild" aria-busy={busy || loading || undefined}>
     <header className={styles.header}>
       <p className={styles.eyebrow}>{operator ? "Managed delivery" : "Website"}</p>
       <h1 className="font-display">{record?.title ?? (managed && !operator ? "Your website preview" : "Your business. A new website.")}</h1>
       <p>{record ? "Review the preview and the decisions below. Every saved change clears the earlier approval." : managed && !operator ? allowIntake ? "Share your current website or describe your business to prepare a private preview. Review it before authorizing publication." : "Your preview will appear here when it is ready for your judgment. Delivery requires a separately authorized provider." : "Start with your current website. We read its content, compose a new site and show you what needs your judgment."}</p>
     </header>
     {readOnly ? <p className={styles.notice}><ShieldCheck size={18} aria-hidden="true" />You have read-only access. An owner or authorized operator can make changes.</p> : null}
-    {error ? <div className={styles.error} role="alert"><CircleAlert size={18} aria-hidden="true" /><div>{error}<p>Your inputs and saved work remain available.</p></div></div> : null}
+    {error ? <div className={styles.error} role="alert"><CircleAlert size={18} aria-hidden="true" /><div>{error}<p>Your inputs and saved work remain available.</p>{needsReload && record ? <Button ref={reloadRef} type="button" variant="secondary" disabled={busy || loading} loading={busy} onClick={() => void reloadCurrentState()}>Reload current state</Button> : null}</div></div> : null}
     {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
     {loading ? <p className={styles.notice} role="status"><Loader2 size={18} className="motion-safe:animate-spin" aria-hidden="true" />Opening the saved website…</p>
       : workId && !record ? <Button variant="secondary" onClick={() => setAttempt(value => value + 1)}>Try loading again</Button>
@@ -253,12 +310,12 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
                 : <div className={styles.actions}><Button size="sm" variant="secondary" disabled={disabled} onClick={() => resolveDecision(id, "confirm")}>Confirm</Button><Button ref={node => { if (node) flaggedEditButtons.current.set(id, node); else flaggedEditButtons.current.delete(id); }} size="sm" variant="ghost" disabled={disabled} onClick={() => { if (disabled || inFlight.current) return; setEditing(id); setEditedText(fact.text); }}>Edit</Button><Button size="sm" variant="danger" disabled={disabled} onClick={() => resolveDecision(id, "remove")}>Remove</Button></div>}
             </article>)}
             {candidate.unmappedPages.length ? <div className={styles.fact}><h3>Old pages not carried over</h3><ul>{candidate.unmappedPages.map(path => <li key={path}>{path}</li>)}</ul><p>Review these pages before authorizing publication.</p></div> : null}
-            <div className={styles.approval}><p>{record.status === "published" ? "This revision has been published." : record.approved ? "This exact preview is approved." : decisions.length ? "Resolve the flagged facts before approving." : "Approval applies to this exact revision and its content."}</p>
+            <div className={styles.approval}><p>{needsReload ? "Check the current saved website before reviewing its approval or publication." : record.status === "published" ? "This revision has been published." : record.approved ? "This exact preview is approved." : decisions.length ? "Resolve the flagged facts before approving." : "Approval applies to this exact revision and its content."}</p>
               {agencyPermission && !agencyPermission.granted && record.status !== "published" ? <label className="flex min-h-11 cursor-pointer items-start gap-3 text-sm"><input type="checkbox" className="mt-1 h-5 w-5 shrink-0 accent-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" checked={allowAgencyPublish} disabled={disabled} onChange={event => setAllowAgencyPublish(event.target.checked)} /><span>Allow {agencyPermission.agencyName} to publish this website after I approve each change.<span className="mt-1 block text-gray-muted">Each new preview still needs your approval. This does not authorize domain changes.</span></span></label> : null}
               {agencyPermission?.granted ? <p>{agencyPermission.agencyName} can publish this website after you approve each exact preview.</p> : null}
               {(!record.approved || (allowAgencyPublish && agencyPermission && !agencyPermission.granted)) && record.status !== "published" ? <Button disabled={disabled || decisions.length > 0 || !safePreview || previewFailed || !previewLoaded || record.status === "building"} loading={busy} onClick={() => void run(() => transport.mutate(record, "approve", allowAgencyPublish && agencyPermission ? { allowAgencyPublish: true, agencyWorkspaceId: agencyPermission.agencyWorkspaceId } : undefined), allowAgencyPublish && agencyPermission ? `This exact preview is approved. ${agencyPermission.agencyName} may publish this website after your approval of each change.` : "This exact preview is approved.")}>{record.approved ? "Approve preview and allow agency publishing" : "Approve this preview"}</Button> : null}
               {record.approved && record.status !== "published" && (!managed || operator || canPublish) ? <Button disabled={disabled} loading={busy} onClick={() => void run(() => transport.mutate(record, "launch"), "Publish result saved. Check its verification below.")}>Publish approved website</Button> : null}
-              {record.approved && managed && !operator && !canPublish && record.status !== "published" ? <p>{agencyPermission ? agencyPermission.granted ? `${agencyPermission.agencyName} can publish this approved preview.` : `Authorize ${agencyPermission.agencyName} above if you want them to publish this website.` : "No agency publication authority is shown here. Choose and authorize an agency before requesting delivery. Domain changes require separate permission."}</p> : null}
+              {!needsReload && record.approved && managed && !operator && !canPublish && record.status !== "published" ? <p>{agencyPermission ? agencyPermission.granted ? `${agencyPermission.agencyName} can publish this approved preview.` : `Authorize ${agencyPermission.agencyName} above if you want them to publish this website.` : "No agency publication authority is shown here. Choose and authorize an agency before requesting delivery. Domain changes require separate permission."}</p> : null}
               <a className={styles.link} href={`/api/websites/${encodeURIComponent(record.workId)}/export?${new URLSearchParams({ workspaceId, revision: String(candidate.revision), contentHash: candidate.contentHash })}`}>Export website and evidence</a>
               {operator ? <a className={styles.link} href={`/workspace?${new URLSearchParams({ workspaceId, view: "websites", work: record.workId })}`}>Owner review link</a> : null}
             </div>
@@ -280,12 +337,12 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
         {record.history.length ? <section className={styles.domain} aria-labelledby="rebuild-history-heading"><h2 id="rebuild-history-heading">Revision history</h2><ol className="mt-4 divide-y divide-gray-border">{record.history.slice().reverse().map((entry, index) => <li key={`${entry.revision}:${entry.kind}:${index}`} className="py-3 text-sm text-gray-muted">Revision {entry.revision} · {entry.kind.replace(/_/g, " ")} · <time dateTime={entry.at}>{new Date(entry.at).toLocaleString()}</time></li>)}</ol></section> : null}
         {agency && candidate && record.status !== "published" ? <WebsiteRebuildSharing workId={record.workId} readOnly={readOnly} /> : null}
         {record.publishedUrl ? <WebsiteRebuildReport key={record.workId} workId={record.workId} fixture={transport !== serverRebuildTransport} /> : null}
-        {record.publishedUrl ? <section className={styles.domain} aria-labelledby="rebuild-domain-heading"><h2 id="rebuild-domain-heading">Your website</h2>{record.publishedUrl ? <a className={styles.link} href={record.publishedUrl} target="_blank" rel="noopener noreferrer">{record.publishedUrl} <ExternalLink size={16} aria-hidden="true" /></a> : null}<p>{record.readBack === "verified" ? "The published document was verified." : record.readBack === "failed" ? "Published, but readback failed. Verification is required before calling this confirmed; checking does not republish the site." : "Publication recorded. Verification is pending."}</p>
+        {!needsReload && record.publishedUrl ? <section className={styles.domain} aria-labelledby="rebuild-domain-heading"><h2 id="rebuild-domain-heading">Your website</h2>{record.publishedUrl ? <a className={styles.link} href={record.publishedUrl} target="_blank" rel="noopener noreferrer">{record.publishedUrl} <ExternalLink size={16} aria-hidden="true" /></a> : null}<p>{record.readBack === "verified" ? "The published document was verified." : record.readBack === "failed" ? "Published, but readback failed. Verification is required before calling this confirmed; checking does not republish the site." : "Publication recorded. Verification is pending."}</p>
           {record.domain ? <><h3>{record.domain.hostname}</h3><p>Status: {record.domain.status} · Last checked: {record.domain.checkedAt ? new Date(record.domain.checkedAt).toLocaleString() : "Not checked yet"}</p>{record.domain.error ? <div role="alert" className={styles.error}>{record.domain.error}</div> : null}{record.domain.records.length ? <div className={styles.records}><table className={styles.dns}><caption>DNS records returned by the domain provider</caption><thead><tr><th>Type</th><th>Name</th><th>Value</th></tr></thead><tbody>{record.domain.records.map((dns, index) => <tr key={index}><td>{dns.type}</td><td>{dns.name}</td><td>{dns.value}</td></tr>)}</tbody></table></div> : <p>No DNS records have been returned yet.</p>}</> : null}
           {operator && !readOnly && transport === serverRebuildTransport ? <WebsiteDomainRequest workId={record.workId} /> : null}
-          {(!managed || operator) && !readOnly ? <form className={styles.domainForm} onSubmit={event => { event.preventDefault(); if (domain.trim() || record.domain) void run(() => transport.mutate(record, "domain", { domain: domain.trim() || record.domain?.hostname }), "Domain status refreshed."); }}><TextInput label="Your domain" placeholder="your-business.com" value={domain} onChange={event => setDomain(event.target.value)} disabled={busy} /><Button type="submit" variant="secondary" disabled={busy || (!domain.trim() && !record.domain)} loading={busy}>{record.domain ? "Check domain status" : "Connect domain"}</Button></form> : <p>{pathHosted && !record.domain ? (agencyPermission ? `This publication uses a hosted address. Ask ${agencyPermission.agencyName} about a custom domain.` : "This publication uses a hosted address. Custom domain setup requires separate authority.") : (agencyPermission ? `Ask ${agencyPermission.agencyName} about domain setup and verification.` : "Domain setup and verification require separate authority.")}</p>}
+          {(!managed || operator) && !readOnly ? <form className={styles.domainForm} onSubmit={event => { event.preventDefault(); if (domain.trim() || record.domain) void run(() => transport.mutate(record, "domain", { domain: domain.trim() || record.domain?.hostname }), "Domain status refreshed."); }}><TextInput label="Your domain" placeholder="your-business.com" value={domain} onChange={event => setDomain(event.target.value)} disabled={disabled} /><Button type="submit" variant="secondary" disabled={disabled || (!domain.trim() && !record.domain)} loading={busy}>{record.domain ? "Check domain status" : "Connect domain"}</Button></form> : <p>{pathHosted && !record.domain ? (agencyPermission ? `This publication uses a hosted address. Ask ${agencyPermission.agencyName} about a custom domain.` : "This publication uses a hosted address. Custom domain setup requires separate authority.") : (agencyPermission ? `Ask ${agencyPermission.agencyName} about domain setup and verification.` : "Domain setup and verification require separate authority.")}</p>}
           {!readOnly && !operator && record.tenantId && (!pathHosted || record.domain) && transport === serverRebuildTransport ? <WebsiteCutoverUndo key={`${record.workId}:${candidate?.contentHash}`} record={record} /> : null}
-          {(!managed || operator) && !readOnly && previousDocuments.length ? <div className={styles.domainForm}><SelectInput label="Revision to restore" value={undoTarget || String(previousDocuments[0]!.revision)} onChange={event => setUndoTarget(event.target.value)} options={previousDocuments.map(item => ({ value: String(item.revision), label: `Revision ${item.revision} · ${new Date(item.createdAt).toLocaleDateString()}` }))} disabled={busy} /><Button variant="secondary" disabled={busy} onClick={() => void run(() => transport.mutate(record, "undo", { targetRevision: Number(undoTarget || previousDocuments[0]!.revision) }), "The selected document is restored as a new revision. Review and approve it before publishing.")}>Restore for review</Button></div> : null}
+          {(!managed || operator) && !readOnly && previousDocuments.length ? <div className={styles.domainForm}><SelectInput label="Revision to restore" value={undoTarget || String(previousDocuments[0]!.revision)} onChange={event => setUndoTarget(event.target.value)} options={previousDocuments.map(item => ({ value: String(item.revision), label: `Revision ${item.revision} · ${new Date(item.createdAt).toLocaleDateString()}` }))} disabled={disabled} /><Button variant="secondary" disabled={disabled} onClick={() => void run(() => transport.mutate(record, "undo", { targetRevision: Number(undoTarget || previousDocuments[0]!.revision) }), "The selected document is restored as a new revision. Review and approve it before publishing.")}>Restore for review</Button></div> : null}
         </section> : null}
       </>}
   </section>;

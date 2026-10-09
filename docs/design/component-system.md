@@ -95,7 +95,8 @@ the owned Button and TextArea with the existing exact candidate edit endpoint;
 the server rechecks current management authority. Saving changes the private
 document and clears its approval, with the changed rendered hash required before
 reapproval. Read-only, loading, rebuilding and pending states disable edits.
-Errors retain the correction and return focus to its field; save and cancel
+Known refusals retain the correction and return focus to its field. Unknown
+acknowledgments retain it behind current-state recovery described below. Save and cancel
 return focus to the mounted Edit fact control. Managed context does not grant
 editing or publication authority. Focused component proof belongs to
 `website-fact-revision.test.tsx`; actual Auth and desktop/mobile native proof are
@@ -1300,3 +1301,20 @@ mounted instruction/connected heading, with the same outside-focus safeguard.
 The heading is programmatically focusable and does not add a Tab stop.
 
 The owned `SiteHeading` wraps uninterrupted site names within its available width. Actual inquiry DOM measurements at 320px with 200% root text located a 373px text range inside a 256px heading, extending document width to 405px. Wrapping changes presentation only; complete corrected browser acceptance remains required.
+### Website review acknowledgment recovery, October 9, local
+
+`RebuildExperience` scopes saved review state to the exact workspace/work and
+keeps unknown mutation outcomes frozen across permission changes. Its transport
+separates fact/restore atomic refusals from approval/publication errors that can
+follow a committed authority or public pointer, including later HTTP400/403/409
+responses. Lost, malformed and failed mutation acknowledgments use truthful
+uncertainty copy; stale approval/publication claims and mutations remain withheld.
+**Reload current state** calls the existing saved-state read, never another POST.
+A failed read retains the correction draft and the lock; a successful exact read
+adopts the current revision and requires its rendered preview before approval.
+Delayed reads from an old workspace, work or permission generation are ignored.
+Keyboard recovery targets the reload action or mounted review heading only while
+the owner remains in the initiating flow. The shared synchronous guard admits one
+write/read per pending operation, and read-only users can still read saved state.
+Focused service/transport/component tests prove these local boundaries. This is
+not browser, genuine Auth, delivery, provider or production proof.

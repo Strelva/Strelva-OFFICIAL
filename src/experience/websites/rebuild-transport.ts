@@ -28,6 +28,18 @@ export interface RebuildTransport {
   mutate(record: RebuildView, action: "confirm" | "edit" | "remove" | "approve" | "launch" | "retry" | "domain" | "undo", extra?: { factId?: string; text?: string; domain?: string; targetRevision?: number; allowAgencyPublish?: boolean; agencyWorkspaceId?: string }): Promise<RebuildView>;
 }
 export class RebuildTransportError extends Error { constructor(message: string, readonly status: number) { super(message); } }
+export class RebuildUnconfirmedError extends Error {
+  constructor(reason?: string) { super(`${reason ? `${reason} ` : ""}The change could not be confirmed. Reload its current saved state before continuing.`); }
+}
+function refusedMutation(error: unknown, action: Parameters<RebuildTransport["mutate"]>[1]) {
+  if (!(error instanceof RebuildTransportError)) return false;
+  if (error.status === 401) return true;
+  // Approval and publication can commit before later row parsing or work CAS.
+  // Fact/restore conflicts precede their atomic candidate commit. Retry may
+  // save progress before a later refusal, but its input parsing is precommit.
+  if (action === "retry") return error.status === 400;
+  return (error.status === 400 || error.status === 403 || error.status === 409) && !["approve", "launch"].includes(action);
+}
 async function request(path: string, options?: RequestInit): Promise<RebuildView> {
   const response = await fetch(path, { credentials: "same-origin", cache: "no-store", ...options });
   const body = await response.json().catch(() => null);
@@ -54,20 +66,26 @@ export const serverRebuildTransport: RebuildTransport = {
   async read(workspaceId, workId, signal) { return withDomain(await request(`/api/websites/${encodeURIComponent(workId)}/rebuild?${new URLSearchParams({ workspaceId })}`, { signal })); },
   start(input) { return request("/api/websites/rebuild", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) }); },
   async mutate(record, action, extra) {
-    const facts = action === "confirm" || action === "edit" || action === "remove";
-    const path = facts ? `facts/${encodeURIComponent(extra?.factId ?? "")}` : action === "retry" ? "rebuild" : action;
-    const identity = { expectedRevision: record.revision, candidateRevision: record.candidate?.revision, candidateContentHash: record.candidate?.contentHash };
-    const body = facts ? { ...identity, action, ...(action === "edit" ? { text: extra?.text } : {}) }
-      : action === "domain" ? { expectedRevision: record.revision, domain: extra?.domain, action: record.domain ? "refresh" : "attach" }
-      : action === "approve" && extra?.allowAgencyPublish ? { ...identity, allowAgencyPublish: true, agencyWorkspaceId: extra.agencyWorkspaceId }
-      : action === "retry" ? { expectedRevision: record.revision } : action === "undo" ? { ...identity, targetRevision: extra?.targetRevision } : identity;
-    if (action === "domain") {
-      const response = await fetch(`/api/websites/${encodeURIComponent(record.workId)}/domain`, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      const value = await response.json().catch(() => null);
-      if (!response.ok) throw new RebuildTransportError(value?.error ?? "The domain could not be checked.", response.status);
-      return { ...record, domain: rebuildViewSchema.shape.domain.parse(value.domain ?? null) };
+    try {
+      const facts = action === "confirm" || action === "edit" || action === "remove";
+      const path = facts ? `facts/${encodeURIComponent(extra?.factId ?? "")}` : action === "retry" ? "rebuild" : action;
+      const identity = { expectedRevision: record.revision, candidateRevision: record.candidate?.revision, candidateContentHash: record.candidate?.contentHash };
+      const body = facts ? { ...identity, action, ...(action === "edit" ? { text: extra?.text } : {}) }
+        : action === "domain" ? { expectedRevision: record.revision, domain: extra?.domain, action: record.domain ? "refresh" : "attach" }
+        : action === "approve" && extra?.allowAgencyPublish ? { ...identity, allowAgencyPublish: true, agencyWorkspaceId: extra.agencyWorkspaceId }
+        : action === "retry" ? { expectedRevision: record.revision } : action === "undo" ? { ...identity, targetRevision: extra?.targetRevision } : identity;
+      if (action === "domain") {
+        const response = await fetch(`/api/websites/${encodeURIComponent(record.workId)}/domain`, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        const value = await response.json().catch(() => null);
+        if (!response.ok) throw new RebuildTransportError(value?.error ?? "The domain could not be checked.", response.status);
+        return { ...record, domain: rebuildViewSchema.shape.domain.parse(value.domain ?? null) };
+      }
+      const next = await request(`/api/websites/${encodeURIComponent(record.workId)}/${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (next.workspaceId !== record.workspaceId || next.workId !== record.workId) throw new RebuildUnconfirmedError();
+      return await withDomain({ ...next, agencyPublishPermission: next.agencyPublishPermission === undefined ? record.agencyPublishPermission : next.agencyPublishPermission });
+    } catch (error) {
+      if (refusedMutation(error, action)) throw error;
+      throw new RebuildUnconfirmedError(error instanceof RebuildTransportError && [403,409].includes(error.status) ? error.message : undefined);
     }
-    const next = await request(`/api/websites/${encodeURIComponent(record.workId)}/${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    return withDomain({ ...next, agencyPublishPermission: next.agencyPublishPermission === undefined ? record.agencyPublishPermission : next.agencyPublishPermission });
   },
 };
