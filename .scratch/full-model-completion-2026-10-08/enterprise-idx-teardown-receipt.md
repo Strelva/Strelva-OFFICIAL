@@ -74,3 +74,28 @@ with its null DB mock). It was not changed or rerun, and does not qualify teardo
 No database, browser, build, typecheck, dependency, provider or production operation
 was run in this correction. The next integration must cherry-pick 8cb19b6a followed
 by this separate correction; 8cb19b6a alone has the reported concurrency gap.
+
+
+Native concurrency/Auth fixture preparation: added an explicitly gated two-worker
+fixture that invokes actual cleanup/account/domain/mirror source with real SQL RPCs
+against the coordinator's already fully migrated disposable cluster and its own
+isolated Redis only in the authorized future window. The transport delays B's
+actual native receipt read; one actual account SET is refused after index deletion.
+Native checkpoint/final CAS and current-receipt retry are never mocked. Other
+resources/subscription and durable account targets are asserted. Provider remains
+disabled and overall pending. The real mirror removal can report unknown deleted
+tenant; the queue index is retained/checked, not claimed as successful PG removal
+or qualified payload repair. The narrow adapter has no table fallback or schema
+fabrication. See `docs/operations/tenant-cleanup-concurrency-proof.md` for exact env,
+resource ownership, limits and execution.
+
+A separate gated actual Auth fixture uses current real super-admin authority and
+the loaded editor, desktop/mobile confirmation/pending202/exact-id retry/native
+revision progress/GET recovery/ordinary403/retired reuse refusal. The deleted-tenant
+editor requires a row on page load; a fresh recovery UI remains unproven. No route
+fulfillment or fabricated provider result. Current profile must keep Vercel disabled
+on both runner and server. Preparation evidence: scoped lint and diff checks pass,
+16 existing mocked cases pass and new native case gated skip; Playwright collects
+two UI cases. No native DB/Redis/Auth/browser/build/provider/production commands in
+this fixture-preparation turn. Root owns composed typecheck and execution; retain
+all failures, native receipts and existing provider/full-model gates.
