@@ -1,0 +1,163 @@
+{
+  "scope": "actual-harmless-local-child-faults",
+  "databaseExecuted": false,
+  "nativeSQLExecuted": false,
+  "fullReleaseQualified": false,
+  "status": "FAULT_CONTROLS_PASS",
+  "cases": [
+    {
+      "case": "spawn-gap/repeated-signals/TERM-resistant/sibling",
+      "faultObserved": true,
+      "retainedTerminal": {
+        "status": "HOLD",
+        "scope": "harmless-local-child-only",
+        "fullReleaseQualified": false,
+        "terminalChildren": [
+          {
+            "clientPid": 65745,
+            "forced": true,
+            "reaped": true,
+            "errors": [],
+            "returncode": -15
+          },
+          {
+            "clientPid": 65746,
+            "forced": true,
+            "reaped": true,
+            "errors": [
+              "TERM wait: Bounded child timeout after 2 seconds"
+            ],
+            "returncode": -9
+          }
+        ],
+        "terminalBackends": [
+          {
+            "clientPid": 65745,
+            "backendPid": 65745,
+            "state": "CLOSED"
+          },
+          {
+            "clientPid": 65746,
+            "backendPid": 65746,
+            "state": "CLOSED"
+          }
+        ],
+        "signals": [
+          2,
+          15,
+          2,
+          15,
+          2,
+          15,
+          2,
+          15,
+          2,
+          15,
+          2,
+          15
+        ]
+      }
+    },
+    {
+      "case": "retention-failure/signal-during-terminal-write",
+      "faultObserved": true,
+      "retainedTerminal": {
+        "status": "HOLD",
+        "scope": "harmless-local-child-only",
+        "fullReleaseQualified": false,
+        "terminalChildren": [
+          {
+            "clientPid": 65945,
+            "forced": true,
+            "reaped": true,
+            "errors": [],
+            "returncode": -15
+          }
+        ],
+        "terminalBackends": [
+          {
+            "clientPid": 65945,
+            "backendPid": 65945,
+            "state": "CLOSED"
+          }
+        ],
+        "signals": [
+          15
+        ],
+        "retentionFailure": "[Errno 21] Is a directory: '/tmp/source-child-fault-e7yk7o0a/retention-failure.json.terminal-7925a7a1621b489592f792a4f6c25524' -> '/tmp/source-child-fault-e7yk7o0a/retention-failure.json'"
+      }
+    },
+    {
+      "case": "repeated-signals-inside-backend-closure",
+      "faultObserved": true,
+      "retainedTerminal": {
+        "status": "HOLD",
+        "scope": "harmless-local-child-only",
+        "fullReleaseQualified": false,
+        "terminalChildren": [
+          {
+            "clientPid": 65946,
+            "forced": true,
+            "reaped": true,
+            "errors": [],
+            "returncode": -15
+          }
+        ],
+        "terminalBackends": [
+          {
+            "clientPid": 65946,
+            "backendPid": 65946,
+            "state": "CLOSED"
+          }
+        ],
+        "signals": [
+          2,
+          15
+        ]
+      }
+    },
+    {
+      "case": "final-handoff-signal-after-clean-natural-exit",
+      "faultObserved": true,
+      "retainedTerminal": {
+        "status": "HOLD",
+        "scope": "harmless-local-child-only",
+        "fullReleaseQualified": false,
+        "terminalChildren": [
+          {
+            "clientPid": 65947,
+            "forced": false,
+            "reaped": true,
+            "errors": [],
+            "returncode": 0
+          }
+        ],
+        "terminalBackends": [
+          {
+            "clientPid": 65947,
+            "backendPid": 65947,
+            "state": "CLOSED"
+          }
+        ],
+        "signals": [
+          15
+        ],
+        "observedFinalHandoff": {
+          "injected": [
+            {
+              "line": 377,
+              "depth": 1
+            }
+          ],
+          "pending": [
+            15
+          ],
+          "inMemoryStatus": "HOLD",
+          "mainAccepts": false,
+          "childNaturalExit": true
+        }
+      }
+    }
+  ],
+  "harnessSha256": "d1659a67630a77c29d7fadae04cbf55882ba2ce502d0b21790c4e3b248029068"
+}

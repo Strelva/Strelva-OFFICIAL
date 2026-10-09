@@ -1,0 +1,121 @@
+{
+  "scope": "actual-harmless-local-child-faults",
+  "databaseExecuted": false,
+  "nativeSQLExecuted": false,
+  "fullReleaseQualified": false,
+  "status": "FAULT_CONTROLS_PASS",
+  "cases": [
+    {
+      "case": "spawn-gap/repeated-signals/TERM-resistant/sibling",
+      "faultObserved": true,
+      "retainedTerminal": {
+        "status": "HOLD",
+        "scope": "harmless-local-child-only",
+        "fullReleaseQualified": false,
+        "terminalChildren": [
+          {
+            "clientPid": 62082,
+            "forced": true,
+            "reaped": true,
+            "errors": [],
+            "returncode": -15
+          },
+          {
+            "clientPid": 62083,
+            "forced": true,
+            "reaped": true,
+            "errors": [
+              "TERM wait: Bounded child timeout after 2 seconds"
+            ],
+            "returncode": -9
+          }
+        ],
+        "terminalBackends": [
+          {
+            "clientPid": 62082,
+            "backendPid": 62082,
+            "state": "CLOSED"
+          },
+          {
+            "clientPid": 62083,
+            "backendPid": 62083,
+            "state": "CLOSED"
+          }
+        ],
+        "signals": [
+          2,
+          15,
+          2,
+          15,
+          2,
+          15,
+          2,
+          15,
+          2,
+          15,
+          2,
+          15
+        ]
+      }
+    },
+    {
+      "case": "retention-failure/signal-during-terminal-write",
+      "faultObserved": true,
+      "retainedTerminal": {
+        "status": "HOLD",
+        "scope": "harmless-local-child-only",
+        "fullReleaseQualified": false,
+        "terminalChildren": [
+          {
+            "clientPid": 62152,
+            "forced": true,
+            "reaped": true,
+            "errors": [],
+            "returncode": -15
+          }
+        ],
+        "terminalBackends": [
+          {
+            "clientPid": 62152,
+            "backendPid": 62152,
+            "state": "CLOSED"
+          }
+        ],
+        "signals": [
+          15
+        ],
+        "retentionFailure": "[Errno 21] Is a directory: '/tmp/source-child-fault-9jedu34l/retention-failure.json.terminal-7945f109530f4abca462f29cdd10ab9f' -> '/tmp/source-child-fault-9jedu34l/retention-failure.json'"
+      }
+    },
+    {
+      "case": "repeated-signals-inside-backend-closure",
+      "faultObserved": true,
+      "retainedTerminal": {
+        "status": "HOLD",
+        "scope": "harmless-local-child-only",
+        "fullReleaseQualified": false,
+        "terminalChildren": [
+          {
+            "clientPid": 62153,
+            "forced": true,
+            "reaped": true,
+            "errors": [],
+            "returncode": -15
+          }
+        ],
+        "terminalBackends": [
+          {
+            "clientPid": 62153,
+            "backendPid": 62153,
+            "state": "CLOSED"
+          }
+        ],
+        "signals": [
+          2,
+          15
+        ]
+      }
+    }
+  ],
+  "harnessSha256": "01cdc933de3fcb875ae2b22a3ffd96f61e0598f75198115416c3357612787f95"
+}

@@ -1,10 +1,11 @@
 import { z } from "zod";
+import { listWorkspaces } from "@/platform/workspaces";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { systemsReleaseMayBeOn, systemsReleasedFor } from "@/platform/systems-release";
 import { VersionAccessError, VersionValidationError, VersionStaleError } from "@/platform/system-versions";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
-import { createPrivateApplicationSource, publishPrivateApplicationSource, sharePrivateApplicationSource, grantPrivateApplicationInstall, installPrivateApplicationVersion } from "@/experience/workspace/agency/private-definition-server";
+import { readPrivateApplicationSources, createPrivateApplicationSource, publishPrivateApplicationSource, sharePrivateApplicationSource, grantPrivateApplicationInstall, installPrivateApplicationVersion } from "@/experience/workspace/agency/private-definition-server";
 export const dynamic="force-dynamic";
 const uuid=z.string().uuid();
 const source=z.object({businessId:uuid,systemId:uuid,revisionId:uuid,number:z.number().int().positive()}).strict();
@@ -34,4 +35,17 @@ export async function POST(request:Request){
   if(error instanceof VersionValidationError)return workspaceJson({error:error.message},400);
   return workspaceHttpFailure(error);
  }
+}
+
+export async function GET(request: Request) {
+ if (!workspaceReleaseEnabled() || !systemsReleaseMayBeOn()) return workspaceJson({ error: "Versions are not enabled." }, 503);
+ try {
+  const actor = await workspaceHttpActor(); if (!actor) return workspaceJson({ error: "Sign in to continue." }, 401);
+  const params = new URL(request.url).searchParams; const workspaceId = uuid.parse(params.get("workspaceId"));
+  if (!await systemsReleasedFor(actor, workspaceId)) return workspaceJson({ error: "Versions are not enabled for this business." }, 503);
+  const current=(await listWorkspaces(actor)).find(w=>w.id===workspaceId && w.access==="member" && ["customer","agency"].includes(w.kind));
+  if(!current)throw new VersionAccessError();
+  const incoming = params.has("sourceSystemId") ? source.parse({ businessId: params.get("sourceWorkspaceId"), systemId: params.get("sourceSystemId"), revisionId: params.get("revisionId"), number: Number(params.get("number")) }) : undefined;
+  return workspaceJson(await readPrivateApplicationSources(actor, workspaceId, incoming));
+ } catch (error) { if (error instanceof VersionAccessError) return workspaceJson({ error: error.message }, 403); return workspaceHttpFailure(error); }
 }

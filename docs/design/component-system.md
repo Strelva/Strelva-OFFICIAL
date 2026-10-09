@@ -1506,3 +1506,19 @@ A completed report read with empty or whitespace HTTP/caught-error copy uses a m
 The saved-work selector in WebsiteEntry uses the existing mobile44px minimum, preserving the shared field geometry elsewhere. SelectInput retains its native select, label/ref/controlled value/change and description/error contracts, and paints its decorative pointer-inert aria-hidden chevron as a sibling rather than a background image. Dashboard's legacy background-image rule applies only to unowned selects; the owned select surface remains solid and its right text clearance is unchanged. This removes unsupported paint from the actual selected text without relaxing the contrast helper.
 
 The original41 rendered cases passed at844fb5 while the two new saved-work cases failed:390px actual outside fixture Button was44px high but the real saved-work select was40px; enlarged320px select passed geometry but the solid-paint check refused its legacy SVG background image. Heading contrast measured17.90:1. Retained traces/screenshots establish those failures. Source preparation requires the unchanged43-case rendered rerun before claiming correction; it does not qualify native Auth, publication or providers.
+
+## Ordinary reusable application sources, October 9, 2026 (prepared locally)
+
+The source-authoring page at `src/app/workspace/version-sources` composes the
+owned Card, Button, TextInput and SelectInput with SourcePackageControls. Customer
+catalog and agency-home links lead to the same page. It creates a small reusable
+request form through real source commands; it does not create account bindings,
+copy records, qualify a revision by itself, or approve a release. Current direct
+owner/admin membership and the existing exit stop govern commands. A recipient
+needs an exact private share and qualified revision to create its separate draft.
+
+Focused React tests cover read-only admission, valid form publication, immutable
+retry after response loss, unmounted observation, and unqualified installation
+refusal. Genuine 1440px/390px Auth screenshots and keyboard journeys are prepared
+in `tests/ordinary-source-authenticated-local.spec.ts` but remain unrun. This is
+component adoption in isolated source, not a visual acceptance or deployment.

@@ -71,3 +71,9 @@ test('actual executable graph refuses omission of journey-evidence leaf',()=>{
  const omitted=coordinator.replace("'scripts/journey-evidence-files.mjs', ",'');
  assert.notEqual(omitted,coordinator);assert.throws(()=>checkGraph(omitted),/Missing executable dependency in receipt: scripts\/journey-evidence-files.mjs/);
 });
+
+for (const leaf of ['scripts/creator-source-proof-registry.mjs', 'tests/support/creator-maintenance-admission.cjs', 'tests/support/ordinary-source-admission.cjs']) test(`actual creator executable graph refuses omission of ${leaf}`,()=>{
+ const coordinator=readFileSync(new URL('../check-governed-creator-exit-races.mjs',import.meta.url),'utf8');
+ const omitted=coordinator.replace(`'${leaf}', `,'');
+ assert.notEqual(omitted,coordinator);assert.throws(()=>checkGraph(omitted),new RegExp(`Missing executable dependency in receipt: ${leaf.replaceAll('.', '\\.')}`));
+});

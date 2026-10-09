@@ -31,6 +31,7 @@ function ScopedPackageCatalog({ workspaceId, canInstall, canGrantInstall = false
   }, [request, workspaceId, attempt]);
   return <section aria-labelledby="qualified-apps-title" className="space-y-5 border-t border-gray-border pt-6">
     <header><h2 id="qualified-apps-title" className="font-display text-xl text-warm-black">Apps from creators</h2><p className="mt-2 text-sm text-gray-muted">Review what an app can use. Install a private draft with your business’s own records and accounts, then approve its release in Needs you.</p></header>
+    {canInstall ? <Link className="inline-flex min-h-12 items-center text-sm underline" href={`/workspace/version-sources?workspaceId=${workspaceId}`}>Create or share a reusable application</Link> : null}
     {!listings && !error ? <p role="status" className="text-sm text-gray-muted">Reading qualified apps…</p> : null}
     {error ? <div className="space-y-3"><p role="alert" className="text-sm text-critical">{error}</p><Button size="sm" variant="secondary" onClick={() => { setListings(null); setError(""); setAttempt(value => value + 1); }}>Retry apps</Button></div> : null}
     {listings?.length === 0 ? <p className="text-sm text-gray-muted">No qualified apps are available for this business yet.</p> : null}

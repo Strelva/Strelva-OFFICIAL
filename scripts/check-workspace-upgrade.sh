@@ -534,6 +534,9 @@ psql "${psql_args[@]}" --file="$repo_root/tests/governed-money-operations-schema
 # Exact additive neutral source/Version lineage; no external/provider calls.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022173000_neutral_creator_version_money.sql"
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/neutral-creator-version-money-contract.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022174000_private_source_exit_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022174500_private_source_exit_lock_order.sql"
+psql "${psql_args[@]}" --file="$repo_root/scripts/sql/private-source-current-contract.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022175000_reward_durable_mutations.sql"
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/reward-durable-catalog-contract.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/function-exposure-schema.sql"

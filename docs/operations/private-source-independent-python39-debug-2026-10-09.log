@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/var/folders/0t/9xnfycn50vd2yv5gb7p4cdsh0000gn/T/strelva-cap-creator-harness-ege4hyj7/debug-controls.py", line 238, in <module>
+    main()
+  File "/var/folders/0t/9xnfycn50vd2yv5gb7p4cdsh0000gn/T/strelva-cap-creator-harness-ege4hyj7/debug-controls.py", line 225, in main
+    retained=fn(directory)
+  File "/var/folders/0t/9xnfycn50vd2yv5gb7p4cdsh0000gn/T/strelva-cap-creator-harness-ege4hyj7/debug-controls.py", line 201, in persist_release_case
+    raise AssertionError('Writer-release gap lost durable HOLD invalidation '+json.dumps({'saved':saved,'memory':evidence,'pending':gate.pending,'accepts':accepts,'injected':injected}))
+AssertionError: Writer-release gap lost durable HOLD invalidation {"saved": {"status": "PASS", "scope": "harmless-local-child-only", "fullReleaseQualified": false, "terminalChildren": [{"clientPid": 34383, "forced": false, "reaped": true, "errors": [], "returncode": 0}], "terminalBackends": [{"clientPid": 34383, "backendPid": 34383, "state": "CLOSED"}], "signals": []}, "memory": {"status": "HOLD", "scope": "harmless-local-child-only", "fullReleaseQualified": false, "terminalChildren": [{"clientPid": 34383, "forced": false, "reaped": true, "errors": [], "returncode": 0}], "terminalBackends": [{"clientPid": 34383, "backendPid": 34383, "state": "CLOSED"}], "signals": [15]}, "pending": [15], "accepts": false, "injected": [{"line": 369, "depth": 1, "writingBeforeRelease": true}]}

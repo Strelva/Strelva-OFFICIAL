@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { ArrowRight, BriefcaseBusiness, Coins, FileText, Globe2, Plus, RefreshCw, Users } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import type { WorkAllowanceInspection } from "@/platform/work-economics/allowances";
@@ -281,6 +283,7 @@ export function AgencyHome({
       {snapshot.releases?.agencySetup ? <a href={`/workspace/agency/start?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-11 items-center gap-2 text-[13px] font-medium text-warm-black underline-offset-4 hover:underline">Agency setup and verification<ArrowRight size={15} aria-hidden="true" /></a> : null}
       {snapshot.releases?.agencyProspecting ? <a href={`/workspace/prospects?workspace=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-11 items-center gap-2 text-[13px] font-medium text-warm-black underline-offset-4 hover:underline">View prospects<ArrowRight size={15} aria-hidden="true" /></a> : null}
     </div> : null}
+    {released && canUseTools && ["owner", "admin"].includes(current?.role || "") ? <Link className="mt-5 inline-flex min-h-12 items-center text-sm underline" href={`/workspace/version-sources?workspaceId=${snapshot.workspaceId}`}>Create or share a reusable application</Link> : null}
     {combined ? <p className="mt-4 font-mono text-[12px] tabular-nums text-warm-black" aria-live="polite">
       {combined.total} {combined.total === 1 ? "client" : "clients"} · {combined.queue.length} {released ? "in the queue" : "need attention"}{oldestQueueWait ? ` · oldest waiting ${oldestQueueWait} ${oldestQueueWait === 1 ? "day" : "days"}` : ""}
     </p> : null}

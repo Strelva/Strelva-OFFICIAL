@@ -4,6 +4,7 @@ import { closeSync, constants, existsSync, fstatSync, lstatSync, openSync, readF
 import { basename, dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readOwnedJourneyFile } from './journey-evidence-files.mjs';
+import { creatorSourceProofRegistry } from './creator-source-proof-registry.mjs';
 
 // Closed inclusion inventory. Environment cleaning in the runner is the other
 // half of this contract: an unlisted inherited switch must never become live.
@@ -179,7 +180,7 @@ export function journeyProfile(name, masterOff = false) {
     Object.assign(env, { STRELVA_MAKE_REAL_LIVE_JOURNEY: '1', STRELVA_BOOKING_STORE_READ: 'postgres', STRELVA_LEADS_READ: 'postgres',
       STRELVA_LEADS_AUTHORITY: 'postgres', STRELVA_CLIENT_RECORDS_READ: 'spam_held,inquiry_timeline,inquiry_reply,inquiry_delivery,booking_config,account_grouping,orders,provider_connections,provider_metadata,reward_members,reward_transactions,threads,tenant_settings' });
   }
-  return { name, masterOff, env, specs: name === 'full-native' ? nativeSpecs : name === 'full-provider' ? providerSpecs : [
+  return { name, masterOff, env, ...(name === 'full-native' ? { supplementalProofs: creatorSourceProofRegistry() } : {}), specs: name === 'full-native' ? nativeSpecs : name === 'full-provider' ? providerSpecs : [
     { ...spec('full-model-flags-off'), title: masterOff
       ? 'master workspace switch refuses additive effects through real Auth'
       : 'additive switches refuse authority and provider effects through real Auth' },

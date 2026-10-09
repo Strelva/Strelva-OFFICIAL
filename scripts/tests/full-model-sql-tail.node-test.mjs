@@ -74,10 +74,10 @@ test('complete composed forward inventory has no unclassified workspace migratio
 });
 
 
-test('combined349 schedules both reviewed additions once before complete current catalog/exposure checks', () => {
+test('combined351 schedules both reviewed additions once before complete current catalog/exposure checks', () => {
   const inventory = JSON.parse(readFileSync(`${root}scripts/sql/historical-forward-inventory.json`, 'utf8'));
-  assert.equal(inventory.forwardCount, 349);
-  assert.equal(new Set(inventory.forwardFiles).size, 349);
+  assert.equal(inventory.forwardCount, 351);
+  assert.equal(new Set(inventory.forwardFiles).size, 351);
   const google = '20261021140100_native_google_hash_portability.sql';
   const rewards = '20261022175000_reward_durable_mutations.sql';
   const tail = readFileSync(`${root}scripts/sql/full-model-current-tail.sh`, 'utf8');
@@ -111,4 +111,19 @@ test('current contracts retain complete accepted catalog guards and both native 
   }
   const creator=read('scripts/check-governed-creator-exit-races.mjs');
   for (const label of ['current-native-google-hash-portability-contract','current-reward-durable-catalog-contract','reapplied-native-google-hash-portability-contract','reapplied-reward-durable-catalog-contract']) assert.ok(creator.includes(label));
+});
+
+
+test('current351 preserves historical phase checks and applies1740 then1745 once in both final owners', () => {
+ const read = path => readFileSync(`${root}${path}`,'utf8');
+ for (const name of ['check-workspace-sql.sh','check-workspace-upgrade.sh']) {
+  const source=read(`scripts/${name}`), a=source.indexOf('/supabase/migrations/20261022174000_private_source_exit_admission.sql'), b=source.indexOf('/supabase/migrations/20261022174500_private_source_exit_lock_order.sql');
+  assert.equal(source.split('/supabase/migrations/20261022174000_private_source_exit_admission.sql').length-1,1);assert.equal(source.split('/supabase/migrations/20261022174500_private_source_exit_lock_order.sql').length-1,1);
+  assert.ok(source.indexOf('/scripts/sql/neutral-creator-version-money-contract.sql')<a && a<b && b<source.indexOf('/scripts/sql/private-source-current-contract.sql') && source.indexOf('/scripts/sql/private-source-current-contract.sql')<source.indexOf('/supabase/migrations/20261022175000_reward_durable_mutations.sql'));
+ }
+ const current=read('scripts/sql/private-source-current-contract.sql');assert.ok(current.includes('begin read only;'));
+ for(const hash of ['c5102a2adad96ab31f2313ddfcc4eceb','1a08f3d5253b3d50037b9bce52fbd916'])assert.ok(current.includes(hash));
+ assert.ok(current.includes('do $neutral_ports$')&&current.includes('do $contract$')&&current.includes('private_journal_incomplete'));
+ assert.ok(read('scripts/sql/neutral-creator-version-money-contract.sql').includes('65070ed346aaff39df0c08a56c1afe2f'));
+ assert.ok(read('tests/function-exposure-schema.sql').includes('private source manager exposed directly'));
 });

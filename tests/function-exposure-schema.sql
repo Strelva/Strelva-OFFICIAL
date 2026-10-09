@@ -155,3 +155,11 @@ do $$declare signature text; f regprocedure; installed integer;t regclass:=to_re
   end loop;
  end if;
 end$$;
+
+-- Internal source authority stays owner-only after1740/1745. No new service
+-- call path is created; the existing private/neutral producer ports admit actors.
+do $$declare f regprocedure:=to_regprocedure('public.system_version_assert_source_manager(uuid,uuid,text)');r text;begin
+ if f is not null then foreach r in array array['anon','authenticated','service_role'] loop
+  if has_function_privilege(r,f,'EXECUTE') then raise exception 'private source manager exposed directly';end if;
+ end loop;end if;
+end$$;

@@ -1865,6 +1865,26 @@
           "rollbackStatus": "Prepared exact three-function/full table/catalog/ACL/trigger guarded inverse under ordered native writer fence and ACCESS EXCLUSIVE receipt locks; refuses retained mutation receipts; forward and inverse require actual superuser catalog/event-hook exclusion and refuse every enabled event hook; managed/provider-hook feasibility HOLD and actual native qualification UNRUN"
         }
       ]
+    },
+    {
+      "id": "private-source-exit-admission-and-lock-order",
+      "status": "Prepared exact ordinary customer/agency source admission and ordered neutral listing authority; source reviewed only;32 controlled native races, guarded inverse/reapply/current catalogs and fresh7+1+1 Auth qualification UNRUN; no commercial/provider permission",
+      "items": [
+        {
+          "file": "20261022174000_private_source_exit_admission.sql",
+          "sha256": "0c401986db5b308159885ba9b07a2aad21a5426c53c4c8ebaeef0734c43cf4ff",
+          "rollback": "rollback-20261022174000_private_source_exit_admission.sql",
+          "rollbackSha256": "9abb7212ae6afb72248062036c4ffbe007fc170d485130f3ab68952236188f19",
+          "rollbackStatus": "Prepared exact owner/body/properties/normalized ACL predecessor/successor inverse; original source/Version/paid/history bytes and prior writer preserved; managed/native drift/refusal/inverse/reapply qualification UNRUN"
+        },
+        {
+          "file": "20261022174500_private_source_exit_lock_order.sql",
+          "sha256": "3f39f293bedb1929ed5fd8cf098f85b8366ddcc2156b1f20a1cdfacc73540bed",
+          "rollback": "rollback-20261022174500_private_source_exit_lock_order.sql",
+          "rollbackSha256": "e3fa48993194ddfcca7d0844fdbbb018f25994e504b073ccb2890a154617dd3d",
+          "rollbackStatus": "Prepared exact owner/body/properties/normalized ACL predecessor/successor inverse; original source/Version/paid/history bytes and prior writer preserved; managed/native drift/refusal/inverse/reapply qualification UNRUN"
+        }
+      ]
     }
   ]
 }
