@@ -236,7 +236,7 @@ describe("offering editor conflict recovery", () => {
     await resolvePending(2, { error: { code: "source_unavailable", message: "The latest offering version could not be loaded." } }, 503);
     await command;
 
-    expect(container.textContent).toContain("The latest saved version could not be loaded");
+    expect(container.textContent).toContain("The latest History entry could not be loaded");
     expect(container.querySelector<HTMLInputElement>('input[maxlength="80"]')?.value).toBe("Keep this draft");
     const save = container.querySelector<HTMLButtonElement>('form button[type="submit"]')!;
     expect(save.disabled).toBe(true);

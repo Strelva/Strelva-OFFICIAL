@@ -177,7 +177,7 @@ export function OfferingInstallationView({
           <input type="checkbox" checked={publicationConfirmed} onChange={(event) => setPublicationConfirmed(event.target.checked)} />
           <span>I published the connected application through its review.</span>
         </label>
-        <button className={styles.primary} type="button" disabled={saving || !publicationConfirmed} onClick={() => void activate()}>{saving ? "Checking release…" : "Activate released version"}</button>
+        <button className={styles.primary} type="button" disabled={saving || !publicationConfirmed} onClick={() => void activate()}>{saving ? "Checking release…" : "Activate release"}</button>
       </> : <p className={styles.note}>Only a business owner or admin can activate it after publication.</p>}
     </section> : null}
 
