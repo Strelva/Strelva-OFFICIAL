@@ -60,6 +60,20 @@ do $$declare owner_id uuid:=gen_random_uuid();manager_id uuid:=gen_random_uuid()
  delete from public.workspace_memberships where workspace_id=agency and user_id=manager_id;
  perform pg_temp.ma_denied(format('select public.record_agency_billing_terms_authorized(%L,%L,%L,%L,%L,%s,%L,%L)',intent_id,manager_id,'admission-manager@example.test','admission-owner@example.test','acct_AdmissionAgency',generation,'cus_Client','price_Retail'),'agency_invoice_denied');
  perform pg_temp.ma_assert((select provider_customer_id is null and provider_price_id is null from public.agency_billing_intents where id=intent_id),'denied binding appends no local terms');
+ -- Exit after reservation blocks only a new provider effect; observation recovery remains.
+ request_id:=gen_random_uuid();
+ insert into public.business_payment_requests(id,workspace_id,kind,source_record_id,lines,amount_cents,currency,expires_at,token_hash,issued_by,idempotency_key)
+ values(request_id,ws,'quote',gen_random_uuid(),'[{"name":"Exit race quote","quantity":1,"unitCents":1000}]',1000,'usd',clock_timestamp()+interval '1 hour',repeat('a',64),owner_id,'native-exit-request');
+ p:=(public.reserve_business_payment(ws,'native-exit-payment','quote',1000,'usd',request_id::text)->>'id')::uuid;
+ perform public.claim_business_payment_channel(p,'agent');
+ insert into public.agent_payment_reservations(payment_id,workspace_id,amount_cents,currency) values(p,ws,1000,'usd');
+ select c.generation into generation from public.connected_accounts c where workspace_id=ws;
+ perform pg_temp.ma_assert(public.assert_agent_payment_admission(p,'acct_AdmissionBusiness',generation),'exit race request initially admitted');
+ perform public.prepare_agent_payment_attempt(p,'acct_AdmissionBusiness');
+ insert into public.workspace_exit_requests(workspace_id,requested_by,idempotency_key,command_digest,future_work,provider_participation,maintained_resource_action,state,completed_at)
+ values(ws,owner_id,'native-payment-exit',repeat('a',64),'pause','keep','stop','{"status":"completed"}',clock_timestamp());
+ perform pg_temp.ma_denied(format('select public.assert_agent_payment_admission(%L,%L,%s)',p,'acct_AdmissionBusiness',generation),'agent_payment_admission_denied');
+ perform pg_temp.ma_assert(public.recover_agent_payment_provider(p,'acct_AdmissionBusiness','pi_ExitAlreadySent',1000,'usd'),'completed exit preserves actual provider observation');
  perform pg_temp.ma_assert(not has_function_privilege('authenticated','public.assert_agent_payment_admission(uuid,text,bigint)','execute') and not has_function_privilege('anon','public.assert_agency_billing_mutation(uuid,uuid,text,text,text,bigint)','execute'),'new admissions service-role only');
 end $$;
 rollback;

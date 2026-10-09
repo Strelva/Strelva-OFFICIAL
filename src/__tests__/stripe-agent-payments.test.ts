@@ -62,7 +62,7 @@ describe("documented Stripe direct-account shared payment token protocol", () =>
     await expect(createStripeAgentPaymentProvider({ rawRequest }, () => 1000000).chargeWithSharedPaymentToken(input)).rejects.toThrow(/not qualified/);
     expect(rawRequest).toHaveBeenCalledTimes(1);
   });
-  it.each(["merchant disconnected", "deposit cancelled", "request expired"])("stops the new POST when durable admission changes during token GET: %s", async reason => {
+  it.each(["merchant disconnected", "deposit cancelled", "request expired", "workspace exit completed"])("stops the new POST when durable admission changes during token GET: %s", async reason => {
     let release!: () => void; let started!: () => void;
     const pending = new Promise<void>(resolve => { release = resolve; });
     const reading = new Promise<void>(resolve => { started = resolve; });
@@ -90,6 +90,7 @@ describe("documented Stripe direct-account shared payment token protocol", () =>
     const provider = { chargeWithSharedPaymentToken: vi.fn(), retrievePayment: vi.fn(async () => ({ id: "pi_Agent", status: "processing" as const, amountReceived: 0, currency: "usd", merchantAccountId: "acct_Merchant" })) };
     expect((await requestAgentPayment({ workspaceId }, { paymentCapability: "f".repeat(64), sharedPaymentToken: "spt_Token" }, { db: database, provider, previewApproved: true })).status).toBe("processing");
     expect(provider.chargeWithSharedPaymentToken).not.toHaveBeenCalled();
+    expect(database.rpc.mock.calls.some(call => call[0] === "assert_agent_payment_admission")).toBe(false);
     expect(database.rpc.mock.calls.some(call => call[0] === "bind_business_payment_provider")).toBe(true);
     expect(database.rpc.mock.calls.some(call => call[0] === "record_business_payment_event")).toBe(false);
   });
