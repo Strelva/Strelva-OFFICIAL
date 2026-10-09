@@ -384,3 +384,26 @@ relative-link/manifest path validation and `git diff --check` pass. Full lint's
 merged-source pass is retained; changed files were rechecked after all corrections.
 The browser replay's 10 union cases reran with explicit coarse-pointer and
 alert containment assertions and pass. No new runtime source changed afterward.
+
+
+## Coordinator release-inventory registration
+
+Root's offline inventory check found exactly one missing prepared packet file:
+`20261022183000_lifetime_system_kind.sql`. The candidate reproduced that failure;
+the release-safety suite also initially had 28 failed / 12 passed because inventory
+coverage failed before staging. Added one `lifetime-system-kind` proposed/held entry
+to `scripts/release-safety/batches.json`, preserving all preexisting objects/status
+values and SQL bytes. Forward SHA256 is
+`cb4634ccfa6dc84e701cc08b707e631ffa2cf813d88899e14dc6294e76aca417`;
+inverse is `95978ca755b1d88c702c30410d438f6a33fad7c6b7f2900c9aa38c9fa3c6634d`.
+The entry states conditioned local PostgreSQL 18 native/inverse proof, required
+runner failures/current harness repair and held/unrun PostgreSQL 17, managed/
+hosted ACL/Auth, historical-kind review, live preflight and application. It grants
+no staging-order, deploy or migration-application authority.
+
+Exact cheap checks:
+`pnpm exec tsx -e 'import { verifyReleaseInventory } from "./scripts/release-safety/inventory"; verifyReleaseInventory(process.cwd());'`
+passes; JSON parse and equality of every preexisting entry/status pass;
+`pnpm exec vitest run src/__tests__/release-safety-tools.test.ts` passes **40 tests**;
+`git diff --check` passes. Raw initial/final inventory and suite logs are retained.
+Foundation F01 must preserve this registration during later source convergence.

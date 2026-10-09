@@ -1924,6 +1924,19 @@
           "rollbackStatus": "Forward-only operation watermark and authority ports; populated or empty inverse deliberately refuses; no DROP/inverse/reapply claim; actual refusal qualification UNRUN"
         }
       ]
+    },
+    {
+      "id": "lifetime-system-kind",
+      "status": "Prepared lifetime System kind with conditioned local PostgreSQL 18 core/current-native and inverse/reapply proof; required workspace SQL and upgrade runners remain red pending separate harness repair; PostgreSQL 17, managed/hosted ACL/Auth, historical-kind review, live preflight and application UNRUN/held; no deployment or migration application authorized",
+      "items": [
+        {
+          "file": "20261022183000_lifetime_system_kind.sql",
+          "sha256": "cb4634ccfa6dc84e701cc08b707e631ffa2cf813d88899e14dc6294e76aca417",
+          "rollback": "rollback-20261022183000_lifetime_system_kind.sql",
+          "rollbackSha256": "95978ca755b1d88c702c30410d438f6a33fad7c6b7f2900c9aa38c9fa3c6634d",
+          "rollbackStatus": "Frozen guarded populated inverse and reapply pass on conditioned disposable PostgreSQL 18; ordinary writers/history retained; PostgreSQL 17, managed/hosted ACL/Auth and live preflight/application UNRUN/held"
+        }
+      ]
     }
   ]
 }
