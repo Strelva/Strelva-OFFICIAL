@@ -79,17 +79,40 @@ function createGoogleMakeRealPorts(service?:LiveMakeRealServiceContext):GoogleMa
    if(error)throw new Error("Google inverse receipt could not be read.");return data as ListingReceipt|null;
   }):null;
   if(!original || original.bindingId!==ctx.bindingId || original.locationId!==request.locationId || !original.undo || original.providerPayloadExpired || !inverse || inverse.undoesReceiptId!==original.id || inverse.bindingId!==ctx.bindingId || inverse.locationId!==request.locationId || !["posting","posted","posted_unverified","held_by_google"].includes(inverse.status) || inverse.providerPayloadExpired)return {ok:false,detail:"Exact retained matched Google compensating receipt unavailable."};
-  if(original.authority.kind!=="owner_approval" || original.authority.approvalRef!==request.eventId || inverse.authority.kind!=="owner_undo" || inverse.authority.actor!==actor.userId || inverse.targetRef!==original.targetRef || !original.intentDigest || !inverse.intentDigest)return {ok:false,detail:"Exact approved native Google undo authority unavailable."};
+  const retainedUndoActor=inverse.authority.kind==="owner_undo"?inverse.authority.actor:null;
+  const undoActorAllowed=service?retainedUndoActor===googleServiceActor(service):retainedUndoActor===actor.userId || Boolean(retainedUndoActor?.startsWith("make-real-service:"));
+  if(original.authority.kind!=="owner_approval" || original.authority.approvalRef!==request.eventId || inverse.authority.kind!=="owner_undo" || !undoActorAllowed || inverse.targetRef!==original.targetRef || !original.intentDigest || !inverse.intentDigest)return {ok:false,detail:"Exact approved native Google undo authority unavailable."};
   const inverseAction=original.undo.kind==="delete_post"?"post_delete":original.undo.kind==="delete_reply"?"reply_delete":original.undo.kind==="restore_reply"?"reply_update":original.action;
   const inverseAfter=original.undo.kind==="delete_post"?null:original.undo.kind==="delete_reply"?{reply:null}:original.undo.kind==="restore_reply"?{reply:original.undo.previous}:original.undo.snapshot;
   const expectedIntent=googleReceiptIntentDigest({workspaceId:businessId,bindingId:ctx.bindingId,locationId:request.locationId,action:inverseAction,targetRef:original.targetRef,authority:inverse.authority,before:original.after,after:inverseAfter,undoesReceiptId:original.id,idempotencyKey:`undo:${original.id}`});
-  if(inverse.action!==inverseAction || inverse.intentDigest!==expectedIntent)return {ok:false,detail:"Exact retained native Google inverse intent changed."};
+  let intentMatches=inverse.intentDigest===expectedIntent;
+  if(request.nativeGrant){
+   if(!db)throw new Error("Google inverse intent storage is unavailable.");
+   const checked=await (db as unknown as {rpc(name:string,args:Record<string,unknown>):PromiseLike<{data:unknown;error:unknown}>}).rpc("verify_native_google_inverse_intent",{
+    p_workspace_id:businessId,p_user_id:actor.userId,p_verified_email:actor.verifiedEmail,p_request:request,p_original_id:original.id,p_inverse_id:inverse.id,p_service_actor:service?googleServiceActor(service):null,
+   });
+   if(checked.error)throw new Error("Google inverse intent could not be verified.");
+   intentMatches=checked.data===true;
+  }
+  if(inverse.action!==inverseAction || !intentMatches)return {ok:false,detail:"Exact retained native Google inverse intent changed."};
+  const checkUndoAuthority=async()=>{
+   if(!service){
+    if((await readBusinessRecord(actor,businessId)).access!=="owner")throw new Error("Current Google owner authority ended.");
+    if(retainedUndoActor===actor.userId)return;
+   }
+   // An owner can recover a retained service inverse only through its logged,
+   // currently authorized session and approval, never through its prefix alone.
+   const current=await checkGoogleMakeRealService({workspaceId:businessId,actorId:service?googleServiceActor(service):retainedUndoActor!,request,...(service?{context:service}:{}),mode:"undo"});
+   if((service && (current.userId!==actor.userId || current.verifiedEmail.toLowerCase()!==actor.verifiedEmail.toLowerCase())) || current.bindingId!==ctx.bindingId)throw new Error("Google undo authority changed.");
+  };
+  // Receipt reads can outlive the exact service session/approval that made undo.
+  await checkUndoAuthority();
   let ok=false;
   const normalize=(value:string|undefined)=>value?.replace(/\s+/g," ").trim();
   if(original.undo.kind==="delete_post") {const live=await ctx.client.getPost(original.undo.postName);ok=!live.ok&&live.kind==="not_found";}
   else if(original.undo.kind==="delete_reply" || original.undo.kind==="restore_reply") {const live=await ctx.client.getReview(ctx.location,original.undo.reviewId);ok=live.ok&&(original.undo.kind==="delete_reply"?!live.data.reviewReply?.comment:normalize(live.data.reviewReply?.comment)===normalize(original.undo.previous));}
   else {const undo=original.undo;const live=await ctx.client.getLocation(ctx.location,[...undo.updateMask,"metadata"]);const {hoursMatch,infoMatches}=await import("./record");ok=live.ok&&(undo.updateMask.includes("regularHours")||undo.updateMask.includes("specialHours")?hoursMatch(undo.snapshot as Parameters<typeof hoursMatch>[0],live.data):infoMatches(undo.snapshot as Parameters<typeof infoMatches>[0],live.data,undo.updateMask));}
-  if(ok && inverse) {const settled=await ctx.receipts.settle(inverse.id,businessId,{status:"posted",readback:"matched"});const linked=await ctx.receipts.get(original.id,businessId);ok=settled.status==="posted"&&settled.readback==="matched"&&linked?.status==="undone"&&linked.undoneByReceiptId===inverse.id;}
+  if(ok && inverse) {await checkUndoAuthority();const settled=await ctx.receipts.settle(inverse.id,businessId,{status:"posted",readback:"matched"});const linked=await ctx.receipts.get(original.id,businessId);ok=settled.status==="posted"&&settled.readback==="matched"&&linked?.status==="undone"&&linked.undoneByReceiptId===inverse.id;}
   return {ok,detail:ok?"Google currently confirms the exact compensating change.":"Google current inverse readback is unconfirmed."};
  },
  async undo(actor,businessId,request,receiptId){

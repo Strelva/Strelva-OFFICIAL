@@ -48,7 +48,7 @@ beforeEach(() => {
   mocks.access.mockResolvedValue({ access: "owner" }); mocks.grant.mockResolvedValue({ id: bindingId });
   mocks.snapshot.mockResolvedValue({ bindings: [{ id: bindingId, status: "connected", originTenantId: null, locations: [{ locationId: "exact", accountId: nativeGrant.accountId }] }] });
   mocks.event.mockResolvedValue({ id: request.eventId, tenantId: request.tenantId, status: "approved", metadata });
-  mocks.rpc.mockImplementation(async (_name: string, args: { p_workspace_id: string; p_idempotency_key: string }) => ({ data: args.p_workspace_id !== workspaceId ? null : args.p_idempotency_key === original.idempotencyKey ? structuredClone(original) : args.p_idempotency_key === inverse.idempotencyKey ? structuredClone(inverse) : null, error: null }));
+  mocks.rpc.mockImplementation(async (name: string, args: Record<string,unknown>) => name==="verify_native_google_inverse_intent" ? {data:args.p_workspace_id===workspaceId && args.p_original_id===original.id && args.p_inverse_id===inverse.id && inverse.intentDigest===googleReceiptIntentDigest({workspaceId,bindingId,locationId:"exact",action:"post_delete",targetRef:original.targetRef,authority:inverse.authority,before:original.after,after:null,undoesReceiptId:original.id,idempotencyKey:`undo:${original.id}`}),error:null} : ({ data: args.p_workspace_id !== workspaceId ? null : args.p_idempotency_key === original.idempotencyKey ? structuredClone(original) : args.p_idempotency_key === inverse.idempotencyKey ? structuredClone(inverse) : null, error: null }));
   mocks.get.mockImplementation(async (id: string, scope: string) => scope !== workspaceId ? null : id === originalId ? structuredClone(original) : id === inverseId ? structuredClone(inverse) : null);
   mocks.settle.mockImplementation(async (id: string, scope: string, result: { status: ListingReceipt["status"]; readback: ListingReceipt["readback"] }) => {
     if (id !== inverseId || scope !== workspaceId) throw new Error("Fixture refused foreign settlement");
@@ -60,6 +60,21 @@ beforeEach(() => {
   mocks.context.mockResolvedValue({ workspaceId, bindingId, location: { accountId: nativeGrant.accountId, locationId: "exact" }, receipts: { get: mocks.get, settle: mocks.settle }, client: { getPost: mocks.getPost, getReview: mocks.getReview, getLocation: mocks.getLocation, deletePost: mocks.write, patchLocation: mocks.write, updateReply: mocks.write, deleteReply: mocks.write } });
 });
 
+describe("native Google actual database inverse intent verdict",()=>{
+ it("uses an authoritative database digest verdict even when PostgreSQL digest differs from compact memory digest",async()=>{
+  inverse.intentDigest="b".repeat(64);const rpc=mocks.rpc.getMockImplementation()!;
+  mocks.rpc.mockImplementation(async(name,args)=>name==="verify_native_google_inverse_intent"?{data:true,error:null}:rpc(name,args));
+  expect(await recover()).toMatchObject({ok:true});expect(mocks.getPost).toHaveBeenCalledTimes(1);noProviderWrite();
+ });
+ it.each([false,null,{ok:true},"true"])("refuses non-boolean or false database verdict %j without falling back to a matching compact hash",async verdict=>{
+  const rpc=mocks.rpc.getMockImplementation()!;mocks.rpc.mockImplementation(async(name,args)=>name==="verify_native_google_inverse_intent"?{data:verdict,error:null}:rpc(name,args));
+  expect(await recover()).toMatchObject({ok:false});expect(mocks.getPost).not.toHaveBeenCalled();expect(mocks.settle).not.toHaveBeenCalled();noProviderWrite();
+ });
+ it("refuses unavailable actual intent qualification before provider readback",async()=>{
+  const rpc=mocks.rpc.getMockImplementation()!;mocks.rpc.mockImplementation(async(name,args)=>name==="verify_native_google_inverse_intent"?{data:null,error:{message:"unavailable"}}:rpc(name,args));
+  await expect(recover()).rejects.toThrow(/intent could not be verified/);expect(mocks.getPost).not.toHaveBeenCalled();expect(mocks.settle).not.toHaveBeenCalled();noProviderWrite();
+ });
+});
 describe("native Google current inverse readback recovery", () => {
   it.each(["posted_unverified", "held_by_google"] as const)("recovers accepted %s undo using fresh readback and durable receipt settlement", async status => {
     inverse.status = status;

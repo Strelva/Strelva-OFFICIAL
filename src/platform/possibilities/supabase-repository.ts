@@ -40,7 +40,7 @@ export const POSSIBILITY_STALE_MESSAGE = "A System this changes moved since it w
 
 export function mapPossibilityError(error: DbError, fallback: string): never {
   const detail = `${error?.code ?? ""} ${error?.message ?? ""}`;
-  if (detail.includes("business_record_access_denied") || detail.includes("system_possibility_not_found") || detail.includes("system_not_found")) {
+  if (detail.includes("native_google_owner_denied") || detail.includes("business_record_access_denied") || detail.includes("system_possibility_not_found") || detail.includes("system_not_found")) {
     throw new WorkspaceAccessError();
   }
   if (detail.includes("system_possibility_revision_conflict")) throw new WorkspaceConflictError("This possibility changed. Reload before deciding.");
@@ -141,6 +141,24 @@ export function createSupabasePossibilityRepository(actor: WorkspaceActor, db?: 
       }, fallback);
       const saved = parse(data, p.businessId, fallback, p.id);
       if (saved.revision !== p.revision) throw new WorkspaceStoreError(`${fallback} The response was malformed.`);
+    },
+    async finalizeNativeGoogleCompletion(value,expectedRevision,activationId) {
+      const p=possibilitySchema.parse(value),fallback="The native Google completion could not be finalized.";
+      const data=await call("finalize_native_google_completion",{
+        p_workspace_id:uuid.parse(p.businessId),...actorArgs(),p_possibility_id:uuid.parse(p.id),
+        p_expected_revision:z.number().int().nonnegative().parse(expectedRevision),p_activation_id:activationId,p_body:p,
+      },fallback);
+      const saved=parse(data,p.businessId,fallback,p.id);
+      if(saved.revision!==p.revision || saved.status!=="made_real" || saved.activationId!==activationId || saved.candidateRevision!==p.candidateRevision)throw new WorkspaceStoreError(`${fallback} The response was malformed.`);
+    },
+    async finalizeNativeGoogleUndo(value,expectedRevision,activationId) {
+      const p=possibilitySchema.parse(value),fallback="The native Google undo could not be finalized.";
+      const data=await call("finalize_native_google_undo",{
+        p_workspace_id:uuid.parse(p.businessId),...actorArgs(),p_possibility_id:uuid.parse(p.id),
+        p_expected_revision:z.number().int().nonnegative().parse(expectedRevision),p_activation_id:activationId,p_body:p,
+      },fallback);
+      const saved=parse(data,p.businessId,fallback,p.id);
+      if(saved.revision!==p.revision || saved.status!=="withdrawn" || saved.activationId)throw new WorkspaceStoreError(`${fallback} The response was malformed.`);
     },
     async list(businessId) {
       return (await listWithSources(businessId)).map((row) => row.possibility);

@@ -1,6 +1,7 @@
 import { nativeGoogleGrantGeneration, assertCurrentNativeGoogleGrant } from "./native/contracts";
 import { nativeGoogleGrantPinSchema } from "@/platform/make-real/google-provider-reference";
 import { assertGoogleDispatchGrant } from "./dispatch-grant";
+import { decryptSecret } from "@/platform/infra/crypto/secrets";
 import { maintenancePinSchema, checkBundleMaintenanceEvent } from "./maintenance";
 import { googleVersionPinSchema, googleVersionDraftCurrent, type GoogleVersionPin } from "./versions";
 import { systemsReleasedFor, systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";
@@ -115,18 +116,39 @@ export async function tenantListingContext(tenantId: string, workspaceId: string
   const { readGoogleBindingForTenant } = await import("@/platform/account-bindings/store");
   const binding = await readGoogleBindingForTenant(tenantId);
   const saved = binding?.workspaceId === workspaceId ? binding.locations.find(location => location.locationId === locationId) : undefined;
-  const fallback = saved ? null : await deps.location(tenantId, grant);
+  const checkNative = async () => {
+    if (!nativeGrant) return;
+    if (nativeWorkspace !== workspaceId || grant.source !== "binding" || grant.workspaceId !== workspaceId || grant.bindingId !== nativeGrant.bindingId) throw new Error("The exact native Google grant changed.");
+    const pinned = await assertCurrentNativeGoogleGrant(workspaceId, locationId, nativeGrant);
+    assertGoogleDispatchGrant(grant, grant, pinned, workspaceId, locationId);
+    if (decryptSecret(pinned.refreshTokenCiphertext) !== grant.refreshToken || decryptSecret(pinned.accessTokenCiphertext) !== grant.accessToken) throw new Error("The captured native Google credentials changed.");
+  };
+  await checkNative();
+  // A native request has one pinned place; it never consults legacy metadata.
+  const fallback = saved || nativeGrant ? null : await deps.location(tenantId, grant);
   const location = saved ?? (fallback?.locationId.replace(/^locations\//, "") === locationId ? fallback : null);
-  if (!location) throw new Error("The Google location changed. Prepare a new draft.");
+  if (!location || (nativeGrant && location.accountId !== nativeGrant.accountId)) throw new Error("The Google location changed. Prepare a new draft.");
   const control = await readListingControl(workspaceId, locationId);
+  // Database/event awaits can outlive the captured consent. Check before refresh.
+  await checkNative();
   const token = await deps.accessToken(grant);
   if (!token) throw new Error("Reconnect Google to continue.");
-  return { workspaceId, bindingId: grant.bindingId ?? null, lifecycle: control.paused ? "paused" : "live", location: { accountId: location.accountId, locationId }, client: paceGoogleWrites(deps.client(token), workspaceId, locationId, undefined, async () => {
-    if (nativeGrant) await assertCurrentNativeGoogleGrant(workspaceId, locationId, nativeGrant);
+  await checkNative();
+  if (nativeGrant && token !== grant.accessToken) throw new Error("The captured native Google access token changed.");
+  const authorize = async () => {
     const current = await deps.grant(tenantId);
-    const liveBinding = await readGoogleBindingForTenant(tenantId);
+    const liveBinding = nativeGrant ? await assertCurrentNativeGoogleGrant(workspaceId, locationId, nativeGrant) : await readGoogleBindingForTenant(tenantId);
     assertGoogleDispatchGrant(grant, current, liveBinding, workspaceId, locationId);
-  }), receipts: deps.receipts() };
+  };
+  const rawClient = deps.client(token);
+  const client = nativeGrant ? {
+    ...rawClient,
+    listReviews: async (...args: Parameters<typeof rawClient.listReviews>) => { await authorize(); return rawClient.listReviews(...args); },
+    getReview: async (...args: Parameters<typeof rawClient.getReview>) => { await authorize(); return rawClient.getReview(...args); },
+    getLocation: async (...args: Parameters<typeof rawClient.getLocation>) => { await authorize(); return rawClient.getLocation(...args); },
+    getPost: async (...args: Parameters<typeof rawClient.getPost>) => { await authorize(); return rawClient.getPost(...args); },
+  } : rawClient;
+  return { workspaceId, bindingId: grant.bindingId ?? null, lifecycle: control.paused ? "paused" : "live", location: { accountId: location.accountId, locationId }, client: paceGoogleWrites(client, workspaceId, locationId, undefined, authorize), receipts: deps.receipts() };
 }
 
 export type GoogleExecutionResult = { accepted: boolean; verified?: boolean; receiptId?: string; reason?: string };

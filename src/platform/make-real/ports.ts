@@ -4,6 +4,9 @@ import type { IsolatedEffectRehearsal, LiveSystemsReader } from "@/platform/poss
 import type { SystemRef } from "@/platform/systems/contracts";
 import type { Activation } from "./contracts";
 
+/** Private native owner inverse frame; it does not make generic closed plans undoable. */
+export interface NativeGoogleCompletedUndo { candidateRevision:number;planFingerprint:string;effectId:string;providerRef:string; }
+
 export type EffectPerformResult =
   | { status: "accepted"; providerRef: string; result?: Record<string, unknown> }
   | { status: "rejected"; reason: string };

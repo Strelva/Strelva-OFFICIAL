@@ -13,7 +13,7 @@ import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";
 import { liveMakeReal, googleMakeRealPorts } from "@/experience/systems/live-server";
 import { createGoogleListingAdapter } from "@/platform/make-real/google-adapter";
-import { nativeGoogleGrantGeneration, assertCurrentNativeGoogleGrant, assertNativeGooglePlan, nativeGoogleCommandSchema, type NativeGooglePlan } from "./contracts";
+import { assertCurrentNativeGoogleGrant, assertNativeGooglePlan, nativeGoogleCommandSchema, type NativeGooglePlan } from "./contracts";
 import { z } from "zod";
 import { createHash } from "node:crypto";
 async function owner(actor: WorkspaceActor, workspaceId: string) {
@@ -67,11 +67,9 @@ export async function commandNativeGoogle(actor: WorkspaceActor, raw: unknown, m
   if (command.action === "agency_authority") return { authorized: true, agencyWorkspaceId: await assertActingProvider(actor, command.workspaceId, { effect: "google", kind: "google_location", ref: command.locationId }) };
   if (command.action === "read_grant") {
     await owner(actor, command.workspaceId);
-    await nativeGoogleLifecycle(actor, command.workspaceId, "read_grant", { bindingId: command.bindingId });
-    const binding=await readGoogleBindingForTenant(workspacePublishingScope(command.workspaceId));
-    if(!binding || binding.id!==command.bindingId || binding.workspaceId!==command.workspaceId || binding.originTenantStableId!==null || binding.originTenantId!==null)throw new WorkspaceConflictError("Exact native Google binding unavailable.");
-    await owner(actor, command.workspaceId);
-    return {bindingId:binding.id,status:binding.status,credentialsPurged:binding.refreshTokenCiphertext===null&&binding.accessTokenCiphertext===null,grantGeneration:nativeGoogleGrantGeneration(binding),subjectDigest:binding.subject?createHash("sha256").update(binding.subject).digest("hex"):null,locations:binding.locations.map(({accountId,locationId})=>({accountId,locationId}))};
+    const result=z.object({bindingId:z.string().uuid(),status:z.enum(["connected","revoked","needs_reauth","error"]),bindingCredentialsPurged:z.boolean(),credentialsPurged:z.boolean(),grantGeneration:z.string().regex(/^[a-f0-9]{64}$/),subjectDigest:z.string().regex(/^[a-f0-9]{64}$/).nullable(),locations:z.array(z.object({accountId:z.string(),locationId:z.string()}).strict())}).strict().parse(await nativeGoogleLifecycle(actor, command.workspaceId, "read_grant", {bindingId:command.bindingId}));
+    if(result.bindingId!==command.bindingId)throw new WorkspaceConflictError("Exact native Google binding unavailable.");
+    await owner(actor, command.workspaceId);return result;
   }
   if (command.action === "read_disconnect") { await owner(actor, command.workspaceId); return nativeGoogleLifecycle(actor, command.workspaceId, "read_disconnect", { commandId: command.commandId }); }
   if (command.action === "purge_expired_cache") { await owner(actor, command.workspaceId); return nativeGoogleLifecycle(actor, command.workspaceId, "purge"); }
@@ -90,17 +88,23 @@ export async function commandNativeGoogle(actor: WorkspaceActor, raw: unknown, m
     return { mandateId: command.mandateId, status: "ended", ownerGrantRevoked: false };
   }
   if (command.action === "disconnect") {
-    const plan = command.plan;
-    await owner(actor, plan.workspaceId);
-    if (plan.request.tenantId !== `workspace-${plan.workspaceId}` || JSON.stringify(plan.request.nativeGrant) !== JSON.stringify(plan.grant)) throw new WorkspaceConflictError("Exact native Google grant scope required.");
+    const plan=command.plan;await owner(actor,plan.workspaceId);
+    if(plan.request.tenantId!==`workspace-${plan.workspaceId}` || JSON.stringify(plan.request.nativeGrant)!==JSON.stringify(plan.grant))throw new WorkspaceConflictError("Exact native Google grant scope required.");
     await noLegacyGoogleGrant();
-    const binding = await assertCurrentNativeGoogleGrant(plan.workspaceId, plan.request.locationId, plan.grant);
-    await nativeGoogleLifecycle(actor, plan.workspaceId, "qualify", {bindingId:binding.id});
-    const claim = z.object({ id: z.string().uuid(), refreshTokenCiphertext: z.string().nullable(), accessTokenCiphertext: z.string().nullable() }).strict().parse(await nativeGoogleLifecycle(actor, plan.workspaceId, "claim_disconnect", { commandId: command.commandId, bindingId: binding.id, expectedUpdatedAt: binding.updatedAt }));
-    let revoked: Awaited<ReturnType<typeof revokeProviderAuthorization>>;
-    try { revoked = await revokeProviderAuthorization("google", decryptSecret(claim.refreshTokenCiphertext) || decryptSecret(claim.accessTokenCiphertext)); }
-    catch { revoked = { outcome: "failed", errorCode: "request_failed" }; }
-    return nativeGoogleLifecycle(actor, plan.workspaceId, "settle_disconnect", { commandId: claim.id, outcome: revoked.outcome, errorCode: revoked.errorCode });
+    const scope={commandId:command.commandId,bindingId:plan.grant.bindingId,accountId:plan.grant.accountId,locationId:plan.request.locationId,grantGeneration:plan.grant.grantGeneration};
+    const existing=await nativeGoogleLifecycle(actor,plan.workspaceId,"find_disconnect",scope);
+    let expectedUpdatedAt:string|undefined;
+    if(existing===null){
+      const binding=await assertCurrentNativeGoogleGrant(plan.workspaceId,plan.request.locationId,plan.grant);
+      await nativeGoogleLifecycle(actor,plan.workspaceId,"qualify",{bindingId:binding.id});expectedUpdatedAt=binding.updatedAt;
+    }
+    const metadata=z.object({dispatch:z.literal(false),id:z.string().uuid(),bindingId:z.string().uuid(),status:z.enum(["claimed","settled"]),remoteOutcome:z.string(),remoteErrorCode:z.string().nullable(),credentialsPurged:z.boolean(),bindingCredentialsPurged:z.boolean(),remoteRevoked:z.boolean(),retryAvailable:z.boolean(),attempts:z.number().int().min(1).max(3)}).strict();
+    const claim=z.discriminatedUnion("dispatch",[metadata,z.object({dispatch:z.literal(true),id:z.string().uuid(),leaseId:z.string().uuid(),revocationTokenCiphertext:z.string().min(1)}).strict()]).parse(await nativeGoogleLifecycle(actor,plan.workspaceId,"claim_disconnect",{...scope,...(expectedUpdatedAt?{expectedUpdatedAt}:{})}));
+    if(!claim.dispatch){const {dispatch,...result}=claim;void dispatch;return result;}
+    let revoked:Awaited<ReturnType<typeof revokeProviderAuthorization>>;
+    try{revoked=await revokeProviderAuthorization("google",decryptSecret(claim.revocationTokenCiphertext));}
+    catch{revoked={outcome:"failed",errorCode:"request_failed"};}
+    return nativeGoogleLifecycle(actor,plan.workspaceId,"settle_disconnect",{commandId:claim.id,leaseId:claim.leaseId,outcome:revoked.outcome,errorCode:revoked.errorCode});
   }
   const plan = command.plan;
   const { proposal, binding, effect } = await nativeGooglePlan(actor, plan);
@@ -113,7 +117,15 @@ export async function commandNativeGoogle(actor: WorkspaceActor, raw: unknown, m
   }
   const activation = await liveMakeReal.read(actor, plan.workspaceId, command.activationId);
   if (activation.possibilityId !== plan.possibilityId || activation.candidateRevision !== plan.candidateRevision || activation.businessId !== plan.workspaceId) throw new WorkspaceConflictError("Activation does not belong to the exact plan.");
-  if (command.action === "resume") { await nativeGooglePlan(actor, plan); return {activation: await liveMakeReal.resume(actor, plan.workspaceId, activation.id, "Current owner resumed the exact recovered native Google plan.")}; }
+  if (command.action === "resume") {
+    await nativeGooglePlan(actor,plan);
+    if(activation.status==="made_real") {
+      const completed=activation.steps.find(step=>step.kind==="effect"&&step.target===plan.effectId);
+      if(!completed?.receipt?.providerRef)throw new WorkspaceConflictError("Exact native Google completion receipt required.");
+      return {activation:await liveMakeReal.completeNativeGoogle(actor,plan.workspaceId,activation.id,{candidateRevision:plan.candidateRevision,planFingerprint:plan.planFingerprint,effectId:plan.effectId,providerRef:completed.receipt.providerRef})};
+    }
+    return {activation:await liveMakeReal.resume(actor,plan.workspaceId,activation.id,"Current owner resumed the exact recovered native Google plan.")};
+  }
   const step = activation.steps.find(item => item.kind === "effect" && item.target === plan.effectId);
   if (!step) throw new WorkspaceConflictError("Exact Google effect step required.");
   const adapter = createGoogleListingAdapter(googleMakeRealPorts, { actor, enabled: async () => true });
@@ -122,7 +134,7 @@ export async function commandNativeGoogle(actor: WorkspaceActor, raw: unknown, m
     return { activation: await liveMakeReal.reconcile(actor, plan.workspaceId, activation.id, { stepId: step.id, resolution: "completed", target: "compensation", evidence: "Exact retained native Google compensating receipt and actual inverse readback confirmed undo." }) };
   }
   if (command.action === "recover") {
-    if (step.status !== "unknown" || step.effect !== "unknown") throw new WorkspaceConflictError("Exact unknown Google effect required.");
+    if (step.status !== "unknown" || !["unknown","accepted"].includes(step.effect)) throw new WorkspaceConflictError("Exact unknown Google effect required.");
     const found = await adapter.find({ businessId: plan.workspaceId, effect, idempotencyKey: step.idempotencyKey });
     if (!found?.found || !(await adapter.readBack({ businessId: plan.workspaceId, providerRef: found.providerRef })).ok) throw new WorkspaceConflictError("Existing Google receipt and current matched readback are required. Nothing was repeated.");
     await nativeGooglePlan(actor, plan);
@@ -132,5 +144,5 @@ export async function commandNativeGoogle(actor: WorkspaceActor, raw: unknown, m
   if (step.effect !== "accepted" || !step.receipt?.providerRef) throw new WorkspaceConflictError("Exact accepted Google effect receipt required.");
   if (command.action === "readback") return { activation, readback: await adapter.readBack({ businessId: plan.workspaceId, providerRef: step.receipt.providerRef }) };
   await nativeGooglePlan(actor, plan);
-  return { activation: await liveMakeReal.rollback(actor, plan.workspaceId, activation.id, "Business owner requested governed undo of this exact approved plan.") };
+  return { activation: await liveMakeReal.rollbackNativeGoogle(actor, plan.workspaceId, activation.id, {candidateRevision:plan.candidateRevision,planFingerprint:plan.planFingerprint,effectId:plan.effectId,providerRef:step.receipt.providerRef}, "Business owner requested governed undo of this exact approved plan.") };
 }

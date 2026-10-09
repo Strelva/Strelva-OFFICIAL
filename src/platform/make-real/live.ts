@@ -4,7 +4,7 @@ import type { PossibilityRepository } from "@/platform/possibilities/repository"
 import type { MakeRealRunResult, ReadyPlan } from "@/platform/needs-you/sources/make-real";
 import type { Activation } from "./contracts";
 import { planApprovalProblem, planFingerprint, type ApprovalRecordsPort } from "./approvals";
-import type { AuthorityPort, EffectAdapter, LiveSystemsPort, OperatingChecksPort } from "./ports";
+import type { NativeGoogleCompletedUndo, AuthorityPort, EffectAdapter, LiveSystemsPort, OperatingChecksPort } from "./ports";
 import type { ActivationRepository } from "./repository";
 import { createMakeReal, type MakeReal } from "./runner";
 import { customerActivationView } from "./view";
@@ -41,6 +41,7 @@ export interface LiveMakeRealDeps {
   adapters(actor: WorkspaceActor, workspaceId: string, service?: LiveMakeRealServiceContext): EffectAdapter[];
   approvals: ApprovalRecordsPort;
   checks?: OperatingChecksPort;
+  nativeGoogleUndoOwner?: (actor:WorkspaceActor,workspaceId:string)=>Promise<boolean>;
   clock?: () => string;
   ids?: () => string;
   /** Strelva (system)'s log (record_strelva_service_action). Required to run under a service session. */
@@ -100,14 +101,15 @@ export function createLiveOperatingChecks(runners: Record<string, (activation: A
 }
 
 export function createLiveMakeRealService(deps: LiveMakeRealDeps) {
-  function makeRealFor(actor: WorkspaceActor, workspaceId: string, possibilityId: string, approvalId: string | null, session?: ServiceSession, activationId?: string): MakeReal {
+  function makeRealFor(actor: WorkspaceActor, workspaceId: string, possibilityId: string, approvalId: string | null, session?: ServiceSession, activationId?: string, nativeUndo=false): MakeReal {
     if (session && (session.workspaceId !== workspaceId || session.actor.userId !== actor.userId || session.actor.verifiedEmail !== actor.verifiedEmail || !["make_real_link", "make_real_resume"].includes(session.purpose))) throw new WorkspaceAccessError();
     const possibilities = deps.possibilities(actor);
+    const approved=createApprovalAuthority({approvals:deps.approvals,possibilities,possibilityId,approvalId});
     return createMakeReal({
       possibilities,
       activations: deps.activations(actor),
       live: deps.live(actor),
-      authority: createApprovalAuthority({ approvals: deps.approvals, possibilities, possibilityId, approvalId }),
+      authority: nativeUndo?{async check(actor,request){if(!deps.nativeGoogleUndoOwner || !(await deps.nativeGoogleUndoOwner(actor,request.businessId)))return {allowed:false,reason:"Current native Google business owner required for governed undo."};return approved.check(actor,request);}}:approved,
       adapters: session ? deps.adapters(actor, workspaceId, { session, approvalId, possibilityId, ...(activationId ? { activationId } : {}) }) : deps.adapters(actor, workspaceId),
       checks: deps.checks ?? createLiveOperatingChecks(),
       approvals: deps.approvals,
@@ -147,6 +149,18 @@ export function createLiveMakeRealService(deps: LiveMakeRealDeps) {
       const { makeReal } = await forActivation(actor, workspaceId, activationId, service);
       return makeReal.rollback(actor, workspaceId, activationId, note);
     },
+    async completeNativeGoogle(actor:WorkspaceActor,workspaceId:string,activationId:string,frame:NativeGoogleCompletedUndo):Promise<Activation> {
+      if(!deps.nativeGoogleUndoOwner || !(await deps.nativeGoogleUndoOwner(actor,workspaceId)))throw new WorkspaceAccessError("Current native Google business owner required for completion recovery.");
+      const activation=await deps.activations(actor).get(workspaceId,activationId);if(!activation)throw new WorkspaceAccessError();
+      return makeRealFor(actor,workspaceId,activation.possibilityId,activation.approvals[0]?.approvalId??null,undefined,activationId,true).completeNativeGoogle(actor,workspaceId,activationId,frame);
+    },
+    async rollbackNativeGoogle(actor:WorkspaceActor,workspaceId:string,activationId:string,frame:NativeGoogleCompletedUndo,note?:string):Promise<Activation> {
+      if(!deps.nativeGoogleUndoOwner || !(await deps.nativeGoogleUndoOwner(actor,workspaceId)))throw new WorkspaceAccessError("Current native Google business owner required for governed undo.");
+      const activation=await deps.activations(actor).get(workspaceId,activationId);if(!activation)throw new WorkspaceAccessError();
+      const makeReal=makeRealFor(actor,workspaceId,activation.possibilityId,activation.approvals[0]?.approvalId??null,undefined,activationId,true);
+      return makeReal.rollback(actor,workspaceId,activationId,note,frame);
+    },
+
     /**
      * The workspace-work cron: continue every in-progress activation. A step
      * left running is reconciled first (provider lookup by key, never a

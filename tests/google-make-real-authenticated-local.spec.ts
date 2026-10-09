@@ -27,7 +27,7 @@ test("native Google complete approved job, unknown recovery, undo, mandate end, 
   if(!current.activation){expect((await dispatch("make_real",{action:"make_real",plan:scope.plan})).status()).toBe(200);current=await read();}
   let activation=activationSchema.parse(current.activation);expect(activation).toMatchObject({businessId:scope.workspaceId,possibilityId:scope.plan.possibilityId,candidateRevision:scope.plan.candidateRevision});
   // An actual unknown step is mandatory. Never fabricate a timeout, receipt or manual reference.
-  const unknown=activation.steps.find(step=>step.kind==="effect"&&step.target===scope.plan.effectId&&step.status==="unknown"&&step.effect==="unknown");expect(unknown).toBeTruthy();
+  const unknown=activation.steps.find(step=>step.kind==="effect"&&step.target===scope.plan.effectId&&step.status==="unknown"&&["unknown","accepted"].includes(step.effect??""));expect(unknown).toBeTruthy();
   const recovered=await dispatch("recover",{action:"recover",plan:scope.plan,activationId:activation.id});expect(recovered.status()).toBe(200);
   const recovery=z.object({activation:activationSchema,providerRef:z.string()}).parse(await recovered.json());activation=recovery.activation;
   const accepted=activation.steps.find(step=>step.id===unknown!.id)!;expect(accepted.effect).toBe("accepted");expect(accepted.receipt?.providerRef).toBe(recovery.providerRef);

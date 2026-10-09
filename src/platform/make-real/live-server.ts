@@ -99,6 +99,7 @@ export function createServerLiveMakeReal(google: GoogleMakeRealPorts) {
     adapters: (actor, workspaceId, service) => liveChannelAdapters(actor, workspaceId, google, service),
     approvals: createNeedsYouApprovalRecords({ read: (workspaceId, itemId) => PostgresNeedsYouStore.read(workspaceId, itemId) }),
     recordService: recordServiceAction,
+    nativeGoogleUndoOwner:async(actor,workspaceId)=>(await (await import("@/platform/business-record/service")).readBusinessRecord(actor,workspaceId)).access==="owner",
   });
 }
 

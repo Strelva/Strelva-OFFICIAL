@@ -33,7 +33,7 @@ check_full_model_current_tail() {
   psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021140000_native_google_lifecycle.sql"
   for fixture in \
     runtime-data-investigation-history.sql runtime-data-client-authority.sql runtime-data-migration-atomicity.sql \
-    runtime-data-google-grant-generation.sql runtime-data-google-receipt-intent.sql runtime-data-google-provider-retention.sql runtime-data-tenant-connection-generation.sql runtime-data-google-service-authority.sql google-review-content-retention-schema.sql native-google-lifecycle-schema.sql google-provider-reference-native.sql money-effect-admission-schema.sql \
+    runtime-data-google-grant-generation.sql runtime-data-google-receipt-intent.sql runtime-data-google-provider-retention.sql runtime-data-tenant-connection-generation.sql runtime-data-google-service-authority.sql google-review-content-retention-schema.sql native-google-lifecycle-schema.sql native-google-completed-undo-schema.sql google-provider-reference-native.sql money-effect-admission-schema.sql \
     enterprise-home-finder-schema.sql agent-payment-attempt-schema.sql \
     custom-sandbox-runtime-schema.sql agent-website-tools-schema.sql; do
     printf "Full-model native contract: %s\n" "$fixture"

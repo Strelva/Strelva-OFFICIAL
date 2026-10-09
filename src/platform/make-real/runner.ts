@@ -1,14 +1,14 @@
-import { assertExtendedProviderReference } from "./google-provider-reference";
+import { googleMakeRealRequestSchema, googleProviderReferenceSchema, assertExtendedProviderReference } from "./google-provider-reference";
 import { randomUUID } from "node:crypto";
 import { WorkspaceAccessError, WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { EFFECT_SCOPE, type DeclaredEffect, type Possibility, type SystemTarget } from "@/platform/possibilities/contracts";
-import { attachActivation, detachActivation, markMadeReal, returnToExploring, staleBaselines } from "@/platform/possibilities/engine";
+import { attachActivation, detachUndoneNativeGoogleActivation, detachActivation, markMadeReal, returnToExploring, staleBaselines } from "@/platform/possibilities/engine";
 import type { PossibilityRepository } from "@/platform/possibilities/repository";
 import { activationSchema, type Activation, type ActivationStep } from "./contracts";
-import { approvalProblem, planApprovalProblem, type ApprovalRecordsPort } from "./approvals";
+import { approvalProblem, planFingerprint, planApprovalProblem, type ApprovalRecordsPort } from "./approvals";
 import { gatePublish } from "./governance";
 import { initialChecks, planActivation } from "./plan";
-import { BaselineMovedError, selectAdapter, type AuthorityPort, type EffectAdapter, type LiveSystemsPort, type OperatingChecksPort } from "./ports";
+import { BaselineMovedError, selectAdapter, type NativeGoogleCompletedUndo, type AuthorityPort, type EffectAdapter, type LiveSystemsPort, type OperatingChecksPort } from "./ports";
 import type { ActivationRepository } from "./repository";
 
 /** A worker that claimed this step or compensation recently may still be active. */
@@ -183,9 +183,17 @@ export function createMakeReal(deps: MakeRealDeps) {
           return { status: "unknown", effect: "unknown", reason: "The provider did not confirm an outcome. Reconcile before continuing." };
         }
         if (result.status === "rejected") return { status: "failed", effect: "none", reason: result.reason };
-        try { assertExtendedProviderReference(result.providerRef, a.businessId, effect); }
-        catch { return { status: "unknown", effect: "unknown", reason: "Accepted provider reference does not match this approved effect. Reconcile before continuing." }; }
         const approval = a.approvals.find((x) => x.effectId === effect.id && !x.consumedAt);
+        try { assertExtendedProviderReference(result.providerRef, a.businessId, effect); }
+        catch {
+          // Explicit acceptance remains final even when its metadata is unusable.
+          // Do not persist malformed/provider content or declare it absent/replayable.
+          return { status: "unknown", effect: "accepted", reason: "The provider accepted this effect, but its reference could not be validated. Recover the exact receipt before continuing.",
+            receipt: { adapterMode: adapter.mode, acceptedAt: at, ...(grantId ? {grantId} : {}), ...(approval ? {approvalId: approval.approvalId} : {}) },
+            readBack: {status:"failed",detail:"Accepted provider reference could not be validated; no readback was attempted.",at},
+            apply: cur => { const x=cur.approvals.find(v=>v.effectId===effect.id&&!v.consumedAt);if(x)x.consumedAt=at; },
+          };
+        }
         let readBack: ActivationStep["readBack"];
         try {
           const rb = await adapter.readBack({ businessId: a.businessId, providerRef: result.providerRef });
@@ -409,6 +417,26 @@ export function createMakeReal(deps: MakeRealDeps) {
     runNext,
     run,
 
+    /** Repair only the final local publication record; never dispatch another effect. */
+    async completeNativeGoogle(actor:WorkspaceActor,businessId:string,id:string,frame:NativeGoogleCompletedUndo):Promise<Activation> {
+      const a=await load(businessId,id);
+      const permission=await deps.authority.check(actor,{businessId,scope:"system.activate"});
+      if(!permission.allowed)throw new WorkspaceAccessError(permission.reason);
+      const p=await loadPossibility(businessId,a.possibilityId),effect=p.effects[0],step=a.steps.find(s=>s.kind==="effect"&&s.target===frame.effectId);
+      if(a.status!=="made_real" || a.rollbackStartedAt || a.steps.some(s=>s.status!=="completed") || a.checks.some(c=>c.status!=="passed") || !["ready","made_real"].includes(p.status) || p.activationId!==a.id || !effect || p.effects.length!==1 || effect.kind!=="publish" || effect.channel!=="google_listing" || !effect.request.nativeGrant || effect.id!==frame.effectId || a.candidateRevision!==frame.candidateRevision || p.candidateRevision!==frame.candidateRevision || planFingerprint(p)!==frame.planFingerprint || step?.effect!=="accepted" || step.receipt?.providerRef!==frame.providerRef)conflict("Native Google completion requires the exact fully completed approved plan.");
+      try {
+        const ref=googleProviderReferenceSchema.parse(JSON.parse(frame.providerRef));
+        if(JSON.stringify(ref)!==frame.providerRef || !ref.receiptId || ref.businessId!==businessId || JSON.stringify(ref.request)!==JSON.stringify(googleMakeRealRequestSchema.parse(effect.request)))conflict("Exact native Google receipt required.");
+      } catch { conflict("Exact native Google receipt required."); }
+      const current=await deps.authority.check(actor,{businessId,scope:"system.activate"});
+      if(!current.allowed)throw new WorkspaceAccessError(current.reason);
+      if(p.status==="ready" && deps.possibilities.finalizeNativeGoogleCompletion) {
+        await deps.possibilities.finalizeNativeGoogleCompletion(markMadeReal(p,a.id,actor.userId,now()),p.revision,a.id);
+        return a;
+      }
+      return settle(actor,a);
+    },
+
     /** Continue only unfinished work. Accepted effects are never replayed; an
      * interrupted effect is resolved by provider lookup on its idempotency key. */
     async resume(actor: WorkspaceActor, businessId: string, id: string, note?: string): Promise<Activation> {
@@ -425,7 +453,16 @@ export function createMakeReal(deps: MakeRealDeps) {
           const found = await adapter.find({ businessId, idempotencyKey: step.idempotencyKey, effect });
           step.leaseId = undefined;
           if (found?.found) {
-            assertExtendedProviderReference(found.providerRef, businessId, effect);
+            try { assertExtendedProviderReference(found.providerRef, businessId, effect); }
+            catch {
+              step.status="unknown";step.effect="accepted";step.finishedAt=now();
+              const approval=a.approvals.find(x=>x.effectId===effect.id&&!x.consumedAt);
+              if(approval)approval.consumedAt=now();
+              step.receipt={adapterMode:adapter.mode,acceptedAt:now(),reconciledBy:"provider_lookup",...(approval?{approvalId:approval.approvalId}:{})};
+              step.reason="The provider found the accepted effect, but its reference could not be validated. Recover the exact receipt; do not repeat the write.";
+              step.readBack={status:"failed",detail:"Accepted provider reference could not be validated; no readback was attempted.",at:now()};
+              notes.push(`${step.id}: accepted reference needs recovery, not repeated`);continue;
+            }
             const rb = await adapter.readBack({ businessId, providerRef: found.providerRef }).catch((e: unknown) => ({ ok: false, detail: e instanceof Error ? e.message : "Read-back failed." }));
             step.status = "completed"; step.effect = "accepted"; step.finishedAt = now();
             step.receipt = { providerRef: found.providerRef, adapterMode: adapter.mode, acceptedAt: now(), reconciledBy: "provider_lookup" };
@@ -525,8 +562,10 @@ export function createMakeReal(deps: MakeRealDeps) {
       }
       if (step.status !== "unknown") conflict("Reconciliation needs an unknown step and evidence of its outcome.");
       if (input.resolution === "not_applied" && step.effect === "accepted") conflict("An accepted write cannot be declared safe to replay.");
+      let nativeAcceptedRecovery=false;
       if (input.resolution === "completed") {
         const declared = step.kind === "effect" ? (await loadPossibility(businessId, a.possibilityId)).effects.find((e) => e.id === step.target) : undefined;
+        nativeAcceptedRecovery=declared?.channel==="google_listing" && Boolean(declared.request.nativeGrant) && step.effect==="accepted" && !step.receipt?.providerRef;
         let providerRef = input.providerRef;
         if (declared?.channel === "google_listing") {
           const adapter = adapterFor(declared);
@@ -540,7 +579,7 @@ export function createMakeReal(deps: MakeRealDeps) {
         }
         if (providerRef !== undefined) assertExtendedProviderReference(providerRef, businessId, declared);
         step.status = "completed"; step.effect = "accepted";
-        step.receipt = { adapterMode: declared ? adapterFor(declared).mode : "internal", acceptedAt: now(), reconciledBy: "operator_evidence", ...(providerRef ? { providerRef } : {}) };
+        step.receipt = { ...(step.receipt ?? {}), adapterMode: declared ? adapterFor(declared).mode : "internal", acceptedAt: step.receipt?.acceptedAt ?? now(), reconciledBy: nativeAcceptedRecovery?"provider_lookup":"operator_evidence", ...(providerRef ? { providerRef } : {}) };
       } else {
         step.status = "failed"; step.effect = "none";
       }
@@ -549,7 +588,8 @@ export function createMakeReal(deps: MakeRealDeps) {
       a.status = "in_progress";
       a.status = deriveStatus(a);
       const next = record(a, "reconcile", actor.userId, now(), `${step.id}: ${input.resolution}${input.note ? ` (${input.note})` : ""}`);
-      await deps.activations.save(next, a.revision);
+      if(nativeAcceptedRecovery && deps.activations.saveNativeGoogleRecovery)await deps.activations.saveNativeGoogleRecovery(next,a.revision);
+      else await deps.activations.save(next,a.revision);
       return settle(actor, next);
     },
 
@@ -560,19 +600,49 @@ export function createMakeReal(deps: MakeRealDeps) {
      * `rolled_back` until it is reconciled with evidence; calling rollback
      * again then finishes it. Each undone step is checkpointed on its own so
      * an interrupted rollback resumes instead of repeating live writes. */
-    async rollback(actor: WorkspaceActor, businessId: string, id: string, note?: string): Promise<Activation> {
+    async rollback(actor: WorkspaceActor, businessId: string, id: string, note?: string, nativeUndo?:NativeGoogleCompletedUndo): Promise<Activation> {
       let a = await load(businessId, id);
-      if (a.status === "made_real") conflict("This is already real. Change it with a new possibility instead of rolling back.");
-      if (a.status === "rolled_back") return a;
+      if (a.status === "made_real" && !nativeUndo) conflict("This is already real. Change it with a new possibility instead of rolling back.");
+      if (a.status === "rolled_back" && !nativeUndo) return a;
       if (a.steps.some((s) => s.status === "running")) conflict("A step is still running. Resume to reconcile it before rolling back.");
       const decision = await deps.authority.check(actor, { businessId, scope: "system.activate" });
       if (!decision.allowed) throw new WorkspaceAccessError(decision.reason);
       const p = await loadPossibility(businessId, a.possibilityId);
+      if(nativeUndo || p.status==="made_real") {
+        const effect=p.effects[0],step=a.steps.find(s=>s.kind==="effect"&&s.target===nativeUndo?.effectId);
+        if(!nativeUndo || !effect || p.effects.length!==1 || effect.kind!=="publish" || effect.channel!=="google_listing" || !effect.request.nativeGrant || effect.id!==nativeUndo.effectId || a.candidateRevision!==nativeUndo.candidateRevision || p.candidateRevision!==nativeUndo.candidateRevision || planFingerprint(p)!==nativeUndo.planFingerprint || !step || step.effect!=="accepted" || step.reversibility!=="compensable" || step.receipt?.providerRef!==nativeUndo.providerRef)conflict("Completed native Google undo requires the exact approved whole plan and accepted compensable receipt.");
+        try {
+          const ref=googleProviderReferenceSchema.parse(JSON.parse(nativeUndo.providerRef));
+          if(JSON.stringify(ref)!==nativeUndo.providerRef || !ref.receiptId || ref.businessId!==businessId || JSON.stringify(ref.request)!==JSON.stringify(googleMakeRealRequestSchema.parse(effect.request)))conflict("Native Google undo requires the exact canonical retained provider receipt.");
+        } catch { conflict("Native Google undo requires the exact canonical retained provider receipt."); }
+        if(p.status==="made_real" && !a.rollbackStartedAt) {
+          for(const pin of a.pinned)if(!pin.stagedRevisionId || (await deps.live.current({businessId,systemId:pin.systemId}))?.revisionId!==pin.stagedRevisionId)conflict("A live System moved after this native Google plan. Review a new inverse plan.");
+          for(const intro of a.introduced)if(!intro.systemId || !intro.revisionId || (await deps.live.current({businessId,systemId:intro.systemId}))?.revisionId!==intro.revisionId)conflict("An introduced System moved after this native Google plan. Review a new inverse plan.");
+        }
+      }
+
+      const saveReverse=async(value:Activation,expectedRevision:number) => {
+        if(nativeUndo && p.status==="made_real" && deps.activations.saveNativeGoogleUndo)await deps.activations.saveNativeGoogleUndo(value,expectedRevision);
+        else await deps.activations.save(value,expectedRevision);
+      };
+      const finishNativeWithdrawal=async(done:Activation) => {
+        const detached=detachUndoneNativeGoogleActivation(p,a.id,actor.userId,now(),{
+          undoneStepIds:done.steps.filter(s=>s.status==="restored"||s.status==="compensated").map(s=>s.id),
+          consumedApprovalIds:done.approvals.filter(x=>x.consumedAt).map(x=>x.approvalId),
+        });
+        if(deps.possibilities.finalizeNativeGoogleUndo)await deps.possibilities.finalizeNativeGoogleUndo(detached,p.revision,a.id);
+        else await deps.possibilities.save(detached,p.revision);
+      };
+      if(a.status==="rolled_back") {
+        if(p.status==="made_real")await finishNativeWithdrawal(a);
+        else if(p.status!=="withdrawn" || p.activationId)conflict("Native Google undo has an inconsistent terminal plan.");
+        return a;
+      }
 
       const checkpoint = async (kind: string, detail?: string) => {
         a.status = deriveStatus(a);
         const next = record(a, kind, actor.userId, now(), detail);
-        await deps.activations.save(next, a.revision);
+        await saveReverse(next,a.revision);
         a = next;
       };
       if (!a.rollbackStartedAt) {
@@ -699,7 +769,8 @@ export function createMakeReal(deps: MakeRealDeps) {
       }
       a.status = "rolled_back";
       const done = record(a, "rollback", actor.userId, now());
-      await deps.activations.save(done, a.revision);
+      await saveReverse(done,a.revision);
+      if(p.status==="made_real") { await finishNativeWithdrawal(done); return done; }
       const detached = detachActivation(p, a.id, actor.userId, now(), {
         undoneStepIds: done.steps.filter((s) => s.status === "restored" || s.status === "compensated").map((s) => s.id),
         consumedApprovalIds: done.approvals.filter((x) => x.consumedAt).map((x) => x.approvalId),
