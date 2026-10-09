@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page, type Route, type TestInfo } from "@playwright/test";
+import { expect, test, type Locator, type Page, type Request, type Route, type TestInfo } from "@playwright/test";
 import { at, routingOptions, routingRecord, workId, workspaceId } from "./support/website-routing-browser-fixture";
 import { reportBrowserFixture, reportBrowserOrigin } from "./support/website-report-browser-fixture";
 import { assertReadableText } from "./support/assert-readable-text";
@@ -7,7 +7,7 @@ test.use({ hasTouch: true, trace: "on" });
 
 async function fixture(page: Page, info: TestInfo, width: number, enlarged: boolean) {
   const origin = reportBrowserOrigin(info.project.use.baseURL), endpoint = `/api/websites/${workId}`, record = routingRecord();
-  const reads: string[] = [], blocked: string[] = [], errors: string[] = [];
+  const reads: string[] = [], requests: Request[] = [], blocked: string[] = [], errors: string[] = [];
   let response: "wrong-period" | "malformed" | "valid" = "wrong-period", pending: Route | undefined, hold = false;
   page.on("pageerror", error => errors.push(error.message));
   await page.route("**/*", async route => {
@@ -16,7 +16,7 @@ async function fixture(page: Page, info: TestInfo, width: number, enlarged: bool
     const currentQuery = () => expect([...url.searchParams]).toEqual([["workspaceId", workspaceId]]);
     if (url.pathname === `${endpoint}/report`) {
       expect([...url.searchParams.keys()]).toEqual(["month"]);
-      const month = url.searchParams.get("month")!; expect(month).toMatch(/^\d{4}-\d{2}$/); reads.push(url.pathname + url.search);
+      const month = url.searchParams.get("month")!; expect(month).toMatch(/^\d{4}-\d{2}$/); reads.push(url.pathname + url.search); requests.push(request);
       if (hold) { pending = route; return; }
       const value = reportBrowserFixture(month);
       return route.fulfill({ json: response === "wrong-period" ? { ...value, month: "1900-01", inquiries: { ...value.inquiries, count: 999 } } : response === "malformed" ? { ...value, inquiries: { ...value.inquiries, count: { invalid: true } } } : value });
@@ -34,7 +34,7 @@ async function fixture(page: Page, info: TestInfo, width: number, enlarged: bool
   if (enlarged) await page.addStyleTag({ content: "html { font-size: 200% !important; }" });
   await expect(page.getByText("Fictional routing recovery · no DNS, Auth, provider or publication proof", { exact: true })).toBeVisible();
   const report = page.getByRole("region", { name: "Monthly website report", exact: true });
-  return { report, reads, blocked, errors,
+  return { report, reads, requests, blocked, errors,
     respond(value: "wrong-period" | "malformed" | "valid", deferred = false) { response = value; hold = deferred; },
     async complete(month: string) { await expect.poll(() => Boolean(pending)).toBe(true); await pending!.fulfill({ json: reportBrowserFixture(month) }); pending = undefined; hold = false; },
   };
@@ -69,25 +69,35 @@ for (const [width, enlarged] of [[390, false], [320, true]] as const) test.descr
       await assertReadableText(text, info, `report-${state}-${recovered ? "inquiries" : "error"}`);
     };
     await assertPeriod(firstMonth); await refused();
+    // This preview runs Next in development: React replays initial effect setup,
+    // aborting its first read. Keep that cancellation separate from user retries.
+    const initialReadCount = f.reads.length;
+    expect(initialReadCount).toBeGreaterThanOrEqual(1); expect(initialReadCount).toBeLessThanOrEqual(2);
+    expect(f.reads).toEqual(Array(initialReadCount).fill(`/api/websites/${workId}/report?month=${firstMonth}`));
+    await expect.poll(() => f.requests.map(request => request.failure()?.errorText ?? null)).toEqual(initialReadCount === 2 ? ["net::ERR_ABORTED", null] : [null]);
     await readable("wrong-period");
     await page.screenshot({ path: info.outputPath("report-wrong-period.png"), fullPage: true });
     f.respond("valid", true);
-    const retry = f.report.getByRole("button", { name: "Try loading report again", exact: true }); await retry.focus(); await page.keyboard.press("Enter");
+    const retry = f.report.getByRole("button", { name: "Try loading report again", exact: true }); await retry.focus();
+    const firstRetryReadCount = f.reads.length; expect(firstRetryReadCount).toBe(initialReadCount); await page.keyboard.press("Enter");
     await expect(heading).toBeFocused(); await expect(f.report.getByRole("status")).toContainText("Loading recorded website activity");
     await f.complete(firstMonth); await expect(heading).toBeFocused(); await expect(f.report.locator("dt").filter({ hasText: /^Inquiries$/ }).locator("..").locator("dd")).toHaveText("17");
-    expect(f.reads).toHaveLength(2); expect(f.reads[1]).toBe(f.reads[0]);
+    expect(f.reads).toHaveLength(firstRetryReadCount + 1); expect(f.reads[firstRetryReadCount]).toBe(f.reads[initialReadCount - 1]);
     const changedMonth = firstMonth === "2026-09" ? "2026-08" : "2026-09";
-    f.respond("malformed"); await input.focus(); await input.fill(changedMonth); await refused(); await expect(input).toBeFocused(); await assertPeriod(changedMonth);
+    f.respond("malformed"); await input.focus(); await input.fill(changedMonth); await refused();
+    expect(f.reads).toHaveLength(initialReadCount + 2); await expect(input).toBeFocused(); await assertPeriod(changedMonth);
     await readable("malformed");
     await page.screenshot({ path: info.outputPath("report-malformed-fields.png"), fullPage: true });
-    f.respond("valid", true); await retry.focus(); await page.keyboard.press("Enter"); await expect(heading).toBeFocused();
+    f.respond("valid", true); await retry.focus();
+    const secondRetryReadCount = f.reads.length; expect(secondRetryReadCount).toBe(initialReadCount + 2); await page.keyboard.press("Enter"); await expect(heading).toBeFocused();
     const outside = page.getByRole("button", { name: "Outside website control", exact: true }); await outside.focus();
     await f.complete(changedMonth); await expect(outside).toBeFocused(); await expect(f.report.getByRole("alert")).toHaveCount(0);
     await expect(f.report.locator("dt").filter({ hasText: /^Inquiries$/ }).locator("..").locator("dd")).toHaveText("17"); await assertPeriod(changedMonth); await geometry(page, f.report);
-    expect(f.reads).toHaveLength(4); expect(f.reads[3]).toBe(f.reads[2]); expect(new URL(f.reads[2]!, "http://localhost").searchParams.get("month")).toBe(changedMonth);
+    expect(f.reads).toHaveLength(secondRetryReadCount + 1); expect(f.reads[initialReadCount + 2]).toBe(f.reads[initialReadCount + 1]); expect(new URL(f.reads[initialReadCount + 1]!, "http://localhost").searchParams.get("month")).toBe(changedMonth);
+    expect(f.requests.slice(initialReadCount).map(request => request.failure())).toEqual([null, null, null]);
     expect(f.blocked).toEqual([]); expect(f.errors).toEqual([]);
     await readable("recovered", true);
     await page.screenshot({ path: info.outputPath("report-selected-month-recovered.png"), fullPage: true });
-    await info.attach("fictional-report-scope", { body: JSON.stringify({ width, enlarged, exactSelectedMonthReads: f.reads, blockedRequests: f.blocked, uncaughtPageErrors: f.errors, httpMutations: 0, nativeAuthQualified: false, providerQualified: false, reportMeasurementsQualified: false, publicationQualified: false }), contentType: "application/json" });
+    await info.attach("fictional-report-scope", { body: JSON.stringify({ width, enlarged, exactSelectedMonthReads: f.reads, initialDevelopmentReadCancellation: f.requests.slice(0, initialReadCount).map(request => request.failure()?.errorText ?? null), explicitRetryReads: [f.reads[initialReadCount], f.reads[initialReadCount + 2]], blockedRequests: f.blocked, uncaughtPageErrors: f.errors, httpMutations: 0, nativeAuthQualified: false, providerQualified: false, reportMeasurementsQualified: false, publicationQualified: false }), contentType: "application/json" });
   });
 });

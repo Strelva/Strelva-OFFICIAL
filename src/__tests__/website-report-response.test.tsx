@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, createElement } from "react";
+import { act, createElement, StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WebsiteRebuildReport } from "@/experience/websites/WebsiteRebuildReport";
@@ -17,7 +17,7 @@ const current = (): WebsiteMonthlyReport => ({
 });
 beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-09-25T12:00:00Z")); vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); uncaught.length = 0; });
 afterEach(async () => { await act(async () => root?.unmount()); container?.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); });
-async function mount(values: unknown[]) {
+async function mount(values: unknown[], strict = false) {
   const replies = [...values];
   const fetcher = vi.fn(async (_input: RequestInfo | URL, _options?: RequestInit) => {
     const reply = replies.length > 1 ? replies.shift() : replies[0];
@@ -27,7 +27,7 @@ async function mount(values: unknown[]) {
   vi.stubGlobal("fetch", fetcher);
   container = document.createElement("div"); document.body.append(container);
   root = createRoot(container, { onUncaughtError: error => uncaught.push(error) });
-  await act(async () => root!.render(createElement(WebsiteRebuildReport, { workId: "website" })));
+  await act(async () => root!.render(strict ? createElement(StrictMode, null, createElement(WebsiteRebuildReport, { workId: "website" })) : createElement(WebsiteRebuildReport, { workId: "website" })));
   return fetcher;
 }
 function refused() {
@@ -94,6 +94,20 @@ describe("actual default monthly report HTTP consumer", () => {
     expect(uncaught).toEqual([]); expect(container.querySelector('[role="alert"]')).toBeNull();
     expect(container.textContent).toContain("Unavailable"); expect(container.textContent).toContain("Not named in check");
     expect(container.textContent).toContain("Not recommended in this saved check"); expect(container.textContent).toContain("1 of 2 passed");
+  });
+  it("isolates development mount cancellation from the single explicit retry", async () => {
+    const wrong = current(); wrong.month = "2026-08";
+    const fetcher = await mount([wrong, wrong, current()], true); refused();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher.mock.calls[0]![1]!.signal!.aborted).toBe(true);
+    expect(fetcher.mock.calls[1]![1]!.signal!.aborted).toBe(false);
+    const retry = Array.from(container.querySelectorAll("button")).find(button => button.textContent === "Try loading report again")!;
+    await act(async () => retry.click());
+    expect(container.querySelector('[role="alert"]')).toBeNull(); expect(container.querySelector("dl")).not.toBeNull();
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(fetcher.mock.calls[1]![1]!.signal!.aborted).toBe(true);
+    expect(fetcher.mock.calls[2]![1]!.signal!.aborted).toBe(false);
+    expect(fetcher.mock.calls.map(([url]) => String(url))).toEqual(Array(3).fill("/api/websites/website/report?month=2026-09"));
   });
   it("retries only the selected current read and recovers after a mismatched receipt", async () => {
     const wrong = current(); wrong.month = "2026-08";
