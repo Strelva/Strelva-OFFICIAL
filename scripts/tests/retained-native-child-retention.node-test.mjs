@@ -4,7 +4,6 @@ import { EventEmitter } from 'node:events';
 import { pathToFileURL } from 'node:url';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve, relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { startRetainedNativeChild as corrected } from '../lib/retained-native-child.mjs';
 const start = process.env.STRELVA_RETENTION_OLD_HELPER ? (await import(pathToFileURL(process.env.STRELVA_RETENTION_OLD_HELPER))).startRetainedNativeChild : corrected;
 function fixture(retain, autoClose=true) {
