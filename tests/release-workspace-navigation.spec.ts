@@ -22,6 +22,10 @@ test("browser Back returns template focus to its list trigger", async ({ page })
   await expect(page.getByRole("heading", { name: "Staff requests", exact: true }).first()).toBeFocused();
   await page.goBack();
   await expect(card).toBeFocused();
+  await card.click();
+  await expect(page.getByRole("heading", { name: "Staff requests", exact: true }).first()).toBeFocused();
+  await page.getByRole("button", { name: "All templates", exact: true }).click();
+  await expect(card).toBeFocused();
 });
 
 test("touch navigation keeps 44px targets and 320px reflow", async ({ browser }, info) => {
@@ -39,6 +43,12 @@ test("touch navigation keeps 44px targets and 320px reflow", async ({ browser },
   await page.screenshot({ path: info.outputPath("navigation-touch-320.png"), fullPage: true });
   await page.keyboard.press("Escape");
   await expect(menu).toBeFocused();
+  await page.goto("/preview/strelva?scenario=business&view=products");
+  for (const control of await page.locator("header button:visible, header a:visible, header select:visible").all()) {
+    const box = await control.boundingBox();
+    expect(box!.width).toBeGreaterThanOrEqual(44);
+    expect(box!.height).toBeGreaterThanOrEqual(44);
+  }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await context.close();
 });

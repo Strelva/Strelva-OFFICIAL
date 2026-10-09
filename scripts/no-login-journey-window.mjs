@@ -155,5 +155,5 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     else if (action === 'preflight' && root && !work) { preflight(noLoginWindowProfile(), resolve(root)); console.log('Closed no-login preflight passed; no Auth, mail or release qualification.'); }
     else if (action === 'run' && root && work) console.log(JSON.stringify(runNoLoginWindow(root, work), null, 2));
     else throw new Error('Use manifest, preflight <source-root>, or run <source-root> <owned-full-native-work>.');
-  } catch (error) { console.error(error.message); process.exitCode = 1; }
+  } catch { console.error('No-login window failed; retain the owned private proof artifacts.'); process.exitCode = 1; }
 }
