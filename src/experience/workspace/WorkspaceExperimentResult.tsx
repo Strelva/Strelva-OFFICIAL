@@ -85,7 +85,7 @@ function LegacyExperimentResult({ work, onOpenTracker }: { work: WorkspaceWork; 
         <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-gray-muted">{legacyExperiment.evidence}</p>
       </section>
       {trackerHref ? <Link className="inline-flex min-h-11 items-center rounded-lg border border-gray-border px-4 text-sm font-medium text-warm-black" href={trackerHref} onNavigate={onOpenTracker && work.sourceWorkId ? (event) => { event.preventDefault(); onOpenTracker(work.sourceWorkId!); } : undefined}>Open current tracker</Link> : null}
-      <p className="border-t border-gray-border pt-4 text-xs leading-relaxed text-gray-muted">Operator reported evidence captured for this tracker version. It is immutable and has not been promoted into a customer capability or verified savings claim.</p>
+      <p className="border-t border-gray-border pt-4 text-xs leading-relaxed text-gray-muted">Operator reported evidence captured for this tracker version. It is immutable and has not been promoted into a business capability or verified savings claim.</p>
     </article>
   );
 }
@@ -163,7 +163,7 @@ function ComparisonResult({ comparison, work, onOpenTracker }: { comparison: Tra
       </section>
 
       {trackerHref ? <Link className="inline-flex min-h-11 items-center rounded-lg border border-gray-border px-4 text-sm font-medium text-warm-black" href={trackerHref} onNavigate={onOpenTracker && work.sourceWorkId ? (event) => { event.preventDefault(); onOpenTracker(work.sourceWorkId!); } : undefined}>Open current tracker</Link> : null}
-      <p className="border-t border-gray-border pt-4 text-xs leading-relaxed text-gray-muted">This comparison is immutable research evidence. It records the selected decision and stays experimental; it does not promote, publish or claim verified customer savings.</p>
+      <p className="border-t border-gray-border pt-4 text-xs leading-relaxed text-gray-muted">This comparison is immutable research evidence. It records the selected decision and stays experimental; it does not promote, publish or claim verified business savings.</p>
     </article>
   );
 }

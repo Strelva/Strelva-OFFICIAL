@@ -94,7 +94,7 @@ export function BusinessSetupPanel({ startProduct = "help", initialRequest = bus
   if (loading) return <p role="status">Checking the businesses you can manage…</p>;
   if (!choices) return <section className="space-y-4"><p role="alert">{error || "Business access is unavailable."}</p>{signIn ? <Link href={`/sign-in?next=${encodeURIComponent(businessStartHref(startProduct))}`}>Sign in to continue</Link> : <Button variant="secondary" onClick={() => setAttempt(value => value + 1)}>Check again</Button>}</section>;
   const locked = saving || Boolean(pending);
-  return <form className="space-y-4" aria-label="Choose the customer business" onSubmit={event => void save(event)}>
+  return <form className="space-y-4" aria-label="Choose your business" onSubmit={event => void save(event)}>
     <h2 className="text-xl">Which business is this for?</h2><p className="text-gray-muted">Use a business you manage or create one. No website purchase is required. Existing personal work stays separate.</p>
     {choices.businesses.length ? <SelectInput label="Business" value={selected} disabled={locked} onChange={event => setSelected(event.target.value)} options={[{value:"new",label:"Create a new business"},...choices.businesses.map(item=>({value:item.id,label:item.name}))]} /> : null}
     {selected === "new" ? <TextInput label="Business name" value={name} maxLength={120} required disabled={locked} onChange={event => setName(event.target.value)} /> : null}
@@ -102,6 +102,6 @@ export function BusinessSetupPanel({ startProduct = "help", initialRequest = bus
     {pending ? <p role="status">Your setup is saved for recovery. Retrying will not create another business.</p> : null}
     {error ? <p role="alert">{error}</p> : null}
     <Button type="submit" disabled={saving || (selected === "new" && !name.trim())}>{saving ? "Saving…" : pending ? "Retry safely" : request.trim() ? "Save business and request" : "Continue with this business"}</Button>
-    <p className="text-sm text-gray-muted">Saving a request does not accept a price or deadline, start delivery, grant provider access, or send email.</p>
+    <p className="text-sm text-gray-muted">Saving a request does not accept a price or deadline, start delivery, grant agency access, or send email.</p>
   </form>;
 }

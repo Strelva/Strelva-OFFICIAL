@@ -665,7 +665,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
             <WebsiteAuditPage key={selectedWork.id} initialResult={selectedWork.assessment.payload} saved />
           ) : selectedWork?.assessment?.kind === "ai_visibility" ? (
             <>
-            <AiVisibilityAssessmentResult work={selectedWork} onRetry={workspaceReadOnly ? undefined : () => { setRetryWork(selectedWork); setOpen(current => ({ ...current, showAssessment: true, start: null })); }} accessLabel={delegatedRead ? "Read-only access granted by the customer" : workspaceExitBlocks ? "Changes are paused for this workspace" : "Access controlled by this workspace"} />
+            <AiVisibilityAssessmentResult work={selectedWork} onRetry={workspaceReadOnly ? undefined : () => { setRetryWork(selectedWork); setOpen(current => ({ ...current, showAssessment: true, start: null })); }} accessLabel={delegatedRead ? "Read-only access granted by the client" : workspaceExitBlocks ? "Changes are paused for this workspace" : "Access controlled by this workspace"} />
               {canShowWorkBudget ? <WorkBudgetPanel workspaceId={snapshot.workspaceId} workId={selectedWork.id} productId="ai_visibility" resourceKind={selectedWork.resourceKind} /> : null}
             </>
           ) : selectedWork?.productId === "research" && selectedWork.resourceKind === "experiment" ? (
@@ -743,8 +743,8 @@ function DelegatedEmpty() {
   return (
     <div className="mx-auto max-w-2xl">
       <LockKeyhole className="h-6 w-6 text-accent-text" strokeWidth={1.5} />
-      <h1 className="mt-5 font-display text-[36px] font-medium text-warm-black">Customer work shared read-only.</h1>
-      <p className="mt-3 max-w-xl text-[14px] leading-relaxed text-gray-muted">There is no work available in this shared view. Only the customer can create or change work here.</p>
+      <h1 className="mt-5 font-display text-[36px] font-medium text-warm-black">Client work shared read-only.</h1>
+      <p className="mt-3 max-w-xl text-[14px] leading-relaxed text-gray-muted">There is no work available in this shared view. Only the client can create or change work here.</p>
     </div>
   );
 }

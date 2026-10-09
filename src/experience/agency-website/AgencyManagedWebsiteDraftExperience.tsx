@@ -150,17 +150,17 @@ export function AgencyManagedWebsiteDraftExperience({ bindingId, section = "hero
       <header className="max-w-2xl space-y-2">
         <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-accent-text">Managed website draft</p>
         <h1 className="font-display text-3xl font-medium text-warm-black sm:text-4xl">Prepare a website update</h1>
-        <p className="text-sm leading-relaxed text-gray-muted">Edit the <strong>{section === "hero" ? "home page introduction" : section}</strong> and save a draft for the customer to review.</p>
+        <p className="text-sm leading-relaxed text-gray-muted">Edit the <strong>{section === "hero" ? "home page introduction" : section}</strong> and save a draft for the client to review.</p>
       </header>
       {status === "loading" ? <p role="status" className="mt-8 text-sm text-gray-muted">Checking the current website permission…</p> : null}
       {status === "error" ? <div role="alert" className="mt-8 space-y-3 text-sm text-critical"><p>{message}</p><Button variant="secondary" onClick={() => { setReload((value) => value + 1); }}>Reload permission</Button></div> : null}
-      {status === "ready" && !grant ? <p role="status" className="mt-8 rounded-xl border border-gray-border p-5 text-sm leading-relaxed text-gray-muted">The customer needs to enable draft editing before you can update this website.</p> : null}
-      {status === "ready" && grant && !active ? <p role="status" className="mt-8 rounded-xl border border-gray-border p-5 text-sm leading-relaxed text-gray-muted">This draft permission is revoked or expired. No new preparation or execution is available. Existing website history remains with the customer.</p> : null}
+      {status === "ready" && !grant ? <p role="status" className="mt-8 rounded-xl border border-gray-border p-5 text-sm leading-relaxed text-gray-muted">The client needs to enable draft editing before you can update this website.</p> : null}
+      {status === "ready" && grant && !active ? <p role="status" className="mt-8 rounded-xl border border-gray-border p-5 text-sm leading-relaxed text-gray-muted">This draft permission is revoked or expired. No new preparation or execution is available. Existing website history remains with the client.</p> : null}
       {status === "ready" && grant && active && state ? <section className="mt-8 space-y-5" aria-labelledby="managed-website-draft-title">
         <div className="rounded-xl border border-gray-border bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div><h2 id="managed-website-draft-title" className="text-base font-medium text-warm-black">{section} draft</h2><p className="mt-1 text-xs text-gray-muted">Version {state.revision}. If the customer changes this section, reload it before saving.</p></div>
-            {customerWebsiteHref ? <Link className="min-h-11 inline-flex items-center rounded-lg px-3 text-sm text-warm-black underline underline-offset-4" href={customerWebsiteHref}>Open customer website editor</Link> : <span className="text-xs text-gray-muted">Customer editor link unavailable</span>}
+            <div><h2 id="managed-website-draft-title" className="text-base font-medium text-warm-black">{section} draft</h2><p className="mt-1 text-xs text-gray-muted">Version {state.revision}. If the client changes this section, reload it before saving.</p></div>
+            {customerWebsiteHref ? <Link className="min-h-11 inline-flex items-center rounded-lg px-3 text-sm text-warm-black underline underline-offset-4" href={customerWebsiteHref}>Open client website editor</Link> : <span className="text-xs text-gray-muted">Client editor link unavailable</span>}
           </div>
           {section === "hero" ? <div className="mt-5 grid gap-4">
             <TextInput id="managed-website-hero-headline" label="Headline" value={fieldValue("headline")} onChange={(event) => updateField("headline", event.target.value)} maxLength={10_000} required disabled={saving} />
@@ -170,13 +170,13 @@ export function AgencyManagedWebsiteDraftExperience({ bindingId, section = "hero
           </div> : null}
           <details className="mt-5 rounded-lg border border-gray-border bg-surface p-3">
             <summary className="cursor-pointer text-sm font-medium text-warm-black">Advanced section data</summary>
-            <TextArea id="managed-website-draft-json" className="mt-3 font-mono text-xs" label={section === "hero" ? "Optional JSON for fields outside this editor" : "Section data"} value={draft} onChange={(event) => setDraft(event.target.value)} rows={10} spellCheck={false} helperText="Keep this data for the assigned section only. The saved result remains a draft until the customer reviews and publishes it." />
+            <TextArea id="managed-website-draft-json" className="mt-3 font-mono text-xs" label={section === "hero" ? "Optional JSON for fields outside this editor" : "Section data"} value={draft} onChange={(event) => setDraft(event.target.value)} rows={10} spellCheck={false} helperText="Keep this data for the assigned section only. The saved result remains a draft until the client reviews and publishes it." />
           </details>
-          <p className="mt-3 text-xs leading-relaxed text-gray-muted">The customer reviews and publishes your draft. Saving here does not change the live website.</p>
+          <p className="mt-3 text-xs leading-relaxed text-gray-muted">The client reviews and publishes your draft. Saving here does not change the live website.</p>
           <Button className="mt-5" disabled={saving || !parsed} onClick={() => void prepareAndRun()}>{saving ? "Saving assigned draft…" : "Prepare and save draft"}</Button>
         </div>
         {message ? <p role="alert" className="text-sm text-critical">{message}</p> : null}
-        {receipt ? <section className="rounded-xl border border-gray-border bg-white p-5 text-sm text-warm-black" aria-label="Draft receipt"><p className="font-medium">Saved {receipt.section} draft{receipt.revision === null ? "" : ` revision ${receipt.revision}`}</p><p className="mt-1 text-xs leading-relaxed text-gray-muted">Your draft is saved and ready for the customer to review.</p>{customerWebsiteHref ? <Link className="mt-3 inline-flex text-sm underline underline-offset-4" href={customerWebsiteHref}>Review and publish in customer website editor</Link> : null}</section> : null}
+        {receipt ? <section className="rounded-xl border border-gray-border bg-white p-5 text-sm text-warm-black" aria-label="Draft receipt"><p className="font-medium">Saved {receipt.section} draft{receipt.revision === null ? "" : ` revision ${receipt.revision}`}</p><p className="mt-1 text-xs leading-relaxed text-gray-muted">Your draft is saved and ready for the client to review.</p>{customerWebsiteHref ? <Link className="mt-3 inline-flex text-sm underline underline-offset-4" href={customerWebsiteHref}>Review and publish in client website editor</Link> : null}</section> : null}
       </section> : null}
     </div>
   </main>;
