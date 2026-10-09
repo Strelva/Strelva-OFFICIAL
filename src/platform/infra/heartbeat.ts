@@ -40,6 +40,7 @@ const _CRON_SCHEDULE = {
   "daily-summary": 26 * 3600, // daily
   "poll-yelp": 26 * 3600, // daily
   "poll-google-reviews": 26 * 3600, // daily
+  "google-content-retention": 3 * 3600, // hourly, independent provider snapshot expiry
   "poll-instagram": 26 * 3600, // daily
   "attention-digest": 26 * 3600, // daily
   "ops-digest": 26 * 3600, // daily
