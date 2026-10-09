@@ -70,6 +70,10 @@ insert into public.system_possibilities(id,business_workspace_id,status,revision
 select '6c000000-0000-4000-8000-000000000052','6c000000-0000-4000-8000-000000000010','ready',1,1,jsonb_build_object('effects',jsonb_build_array(jsonb_build_object('kind','publish','channel','google_listing','request',request))),'6c000000-0000-4000-8000-000000000001' from gs_fixture;
 update gs_fixture set decision=(public.open_owner_decision('6c000000-0000-4000-8000-000000000010',jsonb_build_object('kind','system.change_live','route','owner_decides','title','Google fixture','approveEffect','Publish exact Google draft','notYetEffect','Nothing changes','sourceLifecycle','make_real','sourceId','6c000000-0000-4000-8000-000000000052@1','revisionHash',repeat('b',64),'urgent',false,'adminMayDecide',false))->>'id')::uuid;
 update gs_fixture set session=(public.strelva_make_real_link_session('6c000000-0000-4000-8000-000000000010',decision,'pa-tenant-owner@example.test')->>'sessionId')::uuid;
+-- Bind this fictional item's link through the actual delivery journal producer.
+-- This local fixture records a fictional sent receipt; it sends no message.
+select public.record_owner_decision_delivery('6c000000-0000-4000-8000-000000000010',decision,
+ 'digest','sent','pa-tenant-owner@example.test','fictional-google-service-owner-link',null) from gs_fixture;
 select public.claim_owner_decision('6c000000-0000-4000-8000-000000000010',decision,repeat('b',64),'approve','owner_link',null,null,'pa-tenant-owner@example.test') from gs_fixture;
 select public.record_strelva_service_action('6c000000-0000-4000-8000-000000000010',session,'run','possibility:6c000000-0000-4000-8000-000000000052@1','Fixture') from gs_fixture;
 create function pg_temp.gs_check(mode text default 'approve') returns jsonb language sql as $$ select public.check_google_make_real_service_authority('6c000000-0000-4000-8000-000000000010',session,decision,request,mode,'6c000000-0000-4000-8000-000000000052',null) from gs_fixture $$;
