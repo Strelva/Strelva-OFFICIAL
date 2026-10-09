@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 import { z } from "zod";
 import { websiteAuditSchema } from "../src/products/website-audit/work";
 import { localEnvironment, signedInContext } from "./support/local-auth";
+import { cleanup } from "./support/journeys";
 
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local Auth, Postgres, Redis and public HTTPS read access.");
 test.setTimeout(300_000);
@@ -156,8 +157,30 @@ test("a real anonymous URL check survives Auth and becomes private business evid
     const sources = z.object({ sites: z.array(z.object({ systemId: z.string(), verifiedAt: z.string().nullable() })) }).parse(await stillUnverified.json());
     expect(sources.sites.find(item => item.systemId === site.systemId)?.verifiedAt).toBeNull();
     measurements.conversion = { savedWorkId: stored.id, systemId: site.systemId, possibilityId: possibility!.id, status: possibility!.status, auditScope: prepared.rebuild.audit?.scope, unavailable: prepared.rebuild.audit?.unavailable };
-    await page.goto(`/workspace?${new URLSearchParams({ workspaceId: businessId, view: "system", system: site.systemId })}`);
-    await expect(page.getByRole("heading", { name: "Possibilities", exact: true })).toBeVisible();
+    // Readiness is the owner's exact business read, not a guessed compile wait.
+    const systemRead = page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return response.request().method() === "GET"
+        && url.origin === new URL(env.app).origin
+        && url.pathname === "/api/workspace"
+        && url.searchParams.get("workspaceId") === businessId;
+    }, { timeout: 5_000 });
+    const [systemResponse] = await Promise.all([
+      systemRead,
+      page.goto(`/workspace?${new URLSearchParams({ workspaceId: businessId, view: "system", system: site.systemId })}`, { timeout: 30_000 }),
+    ]);
+    expect(systemResponse.status(), "The actual owner's exact business projection must load before the System's controls.").toBe(200);
+    const browserProjection = systemsSchema.parse(await systemResponse.json()).systems;
+    expect(browserProjection.systems.some(system => system.ref.systemId === site.systemId)).toBe(true);
+    expect(browserProjection.possibilities.find(item => item.id === possibility!.id)).toMatchObject({
+      workId, status: "exploring", sourceSystemIds: expect.arrayContaining([site.systemId]),
+    });
+    // The count is part of the existing SystemPanel heading's accessible name.
+    const possibilitiesName = /^Possibilities(?:\s*\d+)?$/;
+    const possibilitiesPanel = page.getByRole("region", { name: possibilitiesName });
+    await expect(possibilitiesPanel.getByRole("heading", { name: possibilitiesName })).toBeVisible();
+    await expect(possibilitiesPanel.getByText("Exploring", { exact: true })).toBeVisible();
+    await expect(possibilitiesPanel.getByRole("button", { name: "Make real", exact: true })).toBeDisabled();
     for (const width of [390, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -166,11 +189,10 @@ test("a real anonymous URL check survives Auth and becomes private business evid
     measurements.qualification = "public_read_and_local_conversion_only";
   } finally {
     await testInfo.attach("actual-public-check-and-conversion", { body: Buffer.from(JSON.stringify(measurements, null, 2)), contentType: "application/json" });
-    await anonymous.close();
-    if (owner) {
-      await owner.context.close();
-      if (businessId) expect((await admin.from("workspaces").delete().eq("id", businessId)).error).toBeNull();
-      expect((await admin.auth.admin.deleteUser(owner.userId)).error).toBeNull();
-    }
+    await anonymous.close().catch(() => undefined);
+    // Native website documents/receipts are immutable and restrict their work
+    // and creator. The established disposable-stack teardown preserves them
+    // until stack disposal; a direct workspace delete must not mask UI failure.
+    if (owner) await cleanup(admin, { workspaceIds: businessId ? [businessId] : [], people: [owner] });
   }
 });
