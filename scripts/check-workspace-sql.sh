@@ -1305,6 +1305,8 @@ psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.
 # on an empty audit ledger before exercising the append-only SQL contract.
 psql "${psql_args[@]}" --command="delete from public.super_admins;"
 psql "${psql_args[@]}" --command="create table if not exists public.audit_logs(actor_user_id uuid, time timestamptz not null);"
+# Snapshot exact ACLs before this legacy fixture adds browser/service SELECT.
+psql "${psql_args[@]}" --tuples-only --no-align --file="$repo_root/tests/support/super-admin-fixture-acl-restore.sql" >"$cluster_root/super-admin-fixture-acl-restore.sql"
 psql "${psql_args[@]}" <<'SQL'
 create or replace function public.app_is_super_admin() returns boolean
 language sql stable security definer set search_path = '' as $$
@@ -1345,6 +1347,8 @@ begin
 end;
 $$;
 SQL
+# End the fixture privilege lifecycle before any current audit successor.
+psql "${psql_args[@]}" --file="$cluster_root/super-admin-fixture-acl-restore.sql"
 printf 'Super-admin rollback preserved the append-only audit trail.\n'
 # Signed tracking keys are service-role-only and cannot be discarded while a
 # site depends on them. Prove guarded rollback, empty rollback, and reapply.

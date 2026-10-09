@@ -27,3 +27,19 @@ test('historical runners preserve agency inverse before function successor and s
     assert.ok(!tail.includes('/migrations/20261020090039'));
   }
 });
+
+test('legacy superadmin fixture restores exact prior ACLs before the current audit migration tail', () => {
+  const source = readFileSync(`${root}scripts/check-workspace-sql.sh`, 'utf8');
+  const capture = source.indexOf('tests/support/super-admin-fixture-acl-restore.sql');
+  const grant = source.indexOf('grant select on public.users, public.audit_logs');
+  const refused = source.indexOf("Super-admin grant rollback did not refuse the populated audit trail");
+  const restore = source.indexOf('--file="$cluster_root/super-admin-fixture-acl-restore.sql"');
+  const tail = source.indexOf('for money_apps_migration');
+  assert.ok(capture > 0 && capture < grant);
+  assert.ok(restore > refused && restore < tail);
+  const generator = readFileSync(`${root}tests/support/super-admin-fixture-acl-restore.sql`, 'utf8');
+  assert.ok(generator.includes("a.grantee = r.oid and a.privilege_type = 'SELECT'"));
+  assert.ok(generator.includes('a.is_grantable'));
+  assert.ok(generator.includes('super_admin_fixture_acl_restore_failed'));
+  assert.ok(generator.includes("select 'begin;'") && generator.includes("select 'commit;'"));
+});
