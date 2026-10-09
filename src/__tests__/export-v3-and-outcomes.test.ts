@@ -26,6 +26,7 @@ function fakeRpc(options: { role?: "owner" | "operator"; leadCount?: number; lea
     if (options.denied) return { data: null, error: { message: "workspace_export_denied" } };
     switch (name) {
       case "workspace_export_v3_role": return { data: options.role ?? "owner", error: null };
+      case "export_neutral_creator_paid_periods":
       case "export_workspace_v3_category": {
         const category = String(args.p_category);
         if (options.missing?.includes(category)) return { data: { category, items: null, next: null }, error: null };

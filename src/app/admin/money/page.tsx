@@ -5,6 +5,7 @@ import { getAuthenticatedOperatorContext } from "@/platform/infra/auth";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { readOperatorMoneyConfiguration } from "@/platform/connect/governed-operations";
 import { connectProfile } from "@/platform/connect";
+import { SourceMoneyConfiguration } from "@/experience/workspace/money/SourceMoneyConfiguration";
 import { OperatorMoney } from "@/experience/workspace/money/OperatorMoney";
 export const dynamic = "force-dynamic";
 export default async function OperatorMoneyPage({ searchParams }: { searchParams: Promise<{ workspaceId?: string }> }) {
@@ -17,5 +18,5 @@ export default async function OperatorMoneyPage({ searchParams }: { searchParams
   catch { return <section><h1 className="font-display text-3xl">Recorded money operations</h1><p className="mt-6" role="alert">Current operator access or workspace money records could not be confirmed. Sign in and reload.</p></section>; }
   let profileVersion: string | null = null; try { profileVersion = connectProfile().version; } catch { /* The missing approved profile remains visible. */ }
   const executionEnabled = process.env.STRELVA_CONNECT === "1" && process.env.STRELVA_SPLIT_PAYOUT_EXECUTION === "1";
-  return <section className="max-w-3xl"><h1 className="font-display text-3xl">Recorded money operations</h1><p className="mt-4 break-words text-sm text-gray-muted">Workspace {workspaceId}. Recording terms does not authorize production billing or infer a payment mandate.</p><OperatorMoney key={workspaceId} graph={graph} actorId={operator.actor.userId} profileVersion={profileVersion} executionEnabled={executionEnabled} /></section>;
+  return <section className="max-w-3xl"><h1 className="font-display text-3xl">Recorded money operations</h1><p className="mt-4 break-words text-sm text-gray-muted">Workspace {workspaceId}. Recording terms does not authorize production billing or infer a payment mandate.</p><SourceMoneyConfiguration actorId={operator.actor.userId}/><OperatorMoney key={workspaceId} graph={graph} actorId={operator.actor.userId} profileVersion={profileVersion} executionEnabled={executionEnabled} /></section>;
 }

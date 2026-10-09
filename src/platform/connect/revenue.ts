@@ -16,7 +16,10 @@ export async function ingestRevenueEvent(event:Stripe.Event,deps:ConnectDependen
  if(!chargeId)return pending("settlement_charge_required");
  const charge=await stripe.charges.retrieve(chargeId);
  if(charge.id!==chargeId||providerId(charge.payment_intent)!==pi.id||providerId(charge.customer)!==providerId(pi.customer)||charge.livemode!==event.livemode||!charge.paid||!charge.captured||charge.amount!==pi.amount_received||charge.currency!==pi.currency)return pending("collection_charge_mismatch");
- await moneyRpc("record_platform_collection_settlement",{p_id:collectionId,p_intent:pi.id,p_charge:chargeId,p_amount:pi.amount_received,p_currency:pi.currency,p_customer:typeof pi.customer==="string"?pi.customer:pi.customer?.id,p_event:event.id},db);return {processed:true};
+ await moneyRpc("record_neutral_version_settlement",{p_id:collectionId,p_intent:pi.id,p_charge:chargeId,p_amount:pi.amount_received,p_currency:pi.currency,p_customer:typeof pi.customer==="string"?pi.customer:pi.customer?.id,p_event:event.id},db);
+ // Record the accepted settlement first. Generic creator observation is a
+ // separately recoverable ledger write; it never dispatches a provider effect.
+ await moneyRpc("observe_neutral_creator_settlement",{p_collection_id:collectionId},db);return {processed:true};
  }
  if(event.type==="invoice.paid") {
  const invoice=event.data.object as Stripe.Invoice;

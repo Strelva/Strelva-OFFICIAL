@@ -23,7 +23,7 @@ export const V3_PAGE_SIZE = 1000;
 
 export const V3_CATEGORIES = [
   "business_record", "systems", "linked_sites", "leads", "spam_held", "inquiry_timelines", "inquiry_first_replies",
-  "business_payments", "payment_events", "revenue_splits", "split_payouts", "connected_merchant", "payment_requests", "payment_actions", "refund_requests", "transfer_receipts", "transfer_reversals", "platform_collections", "platform_collection_terms", "recovery_payouts",
+  "business_payments", "payment_events", "revenue_splits", "split_payouts", "connected_merchant", "payment_requests", "payment_actions", "refund_requests", "transfer_receipts", "transfer_reversals", "platform_collections", "platform_collection_terms", "creator_version_paid_periods", "recovery_payouts",
   "booking_config", "bookings", "reviews", "content", "billing", "orders", "reward_members", "reward_transactions",
   "threads", "tenant_settings", "provider_metadata", "system_history", "system_connections", "system_outputs", "versions",
   "investigation_history", "saved_system_work", "native_records", "website_documents", "business_bookings", "booking_settings", "inquiry_events", "inquiry_delivery",
@@ -115,7 +115,7 @@ export async function collectWorkspaceExportV3(
     let offset: number | null = 0;
     let missing = false;
     while (offset !== null) {
-      const page = await rpc("export_workspace_v3_category", {
+      const page = await rpc(category === "creator_version_paid_periods" ? "export_neutral_creator_paid_periods" : "export_workspace_v3_category", {
         p_workspace_id: workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail,
         p_category: category, p_offset: offset, p_limit: V3_PAGE_SIZE,
       });
