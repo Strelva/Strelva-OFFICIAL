@@ -9,7 +9,7 @@ import { decryptSecret, encryptSecret } from "@/platform/infra/crypto/secrets";
 import { PublicBookingError, pausedBookingMessage } from "./errors";
 import { settingsOrDefault, storeSlotsForDate, timeZoneOf, zonedLocalToUtc } from "./availability";
 import { readCalendarBusy, withoutBusy } from "./calendar-busy";
-import { bookingAgentsEnabled, bookingReadSource } from "./flags";
+import { bookingAgentsEnabled, bookingReadMode, bookingReadSource } from "./flags";
 import { bookingStoreDb, parseStoreBooking, readBookingContext, readTenantBookings, type StoreBooking } from "./store";
 
 export const agentBookingSchema = z.object({
@@ -38,8 +38,21 @@ export async function nativeRpc(name: string, args: Record<string, unknown>) {
   return response.data;
 }
 
-export async function requireAgentBookings() {
-  if (!bookingAgentsEnabled() || await bookingReadSource() !== "postgres") throw new PublicBookingError("unavailable", "Agent bookings are not enabled.");
+export async function requireAgentBookings(scope?: string) {
+  const unavailable = () => new PublicBookingError("unavailable", "Agent bookings are not enabled.");
+  if (!bookingAgentsEnabled()) throw unavailable();
+  if (scope?.startsWith("workspace:")) {
+    const workspaceId = z.string().uuid().safeParse(scope.slice("workspace:".length));
+    if (!workspaceId.success || bookingReadMode() !== "postgres") throw unavailable();
+    // An unlinked native calendar has no legacy tenant store to cut over.
+    // The native RPC refuses linked/non-live workspaces; do not invent parity
+    // for unrelated website tenants to admit this business's native System.
+    const ctx = await readBookingContext(scope);
+    if (!ctx || ctx.tenantStableId !== null || ctx.workspaceId !== workspaceId.data
+      || ctx.calendarKey !== workspaceId.data || !ctx.systemId || ctx.paused) throw unavailable();
+    return;
+  }
+  if (await bookingReadSource() !== "postgres") throw unavailable();
 }
 
 async function context(tenant: string) {
@@ -112,7 +125,7 @@ export async function agentConfirmationAvailable(tenant: string): Promise<boolea
 }
 
 export async function requestAgentBooking(tenant: string, raw: unknown) {
-  await requireAgentBookings();
+  await requireAgentBookings(tenant);
   const input = agentBookingSchema.parse(raw);
   if (!await agentConfirmationAvailable(tenant)) {
     throw new PublicBookingError("unavailable", "Customer confirmation is not available for this business.");
