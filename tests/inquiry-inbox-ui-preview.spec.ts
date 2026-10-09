@@ -48,27 +48,53 @@ async function reflow(page: Page) {
   } finally {
     // Bounded measurements explain the actual rendered failure without relaxing
     // the reflow gate. This suite renders only its visibly fictional records.
-    const measurement = await page.evaluate(() => ({
-      viewport: innerWidth,
-      documentWidth: document.documentElement.scrollWidth,
-      rootFontSize: getComputedStyle(document.documentElement).fontSize,
-      overflowing: Array.from(document.querySelectorAll<HTMLElement>("body *"))
+    const measurement = await page.evaluate(() => {
+      const geometry = (element: Element) => {
+        const box = element.getBoundingClientRect(), style = getComputedStyle(element);
+        return {
+          tag: element.tagName, name: element.getAttribute("aria-label"),
+          className: element.getAttribute("class"),
+          left: box.left, right: box.right, width: box.width,
+          scrollWidth: element.scrollWidth, clientWidth: element.clientWidth,
+          scrollLeft: element.scrollLeft, scrollTop: element.scrollTop,
+          display: style.display, position: style.position, fontSize: style.fontSize,
+          flexShrink: style.flexShrink, minWidth: style.minWidth, maxWidth: style.maxWidth,
+          whiteSpace: style.whiteSpace, overflowWrap: style.overflowWrap,
+          overflowX: style.overflowX, transform: style.transform,
+        };
+      };
+      const nodes: Element[] = Array.from(document.querySelectorAll("body *"));
+      // Development chrome may use a shadow root. Measure it rather than
+      // suppressing it or excluding its contribution to document scroll width.
+      for (let index = 0; index < nodes.length && index < 1000; index++) {
+        const shadow = nodes[index]?.shadowRoot;
+        if (shadow) nodes.push(...Array.from(shadow.querySelectorAll("*")));
+      }
+      const details = nodes.slice(0, 1000)
         .filter(element => !["SCRIPT", "STYLE", "SVG", "PATH"].includes(element.tagName))
         .map(element => {
-          const box = element.getBoundingClientRect(), style = getComputedStyle(element);
-          return {
-            tag: element.tagName, name: element.getAttribute("aria-label"),
-            text: element.innerText?.trim().slice(0, 120), className: element.className,
-            left: box.left, right: box.right, width: box.width,
-            display: style.display, fontSize: style.fontSize, flexShrink: style.flexShrink,
-            minWidth: style.minWidth, maxWidth: style.maxWidth,
-            whiteSpace: style.whiteSpace, overflowWrap: style.overflowWrap,
-          };
-        })
-        .filter(element => element.width > 0 && (element.right > innerWidth + 0.5 || element.left < -0.5))
-        .sort((a, b) => b.right - a.right)
-        .slice(0, 40),
-    }));
+          const text = Array.from(element.childNodes).filter(node => node.nodeType === Node.TEXT_NODE && node.textContent?.trim()).slice(0, 8).map(node => {
+            const range = document.createRange(); range.selectNodeContents(node);
+            return { text: node.textContent?.trim().slice(0, 120), boxes: Array.from(range.getClientRects()).slice(0, 8).map(box => ({ left: box.left, right: box.right, width: box.width })) };
+          });
+          const pseudo = ["::before", "::after"].map(name => {
+            const style = getComputedStyle(element, name);
+            return { name, content: style.content.slice(0, 120), display: style.display, position: style.position, width: style.width, left: style.left, right: style.right, transform: style.transform, overflowX: style.overflowX };
+          }).filter(item => !["none", "normal"].includes(item.content) && item.display !== "none");
+          return { ...geometry(element), text, pseudo };
+        });
+      return {
+        viewport: innerWidth, documentWidth: document.documentElement.scrollWidth,
+        rootFontSize: getComputedStyle(document.documentElement).fontSize,
+        scrollX, scrollY, root: geometry(document.documentElement), body: geometry(document.body),
+        scrollingElement: document.scrollingElement ? geometry(document.scrollingElement) : null,
+        examined: Math.min(nodes.length, 1000),
+        overflowing: details.filter(element => element.width > 0 && (element.right > innerWidth + 0.5 || element.left < -0.5)).sort((a, b) => b.right - a.right).slice(0, 40),
+        intrinsicOverflow: details.filter(element => element.clientWidth > 0 && element.scrollWidth > element.clientWidth + 1).slice(0, 40),
+        textOverflow: details.filter(element => element.text.some(text => text.boxes.some(box => box.right > innerWidth + 0.5 || box.left < -0.5))).slice(0, 40),
+        pseudoElements: details.filter(element => element.pseudo.length).slice(0, 40),
+      };
+    });
     await test.info().attach("fictional-inquiry-reflow", { body: JSON.stringify(measurement), contentType: "application/json" });
   }
 }
