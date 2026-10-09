@@ -1251,7 +1251,16 @@ reads never replace its frozen draft. Other consumers that omit this optional
 guard retain their existing adoption/polling contract. Work revisions remain separate from candidate
 revisions, approval and publication. A private-preview
 heading does not override a current published work status or imply withdrawal.
-These component checks do not establish browser, native authority or delivery proof. Source/UI contract tests
+These component checks do not establish browser, native authority or delivery proof.
+The development-only website-entry preview has two closed supplemental recovery
+modes (progress and pending), rendering the actual WebsiteEntry and default HTTP
+consumer with fictional initial records. The separate two-case browser packet
+checks selected option/child coherence through building, review, pending and
+unknown-save recovery at 390px and 320px with 200% text, using the existing 2.5s/60s
+poll intervals under browser-controlled time. Existing static preview modes
+remain unchanged. Exact loopback responses are intercepted; this packet does not
+qualify Auth, persistence, provider execution or publication. Source discovery
+and unit controls do not qualify its rendered results. Source/UI contract tests
 are local proof; rendered desktop/mobile, native authority and combined release
 checks remain pending the coordinated verification window.
 

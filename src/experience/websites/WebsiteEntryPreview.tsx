@@ -6,8 +6,27 @@ import { WebsiteEntry } from "./WebsiteEntry";
 import { websiteEntryPath } from "./site-navigation";
 import { fixtureRebuild } from "./rebuild-fixture";
 import type { RebuildTransport } from "./rebuild-transport";
+import { Button } from "@/components/ui/Button";
 
-export function WebsiteEntryPreview({ entry, state }: { entry: string | null; state: string }) {
+export function WebsiteEntryPreview({ entry, state, recovery }: { entry: string | null; state: string; recovery?: "progress" | "pending" }) {
+  if (recovery) return <WebsiteEntryRecoveryPreview mode={recovery} />;
+  return <StaticWebsiteEntryPreview entry={entry} state={state} />;
+}
+
+/** Development-only fictional records. The browser intercepts the real HTTP transport. */
+function WebsiteEntryRecoveryPreview({ mode }: { mode: "progress" | "pending" }) {
+  const initial = useMemo(() => ({ ...fixtureRebuild(), revision: 3, title: "Fictional bakery", status: mode === "progress" ? "building" as const : "published" as const }), [mode]);
+  return <main data-dashboard className="min-h-screen bg-surface-base text-warm-black">
+    <header className="flex flex-wrap gap-4 border-b border-gray-border p-6 text-sm">
+      <p>Fictional saved-work recovery · no Auth, provider or publication proof</p>
+      <Button variant="secondary" className="max-w-full whitespace-normal">Outside website control</Button>
+    </header>
+    <WebsiteEntry workspaceId={initial.workspaceId} connectedEnabled={false} rebuildEnabled path="rebuild" canManage canPublish
+      initialWorkId={initial.workId} rebuilds={[initial]} entryBase="/preview/strelva/website-entry" />
+  </main>;
+}
+
+function StaticWebsiteEntryPreview({ entry, state }: { entry: string | null; state: string }) {
   const ready = useRef<HTMLParagraphElement>(null);
   useEffect(() => { if (ready.current) ready.current.dataset.websiteEntryReady = "true"; }, []);
   const initial = useMemo(() => fixtureRebuild(), []);

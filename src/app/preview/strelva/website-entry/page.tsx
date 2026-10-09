@@ -9,5 +9,7 @@ export const metadata: Metadata = { title: "Website entry fixture", robots: { in
 export default async function WebsiteEntryPreviewPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   if (!strelvaUiPreviewEnabled()) notFound();
   const params = await searchParams;
-  return <div data-dashboard className="min-h-screen bg-surface-base"><WebsiteEntryPreview entry={params.entry ?? null} state={params.state ?? "ready"} /></div>;
+  const recovery = params.recovery === "progress" || params.recovery === "pending" ? params.recovery : undefined;
+  if (params.recovery !== undefined && (process.env.NODE_ENV !== "development" || !recovery)) notFound();
+  return <div data-dashboard className="min-h-screen bg-surface-base"><WebsiteEntryPreview entry={params.entry ?? null} state={params.state ?? "ready"} recovery={recovery} /></div>;
 }
