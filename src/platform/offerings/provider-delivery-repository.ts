@@ -1,8 +1,6 @@
-import { finiteJobDeliveries, readFiniteJobs } from "@/platform/finite-jobs";
-import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 import { getSupabase } from "@/platform/infra/db/client";
 import { OfferingAccessError, OfferingConflictError, OfferingNotFoundError, OfferingStoreError, type OfferingActor } from "./types";
-import { WorkspaceAccessError, WORKSPACE_EXIT_STOPPED_MESSAGE } from "@/platform/workspaces/types";
+import { WORKSPACE_EXIT_STOPPED_MESSAGE } from "@/platform/workspaces/types";
 import { providerDeliverySchema, type ProviderDelivery, type ProviderDeliveryStore } from "./provider-delivery";
 
 type Failure = { message?: string; code?: string } | null;
@@ -50,13 +48,9 @@ async function rpc(name: string, args: Record<string, unknown>): Promise<unknown
 
 export const postgresProviderDeliveries: ProviderDeliveryStore = {
   async list(actor, businessId) {
-    if (await workspaceReleaseFlagEnabled("finite_jobs", businessId)) {
-      try { return finiteJobDeliveries(await readFiniteJobs(actor, businessId)).map(map); }
-      catch (error) {
-        if (error instanceof WorkspaceAccessError) throw new OfferingAccessError();
-        throw new OfferingStoreError("The finite job delivery snapshot could not be read.");
-      }
-    }
+    // This reader also serves assigned agency operators. The customer-wide
+    // finite job snapshot deliberately denies them; use the native scoped
+    // delivery boundary regardless of that customer projection's release.
     const raw = await rpc("read_provider_deliveries", { ...identity(actor), p_business_id: businessId, p_delivery_id: null });
     return Array.isArray(raw) ? raw.map(map) : [];
   },
