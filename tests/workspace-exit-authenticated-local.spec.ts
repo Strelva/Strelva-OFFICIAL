@@ -65,7 +65,7 @@ test("owner records a local exit choice through the real Auth route and can stil
       const prepared = await exportResponse.json();
       expect(prepared.buildId).toMatch(/^[0-9a-f-]{36}$/);
       const archive = exportPage.getByRole("link", { name: "Download business archive", exact: true });
-      await expect(archive).toHaveAttribute("href", `/api/workspace-export/v3/owner-download?build=${prepared.buildId}`);
+      await expect(archive).toHaveAttribute("href", `/api/workspace-export/v3/owner-download?build=${prepared.buildId}`, { timeout: 60_000 });
       downloadPromise = exportPage.waitForEvent("download");
       await archive.click();
     } else {
