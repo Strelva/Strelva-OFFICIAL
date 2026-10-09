@@ -289,8 +289,11 @@ export function createInquiryFormAdapter(ports: InquiryFormPorts, ctx: LiveChann
       const { tenantId, claimId } = split(providerRef);
       const claim = await ports.claim(tenantId, claimId);
       if (!claim) return { ok: false, detail: "The publication claim could not be read." };
+      if (!ACCEPTED_CLAIM.has(claim.status)) return { ok: false, detail: "The original publication has no accepted claim to undo." };
       try {
-        const result = await publish({ tenantId: claim.tenantId, businessId: claim.businessId, requestId: claim.requestId, capabilityId: claim.capabilityId, changeId: claim.changeId, version: claim.version }, "undo", idempotencyKey);
+        // Undo is a new immutable release after the accepted original. The native
+        // queue checks current live version/change; its same-key claim preserves retry identity.
+        const result = await publish({ tenantId: claim.tenantId, businessId: claim.businessId, requestId: claim.requestId, capabilityId: claim.capabilityId, changeId: claim.changeId, version: claim.version + 1 }, "undo", idempotencyKey);
         return result.accepted ? { ok: true, detail: "The previous inquiry form is live again. Inquiries already received are kept." } : { ok: false, detail: result.reason ?? "The previous form was not restored." };
       } catch (error) {
         return { ok: false, detail: message(error, "The previous form was not restored.") };

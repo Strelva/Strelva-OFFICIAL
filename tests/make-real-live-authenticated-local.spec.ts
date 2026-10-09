@@ -3,6 +3,7 @@ import { ordinaryAgencyMaker, type CustomerPerson } from "./support/ordinary-age
 import { randomUUID } from "node:crypto";
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { applicationSchema } from "@/products/applications/contracts";
+import { stateForReceive } from "@/products/inquiries/receive";
 import { InquiryEngine } from "@/products/inquiries/inquiry-engine";
 import { getInquiryRepository } from "@/products/inquiries/repository";
 import type { InquirySurfaceResult } from "@/products/inquiries/surface-contracts";
@@ -14,7 +15,7 @@ import { inquiryFormRequestSchema, internalAppRequestSchema } from "@/platform/m
 import { createSupabaseRevisionContent } from "@/platform/make-real/supabase-content";
 import { createSystemStoreLiveSystems } from "@/platform/make-real/systems-adapter";
 import { createSupabaseSystemStore } from "@/platform/systems/supabase-store";
-import { adminClient, cleanup, convertedBusinessWithOwner, decisions, journeyEnvironment, person, type Person } from "./support/journeys";
+import { adminClient, cleanup, convertedBusinessWithOwner, decisions, journeyEnvironment, localSql, tenantHost, person, type Person } from "./support/journeys";
 
 // Real local Auth, native RPCs, HTTP publication and durable read-back. No
 // route interception, fake provider acceptance, calendar connection or remote
@@ -248,23 +249,29 @@ test("a real owner reviews and makes native inquiry/app changes live, proves rec
     await page.screenshot({ path: testInfo.outputPath("native-make-real-live.png"), fullPage: true });
     await testInfo.attach("native-activation-and-health", { body: JSON.stringify({ activation: completed, workspace: workspaceHealth }, null, 2), contentType: "application/json" });
 
-    await test.step("replay does not republish; revoked authority cannot undo; operator rollback restores both", async () => {
+    const customerRecords = () => localSql<unknown[]>("select coalesce(jsonb_agg(to_jsonb(l) order by l.id),'[]') from public.tenant_leads l where l.tenant_slug_at_capture=:'v1';", tenantId);
+    const visitor = await browser.newContext({ baseURL: journeyEnvironment().app });
+    try {
+      const received = await visitor.request.post(`/api/v1/leads/${tenantId}`, { headers: { origin: tenantHost(tenantId) },
+        data: { name: "Native rollback record", email: `native-${randomUUID()}@example.test`, message: "Keep this actual received inquiry through native undo.", source: "contact-form" } });
+      expect(received.status(), await received.text()).toBe(200);
+      expect(await received.json()).toEqual({ ok: true });
+    } finally { await visitor.close(); }
+    const retainedCustomerRows = customerRecords();
+    expect(retainedCustomerRows).toHaveLength(1);
+    const sealedInquiryDefinition = structuredClone((await readInquiry()).snapshot.state.capabilities.find(capability => capability.id === approved.capabilityId)!.live!);
+
+    await test.step("completed work is sealed; replay cannot republish or roll it back", async () => {
       const replay = await owner.context.request.post("/api/workspace/systems/make-real", { headers: { origin: journeyEnvironment().app }, data: { workspaceId: businessId, possibilityId: possibility.id } });
       expect([200, 404, 409]).toContain(replay.status());
-      expect((await readActivation(activationId)).steps.filter(step => step.kind === "effect")).toEqual(effects);
+      expect(await readActivation(activationId)).toEqual(completed);
       await post(owner.context.request, "/api/admin/make-real", { action: "rollback", workspaceId: businessId, activationId, confirm: true }, 403);
-      expect((await admin.from("workspace_memberships").delete().eq("workspace_id", businessId).eq("user_id", owner.userId)).error).toBeNull();
-      const withdrawn = await operator.context.request.post("/api/admin/make-real", { headers: { origin: journeyEnvironment().app }, data: { action: "rollback", workspaceId: businessId, activationId, confirm: true } });
-      expect([403, 404]).toContain(withdrawn.status());
-      expect((await admin.from("workspace_memberships").insert({ workspace_id: businessId, user_id: owner.userId, role: "owner", created_by: operator.userId })).error).toBeNull();
-      const rolled = activationSchema.parse((await post(operator.context.request, "/api/admin/make-real", { action: "rollback", workspaceId: businessId, activationId, confirm: true })).activation);
-      expect(rolled.status).toBe("rolled_back");
-      expect(rolled.steps.filter(step => step.kind === "effect").every(step => step.status === "compensated")).toBe(true);
-      expect(applicationSchema.parse((await readApp(app.id)).payload).release?.version).toBe(1);
+      await post(operator.context.request, "/api/admin/make-real", { action: "rollback", workspaceId: businessId, activationId, confirm: true }, 409);
+      expect(await readActivation(activationId)).toEqual(completed);
+      expect(applicationSchema.parse((await readApp(app.id)).payload).release?.version).toBe(2);
       expect(applicationSchema.parse((await readApp(app.id)).payload).records).toEqual(originalRecords);
-      expect((await readInquiry()).snapshot.state.capabilities.find(capability => capability.id === approved.capabilityId)!.live!.version).toBe(firstVersion);
-      expect((await live.current(appBaseline))?.revisionId).toBe(appBaseline.revisionId);
-      expect((await live.current(inquiryBaseline))?.revisionId).toBe(inquiryBaseline.revisionId);
+      expect((await readInquiry()).snapshot.state.capabilities.find(capability => capability.id === approved.capabilityId)!.live).toEqual(sealedInquiryDefinition);
+      expect(customerRecords()).toEqual(retainedCustomerRows);
     });
 
     await test.step("booking metadata can activate locally but public booking verification stays pending", async () => {
@@ -289,6 +296,112 @@ test("a real owner reviews and makes native inquiry/app changes live, proves rec
       expect(scheduleAfter.status(), await scheduleAfter.text()).toBe(200);
       expect((await scheduleAfter.json()).payload).toEqual(schedule.payload);
       await testInfo.attach("booking-pending-public-channel", { body: JSON.stringify(partial, null, 2), contentType: "application/json" });
+    });
+    const includedPlanDecisions = (await decisions(admin, businessId, owner, true)).filter(row => row.sourceLifecycle === "make_real");
+    expect(includedPlanDecisions).toHaveLength(2);
+    const bookingOnlyDecision = includedPlanDecisions.find(row => row.id !== openDecision!.id)!;
+    expect(bookingOnlyDecision).toBeDefined();
+    expect(bookingOnlyDecision.revisionHash).not.toBe(openDecision!.revisionHash);
+
+    await test.step("a third independent approval publishes native changes, then pending booking verification permits bounded compensation", async () => {
+      const appBeforePartial = await readApp(app.id);
+      await grantOrdinaryAgencyAppDraft(owner, maker!, businessId, appBeforePartial);
+      const priorApp = applicationSchema.parse(appBeforePartial.payload);
+      app = await appCommand(app.id, { kind: "revise", expectedDesignRevision: priorApp.designRevision,
+        spec: { ...priorApp.spec, title: "Native candidate awaiting booking verification" } });
+      app = await appCommand(app.id, { kind: "rehearse", expectedDesignRevision: app.payload.designRevision });
+      const partialAppRequest = internalAppRequestSchema.parse({ workId: app.id,
+        expectedCandidateRevision: app.payload.candidate.designRevision, expectedReleaseVersion: 2 });
+      inquiry = await readInquiry();
+      await inquiryAction({ kind: "edit", requestId, input: { source: "manual", path: "form.title", after: "Native form awaiting booking verification" } });
+      await inquiryAction({ kind: "rehearse", requestId });
+      const partialSnapshot = await inquiryRepository.getSnapshot(tenantId, businessId);
+      expect(partialSnapshot).not.toBeNull();
+      const partialEngine = new InquiryEngine({ businessId, state: stateForReceive(partialSnapshot!) });
+      const partialApproved = partialEngine.approvePublish(requestId, { actorId: owner.userId });
+      expect((await inquiryRepository.compareAndSwap({ tenantId, businessId, expectedRevision: partialSnapshot!.revision,
+        state: partialEngine.snapshot(), actorId: owner.userId })).changed).toBe(true);
+      const partialInquiryRequest = inquiryFormRequestSchema.parse({ tenantId, businessId, requestId,
+        capabilityId: partialApproved.capabilityId, changeId: partialApproved.activeChangeId, version: partialApproved.draft!.version });
+      expect(partialInquiryRequest.version).toBe(inquiryRequest.version + 1);
+      const currentAppSystem = await live.current(appBaseline), currentInquirySystem = await live.current(inquiryBaseline);
+      expect(currentAppSystem).not.toBeNull(); expect(currentInquirySystem).not.toBeNull();
+      const partialAppBaseline = { businessId, systemId: appBaseline.systemId, revisionId: currentAppSystem!.revisionId, number: currentAppSystem!.number };
+      const partialInquiryBaseline = { businessId, systemId: inquiryBaseline.systemId, revisionId: currentInquirySystem!.revisionId, number: currentInquirySystem!.number };
+      const start = new Date(Date.now() + 86_400_000).toISOString();
+      const end = new Date(Date.now() + 90_000_000).toISOString();
+      const schedule = await post(owner.context.request, "/api/bounded-work", { action: "create", productId: "scheduling", workspaceId: businessId,
+        input: { title: "Native consultation availability", availability: [{ start, end }] } }, 201);
+      const bookingBaseline = await baseline("Booking operating notes", { workId: schedule.id, publicBooking: "pending-calendar-connection", notes: "Original owner notes" }, "booking");
+      const pending = await prepare({ title: "Review native changes with booking verification still pending",
+        intent: "Publish the reviewed native candidates and notes; keep public booking verification explicitly unconnected",
+        changes: [
+          { baseline: partialAppBaseline, candidate: { summary: "Next reviewed native application", content: { ...partialAppRequest } } },
+          { baseline: partialInquiryBaseline, candidate: { summary: "Next reviewed native inquiry form", content: { ...partialInquiryRequest } } },
+          { baseline: bookingBaseline, candidate: { summary: "Reviewed owner notes", content: { publicBooking: "pending-calendar-connection", notes: "Confirm appointments with the owner" } } },
+        ],
+        effects: [
+          { id: "publish-app", kind: "publish", channel: "internal_app", system: { systemId: partialAppBaseline.systemId }, description: "Publish the next reviewed native application", request: partialAppRequest },
+          { id: "publish-inquiry", kind: "publish", channel: "inquiry_form", system: { systemId: partialInquiryBaseline.systemId }, description: "Publish the next reviewed native inquiry form", request: partialInquiryRequest },
+        ],
+        checks: [{ id: "site-serves", description: "Both native publications read back as confirmed" },
+          { id: "public-booking-verification", description: "Public booking publication needs a real calendar connection and public read-back, neither is connected in this local window" }],
+      });
+      const result = await post(owner.context.request, "/api/workspace/systems/make-real", { workspaceId: businessId, possibilityId: pending.id });
+      expect(result.live.live).toBe(true);
+      const partial = await readActivation(result.live.activationId);
+      expect(partial.status).toBe("needs_attention");
+      expect(partial.steps.filter(step => step.kind === "effect")).toHaveLength(2);
+      for (const step of partial.steps.filter(step => step.kind === "effect")) expect(step).toMatchObject({ status: "completed", effect: "accepted", attempts: 1, readBack: { status: "confirmed" } });
+      expect(partial.checks.find(check => check.id === "site-serves")?.status).toBe("passed");
+      expect(partial.checks.find(check => check.id === "public-booking-verification")).toMatchObject({ status: "failed", detail: expect.stringMatching(/No automatic check is connected/) });
+      expect((await live.current(bookingBaseline))?.revisionId).not.toBe(bookingBaseline.revisionId);
+      expect(applicationSchema.parse((await readApp(app.id)).payload).release?.version).toBe(3);
+      expect((await readInquiry()).snapshot.state.capabilities.find(capability => capability.id === approved.capabilityId)!.live!.version).toBe(partialInquiryRequest.version);
+      expect(customerRecords()).toEqual(retainedCustomerRows);
+      const partialDecision = (await decisions(admin, businessId, owner, true)).find(row => row.sourceLifecycle === "make_real" && row.sourceId.startsWith(`${pending.id}@`));
+      expect(partialDecision).toMatchObject({ state: "approved", decidedByKind: "owner_session" });
+      expect(partialDecision!.id).not.toBe(openDecision!.id);
+      expect(partialDecision!.id).not.toBe(bookingOnlyDecision.id);
+      expect(partialDecision!.revisionHash).not.toBe(openDecision!.revisionHash);
+      expect(partialDecision!.revisionHash).not.toBe(bookingOnlyDecision.revisionHash);
+      await post(owner.context.request, "/api/admin/make-real", { action: "rollback", workspaceId: businessId, activationId: partial.id, confirm: true }, 403);
+      expect((await admin.from("workspace_memberships").delete().eq("workspace_id", businessId).eq("user_id", owner.userId)).error).toBeNull();
+      const withdrawn = await operator.context.request.post("/api/admin/make-real", { headers: { origin: journeyEnvironment().app }, data: { action: "rollback", workspaceId: businessId, activationId: partial.id, confirm: true } });
+      expect([403, 404]).toContain(withdrawn.status());
+      expect((await admin.from("workspace_memberships").insert({ workspace_id: businessId, user_id: owner.userId, role: "owner", created_by: operator.userId })).error).toBeNull();
+      const rolled = activationSchema.parse((await post(operator.context.request, "/api/admin/make-real", { action: "rollback", workspaceId: businessId, activationId: partial.id, confirm: true })).activation);
+      expect(rolled.status).toBe("rolled_back");
+      expect(rolled.steps.filter(step => step.kind === "effect").every(step => step.status === "compensated")).toBe(true);
+      expect(applicationSchema.parse((await readApp(app.id)).payload).release?.version).toBe(2);
+      expect(applicationSchema.parse((await readApp(app.id)).payload).records).toEqual(originalRecords);
+      const undone = (await readInquiry()).snapshot.state.capabilities.find(capability => capability.id === approved.capabilityId)!;
+      expect(undone.live).toEqual({ ...sealedInquiryDefinition, version: partialInquiryRequest.version + 1, updatedAt: expect.any(String) });
+      expect(undone.previousLive?.version).toBe(partialInquiryRequest.version);
+      expect(Date.parse(undone.live!.updatedAt)).toBeGreaterThanOrEqual(Date.parse(sealedInquiryDefinition.updatedAt));
+      expect(customerRecords()).toEqual(retainedCustomerRows);
+      const undoStep = rolled.steps.find(step => step.kind === "effect" && step.target === "publish-inquiry")!;
+      expect(undoStep.compensation?.status).toBe("compensated");
+      const compensationKey = `${undoStep.idempotencyKey}:compensate`;
+      const claims = async () => {
+        const result = await admin.from("inquiry_publication_claims").select("id,tenant_id,business_id,request_id,capability_id,change_id,action,version,idempotency_key,status,actor_id,acceptance_id,provider_receipt")
+          .eq("tenant_id", tenantId).eq("idempotency_key", compensationKey);
+        expect(result.error).toBeNull(); return result.data;
+      };
+      const undoClaims = await claims(); expect(undoClaims).toHaveLength(1);
+      expect(undoClaims![0]).toMatchObject({ tenant_id: tenantId, business_id: businessId, request_id: requestId,
+        capability_id: approved.capabilityId, change_id: partialApproved.activeChangeId, action: "undo", version: partialInquiryRequest.version + 1,
+        idempotency_key: compensationKey, status: "accepted", actor_id: owner.userId, acceptance_id: expect.any(String) });
+      const repeated = activationSchema.parse((await post(operator.context.request, "/api/admin/make-real", { action: "rollback", workspaceId: businessId, activationId: partial.id, confirm: true })).activation);
+      expect(repeated).toEqual(rolled); expect(await claims()).toEqual(undoClaims); expect(customerRecords()).toEqual(retainedCustomerRows);
+      expect(await readActivation(activationId)).toEqual(completed);
+      expect((await live.current(partialAppBaseline))?.revisionId).toBe(partialAppBaseline.revisionId);
+      expect((await live.current(partialInquiryBaseline))?.revisionId).toBe(partialInquiryBaseline.revisionId);
+      expect((await live.current(bookingBaseline))?.revisionId).toBe(bookingBaseline.revisionId);
+      const scheduleAfter = await owner.context.request.get(`/api/bounded-work?productId=scheduling&workId=${schedule.id}`);
+      expect(scheduleAfter.status(), await scheduleAfter.text()).toBe(200);
+      expect((await scheduleAfter.json()).payload).toEqual(schedule.payload);
+      await testInfo.attach("booking-pending-public-channel-and-native-compensation", { body: JSON.stringify({ partial, rolled, undoClaims }, null, 2), contentType: "application/json" });
     });
   } finally {
     if (setup) await cleanup(admin, { tenantIds: [setup.tenantId], workspaceIds: [setup.businessId, ...(maker ? [maker.agencyId] : [])], operatorEmail: setup.operator.email,

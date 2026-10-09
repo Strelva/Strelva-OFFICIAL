@@ -209,8 +209,15 @@ describe("live channel adapters", () => {
     await expect(adapter.find({ businessId: BIZ, idempotencyKey: "mr:form" })).resolves.toBeNull();
     await expect(adapter.readBack({ businessId: BIZ, providerRef: "mooney|claim-1" })).resolves.toMatchObject({ ok: true });
     await expect(adapter.compensate!({ businessId: BIZ, providerRef: "mooney|claim-1", idempotencyKey: "mr:form:compensate" })).resolves.toMatchObject({ ok: true, detail: expect.stringMatching(/Inquiries already received are kept/) });
-    expect(ports.queue).toHaveBeenLastCalledWith(expect.objectContaining({ action: "undo", idempotencyKey: "mr:form:compensate", actorId: OWNER.userId }));
+    expect(ports.queue).toHaveBeenLastCalledWith({ tenantId: "mooney", businessId: "mooney-biz", requestId: "req-1", capabilityId: "contact", changeId: "chg-1", version: 3, action: "undo", idempotencyKey: "mr:form:compensate", actorId: OWNER.userId });
     expect(ports.execute).toHaveBeenLastCalledWith({ tenantId: "mooney", eventId: "evt-claim-2", claimId: "claim-2", actorId: OWNER.userId });
+    await expect(adapter.compensate!({ businessId: BIZ, providerRef: "mooney|claim-1", idempotencyKey: "mr:form:compensate" })).resolves.toMatchObject({ ok: true });
+    expect(ports.execute).toHaveBeenCalledTimes(2);
+    expect(claims.size).toBe(2);
+    claims.get("mr:form")!.status = "claimed";
+    ports.queue.mockClear();
+    await expect(adapter.compensate!({ businessId: BIZ, providerRef: "mooney|claim-1", idempotencyKey: "must-not-undo-unaccepted" })).resolves.toMatchObject({ ok: false });
+    expect(ports.queue).not.toHaveBeenCalled();
   });
 
   it("booking page: publishes the grant, finds it by capability, reads it back, revokes it", async () => {
