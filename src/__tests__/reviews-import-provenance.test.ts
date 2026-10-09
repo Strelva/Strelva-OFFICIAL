@@ -23,6 +23,7 @@ it("actual authenticated Google-labelled customer import survives persistence, r
   expect(await response.json()).toMatchObject({ source: "google", text: "Customer supplied review", author: "Customer supplied author", providerContent: { source: "customer_import", producer: "authenticated_reviews_post" } });
   expect(state.insert).toMatchObject({ external_id: null, provider_content: { source: "customer_import", producer: "authenticated_reviews_post" } });
   const [row] = await getReviews("customer");
+  if (!row) throw new Error("The persisted customer import must be readable.");
   expect(row.text).toBe("Customer supplied review");
   expect(JSON.stringify(projectGoogleReviewExport(row, Date.parse("2099-01-01")))).toContain("Customer supplied review");
 });

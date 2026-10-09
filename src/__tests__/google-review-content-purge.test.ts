@@ -21,12 +21,16 @@ beforeEach(() => {
 it("physically scrubs PG, Redis bodies and legacy embedded members plus dev mirrors while preserving customer text/history", async () => {
   expect(await purgeGoogleReviewContent()).toEqual({ reviews: 1, events: 4, devFiles: 1, archiveParts: 3 });
   expect(state.rpc).toHaveBeenCalledWith("purge_google_review_content");
-  const callback = state.update.mock.calls[0][1];
+  const updateCall = state.update.mock.calls[0];
+  const zaddCall = state.zadd.mock.calls[0];
+  const writeCall = state.writeFile.mock.calls[0];
+  if (!updateCall || !zaddCall || !writeCall) throw new Error("Expected each physical purge operation.");
+  const callback = updateCall[1];
   expect(callback(event)).toMatchObject({ body: "", metadata: { execution: { state: "external_accepted" } } });
-  const member = state.zadd.mock.calls[0][1].member;
+  const member = zaddCall[1].member;
   expect(member).not.toContain("Provider comment");
   expect(state.zrem).toHaveBeenCalledWith("events:tenant", JSON.stringify(event));
-  const saved = state.writeFile.mock.calls[0][1];
+  const saved = writeCall[1];
   expect(saved).not.toContain("Provider comment");
   expect(saved).toContain("Customer reply");
   expect(saved).toContain("Customer review");

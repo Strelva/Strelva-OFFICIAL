@@ -82,7 +82,7 @@ describe("reviews Postgres dual-path", () => {
     supa.list = [row, { ...row, id: "unknown", provider_content: null }, { ...row, id: "manual", source: "manual" }];
     const records = await getReviews("gldf");
     expect(records.slice(0, 2)).toEqual(expect.arrayContaining([expect.objectContaining({ text: "", author: "", rating: 0, reply: "Customer reply", externalId: "provider-id" })]));
-    expect(records[2].text).toBe("Provider comment");
+    expect(records[2]?.text).toBe("Provider comment");
     supa.single = row;
     expect(await getReviewById("gldf", "expired")).toMatchObject({ text: "", author: "", reply: "Customer reply" });
   });

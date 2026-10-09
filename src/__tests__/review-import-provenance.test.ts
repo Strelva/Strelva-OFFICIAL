@@ -7,6 +7,7 @@ const manual: ReviewItem = { id: "manual", source: "google", author: "Imported a
 beforeEach(() => { state.enabled = true; state.zrange.mockResolvedValue([]); state.mget.mockResolvedValue([]); });
 it("recognizes only the supported complete no-provider-ID legacy import shape", async () => {
   const [imported, identified, incomplete] = await reconcileLegacyReviewImports("customer", [manual, { ...manual, externalId: "provider" }, { ...manual, text: "" }]);
+  if (!imported || !identified || !incomplete) throw new Error("Review reconciliation must retain every row.");
   expect(imported.providerContent).toMatchObject({ source: "customer_import", producer: "legacy_reviews_post_no_external_id" });
   expect(identified.providerContent).toBeUndefined();
   expect(incomplete.providerContent).toBeUndefined();
@@ -14,7 +15,7 @@ it("recognizes only the supported complete no-provider-ID legacy import shape", 
 it("matching API mirror evidence or unavailable history never establishes customer provenance", async () => {
   state.zrange.mockResolvedValue(["api-event"]);
   state.mget.mockResolvedValue([{ id: "api-event", tenantId: "customer", source: "google", type: "review", body: manual.text, metadata: { author: manual.author, reviewId: "actual-api-id" } }]);
-  expect((await reconcileLegacyReviewImports("customer", [manual]))[0].providerContent).toBeUndefined();
+  expect(await reconcileLegacyReviewImports("customer", [manual])).toEqual([manual]);
   state.enabled = false;
-  expect((await reconcileLegacyReviewImports("customer", [manual]))[0].providerContent).toBeUndefined();
+  expect(await reconcileLegacyReviewImports("customer", [manual])).toEqual([manual]);
 });
