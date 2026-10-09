@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  creatorDraftIds: vi.fn(), makerAuthority: vi.fn(), brandRpc: vi.fn(), user: vi.fn(), rate: vi.fn(), score: vi.fn(), personal: vi.fn(), list: vi.fn(), work: vi.fn(), getWork: vi.fn(),
+  operator: vi.fn(), creatorDraftIds: vi.fn(), makerAuthority: vi.fn(), brandRpc: vi.fn(), user: vi.fn(), rate: vi.fn(), score: vi.fn(), personal: vi.fn(), list: vi.fn(), work: vi.fn(), getWork: vi.fn(),
   save: vi.fn(), createAgency: vi.fn(), handoff: vi.fn(), inspect: vi.fn(), accept: vi.fn(),
   revoke: vi.fn(), cancel: vi.fn(), handoffs: vi.fn(), agencyDelegations: vi.fn(), workDelegations: vi.fn(),
   pending: vi.fn(), operation: vi.fn(), saveAudit: vi.fn(), preflight: vi.fn(), runPrivate: vi.fn(), savePublicResult: vi.fn(), managedWork: vi.fn(), exitRead: vi.fn(), exitCompleted: vi.fn(), systems: vi.fn(), provided: vi.fn(),
 }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mocks.brandRpc }) }));
+vi.mock("@/platform/infra/db/repositories", () => ({ isSuperAdminUser: mocks.operator }));
 vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.user }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate }));
 vi.mock("@/products/ai-visibility/server", () => ({ runPrivateAiVisibilityAssessment: mocks.runPrivate, savePublicAiVisibilityResult: mocks.savePublicResult }));
@@ -55,6 +56,7 @@ beforeEach(() => {
   vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "1");
   mocks.user.mockResolvedValue({ id: "actor", email: "OWNER@example.com", email_confirmed_at: "2026-09-05" });
   mocks.brandRpc.mockResolvedValue({ data: null, error: null });
+  mocks.operator.mockResolvedValue(false);
   mocks.rate.mockResolvedValue(false);
   mocks.creatorDraftIds.mockResolvedValue([]);
   mocks.makerAuthority.mockResolvedValue(null);
@@ -108,6 +110,80 @@ it("opens a provider client without publishing inquiry, Ask, decision or member 
   expect(mocks.systems).toHaveBeenCalledWith(expect.objectContaining({ canWrite: false }));
   expect(mocks.pending).not.toHaveBeenCalled();
   expect(mocks.workDelegations).not.toHaveBeenCalled();
+});
+
+describe("authenticated snapshot read dependencies", () => {
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>(done => { resolve = done; });
+    return { promise, resolve };
+  }
+
+  it("starts independent agency reads while exit is pending, after personal creation and selection", async () => {
+    const personal = deferred<typeof workspace>(), selection = deferred<Array<typeof workspace>>();
+    const exit = deferred<{ state: null }>();
+    mocks.personal.mockReturnValue(personal.promise); mocks.list.mockReturnValue(selection.promise);
+    mocks.exitRead.mockReturnValue(exit.promise); mocks.provided.mockResolvedValue([]);
+    const response = GET(new Request("https://strelva.com/api/workspace"));
+    await vi.waitFor(() => expect(mocks.personal).toHaveBeenCalled());
+    expect(mocks.list).not.toHaveBeenCalled(); expect(mocks.work).not.toHaveBeenCalled();
+    personal.resolve(workspace);
+    await vi.waitFor(() => expect(mocks.list).toHaveBeenCalled());
+    expect(mocks.exitRead).not.toHaveBeenCalled(); expect(mocks.managedWork).not.toHaveBeenCalled(); expect(mocks.operator).not.toHaveBeenCalled();
+    expect(mocks.work).not.toHaveBeenCalled(); expect(mocks.brandRpc).not.toHaveBeenCalled();
+    selection.resolve([{ ...workspace, kind: "agency" }]);
+    try {
+      await vi.waitFor(() => {
+        expect(mocks.work).toHaveBeenCalled(); expect(mocks.managedWork).toHaveBeenCalled();
+        expect(mocks.handoffs).toHaveBeenCalled(); expect(mocks.agencyDelegations).toHaveBeenCalled();
+        expect(mocks.provided).toHaveBeenCalled(); expect(mocks.pending).toHaveBeenCalled();
+        expect(mocks.makerAuthority).toHaveBeenCalled(); expect(mocks.brandRpc).toHaveBeenCalled();
+      });
+    } finally { exit.resolve({ state: null }); await response; }
+    expect((await response).status).toBe(200);
+  });
+
+  it("waits for visible work and managed domains before Systems, but delegations only need work", async () => {
+    const saved = deferred<Array<typeof work>>(), managed = deferred<{ managedWork: unknown[]; unavailable: boolean }>();
+    mocks.list.mockResolvedValue([{ ...workspace, kind: "customer" }]);
+    mocks.work.mockReturnValue(saved.promise); mocks.managedWork.mockReturnValue(managed.promise);
+    const response = GET(new Request("https://strelva.com/api/workspace"));
+    try {
+      await vi.waitFor(() => expect(mocks.work).toHaveBeenCalled());
+      expect(mocks.workDelegations).not.toHaveBeenCalled(); expect(mocks.systems).not.toHaveBeenCalled();
+      saved.resolve([work]);
+      await vi.waitFor(() => expect(mocks.workDelegations).toHaveBeenCalledWith(expect.anything(), work.id));
+      expect(mocks.systems).not.toHaveBeenCalled();
+    } finally { saved.resolve([work]); managed.resolve({ managedWork: [], unavailable: false }); await response; }
+    expect(mocks.systems).toHaveBeenCalledWith(expect.objectContaining({ savedWork: [work], siteDomains: new Map() }));
+  });
+
+  it.each(["missing", "malformed"])("starts no private snapshot reads for a %s workspace", async kind => {
+    const id = kind === "missing" ? otherId : "not-a-uuid";
+    expect((await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${id}`))).status).toBe(kind === "missing" ? 404 : 400);
+    for (const read of [mocks.work, mocks.managedWork, mocks.exitRead, mocks.exitCompleted,
+      mocks.handoffs, mocks.agencyDelegations, mocks.provided, mocks.pending, mocks.brandRpc, mocks.makerAuthority, mocks.operator]) expect(read).not.toHaveBeenCalled();
+  });
+
+  it("fails required reads while optional discovery is pending and observes later dependent failures", async () => {
+    const managed = deferred<{ managedWork: unknown[]; unavailable: boolean }>();
+    mocks.managedWork.mockReturnValue(managed.promise);
+    mocks.work.mockRejectedValue(new WorkspaceStoreError("Private work unavailable"));
+    const response = GET(new Request("https://strelva.com/api/workspace"));
+    try {
+      expect((await response).status).toBe(503);
+      expect(await (await response).json()).not.toHaveProperty("work");
+      expect(mocks.workDelegations).not.toHaveBeenCalled(); expect(mocks.systems).not.toHaveBeenCalled();
+    } finally { managed.resolve({ managedWork: [], unavailable: false }); await Promise.resolve(); }
+  });
+
+  it("performs the operator lookup once for both work visibility and release targeting", async () => {
+    mocks.work.mockResolvedValue([work, { ...trackerWork, productId: "product-learning" }]);
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+    expect(response.status).toBe(200);
+    expect((await response.json()).work.map((item: { id: string }) => item.id)).toEqual([work.id]);
+    expect(mocks.operator).toHaveBeenCalledExactlyOnceWith("actor");
+  });
 });
 
 describe("current maker authority snapshot", () => {

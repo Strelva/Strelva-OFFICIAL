@@ -94,7 +94,8 @@ function services(actor: WorkspaceActor, db: VersionsDb) {
   };
 }
 
-async function readSources(actor: WorkspaceActor, agencyWorkspaceId: string, db: VersionsDb) {
+/** Authorized source discovery, without client comparisons or inquiry hydration. */
+export async function readAgencyVersionSources(actor: WorkspaceActor, agencyWorkspaceId: string, db: VersionsDb = versionsDb()) {
   const data = await rpc(db, "read_workspace_version_sources", { p_workspace_id: uuid.parse(agencyWorkspaceId), ...actorArgs(actor) },
     "The library could not be loaded.");
   const parsed = sourcesSchema.safeParse(data);
@@ -103,7 +104,7 @@ async function readSources(actor: WorkspaceActor, agencyWorkspaceId: string, db:
 }
 
 export async function readAgencyLibrary(actor: WorkspaceActor, agencyWorkspaceId: string, db: VersionsDb = versionsDb()): Promise<AgencyLibrary> {
-  const sources = await readSources(actor, agencyWorkspaceId, db);
+  const sources = await readAgencyVersionSources(actor, agencyWorkspaceId, db);
   const { versions, actor: pending } = services(actor, db);
   const versionActor: VersionActor = await pending;
   const result: AgencyLibrary = { agencyWorkspaceId, sources: [] };
@@ -165,7 +166,7 @@ export async function reviewAllImprovements(
   db: VersionsDb = versionsDb(),
   prepare: ((actor: WorkspaceActor, lineage: VersionLineage) => Promise<VersionPreparationReceipt | null>) | null = needsYouReleaseEnabled() ? (actor, lineage) => prepareVersionRelease(actor, lineage, { db }) : null,
 ): Promise<AgencyBulkReviewResult> {
-  const sources = await readSources(actor, input.agencyWorkspaceId, db);
+  const sources = await readAgencyVersionSources(actor, input.agencyWorkspaceId, db);
   const source = sources.find((item) => item.systemId === input.sourceSystemId);
   if (!source) throw new WorkspaceStoreError("That source is not in this library.");
   const latest = source.revisions.at(-1)?.number;

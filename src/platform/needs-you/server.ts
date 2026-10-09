@@ -124,14 +124,19 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, ef
 /** The last week of recorded changes for this business, newest first. */
 export async function readStrelvaHandled(actor: WorkspaceActor, workspaceId: string, store: NeedsYouStore = PostgresNeedsYouStore, now = Date.now()): Promise<HandledReceipt[]> {
   const since = now - 7 * 24 * 60 * 60 * 1000;
-  const rows = await store.handled(actor, workspaceId, new Date(since).toISOString());
-  const tenants = await store.linkedTenants(workspaceId).catch(() => []);
+  const sinceIso = new Date(since).toISOString();
+  const rows = await store.handled(actor, workspaceId, sinceIso);
   // A tenant event an owner decided through Needs you is shown once, as the decision's receipt.
   const decided = decidedTenantEventIds(rows);
-  const events = (await Promise.all(tenants.map(async link => (await getEvents(link.tenantId, { limit: 100 }).catch(() => []))
-    .filter(event => !decided.has(`${link.tenantId}:${event.id}`))))).flat();
-  const reports = await readCatalogReportHandled(actor, workspaceId, new Date(since).toISOString());
-  const notices = await readToolNoticeHandled(actor, workspaceId, new Date(since).toISOString());
+  // The actor-scoped handled read must succeed before unscoped tenant discovery.
+  // Receipt sources recheck their own access; required failures still reject.
+  const [events, reports, notices] = await Promise.all([
+    store.linkedTenants(workspaceId).catch(() => []).then(tenants => Promise.all(tenants.map(async link =>
+      (await getEvents(link.tenantId, { limit: 100 }).catch(() => []))
+        .filter(event => !decided.has(`${link.tenantId}:${event.id}`)))).then(rows => rows.flat())),
+    readCatalogReportHandled(actor, workspaceId, sinceIso),
+    readToolNoticeHandled(actor, workspaceId, sinceIso),
+  ]);
   return mergeHandled([...rows.map(handledFromStore), ...events.map(handledFromTenantEvent), ...reports, ...notices], since).slice(0, 50);
 }
 

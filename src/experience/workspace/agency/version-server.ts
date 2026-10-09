@@ -6,7 +6,7 @@ import { projectVersionPossibilities } from "@/platform/system-versions/possibil
 import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
 import { WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { requireAgencyAuthoring } from "./authoring-server";
-import { readAgencyLibrary } from "../agency-server";
+import { readAgencyVersionSources } from "../agency-server";
 import { z } from "zod";
 import { mapVersionsError } from "@/platform/system-versions/supabase-store";
 import {prepareNativeBundleVersion} from "./bundle-lifecycle-server";
@@ -44,9 +44,9 @@ export async function readSystemVersion(actor: WorkspaceActor, workspaceId: stri
 
 export async function readVersionCreationChoices(actor: WorkspaceActor, agencyWorkspaceId: string, db: VersionsDb = versionsDb()) {
   await requireAgencyAuthoring(actor, agencyWorkspaceId, agencyWorkspaceId, db);
-  const library = await readAgencyLibrary(actor, agencyWorkspaceId, db);
+  const sources = await readAgencyVersionSources(actor, agencyWorkspaceId, db);
   const versionActor = await readVersionActor(actor, db), store = createSupabaseVersionStore(db);
-  return { workspaceId: agencyWorkspaceId, sources: await Promise.all(library.sources.map(async source => ({ systemId: source.systemId, name: source.name,
+  return { workspaceId: agencyWorkspaceId, sources: await Promise.all(sources.map(async source => ({ systemId: source.systemId, name: source.name,
     revisions: (await store.listRevisions(versionActor, { businessId: agencyWorkspaceId, systemId: source.systemId })).filter(isRevisionQualified).map(revision => ({ source: revision.source, summary: revision.summary })) }))) };
 }
 

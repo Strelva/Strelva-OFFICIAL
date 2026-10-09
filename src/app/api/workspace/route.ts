@@ -233,68 +233,57 @@ export async function GET(request: Request) {
     const selected = workspaces.find((workspace) => workspace.id === selectedId);
     if (!selected) return json({ error: "Workspace unavailable." }, 404);
     const providerSeat = selected.access === "provider_seat";
-    let workspaceExitState = null;
-    let workspaceExitReadStatus: "available" | "completed" | "not_owner" | "unavailable" = selected.role === "owner" ? "available" : "not_owner";
-    if (selected.role === "owner") {
-      try {
-        workspaceExitState = (await readWorkspaceExit(current, selected.id)).state;
-      } catch {
-        // An owner must not be shown mutation controls when the durable stop
-        // state cannot be checked. The browser receives an explicit status so
-        // it can fail closed without claiming that an exit was completed.
-        workspaceExitReadStatus = "unavailable";
-      }
-    } else {
-      try {
-        workspaceExitReadStatus = await readWorkspaceExitCompleted(selected.id) ? "completed" : "available";
-      } catch {
-        // Members receive only the completion bit. A failed check still
-        // disables mutations instead of presenting an active workspace.
-        workspaceExitReadStatus = "unavailable";
-      }
-    }
-    // Managed presence is a compatibility projection of existing tenant
-    // entities. A transient tenant read must not make unrelated private work
-    // unavailable; the product reports a bounded status alongside successes.
-    const managedPresence = presentManagedWorkListing(
-      await listManagedPresenceWork().catch(() => ({ managedWork: [], unavailable: true })),
-    );
-    const allWork = await listWork(current, selected.id);
-    const work = allWork.some(item => item.productId === "product-learning") && !(await isSuperAdminUser(current.userId))
-      ? allWork.filter(item => item.productId !== "product-learning") : allWork;
-    const handoffs = selected.kind === "agency" && selected.access === "member"
-      ? await listAgencyHandoffs(current, selected.id) : [];
-    const agencyDelegations = selected.kind === "agency" && selected.access === "member"
-      ? await listAgencyDelegations(current, selected.id) : [];
-    // The provider mark grants nothing: the list is only businesses the actor
-    // already belongs to. A failed read (or the migration not yet applied)
-    // leaves the agency home on delegations alone, as before.
-    const providedClients = selected.kind === "agency" && selected.access === "member"
-      ? await Promise.resolve().then(() => listProvidedClients(current, selected.id))
-        .then((rows) => rows.map(({ customerWorkspaceId, name, startedAt }) => ({ customerWorkspaceId, name, startedAt })))
-        .catch(() => undefined)
-      : undefined;
-    const customerDelegations = selected.access === "member" && (selected.role === "owner" || selected.role === "admin")
-      ? (await Promise.all(work.map((item) => listWorkDelegations(current, item.id)))).flat() : [];
-    // Systems are business-level: the spine projection, its health and any
-    // Possibility a saved rebuild offers. A failed read is reported as such.
-    // Off (STRELVA_SYSTEMS_RELEASE, per workspace when the env says `workspace`),
-    // no projection is built and the browser renders the pre-Systems workspace.
-    const releaseViewer = { operator: await isSuperAdminUser(current.userId), tester: false, userId: current.userId };
-    const [systemsReleased, inquiryRelease, websiteRebuildReleased] = await Promise.all([
-      systemsReleaseEnabledForWorkspace(selected.id, releaseViewer),
-      inquiryReleaseEnabledForWorkspace(selected.id, releaseViewer),
-      websiteRebuildReleaseEnabledForWorkspace(selected.id, releaseViewer),
+    const agencyMember = selected.kind === "agency" && selected.access === "member";
+    const canWrite = selected.access === "member" && (selected.role === "owner" || selected.role === "admin");
+    // Start private reads only after verified identity and workspace selection.
+    // Work visibility and release targeting share one current operator check.
+    const operator = isSuperAdminUser(current.userId);
+    const visibleWork = Promise.all([listWork(current, selected.id), operator]).then(([allWork, isOperator]) =>
+      isOperator ? allWork : allWork.filter(item => item.productId !== "product-learning"));
+    // Tenant compatibility failures remain explicit and do not hide private work.
+    const managed = listManagedPresenceWork().catch(() => ({ managedWork: [], unavailable: true })).then(presentManagedWorkListing);
+    const releases = operator.then(isOperator => {
+      const viewer = { operator: isOperator, tester: false, userId: current.userId };
+      return Promise.all([systemsReleaseEnabledForWorkspace(selected.id, viewer),
+        inquiryReleaseEnabledForWorkspace(selected.id, viewer), websiteRebuildReleaseEnabledForWorkspace(selected.id, viewer)]);
+    });
+    // Attach every required read to the same aggregate before awaiting. Only
+    // visible work gates delegations; Systems also need managed domains/releases.
+    const [work, managedPresence, [systemsReleased, inquiryRelease, websiteRebuildReleased], exit,
+      handoffs, agencyDelegations, providedClients, customerDelegations, systems, connectedSitesReleased,
+      creatorDraftIds, makerAuthority, ownerBrand, pendingAssessments] = await Promise.all([
+      visibleWork, managed, releases,
+      (async () => {
+        try {
+          return selected.role === "owner"
+            ? { state: (await readWorkspaceExit(current, selected.id)).state, status: "available" as const }
+            : { state: null, status: await readWorkspaceExitCompleted(selected.id) ? "completed" as const : "available" as const };
+        } catch {
+          // An unconfirmed stop state disables mutation controls for every viewer.
+          return { state: null, status: "unavailable" as const };
+        }
+      })(),
+      agencyMember ? listAgencyHandoffs(current, selected.id) : [],
+      agencyMember ? listAgencyDelegations(current, selected.id) : [],
+      // A provider mark grants nothing. Keep the existing optional projection.
+      agencyMember ? Promise.resolve().then(() => listProvidedClients(current, selected.id))
+        .then(rows => rows.map(({ customerWorkspaceId, name, startedAt }) => ({ customerWorkspaceId, name, startedAt })))
+        .catch(() => undefined) : undefined,
+      canWrite ? visibleWork.then(items => Promise.all(items.map(item => listWorkDelegations(current, item.id))).then(rows => rows.flat())) : [],
+      Promise.all([visibleWork, managed, releases]).then(([savedWork, presence, [released]]) =>
+        released && selected.kind === "customer" ? readWorkspaceSystems({
+          actor: current, businessId: selected.id, savedWork, canWrite,
+          siteDomains: new Map(presence.managedWork.flatMap(site => site.domain ? [[site.id, site.domain] as const] : [])),
+        }) : undefined),
+      releases.then(([released]) => released && selected.kind === "customer" && selected.access === "member"
+        ? connectedSitesReleasedFor(current, selected.id).catch(() => false) : false),
+      providerSeat ? createdAgencyApplicationWorkIds(current, selected.id) : [],
+      releases.then(([released]) => released ? makeSystemsAuthority(current, selected.id) : null),
+      resolveOwnerBrand(selected.id),
+      selected.access === "member" ? listPendingAssessments(current, selected.id) : [],
     ]);
     // #241 remains undecided: a seat alone adds no inquiry entry or inbox grant.
     const inquiriesReleased = inquiryRelease && !providerSeat;
-    const systems = systemsReleased && selected.kind === "customer" ? await readWorkspaceSystems({
-      actor: current, businessId: selected.id, savedWork: work,
-      canWrite: selected.access === "member" && (selected.role === "owner" || selected.role === "admin"),
-      siteDomains: new Map(managedPresence.managedWork.flatMap((site) => site.domain ? [[site.id, site.domain] as const] : [])),
-    }) : undefined;
-    const connectedSitesReleased = systemsReleased && selected.kind === "customer" && selected.access === "member"
-      ? await connectedSitesReleasedFor(current, selected.id).catch(() => false) : false;
     const homeFinderPreview = resolveHomeFinderPreviewHref();
     const products: WorkspaceProduct[] = workspaceDiscoveryProducts().map((product): WorkspaceProduct => ({ id: product.id, name: product.name, description: product.promise,
       availability: workspaceAvailability(product),
@@ -310,19 +299,16 @@ export async function GET(request: Request) {
     // Inquiry work is intentionally absent while its explicit exposure flag is
     // off for this workspace. The route still enforces the flag per site.
     if (inquiriesReleased) products.push({ id: "inquiries", name: "Inquiry work", description: "Keep customer requests moving with a clear, inspectable thread.", availability: "available" });
-    const creatorDraftIds = selected.access === "provider_seat"
-      ? await createdAgencyApplicationWorkIds(current, selected.id) : [];
-    const makerAuthority = systemsReleased ? await makeSystemsAuthority(current, selected.id) : null;
     const snapshot: WorkspaceSnapshot = {
       canMakeSystems: makerAuthority === "provider" || makerAuthority === "agency",
-      ownerBrand: await resolveOwnerBrand(selected.id),
+      ownerBrand,
       actor: { email: current.verifiedEmail, localPreview: false },
       workspaces: workspaces.map(({ id, kind, name, access, role }) => ({ id, kind, name, access, role })), workspaceId: selected.id,
-      workspaceExitState,
-      workspaceExitReadStatus,
+      workspaceExitState: exit.state,
+      workspaceExitReadStatus: exit.status,
       work: work.map((item) => ({ ...presentWorkspaceWork(item, { access: workAccess(selected) }),
-        ...(creatorDraftIds.includes(item.id) ? { creatorDraft: true } : {}) })),
-      pendingAssessments: selected.access === "member" ? await listPendingAssessments(current, selected.id) : [],
+        ...(creatorDraftIds.some(id => id === item.id) ? { creatorDraft: true } : {}) })),
+      pendingAssessments,
       managedWork: managedPresence.managedWork,
       ...(managedPresence.unavailable ? { managedWorkUnavailable: true } : {}),
       handoffs: handoffs.map(({ id, sourceWorkId, recipientEmail, status, expiresAt, createdAt }) => ({ id, sourceWorkId, recipientEmail, status, expiresAt, createdAt })),

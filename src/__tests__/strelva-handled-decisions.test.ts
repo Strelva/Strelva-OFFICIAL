@@ -1,12 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // What changed lists the owner's decided Needs you items
 // (20261009130000_strelva_handled_decisions.sql): what Strelva did after an
 // approval or a Not yet, and the honest undo for that lifecycle. None is a
 // one-tap undo; each says why or what undoing takes.
 
-const events = vi.hoisted(() => ({ getEvents: vi.fn() }));
+const events = vi.hoisted(() => ({ getEvents: vi.fn(), reports: vi.fn(), notices: vi.fn() }));
 vi.mock("@/lib/events", () => ({ getEvents: events.getEvents, getEventRaw: vi.fn() }));
+vi.mock("@/platform/catalog-reports/receipts", () => ({ readCatalogReportHandled: events.reports }));
+vi.mock("@/platform/catalog-reports/tool-notices", () => ({ readToolNoticeHandled: events.notices }));
 
 import { approvedDecisionUndo, decidedTenantEventIds, handledFromStore, mergeHandled } from "@/platform/needs-you/handled";
 import { readStrelvaHandled } from "@/platform/needs-you/server";
@@ -15,6 +17,51 @@ import type { UnifiedEvent } from "@/lib/types";
 
 const AT = "2026-10-08T15:00:00.000Z";
 const SYSTEM = "11111111-1111-4111-8111-111111111111";
+beforeEach(() => { vi.resetAllMocks(); events.reports.mockResolvedValue([]); events.notices.mockResolvedValue([]); });
+
+describe("What changed read dependencies", () => {
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>(done => { resolve = done; });
+    return { promise, resolve };
+  }
+  const actor = { userId: SYSTEM, verifiedEmail: "owner@example.test" };
+
+  it("authorizes first, then starts report and notice reads while tenant discovery is pending", async () => {
+    const authorized = deferred<unknown[]>(), tenants = deferred<[]>(), reports = deferred<[]>();
+    const store = { handled: vi.fn(() => authorized.promise), linkedTenants: vi.fn(() => tenants.promise) } as unknown as NeedsYouStore;
+    events.reports.mockReturnValue(reports.promise);
+    const read = readStrelvaHandled(actor, SYSTEM, store, Date.parse(AT) + 1000);
+    expect(store.linkedTenants).not.toHaveBeenCalled(); expect(events.reports).not.toHaveBeenCalled(); expect(events.notices).not.toHaveBeenCalled();
+    authorized.resolve([]);
+    try {
+      await vi.waitFor(() => { expect(store.linkedTenants).toHaveBeenCalled(); expect(events.reports).toHaveBeenCalled(); expect(events.notices).toHaveBeenCalled(); });
+      expect(events.reports).toHaveBeenCalledWith(actor, SYSTEM, "2026-10-01T15:00:01.000Z");
+      expect(events.notices).toHaveBeenCalledWith(actor, SYSTEM, "2026-10-01T15:00:01.000Z");
+    } finally { tenants.resolve([]); reports.resolve([]); await read; }
+    expect(await read).toEqual([]);
+  });
+
+  it("does no tenant or receipt reads when access is denied", async () => {
+    const store = { handled: vi.fn().mockRejectedValue(new Error("denied")), linkedTenants: vi.fn() } as unknown as NeedsYouStore;
+    await expect(readStrelvaHandled(actor, SYSTEM, store)).rejects.toThrow("denied");
+    expect(store.linkedTenants).not.toHaveBeenCalled(); expect(events.getEvents).not.toHaveBeenCalled();
+    expect(events.reports).not.toHaveBeenCalled(); expect(events.notices).not.toHaveBeenCalled();
+  });
+
+  it.each(["reports", "notices"] as const)("rejects unavailable %s rather than reporting empty history", async source => {
+    const store = { handled: vi.fn().mockResolvedValue([]), linkedTenants: vi.fn().mockResolvedValue([]) } as unknown as NeedsYouStore;
+    events[source].mockRejectedValue(new Error("required receipt unavailable"));
+    await expect(readStrelvaHandled(actor, SYSTEM, store)).rejects.toThrow("required receipt unavailable");
+  });
+
+  it.each(["links", "events"])("retains the existing optional tenant fallback on unavailable %s", async source => {
+    const store = { handled: vi.fn().mockResolvedValue([decision()]), linkedTenants: vi.fn().mockResolvedValue([{ tenantId: "fictional" }]) } as unknown as NeedsYouStore;
+    if (source === "links") vi.mocked(store.linkedTenants).mockRejectedValue(new Error("optional tenant read"));
+    else events.getEvents.mockRejectedValue(new Error("optional event read"));
+    expect(await readStrelvaHandled(actor, SYSTEM, store, Date.parse(AT) + 1000)).toEqual([handledFromStore(decision())]);
+  });
+});
 
 function decision(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
