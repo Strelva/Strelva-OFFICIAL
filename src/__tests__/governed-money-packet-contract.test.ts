@@ -36,6 +36,11 @@ describe("governed money source packet", () => {
     const exit = readFileSync("supabase/migrations/20260920100000_workspace_exit.sql", "utf8");
     expect(exit).toContain("from public.workspaces where id = p_workspace_id for update");
   });
+  it("returns recorded payout authorization separately from the recipient's current profile", () => {
+    const reader = forward.slice(forward.indexOf("create function public.read_governed_money_configuration"), forward.indexOf("create function public.read_governed_money_preparation"));
+    expect(reader).toContain("'authorizationProfileVersion',a.profile_version");
+    expect(reader).toContain("'recipientProfileVersion',c.profile_version");
+  });
   it("counts existing restored recovery reservations using the declared net-capacity contract", () => {
     const dispatch = forward.slice(forward.indexOf("create function public.assert_governed_payout_dispatch"), forward.indexOf("do $$declare f regprocedure"));
     expect(dispatch).toContain("coalesce(sum(public.split_reserved_net(split_id)),0)");

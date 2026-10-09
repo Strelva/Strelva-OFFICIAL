@@ -88,17 +88,19 @@ unproven; this entry records source behavior rather than final interface approva
 operator frame. Signed-in current operators enter explicit written price or
 agreement references, amount/currency or rate, and dates. Blank rates do not
 become zero. Payout review exposes the immutable source, recipient, amount and
-recorded profile; recording authorization and dispatch remain separate actions.
+recorded authorization profile separately from the recipient’s current profile; recording authorization and dispatch remain separate actions.
 An unavailable approved profile removes authorization and dispatch, and disabled
 execution removes dispatch. These states make no provider/commercial approval.
 
 Acknowledgments match the actual requesting operator, payout and profile.
 Unknown responses freeze the exact command and disable new work until current
-readback; any retry preserves the same command. An accepted historical transfer
-is observed without another POST. Current read refusal leaves controls locked.
+readback; any retry preserves the same command. Accepted historical readback matches the captured immutable source/recipient/
+amount/currency/agreement/authorization and a valid transfer ID, without another
+POST. A later change to the current recipient profile cannot rewrite the
+recorded approval or invalidate matching accepted historical evidence. Current read refusal leaves controls locked.
 Actor/workspace changes abort old observations. The shared navigation entry is
 visible only when the server's Workspace and Revenue splits flags are enabled.
-Forty-one focused tests in five files pass locally, with scoped lint and bounded
+Focused source/component tests pass locally, with scoped lint and bounded
 types. Real operator Auth/browser/provider proof remains unrun.
 
 ## Start with tokens and atoms

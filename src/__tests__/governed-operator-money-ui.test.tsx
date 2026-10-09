@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OperatorMoney } from "@/experience/workspace/money/OperatorMoney";
 import type { GovernedOperatorGraph } from "@/platform/connect/governed-money-contract";
 const workspaceId = "11111111-1111-4111-8111-111111111111", actorId = "22222222-2222-4222-8222-222222222222", payoutId = "33333333-3333-4333-8333-333333333333", other = "44444444-4444-4444-8444-444444444444";
-const graph: GovernedOperatorGraph = { workspaceId, agreements: [], prices: [], payouts: [{ id: payoutId, amountCents: 1700, currency: "cad", sourceAccountId: "platform", sourceTransaction: "ch_FictionalSource", recipientAccountId: "acct_FictionalRecipient", agreementVersion: "Explicit written agreement", profileVersion: "explicit-profile", authorizedBy: actorId, transferId: null }] };
+const graph: GovernedOperatorGraph = { workspaceId, agreements: [], prices: [], payouts: [{ id: payoutId, amountCents: 1700, currency: "cad", sourceAccountId: "platform", sourceTransaction: "ch_FictionalSource", recipientAccountId: "acct_FictionalRecipient", agreementVersion: "Explicit written agreement", profileVersion: "explicit-profile", recipientProfileVersion: "explicit-profile", authorizationProfileVersion: "explicit-profile", authorizedBy: actorId, transferId: null }] };
 const reply = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status }), roots: ReturnType<typeof createRoot>[] = [];
 async function mount(request = vi.fn<typeof fetch>().mockResolvedValue(reply(graph)), profileVersion: string | null = "explicit-profile", executionEnabled = false) { const node = document.createElement("div"); document.body.append(node); const root = createRoot(node); roots.push(root); await act(async () => root.render(createElement(OperatorMoney, { graph, actorId, profileVersion, executionEnabled, request }))); return { node, root, request }; }
 async function click(node: HTMLElement, text: string) { const button = [...node.querySelectorAll("button")].find(item => item.textContent === text)!; await act(async () => button.click()); }
@@ -39,6 +39,22 @@ describe("recorded operator money", () => {
   });
   it("unknown payout readback with an accepted receipt never sends a second transfer", async () => {
     const request = vi.fn<typeof fetch>().mockResolvedValueOnce(reply({ error: "Lost accepted response" }, 500)).mockResolvedValueOnce(reply({ ...graph, payouts: [{ ...graph.payouts[0]!, transferId: "tr_FictionalAccepted" }] })); const { node } = await mount(request, "explicit-profile", true); await click(node, "Send this approved payout"); await click(node, "Reload current money records"); expect(node.textContent).toContain("No new payout was requested"); expect(node.textContent).not.toContain("Retry the exact payout"); expect(request.mock.calls.filter(call => call[1]?.method === "POST")).toHaveLength(1);
+  });
+  it("shows stale recorded authorization separately and never treats a new recipient profile as approval", async () => {
+    const node = document.createElement("div"); document.body.append(node); const root = createRoot(node); roots.push(root);
+    await act(async () => root.render(createElement(OperatorMoney, { graph: { ...graph, payouts: [{ ...graph.payouts[0]!, profileVersion: "new-profile", recipientProfileVersion: "new-profile", authorizationProfileVersion: "old-profile" }] }, actorId, profileVersion: "new-profile", executionEnabled: true })));
+    expect(node.textContent).toContain("Recorded for old-profile"); expect(node.textContent).toContain("Current recipient profile: new-profile"); expect(node.textContent).not.toContain("Send this approved payout");
+  });
+  it("never confirms malformed transfer IDs or changed immutable payout readback", async () => {
+    for (const changed of [{ transferId: "not-a-transfer" }, { amountCents: 1701 }, { currency: "usd" }, { sourceTransaction: "ch_Foreign" }, { recipientAccountId: "acct_Foreign" }, { agreementVersion: "foreign-agreement" }, { authorizationProfileVersion: "foreign-profile" }]) {
+      const request = vi.fn<typeof fetch>().mockResolvedValueOnce(reply({ error: "Lost payout response" }, 500)).mockResolvedValueOnce(reply({ ...graph, payouts: [{ ...graph.payouts[0]!, transferId: "tr_FictionalAccepted", ...changed }] }));
+      const { node } = await mount(request, "explicit-profile", true); await click(node, "Send this approved payout"); await click(node, "Reload current money records");
+      expect(node.textContent).not.toContain("The accepted payout receipt is recorded"); expect(node.querySelector("[role=alert]")).not.toBeNull();
+    }
+  });
+  it("preserves accepted historical readback when the mutable recipient profile changes later", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValueOnce(reply({ error: "Lost payout response" }, 500)).mockResolvedValueOnce(reply({ ...graph, payouts: [{ ...graph.payouts[0]!, transferId: "tr_FictionalAccepted", profileVersion: "recipient-later-profile", recipientProfileVersion: "recipient-later-profile" }] }));
+    const { node } = await mount(request, "explicit-profile", true); await click(node, "Send this approved payout"); await click(node, "Reload current money records"); expect(node.textContent).toContain("The accepted payout receipt is recorded"); expect(node.textContent).toContain("Recorded for explicit-profile"); expect(node.textContent).not.toContain("Send this approved payout");
   });
   it("withdraws stale controls on read refusal and rejects cross-workspace graphs", async () => {
     const request = vi.fn<typeof fetch>().mockResolvedValueOnce(reply({ error: "Operator revoked" }, 403)).mockResolvedValueOnce(reply({ ...graph, workspaceId: other })); const { node } = await mount(request); await click(node, "Reload current money records"); expect(node.querySelector("[role=alert]")!.textContent).toContain("Operator revoked"); expect([...node.querySelectorAll("button")].filter(button => button.textContent?.startsWith("Authorize")).every(button => button.disabled)).toBe(true); await click(node, "Reload current money records"); expect(node.querySelector("[role=alert]")!.textContent).toContain("another workspace");

@@ -6,7 +6,7 @@ declare expected record; p record; migrator oid:=(current_user::regrole)::oid;
 begin
  for expected in select * from (values
  ('public.record_governed_money_configuration(uuid,text,jsonb)','c50a9dbfea6cd8fb74158f9c3131306e','v',array['p_user_id','p_verified_email','p_command']::text[]),
- ('public.read_governed_money_configuration(uuid,uuid,text)','cb48f96fadd0536308c1cdf9784145cd','s',array['p_workspace_id','p_user_id','p_verified_email']::text[]),
+ ('public.read_governed_money_configuration(uuid,uuid,text)','782c1f0df744dc307442b45776907142','s',array['p_workspace_id','p_user_id','p_verified_email']::text[]),
  ('public.read_governed_money_preparation(uuid,uuid,text)','069ebd4ec0274185bf97814ea64f6523','s',array['p_workspace_id','p_user_id','p_verified_email']::text[]),
  ('public.prepare_governed_collection_terms(uuid,text,jsonb)','d76caf2ab026b72931ce6af8570b7d36','v',array['p_user_id','p_verified_email','p_command']::text[]),
  ('public.register_governed_creator_listing(uuid,text,jsonb)','e67a0cb58c80c3622be80e31bfa98940','v',array['p_user_id','p_verified_email','p_command']::text[]),
