@@ -144,7 +144,8 @@ try {
       holder.child.stdin.end(`${mutation}commit;\n`);
       const held = await holder.completed; if (held.code !== 0 || held.signal || held.error || held.timedOut) throw new Error(`${kind}: holder mutation failed`);
       const result = await worker.completed;
-      if (result.code !== 3 || result.signal || result.error || result.timedOut || !/checkout_admission_denied|agency_invoice_denied/.test(result.stderr)) throw new Error(`${kind}: final admission did not refuse actual committed authority loss`);
+      const refusal = kind === "agency payer withdrawal" ? /ERROR:\s+agency_invoice_conflict(?:\r?\n|$)/ : /checkout_admission_denied|agency_invoice_denied/;
+      if (result.code !== 3 || result.signal || result.error || result.timedOut || !refusal.test(result.stderr)) throw new Error(`${kind}: final admission did not refuse actual committed authority loss`);
       // Original accepted-effect port remains usable; no new session was sent.
       const session = `cs_CheckoutWait${randomBytes(6).toString("hex")}`;
       await run(`${label}-accepted-observation`, `select public.record_business_payment_event(${literal(f.account)},${literal(`checkout:${session}`)},${literal(session)},'${f.payment}','checkout_created',0);`);
