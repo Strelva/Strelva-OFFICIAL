@@ -3,7 +3,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { RebuildExperience } from '@/experience/websites/RebuildExperience';
-import { parseRebuildView, serverRebuildTransport } from '@/experience/websites/rebuild-transport';
+import { parseRebuildView } from '@/experience/websites/rebuild-transport';
 import { rebuildHttpFailure } from '@/app/api/websites/rebuild-http';
 import { createWebsiteDocumentStore } from '@/products/websites/document-store';
 import { harness, actor, selection } from './rebuild-recovery-independent-harness';
