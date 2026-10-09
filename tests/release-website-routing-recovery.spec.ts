@@ -23,7 +23,7 @@ async function fixture(page: Page, info: TestInfo, mode: "domain" | "undo", widt
         const command = JSON.parse(writes.find(item => item.path === url.pathname)!.body);
         expect([...url.searchParams]).toEqual([["requestId", command.requestId], ["workspaceId", workspaceId]]);
         reads.push(url.pathname + url.search);
-        return failDomainRead ? route.fulfill({ status: domainReadFailureStatus, json: { error: "Fictional exact domain read unavailable." } }) : route.fulfill({ json: { request: domainReceipt(command.requestId, command.domain.toLowerCase()) } });
+        return failDomainRead ? route.fulfill({ status: domainReadFailureStatus, json: { error: "Fictional exact domain read unavailable." } }) : route.fulfill({ json: { request: domainReceipt(command.requestId, command.domain.toLowerCase(), currentPublished) } });
       }
     }
     if (url.pathname === `${endpoint}/cutover-undo` && method === "POST" && !url.search) {
@@ -68,11 +68,12 @@ async function fixture(page: Page, info: TestInfo, mode: "domain" | "undo", widt
 async function geometry(page: Page, parent: Locator, width: number) {
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   if (width >= 768) return;
-  const boxes = [];
-  for (const control of await parent.locator("button:visible, select:visible, textarea:visible, input:not([type=checkbox]):visible, label:has(input[type=checkbox]):visible").all()) {
-    const box = await control.boundingBox(); expect(box).not.toBeNull();
-    expect(box!.width).toBeGreaterThanOrEqual(44); expect(box!.height).toBeGreaterThanOrEqual(44); boxes.push(box!);
-  }
+  const boxes = await parent.locator("button:visible, select:visible, textarea:visible, input:not([type=checkbox]):visible, label:has(input[type=checkbox]):visible").evaluateAll(controls => controls.map(control => {
+    const box = control.getBoundingClientRect();
+    return { x: box.x, y: box.y, width: box.width, height: box.height };
+  }));
+  expect(boxes.length).toBeGreaterThan(0);
+  for (const box of boxes) { expect(box.width).toBeGreaterThanOrEqual(44); expect(box.height).toBeGreaterThanOrEqual(44); }
   for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
     const a = boxes[i]!, b = boxes[j]!;
     expect(a.x + a.width <= b.x + 0.5 || b.x + b.width <= a.x + 0.5 || a.y + a.height <= b.y + 0.5 || b.y + b.height <= a.y + 0.5).toBe(true);
@@ -178,7 +179,7 @@ test.describe("reverse operator admission", () => {
     f.failDomainRead(true, 403); await check.focus(); await page.keyboard.press("Enter");
     await expect(domain.getByRole("alert")).toContainText("exact saved request"); await expect(check).toBeFocused();
     await expect(page.getByRole("button", { name: "Approve this preview", exact: true })).toBeDisabled(); expect(f.writes).toHaveLength(1);
-    f.failDomainRead(false); await page.keyboard.press("Enter"); await expect(domain.getByRole("status")).toContainText("Domain setup waits for their approval");
+    f.failDomainRead(false); await page.keyboard.press("Enter"); await expect(domain.getByRole("status")).toContainText("This request is no longer current");
     await page.getByRole("button", { name: "Restore fictional operator access", exact: true }).click();
     await expect(domain.getByLabel("Domain to request", { exact: true })).toHaveValue("bakery.example.test");
     await expect(domain.getByRole("button", { name: "Prepare another domain request", exact: true })).toBeDisabled();

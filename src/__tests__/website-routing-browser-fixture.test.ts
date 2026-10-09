@@ -21,6 +21,9 @@ it("domain fixture binds exact request, work, workspace and hostname without a p
   expect([receipt.id, receipt.workId, receipt.workspaceId, receipt.hostname]).toEqual([id, workId, workspaceId, "bakery.example.test"]);
   expect(receipt.receiptEmail?.status).toBe("suppressed");
   expect(receipt.result).toBeNull();
+  const stale = websiteDomainRequestSchema.parse(domainReceipt(id, "bakery.example.test", false));
+  expect(stale.current).toBe(false);
+  expect([stale.id, stale.publishedRevision, stale.publishedHash]).toEqual([receipt.id, receipt.publishedRevision, receipt.publishedHash]);
 });
 it("undo fixture uses exact captured command and candidate identity with the full strict receipt", () => {
   const candidate = routingRecord().rebuild.candidate;
