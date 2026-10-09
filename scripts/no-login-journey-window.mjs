@@ -23,7 +23,7 @@ export function parseNoLoginRuntime(text) {
   const allowed = new Set([...Object.keys(journeyProfile('full-native').env),
     'STRELVA_AUTH_STACK_DIR', 'STRELVA_LOCAL_DB_URL', 'SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL',
     'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'PLAYWRIGHT_BASE_URL', 'NEXT_PUBLIC_APP_URL',
-    'PLAYWRIGHT_DIST_DIR', 'STRELVA_BUILD_CACHE', 'APPROVE_LINK_SECRET', 'CRON_SECRET', 'SECRETS_ENC_KEY',
+    'NEXT_PUBLIC_SITES_PATH_ORIGIN', 'PLAYWRIGHT_DIST_DIR', 'STRELVA_BUILD_CACHE', 'APPROVE_LINK_SECRET', 'CRON_SECRET', 'SECRETS_ENC_KEY',
     'PUBLIC_CONTINUATION_SECRET', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN']);
   const env = {}, overrides = new Set();
   for (const line of text.split('\n').filter(Boolean)) {
@@ -43,7 +43,7 @@ export function assertNoLoginEnvironment(env, owned, runtime) {
   assertCleanupEnvironment(env, owned);
   for (const [key, value] of Object.entries(runtime)) if (env[key] !== value) throw new Error(`No-login window differs from the owned server runtime: ${key}`);
   for (const key of ['STRELVA_AUTH_STACK_DIR', 'APPROVE_LINK_SECRET', 'CRON_SECRET', 'SECRETS_ENC_KEY',
-    'PUBLIC_CONTINUATION_SECRET', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN', 'PLAYWRIGHT_BASE_URL', 'NEXT_PUBLIC_APP_URL']) {
+    'PUBLIC_CONTINUATION_SECRET', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN', 'PLAYWRIGHT_BASE_URL', 'NEXT_PUBLIC_APP_URL', 'NEXT_PUBLIC_SITES_PATH_ORIGIN']) {
     if (!runtime[key]) throw new Error(`No-login window requires the owned server runtime: ${key}`);
   }
   if (env.STRELVA_AUTH_STACK_DIR !== owned.STRELVA_AUTH_STACK_DIR) throw new Error('No-login window requires the qualified owned Auth stack.');
@@ -53,6 +53,14 @@ export function assertNoLoginEnvironment(env, owned, runtime) {
       throw new Error(`No-login window requires an owned loopback origin: ${key}`);
   }
   if (env.NEXT_PUBLIC_APP_URL !== new URL(env.PLAYWRIGHT_BASE_URL).origin) throw new Error('No-login signed links must use the owned app origin.');
+  // The primary native runner uses the separate owned sites host on this app's
+  // exact port. Accepting its assignment never permits an external sites host.
+  const sites = new URL(env.NEXT_PUBLIC_SITES_PATH_ORIGIN);
+  const appPort = new URL(env.PLAYWRIGHT_BASE_URL).port;
+  if (env.NEXT_PUBLIC_SITES_PATH_ORIGIN !== `http://sites.localhost:${appPort}`
+    || sites.protocol !== 'http:' || sites.hostname !== 'sites.localhost' || sites.port !== appPort
+    || sites.username || sites.password || sites.pathname !== '/' || sites.search || sites.hash)
+    throw new Error('No-login window requires the exact owned separate sites origin.');
   for (const [key, value] of Object.entries(env)) if (value && (/SMTP/i.test(key) || /^(EMAIL_PROVIDER_API_KEY|SENDGRID_API_KEY|MAILGUN_API_KEY|POSTMARK_SERVER_TOKEN|BREVO_API_KEY)$/.test(key)))
     throw new Error('Mail transport configuration is forbidden in the no-login window.');
   return true;

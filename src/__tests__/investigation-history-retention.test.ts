@@ -6,6 +6,44 @@ import type { InvestigationHistory, InvestigationRun } from "@/products/investig
 import { memoryBoundedStore, owner } from "./fixtures/bounded-store";
 
 describe("standing-check durable history", () => {
+ it.each(["2026-10-09T18:04:22.654321+00:00", "2026-10-09T14:04:22.654321-04:00", "2026-10-09T18:04:22.654321Z"])("reads retained investigation history after native exit timestamp %s", async nativeExitAt => {
+  const store = memoryBoundedStore();
+  const sources = [];
+  for (let i = 0; i < 2; i++) {
+   const document = await store.create(owner, "workspace-a", { productId: "documents", resourceKind: "document", title: "Retained source",
+    payload: createDocument({ title: "Retained source", text: "Same source" }, owner.userId) });
+   sources.push({ workId: document.id });
+  }
+  const rows: Array<{ revision: number; run: InvestigationRun }> = [];
+  const history: InvestigationHistory = {
+   async find() { return null; },
+   async page() { return structuredClone(rows); },
+  };
+  const service = createInvestigationService(store, { history });
+  const work = await service.create(owner, "workspace-a", { title: "Retained comparison", intervalMinutes: 60, sources });
+  const checked = await service.run(owner, work.id, { expectedRevision: 0, requestId: "before-exit" }, new Date(Date.now() + 60 * 60_000));
+  const run = checked.payload.runs[0];
+  if (!run) throw new Error("Expected committed pre-exit evidence");
+  rows.push({ revision: checked.payload.revision, run });
+  // Controlled representation of complete_workspace_exit's persisted payload:
+  // it pauses, increments the revision and appends raw PostgreSQL timestamptz.
+  const exited = { ...checked.payload, status: "paused", revision: checked.payload.revision + 1,
+   history: [...checked.payload.history, { revision: checked.payload.revision + 1, kind: "pause", actorId: owner.userId, at: nativeExitAt }] };
+  const read = store.read.bind(store);
+  store.read = async (...args) => {
+   const row = await read(...args);
+   return row?.id === checked.id ? { ...row, payload: structuredClone(exited) } : row;
+  };
+  const reopened = await service.read(owner, checked.id);
+  expect(reopened.payload.history.at(-1)?.at).toBe(nativeExitAt);
+  expect(reopened.payload.runs).toEqual(checked.payload.runs);
+  expect((await service.history(owner, checked.id)).runs).toEqual(rows);
+  await expect(service.run(owner, checked.id, { expectedRevision: exited.revision, requestId: "after-exit" })).rejects.toThrow("This investigation is paused.");
+  await expect(service.history({ userId: "stranger", verifiedEmail: "stranger@example.test" }, checked.id)).rejects.toThrow();
+  for (const invalid of ["not-an-instant", "2026-10-09T18:04:22", "2026-10-09T18:04:22+00:0"]) {
+   expect(investigationSchema.safeParse({ ...exited, history: [{ ...exited.history.at(-1)!, at: invalid }] }).success).toBe(false);
+  }
+ });
  it("normalizes native PostgreSQL source timestamps before committing evidence",async()=>{
   const store=memoryBoundedStore();
   const sources=[];

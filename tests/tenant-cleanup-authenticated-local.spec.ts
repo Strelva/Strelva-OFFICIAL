@@ -29,7 +29,8 @@ for (const width of [1440, 390]) {
       await page.goto(`/admin/clients/${tenantId}`);
       const remove = page.getByRole("button", { name: "Permanently delete this tenant", exact: true });
       await expect(remove).toBeVisible(); await expect(remove).toBeDisabled();
-      const typed = page.getByPlaceholder(tenantId, { exact: true });
+      const typed = remove.locator("xpath=..").getByRole("textbox");
+      await expect(typed).toHaveAttribute("placeholder", tenantId);
       await typed.fill(`${tenantId}-wrong`); await expect(remove).toBeDisabled();
       await typed.fill(tenantId); await expect(remove).toBeEnabled();
       const pendingResponse = page.waitForResponse(response => new URL(response.url()).pathname === endpoint && response.request().method() === "POST");

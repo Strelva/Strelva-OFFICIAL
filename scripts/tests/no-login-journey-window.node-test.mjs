@@ -15,7 +15,7 @@ function report(profile) {
 }
 const owned = { STRELVA_AUTH_STACK_DIR: '/private/tmp/strelva-auth.test', STRELVA_LOCAL_DB_URL: 'postgresql://postgres:fixture@127.0.0.1:5433/postgres',
   SUPABASE_URL: 'http://127.0.0.1:5432', NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:5432', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'local-anon', SUPABASE_SERVICE_ROLE_KEY: 'local-service' };
-const environment = () => ({ ...journeyProfile('full-native').env, ...owned, PLAYWRIGHT_BASE_URL: 'http://localhost:3100', NEXT_PUBLIC_APP_URL: 'http://localhost:3100',
+const environment = () => ({ ...journeyProfile('full-native').env, ...owned, PLAYWRIGHT_BASE_URL: 'http://localhost:3100', NEXT_PUBLIC_APP_URL: 'http://localhost:3100', NEXT_PUBLIC_SITES_PATH_ORIGIN: 'http://sites.localhost:3100',
   APPROVE_LINK_SECRET: 'local-signer-secret', CRON_SECRET: 'local-cron-secret', SECRETS_ENC_KEY: 'local-encryption-key', PUBLIC_CONTINUATION_SECRET: 'local-continuation-secret',
   UPSTASH_REDIS_REST_URL: 'http://127.0.0.1:3101', UPSTASH_REDIS_REST_TOKEN: 'local-redis-token' });
 
@@ -59,7 +59,7 @@ test('requires exact owned server flags, mail hold, signer and loopback services
     { UPSTASH_REDIS_REST_URL: 'https://remote.upstash.io' }, { UPSTASH_REDIS_REST_TOKEN: 'other-redis' },
     { RESEND_API_KEY: 'fixture' }, { SMTP_HOST: 'live-mail.example' }, { SENDGRID_API_KEY: 'fixture' },
     { VERCEL_API_TOKEN: 'fixture' }, { STRIPE_SECRET_KEY: 'fixture' }]) assert.throws(() => assertNoLoginEnvironment({ ...environment(), ...change }, owned, runtime));
-  for (const key of ['APPROVE_LINK_SECRET', 'CRON_SECRET', 'UPSTASH_REDIS_REST_TOKEN']) {
+  for (const key of ['APPROVE_LINK_SECRET', 'CRON_SECRET', 'UPSTASH_REDIS_REST_TOKEN', 'NEXT_PUBLIC_SITES_PATH_ORIGIN']) {
     const absent = environment(); delete absent[key]; assert.throws(() => assertNoLoginEnvironment(absent, owned, absent));
   }
   for (const origin of ['http://localhost', 'http://user:password@localhost:3100', 'http://localhost:3100?redirect=remote']) {
@@ -73,6 +73,25 @@ test('parses generated runtime safely and only permits one generated app-origin 
   for (const value of ["export EMAIL_SENDING_ENABLED='false'\nexport EMAIL_SENDING_ENABLED='true'", "export UNLISTED_PROVIDER_SECRET='fixture'", 'source external.env',
     "export PLAYWRIGHT_BASE_URL='http://localhost:3100'\nexport PLAYWRIGHT_BASE_URL='http://localhost:3199'\nexport PLAYWRIGHT_BASE_URL='http://localhost:3200'",
     'export CRON_SECRET=$(curl https://remote.example)', 'export CRON_SECRET="fixture"']) assert.throws(() => parseNoLoginRuntime(value));
+});
+test('primary runner owned separate sites origin survives parsing and finite child composition', () => {
+  const runtime = environment();
+  assert.equal(parseNoLoginRuntime(shellEnvironment(runtime)).NEXT_PUBLIC_SITES_PATH_ORIGIN, 'http://sites.localhost:3100');
+  assert.equal(noLoginChildEnvironment({}, runtime).NEXT_PUBLIC_SITES_PATH_ORIGIN, runtime.NEXT_PUBLIC_SITES_PATH_ORIGIN);
+  assert.equal(assertNoLoginEnvironment(runtime, owned, runtime), true);
+  const runner = readFileSync(resolve(root, 'scripts/check-full-model-journeys.sh'), 'utf8');
+  assert.ok(runner.includes("export NEXT_PUBLIC_SITES_PATH_ORIGIN='http://sites.localhost:%s'"));
+  assert.throws(() => parseNoLoginRuntime("export NEXT_PUBLIC_SITES_PATH_ORIGIN='http://sites.localhost:3100'\nexport NEXT_PUBLIC_SITES_PATH_ORIGIN='http://sites.localhost:3199'"));
+});
+test('separate sites origin refuses external, different-port, credential, path and redirect values', () => {
+  for (const origin of ['https://sites.localhost:3100', 'http://sites.localhost:3199', 'http://localhost:3100',
+    'http://customer.example:3100', 'http://user:password@sites.localhost:3100', 'http://sites.localhost:3100/path',
+    'http://sites.localhost:3100?redirect=remote', 'http://sites.localhost:3100#remote', 'http://sites.localhost:3100/']) {
+    const runtime = { ...environment(), NEXT_PUBLIC_SITES_PATH_ORIGIN: origin };
+    assert.throws(() => assertNoLoginEnvironment(runtime, owned, runtime));
+  }
+  const runtime = environment();
+  assert.throws(() => assertNoLoginEnvironment({ ...runtime, NEXT_PUBLIC_SITES_PATH_ORIGIN: 'http://sites.localhost:3199' }, owned, runtime));
 });
 test('requires disabled local SMTP and refuses an Auth SMTP transport', () => {
   assert.equal(assertNoLoginAuthConfiguration('[local_smtp]\nenabled = false\n[auth]\nenabled = true\n'), true);

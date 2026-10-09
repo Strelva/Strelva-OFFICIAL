@@ -20,6 +20,23 @@ test("owner records a local exit choice through the real Auth route and can stil
 
     const page = await owner.context.newPage();
     await page.setViewportSize({ width: 1280, height: 900 });
+    // A membership does not select the trusted business email recipient.
+    // Prove the missing-recipient export refusal, then let this real owner
+    // choose the address through the existing revision-bound details form.
+    if (process.env.STRELVA_EXPORT_SCHEMA_3 === "1") {
+      const missingRecipient = await owner.context.request.post("/api/workspace-export/v3", {
+        headers: { origin: env.app }, data: { workspaceId },
+      });
+      expect(missingRecipient.status(), await missingRecipient.text()).toBe(400);
+    }
+    await page.goto(`/workspace/business-details?workspaceId=${workspaceId}`);
+    await expect(page.getByRole("heading", { name: "Business details", exact: true })).toBeVisible();
+    await page.getByRole("textbox", { name: "Send Strelva's emails to", exact: true }).fill(owner.email);
+    await page.getByRole("button", { name: "Save details", exact: true }).click();
+    await expect(page.getByText("Saved to your business record. To change what your site or Google listing shows, ask Strelva from Home.", { exact: true })).toBeVisible();
+    const recipient = await admin.rpc("resolve_business_owner_recipient", { p_workspace_id: workspaceId });
+    expect(recipient.error).toBeNull();
+    expect(recipient.data).toMatchObject({ email: owner.email, trusted: true });
     let failuresRemaining = 2;
     await page.route(/\/api\/workspace-exit(?:\?.*)?$/, async (route) => {
       if (failuresRemaining > 0) {
