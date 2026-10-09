@@ -1713,6 +1713,8 @@ psql "${psql_args[@]}" --file="$repo_root/tests/native-business-billing-conversi
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021096000_agency_release_flag_lock_order.sql"
 source "$repo_root/scripts/sql/full-model-current-tail.sh"
 check_full_model_current_tail
+source "$repo_root/tests/support/runtime-data-tenant-generation-races.sh"
+check_tenant_connection_generation_lifecycle
 # Saved-main guarded teardown composes final export/retention owners.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022090000_guarded_tenant_teardown.sql"
 # Full legacy teardown behavior is proved by check-guarded-teardown-fresh.sh.
