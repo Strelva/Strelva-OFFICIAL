@@ -205,7 +205,11 @@ describe("WebsiteExperience", () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const body = typeof init?.body === "string" ? JSON.parse(init.body) as Record<string, unknown> : undefined;
       requests.push({ url: String(input), body });
-      return new Response(JSON.stringify(record()), { status: 200, headers: { "Content-Type": "application/json" } });
+      const acknowledged = body?.action === "revise" ? record({ revision: 5, candidate: artifact(5) })
+        : body?.action === "approve" ? record({ revision: 5, status: "approved", approvedCandidateRevision: 4 })
+        : body?.action === "prepareLaunch" ? await transport().prepareLaunch({ workspaceId, workId, expectedRevision: 5, candidateRevision: 4, candidateContentHash: "a".repeat(64) })
+        : record();
+      return new Response(JSON.stringify(acknowledged), { status: 200, headers: { "Content-Type": "application/json" } });
     });
     const signal = new AbortController().signal;
     await serverWebsiteTransport.read({ workspaceId, workId }, signal);

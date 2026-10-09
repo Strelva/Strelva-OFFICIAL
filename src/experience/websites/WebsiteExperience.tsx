@@ -7,6 +7,9 @@ import { TextArea, TextInput } from "@/components/ui/TextInput";
 import type { Website, WebsiteBrief, WebsiteRecord } from "@/products/websites/contracts";
 import {
   createWebsiteRequestId,
+  currentWebsiteRecord,
+  websiteMutationAcknowledgement,
+  WebsiteExperienceError,
   serverWebsiteTransport,
   type WebsiteExperienceTransport,
 } from "./contracts";
@@ -225,6 +228,7 @@ function WebsiteSession({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const requestId = useRef(createWebsiteRequestId()).current;
+  const creationAttempt = useRef<Parameters<WebsiteExperienceTransport["create"]>[0] | null>(null);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -240,6 +244,7 @@ function WebsiteSession({
     setLoading(true);
     transport.read({ workspaceId, workId }, controller.signal).then((next) => {
       if (controller.signal.aborted) return;
+      currentWebsiteRecord(next, workspaceId, workId);
       setRecord(next);
       setFields(fieldsFromBrief(next.website.brief));
       setLoadFailed(false);
@@ -257,69 +262,68 @@ function WebsiteSession({
   const dirty = Boolean(record && savedFields && (Object.keys(EMPTY_BRIEF) as Array<keyof BriefFields>).some((key) => fields[key] !== savedFields[key]));
   const canSubmitBrief = Boolean(brief.businessName && brief.description);
 
-  async function run(label: string, operation: () => Promise<WebsiteRecord>, success: (next: WebsiteRecord) => string) {
-    if (inFlight.current || unresolved.current || busy || readOnly) return;
+  async function run(label: string, operation: () => Promise<WebsiteRecord>, success: (next: WebsiteRecord) => string, acknowledge: (next: WebsiteRecord) => WebsiteRecord, checkCreation = false) {
+    if (inFlight.current || (unresolved.current && !checkCreation) || busy || readOnly) return;
+    const wasUnknown = unresolved.current;
+    const started = permission.current.revision;
     inFlight.current = true;
-    setBusy(true);
-    setError("");
-    setNotice("");
+    reloadFocus.current?.cancel(); reloadFocus.current = beginFocusRecovery(recoveryRootRef.current);
+    setBusy(true); setError(""); setNotice("");
     try {
-      const next = await operation();
+      const next = acknowledge(await operation());
       if (!mountedRef.current) return;
-      setRecord(next);
-      setFields(fieldsFromBrief(next.website.brief));
-      setNotice(success(next));
+      if (permission.current.revision !== started) throw new Error("Your access changed while the website result was being checked.");
+      unresolved.current = false; setNeedsReload(false); creationAttempt.current = null;
+      setRecord(next); setFields(fieldsFromBrief(next.website.brief)); setNotice(success(next));
       onSaved?.(next.workId);
     } catch (cause) {
       if (!mountedRef.current) return;
-      setError(cause instanceof Error ? cause.message : `${label} could not be completed.`);
+      const reason = cause instanceof Error ? cause.message : `${label} could not be confirmed.`;
+      // Only the route's initial unauthenticated refusal proves no action ran.
+      // A later denial cannot settle a previously unknown creation attempt.
+      if (!wasUnknown && cause instanceof WebsiteExperienceError && cause.status === 401 && permission.current.revision === started) {
+        creationAttempt.current = null; setError(reason);
+      } else {
+        unresolved.current = true; setNeedsReload(true);
+        setError(`${reason} Check the current saved website before continuing.`);
+      }
     } finally {
       inFlight.current = false;
       if (mountedRef.current) setBusy(false);
     }
   }
 
+  async function createPreview(check = false) {
+    const input = check ? creationAttempt.current : { workspaceId, requestId, brief: structuredClone(brief) };
+    if (!input) return;
+    if (!check && (inFlight.current || unresolved.current || readOnly)) return;
+    creationAttempt.current = input;
+    await run("Preview generation", () => transport.create(input), next => `Private website preview generated as version ${next.website.candidate?.revision ?? next.website.revision}.`, next => websiteMutationAcknowledgement(next, "create", input), check);
+  }
+
   async function createOrRevise() {
     if (!canSubmitBrief) return;
     if (record) {
-      await run("Preview generation", () => transport.revise({
-        workspaceId,
-        workId: record.workId,
-        expectedRevision: record.website.revision,
-        brief,
-      }), next => `Private website preview generated as version ${next.website.candidate?.revision ?? next.website.revision}. Review it before approving.`);
+      const input = { workspaceId, workId: record.workId, expectedRevision: record.website.revision, brief: structuredClone(brief) };
+      await run("Preview generation", () => transport.revise(input), next => `Private website preview generated as version ${next.website.candidate?.revision ?? next.website.revision}. Review it before approving.`, next => websiteMutationAcknowledgement(next, "revise", input));
       return;
     }
-    await run("Preview generation", () => transport.create({ workspaceId, requestId, brief }), next => `Private website preview generated as version ${next.website.candidate?.revision ?? next.website.revision}.`);
+    await createPreview();
   }
 
   async function approve() {
     if (!record?.website.candidate) return;
     const candidate = record.website.candidate;
-    await run("Approval", () => transport.approve({
-      workspaceId,
-      workId: record.workId,
-      expectedRevision: record.website.revision,
-      candidateRevision: candidate.revision,
-      candidateContentHash: candidate.contentHash,
-    }), next => `Preview version ${next.website.approvedCandidateRevision ?? candidate.revision} is approved. Prepare launch when you are ready.`);
+    const input = { workspaceId, workId: record.workId, expectedRevision: record.website.revision, candidateRevision: candidate.revision, candidateContentHash: candidate.contentHash };
+    await run("Approval", () => transport.approve(input), next => `Preview version ${next.website.approvedCandidateRevision ?? candidate.revision} is approved. Prepare launch when you are ready.`, next => websiteMutationAcknowledgement(next, "approve", input));
   }
 
   async function prepareLaunch() {
     if (!record?.website.candidate || record.website.approvedCandidateRevision == null) return;
     const candidate = record.website.candidate;
     if (candidate.revision !== record.website.approvedCandidateRevision) return;
-    await run("Launch preparation", () => transport.prepareLaunch({
-      workspaceId,
-      workId: record.workId,
-      expectedRevision: record.website.revision,
-      candidateRevision: candidate.revision,
-      candidateContentHash: candidate.contentHash,
-    }), next => isLocalExportReady(next.website)
-      ? "Your approved website files are ready to download."
-      : next.website.status === "published"
-      ? "The approved website is published."
-      : "Launch preparation is pending. Check the saved status before trying again.");
+    const input = { workspaceId, workId: record.workId, expectedRevision: record.website.revision, candidateRevision: candidate.revision, candidateContentHash: candidate.contentHash };
+    await run("Launch preparation", () => transport.prepareLaunch(input), next => isLocalExportReady(next.website) ? "Your approved website files are ready to download." : next.website.status === "published" ? "The approved website is published." : "Launch preparation is pending. Check the saved status before trying again.", next => websiteMutationAcknowledgement(next, "prepareLaunch", input));
   }
 
   async function reload() {
@@ -334,9 +338,11 @@ function WebsiteSession({
       const next = await transport.read(work, new AbortController().signal);
       if (!mountedRef.current || permission.current.revision !== started) return;
       if (next.workspaceId !== work.workspaceId || next.workId !== work.workId) throw new Error("The current saved website could not be confirmed.");
+      currentWebsiteRecord(next, work.workspaceId, work.workId);
+      const retainDraft = unresolved.current;
       unresolved.current = false; setNeedsReload(false); setConnectionReadRevision(value => value + 1); setError("");
       setRecord(next);
-      setFields(fieldsFromBrief(next.website.brief));
+      if (!retainDraft) setFields(fieldsFromBrief(next.website.brief));
       setNotice("Saved status refreshed.");
     } catch {
       if (!mountedRef.current || permission.current.revision !== started) return;
@@ -367,7 +373,7 @@ function WebsiteSession({
       </header>
 
       {readOnly ? <div className={styles.status}><ShieldCheck size={16} aria-hidden="true" /><span>You can review this website, but this access level cannot change it.</span></div> : null}
-      {error ? <div className={styles.alert} role="alert">{error}<p className="mt-2 text-xs">{needsReload ? "Your entered details remain available. Check the current saved website before continuing." : "Your entered details and saved work remain available."}</p>{needsReload && record ? <Button ref={reloadRef} type="button" variant="secondary" loading={busy} disabled={busy} onClick={() => void reload()}>Reload current state</Button> : null}</div> : null}
+      {error ? <div className={styles.alert} role="alert">{error}<p className="mt-2 text-xs">{needsReload ? "Your entered details remain available. Check the current saved website before continuing." : "Your entered details and saved work remain available."}</p>{needsReload && record ? <Button ref={reloadRef} type="button" variant="secondary" loading={busy} disabled={busy} onClick={() => void reload()}>Reload current state</Button> : needsReload && creationAttempt.current ? <Button ref={reloadRef} type="button" variant="secondary" loading={busy} disabled={busy || readOnly} onClick={() => void createPreview(true)}>Check this website request</Button> : null}</div> : null}
       {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
 
       {workId && loadFailed && !record ? (
@@ -376,7 +382,7 @@ function WebsiteSession({
           <div className={styles.actions}><Button type="button" variant="secondary" onClick={() => { setError(""); setLoadFailed(false); setLoading(true); setLoadAttempt((attempt) => attempt + 1); }} icon={<RefreshCw size={16} />}>Try loading again</Button></div>
         </div>
       ) : !record ? (
-        <BriefForm fields={fields} setFields={setFields} onSubmit={() => void createOrRevise()} busy={busy} readOnly={readOnly} submitLabel="Generate a private preview" canSubmit={canSubmitBrief} />
+        <BriefForm fields={fields} setFields={setFields} onSubmit={() => void createOrRevise()} busy={busy || needsReload} readOnly={readOnly} submitLabel="Generate a private preview" canSubmit={canSubmitBrief} />
       ) : (
         <>
           <div className={styles.status} data-tone={website?.status === "failed" ? "attention" : undefined}>

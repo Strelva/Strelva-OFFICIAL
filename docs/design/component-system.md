@@ -1361,3 +1361,9 @@ and different selections remain unconfirmed. A managed pending/unknown editor
 retains its inputs while publication permission changes, staying hidden and
 read-only without that permission. Late producer uncertainty can notify only its
 still-mounted exact owning view; old-work/unmounted callbacks are ignored.
+
+### Legacy website revision and creation recovery
+
+`WebsiteExperience` retains exact workspace/work state and synchronously admits one general mutation or recovery read. Revision, approval and launch acknowledgements must match the captured target, submitted brief or candidate hash/revision, and the actual action progression; work revision can advance independently of candidate revision. Lost, malformed, stale, foreign or inconsistent results freeze approval/launch truth and write controls. **Reload current state** performs only the existing exact saved-work GET; failed reads retain the edited brief, and delayed permission-generation reads cannot unlock the review. Focus recovery respects deliberate movement outside the initiating flow. An initial route401 precedes action invocation; other general mutation failures remain conservative, including status codes that may arise after persistence. A later denial cannot settle an already unknown attempt.
+
+Initial legacy creation has no saved workId for a GET. It freezes the captured brief/requestId and offers explicit **Check this website request**, using only the existing exact idempotent creation contract. The service checks current write authority and finds the original request before generation; the check never automatically retries or uses edited fields under the captured key. Successful readback restores the current preview; no provider delivery or publication claim follows from these local tests. Forms recovery remains owned by the separate selector contract.
