@@ -45,3 +45,32 @@ nullable and unrelated issue exclusion, every force/export/receipt flag
 combination, the native refusal, unchanged live System/tenant/issue rows and absence of a
 cleanup receipt. Run only in the coordinator's owned native window; source/mock
 checks do not prove that this fixture or migration has executed.
+
+## Unsupported migration baseline and exact inverse
+
+This isolated, still-unapplied successor supports the canonical341 function
+baseline only. Before any rename or object creation it requires the migrator to
+own both predecessor functions, pins their body and function properties, and
+allows only owner-issued ordinary execute privileges: owner plus service role
+on the blocker reader, owner alone on the internal cleanup helper. Custom,
+delegated, grant-option, owner or body drift refuses the whole migration.
+Custom global/public default grants on functions or the new journal table also
+refuse before creation; existing grants are not silently removed.
+
+A closed RLS journal captures the actual predecessor definitions and ACLs and
+all three successor definitions, owners and normalized ACLs. The forward
+asserts the final closed authority before capturing it. The inverse checks the
+whole packet and journal authority before its first mutation. It restores the
+captured reader/helper and verifies exact definitions and normalized ACLs;
+successor drift refuses rather than being overwritten. No role is removed and
+no grants outside the two owned functions are altered.
+
+Generate the prepared native matrix with
+`node scripts/tenant-newsletter-baseline-proof.mjs` into the coordinator's owned
+local evidence directory, then run that SQL against the owned native341 session.
+The generator starts no server and calls no database. Its transactional cases
+cover direct/delegated/grant-option/default grants, nonowner and predecessor
+body/property refusal; successor body/ACL drift on all three functions; and an
+exact forward/inverse catalog round trip. It refuses pre-existing fixture-role
+names, creates only fictional transactional roles, and rolls back each case and
+the whole script. Source syntax/lint checks do not prove native matrix results.
