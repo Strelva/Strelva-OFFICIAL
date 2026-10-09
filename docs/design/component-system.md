@@ -79,6 +79,21 @@ field components. Focused local jsdom tests cover acknowledgment uncertainty,
 overlap, stale authority and admin preparation; rendered and actual Auth proof
 remain separate release checks.
 
+### Ordinary website fact revision, October 9, local
+
+`RebuildExperience` also exposes supported facts, including facts already
+confirmed by the owner, in the collapsed **Edit website facts** section. Flagged
+and sensitive decisions remain in their existing review panel. Each fact uses
+the owned Button and TextArea with the existing exact candidate edit endpoint;
+the server rechecks current management authority. Saving changes the private
+document and clears its approval, with the changed rendered hash required before
+reapproval. Read-only, loading, rebuilding and pending states disable edits.
+Errors retain the correction and return focus to its field; save and cancel
+return focus to the mounted Edit fact control. Managed context does not grant
+editing or publication authority. Focused component proof belongs to
+`website-fact-revision.test.tsx`; actual Auth and desktop/mobile native proof are
+separate release checks.
+
 ### Website owner consent for agency publication, October 7, local
 
 `RebuildExperience` uses the owned Button and a labelled native checkbox for
