@@ -74,11 +74,25 @@ test('new money Auth specs are required at their exact paths and case counts', (
   const profile = journeyProfile('full-native');
   assert.equal(profile.specs.find(item => basename(item.file) === 'assistant-connections-authenticated-local.spec.ts')?.count, 2);
   assert.equal(profile.specs.find(item => basename(item.file) === 'billing-payments-prerequisites-authenticated-local.spec.ts')?.count, 1);
-  assert.equal(profile.env.STRELVA_CONNECT, '0');
+  assert.equal(profile.env.STRELVA_CONNECT, '1');
   assert.equal(profile.env.STRELVA_SANDBOX_RUNTIME_APPROVED, '0');
   assert.equal(profile.env.STRELVA_MCP_OAUTH, '1');
   assert.ok(profile.env.STRELVA_CLIENT_RECORDS_READ.split(',').includes('orders'));
   assert.ok(!profile.env.STRELVA_CLIENT_RECORDS_READ.split(',').includes('postgres'));
+});
+test('native merchant prerequisite reads retain a clean, unapproved provider boundary', () => {
+  const native = journeyProfile('full-native');
+  assert.equal(native.env.STRELVA_CONNECT, '1');
+  for (const profile of [journeyProfile('full-dark'), journeyProfile('full-dark', true), journeyProfile('full-provider')])
+    assert.equal(profile.env.STRELVA_CONNECT, '0');
+  assert.equal(native.specs.reduce((sum, spec) => sum + spec.count, 0), 34);
+  assert.equal(native.providerActions, 'held');
+  for (const key of ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_CONNECT_WEBHOOK_SECRET',
+    'STRIPE_CONNECT_THIN_WEBHOOK_SECRET', 'STRELVA_CONNECT_PROFILE_VERSION',
+    'STRELVA_CONNECT_FEES_COLLECTOR', 'STRELVA_CONNECT_LOSSES_COLLECTOR'])
+    assert.ok(!Object.hasOwn(native.env, key), key);
+  for (const suffix of ['AGENT_PAYMENTS', 'REVENUE_SPLITS', 'PLATFORM_COLLECTION', 'SPLIT_PAYOUT_EXECUTION',
+    'AGENT_PAYMENT_SELLER_TERMS_APPROVED']) assert.equal(native.env[`STRELVA_${suffix}`], '0', suffix);
 });
 test('owned stack parser rejects inherited provider credentials, hosted URLs and executable env syntax', () => {
   const root = mkdtempSync(join(tmpdir(), 'strelva-manifest-test-'));
