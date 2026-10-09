@@ -52,7 +52,8 @@ for (const ending of ["owner disconnect", "owner authority withdrawal"] as const
       const manage = page.getByRole("link", { name: "Manage assistant connections", exact: true });
       await expect(manage).toHaveAttribute("href", `/connect?workspaceId=${workspaceId}`);
       await manage.click();
-      await expect(page).toHaveURL(new RegExp(`/connect\\?workspaceId=${workspaceId}$`));
+      // The first real navigation compiles this route in the native dev server.
+      await expect(page).toHaveURL(new RegExp(`/connect\\?workspaceId=${workspaceId}$`), { timeout: 30_000 });
       const panel = page.locator("section", { has: page.getByRole("heading", { name: "Connected assistants", exact: true }) });
       await expect(panel.getByRole("heading", { name: fixture.clientName, exact: true })).toBeVisible();
       await expect(panel).toContainText("Connected");
