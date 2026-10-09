@@ -35,6 +35,7 @@ export interface ClientRecordCopy {
 }
 
 export interface ClientRecordsPort {
+  mutateProviderConnection(tenant:string,provider:string,expected:Record<string,unknown>,payload:Record<string,unknown>,capturedAt:string):Promise<string>;
   clientRecordReadSource(store: ClientRecordStoreName): Promise<"redis" | "postgres">;
   writeClientRecord(store: ClientRecordStoreName, tenant: string, record: ClientRecordCopy | { recordId: string; remove: true; capturedAt?: string }, via: "dual_write", mode?: "replace" | "keep_first"): Promise<{ status: string; reason?: string }>;
   /** Dual-write one record after the Redis write. Never throws. */

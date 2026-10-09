@@ -110,6 +110,16 @@ async function call(name: string, args: Record<string, unknown>, db: ClientRecor
   }
 }
 
+/** Compare the complete encrypted generation under the record's write lock. */
+export async function mutateProviderConnection(tenant:string,provider:string,expected:Record<string,unknown>,payload:Record<string,unknown>,capturedAt:string,db:ClientRecordDb|null=clientRecordDb()):Promise<string> {
+  if(!db) throw new Error("Connection mutation authority is unavailable.");
+  const {data,error}=await call("mutate_tenant_provider_connection",{p_tenant_id:tenant,p_provider:provider,p_expected_payload:expected,p_payload:payload,p_payload_hash:clientRecordHash(payload),p_captured_at:capturedAt},db);
+  if(error) throw new Error("Connection mutation authority could not be confirmed.");
+  const status=(data as {status?:string}|null)?.status;
+  if(!status || !["updated","unchanged","kept"].includes(status))throw new Error("Connection mutation authority could not be confirmed.");
+  return status;
+}
+
 /** One write to Postgres. Never throws; `failed` is returned instead. */
 export async function writeClientRecord(
   store: ClientRecordStore,

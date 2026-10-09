@@ -11,6 +11,12 @@ const tombstones = new Map<string,string>();
 const db: ClientRecordDb = { rpc(name,args) {
  if (name === fail) return Promise.resolve({ data:null,error:{message:"offline"} });
  if (name === "client_record_parity_streak") return Promise.resolve({data:{days:7},error:null});
+ if (name === "mutate_tenant_provider_connection") {
+  const key=`provider_connections|${args.p_provider}`;
+  if(JSON.stringify(rows.get(key)?.payload)!==JSON.stringify(args.p_expected_payload))return Promise.resolve({data:{status:"kept"},error:null});
+  rows.set(key,{recordId:String(args.p_provider),payload:args.p_payload as Record<string,unknown>,capturedAt:String(args.p_captured_at)});
+  return Promise.resolve({data:{status:"updated"},error:null});
+ }
  const key = `${args.p_store}|${args.p_record_id}`;
  if (name === "record_tenant_client_record") {
   if (args.p_mode === "remove") { tombstones.set(key,String(args.p_captured_at)); rows.delete(key); return Promise.resolve({data:{status:"removed"},error:null}); }
@@ -54,6 +60,22 @@ describe("qualified durable client-record authority",()=>{
    await expect(saveConnectionMutation(retained,{accessToken:"stale-refreshed"},startedAt)).rejects.toThrow(/superseded|revoked/);
    expect((await getConnection("acme","google"))?.accessToken).toBe("new");
   } finally { vi.useRealTimers(); }
+ });
+ it("rejects stale refresh sharing the reconnect timestamp after a clock-skewed revoke",async()=>{
+  vi.useFakeTimers();
+  try {
+   vi.setSystemTime(new Date("2026-10-07T23:59:59.999Z"));
+   await saveConnection({tenantId:"acme",provider:"google",accessToken:"old",status:"connected"});
+   vi.setSystemTime(new Date("2026-10-08T00:00:00Z"));
+   const retained=(await getConnection("acme","google"))!;
+   vi.setSystemTime(new Date("2026-10-07T23:59:59.999Z"));
+   await deleteConnection("acme","google");
+   vi.setSystemTime(new Date("2026-10-08T00:00:00Z"));
+   await saveConnection({tenantId:"acme",provider:"google",accessToken:"new",status:"connected"});
+   for(const captured of ["2026-10-08T00:00:00Z","2036-10-08T00:00:00Z"])
+    await expect(saveConnectionMutation(retained,{accessToken:"stale"},captured)).rejects.toThrow(/superseded|revoked/);
+   expect((await getConnection("acme","google"))?.accessToken).toBe("new");
+  } finally {vi.useRealTimers();}
  });
  it("captures concurrent/restarted order beacons once without Redis",async()=>{
   const input={externalId:"provider-order",amountCents:2500,currency:"USD",items:[],verification:"site-signature" as const};

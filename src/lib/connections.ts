@@ -1,4 +1,4 @@
-import { mirrorRecord, removeRecord, readRecord, readRecords, durableRecordAuthority, writeDurableRecord, removeDurableRecord } from "./client-records";
+import { mutateDurableConnection, mirrorRecord, removeRecord, readRecord, readRecords, durableRecordAuthority, writeDurableRecord, removeDurableRecord } from "./client-records";
 import { getRedis } from "@/platform/infra/redis";
 import { decryptSecret, encryptSecret } from "@/platform/infra/crypto/secrets";
 import type { IntegrationProvider, Connection } from "./types";
@@ -108,12 +108,13 @@ export async function saveConnectionMutation(expected: Connection, patch: Partia
   const next = { ...expected, ...patch };
   const encoded = encodeConnection(next);
   const durable = await durableRecordAuthority("provider_connections");
+  const raw = storedConnections.get(expected);
+  if (!raw) throw new Error("Connection mutation authority is unavailable.");
   if (durable) {
-    const status = await writeDurableRecord("provider_connections", next.tenantId, next.provider, encoded, capturedAt);
+    const status = await mutateDurableConnection(next.tenantId,next.provider,raw,encoded,capturedAt);
     if (status === "kept") throw new Error("Connection mutation was superseded or revoked.");
   }
   const redis = getRedis();
-  const raw = storedConnections.get(expected);
   if (!durable && (!redis || !raw)) throw new Error("Connection mutation authority is unavailable.");
   if (redis && raw) {
     // Compare the exact stored generation, including encrypted tokens. A

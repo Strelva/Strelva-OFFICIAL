@@ -19,6 +19,7 @@ export const workspacePortLoaders = {
       import("@/platform/client-records/move"),
     ]);
     return {
+      mutateProviderConnection: mirror.mutateProviderConnection,
       mirrorClientRecord: mirror.mirrorClientRecord,
       mirrorClientRecordRemoval: mirror.mirrorClientRecordRemoval,
       readThroughFlag: move.readThroughFlag,
