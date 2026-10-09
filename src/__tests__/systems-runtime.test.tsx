@@ -68,6 +68,53 @@ async function fill(field: HTMLInputElement, value: string) {
   await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, value); field.dispatchEvent(new Event("input", { bubbles: true })); });
 }
 function button(label: string) { return [...container.querySelectorAll("button")].find(item => item.textContent?.trim() === label)!; }
+
+it.each([true, false])("searches canonical Systems and supporting files with the Systems release %s", async released => {
+  const state = await snapshot({ id: "backing-work", workspaceId: "workspace-a", title: "Older document controls", productId: "documents", resourceKind: "document", payload: null, input: {}, createdAt: "2026-10-08T00:00:00Z" });
+  state.work.push({ ...state.work[0]!, id: "supporting-file", title: "Decision evidence", productId: "ai_visibility", resourceKind: "assessment" });
+  state.releases!.systems = released;
+  state.systems!.systems[0]!.name = "Client intake";
+  state.systems!.systems[0]!.kind = "document";
+  state.systems!.history = [{ id: "retained-history", systemId: SYSTEM, sentence: "Earlier accepted change retained.", at: "2026-10-07T00:00:00Z" }];
+  window.history.replaceState(null, "", "/workspace?view=work");
+  const onChoose = vi.fn();
+  const request = vi.fn(async () => new Response(JSON.stringify({ error: "Unavailable" }), { status: 503 }));
+  await mount(createElement(WorkspaceRequestContext.Provider, { value: request }, createElement(WorkspaceLayout, { snapshot: state, home: true, agency: false, busy: false, selectedWork: null, onHome: noop, onNew: noop, onOngoing: noop, onAgency: noop, onChoose, onWorkspace: noop, onOpenClientWork: noop, notice: null })));
+  const results = [...container.querySelectorAll<HTMLButtonElement>('[role="option"]')];
+  expect(results.map(item => item.querySelector("strong")!.textContent)).toEqual(released ? ["Decision evidence", "Client intake"] : ["Older document controls", "Decision evidence"]);
+  await act(async () => results.find(item => item.textContent?.includes("Decision evidence"))!.click());
+  expect(onChoose).toHaveBeenCalledWith("supporting-file");
+  if (released) {
+    onChoose.mockClear();
+    const system = results.find(item => item.textContent?.includes("Client intake"))!;
+    expect(system.textContent).toContain("Document");
+    await act(async () => system.click());
+    expect(new URLSearchParams(window.location.search).get("system")).toBe(SYSTEM);
+    expect(new URLSearchParams(window.location.search).get("work")).toBeNull();
+    expect(onChoose).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("Earlier accepted change retained.");
+  }
+});
+
+it.each([true, false])("opens a registry-only inquiry in the released business inbox (%s)", async inquiryInbox => {
+  const state = await snapshot({ id: "file", workspaceId: "workspace-a", title: "File", productId: "ai_visibility", resourceKind: "assessment", payload: null, input: {}, createdAt: "2026-10-08T00:00:00Z" });
+  state.work = [];
+  state.systems!.systems = [{ ref: { businessId: state.workspaceId, systemId: SYSTEM }, name: "Inquiries", kind: "inquiry", lifecycle: "live", basis: null, savedWorkId: null, tenantId: null, health: { status: "unknown", summary: "No evidence", lastVerifiedAt: null } }];
+  const { systems } = readBusinessSystems({ snapshot: state, sites: [] });
+  expect(systems[0]!.surface).toEqual({ kind: "work", workId: SYSTEM, productId: "unknown" });
+  const request = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({ error: "Denied" }), { status: 403 }));
+  vi.stubGlobal("fetch", request);
+  await mount(createElement(SystemPage, { system: systems[0], systems, workspaceId: state.workspaceId, sources: [], readOnly: true, inquiryInbox, systemHref: id => `?system=${id}`, onHome: noop, onAsk: noop }));
+  if (inquiryInbox) {
+    expect(request.mock.calls).toHaveLength(1);
+    expect(request.mock.calls[0]![0]).toBe("/api/workspace/inquiries?workspaceId=workspace-a");
+    expect(container.textContent).toContain("This belongs to another business");
+    expect(container.textContent).not.toContain("There is nothing to open");
+  } else {
+    expect(request).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("There is nothing to open");
+  }
+});
 async function mountLayout(state: WorkspaceSnapshot, request: typeof fetch) {
   window.history.replaceState(null, "", `/workspace?view=system&system=${SYSTEM}`);
   await mount(createElement(WorkspaceRequestContext.Provider, { value: request }, createElement(WorkspaceLayout, {

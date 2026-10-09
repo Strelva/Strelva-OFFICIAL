@@ -549,9 +549,9 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
   const deliveryScope = current?.kind === "customer" && !readOnly && ["owner", "admin"].includes(current.role || "") ? snapshot.workspaceId : undefined;
   const agencyNames = new Map(snapshot.workspaces.filter(item => item.kind === "agency").map(item => [item.id, item.name]));
   const searchItems = [
-    ...snapshot.work.map(work => ({ id: work.id, title: work.title, detail: workspaceWorkLabel(work), href: `${appBase || ""}/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&work=${encodeURIComponent(work.id)}`, onOpen: () => openWork(work.id) })),
+    ...(systemsReleased ? files : snapshot.work).map(work => ({ id: work.id, title: work.title, detail: workspaceWorkLabel(work), href: `${appBase || ""}/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&work=${encodeURIComponent(work.id)}`, onOpen: () => openWork(work.id) })),
     ...(systemsReleased
-      ? systems.map(system => ({ id: `site-${system.id}`, title: system.name, detail: "System", href: systemLink(system.id), onOpen: () => openSystem(system.id) }))
+      ? systems.map(system => ({ id: `site-${system.id}`, title: system.name, detail: `${SYSTEM_KIND_LABEL[system.kind]} · ${LIFECYCLE_LABEL[system.lifecycle]} · ${HEALTH_LABEL[system.health.state]}`, href: systemLink(system.id), onOpen: () => openSystem(system.id) }))
       : assignedSites.map(site => ({ id: `site-${site.id}`, title: site.title, detail: "Managed website", href: site.href }))),
   ];
   return <WorkspaceIntent request={requestText} current={requestCurrent} route={requestRoute} draftKey={draftKey} onSpent={spendRequest}><StrelvaShell ownerBrand={snapshot.ownerBrand} appBase={appBase} signOut={signOut}
