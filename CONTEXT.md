@@ -8,7 +8,10 @@ requests. `reborn-1.0` is the next-release source before `main`; the earlier
 `integrate/reborn-1.0` name is superseded. Active, dirty, held and uniquely
 unmerged work stays isolated. The legacy remote `reborn` remains for the
 nightly workflow on `main`, which still defaults to that name; remove this
-compatibility reference after the routing change reaches `main`. Neither
+compatibility reference after the routing change reaches `main`.
+[Draft next-release PR #616](https://github.com/Strelva/Strelva-OFFICIAL/pull/616)
+now carries the reviewed union; the consolidation record owns completed branch
+cleanup and the two source-superseded PR closures. Neither
 publication nor cleanup authorizes a `main` merge or production rollout.
 
 ## October 9 reviewed Reborn consolidation

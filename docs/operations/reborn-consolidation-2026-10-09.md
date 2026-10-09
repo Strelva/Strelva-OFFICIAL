@@ -89,6 +89,46 @@ Exact expected-SHA inventories, deletion receipts and PR dispositions live in
 workspace `.scratch/domain-language-2026-10-09/`. Deleted branch tips remain
 reachable from the canonical reviewed source; no worktree directories are removed.
 
+## Publication receipt
+
+Canonical `reborn-1.0` was published at `4c301c8e371b45fa1258beff334944d9626e98c3`.
+[Draft next-release PR #616](https://github.com/Strelva/Strelva-OFFICIAL/pull/616)
+targets `main`. The publication and receipt edits leave the tested `src` tree
+`435ba7e567fcd478e7a9a40cb2fe1e7236990636` unchanged. Normal pre-push typecheck
+passed after reusing dependencies with byte-identical package and lock manifests;
+the initial missing-dependency failure remains recorded.
+
+Cleanup deleted 118 local and 50 remote incorporated branch refs, including the
+old remote `integrate/reborn-1.0`. The common local branch was renamed, and six
+completed worktrees owned by this consolidation were detached at their preserved
+commits; their directories and proof artifacts remain. Remote deletions used
+expected-SHA leases, local deletion required ancestry and current-tip checks.
+
+Closed source-superseded PRs:
+
+- [#609 MCP body cap](https://github.com/Strelva/Strelva-OFFICIAL/pull/609): streamed
+  30,000-byte cap, cancellation and tests retained; fatal UTF-8 decoding and
+  telemetry-failure coverage also present.
+- [#545 tenant RLS](https://github.com/Strelva/Strelva-OFFICIAL/pull/545): forward
+  and inverse SQL byte-identical; current inventory adds duplicate-version refusal
+  and retains the later append-only audit boundary. Closure is not evidence of
+  production migration application or completed remediation.
+
+Keep #614, #615, #608, #607 and #606 open: digest rendering, provider-health
+routing/schema, dual-store backfill guards and limiter-outage behavior include
+repairs absent from this candidate. Keep #201, #202 and #102: alternative request
+flow, Home composition and block-editor implementations are not incorporated or
+explicitly retired. Keep #204, #206 and #207: newer native publisher/declaration
+work does not establish whole legacy-PR equivalence; unique route/qualification
+behavior and dated evidence remain. Source comparison alone does not authorize
+retiring those alternatives. No retained PR was retargeted or merged.
+
+The legacy `reborn` stays unchanged at `42d5f7025bab8385fb969bd992832261eda3ba81`:
+its tip is not an ancestor of the candidate, and `main`'s nightly definition still
+reads it. `origin/main` remains `2dd3453a5e8ae5493c86a57a428a6f71f32f30c1`.
+No private integration/model checkout, provider, production or customer state was
+changed. Apply the canonical nightly routing only with later `main` promotion.
+
 ## Next action
 
 Use `reborn-1.0` as the common next-release branch. Leave
