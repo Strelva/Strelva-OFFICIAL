@@ -43,6 +43,94 @@ export const fullAcceptance = [
   { rung: 8, requires: ['qualified-connect-spt-payment-settlement-recovery', 'accepted-financial-responsibilities'] },
 ];
 
+// Accepted native identities. Changing the journey requires an explicit contract edit.
+const nativeCaseTitles = {
+  "tests/public-continuation-authenticated-local.spec.ts": [
+    "a browser-held public brief survives Auth, requires an explicit destination, and stays private after import"
+  ],
+  "tests/public-website-continuation-authenticated-local.spec.ts": [
+    "a confirmed public brief can start one owned website draft after Auth"
+  ],
+  "tests/account-continuity-authenticated-local.spec.ts": [
+    "a public continuation reaches the selected customer business once and keeps unsafe input recoverable",
+    "an invitation recipient can recover the exact return path, while an expired link stays terminal"
+  ],
+  "tests/website-creation-authenticated-local.spec.ts": [
+    "website creation, preview, approval and revision persist at 1440px",
+    "website creation, preview, approval and revision persist at 390px"
+  ],
+  "tests/agency-workflow-authenticated-local.spec.ts": [
+    "ordinary agency adds a client, gets the owner's exact approval, publishes, and reads the receipt"
+  ],
+  "tests/agency-website-authoring-authenticated-local.spec.ts": [
+    "customer grants one managed website draft, agency prepares it, and customer publishes then revokes"
+  ],
+  "tests/agency-application-authoring-authenticated-local.spec.ts": [
+    "a named agency operator revises one assigned application and returns it for customer publication"
+  ],
+  "tests/application-use-authenticated-local.spec.ts": [
+    "a verified staff recipient uses one released version while a candidate changes, then survives rollback and revocation",
+    "a verified recipient edits a date record through a stale correction and recovers it",
+    "ordinary agency template becomes a private native app, then a live app without copying preview records"
+  ],
+  "tests/application-installation-authenticated-local.spec.ts": [
+    "independently owned businesses install and update definitions without copying customer records"
+  ],
+  "tests/operational-assignments-authenticated-local.spec.ts": [
+    "an accepted member runs exact zero-cost work as themselves, then revocation and expiry stop the next effect"
+  ],
+  "tests/horizontal-operations-authenticated-local.spec.ts": [
+    "approved budgeted work completes a native document edit and refuses another account",
+    "native scheduling keeps one reservation identity through cancel, reschedule and retry",
+    "scheduling, generated applications and two-source investigation persist with their native checks"
+  ],
+  "tests/standing-responsibilities-authenticated-local.spec.ts": [
+    "admits two current saved checks as distinct finite jobs, replays a trigger, and gates a revoked job",
+    "an owner can discover, create, and reopen ongoing work in the workspace"
+  ],
+  "tests/work-authority-authenticated-local.spec.ts": [
+    "verified outside contribution survives review and loses access on revocation"
+  ],
+  "tests/agent-access-authenticated-local.spec.ts": [
+    "an exact-work personal AI token can read and propose, then revocation stops both"
+  ],
+  "tests/workspace-exit-authenticated-local.spec.ts": [
+    "owner records a local exit choice through the real Auth route and can still review its retained state"
+  ],
+  "tests/public-check-conversion-authenticated-local.spec.ts": [
+    "a real anonymous URL check survives Auth and becomes private business evidence, an unverified System and a prepared Possibility"
+  ],
+  "tests/make-real-live-authenticated-local.spec.ts": [
+    "a real owner reviews and makes native inquiry/app changes live, proves receipts and rollback, and sees booking's pending verification"
+  ],
+  "tests/agent-business-booking-authenticated-local.spec.ts": [
+    "bounded issuer fixture: native owner context stays business-bound and current authority removal stops access",
+    "native public booking discovery, disabled admission, scanner preview and status rate limits produce no booking effect"
+  ],
+  "tests/access-review-authenticated-local.spec.ts": [
+    "real Auth organization review excludes inaccessible businesses and revokes current member authority with audit"
+  ],
+  "tests/units-standards-authenticated-local.spec.ts": [
+    "real Auth Units bind business Versions, preserve owner decisions on standards and stop writes after authority withdrawal"
+  ],
+  "tests/investigation-history-authenticated-local.spec.ts": [
+    "real owner pages committed investigation runs, retries an evicted exact request, and loses history access after revocation"
+  ],
+  "tests/workspace-export-v3-authenticated-local.spec.ts": [
+    "owner downloads real schema-3 categories after exit pauses work; linked-tenant masking, retained history and withdrawn agency authority hold"
+  ],
+  "tests/client-records-cutover-authenticated-local.spec.ts": [
+    "all 13 stores backfill with measured parity; real durable reads and writes survive owned Redis outage and refuse unqualified cutover"
+  ],
+  "tests/assistant-connections-authenticated-local.spec.ts": [
+    "bounded issuer fixture: real Auth connection renewal stops after owner disconnect",
+    "bounded issuer fixture: real Auth connection renewal stops after owner authority withdrawal"
+  ],
+  "tests/billing-payments-prerequisites-authenticated-local.spec.ts": [
+    "native unpriced billing homes preserve payer authority and merchant prerequisites after access withdrawal"
+  ]
+};
+
 const nativeSpecs = [
   spec('public-continuation'), spec('public-website-continuation'), spec('account-continuity', 2),
   spec('website-creation', 2), spec('agency-workflow'), spec('agency-website-authoring'),
@@ -54,7 +142,7 @@ const nativeSpecs = [
   spec('access-review'), spec('units-standards'), spec('investigation-history'), spec('workspace-export-v3'),
   spec('client-records-cutover'),
   spec('assistant-connections', 2), spec('billing-payments-prerequisites'),
-];
+].map(item => ({ ...item, cases: nativeCaseTitles[item.file].map(title => ({ title, project: 'desktop' })) }));
 const providerSpecs = [
   spec('google-make-real'), spec('assistant-oauth'), spec('sandbox-application'),
   spec('connect-agent-payment'), spec('home-finder'), spec('native-planning-provider'),
@@ -105,6 +193,7 @@ export function preflight(profile, root) {
 export function validateReport(report, profile) {
   const expected = new Map(profile.specs.map(item => [basename(item.file), item]));
   const observed = new Map();
+  const identities = new Set();
   const problems = [];
   function visit(suite) {
     for (const item of suite.specs || []) {
@@ -113,6 +202,12 @@ export function validateReport(report, profile) {
       if (!contract) { problems.push(`Unlisted spec: ${file}`); continue; }
       if (contract.title && item.title !== contract.title) problems.push(`Unexpected case title: ${file}`);
       for (const test of item.tests || []) {
+        const identity = JSON.stringify([file, item.title, test.projectName]);
+        if (identities.has(identity)) problems.push(`Duplicate case identity: ${file}`);
+        identities.add(identity);
+        if (contract.cases && !contract.cases.some(expectedCase => expectedCase.title === item.title && expectedCase.project === test.projectName))
+          problems.push(`Unexpected case or project identity: ${file}`);
+        if (contract.title && test.projectName !== 'desktop') problems.push(`Unexpected project identity: ${file}`);
         const results = test.results || [];
         if (test.status !== 'expected' || results.length !== 1 || results[0].status !== 'passed'
           || (results[0].retry ?? 0) !== 0 || results[0].error || results[0].errors?.length)
@@ -124,7 +219,11 @@ export function validateReport(report, profile) {
   }
   for (const suite of report.suites || []) visit(suite);
   const total = profile.specs.reduce((sum, item) => sum + item.count, 0);
-  for (const [file, item] of expected) if (observed.get(file) !== item.count) problems.push(`Required case count differs: ${file}`);
+  for (const [file, item] of expected) {
+    if (observed.get(file) !== item.count) problems.push(`Required case count differs: ${file}`);
+    for (const required of item.cases || []) if (!identities.has(JSON.stringify([file, required.title, required.project])))
+      problems.push(`Missing required case identity: ${file}`);
+  }
   if (!report.stats || report.stats.expected !== total || report.stats.skipped !== 0 || report.stats.unexpected !== 0
     || report.stats.flaky !== 0 || report.errors?.length) problems.push('Report statistics or global errors violate the closed manifest.');
   if (problems.length) throw new Error([...new Set(problems)].join('\n'));

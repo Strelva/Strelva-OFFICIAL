@@ -8,7 +8,7 @@ import { journeyProfile, parseLocalStackEnv, preflight, releaseSwitches, shellEn
 
 function report(profile) {
   const specs = profile.specs.flatMap(item => Array.from({ length: item.count }, (_, i) => ({
-    file: item.file, title: item.title || `case-${i}`, tests: [{ status: 'expected', results: [{ status: 'passed', retry: 0 }] }],
+    file: item.file, title: item.cases?.[i]?.title || item.title || `case-${i}`, tests: [{ projectName: item.cases?.[i]?.project || 'desktop', status: 'expected', results: [{ status: 'passed', retry: 0 }] }],
   })));
   return { suites: [{ specs }], stats: { expected: specs.length, skipped: 0, unexpected: 0, flaky: 0 }, errors: [] };
 }

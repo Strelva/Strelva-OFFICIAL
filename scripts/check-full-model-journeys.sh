@@ -23,7 +23,7 @@ node "$manifest" preflight "$profile" "$root"
 for file in .env .env.local .env.development .env.development.local; do
   [[ ! -e "$file" ]] || { echo "Remove $file from this prepared proof checkout first." >&2; exit 1; }
 done
-for command_name in docker psql redis-server npx node curl python3 openssl pnpm; do
+for command_name in docker psql pg_dump redis-server npx node curl python3 openssl pnpm; do
   command -v "$command_name" >/dev/null || { echo "Required command unavailable: $command_name" >&2; exit 1; }
 done
 docker info >/dev/null 2>&1 || { echo 'Docker is not running.' >&2; exit 1; }
@@ -82,6 +82,8 @@ node "$manifest" stack-env "$profile" "$work/env" > "$work/stack.env"
 if [[ -z "$reuse" ]]; then
   owned_stack="$(node -e 'const fs=require("fs"); const line=fs.readFileSync(process.argv[1],"utf8").split("\n").find(x=>x.startsWith("STRELVA_AUTH_STACK_DIR=")); process.stdout.write(line.slice(line.indexOf("=")+1))' "$work/env")"
 fi
+# A bootstrap baseline is mandatory even for loopback reuse. Never mint it here.
+env -i "${base_env[@]}" node "$root/scripts/full-model-stack-qualification.mjs" verify "$root" "$work/env" > "$work/stack-qualification.json"
 port="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')"
 origin="http://localhost:$port"
 run_clean() {
@@ -124,6 +126,7 @@ for variant in "${variants[@]}"; do
   node "$manifest" validate "$profile" "$work/results-$variant.json" ${variant_arg[@]+"${variant_arg[@]}"} > "$work/receipt-$variant.json" || status=1
   [[ "$status" == 0 ]] || { echo "Closed $profile/$variant failed; see retained reports." >&2; exit 1; }
 done
+env -i "${base_env[@]}" node "$root/scripts/full-model-stack-qualification.mjs" verify "$root" "$work/env" > "$work/stack-qualification-end.json"
 node "$manifest" source "$profile" "$root" > "$work/source-end.json"
 cmp -s "$work/source.json" "$work/source-end.json" || { echo 'Source changed during proof; no profile qualification is retained.' >&2; exit 1; }
 echo "Local $profile passed. All eight release requirements, provider/client qualification and production remain separate."

@@ -103,5 +103,11 @@ with open(sys.argv[2],'a') as output:
     for name,value in values.items():
         if '\n' in value or '\r' in value: raise SystemExit('Invalid local configuration value')
         output.write(name+'='+value+'\n')
+# Standalone allowlisted env for baseline capture, independent of a shared CI env file.
+stack=Path(sys.argv[1]).parent
+Path(stack/'proof.env').write_text('STRELVA_AUTH_STACK_DIR='+str(stack)+'\n'+''.join(name+'='+value+'\n' for name,value in values.items()))
 print('Disposable Auth and database configured on loopback. No hosted project was used.')
 PY
+
+# Capture actual catalog/ACL and migration ledger at fresh bootstrap, before fixtures.
+node "$root/scripts/full-model-stack-qualification.mjs" bootstrap "$root" "$stack/proof.env" > "$stack/bootstrap-qualification.json"
