@@ -6,6 +6,7 @@ const mockRedis = {
   get: vi.fn(),
   incr: vi.fn(),
   expire: vi.fn(),
+  eval: vi.fn(),
   zadd: vi.fn(),
   zrange: vi.fn(),
   zremrangebyrank: vi.fn(),
@@ -21,7 +22,7 @@ vi.mock("@/platform/infra/logger", () => ({ logger: loggerMock }));
 
 import { recordHeartbeat, checkHeartbeats, CRON_MAX_AGE_SECONDS } from "@/platform/infra/heartbeat";
 import { recordMailSend, getMailLog } from "../lib/storage/mail-log";
-import { alertOnce } from "@/platform/infra/monitoring";
+import { alertOnce, reportCronHeartbeat } from "@/platform/infra/monitoring";
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -149,5 +150,14 @@ describe("alertOnce dedup", () => {
     await alertOnce("cron_stale", "high", { cron: "x" });
     expect(loggerMock.error).toHaveBeenCalledTimes(1);
     redisClient = mockRedis;
+  });
+
+  it("contains Redis reconciliation failure and emits safe failure metadata", async () => {
+    mockRedis.eval.mockRejectedValueOnce(new Error("unavailable"));
+    await expect(reportCronHeartbeat({ cron: "weekly-report", lastSeen: "2026-10-09T12:00:00.000Z", ageSeconds: 0, maxAgeSeconds: 1000, stale: false, lastOk: false }, "request-fixture")).resolves.toBeUndefined();
+    expect(loggerMock.error).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ outcome: "failed", actorRole: "cron", requestId: "request-fixture" }));
+    loggerMock.error.mockClear();
+    await expect(reportCronHeartbeat({ cron: "weekly-report", lastSeen: null, ageSeconds: null, maxAgeSeconds: 1000, stale: false, lastOk: null }, "request-fixture")).resolves.toBeUndefined();
+    expect(loggerMock.error).not.toHaveBeenCalled();
   });
 });

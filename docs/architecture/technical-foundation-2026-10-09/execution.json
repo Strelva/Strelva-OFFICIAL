@@ -51,36 +51,136 @@
           "branch": "foundation/security-convergence-20261009",
           "taskId": "node:delegated-task:command%3Amcp%3A9332c173-8b75-41ef-8758-1759b2f24132%3Adelegate-task%3Afoundation-execution-20261009-wave1-security",
           "childThreadId": "thread:delegated-task:command%3Amcp%3A9332c173-8b75-41ef-8758-1759b2f24132%3Adelegate-task%3Afoundation-execution-20261009-wave1-security",
-          "status": "running",
-          "model": "gpt-6.1-sol"
+          "status": "source_prepared_review_pending",
+          "model": "gpt-6.1-sol",
+          "head": "24707cc509434cd83494b6aae0c161ae5c1d7b5f",
+          "pr": 626
         },
         {
           "key": "toolchain",
           "branch": "foundation/toolchain-qualification-20261009",
           "taskId": "node:delegated-task:command%3Amcp%3A9332c173-8b75-41ef-8758-1759b2f24132%3Adelegate-task%3Afoundation-execution-20261009-wave1-toolchain",
           "childThreadId": "thread:delegated-task:command%3Amcp%3A9332c173-8b75-41ef-8758-1759b2f24132%3Adelegate-task%3Afoundation-execution-20261009-wave1-toolchain",
-          "status": "running",
-          "model": "gpt-6.1-sol"
+          "status": "source_prepared_review_pending",
+          "model": "gpt-6.1-sol",
+          "head": "e4c6e625e9981c1ff4ff008c114a541599c2de4b",
+          "pr": 627
         },
         {
           "key": "availability",
           "branch": "foundation/capability-qualification-20261009",
           "taskId": "node:delegated-task:command%3Amcp%3A9332c173-8b75-41ef-8758-1759b2f24132%3Adelegate-task%3Afoundation-execution-20261009-wave1-availability",
           "childThreadId": "thread:delegated-task:command%3Amcp%3A9332c173-8b75-41ef-8758-1759b2f24132%3Adelegate-task%3Afoundation-execution-20261009-wave1-availability",
-          "status": "running",
-          "model": "gpt-6.1-sol"
+          "status": "validator_repair_in_progress",
+          "model": "gpt-6.1-sol",
+          "head": "608ae57cf4daf9f1384cc397bd7a6c92fa738f85",
+          "pr": 625
         },
         {
           "key": "v1",
           "branch": "foundation/v1-contract-completeness-20261009",
           "taskId": "node:delegated-task:command%3Amcp%3A9332c173-8b75-41ef-8758-1759b2f24132%3Adelegate-task%3Afoundation-execution-20261009-wave1-v1",
           "childThreadId": "thread:delegated-task:command%3Amcp%3A9332c173-8b75-41ef-8758-1759b2f24132%3Adelegate-task%3Afoundation-execution-20261009-wave1-v1",
-          "status": "running",
-          "model": "gpt-6.1-sol"
+          "status": "source_prepared_review_pending",
+          "model": "gpt-6.1-sol",
+          "head": "68b88085d9daff17c0f9970eedb0569a726c31df",
+          "pr": 624
+        }
+      ]
+    },
+    {
+      "wave": 2,
+      "tasks": [
+        {
+          "key": "secret_rotation",
+          "branch": "foundation/secret-rotation-20261009",
+          "taskId": "node:delegated-task:command%3Amcp%3A9332c173-8b75-41ef-8758-1759b2f24132%3Adelegate-task%3Afoundation-execution-20261009-wave2-secret-rotation",
+          "childThreadId": "thread:delegated-task:command%3Amcp%3A9332c173-8b75-41ef-8758-1759b2f24132%3Adelegate-task%3Afoundation-execution-20261009-wave2-secret-rotation",
+          "status": "read_only_result_no_implementation",
+          "block": "Croki child inherited coordinator worktree; second handoff rejected already_in_worktree. No branch/commit/PR. Asked existing unbound root for isolated child allocation; fallback separately reviewed stacked source in own existing checkout.",
+          "next": "Existing root also bound. Root authorized separately reviewed stacked S04 in this program checkout after O01 commit; no binding bypass. Resume same implementation child with exact parent HEAD and exclusive secrets/backfill/connection scopes."
         }
       ]
     }
   ],
-  "resume": "Coordinator handoff to foundation/program-20261009; preserve current source/runner ownership and serialize broad qualification with architecture union/SQL companion.",
-  "resourceHold": "Union broad units/browser/build and SQL companion required clusters currently active; children targeted checks only until coordinated grant."
+  "resume": "Complete O01 independent review/draft PR; receive wave1 exact heads and evidence; allocate F01 Redis only on owner release; advance ready dependency scopes after qualified source reconciliation. Canonical/model and union/SQL reservations unchanged.",
+  "resourceHold": "Required workspace SQL serial PG18 retry active; upgraded runner passed after retained fixture repairs. Union single clean build next, F01 one-worker Redis then O01 separately owned tiny Redis Lua proof. Explicit owner allocation required, no gap start.",
+  "coordinatorWork": {
+    "record": "O01",
+    "status": "local_verified_reviewed_native_proof_pending",
+    "base": "645b94339",
+    "files": [
+      "src/app/api/cron/heartbeat/route.ts",
+      "src/platform/infra/monitoring.ts",
+      "src/__tests__/heartbeat-route.test.ts",
+      "src/__tests__/observability.test.ts"
+    ],
+    "proof": {
+      "baseline": "4 regression failures / 2 passes",
+      "focused": "49 passes / 4 suites",
+      "typecheck": "passed",
+      "scopedLint": "passed"
+    },
+    "limits": [
+      "Shell Node26, not pinned Node22 qualification",
+      "F01 dependent final integration pending",
+      "Sentry delivery mocked; no delivered alert or production proof",
+      "Existing Sentry privacy filters unchanged"
+    ],
+    "next": "Independent source review, then draft PR and F01-qualified combined integration.",
+    "reviewFindings": [
+      "Round1 old healthy snapshot could erase new failure marker",
+      "Round2 old failed snapshot could recreate marker after recovery"
+    ],
+    "response": "Single atomic heartbeat-generation-guarded failure/stale/recovery reconciliation; both deterministic overlap regressions pass.",
+    "nativeProof": {
+      "script": "scripts/tests/heartbeat-recovery-redis.node-test.mjs",
+      "status": "prepared_unrun",
+      "allocation": "Queued after SQL, union single clean build and F01 Redis; separately owned private Unix socket."
+    },
+    "review": "Round3 no new findings; both snapshot races addressed. Typecheck and scoped lint passed after final source changes."
+  },
+  "wave1Observations": {
+    "security": "Agent reports 250 focused tests, typecheck/lint/boundaries pass; independent carry only, actor-authority SQL/app patch quarantined. No retained approved applied-version JSON available. Draft PR preparation; Redis campaign waits explicit allocation.",
+    "toolchain": "PR627 source prepared;13 controls/typecheck Node26diagnostic/scopedlint/frozeninstall/seeded3 secrets/stagedscan pass. Node22/PG17/browser absent; licenses usage review blocked; fullhistoryscan120stimeout twice; pinnedDocker unrun. Prepush duplicate hook skipped --no-verify after same-source typecheck; retain this limitation.",
+    "availability": "PR625 initial71 focused passes; independent review reproduced sparse/deleted entries/evidence/provenModes validation bypass. Owner fixing before consumer adoption. Source preparation release on union77fc only; E04 authority prerequisite remains.",
+    "v1": "PR624 source prepared:14 contracts,146 targeted passes;9 exact-pin consumer checkouts223/223 zero failures/skips. Deployed/Auth/provider/build unproven, Smokin mapping unconfirmed."
+  },
+  "reviews": [
+    {
+      "key": "o01ReviewRound2",
+      "taskId": "node:delegated-task:command%3Amcp%3A9332c173-8b75-41ef-8758-1759b2f24132%3Adelegate-task%3Afoundation-o01-watchdog-review-round2-20261009",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3A9332c173-8b75-41ef-8758-1759b2f24132%3Adelegate-task%3Afoundation-o01-watchdog-review-round2-20261009",
+      "status": "findings_addressed"
+    },
+    {
+      "key": "o01ReviewRound3",
+      "taskId": "node:delegated-task:command%3Amcp%3A9332c173-8b75-41ef-8758-1759b2f24132%3Adelegate-task%3Afoundation-o01-watchdog-review-round3-20261009",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3A9332c173-8b75-41ef-8758-1759b2f24132%3Adelegate-task%3Afoundation-o01-watchdog-review-round3-20261009",
+      "status": "no_new_findings"
+    },
+    {
+      "key": "capabilityReviewRound1",
+      "taskId": "node:delegated-task:command%3Amcp%3A9332c173-8b75-41ef-8758-1759b2f24132%3Adelegate-task%3Afoundation-e08-e03-review-round1-20261009",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3A9332c173-8b75-41ef-8758-1759b2f24132%3Adelegate-task%3Afoundation-e08-e03-review-round1-20261009",
+      "status": "repair_in_progress"
+    },
+    {
+      "key": "v1ReviewRound1",
+      "taskId": "node:delegated-task:command%3Amcp%3A9332c173-8b75-41ef-8758-1759b2f24132%3Adelegate-task%3Afoundation-c01-c02-review-round1-20261009",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3A9332c173-8b75-41ef-8758-1759b2f24132%3Adelegate-task%3Afoundation-c01-c02-review-round1-20261009",
+      "status": "running"
+    },
+    {
+      "key": "f01ReviewRound1",
+      "taskId": "node:delegated-task:command%3Amcp%3A9332c173-8b75-41ef-8758-1759b2f24132%3Adelegate-task%3Afoundation-f01-security-review-round1-20261009",
+      "childThreadId": "thread:delegated-task:command%3Amcp%3A9332c173-8b75-41ef-8758-1759b2f24132%3Adelegate-task%3Afoundation-f01-security-review-round1-20261009",
+      "status": "running"
+    }
+  ],
+  "sourcePreparationRelease": {
+    "union": "77fc4ea49f61aecc901f92062d8646bd125f21ee",
+    "scope": "E08/E03 own-isolated consumer followup preparation",
+    "limits": "No canonical promotion/merge. Inquiry definitions reserved. Preserve owner interfaces, permissions epochs, current GET authority and failed-refresh callback fences. Final union clean build pending."
+  }
 }
