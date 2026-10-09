@@ -120,7 +120,9 @@ test("empty, loading and error states say what is true", async ({ page }) => {
   // Systems arrive with the workspace read; the slower decision reads say they are still checking.
   await page.goto("/preview/strelva?scenario=mooney-loading&systems=on");
   await expect(page.getByRole("region", { name: "Needs you" }).getByText("Checking your work…")).toBeVisible();
-  await expect(page.getByRole("list", { name: "The Mooney Firm systems" }).getByRole("link")).toHaveCount(4);
+  const loadingSystems = page.getByRole("list", { name: "The Mooney Firm systems" });
+  await expect(loadingSystems.getByRole("link")).toHaveCount(5);
+  await expect(loadingSystems.getByRole("link", { name: "Open Arbitration intake, Internal tool, Live, Unknown" })).toBeVisible();
   await page.goto("/preview/strelva?scenario=mooney-error&systems=on");
   await expect(page.getByText("Some websites could not be loaded.")).toBeVisible();
   await expect(page.getByText("Requests waiting on your decision could not be checked.")).toBeVisible();
