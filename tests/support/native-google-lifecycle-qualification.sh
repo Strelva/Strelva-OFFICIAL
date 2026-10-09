@@ -112,6 +112,17 @@ late_marker="marker text := '  perform pg_advisory_xact_lock(hashtextextended(v_
 assert f.count(late_marker)==1
 write('forward-late-marker-refusal',f.replace(late_marker,"marker text := 'missing_marker perform pg_advisory_xact_lock(hashtextextended(v_workspace::text || '",1))
 write('inverse-extra-acl',injected(i,'grant execute on function '+target+' to authenticated;'))
+# Coordinate live ACL drift with both mutable journal snapshots. The immutable
+# inverse policy must refuse before restoration even when those three agree.
+rebaseline_acl="""grant execute on function public.upsert_workspace_account_binding(jsonb,text) to authenticated;
+update public.native_google_lifecycle_prior_functions journal set prior_properties=live_authority.properties,applied_properties=live_authority.properties
+ from (select (to_jsonb(p)-array['oid','prosrc','prosqlbody'])||jsonb_build_object(
+  'qualifiedSignature','public.upsert_workspace_account_binding(jsonb,text)',
+  'ownerName',pg_get_userbyid(p.proowner),'languageName',l.lanname,
+  'bindingTableOwner',pg_get_userbyid((select relowner from pg_class where oid='public.workspace_account_bindings'::regclass))) properties
+ from pg_proc p join pg_language l on l.oid=p.prolang where p.oid='public.upsert_workspace_account_binding(jsonb,text)'::regprocedure) live_authority
+ where journal.signature='public.upsert_workspace_account_binding(jsonb,text)';"""
+write('inverse-coordinated-acl-journal-drift',injected(i,rebaseline_acl))
 write('inverse-security-drift',injected(i,'alter function '+target+' security invoker;'))
 write('inverse-owner-drift',injected(i,'alter function '+target+' owner to authenticated;'))
 write('inverse-search-path-drift',injected(i,'alter function '+target+' set search_path=pg_temp,public;'))
@@ -128,7 +139,7 @@ write('inverse-populated',injected(i,populate))
 PY
  local label
  # All inverse refusal scenarios exercise the actual current inverse guards.
- for label in inverse-extra-acl inverse-security-drift inverse-owner-drift inverse-search-path-drift; do
+ for label in inverse-extra-acl inverse-coordinated-acl-journal-drift inverse-security-drift inverse-owner-drift inverse-search-path-drift; do
   native_qualification_refuse "$label" "$qualification_dir/$label.sql" 'native_google_rollback_(source|authority)_drift'
  done
  native_qualification_refuse inverse-deleted-journal "$qualification_dir/inverse-deleted-journal.sql" native_google_rollback_archive_incomplete
