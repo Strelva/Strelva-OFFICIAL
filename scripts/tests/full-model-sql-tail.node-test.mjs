@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 const root = new URL('../../', import.meta.url).pathname;
@@ -42,4 +42,31 @@ test('legacy superadmin fixture restores exact prior ACLs before the current aud
   assert.ok(generator.includes('a.is_grantable'));
   assert.ok(generator.includes('super_admin_fixture_acl_restore_failed'));
   assert.ok(generator.includes("select 'begin;'") && generator.includes("select 'commit;'"));
+});
+
+test('complete composed forward inventory has no unclassified workspace migration omissions', () => {
+  const inventory = JSON.parse(readFileSync(`${root}scripts/sql/historical-forward-inventory.json`, 'utf8'));
+  assert.equal(inventory.forwardCount, 330);
+  for (const file of readdirSync(`${root}supabase/migrations`).filter(file => /^20\d+_.*\.sql$/.test(file))) assert.ok(inventory.forwardFiles.includes(file), `inventory must classify new forward migration: ${file}`);
+  assert.equal(inventory.forwardFiles.length, inventory.forwardCount);
+  assert.equal(new Set(inventory.forwardFiles).size, inventory.forwardCount);
+  assert.deepEqual(inventory.forwardFiles, [...inventory.forwardFiles].sort());
+  const source = ['scripts/check-workspace-sql.sh', 'scripts/sql/full-model-current-tail.sh', 'scripts/sql/historical-current-predecessors.sh'].map(file => readFileSync(`${root}${file}`, 'utf8')).join('\n');
+  // Array-driven names omit .sql until invocation. Count only forward names.
+  const names = new Set([...source.matchAll(/(?<!rollback-)(20\d+_[\w-]+?)(?=\.sql|[\s)"'])/g)].map(match => `${match[1]}.sql`));
+  for (const file of inventory.forwardFiles) {
+    if (file < inventory.workspaceBoundary || inventory.focusedLegacyExceptions[file]) continue;
+    if (file.startsWith('20261020')) { assert.ok(source.includes('/supabase/migrations/20261020*.sql')); continue; }
+    assert.ok(names.has(file), `unaccounted current predecessor: ${file}`);
+  }
+  const upgrade = readFileSync(`${root}scripts/check-workspace-upgrade.sh`, 'utf8');
+  assert.ok(upgrade.includes("-name '20*.sql' | sort"));
+  assert.ok(upgrade.includes('check_historical_current_predecessors'));
+  assert.ok(!upgrade.includes('apply_historical_current_predecessors'));
+  const scheduled = execFileSync('bash', ['-c', 'repo_root="$1"; psql_args=(); psql() { printf "%s\\n" "$*"; }; source "$repo_root/scripts/sql/historical-current-predecessors.sh"; apply_historical_current_predecessors', 'test', root], { encoding: 'utf8' });
+  const applied = [...scheduled.matchAll(/migrations\/(20\d+_[\w-]+\.sql)/g)].map(match => match[1]);
+  assert.equal(applied.length, 5); assert.equal(new Set(applied).size, 5);
+  assert.deepEqual(applied, [...applied].sort());
+  const predecessor = source.indexOf('apply_historical_current_predecessors');
+  assert.ok(predecessor < source.indexOf('20261019100000_actor_rpc_service_boundary.sql'));
 });

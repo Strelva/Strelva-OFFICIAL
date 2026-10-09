@@ -1662,6 +1662,11 @@ printf 'Owner effect rollback retained sessions and authority gates.\n'
 # historical hand-ordered rehearsal. No existing migration is edited.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260930120000_revoke_public_execute_internal_functions.sql"
 
+# Compose formerly separate products only after historical inverses finish.
+source "$repo_root/scripts/sql/historical-current-predecessors.sh"
+apply_historical_current_predecessors
+check_historical_current_predecessors
+
 # #601: current service-only ACL successor must precede the pending tail.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261019100000_actor_rpc_service_boundary.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/actor-rpc-service-boundary-schema.sql"

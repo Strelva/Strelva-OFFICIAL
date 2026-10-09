@@ -482,6 +482,10 @@ node --test "$repo_root/scripts/tests/readonly-rpcs.node-test.mjs"
 psql "${psql_args[@]}" --file="$repo_root/tests/legacy-calendar-revoke-result-schema.sql"
 bash "$repo_root/scripts/check-reader-writer-locks.sh" "postgresql:///postgres?host=$cluster_socket&port=$cluster_port"
 
+# The lexical upgrade already applied these predecessors; never reapply them.
+source "$repo_root/scripts/sql/historical-current-predecessors.sh"
+check_historical_current_predecessors
+
 # #601: combined contracts preserve current authority after the historical rehearsal.
 for money_apps_migration in "$repo_root"/supabase/migrations/20261020*.sql; do
   psql "${psql_args[@]}" --file="$money_apps_migration" >/dev/null
