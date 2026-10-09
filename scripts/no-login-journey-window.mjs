@@ -123,7 +123,7 @@ export function runNoLoginWindow(rootInput, workInput) {
   const save = (name, data) => writeFileSync(join(output, name), JSON.stringify(redactNoLoginEvidence(data, runtime), null, 2), { mode: 0o600 });
   save('manifest.json', profile); save('source.json', source); save('native-contract.json', native); save('native-report-state.json', nativeReportState);
   const qualify = () => JSON.parse(execFileSync(process.execPath,
-    [join(root, 'scripts/full-model-stack-qualification.mjs'), 'verify', root, join(work, 'env')], { cwd: root, env: childEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
+    [join(root, 'scripts/full-model-stack-qualification.mjs'), 'verify', root, join(work, 'env')], { cwd: root, env: childEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 16 * 1024 * 1024 }));
   save('stack-before.json', qualify());
   const rawResult = join(output, 'results-raw.json');
   const browser = spawnSync('pnpm', ['exec', 'playwright', 'test', fixedSpec, '--workers=1', '--retries=0', '--reporter=line,json', `--output=${join(output, 'artifacts')}`], {

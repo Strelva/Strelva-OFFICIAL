@@ -57,7 +57,7 @@ export function runCleanupWindow(rootInput, workInput) {
   const save = (name, data) => writeFileSync(join(output, name), JSON.stringify(data, null, 2), { mode: 0o600 });
   save('manifest.json', profile); save('source.json', source); save('native-contract.json', native); save('native-report-state.json', nativeReportState);
   const qualify = () => JSON.parse(execFileSync(process.execPath,
-    [join(root, 'scripts/full-model-stack-qualification.mjs'), 'verify', root, join(work, 'env')], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
+    [join(root, 'scripts/full-model-stack-qualification.mjs'), 'verify', root, join(work, 'env')], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 16 * 1024 * 1024 }));
   save('stack-before.json', qualify());
   const resultPath = join(output, 'results.json');
   const browser = spawnSync('pnpm', ['exec', 'playwright', 'test', profile.specs[0].file,
