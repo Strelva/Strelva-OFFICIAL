@@ -54,6 +54,13 @@ test("read-only users can inspect templates without creating apps", async ({ pag
   await expect(page.getByLabel("App name", { exact: true })).toBeDisabled();
 });
 
+test("an agency's maker permission does not enable creation in a shared client", async ({ page }) => {
+  await page.goto("/preview/strelva?scenario=agency&workspaceId=33333333-3333-4333-8333-333333333333&view=products&template=staff-requests");
+  await expect(page.getByRole("button", { name: "Create private tool", exact: true })).toBeDisabled();
+  await expect(page.getByLabel("App name", { exact: true })).toBeDisabled();
+  await expect(page.getByRole("region", { name: "Interactive app preview", exact: true })).toBeVisible();
+});
+
 test("a visible request edit replaces the previously submitted request across tools", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=business");
   const composer = page.getByLabel("What do you want to accomplish?", { exact: true });

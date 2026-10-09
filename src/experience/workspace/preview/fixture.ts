@@ -104,10 +104,6 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
   const workspaceId = scenario === "agency" ? AGENCY : scenario === "read-only" || scenario === "business" ? CUSTOMER : PERSONAL;
   const base: WorkspaceSnapshot = {
     actor: { email: "alex@example.com", localPreview: true },
-    // The Business/Agency creation walkthroughs explicitly model a fictional
-    // maker permission. Owner membership alone is never the production grant.
-    // Shared and other examples retain no maker permission.
-    canMakeSystems: scenario === "business" || scenario === "agency",
     workspaceId,
     workspaces: [
       { id: PERSONAL, kind: "personal", name: "Alex’s work" },
@@ -446,9 +442,15 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
     if (scenario === "unavailable") return response({ error: "Saved work is unavailable right now. Nothing has been confirmed. Please try again." }, 503);
     if ((init?.method || "GET") === "GET") {
       const current = url.searchParams.get("workspaceId") || workspaceId;
-      if (!base.workspaces.some(workspace => workspace.id === current)) return response({ error: "This workspace is not part of the local preview." }, 403);
+      const selectedWorkspace = base.workspaces.find(workspace => workspace.id === current);
+      if (!selectedWorkspace) return response({ error: "This workspace is not part of the local preview." }, 403);
       if (scenario === "agency" && current === SECOND_CUSTOMER) return response({ error: "This fictional client is unavailable for partial-load testing." }, 503);
-      return response({ ...base, workspaceId: current, work: saved.get(current) || [] });
+      // Creation walkthroughs model an explicit fictional maker grant only in
+      // their own business/agency. Switching to a shared client must discard it.
+      // Owner membership alone is never the production permission.
+      const makerGranted = (scenario === "business" || scenario === "agency") && current === workspaceId;
+      const canMakeSystems = makerGranted && selectedWorkspace.role === "owner" && selectedWorkspace.access !== "delegated_read";
+      return response({ ...base, workspaceId: current, canMakeSystems, work: saved.get(current) || [] });
     }
     if (init?.method !== "POST" || typeof init.body !== "string") return response({ error: "Unsupported local preview request." }, 400);
     let action: WorkspaceAction;

@@ -11,6 +11,20 @@ describe("isolated Strelva interface preview", () => {
       expect(snapshot.canMakeSystems).toBe(scenario === "business" || scenario === "agency");
     }
   });
+  it("drops the fictional maker grant when an agency opens a shared customer", async () => {
+    const request = createPreviewRequest("agency");
+    const agency = await (await request("/api/workspace")).json() as WorkspaceSnapshot;
+    expect(agency.canMakeSystems).toBe(true);
+    const sharedWorkspace = agency.workspaces.find(workspace => workspace.access === "delegated_read")!;
+    const shared = await (await request(`/api/workspace?workspaceId=${sharedWorkspace.id}`)).json() as WorkspaceSnapshot;
+    expect(shared.workspaceId).toBe(sharedWorkspace.id);
+    expect(shared.canMakeSystems).toBe(false);
+    const personal = agency.workspaces.find(workspace => workspace.kind === "personal")!;
+    const personalView = await (await request(`/api/workspace?workspaceId=${personal.id}`)).json() as WorkspaceSnapshot;
+    expect(personalView.canMakeSystems).toBe(false);
+    const reopened = await (await request(`/api/workspace?workspaceId=${agency.workspaceId}`)).json() as WorkspaceSnapshot;
+    expect(reopened.canMakeSystems).toBe(true);
+  });
   it.each([
     ["preview", "1", true], ["production", "1", false],
     ["development", "1", false], [undefined, "1", false], ["preview", "", false],
