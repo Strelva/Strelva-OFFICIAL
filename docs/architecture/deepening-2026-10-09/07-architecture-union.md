@@ -1,10 +1,10 @@
 # Architecture union: scoped PRD and acceptance plan
 
-Stream: `architecture-union`. Phase one, October 9, 2026: **source held**.
+Stream: `architecture-union`. October 9, 2026: phase one complete; phase two released.
 Branch: `integrate/architecture-depth-20261009`; clean starting HEAD
 `6ddc03f4d0f854997ff3f54481d5066625bf62fe`. Reviewed reads head
 `65ebfc723b25e8a6c891589103be1530636cd83a` is an ancestor. The
-[rolling integration record](README.md) stays coordinator-owned.
+[rolling integration record](README.md) was coordinator-owned during preflight; its candidate union update is now delegated here.
 
 ## Person, job and bounded result
 
@@ -260,3 +260,127 @@ mapping defect. No capability promotion, offer, economics or domain-meaning chan
 lifetime kind and the complete approved source manifest. Then resume step 1 here.
 Phase one is ready for that source-review gate; the union is not implemented or
 qualified yet. No PR or push is needed for this preflight document.
+
+## Phase-two source admission
+
+Coordinator released domain `4543251842d0546258e392fdf368635b1deaf6c3`,
+location `3de2cedc580025a0921533bb5efe9b22597c40e2`, composition
+`3b898fe5f5c338a02ee28f5258223a6850a34ca3`, website
+`5beb3829def795887dc11c822c693bc625c0cc32`, then lifetime kind
+`bfb5ab065d934c03cdb6665229022e8e935ccbc0` through a distinct release.
+All were merged with complete peer histories into this candidate; reads is already
+in the base. Git resolved App/inventory adjacency automatically; combined behavior
+is still to be proven. All six input PRs are registered in this thread. Existing
+lockfile installation completed without lockfile changes. Candidate ownership now
+includes factual union updates to the rolling README, granted by coordinator.
+Kind's frozen forward/inverse bytes remain unchanged; no shared SQL is applied.
+
+The original plan above retains its preflight status and findings as history; the
+release supersedes its source hold, pending-kind disposition and README ownership.
+
+
+## Union recovery correction and local proof
+
+At merged checkpoint `01dfae2e29dcf16d416600e86527d07e1ef484f4`, a
+supplemental workspace 500/503 retained the accepted tool but left App callback
+authority null indefinitely. Tool-local reload could not restore App authority;
+naive workspace retry compared selection with null authority and remounted work.
+New deferred real-tool cases initially failed: 10 failed / 12 passed in the
+expanded refresh suite (the earlier two recovery cases also failed). These are
+runtime regression evidence, retained locally in `refresh-deferred-initial.log`.
+
+The bounded correction uses the existing requested workspace for retained
+same-work selection, independently of callback authority. The existing sequence,
+location and navigation-generation guards remain. Retry invalidates authority
+again; only a successful current actor-scoped GET restores callback eligibility.
+401/403/404 clear access, missing work becomes unavailable and scope changes reject
+late reads/callbacks. A required recovery warning cannot be dismissed; independent
+review caught that Dismiss would otherwise remove the only recovery path. No
+retained data grants permission. Mobile notice text/action stack using existing
+Button/tokens, with no controller, cache or provider change.
+
+The executable deduplicated [83-suite manifest](07-union-test-files.txt) covers
+System stores/invariants/Supabase/native/health/projection, Version decisions,
+workspace/location/reads, shared URL/crawl and V1/V2 website recovery. Its first
+combined run had 979 passed, 5 failed, 12 skipped and 6 uncaught exceptions. All
+five failures and exceptions were old Systems UI fixture destinations with
+non-UUID workspace/System IDs or missing workspace scope. Fictional fixture IDs
+were corrected; location guards were not weakened. Final broad result: **984
+passed / 12 skipped / 83 files**, zero errors. This is a targeted combined manifest,
+not the full repository suite. The 12 skips require `STRELVA_VERSIONS_PSQL`
+(eleven Version PostgreSQL cases, one Library/Review-all case); no SQL claim is
+made for them. After the final mobile-only layout change, the three mandatory
+real-tool union files reran: **41 passed / 3 files / zero skips**. Independent
+bounded review reran the 22 refresh cases and found no remaining recovery blocker.
+
+Final documented browser replay: **31 peer cases + 10 union cases passed**, zero
+skips. Real WorkspaceApp/tools, workspace and System entrances use closed
+fictional transports with foreign network requests refused. Populated/loading/
+empty/error/read-only/permission, desktop 1440px, mobile 390px and union 320px,
+keyboard focus/Enter, retained tool node/notice during held retries and after 200,
+current subsequent save,403 refusal and business Back/stale read were exercised.
+Coarse-pointer Retry measures at least 44px in both dimensions; its rectangle is
+inside the warning at 320/390. Croki primary inspection first observed V1 accepted
+notice and identical tool after 500 at 390/320; the 320 button extended ~3px beyond
+the alert border before stacking. Later Croki reported explicitly: “No preview
+automation host is available … Do not retry … use a headless browser”. The
+existing documented headless runner completed the replay. This is local rendered
+proof, not Auth/provider/production qualification. The initial browser fixture
+held a second StrictMode initial read and hung; hold now starts only after a
+mutation, and assertions use baseline counts. Two preliminary runs were stopped;
+other preliminary failures were ambiguous alert selection/busy chooser fixture
+assumptions, not runtime defects. All initial/final logs are retained locally.
+
+Actual PostgreSQL 18 conditioned lifetime-kind script passes on this combined
+source, including core/inverse/reapply/populated rollback refusal and current
+native source/schedule/website/offer writers. Its local shim temporarily removes
+named-role default table/function grants before the existing 1751 ACL precondition,
+then restores them immediately afterward. This conditions a disposable fixture;
+it does not qualify hosted ACL/Auth or PostgreSQL 17. Required workspace SQL still
+fails at frozen `20261022175100_legacy_google_operation_authority.sql:24`,
+`legacy_google_creation_authority_invalid`; required upgrade still fails at
+`tests/money-effect-admission-schema.sql:78`, omitted non-null booking `created_at`.
+Retain both failures and peer historical native fixture failure records. No guards,
+frozen migration bytes or required wrappers changed here. SQL companion repair
+is separate, subject to root review. No agency/provider authority expansion.
+
+Typecheck, boundaries, ontology and full lint passed on merged source with the
+initial recovery correction; final correction typecheck/focused lint and diff
+checks are recorded below at freeze. Clean build waits for the coordinator's
+serialized resource window. No full build/suite or production qualification is
+claimed before execution. Disposable routes were removed and devserver stopped.
+Draft [#623](https://github.com/Strelva/Strelva-OFFICIAL/pull/623) was published at
+checkpoint `01dfae2` solely as the requested safe stack base, explicitly unfinished.
+
+## Authorized adjacent inquiry-link plan
+
+After original union proof: remove only the fabricated `inquiryWorkspaceId`
+destination in `src/platform/offerings/definitions.ts`, returning `href:null`.
+Update the existing emission test in `offering-installations.test.ts`, retaining
+business resource validation, installation identity/revision and replay/history.
+Add a real OfferingInstallation UI case using canonical surface resolution in
+`workspace-offerings-ui.test.tsx`: connected installation remains visible, its
+inquiry surface says Unavailable and emits no Open link. Preserve existing UI
+fallback and native resources. Capture initial failing emission/UI assertions,
+then run both affected suites, typecheck/boundaries/ontology/changed lint/diff.
+
+A future exact destination requires an actor-authorized resource-to-tenant-slug
+mapping that also verifies the selected business. No authoritative mapping is
+exposed here; tenant/resource uniqueness alone can select another business.
+Prepared future action: design that exact scoped resolver and failure cases,
+then separately authorize its implementation. Do not alias resource UUID to
+`tenantId`, substitute the aggregate inbox or add grants/migrations/API mapping.
+
+
+Final proof-route teardown exposed two stale generated `.next/dev/types` imports
+of removed disposable pages in typecheck. Retained that failed log, moved only
+this worktree's generated dev type directory out, then regenerated route types
+for source-only verification. No deployed route or bridge remains.
+
+
+Recovery correction freeze: final `pnpm typecheck`, `pnpm check:boundaries`,
+`pnpm check:ontology`, focused ESLint across every union correction TS/TSX file,
+relative-link/manifest path validation and `git diff --check` pass. Full lint's
+merged-source pass is retained; changed files were rechecked after all corrections.
+The browser replay's 10 union cases reran with explicit coarse-pointer and
+alert containment assertions and pass. No new runtime source changed afterward.

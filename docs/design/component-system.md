@@ -1229,7 +1229,7 @@ System/work/detail hints and complete destinations. Business switches and opens
 preserve Back; acknowledged saves replace creation entries. Location remains a
 navigation hint, with existing server authority and UI read-only gates. Same-work
 save refreshes keep the mounted tool and its accepted notice; supplemental read
-errors appear separately. Access refusals and actual navigation still reset work,
+errors appear separately. A retained same-work refresh error offers “Retry workspace refresh”; it cannot be dismissed while callback authority is unavailable. The retry keeps the tool and accepted notice mounted through pending/failure, and only a successful current actor-scoped snapshot restores callbacks. The notice stacks its text and action on mobile, using the existing secondary Button and focus outline. Access refusals and actual navigation still reset work,
 and callbacks from a prior visit cannot claim a new instance after Back. Local
 fixture evidence and integration limits are in the [October 9 location handoff](../architecture/deepening-2026-10-09/workspace-location.md).
 

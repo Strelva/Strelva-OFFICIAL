@@ -43,7 +43,7 @@ import { workspaceExitBlocksChanges, workspaceExitIsStopped } from "./workspace-
 import { NO_OPEN_WORK, leaveWork, startContinuation, startAsk, type OpenWorkContext } from "./open-work";
 import type { PreviewRouteContext } from "./preview/route-context";
 
-type Notice = { kind: "success" | "error"; message: string } | null;
+type Notice = { kind: "success" | "error"; message: string; refreshWorkspaceId?: string } | null;
 
 export interface WorkspaceInquiryConfig {
   tenantId: string;
@@ -113,8 +113,9 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     // starting their request; ordinary navigation reads the current URL.
     if (workspaceId && requestedWorkspaceRef.current && requestedWorkspaceRef.current !== workspaceId) return;
     // A same-workspace save refresh must keep the mounted work until the read
-    // resolves. Authority is still invalidated below; navigation resets selection.
-    const preserveSelection = preserveNotice && selectedId === activeWorkspaceRef.current;
+    // resolves, including explicit retries after a supplemental failure. Requested
+    // scope is retained data, not callback authority, which is invalidated below.
+    const preserveSelection = preserveNotice && selectedId === requestedWorkspaceRef.current;
     if (!preserveNotice) navigationGenerationRef.current += 1;
     requestedWorkspaceRef.current = selectedId;
     const requestId = ++requestRef.current;
@@ -131,6 +132,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
       activeWorkspaceRef.current = data.workspaceId;
       requestedWorkspaceRef.current = data.workspaceId;
       setSnapshot(data);
+      if (preserveNotice) setNotice(current => current?.refreshWorkspaceId === data.workspaceId ? null : current);
       const params = new URLSearchParams(window.location.search);
       const selection = selectWorkspaceLocation(params, data, inquiryConfig);
       setSelectedWorkId(selection.selectedWorkId);
@@ -144,7 +146,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
       if (!supplementalFailure) setSnapshot(null);
       if (cause instanceof WorkspaceRequestError && cause.status === 401) setSignInRequired(true);
       const message = cause instanceof Error ? cause.message : "We couldn’t load this workspace.";
-      setNotice({ kind: "error", message: supplementalFailure ? `Your workspace could not be refreshed. ${message}` : message });
+      setNotice({ kind: "error", message: supplementalFailure ? `Your workspace could not be refreshed. ${message}` : message, ...(supplementalFailure && selectedId ? { refreshWorkspaceId: selectedId } : {}) });
     } finally {
       if (requestId === requestRef.current) setLoading(false);
     }
@@ -517,9 +519,10 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
         {pendingRequest ? <div role="status" className="mx-4 mt-4 flex flex-wrap items-center gap-4 rounded-xl border border-gray-border p-4 text-sm"><span>An assessment may still need to finish saving.</span>
           {(snapshot.pendingAssessments?.length || 0) > 1 ? <label className="flex items-center gap-2">Assessment<select className="rounded-lg border border-gray-border bg-surface px-3 py-2" value={pendingRequest} onChange={event => setPendingRequest(event.target.value)}>{!snapshot.pendingAssessments?.some(item => item.id === pendingRequest) ? <option value={pendingRequest}>Current attempt</option> : null}{snapshot.pendingAssessments?.map((item, index) => <option key={item.id} value={item.id}>{index + 1} · {formatDate(item.createdAt)}</option>)}</select></label> : null}<Button disabled={recovering} onClick={() => void recoverAssessment()}>Recover assessment</Button><Button variant="ghost" disabled={recovering} onClick={() => rememberAttempt(null)}>Dismiss</Button></div> : null}
         {notice ? (
-        <div inert={Boolean(handoffLoading || (handoffToken && handoffPreview)) || undefined} role={notice.kind === "error" ? "alert" : "status"} className={`mx-4 mt-4 flex items-start justify-between gap-4 rounded-xl border px-4 py-3 text-[13px] sm:mx-7 ${notice.kind === "error" ? "border-critical/30 bg-critical/10 text-critical" : "border-positive/30 bg-positive/10 text-positive"}`}>
+        <div inert={Boolean(handoffLoading || (handoffToken && handoffPreview)) || undefined} role={notice.kind === "error" ? "alert" : "status"} className={`mx-4 mt-4 flex flex-col items-start justify-between gap-4 rounded-xl border px-4 py-3 text-[13px] sm:mx-7 sm:flex-row ${notice.kind === "error" ? "border-critical/30 bg-critical/10 text-critical" : "border-positive/30 bg-positive/10 text-positive"}`}>
           <span>{notice.message}</span>
-          <button type="button" onClick={() => setNotice(null)} className="shrink-0 underline underline-offset-2">Dismiss</button>
+          {notice.refreshWorkspaceId ? <Button type="button" variant="secondary" size="sm" disabled={loading} onClick={() => void loadWorkspace(notice.refreshWorkspaceId, true)}>Retry workspace refresh</Button> : null}
+          {!notice.refreshWorkspaceId ? <button type="button" onClick={() => setNotice(null)} className="shrink-0 underline underline-offset-2">Dismiss</button> : null}
         </div>
       ) : null}</>}>
           {missingWork ? (

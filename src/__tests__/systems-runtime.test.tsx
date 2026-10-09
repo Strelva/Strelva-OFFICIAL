@@ -27,14 +27,14 @@ beforeEach(() => { vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); HTMLElement.
 afterEach(async () => { await act(async () => root?.unmount()); root = undefined; container?.remove(); window.history.replaceState(null, "", "/"); vi.unstubAllGlobals(); });
 
 function memberStore(): BoundedStore & { manager: (actor: WorkspaceActor, workspaceId: string) => Promise<void> } {
-  const base = memoryBoundedStore();
+  const base = memoryBoundedStore("33333333-3333-4333-8333-333333333333");
   const assertMember = async (actor: WorkspaceActor, workspaceId: string) => {
-    if (workspaceId !== "workspace-a" || ![owner.userId, member.userId].includes(actor.userId)) throw new WorkspaceAccessError();
+    if (workspaceId !== "33333333-3333-4333-8333-333333333333" || ![owner.userId, member.userId].includes(actor.userId)) throw new WorkspaceAccessError();
   };
   return {
     member: assertMember,
     async manager(actor, workspaceId) { await assertMember(actor, workspaceId); if (actor.userId !== owner.userId) throw new WorkspaceAccessError("Management access is required."); },
-    async read(actor, id) { await assertMember(actor, "workspace-a"); return base.read(owner, id); },
+    async read(actor, id) { await assertMember(actor, "33333333-3333-4333-8333-333333333333"); return base.read(owner, id); },
     async create(actor, workspaceId, input) { await assertMember(actor, workspaceId); return base.create(owner, workspaceId, input); },
     async update(actor, work, revision, payload) { await assertMember(actor, work.workspaceId); return base.update(owner, work, revision, payload); },
   };
@@ -70,7 +70,7 @@ async function fill(field: HTMLInputElement, value: string) {
 function button(label: string) { return [...container.querySelectorAll("button")].find(item => item.textContent?.trim() === label)!; }
 
 it.each([true, false])("searches canonical Systems and supporting files with the Systems release %s", async released => {
-  const state = await snapshot({ id: "backing-work", workspaceId: "workspace-a", title: "Older document controls", productId: "documents", resourceKind: "document", payload: null, input: {}, createdAt: "2026-10-08T00:00:00Z" });
+  const state = await snapshot({ id: "backing-work", workspaceId: "33333333-3333-4333-8333-333333333333", title: "Older document controls", productId: "documents", resourceKind: "document", payload: null, input: {}, createdAt: "2026-10-08T00:00:00Z" });
   state.work.push({ ...state.work[0]!, id: "supporting-file", title: "Decision evidence", productId: "ai_visibility", resourceKind: "assessment" });
   state.releases!.systems = released;
   state.systems!.systems[0]!.name = "Client intake";
@@ -97,7 +97,7 @@ it.each([true, false])("searches canonical Systems and supporting files with the
 });
 
 it.each([true, false])("opens a registry-only inquiry in the released business inbox (%s)", async inquiryInbox => {
-  const state = await snapshot({ id: "file", workspaceId: "workspace-a", title: "File", productId: "ai_visibility", resourceKind: "assessment", payload: null, input: {}, createdAt: "2026-10-08T00:00:00Z" });
+  const state = await snapshot({ id: "file", workspaceId: "33333333-3333-4333-8333-333333333333", title: "File", productId: "ai_visibility", resourceKind: "assessment", payload: null, input: {}, createdAt: "2026-10-08T00:00:00Z" });
   state.work = [];
   state.systems!.systems = [{ ref: { businessId: state.workspaceId, systemId: SYSTEM }, name: "Inquiries", kind: "inquiry", lifecycle: "live", basis: null, savedWorkId: null, tenantId: null, health: { status: "unknown", summary: "No evidence", lastVerifiedAt: null } }];
   const { systems } = readBusinessSystems({ snapshot: state, sites: [] });
@@ -107,7 +107,7 @@ it.each([true, false])("opens a registry-only inquiry in the released business i
   await mount(createElement(SystemPage, { system: systems[0], systems, workspaceId: state.workspaceId, sources: [], readOnly: true, inquiryInbox, systemHref: id => `?system=${id}`, onHome: noop, onAsk: noop }));
   if (inquiryInbox) {
     expect(request.mock.calls).toHaveLength(1);
-    expect(request.mock.calls[0]![0]).toBe("/api/workspace/inquiries?workspaceId=workspace-a");
+    expect(request.mock.calls[0]![0]).toBe("/api/workspace/inquiries?workspaceId=33333333-3333-4333-8333-333333333333");
     expect(container.textContent).toContain("This belongs to another business");
     expect(container.textContent).not.toContain("There is nothing to open");
   } else {
@@ -116,7 +116,7 @@ it.each([true, false])("opens a registry-only inquiry in the released business i
   }
 });
 async function mountLayout(state: WorkspaceSnapshot, request: typeof fetch) {
-  window.history.replaceState(null, "", `/workspace?view=system&system=${SYSTEM}`);
+  window.history.replaceState(null, "", `/workspace?workspaceId=${state.workspaceId}&view=system&system=${SYSTEM}`);
   await mount(createElement(WorkspaceRequestContext.Provider, { value: request }, createElement(WorkspaceLayout, {
     snapshot: state, home: true, agency: false, busy: false, selectedWork: null,
     onHome: noop, onNew: noop, onOngoing: noop, onAgency: noop, onChoose: noop, onWorkspace: noop, onOpenClientWork: noop, notice: null,
@@ -148,7 +148,7 @@ it.each([{ payload: { version: 2 } }, { payload: { rebuild: { version: 2 } } }, 
 
 it("lets a member submit a released app through its System without design or sharing authority", async () => {
   const service = createApplicationService(memberStore());
-  const created = await service.create(owner, "workspace-a", { title: "Requests", maintenanceOwner: owner.userId, fields: [{ id: "name", label: "Name", type: "text", required: true }], components: [{ kind: "form", fields: ["name"] }, { kind: "list", fields: ["name"] }] });
+  const created = await service.create(owner, "33333333-3333-4333-8333-333333333333", { title: "Requests", maintenanceOwner: owner.userId, fields: [{ id: "name", label: "Name", type: "text", required: true }], components: [{ kind: "form", fields: ["name"] }, { kind: "list", fields: ["name"] }] });
   await service.rehearse(owner, created.id, { expectedDesignRevision: 0 });
   const released = await service.publish(owner, created.id, { expectedCandidateRevision: 0, expectedReleaseVersion: null });
   const commands: unknown[] = [];
@@ -173,7 +173,7 @@ it("lets a member submit a released app through its System without design or sha
 it("lets a member reserve workspace time while retaining native manager-only pause", async () => {
   const store = memberStore();
   const service = createSchedulingService(store, { assertManager: store.manager, workspaceExitCompleted: async () => false });
-  const created = await service.create(owner, "workspace-a", { title: "Sessions", availability: [{ start: "2030-01-01T09:00:00Z", end: "2030-01-01T17:00:00Z" }] });
+  const created = await service.create(owner, "33333333-3333-4333-8333-333333333333", { title: "Sessions", availability: [{ start: "2030-01-01T09:00:00Z", end: "2030-01-01T17:00:00Z" }] });
   const commands: unknown[] = [];
   const request: typeof fetch = async (url, init) => {
     if (!String(url).startsWith("/api/bounded-work")) return new Response(JSON.stringify({ error: "Not simulated." }), { status: 403 });
@@ -194,7 +194,7 @@ it("lets a member reserve workspace time while retaining native manager-only pau
 
 it("keeps shared read-only System use disabled", async () => {
   const service = createSchedulingService(memberStore(), { workspaceExitCompleted: async () => false });
-  const created = await service.create(owner, "workspace-a", { title: "Sessions", availability: [{ start: "2030-01-01T09:00:00Z", end: "2030-01-01T17:00:00Z" }] });
+  const created = await service.create(owner, "33333333-3333-4333-8333-333333333333", { title: "Sessions", availability: [{ start: "2030-01-01T09:00:00Z", end: "2030-01-01T17:00:00Z" }] });
   const request = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify(String(url).startsWith("/api/bounded-work") ? created : { error: "Not simulated." }), { status: String(url).startsWith("/api/bounded-work") ? 200 : 403 }));
   await mountLayout(await snapshot(source(created), "member", "delegated_read"), request);
   expect(input("Reservation name").disabled).toBe(true);
@@ -203,17 +203,17 @@ it("keeps shared read-only System use disabled", async () => {
 });
 
 it.each([undefined, "delegated_read" as const, "provider_seat" as const])("lists registry-only Systems by identity and separates searchable files (%s)", async access => {
-  const state = await snapshot({ id: "file", workspaceId: "workspace-a", title: "File", productId: "ai_visibility", resourceKind: "assessment", payload: null, input: {}, createdAt: "2026-10-08T00:00:00Z" });
+  const state = await snapshot({ id: "file", workspaceId: "33333333-3333-4333-8333-333333333333", title: "File", productId: "ai_visibility", resourceKind: "assessment", payload: null, input: {}, createdAt: "2026-10-08T00:00:00Z" });
   state.work = [{ ...state.work[0]!, id: "supporting-file", title: "Campaign evidence", productId: "ai_visibility", resourceKind: "assessment" }];
   state.workspaces[0]!.access = access;
-  state.systems!.systems = ["inquiry", "listing", "newsletter"].map((kind, index) => ({ ref: { businessId: state.workspaceId, systemId: `registry-${index}` }, name: `Registry ${kind}`, kind, lifecycle: "live", basis: null, savedWorkId: null, tenantId: null, health: { status: "unknown", summary: "No evidence", lastVerifiedAt: null } }));
+  state.systems!.systems = ["inquiry", "listing", "newsletter"].map((kind, index) => ({ ref: { businessId: state.workspaceId, systemId: `51000000-0000-4000-8000-00000000000${index + 2}` }, name: `Registry ${kind}`, kind, lifecycle: "live", basis: null, savedWorkId: null, tenantId: null, health: { status: "unknown", summary: "No evidence", lastVerifiedAt: null } }));
   window.history.replaceState(null, "", "/workspace?view=work");
   const onChoose = vi.fn();
   const request = vi.fn(async () => new Response(JSON.stringify({ error: "Unavailable" }), { status: 503 }));
   await mount(createElement(WorkspaceRequestContext.Provider, { value: request }, createElement(WorkspaceLayout, { snapshot: state, home: true, agency: false, busy: false, selectedWork: null, onHome: noop, onNew: noop, onOngoing: noop, onAgency: noop, onChoose, onWorkspace: noop, onOpenClientWork: noop, notice: null })));
   for (const [index, kind] of ["inquiry", "listing", "newsletter"].entries()) {
     const link = [...container.querySelectorAll("a")].find(item => item.textContent?.includes(`Registry ${kind}`));
-    expect(link?.getAttribute("href")).toContain(`system=registry-${index}`);
+    expect(link?.getAttribute("href")).toContain(`system=51000000-0000-4000-8000-00000000000${index + 2}`);
   }
   expect(container.textContent).toContain("Files");
   const file = container.querySelector<HTMLButtonElement>('[aria-label="Open file Campaign evidence"]')!;
@@ -230,7 +230,7 @@ it.each([undefined, "delegated_read" as const, "provider_seat" as const])("lists
 });
 
 it("projects registry HomeFinder to the native business management surface", async () => {
-  const state = await snapshot({ id: "file", workspaceId: "workspace-a", title: "File", productId: "ai_visibility", resourceKind: "assessment", payload: null, input: {}, createdAt: "2026-10-08T00:00:00Z" }, "member");
+  const state = await snapshot({ id: "file", workspaceId: "33333333-3333-4333-8333-333333333333", title: "File", productId: "ai_visibility", resourceKind: "assessment", payload: null, input: {}, createdAt: "2026-10-08T00:00:00Z" }, "member");
   state.work = [];
   state.systems!.systems = [{ ref: { businessId: state.workspaceId, systemId: SYSTEM }, name: "Brokerage search", kind: "home_finder", lifecycle: "draft", basis: null, savedWorkId: null, tenantId: null, health: { status: "unknown", summary: "License evidence pending", lastVerifiedAt: null } }];
   const result = readBusinessSystems({ snapshot: state, sites: [] });
@@ -238,12 +238,12 @@ it("projects registry HomeFinder to the native business management surface", asy
   expect(result.systems[0]?.surface).toEqual({ kind: "work", workId: SYSTEM, productId: "home_finder" });
   const request = vi.fn(async () => new Response(JSON.stringify({ error: "Unavailable" }), { status: 503 }));
   await mountLayout(state, request);
-  expect([...container.querySelectorAll("a")].find(link => link.textContent?.includes("Open HomeFinder"))?.getAttribute("href")).toBe("/workspace/home-finder?workspaceId=workspace-a");
+  expect([...container.querySelectorAll("a")].find(link => link.textContent?.includes("Open HomeFinder"))?.getAttribute("href")).toBe("/workspace/home-finder?workspaceId=33333333-3333-4333-8333-333333333333");
   expect(container.textContent).toContain("License evidence pending");
 });
 
 it("shows a sourced native introduction without making the external System a change target", async () => {
-  const state = await snapshot({ id: "evidence", workspaceId: "workspace-a", title: "Evidence", productId: "ai_visibility", resourceKind: "assessment", payload: null, input: {}, createdAt: "2026-10-08T00:00:00Z" });
+  const state = await snapshot({ id: "evidence", workspaceId: "33333333-3333-4333-8333-333333333333", title: "Evidence", productId: "ai_visibility", resourceKind: "assessment", payload: null, input: {}, createdAt: "2026-10-08T00:00:00Z" });
   state.systems!.systems = [{ ref: { businessId: state.workspaceId, systemId: SYSTEM }, name: "External reference", kind: "website", lifecycle: "draft", basis: "Unverified source", savedWorkId: null, tenantId: null, connectedSite: { siteUrl: "https://example.org/", siteHost: "example.org", verified: false, lastEventAt: null }, health: { status: "unknown", summary: "Control is unverified", lastVerifiedAt: null } }];
   state.systems!.possibilities = [{ id: "new-native", title: "Private native copy", summary: "The source remains unchanged.", status: "exploring", affects: [], sourceSystemIds: [SYSTEM], introduces: ["Native website"], evidence: "HTML source only", previewHref: null, workId: "prepared-copy", stored: true }];
   const projection = readBusinessSystems({ snapshot: state, sites: [] });
@@ -260,8 +260,8 @@ it.each([
   { creatorDraft: true, versionReadOnly: undefined, workspaceStopped: false, editable: false },
   { creatorDraft: true, versionReadOnly: false, workspaceStopped: true, editable: false },
 ])("limits provider System draft editing to exact unblocked creator work: %j", async ({ creatorDraft, versionReadOnly, workspaceStopped, editable }) => {
-  const service = createApplicationService(memoryBoundedStore());
-  const saved = await service.create(owner, "workspace-a", { title: "Provider draft", maintenanceOwner: owner.userId, fields: [{ id: "name", label: "Name", type: "text", required: true }], components: [{ kind: "form", fields: ["name"] }] });
+  const service = createApplicationService(memoryBoundedStore("33333333-3333-4333-8333-333333333333"));
+  const saved = await service.create(owner, "33333333-3333-4333-8333-333333333333", { title: "Provider draft", maintenanceOwner: owner.userId, fields: [{ id: "name", label: "Name", type: "text", required: true }], components: [{ kind: "form", fields: ["name"] }] });
   const work = { ...source(saved), creatorDraft };
   const state = await snapshot(work);
   const { systems } = readBusinessSystems({ snapshot: state, sites: [] });

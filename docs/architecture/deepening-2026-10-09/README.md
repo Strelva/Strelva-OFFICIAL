@@ -45,95 +45,169 @@ source guards, not newly exercised SQL proof. New route tests mock the Systems
 adapter and do not reproduce its synchronization racing with delegation
 failure. This is retained uncertainty, not an observed permission bypass.
 
-## Reviewed, awaiting convergence
+## Released source in the isolated union candidate
 
-[Domain/Version PR #618](https://github.com/Strelva/Strelva-OFFICIAL/pull/618)
-is reviewed at `4543251842d0546258e392fdf368635b1deaf6c3` and remains isolated
-until the remaining streams converge. The coordinator reran its fifteen suites:
-**113 passed, 12 SQL-dependent skips**. Typecheck, boundaries, ontology, focused
-ESLint and diff whitespace pass. These totals overlap other streams' suites;
-do not add them as unique combined coverage.
+All six exact source heads are released and combined in
+`integrate/architecture-depth-20261009`. The merge checkpoint is
+`01dfae2e2`, before the union's additional recovery repair and regression
+fixtures. This is an isolated candidate: draft PR preparation is underway,
+while the coordinator holds canonical `reborn-1.0` integration for independent
+candidate review. `main`, production and shared migration application remain
+outside this work.
 
-Independent source review found no blocker. One Version-owned determination
-now supplies working definition, latest release, release-needed verdict, next
-number and changed paths to projection, generic/native preparation and release.
-The first release describes its full definition; reordered object keys do not
-create preparation. Array order still matters. Native exact-revision reads and
-retained receipts precede the unchanged-work exit; release qualification,
-approval and locked-field guards remain. Supported release/restore and current
-SQL wrapper paths keep current/latest aligned. Runtime source adds seven lines
-while removing consumer-local decisions; no new module or dependency is added.
+- Reads [PR #617](https://github.com/Strelva/Strelva-OFFICIAL/pull/617):
+  `65ebfc723b25e8a6c891589103be1530636cd83a`, already in the union's base;
+  [PRD](05-read-performance.md), [handoff](05-read-performance-handoff.md).
+- Domain/Version [PR #618](https://github.com/Strelva/Strelva-OFFICIAL/pull/618):
+  `4543251842d0546258e392fdf368635b1deaf6c3`;
+  [PRD and handoff](01-domain-version.md). Runtime commit
+  `1b70821155f51699d3c1398978ab15bc5517b264` precedes its proof-doc correction.
+- Location [PR #619](https://github.com/Strelva/Strelva-OFFICIAL/pull/619):
+  corrected `3de2cedc580025a0921533bb5efe9b22597c40e2`;
+  [PRD and handoff](workspace-location.md). This includes both the original
+  location work and the independently cleared remount/departed-callback repair.
+- Website [PR #620](https://github.com/Strelva/Strelva-OFFICIAL/pull/620):
+  corrected final `5beb3829def795887dc11c822c693bc625c0cc32`;
+  [PRD and handoff](02-website-settlement.md),
+  [test manifest](02-website-test-files.txt). Runtime `683c6efe5` precedes the
+  explicit test/doc followup. Final independent audit cleared this exact head.
+- Opened-work composition
+  [PR #621](https://github.com/Strelva/Strelva-OFFICIAL/pull/621):
+  docs-final `3b898fe5f5c338a02ee28f5258223a6850a34ca3`;
+  [PRD and handoff](opened-work-composition.md). Runtime remains
+  `e7fe129a5ee706de91d4c071edd69c0e2b888ff3`, independently reviewed.
+- Lifetime System kind
+  [PR #622](https://github.com/Strelva/Strelva-OFFICIAL/pull/622):
+  `bfb5ab065d934c03cdb6665229022e8e935ccbc0`;
+  [PRD, frozen hashes and handoff](06-lifetime-system-kind.md). Its distinct
+  release supersedes the earlier hold. Independent review verified predecessor
+  migration/helper bytes and the new frozen forward/inverse hashes.
 
-Caller tests use fictional transports, including generic runtime eligibility
-that is deliberately substituted. They do not prove native eligibility, SQL,
-Auth, provider publication or production. The stream's fictional preview proof
-also substitutes responses; it does not execute the refactored server helper.
+Full peer histories and handoffs are retained. Git reconciled the narrow
+WorkspaceApp import/render and navigation/save adjacency, plus the component
+inventory additions; combined tests still own behavioral qualification. The
+reads chooser remains in `agency/version-server.ts`. No peer worktree was edited.
 
-The founder glossary requires lifetime System kind, while older contracts,
-stores, tests and SQL permit kind updates. No application update caller was
-found beyond stores/tests, but the service-role RPC still exists. Kind affects
-health and native eligibility, so renaming it a description does not reconcile
-the discrepancy. This PR changes neither meaning nor enforcement. Jacob selected
-lifetime `System.kind` on October 9: a proposal can gain onboarding through
-content, purpose and behavior while keeping its kind. A separate implementation
-stream will remove the mutable contract and prepare forward SQL enforcement,
-preserving existing rows and migration history. Local disposable proof is
-authorized; applying migrations to shared/production data or rolling out the
-change still requires the existing separate authorization.
+## Domain and authority preserved
 
-## Remaining streams and integration order
+One Version-owned determination supplies working definition, latest release,
+release-needed verdict, next number and changed paths to projection,
+generic/native preparation and release. The first release describes its full
+definition; reordered object keys do not create preparation. Array order still
+matters. Native exact-revision reads and retained receipts precede the
+unchanged-work exit; release qualification, approval and locked-field guards
+remain. The coordinator's source-specific rerun was **113 passed, 12
+SQL-dependent skips**, with typecheck, boundaries, ontology, focused ESLint and
+diff whitespace passing. Those counts overlap other stream suites and are not
+unique union coverage.
 
-Opened-work composition [PR #621](https://github.com/Strelva/Strelva-OFFICIAL/pull/621)
-is independently reviewed at `3b898fe5f5c338a02ee28f5258223a6850a34ca3`.
-Its runtime is unchanged from `e7fe129a5ee706de91d4c071edd69c0e2b888ff3`;
-the later commit clarifies the combined acceptance gate. Inspection found no
-introduced dispatch, callback or permission blocker. The website peer's
-unconditional scope/revision guard closes an inherited initial-read gap in the
-intended union. This inspection is not combined execution proof.
+Domain #618 does not change kind meaning. Jacob separately selected lifetime
+`System.kind`: a proposal can gain onboarding through content, purpose and
+behavior while retaining its kind. #622 removes the mutable application contract
+and prepares forward SQL enforcement. Historical rows and all predecessor
+migration bytes remain unchanged. Source admission is not permission to apply
+that migration to shared/production data, reinterpret historical kinds or roll
+out enforcement.
 
-Two other reviewed heads need correction before integration:
+Composition keeps current permissions with each caller. Website admission now
+rejects deterministic invalid fresh URL input before retaining a command; an
+actually uncertain write retains the exact original command ID/body. Shared URL
+normalization preserves crawler error compatibility, while server DNS,
+redirect validation and pinned fetching stay separate. Supplemental History or
+domain failure cannot undo a confirmed mutation. Frozen public props, session
+keys and client-site contracts stay intact.
 
-- Website [PR #620](https://github.com/Strelva/Strelva-OFFICIAL/pull/620), original
-  head `8ff3578f485f4b207fbbf5be5af2a78d13faa70c`: malformed initial input can
-  become an immutable unknown attempt before any service claim exists. Reject
-  deterministic input errors before admission; retain exact replay for uncertain
-  writes. The owning stream is preparing a corrected head.
-- Location [PR #619](https://github.com/Strelva/Strelva-OFFICIAL/pull/619), original
-  head `ebbeda6e2ea0402220461c0a050c6f36c4cd70ba`: same-work save refresh clears
-  selected work before awaiting the snapshot, remounting Website and losing its
-  settled notice. A callback from a departed creation instance can also be
-  admitted after Home then Back restores the same URL. The owning stream is
-  preparing refresh preservation and instance-generation regressions.
+## Union behavior and evidence in progress
 
-Mandatory union cases use the real WorkspaceApp and tools: defer the same-work
-snapshot after an acknowledged save and preserve work, attempt and notice while
-pending, after success and after refresh failure; depart and return before an old
-save settles and refuse its callback; reject a successful wrong-work/workspace
-website envelope through both entrances; and retain revision 2 against a delayed
-revision 1. Fast batched fixture runs do not substitute for deferred settlement.
-Preserve permission epochs, workspace/work keys and optional History/domain
-unavailability without treating those reads as unknown writes.
+The [union PRD and proof record](07-architecture-union.md) owns the current
+objective, exact commands, retained failures, final totals and continuation.
+Its [combined test manifest](07-union-test-files.txt) deduplicates peer suites.
+The original preflight sections in that document are historical; the source
+release supersedes their runtime hold and pending-kind disposition.
 
-- Domain and Version changes: reviewed and held at the head above; retain the
-  separate System-kind decision when integrating.
-- Website acceptance/recovery: retain submitted payloads and stable public
-  props and workspace/work session keys; supplemental reads cannot undo an
-  accepted mutation.
-- Workspace location: own navigation/start/save/history changes, preserving
-  URL and Back contracts.
-- Opened-work composition: own shared rendering and imports, preserving
-  distinct action permissions and mounted request identity.
-- Lifetime System kind: enforce the selected glossary contract in an isolated
-  follow-up; inventory native/health consumers and existing SQL writers, prepare
-  forward enforcement, and prove changed-kind refusal plus ordinary updates.
+The real V1/V2 refresh regressions exposed an additional recovery defect: an
+acknowledged save survived a temporary snapshot failure, but App callback
+authority stayed invalid and the owner had no preserving retry path. Initial
+union evidence retained ten failed deferred recovery cases. The candidate adds
+**Retry workspace refresh**, retaining the same work/tool through repeated
+failure. Only a successful current-workspace GET restores callback authority;
+401/403/404 still remove access, and navigation rejects stale reads. Dismiss is
+omitted for this required retry so the owner cannot hide the recovery action.
+This repair does not turn retained requested scope into authority.
 
-Review each exact completed head and its proof before integration. Reconcile
-`agency/version-server.ts` without losing the reads stream's chooser hunk.
-Reconcile WorkspaceApp navigation and composition against both behavioral
-contracts. Then run the affected tests and rendered desktop/mobile scenarios
-on the combined source; isolated passes do not prove the union.
+A recorded union gate run passes **41 tests in three files**, covering real
+WorkspaceApp/tools and both workspace/System entrances: accepted-save deferred
+refresh, V1/V2 recovery and subsequent usability, Home/Back departed creation,
+valid foreign identity envelopes, revision regression, role/authority epochs,
+and supplemental History/domain failures. Fictional closed transports prove
+these local interaction rules, not genuine Auth, provider acceptance or hosted
+delivery. The final local browser replay separately passes **31 peer cases plus
+10 union cases**, including coarse-pointer geometry, keyboard and deferred recovery
+at 1440/390/320px. Its fixture and unavailable Croki host limits are retained in
+the [union handoff](07-architecture-union.md).
 
-Keep the next-release source in `reborn-1.0`; `main` and production remain
-outside this work. Canonical `PRODUCT_MODEL.md` and shared strategic state stay
-with their existing integration owner. Hand off bounded evidence deltas rather
-than creating a competing model or claiming a commercial change.
+The first broader manifest run retained **979 passed, five failed, 12 skipped,
+and six unhandled errors across 83 files**. The failures came from old runtime
+fixtures using invalid workspace/System identifiers and missing workspace scope now rejected by the strict
+location contract. Only fictional fixture IDs were corrected; guards were not
+weakened. The affected two-file rerun passes **42 tests**. The deduplicated
+[83-file manifest](07-union-test-files.txt) now passes **984 tests / 12 skips**,
+with zero unhandled errors. The skips are eleven PostgreSQL Version-store cases
+and one Library/Review-all case requiring `STRELVA_VERSIONS_PSQL`. This is a
+targeted combined run, not the full repository suite.
+
+Typecheck, product boundaries and ontology pass after the recovery correction;
+full lint passed on merged source and final correction files pass focused lint.
+The three mandatory union files reran after the mobile-only layout change:
+**41 passed / zero skips**. Clean build remains deferred for the serialized SQL
+companion resource window. Runtime TypeScript/TSX, runtime SQL, tests and docs will be counted
+separately in the union handoff. No subtraction, bundle, latency, adoption or
+economic claim is inferred from prior stream counts.
+
+## Disposable SQL qualification and retained blockers
+
+The actual combined-source
+`PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH bash scripts/check-lifetime-system-kind.sh`
+passes its fully ordered disposable local contract: kind-change refusal,
+legacy no-op, ordinary updates, authority/history, current native writers,
+preflight and inverse/reapply. This is explicitly conditioned local proof.
+Immediately before unchanged migration 1751, the runner temporarily revokes
+only the local Supabase shim's anon/authenticated table defaults and
+anon/authenticated/service-role function defaults, then restores them
+immediately after. The lifetime tail runs with those restored hostile defaults.
+No migration guard is skipped and no frozen migration byte is rewritten.
+
+The required combined runners remain failures:
+
+- `pnpm check:workspace-sql` stops at
+  `20261022175100_legacy_google_operation_authority.sql:24` with
+  `legacy_google_creation_authority_invalid`.
+- `pnpm check:workspace-upgrade` stops at
+  `tests/money-effect-admission-schema.sql:78` because the historical booking
+  fixture omits required `business_bookings.created_at`.
+
+Neither required runner reaches the new lifetime tail. The focused conditioned
+pass does not qualify either required runner. Historical native fixture failures
+remain in the [kind handoff](06-lifetime-system-kind.md): an unqualified source
+revision, missing current package/private source grant, unpersisted content
+pointer and omitted historical content author. Current-writer proof does not
+mark those historical suites passed. Hosted ACL/Auth, historical-kind review,
+live preflight and migration application remain separate release obligations.
+No agency-workflow/provider authority expansion or shared database action was
+performed.
+
+## Exact next action
+
+Complete the final combined manifest, checks and desktop/mobile replay, then
+record actual failures/skips and runtime/SQL/test/doc counts in the union handoff.
+After the original union proof passes, the separately authorized bounded inquiry
+repair may remove its fabricated resource-UUID href and prove the existing
+Unavailable installation UI; an exact authorized resource-to-tenant mapping
+remains future work. Publish/register the draft union PR against `reborn-1.0`
+and hand the exact candidate head to the coordinator for independent review.
+Canonical integration remains held; local source readiness is distinct from
+production readiness.
+
+Canonical `PRODUCT_MODEL.md` and shared strategic state remain with their existing
+integration owner. Return bounded evidence deltas without creating a competing
+model or claiming a commercial change.
