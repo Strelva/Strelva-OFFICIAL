@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
-import { noLoginWindowProfile, parseNoLoginRuntime, assertNoLoginEnvironment, assertNoLoginAuthConfiguration, redactNoLoginEvidence } from '../no-login-journey-window.mjs';
+import { noLoginWindowProfile, parseNoLoginRuntime, assertNoLoginEnvironment, assertNoLoginAuthConfiguration, redactNoLoginEvidence, noLoginReportEvidence, noLoginChildEnvironment } from '../no-login-journey-window.mjs';
 import { journeyProfile, shellEnvironment, validateReport } from '../full-model-journey-profile.mjs';
 import { cleanupWindowProfile } from '../tenant-cleanup-journey-window.mjs';
 
@@ -86,6 +86,38 @@ test('redacts nested evidence, local credential values and signed URL parameters
   const redacted = JSON.stringify(redactNoLoginEvidence(data, env));
   for (const secret of [env.STRELVA_LOCAL_DB_URL, env.APPROVE_LINK_SECRET, env.SUPABASE_SERVICE_ROLE_KEY, 'signed-value', 'other-value', 'signature-value']) assert.ok(!redacted.includes(secret));
   assert.ok(redacted.includes('[redacted'));
+});
+test('JSON signed-link reports remain parseable with intact sibling fields after redaction', () => {
+  const nativeReport = { ...report(noLoginWindowProfile()), metadata: { link: 'http://localhost:3100/approve?token=ws2.signed-value', adjacent: 'kept' } };
+  const safe = noLoginReportEvidence(JSON.stringify(nativeReport), environment());
+  const parsed = JSON.parse(JSON.stringify(safe.evidence));
+  assert.equal(parsed.metadata.link, 'http://localhost:3100/approve?token=[redacted-link-token]');
+  assert.equal(parsed.metadata.adjacent, 'kept');
+  assert.equal(validateReport(parsed, noLoginWindowProfile()).passed, 2);
+  assert.deepEqual(safe.report, nativeReport);
+});
+test('malformed raw reports preserve bounded private redacted evidence and cannot qualify', () => {
+  const raw = `{"error":"${environment().CRON_SECRET}","link":"http://localhost:3100/approve?token=signed-value" broken ${'x'.repeat(20_000)}`;
+  const safe = noLoginReportEvidence(raw, environment());
+  assert.equal(safe.report, null); assert.equal(safe.evidence.fullReleaseQualified, false);
+  assert.equal(safe.evidence.malformed, true); assert.ok(safe.evidence.redactedExcerpt.length <= 16_384);
+  const parsed = JSON.parse(JSON.stringify(safe.evidence));
+  assert.ok(!parsed.redactedExcerpt.includes(environment().CRON_SECRET)); assert.ok(!parsed.redactedExcerpt.includes('signed-value'));
+  const boundary = noLoginReportEvidence(`broken ${'x'.repeat(16_365)}${environment().CRON_SECRET}`, environment());
+  assert.ok(!boundary.evidence.redactedExcerpt.includes('local-cron'));
+  assert.throws(() => validateReport(parsed, noLoginWindowProfile()));
+});
+test('actual child environment excludes inherited role injection, calendar SDK secret and preloads without mutating the parent', () => {
+  const parent = { PATH: process.env.PATH, HOME: process.env.HOME, USER: process.env.USER, LC_ALL: 'other',
+    PGOPTIONS: '-c role=service_role', PGSERVICE: 'production', GOOGLE_CALENDAR_CLIENT_SECRET: 'hidden-sdk-secret',
+    NODE_OPTIONS: '--require arbitrary.js', LD_PRELOAD: '/arbitrary.so', DYLD_INSERT_LIBRARIES: '/arbitrary.dylib', UNLISTED_PROVIDER_FLAG: '1' };
+  const before = structuredClone(parent), runtime = environment(), child = noLoginChildEnvironment(parent, runtime);
+  const received = JSON.parse(execFileSync(process.execPath, ['-e', 'process.stdout.write(JSON.stringify(process.env))'], { env: child, encoding: 'utf8' }));
+  for (const key of ['PGOPTIONS', 'PGSERVICE', 'GOOGLE_CALENDAR_CLIENT_SECRET', 'NODE_OPTIONS', 'LD_PRELOAD', 'DYLD_INSERT_LIBRARIES', 'UNLISTED_PROVIDER_FLAG']) assert.equal(received[key], undefined);
+  for (const [key, value] of Object.entries(runtime)) assert.equal(received[key], value);
+  assert.equal(received.LC_ALL, 'C'); assert.deepEqual(parent, before);
+  assert.throws(() => noLoginChildEnvironment(parent, { ...runtime, PGOPTIONS: '-c role=service_role' }));
+  assert.throws(() => noLoginChildEnvironment(parent, { ...runtime, GOOGLE_CALENDAR_CLIENT_SECRET: 'hidden-sdk-secret' }));
 });
 test('CLI refuses arbitrary spec/profile override before executing anything', () => {
   assert.throws(() => execFileSync(process.execPath, [resolve(root, 'scripts/no-login-journey-window.mjs'), 'run', root, '/not-an-owned-work', 'arbitrary.spec.ts'], { stdio: 'pipe' }), /Command failed/);
