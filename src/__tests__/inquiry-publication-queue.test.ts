@@ -9,7 +9,7 @@ vi.mock("@/products/inquiries/workspace-exit", () => ({
   assertInquiryWorkspaceOpen: vi.fn(async () => undefined),
 }));
 
-import { queueInquiryPublication } from "@/products/inquiries/server";
+import { findInquiryPublication, queueInquiryPublication } from "@/products/inquiries/server";
 
 const time = "2026-09-11T12:00:00.000Z";
 const claim: PublicationClaim = {
@@ -132,5 +132,30 @@ describe("inquiry publication queue", () => {
 
     expect(result).toMatchObject({ acquired: false, reason: "already_claimed", eventId: null });
     expect(mocks.addEvent).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("readonly native publication recovery", () => {
+  it("reads an accepted command while inquiry admission is OFF without creating a claim, event or snapshot", async () => {
+    vi.stubEnv("STRELVA_INQUIRIES_RELEASE", "0");
+    const lookup = vi.fn(async () => ({ ...claim, status: "accepted" as const }));
+    const store = repository(); store.findPublicationClaim = lookup;
+    const create = vi.mocked(store.claimPublication), snapshot = vi.mocked(store.getSnapshot);
+    mocks.addEvent.mockClear();
+    try {
+      expect(await findInquiryPublication({ ...input, repository: store })).toMatchObject({ status: "accepted" });
+      expect(lookup).toHaveBeenCalledWith({ ...input, repository: store });
+      expect(create).not.toHaveBeenCalled(); expect(snapshot).not.toHaveBeenCalled(); expect(mocks.addEvent).not.toHaveBeenCalled();
+    } finally { vi.unstubAllEnvs(); }
+  });
+  it("keeps completed workspace-exit refusal before the receipt read", async () => {
+    const { assertInquiryWorkspaceOpen } = await import("@/products/inquiries/workspace-exit");
+    const guard = vi.mocked(assertInquiryWorkspaceOpen);
+    const lookup = vi.fn(async () => ({ ...claim, status: "accepted" as const }));
+    const store = repository(); store.findPublicationClaim = lookup;
+    guard.mockRejectedValueOnce(new Error("Workspace exited"));
+    await expect(findInquiryPublication({ ...input, repository: store })).rejects.toThrow("Workspace exited");
+    expect(lookup).not.toHaveBeenCalled();
   });
 });

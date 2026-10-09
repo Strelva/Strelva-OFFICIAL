@@ -154,6 +154,13 @@ export interface QueueInquiryPublicationResult {
   eventId: string | null;
 }
 
+/** Recovery reads the exact existing native receipt without queuing new work.
+ * Closed-workspace refusal and full actor/command identity still apply. */
+export async function findInquiryPublication(input: ClaimPublicationInput & { repository?: InquiryRepository }) {
+  await assertInquiryWorkspaceOpen({ tenantId: input.tenantId });
+  return (input.repository ?? getInquiryRepository()).findPublicationClaim(input);
+}
+
 /**
  * Place a make-live or undo request in the existing governed event queue. The
  * route intentionally stops here. No capability state is made live by this

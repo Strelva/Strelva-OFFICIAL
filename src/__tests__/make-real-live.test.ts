@@ -196,6 +196,7 @@ describe("live channel adapters", () => {
       }),
       execute: vi.fn(async (input: { claimId: string }) => { for (const c of claims.values()) if (c.id === input.claimId) c.status = "accepted"; return { accepted: true, verified: true }; }),
       claim: async (_t: string, id: string) => [...claims.values()].find((c) => c.id === id) ?? null,
+      find: vi.fn(async (input: { idempotencyKey: string }) => claims.get(input.idempotencyKey) ?? null),
     };
     const adapter = createInquiryFormAdapter(ports, ctx());
     const effect: DeclaredEffect = { id: "form", kind: "publish", channel: "inquiry_form", system: { systemId: "b1000000-0000-4000-8000-0000000000e2" }, description: "Publish the consult form",

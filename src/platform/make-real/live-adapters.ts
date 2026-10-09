@@ -239,6 +239,8 @@ export interface InquiryFormPorts {
   queue(input: z.infer<typeof inquiryFormRequestSchema> & { action: "make_live" | "undo"; idempotencyKey: string; actorId: string }): Promise<{ claim: InquiryClaim; acquired: boolean; reason?: string; eventId: string | null }>;
   execute(input: { tenantId: string; eventId: string; claimId: string; actorId: string }): Promise<{ accepted: boolean; verified: boolean; reason?: string }>;
   claim(tenantId: string, claimId: string): Promise<InquiryClaim | null>;
+  /** Optional older internal ports fail closed; recovery never falls back to queue. */
+  find?(input: z.infer<typeof inquiryFormRequestSchema> & { action: "make_live"; idempotencyKey: string; actorId: string }): Promise<InquiryClaim | null>;
 }
 
 const ACCEPTED_CLAIM = new Set(["accepted", "verification_failed"]);
@@ -272,12 +274,13 @@ export function createInquiryFormAdapter(ports: InquiryFormPorts, ctx: LiveChann
     async find({ effect, idempotencyKey }) {
       const req = parseRequest(inquiryFormRequestSchema, effect);
       if (!req) return null;
-      // The claim is keyed by the step's idempotency key; asking again creates
-      // at most the claim row, never a publication.
+      if (!ports.find) return null;
       const { followUpAlternative: _selection, ...native } = req;
       void _selection;
-      const queued = await ports.queue({ ...native, action: "make_live", idempotencyKey, actorId: ctx.actor.userId });
-      return ACCEPTED_CLAIM.has(queued.claim.status) ? { found: true, providerRef: ref(req.tenantId, queued.claim.id) } : { found: false };
+      // Recovery is observation only. A missing key must not create a claim or
+      // governed event before current channel/owner admission is checked again.
+      const claim = await ports.find({ ...native, action: "make_live", idempotencyKey, actorId: ctx.actor.userId });
+      return claim && ACCEPTED_CLAIM.has(claim.status) ? { found: true, providerRef: ref(req.tenantId, claim.id) } : { found: false };
     },
     async readBack({ providerRef }) {
       const { tenantId, claimId } = split(providerRef);

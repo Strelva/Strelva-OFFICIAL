@@ -73,6 +73,7 @@ export function liveChannelAdapters(actor: WorkspaceActor, workspaceId: string, 
     createInquiryFormAdapter({
       prepareFollowUp: async (a, selection) => (await import("@/products/inquiries/server")).approveAskInquiryFollowUpPublication(a, selection),
       queue: async (input) => (await import("@/products/inquiries/server")).queueInquiryPublication(input),
+      find: async (input) => (await import("@/products/inquiries/server")).findInquiryPublication(input),
       execute: async (input) => (await import("@/products/inquiries/publication")).executeInquiryPublication(input),
       claim: async (tenantId, claimId) => (await import("@/products/inquiries/repository")).getInquiryRepository().getPublicationClaim(tenantId, claimId),
     }, ctx),

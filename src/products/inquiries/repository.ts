@@ -511,6 +511,8 @@ export interface InquiryRepository {
   compareAndSwap(input: CompareAndSwapInput): Promise<CompareAndSwapResult>;
   claimPublication(input: ClaimPublicationInput): Promise<ClaimPublicationResult>;
   getPublicationClaim(tenantId: string, claimId: string): Promise<PublicationClaim | null>;
+  /** Read an exact existing command only. Never creates a claim or event. */
+  findPublicationClaim(input: ClaimPublicationInput): Promise<PublicationClaim | null>;
   markPublicationAccepted(input: MarkPublicationAcceptedInput): Promise<PublicationClaim>;
   markPublicationFailed(input: MarkPublicationFailedInput): Promise<PublicationClaim>;
   linkPublicationEvent(input: LinkPublicationEventInput): Promise<PublicationClaim>;
@@ -595,6 +597,15 @@ export class InMemoryInquiryRepository implements InquiryRepository {
     const claimToken = publicationClaimToken(claim);
     this.publicationTokens.set(claim.id, tokenHash(claimToken));
     return { acquired: true, claim: structuredClone(claim), claimToken };
+  }
+
+  async findPublicationClaim(input: ClaimPublicationInput): Promise<PublicationClaim | null> {
+    const key = `${normalizedTenant(input.tenantId)}:${bounded(input.idempotencyKey, "Publication idempotency key")}`;
+    const id = this.publicationByKey.get(key);
+    if (!id) return null;
+    const claim = this.publications.get(id)!;
+    assertSameCommand(claim, input, digest(input));
+    return structuredClone(claim);
   }
 
   async getPublicationClaim(tenant: string, claimId: string): Promise<PublicationClaim | null> {
@@ -763,6 +774,16 @@ class PostgresInquiryRepository implements InquiryRepository {
       }
     }
     throw new InquiryPersistenceError("Create publication claim failed.", { cause: result.error });
+  }
+
+  async findPublicationClaim(input: ClaimPublicationInput): Promise<PublicationClaim | null> {
+    const result = await this.db.from("inquiry_publication_claims").select("*")
+      .eq("tenant_id", normalizedTenant(input.tenantId)).eq("idempotency_key", bounded(input.idempotencyKey, "Publication idempotency key")).maybeSingle();
+    if (result.error) throw new InquiryPersistenceError("Read publication claim failed.", { cause: result.error });
+    if (!result.data) return null;
+    const claim = mapPublication(result.data as Row<"inquiry_publication_claims">);
+    assertSameCommand(claim, input, digest(input));
+    return claim;
   }
 
   async getPublicationClaim(tenantValue: string, claimId: string): Promise<PublicationClaim | null> {
