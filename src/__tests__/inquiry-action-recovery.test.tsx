@@ -2,7 +2,7 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { WorkspaceInquiryReply, REPLY_OUTCOME } from "@/experience/places/WorkspaceInquiryReply";
+import { WorkspaceInquiryReply } from "@/experience/places/WorkspaceInquiryReply";
 import { HeldInquiryActions } from "@/experience/places/HeldInquiryActions";
 
 const workspaceId = "11111111-1111-4111-8111-111111111111", rowId = "22222222-2222-4222-8222-222222222222";
@@ -31,7 +31,7 @@ it("dispatches only one reply request ID for two same-batch send actions", async
   expect(bodies.map(item => item.requestId)).toEqual([expect.any(String)]); expect(bodies[0]).toMatchObject({ workspaceId, rowId, body: "Thanks Pat. Could you tell us more?" }); expect(bodies[0]).not.toHaveProperty("to");
   expect(container.querySelector("textarea")!.disabled).toBe(true);
   await act(async () => resolve(Response.json({ outcome: receipt })));
-  expect(container.querySelector('[role="status"]')?.textContent).toBe(REPLY_OUTCOME.accepted);
+  expect(container.querySelector('[role="status"]')?.textContent).toBe("Sent. Delivery isn't confirmed yet.");
 });
 
 it.each([400, 401, 403, 404, 409, 429, 503])("retains an unknown attempt after a later %s denial and explicitly checks the same payload", async status => {
@@ -73,9 +73,18 @@ it.each([{ status: "accepted" }, { ...receipt, providerMessageId: { bad: true } 
   expect(container.querySelector('[role="status"]')).toBeNull(); expect(button("Check this reply")).toBeDefined(); expect(container.querySelector("textarea")!.disabled).toBe(true);
 });
 
-it.each(Object.keys(REPLY_OUTCOME))("preserves the established %s outcome promise", async status => {
+it.each([
+  ["sending", "This reply is being checked. Reload its receipt before sending anything else."],
+  ["suppressed", "Email is paused. Nothing was sent."],
+  ["accepted", "Sent. Delivery isn't confirmed yet."],
+  ["delivered", "Delivered to the recipient's email provider."],
+  ["deferred", "Sent. The recipient's email provider delayed delivery."],
+  ["bounced", "Sent, but the recipient's email provider bounced it. Check their address."],
+  ["failed", "The provider reported a failure. This reply won't be sent again."],
+  ["unknown", "The send couldn't be confirmed. Strelva must check the receipt before another attempt."],
+])("preserves the established %s outcome promise", async (status, message) => {
   vi.stubGlobal("fetch", vi.fn(async () => Response.json({ outcome: { ...receipt, status } }))); await reply(); await act(async () => button("Approve and send reply").click());
-  expect(container.querySelector('[role="status"]')?.textContent).toBe(REPLY_OUTCOME[status as keyof typeof REPLY_OUTCOME]); expect(button("Check this reply")).toBeUndefined();
+  expect(container.querySelector('[role="status"]')?.textContent).toBe(message); expect(button("Check this reply")).toBeUndefined();
 });
 
 it("cannot close a reply draft in the same batch that dispatches its attempt", async () => {
