@@ -34,6 +34,7 @@
 .historyList time { color: var(--gray-subtle); font-size: 11px; }
 .srStatus { margin-top: 28px; color: var(--gray-muted); font-size: 14px; }
 @media (max-width: 767px) {
+  .root :is(input, textarea, select, button), .requestCard :is(input, textarea, select, button) { min-block-size: 44px; max-inline-size: 100%; }
   .root { padding: 28px 16px 56px; }
   .requestCard { margin-top: 24px; padding: 18px; }
   .formGrid { grid-template-columns: 1fr; }

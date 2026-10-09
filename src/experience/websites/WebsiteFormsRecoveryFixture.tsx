@@ -13,9 +13,9 @@ export function WebsiteFormsRecoveryFixture({ version, managed = false }: { vers
   return <main data-dashboard className="min-h-screen bg-surface-base">
     <header className="flex flex-wrap gap-4 border-b border-gray-border p-6 text-sm">
       <p>Fictional website forms interface · no Auth or publication proof</p>
-      <Button variant="secondary" onClick={() => setReadOnly(value => !value)}>{readOnly ? "Restore fictional editing access" : "Remove fictional editing access"}</Button>
-      {version === 2 && managed ? <Button variant="secondary" onClick={() => setCanPublish(value => !value)}>{canPublish ? "Remove fictional publication permission" : "Restore fictional publication permission"}</Button> : null}
-      <Button variant="secondary">Outside website control</Button>
+      <Button className="max-w-full whitespace-normal" variant="secondary" onClick={() => setReadOnly(value => !value)}>{readOnly ? "Restore fictional editing access" : "Remove fictional editing access"}</Button>
+      {version === 2 && managed ? <Button className="max-w-full whitespace-normal" variant="secondary" onClick={() => setCanPublish(value => !value)}>{canPublish ? "Remove fictional publication permission" : "Restore fictional publication permission"}</Button> : null}
+      <Button className="max-w-full whitespace-normal" variant="secondary">Outside website control</Button>
     </header>
     {version === 2 ? <RebuildExperience {...identity} managed={managed} canPublish={canPublish} readOnly={readOnly} /> : <WebsiteExperience {...identity} readOnly={readOnly} />}
   </main>;

@@ -127,6 +127,9 @@ describe("workspace invitation return target", () => {
     expect(analyticsAllowedPath("/sign-in")).toBe(false);
     expect(analyticsAllowedPath("/sign-up")).toBe(false);
     expect(analyticsAllowedPath("/auth/callback")).toBe(false);
+    expect(analyticsAllowedPath("/preview/strelva/website-forms")).toBe(false);
+    expect(analyticsAllowedPath("/preview")).toBe(false);
+    expect(analyticsAllowedPath("/preview-other")).toBe(true);
     expect(analyticsAllowedPath("/")).toBe(true);
   });
 });

@@ -1373,3 +1373,8 @@ The legacy brief setter uses the same synchronous in-flight/unknown/permission f
 Legacy lifecycle recovery validates website status, launch status, receipt status and failure stage together in both directions. It preserves legitimate receipt-less launch preparation, pending exports, published receipts, saved artifact/launch failures and idempotent responses. A retained initial draft at work revision0 is a valid creation readback before generation; it shows saved-draft copy and requires explicit preview generation instead of claiming a preview already exists.
 
 Legacy forms acknowledgements pass the same `currentWebsiteRecord` lifecycle guard before parent adoption or saved confirmation. Full-schema forms records with inconsistent launch metadata remain unconfirmed and require the existing current-state read.
+
+
+### Website recovery rendered boundaries, October 9
+
+The first complete26-case local recovery run retained26 valid traces but failed: preview telemetry attempted an external analytics script, mobile website fields/actions measured40px, and the enlarged320px preview fixture outside button extended to424px. Preview routes are excluded from analytics; owned website controls have a44px mobile minimum; fixture controls wrap within their available width. Existing recovery, immutable commands and authority checks are unchanged. These corrections require the complete rendered rerun; source tests do not qualify native Auth or publication.

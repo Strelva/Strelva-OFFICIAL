@@ -50,3 +50,7 @@
 @media(max-width:767px) { .root { padding:24px 24px 48px; } .progress { grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; } .intake { padding:24px; } .previewBar { padding:16px; } .preview iframe { height:520px; } .actions { gap:8px; } .domainForm > div { min-width:0; width:100%; } }
 @media(max-width:360px) { .root { padding-inline:16px; } .intake { padding:16px; } }
 @media(max-width:767px) { .domainForm { display:grid; grid-template-columns:minmax(0,1fr); } .domainForm > div { max-width:none; } }
+
+@media (max-width: 767px) {
+  .root :is(input, textarea, select, button) { min-block-size: 44px; max-inline-size: 100%; }
+}
