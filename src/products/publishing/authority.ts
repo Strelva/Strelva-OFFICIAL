@@ -48,7 +48,7 @@ export async function authorizePublishingEvent(input: { tenantId: string; event:
   if (input.actorId.startsWith("make-real-service:")) {
     if (input.event.metadata?.kind !== "workspace_google_listing_draft") return deny("publishing_approval_required");
     try {
-      const service = await (await import("@/products/google-listing/make-real-service-authority")).authorizeGoogleServiceEvent(input);
+      const service = await (await import("@/products/google-listing/server")).authorizeGoogleServiceEvent(input);
       actor = { userId: service.userId, verifiedEmail: service.verifiedEmail };
       bindingId = service.bindingId;
     } catch { return deny("publishing_service_authority_ended"); }
