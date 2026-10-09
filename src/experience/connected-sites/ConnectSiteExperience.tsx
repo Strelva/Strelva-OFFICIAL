@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { z } from "zod";
+import { expectedConnectedSiteSystemId } from "@/products/connected-sites/acknowledgement";
 import { Button } from "@/components/ui/Button";
 import { SelectInput, TextInput } from "@/components/ui/TextInput";
 import { PLATFORMS, type SitePlatform } from "@/products/connected-sites/contracts";
@@ -77,14 +78,17 @@ function ConnectSiteExperienceContent({ workspaceId, canManage, initialSites, ap
     setError([message, UNCONFIRMED_CONNECTION].filter(Boolean).join(" "));
   }
 
-  async function post(body: Record<string, unknown>): Promise<ConnectableSite | null> {
+  async function post(body: Record<string, unknown>, expectedSite?: ConnectableSite): Promise<ConnectableSite | null> {
     const response = await request("/api/workspace/connected-sites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, ...body }) });
     const raw: unknown = await response.json().catch(() => null);
     const parsed = connectedResponse.safeParse(raw), error = errorResponse.safeParse(raw);
     const result = parsed.success ? parsed.data : null;
     const message = error.success ? error.data.error : undefined;
     const address = body.action === "connect" ? submittedAddress(String(body.siteUrl)) : null;
-    const exact = result && result.site.status === "active" && (body.action === "verify" ? result.site.id === body.siteId
+    const expectedSystemId = response.ok && result ? await expectedConnectedSiteSystemId(workspaceId, result.site.id) : null;
+    const exact = result && result.site.status === "active" && result.site.systemId === expectedSystemId && (body.action === "verify"
+      ? expectedSite && result.site.id === body.siteId && result.site.systemId === expectedSite.systemId
+        && result.site.siteUrl === expectedSite.siteUrl && result.site.siteHost === expectedSite.siteHost
       : address && result.site.siteUrl === address.siteUrl && result.site.siteHost === address.siteHost);
     if (!response.ok || !result || !exact) {
       const held = response.status === 503 && message === "Connected sites are not enabled. Nothing changed.";
@@ -109,7 +113,7 @@ function ConnectSiteExperienceContent({ workspaceId, canManage, initialSites, ap
   async function verify() {
     if (!site || !canManage || inFlight.current || needsReload.current) return;
     inFlight.current = true; recovery.current = beginFocusRecovery(scope.current); setBusy(true); setError("");
-    try { const next = await post({ action: "verify", siteId: site.id }); if (next) setSite(next); }
+    try { const next = await post({ action: "verify", siteId: site.id }, site); if (next) setSite(next); }
     catch { uncertain(); }
     finally { inFlight.current = false; setBusy(false); }
   }

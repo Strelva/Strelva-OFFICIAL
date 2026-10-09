@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { act, createElement } from "react";
+import { createHash, randomUUID } from "node:crypto";
+import { systemOriginId } from "@/platform/systems/invariants";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ConnectSiteExperience, type ConnectableSite } from "@/experience/connected-sites/ConnectSiteExperience";
@@ -14,7 +16,11 @@ const BUSINESS = "11111111-1111-4111-8111-111111111111";
 const SYSTEM = "22222222-2222-4222-8222-222222222222";
 const REQUEST = "33333333-3333-4333-8333-333333333333";
 const roots: ReturnType<typeof createRoot>[] = [];
-beforeEach(() => vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true));
+beforeEach(() => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  // Real SHA-256 bytes; a synchronous resolved digest keeps DOM fixtures deterministic.
+  vi.stubGlobal("crypto", { randomUUID, subtle: { digest: async (_algorithm: string, bytes: Uint8Array) => Uint8Array.from(createHash("sha256").update(bytes).digest()).buffer } });
+});
 afterEach(async () => { for (const root of roots.splice(0)) await act(async () => root.unmount()); document.body.innerHTML = ""; vi.unstubAllGlobals(); });
 async function mount(element: ReturnType<typeof createElement>, request: typeof fetch) {
   const node = document.createElement("div"); document.body.appendChild(node);
@@ -91,10 +97,10 @@ it("admits one page mutation during same-batch submits", async () => {
   const node = await mount(pageElement(), request as unknown as typeof fetch);
   await act(async () => { node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
   expect(request).toHaveBeenCalledTimes(1);
-  await act(async () => finish(new Response(JSON.stringify({ page: { handle: "bread", published: true, url: "https://app.example.test/b/bread" } }))));
+  await act(async () => finish(new Response(JSON.stringify({ page: { handle: "bread", published: true, url: "https://app.strelva.com/biz/bread" } }))));
 });
 
-const connection: ConnectableSite = { id: REQUEST, systemId: SYSTEM, siteHost: "bakery.example", siteUrl: "https://bakery.example/", status: "active", verifiedAt: null, snippet: { script: "<script></script>", meta: null } };
+const connection: ConnectableSite = { id: REQUEST, systemId: systemOriginId(BUSINESS, { kind: "connected_site", ref: REQUEST }), siteHost: "bakery.example", siteUrl: "https://bakery.example/", status: "active", verifiedAt: null, snippet: { script: "<script></script>", meta: null } };
 it("rejects a valid connection acknowledgement for another submitted address", async () => {
   const request = vi.fn(async () => new Response(JSON.stringify({ site: connection }), { status: 201 }));
   const node = await mount(createElement(ConnectSiteExperience, { workspaceId: BUSINESS, canManage: true, initialSites: [] }), request as unknown as typeof fetch);
@@ -134,7 +140,7 @@ it("keeps unknown publication locked and visible while a read-only site check co
 });
 it("keeps an uncertain unpublish decision locked through a later submit", async () => {
   const request = vi.fn(async (_url: string, _init?: RequestInit) => { throw new TypeError("Reply lost"); });
-  const node = await mount(createElement(ServerVisibility, { workspaceId: BUSINESS, canManage: true, initial: { pagesEnabled: true, page: { handle: "bread", published: true, url: "https://app.example.test/b/bread" }, blocks: null } }), request as unknown as typeof fetch);
+  const node = await mount(createElement(ServerVisibility, { workspaceId: BUSINESS, canManage: true, initial: { pagesEnabled: true, page: { handle: "bread", published: true, url: "https://app.strelva.com/biz/bread" }, blocks: null } }), request as unknown as typeof fetch);
   await act(async () => button(node, "Unpublish")!.click());
   expect(JSON.parse(String(request.mock.calls[0]?.[1]?.body)).published).toBe(false);
   expect(button(node, "Unpublish")?.disabled).toBe(true); expect(button(node, "Save address")?.disabled).toBe(true);
@@ -149,7 +155,7 @@ it("does not attach an old page flight or its recovery focus to a newly selected
   const publish = button(node, "Publish page")!; publish.focus();
   await act(async () => publish.click());
   const next = createElement(ServerVisibility, { workspaceId: SYSTEM, canManage: true, suggestedHandle: "other", initial: { pagesEnabled: true, page: null, blocks: null } });
-  await act(async () => roots[roots.length - 1].render(createElement(WorkspaceRequestContext.Provider, { value: request as unknown as typeof fetch }, next)));
+  await act(async () => roots[roots.length - 1]!.render(createElement(WorkspaceRequestContext.Provider, { value: request as unknown as typeof fetch }, next)));
   const current = button(node, "Publish page")!; current.focus();
   await act(async () => finish());
   expect(node.querySelector("input")?.value).toBe("other"); expect(current.disabled).toBe(false);
@@ -180,4 +186,33 @@ it.each([false, true])("recovers a completed verification to its connected resul
   await act(async () => finish(new Response(JSON.stringify({ site: { ...connection, verifiedAt: "2026-10-09T00:00:00Z" } }))));
   expect(node.querySelector("h2")?.textContent).toBe("bakery.example is connected");
   expect(document.activeElement).toBe(outside ? elsewhere : node.querySelector("h2"));
+});
+
+it.each(["https://app.strelva.com/b/bread", "https://app.strelva.com/biz/other", "https://foreign.example/biz/bread", "https://app.strelva.com/biz/bread?changed=1", "https://app.strelva.com/biz/bread#different"])("locks a schema-valid publication acknowledgement with the wrong URL %s", async url => {
+  const request = vi.fn(async () => new Response(JSON.stringify({ page: { handle: "bread", published: true, url } })));
+  const reload = reloadSpy(), node = await mount(pageElement(), request as unknown as typeof fetch);
+  await act(async () => button(node, "Publish page")!.click());
+  expect(button(node, "Reload page")).toBeTruthy();
+  expect(button(node, "Publish page")?.disabled).toBe(true);
+  expect(node.querySelector('a[href="' + url + '"]')).toBeNull();
+  await act(async () => node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+  await act(async () => button(node, "Reload page")!.click());
+  expect(request).toHaveBeenCalledTimes(1); expect(reload).toHaveBeenCalledTimes(1);
+});
+it.each(["connect", "verify"])("locks a schema-valid %s acknowledgement for an unrelated System", async action => {
+  const request = vi.fn(async () => new Response(JSON.stringify({ site: { ...connection, systemId: SYSTEM, verifiedAt: "2026-10-09T00:00:00Z" } })));
+  const reload = reloadSpy(), node = await mount(createElement(ConnectSiteExperience, { workspaceId: BUSINESS, canManage: true, initialSites: action === "verify" ? [connection] : [] }), request as unknown as typeof fetch);
+  if (action === "connect") await fill(node, "bakery.example");
+  await act(async () => button(node, action === "connect" ? "Get my two lines" : "Check my site")!.click());
+  expect(button(node, "Reload connection")).toBeTruthy();
+  expect(node.textContent).not.toContain("bakery.example is connected");
+  expect(node.querySelector(`a[href*="system=${SYSTEM}"]`)).toBeNull();
+  await act(async () => button(node, "Reload connection")!.click());
+  expect(request).toHaveBeenCalledTimes(1); expect(reload).toHaveBeenCalledTimes(1);
+});
+it("locks a verification acknowledgement with the right IDs but another address", async () => {
+  const request = vi.fn(async () => new Response(JSON.stringify({ site: { ...connection, siteUrl: "https://other.example/", siteHost: "other.example", verifiedAt: "2026-10-09T00:00:00Z" } })));
+  const node = await mount(createElement(ConnectSiteExperience, { workspaceId: BUSINESS, canManage: true, initialSites: [connection] }), request as unknown as typeof fetch);
+  await act(async () => button(node, "Check my site")!.click());
+  expect(button(node, "Reload connection")).toBeTruthy(); expect(node.textContent).not.toContain("other.example is connected");
 });

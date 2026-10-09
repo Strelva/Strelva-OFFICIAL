@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
+import { exactBusinessPageUrl } from "@/products/connected-sites/acknowledgement";
 import { beginFocusRecovery, type FocusRecovery } from "@/experience/websites/focus-recovery";
 import { Button } from "@/components/ui/Button";
 import { SelectInput, TextInput } from "@/components/ui/TextInput";
@@ -83,7 +84,7 @@ function ServerVisibilityContent({ workspaceId, canManage, initial, suggestedHan
       const raw: unknown = await response.json().catch(() => null);
       const result = pageResponse.safeParse(raw), error = errorResponse.safeParse(raw);
       const message = error.success ? error.data.error : undefined;
-      if (response.ok && result.success && result.data.page.handle === submittedHandle && result.data.page.published === published) {
+      if (response.ok && result.success && result.data.page.handle === submittedHandle && result.data.page.published === published && exactBusinessPageUrl(result.data.page.url, submittedHandle)) {
         setPage(result.data.page);
       } else {
         const held = response.status === 503 && (message === "Connected sites are not enabled. Nothing changed." || message === "Public business pages are not enabled. Nothing changed.");

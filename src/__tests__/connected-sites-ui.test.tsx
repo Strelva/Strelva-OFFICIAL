@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { act, createElement } from "react";
+import { createHash, randomUUID } from "node:crypto";
+import { systemOriginId } from "@/platform/systems/invariants";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -41,7 +43,7 @@ describe("a connected site on its website System page", () => {
 
 describe("bringing the website a business already has", () => {
   const roots: ReturnType<typeof createRoot>[] = [];
-  beforeEach(() => { vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); });
+  beforeEach(() => { vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); vi.stubGlobal("crypto", { randomUUID, subtle: { digest: async (_algorithm: string, bytes: Uint8Array) => Uint8Array.from(createHash("sha256").update(bytes).digest()).buffer } }); });
   afterEach(async () => { for (const root of roots.splice(0)) await act(async () => root.unmount()); document.body.innerHTML = ""; vi.unstubAllGlobals(); });
   async function mount(request: typeof fetch, props: Partial<Parameters<typeof ConnectSiteExperience>[0]> = {}) {
     const node = document.createElement("div"); document.body.appendChild(node);
@@ -49,7 +51,7 @@ describe("bringing the website a business already has", () => {
     await act(async () => root.render(createElement(WorkspaceRequestContext.Provider, { value: request }, createElement(ConnectSiteExperience, { workspaceId: BUSINESS, canManage: true, initialSites: [], ...props }))));
     return node;
   }
-  const site = { id: SITE, siteHost: "bakery.example", siteUrl: "https://bakery.example/", status: "active" as const, verifiedAt: null, systemId: SYSTEM, snippet: install };
+  const site = { id: SITE, siteHost: "bakery.example", siteUrl: "https://bakery.example/", status: "active" as const, verifiedAt: null, systemId: systemOriginId(BUSINESS, { kind: "connected_site", ref: SITE }), snippet: install };
   it("connects, shows the lines, then confirms and links to the website System", async () => {
     const request = vi.fn(async (_url: string, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body)) as { action: string };
@@ -62,7 +64,7 @@ describe("bringing the website a business already has", () => {
     expect(node.textContent).toContain("Add these two lines to bakery.example");
     await act(async () => { [...node.querySelectorAll("button")].find(item => item.textContent?.includes("Check my site"))!.click(); });
     expect(node.textContent).toContain("bakery.example is connected");
-    expect(node.querySelector(`a[href*="system=${SYSTEM}"]`)).toBeTruthy();
+    expect(node.querySelector(`a[href*="system=${site.systemId}"]`)).toBeTruthy();
   });
   it("shows the server's refusal and changes nothing", async () => {
     const node = await mount((async () => new Response(JSON.stringify({ error: "We couldn't find your verification tag or Strelva script on the live page yet." }), { status: 409 })) as unknown as typeof fetch, { initialSites: [site] });
@@ -141,7 +143,7 @@ describe("bringing the website a business already has", () => {
     let finish!: (value: Response) => void;
     const response = new Promise<Response>(resolve => { finish = resolve; });
     const otherBusiness = "7a000000-0000-4000-8000-000000000004";
-    const otherSite = { ...site, id: "7a000000-0000-4000-8000-000000000005", siteHost: "second.example", siteUrl: "https://second.example/", systemId: "7a000000-0000-4000-8000-000000000006" };
+    const otherSite = { ...site, id: "7a000000-0000-4000-8000-000000000005", siteHost: "second.example", siteUrl: "https://second.example/", systemId: systemOriginId(otherBusiness, { kind: "connected_site", ref: "7a000000-0000-4000-8000-000000000005" }) };
     const bodies: Record<string, unknown>[] = [];
     const request = vi.fn(async (_url: string, init?: RequestInit) => {
       bodies.push(JSON.parse(String(init?.body)));

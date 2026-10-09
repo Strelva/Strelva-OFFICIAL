@@ -1283,8 +1283,10 @@ and **Reload page**; uncertain receipt actions expose **Reload receipts**. These
 read current state by reloading the page and never replay a write. Recovery moves
 focus from the disabled initiating control to the mounted reload action only
 when the person has not moved focus elsewhere. A connection acknowledgement must
-match the submitted canonical URL and host; publication must match the submitted
-handle and publish decision. Generic post-write400 responses cannot unlock a new
+match the submitted canonical URL and host and the deterministic System identity
+for that business and returned site ID; verification also preserves the selected
+site's URL, host and System identity. Publication must match the submitted handle,
+publish decision and exact `/biz/{handle}` URL at the configured public app origin. Generic post-write400 responses cannot unlock a new
 publication; independent read-only block checks keep the uncertainty visible.
 
 Successful connection/verification recovers a removed initiating control to the
