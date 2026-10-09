@@ -95,3 +95,20 @@ provider/production/customer/economics claims stay unknown; real consumer adopti
 is pending. Parent alone updates the canonical model and dependent vault/review
 state. Factory implication: qualification labels can no longer silently turn
 source/fixture references into stronger status in the generated view.
+
+## PR625 review round 1 repair
+
+Review at `608ae57cf4daf9f1384cc397bd7a6c92fa738f85` found that
+`Array.every` skips sparse indices in the retained status validator. The three
+new regressions reproduce acceptance of fully sparse top-level `entries`, nested
+`evidence` and `provenModes` arrays: seven existing tests pass / three new fail
+before repair. Explicit index iteration now requires own elements and recursively
+compares every position. The regressions also refuse individually deleted
+first/middle/last positions and an inherited value replacing an absent element.
+
+After repair, the same four focused suites pass **74 tests / zero skips**;
+`pnpm typecheck` and scoped registry/test ESLint pass. No broad/native test or
+review delegation ran. Consumer source preparation is authorized against frozen
+union `77fc4ea49f61aecc901f92062d8646bd125f21ee`, without applying consumer/interface
+changes or merging that union onto this branch. Root coordinates that base first;
+inquiry definitions remain reserved and E04 still needs A07 authority proof.

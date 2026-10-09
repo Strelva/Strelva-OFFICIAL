@@ -92,6 +92,29 @@ describe("capability registry", () => {
     expect(validateCapabilityStatusView(status)).toBe(false);
   });
 
+  it.each(["entries", "evidence", "provenModes"] as const)("rejects sparse or deleted %s array elements", (field) => {
+    function candidate() {
+      const status = JSON.parse(JSON.stringify(capabilityStatusView()));
+      const holder = field === "entries" ? status : status.entries[0].qualification;
+      return { status, holder, values: holder[field] };
+    }
+    const sparse = candidate();
+    sparse.holder[field] = new Array(sparse.values.length);
+    expect(validateCapabilityStatusView(sparse.status), "all slots absent").toBe(false);
+
+    for (const index of new Set([0, Math.floor(sparse.values.length / 2), sparse.values.length - 1])) {
+      const deleted = candidate();
+      delete deleted.values[index];
+      expect(validateCapabilityStatusView(deleted.status), `deleted slot ${index}`).toBe(false);
+    }
+
+    const inherited = candidate();
+    const first = inherited.values[0];
+    delete inherited.values[0];
+    Object.setPrototypeOf(inherited.values, Object.assign(Object.create(Array.prototype), { 0: first }));
+    expect(validateCapabilityStatusView(inherited.status), "inherited slot cannot replace an own element").toBe(false);
+  });
+
   it("listing and status generation do not admit a descriptive or unqualified operation", () => {
     const before = executableCapabilityRegistry.listDescriptors();
     listCapabilities();

@@ -197,14 +197,22 @@ export function validateCapabilityStatusView(value: unknown): boolean {
     const expected = capabilityStatusView();
     const candidate = value as { schemaVersion?: unknown; entries?: unknown };
     if (Object.keys(value).sort().join(",") !== "entries,schemaVersion" || candidate.schemaVersion !== 1 || !Array.isArray(candidate.entries)) return false;
-    return candidate.entries.length === expected.entries.length && candidate.entries.every((item, index) => sameJson(item, expected.entries[index]));
+    return sameJson(candidate.entries, expected.entries);
   } catch { return false; }
 }
 
 function sameJson(left: unknown, right: unknown): boolean {
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    // Array.every skips holes, including absent qualification witnesses. Every
+    // position must be an own element before recursively comparing its value.
+    for (let index = 0; index < left.length; index++) {
+      if (!Object.hasOwn(left, index) || !Object.hasOwn(right, index) || !sameJson(left[index], right[index])) return false;
+    }
+    return true;
+  }
   if (left === right) return true;
   if (!left || !right || typeof left !== "object" || typeof right !== "object") return false;
-  if (Array.isArray(left) || Array.isArray(right)) return Array.isArray(left) && Array.isArray(right) && left.length === right.length && left.every((item, i) => sameJson(item, right[i]));
   const a = left as Record<string, unknown>, b = right as Record<string, unknown>;
   const keys = Object.keys(a);
   return keys.length === Object.keys(b).length && keys.every(key => Object.hasOwn(b, key) && sameJson(a[key], b[key]));
