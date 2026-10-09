@@ -49,8 +49,8 @@ select pg_temp.pa_assert((select provider_workspace_id from public.workspace_pro
 
 
 insert into public.business_owner_recipient_trust(workspace_id,email,trusted_via,tenant_stable_id) values('6c000000-0000-4000-8000-000000000010','pa-tenant-owner@example.test','conversion','6c000000-0000-4000-8000-0000000000a1') on conflict(workspace_id) do nothing;
-select public.record_agency_verification('pa-operator@strelva.example.test','6c000000-0000-4000-8000-000000000020','publish','verified','{}',null);
-select public.record_agency_verification('pa-operator@strelva.example.test','6c000000-0000-4000-8000-000000000020','google','verified','{}',null);
+select public.record_agency_verification('pa-operator@strelva.example.test','6c000000-0000-4000-8000-000000000020','publish','verified','{"fixture":"fictional local authority"}',null);
+select public.record_agency_verification('pa-operator@strelva.example.test','6c000000-0000-4000-8000-000000000020','google','verified','{"fixture":"fictional local authority"}',null);
 insert into public.client_resource_mandates(customer_workspace_id,agency_workspace_id,effect,resource_kind,resource_ref,granted_by_kind,granted_by,granter_is_agency_member)
 values('6c000000-0000-4000-8000-000000000010','6c000000-0000-4000-8000-000000000020','google','google_location','service-location','owner','6c000000-0000-4000-8000-000000000001',true);
 insert into public.workspace_account_bindings(id,workspace_id,provider,migrated_from,status,access_token_ciphertext)
