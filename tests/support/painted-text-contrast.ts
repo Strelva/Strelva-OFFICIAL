@@ -29,7 +29,8 @@ export function captureTextPaint(element: Element): TextPaint {
         if (paint.content !== "none" && paint.content !== "normal" && (rgba(paint.backgroundColor)[3] > 0 || paint.backgroundImage !== "none")) unsupported.push(`${current.tagName}${pseudo}: painted overlay`);
       }
       const color = rgba(style.backgroundColor);
-      layers.push({ tag: current.tagName, color, image: style.backgroundImage });
+      // Presence is sufficient for refusal; never attach CSS image URLs.
+      layers.push({ tag: current.tagName, color, image: style.backgroundImage === "none" ? "none" : "present" });
       opaque = color[3] === 1;
     }
   }
