@@ -1,7 +1,8 @@
 # Money and the client's data
 
 > **Changed by ADR 0013 / decision 2.** The business or its agency is the payer, chosen
-> per business. Owner-only payment email (§3.7), payer identity and permissions (§4–5), and
+> per business. Current managed clients remain business-paid, with unchanged billing
+> and grandfathered terms (October 9 Addendum 2). Owner-only payment email (§3.7), payer identity and permissions (§4–5), and
 > operator conversion/export/exit as client service (§2, §3.19, §4) are superseded
 > requirements with engineering follow-up. Platform billing support remains logged platform
 > work; it does not grant client-service powers.
@@ -137,7 +138,7 @@ it is counted or linked, and nothing is claimed that the data can't join.
   them.
 - **Needs you** carries decisions for the authorized person: money goes to
   the selected payer; owner approval of a payer change and exit remains
-  explicit. Strelva handled (label open, D-label) carries actor-named receipts:
+  explicit. What changed carries actor-named receipts:
   "Acme Marketing sent your export" with "Runs on Strelva", or
   "Strelva recorded your payment" when the platform acted.
 - **Strelva operator** does conversions, billing setup and exports for owners

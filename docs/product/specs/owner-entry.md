@@ -63,7 +63,7 @@ After her workspace is moved, the same link opens her workspace instead.
 
 - **If she's signed in and has the owner role,** she lands on Home with the
   report open. Needs you is at the top (one review reply waiting), then
-  Strelva handled ("Acme Marketing fixed a broken image on the store page", with "Runs on
+  What changed ("Acme Marketing fixed a broken image on the store page", with "Runs on
   Strelva" credit; platform work names Strelva). Her
   store and website show by their own names: "greatlakesdriedfruit.com ·
   Live".
@@ -254,7 +254,7 @@ The other pages are reached from inside those.
 
 | `/dashboard` page | Lands in the workspace | Today | Work needed |
 | --- | --- | --- | --- |
-| `/` Today | Home: Needs you, **From your site** (visits, customer actions, who reached out, Strelva's work, links to the places below), Strelva handled, In progress, Recent | **Ready** while Needs you is on (`w2/owner-surfaces-a`). Approvals come through Needs you's tenant-event adapter; the rest from `/api/workspace/site-summary` | Parity gaps: no onboarding checklist or wizard, day-one cards, retention panel or "Do this next"; no sparklines; no Edit site / View live site buttons on Home |
+| `/` Today | Home: Needs you, **From your site** (visits, customer actions, who reached out, Strelva's work, links to the places below), What changed, In progress, Recent | **Ready** while Needs you is on (`w2/owner-surfaces-a`). Approvals come through Needs you's tenant-event adapter; the rest from `/api/workspace/site-summary` | Parity gaps: no onboarding checklist or wizard, day-one cards, retention panel or "Do this next"; no sparklines; no Edit site / View live site buttons on Home |
 | `/chat` Ask Strelva | Ask Strelva (`view=ask`) on Home and each System | **Ready** while Ask and Systems are released | No approvals in chat; workspace conversations start fresh |
 | `/site` Website editor | Website System ("greatlakesdriedfruit.com") | **Ready**, gate `systems`; native editor or repo-site request surface | Existing client APIs and governed Requests are reused; repo sites remain requests for Strelva |
 | `/content` | Website System, Edit | **Ready**, gate `systems` | Reuses the website editor |

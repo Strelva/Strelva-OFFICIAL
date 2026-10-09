@@ -64,7 +64,7 @@ any of this makes customer work easier at a cost we can carry.
 
 [docs/product/product-model.md](./docs/product/product-model.md) says what
 every area becomes at 1.0.0, including the two nouns outside the four
-(Requests and Running), Needs you and Strelva handled.
+(Requests and Running), Needs you and What changed.
 [docs/product/systems-transition.md](./docs/product/systems-transition.md)
 maps today's code onto Systems, Connections, Possibilities and Versions:
 where each existing module lands and what the inventory found.

@@ -131,9 +131,13 @@ property is represented by Tenant delivery metadata plus content/configuration.
 An entity that initiates or owns an action. Canonical actor classes are
 Prospect, Client Team Member, End Customer, Platform Operator, and System.
 An agency action names the agency display name with “Runs on Strelva” credit;
-Strelva is named only when the platform or its own agency acted. Receipts retain
-the actual actor. Actor answers *who*; it does not encode authorization. A Platform Membership grants a client
-team member access, while a role describes what that authenticated actor may do.
+Strelva is named only when the platform acted. Its own agency shows
+**Strelva Agency** under the same display-name rule as every agency. Receipts
+retain the actual executor and its display name recorded at action time;
+renames never rewrite past receipts. An approver is not the executor. Actor
+answers *who*; it does not encode authorization. A Platform Membership grants
+a client team member access, while a role describes what that authenticated
+actor may do.
 
 ### Tenant Capability, Site Capability, and Agent Capability
 

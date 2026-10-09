@@ -84,7 +84,7 @@ path. Ask Strelva returns:
 
 The owner gets one email with the change and a one-tap Approve / Not yet. They
 tap Approve. Acme Marketing publishes, reads it back, and the receipt appears in
-**Strelva handled**: "Acme Marketing added Estate planning consult to attymooney.com", with
+**What changed**: "Acme Marketing added Estate planning consult to attymooney.com", with
 "Runs on Strelva" credit. Automatic platform work instead names Strelva.
 The booking Possibility waits until someone opens it and chooses **Make real**.
 
@@ -229,7 +229,7 @@ Ask Strelva hands each draft to the Needs you policy with the System, the
 change type and today's governance reason code (`AiGovernanceReasonCode` in
 `src/lib/ai-governance.ts`). The policy answers one of:
 
-- **The authorized actor does it**, is named, and reports it in Strelva handled (today: governance
+- **The authorized actor does it**, is named, and reports it in What changed (today: governance
   `publish`, `maybeAutoApprove` for low-risk sections, content autonomy
   `auto`, review-reply `auto` mode).
 - **The serving agency reviews it** first (today: `reviewAudience: "operator"` in
@@ -334,7 +334,7 @@ retires, built from the same implementations.
 | `get_metrics` | Merged | `read_performance` | Website | Read |
 | `explain_traffic` | Merged | `read_performance` | Website | Read |
 | `show_report` | Merged | `read_performance` (card) | Website | Read |
-| `get_activity` | Merged | `read_history` | Any System (History, Strelva handled) | Read |
+| `get_activity` | Merged | `read_history` | Any System (History, What changed) | Read |
 | `show_connections` | Kept, renamed | `read_connections` | The System's Connections | Read |
 | `get_reviews` | Kept, renamed | `read_reviews` | Google Business Connection, reviews | Read |
 | — | New | `read_requests` | Requests for this workspace | Read |

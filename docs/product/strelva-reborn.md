@@ -6,7 +6,7 @@
 > them with the ordinary agency path: Strelva's agency has no extra powers, and platform
 > operators never serve or convert clients. Payer is chosen per business (business or
 > agency), separate from owner. Actor-named receipts carry "Runs on Strelva" for agency
-> work; "Strelva handled" stays label open (D-label).
+> work; "What changed" is the decided place label (October 9).
 
 Created: 2026-10-02
 Changed: 2026-10-07. Reborn is now the one build to `1.0.0`, not a ladder of `0.x` releases.
@@ -56,7 +56,7 @@ later `0.x`.
 | 4. Publishing, Google | The Google listing and the newsletter become **Systems**; blog stays part of the website. Google writes are **Connections** of kind *act* on an account the business granted ([publishing spec](../capabilities/publishing/publishing-spec-2026-10-06.md)) |
 | 4. Bookings, inquiries, internal tools | Each its own **System** ([systems catalog](./specs/systems-catalog.md)) |
 | 4. Website rebuild, agency drafts | **Possibilities** on the website System; approve and publish is **Make real** |
-| 5. Receipts, site health, one operator place | **Strelva handled** and System health ([operator](./specs/operator.md)) |
+| 5. Receipts, site health, one operator place | **What changed** and System health ([operator](./specs/operator.md)) |
 | 6. Owners enter the workspace | Home shows the business's Systems and **Needs you** ([owner entry](./specs/owner-entry.md), [needs you](./specs/needs-you.md)) |
 | New | **Versions** for multi-location and agency clients ([agency and Versions](./specs/agency-and-versions.md)); **Ask Strelva** in the workspace ([ask-strelva](./specs/ask-strelva.md)); billing and Redis exit ([money and data](./specs/money-and-data.md)) |
 
@@ -385,7 +385,7 @@ Neither is used by any journey today.
 - [ ] Every outside write leaves a receipt with read-back and undo. Google
       Business, Stripe and domain removal have no undo; Vercel domains are
       never removed. *Partial · L. Built locally Oct 6 on `w4/journey-gaps`:
-      every decided Needs you item is a Strelva handled receipt that says why
+      every decided Needs you item is a What changed receipt that says why
       it can't be undone in one tap (migration `20261009130000`, not applied)*
 - [ ] Site health and domain checks cover every site. `website-health` skips
       custom-repo client sites; domain verification skips non-workspace
@@ -518,7 +518,7 @@ runs beside it from step 2.
    [Strelva 1.0.0](./strelva-1.0.0.md#the-bar).
 6. **The model on screen:** Systems Home, System pages, Connections,
    Possibilities and Make real with real effects, Versions in Postgres,
-   Needs you and Strelva handled, Ask Strelva.
+   Needs you and What changed, Ask Strelva.
 7. **Entry and operation:** per-workspace flags, owners in (never required),
    dashboard redirects, the agency home and one operator queue.
 8. **Structure:** shared infrastructure out of `src/lib`, one capability

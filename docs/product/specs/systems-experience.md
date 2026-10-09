@@ -2,8 +2,8 @@
 
 > **Changed by ADR 0013 / decision 1.** Every receipt names whoever acted. Agency work
 > shows its display name and "Runs on Strelva"; automatic platform effects and
-> reconciliation name Strelva. "Strelva handled" remains the place name, label open
-> (D-label), behind one constant. Past restorable states are History; Versions are
+> reconciliation name Strelva. "What changed" is the decided place label
+> (October 9), behind one constant. Past restorable states are History; Versions are
 > adaptations to another context, never past states.
 
 Status: draft spec, 2026-10-06. Not approved. Wave 2 (branch
@@ -20,7 +20,7 @@ live stored plans and isolated rebuild plans share one adapter, item id,
 fingerprint and approval reader; `src/platform/needs-you/systems-sources.ts`),
 durable activations resumed by the workspace-work cron, partly live steps in
 the operator queue, operator resume/reconcile/roll back, and the Home and
-System page gaps (History, Make real in progress, Strelva handled receipts,
+System page gaps (History, Make real in progress, What changed receipts,
 no empty panels, paused copy). Not built: History Restore (no undo action
 from History yet), Needs you for this System on the System page, the
 "form-delivers" operating check (fails honestly, so a rebuild with
@@ -87,7 +87,7 @@ The first two land. The third waits, because Google hasn't approved Strelva's
 API access yet. The owner gets one email: "Consult booking is live on
 attymooney.com. Not on Google yet: Google hasn't approved Strelva's access.
 Strelva will add it when it does. Nothing else changed." The parts that landed
-stay. Under **Strelva handled** there are two receipts, each with **Undo**.
+stay. Under **What changed** there are two receipts, each with **Undo**.
 
 Jacob opens Home as an operator. Needs you is empty, so it isn't shown. The
 cards read "attymooney.com · Live · Working", "Consult booking · Live ·
@@ -97,7 +97,7 @@ progress** has one line: "Making consult booking live: 3 of 4 done".
 ## 2. In the model
 
 - **Home** is the business's front page. It is not a noun. It shows Needs
-  you, the Systems, Strelva handled and In progress.
+  you, the Systems, What changed and In progress.
 - **The System page** is one **System**. The real thing (the site, the inbox,
   the calendar, the tool) gets most of the space. **Connections**,
   **Possibilities**, **Versions** and **History** sit beside it, and only when
@@ -135,7 +135,7 @@ progress** has one line: "Making consult booking live: 3 of 4 done".
    Live, because an unchecked System isn't an alarm.
 4. **Card hints.** A card can add "1 possibility ready", "Making live: 2 of
    4" or "Partly live". It never adds a count of empty things.
-5. **Strelva handled** lists the last 7 days of receipts (needs-you
+5. **What changed** lists the last 7 days of receipts (needs-you
    behavior 14). Today the section shows Requests whose stage is `done`
    (`BusinessHome.tsx`, `handled = requestRows.filter(row => row.stage ===
    "done")`). The receipt feed replaces that.
@@ -176,7 +176,7 @@ progress** has one line: "Making consult booking live: 3 of 4 done".
 13. **History is new.** No History block exists today. It merges three
     sources: the System's revisions (`system_revisions`), its native releases
     (website document revisions, application releases, content versions), and
-    Strelva handled receipts for this System. It is newest first. A row reads
+    What changed receipts for this System. It is newest first. A row reads
     "Acme Marketing published the rebuilt site · Oct 9 · Restore", with
     "Runs on Strelva" credit; a platform publication instead names Strelva. Restore uses the
     native undo path and routes through needs-you behavior 15. It is never
@@ -260,7 +260,7 @@ progress** has one line: "Making consult booking live: 3 of 4 done".
 26. **Result after Make real, item by item** (section 4). It is shown on the
     System page and in In progress. It goes to the owner by email only when
     it settles or when the owner has to act.
-27. **Receipts.** Every accepted effect writes a Strelva handled receipt with
+27. **Receipts.** Every accepted effect writes a What changed receipt with
     the System, a sentence, the provider reference, the read-back result and
     an undo state. Each activation writes one summary receipt. An isolated
     receipt (`adapterMode: "isolated"`, provider ref `isolated-…`) is never
@@ -455,7 +455,7 @@ owner reads:
 - The sandbox as the production path. `sandbox.ts` stays for exploring and tests.
 - `makeRealSummary`'s "ran on an isolated copy" copy, once live effects are on.
 - Always-drawn empty panels.
-- "Strelva handled = done Requests".
+- "What changed = done Requests".
 
 **Tenant model vs workspace model.** The System registry, Possibilities and
 activations are workspace-model only. Tenants are reached through `origin`
@@ -622,7 +622,9 @@ them authorizes a production step.
     business sees.
   - Connected sites add the `connected_site` origin and limit Possibilities
     to sections. The spec holds either way.
-- Assumption 2 (no partner agencies): agency rights above apply to Strelva only.
+- Superseded assumption 2 (no partner agencies): ADR 0012 gives Strelva Agency
+  and outside agencies the same delegated-client rights, with no platform powers
+  for client service. The earlier Strelva-only assumption no longer applies.
 
 ## 10. Unknowns
 
@@ -634,7 +636,7 @@ them authorizes a production step.
 - `systems.sql` is unapplied in production.
 - No History block exists.
 - Empty panels render.
-- Home's Strelva handled shows done Requests.
+- Home's What changed shows done Requests.
 
 **Inferences to check:**
 

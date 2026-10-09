@@ -35,16 +35,16 @@ Business  ─ owns ─  Business record (name, hours, services, people, contacts
    ├─ Requests ........... asked-for work with an end
    ├─ Running ............ what is kept true, one sentence each
    ├─ Needs you .......... only the owner's decisions, in the app or by email
-   └─ Strelva handled .... receipts naming who acted; undo where available
+   └─ What changed .... receipts naming who acted; undo where available
 ```
 
 Ask Strelva is the one way in. **Whoever acted is named on screen and in the
 receipt.** For example: "Acme Marketing updated your hours", with the agency
 display name and **Runs on Strelva** platform credit. "Strelva" names the actor
-only when the platform itself acted. Strelva's own agency shows its display name
+only when the platform itself acted. Strelva's own agency shows **Strelva Agency**
 and the same credit, under the same rules as every agency.
 
-**Strelva handled** stays the place name for now; **label open (D-label)**.
+**What changed** is the decided place name (October 9).
 Keep the label behind one constant. System, Connection, Possibility, Make real,
 Version, History, Health, Requests, Running, Needs you and Ask Strelva also name
 concepts whose exact on-screen labels remain open for Jacob (UI plan D2).
@@ -60,6 +60,14 @@ the public are **their customers** or **end customers**.
 | Agency | Anyone who makes and runs Systems for clients, including Strelva's agency with no extra powers | Make, operate and adapt delegated Systems; pay for a client when chosen per business | See a client that has not delegated to it; gain owner authority from being an agency |
 | Payer | Chosen per business: the business or its agency | Pay under the business's chosen billing arrangement | Gain owner or operating authority by paying |
 | Platform operator | Strelva staff acting for the platform | Logged support, incident and release work | Sell to, serve or convert a client using platform powers; client work uses the ordinary agency path |
+
+Current managed clients are clients of **Strelva Agency**, delegated through the
+ordinary agency path. While owner entry is off, Strelva Agency acts only within
+each client's existing contract; anything beyond it goes to Jacob to handle
+with the client manually. The business remains the payer, with unchanged billing
+and grandfathered terms. Only real contracted clients convert with agency basis
+`existing_contract`; test/demo tenants never convert on that basis. These are
+selected boundaries, not evidence that production conversions have occurred.
 
 ## Area by area
 
@@ -122,7 +130,7 @@ and more; origins `saved_work` or a tenant `stable_id`) behind
 | Finite work | Requests sent to an agency, delivery commitments | Requests: Asked → Needs you → In progress → Ready for your review → Done | Request | [needs-you](./specs/needs-you.md) |
 | Ongoing work | Standing responsibilities, crons | Running: "Your hours match Google every day", "Every inquiry is answered within a day" | Running | [needs-you](./specs/needs-you.md) |
 | Decisions | Approvals in five stores, no policy for what reaches the owner | One policy per System and change type. Most changes the authorized actor does and reports. The rest reach the owner in the app **and** by email, with one-tap answers | Needs you | [needs-you](./specs/needs-you.md) |
-| Proof of work | Receipts on some writes; Google writes have none | Strelva handled (label open, D-label): every outside write names its actor and has a receipt, read-back and undo where undo exists | Strelva handled | [needs-you](./specs/needs-you.md), [operator](./specs/operator.md) |
+| Proof of work | Receipts on some writes; Google writes have none | What changed: every outside write names its actor and has a receipt, read-back and undo where undo exists | What changed | [needs-you](./specs/needs-you.md), [operator](./specs/operator.md) |
 
 ### Getting in, running it, paying for it
 

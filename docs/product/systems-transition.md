@@ -3,7 +3,7 @@
 > **Changed by ADR 0013 / decisions 1–2 and 4–8.** This dated inventory retains
 > storage/API names. Provider now means an outside system; Agency means a person or agency
 > serving a business. Receipts name whoever acted, with agency display name and "Runs on
-> Strelva" credit. "Strelva handled" stays label open (D-label). Client service must use
+> Strelva" credit. "What changed" is the decided place label (October 9). Client service must use
 > ordinary agency authority; reconcile any operator/admin conversion or delivery paths
 > before treating them as the selected model. Past restorable states are History; research
 > responses are Proposals; a stored credential is an account connection; text before work

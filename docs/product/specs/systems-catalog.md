@@ -108,7 +108,7 @@ No fresh production read was made.
 - The Bookings System (another spec) owns schedule and roster. This spec only
   says they are views of it.
 - Reports belong to **Running**, not to any System page, and each send leaves a
-  receipt in **Strelva handled**.
+  receipt in **What changed**.
 
 ## 3. What it does at 1.0.0
 
@@ -144,7 +144,7 @@ No fresh production read was made.
    `src/lib/email/send.ts`. The email names the tool, the record title and the
    one next step. If the person has no account, the email still goes out, with
    no record data beyond the title (decision 9.3). One email per submit, with
-   a receipt in Strelva handled.
+   a receipt in What changed.
 9. The System page shows the live tool first, with records, and History
    (releases from `application_releases`) beside it.
 
@@ -188,7 +188,7 @@ No fresh production read was made.
    `src/products/websites/site-report.ts`) uses the same rule. Today it reads
    the first `owner` membership with a confirmed email, which a converted
    client does not have: the conversion operator joins as `admin`.
-5. Each send, suppression or failure is a receipt in Strelva handled
+5. Each send, suppression or failure is a receipt in What changed
    ("Strelva sent your September recap to pat@…"). It is not a Needs you item.
 6. Report cadence and last-sent markers move to Postgres (§5).
 7. Running shows one line per business: "Strelva sends you a monthly recap."
@@ -336,7 +336,7 @@ copies them.
 
 | What fails | What the person sees | Undo |
 | --- | --- | --- |
-| Assigned-person email suppressed or fails | Record saved. Strelva handled: "Couldn't email Sam about Acme Co. Strelva will retry." Operator queue gets it after 3 failures | Email can't be unsent |
+| Assigned-person email suppressed or fails | Record saved. What changed: "Couldn't email Sam about Acme Co. Strelva will retry." Operator queue gets it after 3 failures | Email can't be unsent |
 | Contact upsert conflicts (email matches one contact, phone another) | Record saved with the email match; operator queue gets a merge item | Record edit is undoable |
 | Non-builder tries to make a tool | 403, "Ask Strelva to build this", with a Request button | — |
 | Plan generation fails or no model is configured | "Strelva couldn't draft this yet" and a Request is filed | Nothing was created |

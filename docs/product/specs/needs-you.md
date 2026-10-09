@@ -1,12 +1,11 @@
-# Needs you and Strelva handled
+# Needs you and What changed
 
 > **Changed by ADR 0013 / decisions 1–2.** Agency work names the serving agency and
 > carries "Runs on Strelva"; automatic platform work names Strelva. The platform sets fixed
 > safety rules; any agency uses the ordinary agency path for client review and service.
 > Operator-set agency defaults/escalation, client chasing and the converted-admin fallback
 > below are older implementation, needing engineering follow-up (§3.3/12/16, §4, §6–7). Do
-> not use platform authority for client service. "Strelva handled" stays label open
-> (D-label).
+> not use platform authority for client service. "What changed" is the decided place label (October 9).
 
 Status: draft spec, 2026-10-06; working default per the product model. Built
 and proven **locally** on branch `build/needs-you` (2026-10-06), behind
@@ -22,7 +21,7 @@ stays gated.
   `change_service_delivery_commitment`); workspace-keyed signed links at
   `/api/approve`; the urgent and morning emails and day 3/7 reminders and
   day 14 lapse as the hourly `/api/cron/needs-you`; Home's Needs you and
-  Strelva handled; a route for `undo_business_record_revision`; the parity
+  What changed; a route for `undo_business_record_revision`; the parity
   replay (`scripts/needs-you-parity.ts`); the `change_verify_failed` and
   `sendUpdateLiveEmail` fixes.
 - **Built locally on `w2/decisions-wiring` (2026-10-06), same flag:**
@@ -96,7 +95,7 @@ these the firm has connected today is not checked.
 - **Monday, 9:02.** An end customer leaves a five-star Google review. Acme Marketing drafts
   a reply in the firm's voice. The firm's review replies are set to "post
   after 12 hours unless I stop it". No email goes out for this. The reply
-  posts Monday night and shows in **Strelva handled**: "Acme Marketing replied to
+  posts Monday night and shows in **What changed**: "Acme Marketing replied to
   Dana's review", with "Runs on Strelva". If automatic platform behavior did
   the work, the receipt instead names Strelva.
 - **Monday, 14:10.** The owner emails Acme Marketing that Friday hours change to 9–3.
@@ -112,7 +111,7 @@ these the firm has connected today is not checked.
 - **Friday, 07:00.** A reminder covers the booking page only. On day 14 it
   lapses. Nothing goes live. The operator queue shows it as the owner's call,
   unanswered.
-- **The monthly report** lists the actor-named receipts from Strelva handled, with links that undo
+- **The monthly report** lists the actor-named receipts from What changed, with links that undo
   what can still be undone.
 
 The owner never signed in. Every decision that was theirs reached them, and
@@ -124,10 +123,11 @@ nothing that wasn't theirs did.
   belong to the owner, across every **System**, **Request** and **Running**
   item. Each item names the System it touches ("attymooney.com") and what the
   owner is deciding.
-- **Strelva handled** is the receipt view; **label open (D-label)**, kept
+- **What changed** is the decided receipt-view label, kept
   behind one label constant. Each entry names whoever acted on the System.
   An agency uses its display name and "Runs on Strelva" credit; Strelva names
-  the actor only for platform behavior or as its own agency's display name.
+  the actor only for platform behavior. Its own agency shows **Strelva Agency**.
+  Receipts keep the name recorded at action time; later renames never rewrite them.
 - **The policy** is set per business, per System, per kind of change. The serving
   agency sets it within the platform's fixed rules. The owner can make it stricter. Fixed rules in code
   hold no matter what either of them sets.
@@ -285,7 +285,7 @@ nothing that wasn't theirs did.
     open their System page. An owner who signs in sees exactly what the last
     email listed, plus anything newer. If Needs you is empty, the section is
     gone.
-14. **Strelva handled is one receipt feed.** Each receipt has the System, a
+14. **What changed is one receipt feed.** Each receipt has the System, a
     sentence naming the actor ("Acme Marketing updated your Friday hours on
     Google", with "Runs on Strelva", or "Strelva updated your Friday hours
     on Google" for automatic platform behavior), the time, what
@@ -297,7 +297,7 @@ nothing that wasn't theirs did.
     - Home shows the last 7 days. The monthly report, or the weekly one if
       that cadence is chosen (`src/lib/report-cadence.ts`), carries the same
       list with signed undo links.
-15. **Undo for things Strelva handled.** Undoing a handled change restores the
+15. **Undo for recorded changes.** Undoing a handled change restores the
     state just before it, if nothing later touched the same item. This is the
     rule `undo_business_record_revision` already enforces.
     - Restoring a prior approved state is handled. It doesn't route back to

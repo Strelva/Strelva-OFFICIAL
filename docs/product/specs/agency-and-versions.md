@@ -109,7 +109,7 @@ hand. It arrives as a Possibility, not as an automatic copy.
 
 Twin Trees' owner never signs in. The owner gets one email: "Strelva has an update
 for your Fayetteville site. Look at it, or approve it." The owner approves. Strelva
-publishes, reads it back, and the receipt lands under **Strelva handled**.
+publishes, reads it back, and the receipt lands under **What changed**.
 
 Separately, Strelva improves its own inquiry intake, the source behind
 clients' contact forms. **Library** shows that intake with its client
@@ -234,7 +234,7 @@ that workspace.
 | `blocked: conflicts` | Local override overlaps an upstream change | "Needs a choice on 2 changes" |
 | `blocked: missingBindings` | Needs an account this Version hasn't connected | "Needs Google calendar connected first" |
 | adopted | Working definition updated, not released | Possibility "ready for review" |
-| released | Version release N is live | Receipt under Strelva handled |
+| released | Version release N is live | Receipt under What changed |
 | declined | Decision recorded with reason | Shown in History |
 
 These keep the inquiry pattern vocabulary underneath

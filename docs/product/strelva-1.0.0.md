@@ -2,7 +2,7 @@
 
 > **Changed by ADR 0013 / decisions 1–2.** Actor-named receipts show the agency display
 > name and "Runs on Strelva" for agency work, or Strelva for automatic platform work.
-> "Strelva handled" stays label open (D-label). Operator policy settings, client
+> "What changed" is the decided place label (October 9). Operator policy settings, client
 > delivery/lead access in `/admin`, conversion and privileged admin agency access in the
 > local inventory below need engineering follow-up; they do not establish the selected
 > neutral-platform authority. Client service uses the ordinary agency path; the business or
@@ -62,7 +62,7 @@ and [Local Services Ads booking](https://developers.google.com/actions-center/ve
 | Area | Spec | State |
 | --- | --- | --- |
 | The model, every area | [product-model.md](./product-model.md) | Draft, Oct 6 |
-| Needs you and Strelva handled | [specs/needs-you.md](./specs/needs-you.md) | Draft, Oct 6 |
+| Needs you and What changed | [specs/needs-you.md](./specs/needs-you.md) | Draft, Oct 6 |
 | Owners entering, leaving `/dashboard` | [specs/owner-entry.md](./specs/owner-entry.md) | Draft, Oct 6 |
 | Ask Strelva in the workspace | [specs/ask-strelva.md](./specs/ask-strelva.md) | Draft, Oct 6 |
 | Agency surface and Versions | [specs/agency-and-versions.md](./specs/agency-and-versions.md) | Draft, Oct 6 |
@@ -94,7 +94,7 @@ or production proof. The October 7 source review did not rerun runtime tests.
 | Feature | Today | Source |
 | --- | --- | --- |
 | Home shows the business's actual Systems, each with Draft/Live/Paused and a separate health signal | Local, merged Systems Home | ADR 0011, `PRIM_SYSTEM` |
-| **Needs you**: only the decisions the owner must make, set by policy, not an approval per change | Local, flag off: one policy evaluator; every lifecycle resolves through Needs you (Ask, Make real, Versions included); policy settings for owners and operators; owners who never sign in get every workspace source by email, opened by the logged "Strelva (system)" service actor that never decides (`w3/decision-gaps`, migration `20261009100000` not applied); decided items listed under Strelva handled with an honest undo state, and an owner with no account approves Make real by email link (`w4/journey-gaps`, migrations `20261009130000` and `20261009131000` not applied) | agency-in-the-loop decision, Oct 2 |
+| **Needs you**: only the decisions the owner must make, set by policy, not an approval per change | Local, flag off: one policy evaluator; every lifecycle resolves through Needs you (Ask, Make real, Versions included); policy settings for owners and operators; owners who never sign in get every workspace source by email, opened by the logged "Strelva (system)" service actor that never decides (`w3/decision-gaps`, migration `20261009100000` not applied); decided items listed under What changed with an honest undo state, and an owner with no account approves Make real by email link (`w4/journey-gaps`, migrations `20261009130000` and `20261009131000` not applied) | agency-in-the-loop decision, Oct 2 |
 | System page: the real thing first (live site, inbox, calendar, tool), Connections, Possibilities and Versions beside it | Local | `DESIGN.md` Oct 4 |
 | Possibilities you can open, compare and **Make real**, with honest partial states and undo where undo exists | Local (branch `w2/systems-live`, Oct 6): Possibilities and activations in Postgres (migrations `20261008130000`, `20261008131000`, not applied anywhere), five live channel adapters behind `make_real_live:<channel>` flags (all off), one plan approval through Needs you, cron resume under the Strelva (system) service actor with the owner as approver of record (`w3/decision-gaps`); one Home item per rebuild. No live effect has run outside tests | `COMP_MULTI_SYSTEM_ACTIVATION` |
 | Versions: one System adapted per location or client, with shared improvements offered, never forced | Local: Postgres `system_versions` store, lineage, offered improvements and conflicts; Needs you approval; production not verified | `PRIM_CONTEXT_VERSION` |

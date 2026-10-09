@@ -8,8 +8,7 @@
 > service acceptance, sales prospects, owner chasing, lead contents, assignment and
 > delivery-minute capture (§1, §3.1/3/5/8/12–14, §4, §9.1/5). Platform incident/check
 > coverage does not grant client-service authority. Receipts name the actual actor; agency
-> display names carry "Runs on Strelva". The place name "Strelva handled" is label open
-> (D-label).
+> display names carry "Runs on Strelva". The decided place name is "What changed" (October 9).
 
 Status: locally implemented for wave 6 on `w6/agency-operator`, October 7,
 2026. Not deployed. The operator rollout is selected by
@@ -88,7 +87,7 @@ per business.
 - An item that waits on the owner is the owner's **Needs you** on their side,
   and an "owner's call" item on the operator's side. The operator can see it
   and chase it; the operator cannot decide it.
-- Every outside write produces a **Strelva handled** receipt the owner can
+- Every outside write produces a **What changed** receipt the owner can
   see, and the same receipt is the operator's evidence.
 - Proactive "Ready to work" ideas (`src/app/admin/actions/portfolio-opportunities.ts`)
   are **Possibilities**, not queue items. Only working alternatives a person can open, use and compare qualify;
@@ -365,7 +364,7 @@ stay addressable as redirects.
 1. **Where the queue lives.** (a) `/admin` only; (b) the agency surface Queue
    (`DESIGN.md` "Not built yet"), which Strelva uses as its own agency under
    assumption 2; (c) one projection rendered in both. **Recommend (c)** with
-   `/admin` first. If partner agencies come into 1.0.0, (c) is required and the
+   `/admin` first. ADR 0012 includes outside agencies on equal terms; (c) is required and the
    projection must filter by delegation.
 2. **Clocks.** Proposed: P1 acknowledged in 2 working hours; owner chase at 3
    and 7 days. Different numbers change only config.
