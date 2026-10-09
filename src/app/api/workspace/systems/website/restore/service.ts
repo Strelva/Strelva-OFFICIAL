@@ -19,6 +19,8 @@ import { getSiteSnapshots } from "@/lib/storage/site-snapshot-store";
 import { websiteRebuildReleasedFor, websiteDocumentStore } from "@/products/websites/index";
 import { logAuditEvent } from "@/lib/storage";
 
+import { readSiteChangeProvider } from "@/platform/service-requests/provider-options";
+
 // App-edge composition: resolve workspace authority, then adapt the existing
 // tenant review stores. Neither product code nor src/lib imports this adapter.
 export const websiteContentRestoreSchema = z.object({
@@ -49,6 +51,7 @@ const live = {
 };
 
 const history = {
+  provider: readSiteChangeProvider,
   snapshots: (tenantId: string) => getSiteSnapshots(tenantId, 60),
   rebuildReleased: websiteRebuildReleasedFor,
   document: (...args: Parameters<typeof websiteDocumentStore.read>) => websiteDocumentStore.read(...args),
@@ -69,7 +72,7 @@ export function createWebsiteContentRestoreService(ports: typeof live & Partial<
     const input = websiteHistoryRestoreSchema.parse(raw);
     if (!(await ports.released(actor, input.workspaceId))) throw new WorkspaceConflictError("Website restore is not enabled for this business.");
     const workspace = (await ports.workspaces(actor)).find(item => item.id === input.workspaceId && item.kind === "customer" && item.access === "member");
-    if (!workspace || (workspace.role !== "owner" && !(workspace.role === "admin" && await ports.operator(actor.userId)))) throw new WorkspaceAccessError("Only the owner or a Strelva operator can prepare a restore.");
+    if (!workspace || (workspace.role !== "owner" && !(workspace.role === "admin" && await ports.operator(actor.userId)))) throw new WorkspaceAccessError("Only the owner or an authorized operator can prepare a restore.");
     const site = (await ports.systems(actor, input.workspaceId)).systems.find(item => item.system.id === input.systemId && item.system.kind === "website");
     if (!site) throw new WorkspaceAccessError();
     if ("kind" in input && input.kind === "document") {
@@ -99,14 +102,14 @@ export function createWebsiteContentRestoreService(ports: typeof live & Partial<
       const snapshot = (await sources.snapshots(tenantId)).find(item => item.id === input.snapshotId && item.tenantId === tenantId && item.status === "available");
       if (!snapshot) throw new WorkspaceConflictError("That saved site copy is unavailable on this website.");
       // The legacy full-snapshot restore writes live sections without review.
-      // Request the exact copy instead; Strelva must prepare a preview and obtain
+      // Request the exact copy instead; the agency must prepare a preview and obtain
       // approval. Neither this Request nor its retry mutates the saved copy.
-      const command = siteChangeRequestCommand({ workspaceId: input.workspaceId, systemId: input.systemId, tenantStableId: site.references.tenantStableId, editing: siteEditingFor(tenant), words: `Prepare a restore from saved copy "${snapshot.label}" (${snapshot.id}, saved ${snapshot.createdAt}) for my review. Preserve the live site until I approve the preview.`, idempotencyKey: `restore-snapshot:${createHash("sha256").update(`${input.systemId}:${snapshot.id}`).digest("hex")}` });
+      const command = siteChangeRequestCommand({ provider: await sources.provider(actor, input.workspaceId), workspaceId: input.workspaceId, systemId: input.systemId, tenantStableId: site.references.tenantStableId, editing: siteEditingFor(tenant), words: `Prepare a restore from saved copy "${snapshot.label}" (${snapshot.id}, saved ${snapshot.createdAt}) for my review. Preserve the live site until I approve the preview.`, idempotencyKey: `restore-snapshot:${createHash("sha256").update(`${input.systemId}:${snapshot.id}`).digest("hex")}` });
       const restoreCommand = { ...command, context: { ...command.context, restoreSnapshotId: snapshot.id, restoreSnapshotCreatedAt: snapshot.createdAt } };
       const filed = await sources.request(actor, restoreCommand);
-      return { status: "requested" as const, requestId: filed.id, message: "Strelva has your Request to restore this exact saved copy. A preview still needs to be prepared and approved. Your live website is unchanged." };
+      return { status: "requested" as const, requestId: filed.id, message: "Your agency has your Request to restore this exact saved copy. A preview still needs to be prepared and approved. Your live website is unchanged." };
     }
-    if (!tenant?.active || siteEditingFor(tenant) !== "native") throw new WorkspaceConflictError("Strelva prepares repository changes as Requests for this website.");
+    if (!tenant?.active || siteEditingFor(tenant) !== "native") throw new WorkspaceConflictError("Your agency prepares repository changes as Requests for this website.");
     const template = await ports.template(tenantId);
     if (!isContentSection(input.section) || !template.contentSections.includes(input.section)) throw new WorkspaceConflictError("This section is not editable on this website.");
     const version = (await ports.versions(input.section, tenantId)).find(item => item.id === input.versionId);

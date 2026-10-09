@@ -10,7 +10,7 @@ const input = { workspaceId, systemId, section: "hero", versionId: "saved-hero" 
 const ports = {
   released: vi.fn(), workspaces: vi.fn(), systems: vi.fn(), operator: vi.fn(), tenant: vi.fn(),
   template: vi.fn(), capabilities: vi.fn(), canWrite: vi.fn(), subscribed: vi.fn(), versions: vi.fn(), apply: vi.fn(),
-  snapshots: vi.fn(), rebuildReleased: vi.fn(), document: vi.fn(), rebuild: vi.fn(), undo: vi.fn(), request: vi.fn(), audit: vi.fn(),
+  provider: vi.fn(), snapshots: vi.fn(), rebuildReleased: vi.fn(), document: vi.fn(), rebuild: vi.fn(), undo: vi.fn(), request: vi.fn(), audit: vi.fn(),
 };
 const restore = createWebsiteContentRestoreService(ports);
 beforeEach(() => {
@@ -25,6 +25,7 @@ beforeEach(() => {
   ports.versions.mockResolvedValue([{ id: input.versionId, data: { headline: "Earlier reviewed headline" } }]);
   ports.apply.mockResolvedValue({ status: "queued", section: "hero", eventId: "review-event" });
   ports.snapshots.mockResolvedValue([{ id: "snap_one", tenantId: "gldf", label: "Before changing hours", createdAt: "2026-10-01T12:00:00Z", status: "available" }]);
+  ports.provider.mockResolvedValue({ kind: "agency", agencyWorkspaceId: workspaceId });
   ports.request.mockResolvedValue({ id: "restore-request" });
   ports.rebuildReleased.mockResolvedValue(true);
   ports.document.mockResolvedValue({ revision: 1, contentHash: hash });
@@ -40,13 +41,19 @@ describe("saved copy restore Requests", () => {
     if (result.status !== "requested") throw new Error("Expected a restore Request");
     expect(result.message).toContain("preview still needs to be prepared and approved");
     expect(ports.request).toHaveBeenCalledWith(actor, expect.objectContaining({
-      status: "requested", request: expect.stringContaining("snap_one, saved 2026-10-01T12:00:00Z"),
+      provider: { kind: "agency", agencyWorkspaceId: workspaceId }, status: "requested", request: expect.stringContaining("snap_one, saved 2026-10-01T12:00:00Z"),
       context: expect.objectContaining({ systemId, tenantStableId: workspaceId, restoreSnapshotId: "snap_one", restoreSnapshotCreatedAt: "2026-10-01T12:00:00Z" }),
       idempotencyKey: expect.stringMatching(/^restore-snapshot:[a-f0-9]{64}$/),
     }));
     const command = ports.request.mock.calls[0]![1];
     await restore(actor, savedCopy);expect(ports.request.mock.calls[1]![1]).toEqual(command);
     expect(ports.apply).not.toHaveBeenCalled();expect(ports.undo).not.toHaveBeenCalled();
+  });
+  it("does not file a restore when no current agency qualifies", async () => {
+    ports.provider.mockRejectedValueOnce(new Error("No agency has an active provider seat"));
+    await expect(restore(actor, savedCopy)).rejects.toThrow("active provider seat");
+    expect(ports.request).not.toHaveBeenCalled();
+    expect(ports.apply).not.toHaveBeenCalled();
   });
   it("supports repository clients through the same reviewed Request delivery", async () => {
     ports.tenant.mockResolvedValue({ id: "mclears", active: true, deliveryModel: "custom_repo" });

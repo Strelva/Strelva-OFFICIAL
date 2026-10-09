@@ -12,6 +12,8 @@ import { createSiteChangeStore } from "@/products/websites/server";
 import { recordSiteChangeSchema, siteChangeRequestCommand } from "@/products/websites/client";
 import { siteEditingFor } from "@/products/websites/client";
 
+import { readSiteChangeProvider } from "@/platform/service-requests/provider-options";
+
 export const dynamic = "force-dynamic";
 
 const uuid = z.string().uuid();
@@ -59,8 +61,8 @@ export async function GET(request: Request) {
 /**
  * POST /api/workspace/site-changes
  * - `ask`: an owner or admin asks for a change to the site's repo. Files a
- *   Request to Strelva at Asked; nothing on the site changes.
- * - `record`: a step on that Request. Strelva records previews and deploys;
+ *   Request to the current agency at Asked; nothing on the site changes.
+ * - `record`: a step on that Request. The agency records previews and deploys;
  *   an owner approves or declines a preview. The database enforces who and
  *   in what order.
  */
@@ -86,7 +88,7 @@ export async function POST(request: Request) {
     const config = await getTenantConfig(site.tenantId).catch(() => undefined);
     const service = new ServiceRequestService(PostgresServiceRequestStore);
     const filed = await service.execute(actor, siteChangeRequestCommand({
-      workspaceId: body.workspaceId, systemId: body.systemId, tenantStableId: site.tenantStableId,
+      provider: await readSiteChangeProvider(actor, body.workspaceId), workspaceId: body.workspaceId, systemId: body.systemId, tenantStableId: site.tenantStableId,
       editing: siteEditingFor(config ?? { id: site.tenantId }), words: body.request, page: body.page, idempotencyKey: body.idempotencyKey,
     }));
     return workspaceJson({ requestId: filed.id, requests: await store.list(actor, body.workspaceId, body.systemId) }, 201);

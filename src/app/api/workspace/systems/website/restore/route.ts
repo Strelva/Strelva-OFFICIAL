@@ -3,6 +3,8 @@ import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 import { prepareWebsiteContentRestore } from "./service";
 
+import { ServiceRequestAccessError, ServiceRequestConflictError } from "@/platform/service-requests";
+
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
@@ -15,5 +17,9 @@ export async function POST(request: Request) {
     const result = await prepareWebsiteContentRestore(actor, await readWorkspaceBody(request, 4000));
     if (result.status === "blocked" || result.status === "failed") return workspaceJson({ error: result.status === "blocked" ? result.message : "The saved content could not be prepared for review." }, 409);
     return workspaceJson({ status: result.status, ...(result.status === "queued" ? { eventId: result.eventId } : {}), ...("requestId" in result ? { requestId: result.requestId } : {}), ...("previewHref" in result ? { previewHref: result.previewHref } : {}), message: "message" in result ? result.message : "The earlier content is prepared for review. Your live website is unchanged." });
-  } catch (error) { return workspaceHttpFailure(error); }
+  } catch (error) {
+    if (error instanceof ServiceRequestConflictError) return workspaceJson({ error: error.message }, 409);
+    if (error instanceof ServiceRequestAccessError) return workspaceJson({ error: error.message }, 403);
+    return workspaceHttpFailure(error);
+  }
 }

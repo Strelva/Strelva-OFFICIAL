@@ -142,11 +142,11 @@ describe("website change Requests", () => {
   });
 
   it("files a Request to Strelva with the System and the person's words", () => {
-    const command = siteChangeRequestCommand({ workspaceId: WS, systemId: mclearsSystem, tenantStableId: MCLEARS, editing: "request", words: "  Add a private events page ", page: "Home", idempotencyKey: "k1" });
+    const command = siteChangeRequestCommand({ provider: { kind: "agency", agencyWorkspaceId: WS }, workspaceId: WS, systemId: mclearsSystem, tenantStableId: MCLEARS, editing: "request", words: "  Add a private events page ", page: "Home", idempotencyKey: "k1" });
     expect(command).toEqual({
       action: "save", businessId: WS, status: "requested", request: "Add a private events page", outcome: "Add a private events page",
       context: { source: "website_change", systemId: mclearsSystem, tenantStableId: MCLEARS, implementation: "custom_repo", page: "Home" },
-      scope: ["website.repo_change"], provider: { kind: "strelva" }, idempotencyKey: "k1",
+      scope: ["website.repo_change"], provider: { kind: "agency", agencyWorkspaceId: WS }, idempotencyKey: "k1",
     });
   });
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
-import { ServiceRequestAccessError, ServiceRequestStoreError, ServiceRequestValidationError, type ServiceRequestActor } from "./types";
+import { ServiceRequestAccessError, ServiceRequestConflictError, ServiceRequestStoreError, ServiceRequestValidationError, type ServiceRequestActor } from "./types";
 
 type ProviderIdentityReadArgs = { p_user_id: string; p_verified_email: string; p_business_id: string };
 interface ProviderIdentityReadPort {
@@ -31,4 +31,16 @@ export async function readBusinessProviderIdentity(actor: ServiceRequestActor, b
   const parsed = z.object({ agencyWorkspaceId: z.string().uuid(), name: z.string().min(1) }).strict().nullable().safeParse(data);
   if (!parsed.success) throw new ServiceRequestStoreError();
   return parsed.data;
+}
+
+/** Choose only an unambiguous current owner-granted agency seat. The write RPC
+ * rechecks that seat; identity presentation alone never grants serving access. */
+export function siteChangeProviderFromOptions(options: Awaited<ReturnType<typeof readServiceRequestProviders>>) {
+  const ofRecord = options.filter(option => option.providerOfRecord);
+  const qualified = ofRecord.length ? ofRecord : options;
+  if (qualified.length !== 1) throw new ServiceRequestConflictError(qualified.length ? "Choose one agency for this website Request before continuing." : "No agency has an active provider seat for this business.");
+  return { kind: "agency" as const, agencyWorkspaceId: qualified[0].agencyWorkspaceId };
+}
+export async function readSiteChangeProvider(actor: ServiceRequestActor, businessId: string) {
+  return siteChangeProviderFromOptions(await readServiceRequestProviders(actor, businessId));
 }
