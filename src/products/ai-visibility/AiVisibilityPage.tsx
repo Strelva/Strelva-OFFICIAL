@@ -2,7 +2,7 @@
 import { OwnerBrandIdentity } from "@/components/brand/OwnerBrandIdentity";
 import { STRELVA_BRAND } from "@/platform/infra/agency-brand";
 
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { AiVisibilityResultView } from "./AiVisibilityResultView";
 import type { AgencyAttribution } from "@/platform/infra/agency-attribution";
@@ -47,12 +47,16 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
   const [scanId, setScanId] = useState<string | null>(initialScanId ?? null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [invalidField, setInvalidField] = useState<"business" | "url" | null>(null);
+  const errorId = useId();
 
   async function handleScan(event: FormEvent) {
     event.preventDefault();
+    setInvalidField(null);
     const name = business.trim();
     if (!name) {
       setError("Enter your business name to run the audit.");
+      setInvalidField("business");
       return;
     }
 
@@ -63,6 +67,7 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
         new URL(normalized);
       } catch {
         setError("Please enter a valid website URL (e.g., example.com).");
+        setInvalidField("url");
         return;
       }
     }
@@ -120,6 +125,7 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
     setScanId(null);
     setShareUrl(null);
     setError("");
+    setInvalidField(null);
   }
 
   return (
@@ -136,14 +142,14 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
               Check how clearly your website explains your business to AI systems. When available, the result also includes one live Gemini citation check.
             </p>
 
-            <form onSubmit={handleScan} className="mt-8 grid gap-3 sm:grid-cols-2">
+            <form onSubmit={handleScan} aria-describedby={error ? errorId : undefined} className="mt-8 grid gap-3 sm:grid-cols-2">
               <label className="block">
                 <span className="mb-2 block text-sm text-m-text-2">Business name</span>
-                <input id="business-name" type="text" value={business} onChange={(event) => setBusiness(event.target.value)} placeholder="Business name" autoComplete="organization" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
+                <input id="business-name" type="text" required aria-invalid={invalidField === "business" || undefined} aria-describedby={invalidField === "business" ? errorId : undefined} value={business} onChange={(event) => setBusiness(event.target.value)} placeholder="Business name" autoComplete="organization" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
               </label>
               <label className="block">
                 <span className="mb-2 block text-sm text-m-text-2">Website</span>
-                <input id="website" type="text" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="example.com" autoComplete="url" inputMode="url" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
+                <input id="website" type="text" aria-invalid={invalidField === "url" || undefined} aria-describedby={invalidField === "url" ? errorId : undefined} value={url} onChange={(event) => setUrl(event.target.value)} placeholder="example.com" autoComplete="url" inputMode="url" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
               </label>
               <label className="block">
                 <span className="mb-2 block text-sm text-m-text-2">Business category</span>
@@ -158,7 +164,7 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
               </button>
             </form>
 
-            {error && <p role="alert" className="mt-4 rounded-lg border px-4 py-3 text-[13px]" style={{ color: "var(--m-danger)", borderColor: "color-mix(in oklch, var(--m-danger) 38%, transparent)", background: "color-mix(in oklch, var(--m-danger) 10%, transparent)" }}>{error}</p>}
+            {error && <p id={errorId} role="alert" className="mt-4 rounded-lg border px-4 py-3 text-[13px]" style={{ color: "var(--m-danger)", borderColor: "color-mix(in oklch, var(--m-danger) 38%, transparent)", background: "color-mix(in oklch, var(--m-danger) 10%, transparent)" }}>{error}</p>}
             <p className="mt-4 text-[13px] text-m-text-3">Free. No signup required. Add your website for AI-readiness signals.</p>
           </div>
         )}
@@ -167,8 +173,8 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
           <div className="motion-rise">
             <p className="text-[14px] font-medium text-m-text-3">Auditing</p>
             <h2 className="mt-4 text-3xl font-semibold text-m-text sm:text-4xl">Checking AI visibility for {business}...</h2>
-            <div className="mt-10 flex items-center gap-3 rounded-2xl border border-m-rule-soft bg-m-panel p-6">
-              <Loader2 className="size-5 shrink-0 animate-spin text-m-accent" />
+            <div role="status" className="mt-10 flex items-center gap-3 rounded-2xl border border-m-rule-soft bg-m-panel p-6">
+              <Loader2 aria-hidden="true" className="size-5 shrink-0 animate-spin text-m-accent motion-reduce:animate-none" />
               <span className="text-[14px] text-m-text-2">Reading your site and checking AI-crawler access. A live Gemini result will be included when available.</span>
             </div>
           </div>

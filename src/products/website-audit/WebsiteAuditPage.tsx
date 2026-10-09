@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useId, useState } from "react";
 import {
   ArrowRight,
   CheckCircle2,
@@ -150,12 +150,15 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
   const [result, setResult] = useState<AuditResult | null>(initialResult || null);
   const [reportId, setReportId] = useState<string | null>(initialReportId || null);
   const [error, setError] = useState(initialError || "");
+  const [invalidUrl, setInvalidUrl] = useState(false);
+  const errorId = useId();
   const [reportLoading, setReportLoading] = useState(false);
 
 
 
   async function handleScan(e: React.FormEvent) {
     e.preventDefault();
+    setInvalidUrl(false);
     const cleaned = url.trim();
     if (!cleaned) return;
 
@@ -168,6 +171,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
       new URL(normalizedUrl);
     } catch {
       setError("Please enter a valid URL (e.g., example.com)");
+      setInvalidUrl(true);
       return;
     }
 
@@ -210,6 +214,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
     window.history.replaceState(workspaceHistoryState(window.history.state), "", `${location.pathname}${location.search}`);
     setReportId(null);
     setState("idle");
+    setInvalidUrl(false);
     setResult(null);
     setError("");
     setUrl("");
@@ -267,6 +272,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
 
             <form
               onSubmit={handleScan}
+              aria-describedby={error ? errorId : undefined}
               className="mt-8 flex flex-col gap-3 sm:flex-row"
             >
               <div className="relative flex-1">
@@ -274,6 +280,8 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
                 <input
                   type="text"
                   aria-label="Website address"
+                  aria-invalid={invalidUrl || undefined}
+                  aria-describedby={invalidUrl ? errorId : undefined}
                   required
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
@@ -294,6 +302,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
 
             {error && (
               <p
+                id={errorId}
                 role="alert"
                 className="mt-4 rounded-lg border px-4 py-3 text-[13px]"
                 style={{
@@ -328,7 +337,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
             </p>
 
             <div role="status" className="mt-10 flex items-center gap-3 rounded-2xl border border-m-rule-soft bg-m-panel p-6">
-              <Loader2 className="size-5 shrink-0 animate-spin text-m-accent" />
+              <Loader2 aria-hidden="true" className="size-5 shrink-0 animate-spin text-m-accent motion-reduce:animate-none" />
               <span className="text-[14px] text-m-text-2">Reading the website and running its checks. Results appear when the scan completes.</span>
             </div>
           </div>
