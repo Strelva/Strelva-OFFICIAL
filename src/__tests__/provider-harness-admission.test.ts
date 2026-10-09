@@ -78,6 +78,8 @@ it("refuses a public or symlinked dispatch journal directory", () => {
   const fixture = privateFixture();
   try {
     const claims = join(fixture.directory, "claims"); mkdirSync(claims, { mode: 0o755 });
+    // mkdir applies the caller's umask; make this refusal fixture actually public.
+    chmodSync(claims, 0o755);
     const scope = { kind: "sandbox-application", authorizationReference: "fictional", dispatchJournalDirectory: claims };
     expect(() => claimProviderDispatch(scope, id)).toThrow("private current-owner");
     symlinkSync(fixture.directory, join(fixture.directory, "link"));
