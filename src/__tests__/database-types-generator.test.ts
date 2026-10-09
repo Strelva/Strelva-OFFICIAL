@@ -81,6 +81,16 @@ describe("generate-database-types render", () => {
     expect(out).toContain(`widget_kind: ["small", "large"],`);
   });
 
+  it("preserves the explicit signing-key clear contract without widening other RPC arguments", () => {
+    const generated = render({ ...catalog, functions: [...catalog.functions, {
+      name: "rotate_tenant_track_signing_key", oid: 6, retset: false, rettype: T.void,
+      argnames: ["p_tenant_id", "p_public_key"], argmodes: null, alltypes: null,
+      argtypes: [T.text, T.text], ndefaults: 0,
+    }] });
+    expect(generated).toMatch(/rotate_tenant_track_signing_key: \{[\s\S]*?p_public_key: string \| null[\s\S]*?p_tenant_id: string/);
+    expect(generated).toMatch(/touch:[\s\S]*?p_id: string\n/);
+  });
+
   it("keeps the helper types the app imports", () => {
     for (const name of ["export type Tables<", "export type TablesInsert<", "export type TablesUpdate<", "export type Enums<", "export const Constants"]) {
       expect(out).toContain(name);

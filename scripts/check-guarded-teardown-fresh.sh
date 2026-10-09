@@ -22,6 +22,22 @@ while IFS= read -r migration;do
   psql "${psql_args[@]}" --file="$repo_root/tests/google-review-content-retention-upgrade-before.sql"
  fi
  if [[ "${STRELVA_PRIVATE_DEFINITION_SQL_PROOF:-0}" == 1 && "$(basename "$migration")" == 20261022123000_private_definition_versions.sql ]]; then
+  psql "${psql_args[@]}" --tuples-only --no-align --command="select jsonb_build_object('dataDirectory',current_setting('data_directory'),'socketDirectory',current_setting('unix_socket_directories'),'port',current_setting('port'),'systemIdentifier',(select system_identifier::text from pg_control_system()),'databaseOid',(select oid::text from pg_database where datname=current_database()));" > "$cluster_root/private-native-identity.json"
+  python3 - "$cluster_root/private-native-identity.json" "$cluster_root/private-native-marker.json" <<'PYMARKER'
+import json,os,pathlib,sys
+identity=json.loads(pathlib.Path(sys.argv[1]).read_text())
+identity.update(kind='strelva-owned-temporary-postgres',uid=os.getuid())
+for key in ('dataDirectory','socketDirectory'): identity[key]=str(pathlib.Path(identity[key]).resolve(strict=True))
+with open(sys.argv[2],'x') as handle: json.dump(identity,handle)
+os.chmod(sys.argv[2],0o600)
+PYMARKER
+  private_native_url=$(python3 - "$cluster_root/private-native-marker.json" <<'PYURL'
+import json,pathlib,pwd,os,sys,urllib.parse
+identity=json.loads(pathlib.Path(sys.argv[1]).read_text())
+print('postgresql://'+urllib.parse.quote(pwd.getpwuid(os.getuid()).pw_name,safe='')+'@/postgres?'+urllib.parse.urlencode({'host':identity['socketDirectory'],'port':identity['port']}))
+PYURL
+  )
+  env -u STRELVA_LOCAL_AUTH_PROOF STRELVA_PRIVATE_DEFINITION_NATIVE_PROOF=1 STRELVA_LOCAL_DB_URL="$private_native_url" STRELVA_PRIVATE_DEFINITION_CLUSTER_MARKER="$cluster_root/private-native-marker.json" python3 scripts/check-private-definition-acl-baseline.py "$migration" "$repo_root/supabase/migrations/rollback-$(basename "$migration")"
   pg_dump --host="$cluster_socket" --port="$cluster_port" --username="$(id -un)" --dbname=postgres --schema-only --schema=public | python3 -c 'import sys; sys.stdout.writelines(line for line in sys.stdin if not line.startswith((r"\restrict ",r"\unrestrict ")))' > "$cluster_root/private-definition-before.sql"
  fi
  psql "${psql_args[@]}" --file="$migration" >/dev/null

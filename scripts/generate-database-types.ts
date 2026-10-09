@@ -26,6 +26,12 @@ import { userInfo } from "node:os";
 
 const DEFAULT_OUT = "src/platform/infra/db/database.types.ts";
 
+// pg_proc has no argument-nullability metadata. This existing RPC explicitly
+// accepts NULL to clear a signing key (20261012120000_track_signing_key_rotation).
+const nullableRpcArguments: Readonly<Record<string, readonly string[]>> = {
+  rotate_tenant_track_signing_key: ["p_public_key"],
+};
+
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(name);
   return i === -1 ? undefined : process.argv[i + 1];
@@ -211,7 +217,7 @@ export function render(catalog: Catalog): string {
     const inArgs = allTypes.map((type, i) => ({ type, name: names[i] ?? "", mode: modes[i] ?? "i" }))
       .filter((a) => a.mode === "i" || a.mode === "b" || a.mode === "v");
     const optionalFrom = inArgs.length - fn.ndefaults;
-    const args = inArgs.map((a, i) => [`${a.name || '""'}${i >= optionalFrom ? "?" : ""}`, ts(a.type)] as [string, string])
+    const args = inArgs.map((a, i) => [`${a.name || '""'}${i >= optionalFrom ? "?" : ""}`, nullableRpcArguments[fn.name]?.includes(a.name) ? `${ts(a.type)} | null` : ts(a.type)] as [string, string])
       .sort(([a], [b]) => a.localeCompare(b));
     const tableOut = allTypes.map((type, i) => ({ type, name: names[i] ?? "", mode: modes[i] ?? "i" })).filter((a) => a.mode === "t");
     let returns: string;
