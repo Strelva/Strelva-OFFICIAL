@@ -1,0 +1,7 @@
+\set ON_ERROR_STOP on
+-- Harness binds actual holderPid/holderXid read from marker; no guessed PID.
+select jsonb_build_object('workerPid',a.pid,'holderPid',:holder_pid,'holderXid',:'holder_xid','blockingPids',pg_blocking_pids(a.pid),'workerXactStart',a.xact_start,'observedAt',clock_timestamp(),'blockedOnHolder',:holder_pid::integer=any(pg_blocking_pids(a.pid)), 'matchingHolderXidWait',exists(select 1 from pg_locks l where l.pid=a.pid and l.locktype='transactionid' and l.transactionid::text=:'holder_xid' and l.mode='ShareLock' and not l.granted),'workspaceRelationHeld',exists(select 1 from pg_locks l where l.pid=a.pid and l.relation='public.workspaces'::regclass and l.mode='RowShareLock' and l.granted)) from pg_stat_activity a where a.application_name='governed_creator_exit_worker' and a.wait_event_type='Lock';
+-- Release requires exactly one row and all3 booleans true, while holder remains
+-- alive in that exact transaction. After holder COMMIT await worker CLOSE,
+-- retain exact error/code/signal and query actual completed exit + zero listing.
+select jsonb_build_object('completedExit',public.workspace_exit_completed('d1720000-0000-4000-8000-000000000020'),'creatorListingCount',(select count(*) from public.creator_listings where creator_workspace_id='d1720000-0000-4000-8000-000000000020'),'retainedAgreementCount',(select count(*) from public.money_agreements where beneficiary_workspace_id='d1720000-0000-4000-8000-000000000020' and version='fictional-gm-written-agreement'));

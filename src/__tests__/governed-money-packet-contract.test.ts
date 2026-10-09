@@ -24,6 +24,18 @@ describe("governed money source packet", () => {
     expect(owner.indexOf("public.accept_platform_collection_terms")).toBeLessThan(owner.indexOf("public.freeze_platform_collection_period"));
     expect(owner).toContain("m.role='owner' for share of m,w");
   });
+  it("locks the exact creator workspace before membership/source waits and rechecks exit before inserting", () => {
+    const listing = forward.slice(forward.indexOf("create function public.register_governed_creator_listing"), forward.indexOf("create function public.assert_governed_payout_dispatch"));
+    const workspaceLock = listing.indexOf("from public.workspaces where id=workspace for share");
+    expect(workspaceLock).toBeGreaterThan(0);
+    expect(workspaceLock).toBeLessThan(listing.indexOf("public.connect_assert_manager"));
+    const exitCheck = listing.indexOf("public.workspace_exit_completed(workspace)");
+    expect(exitCheck).toBeGreaterThan(listing.indexOf("public.lock_system_revision_qualification"));
+    expect(exitCheck).toBeGreaterThan(workspaceLock);
+    expect(exitCheck).toBeLessThan(listing.indexOf("listing:=public.register_creator_listing"));
+    const exit = readFileSync("supabase/migrations/20260920100000_workspace_exit.sql", "utf8");
+    expect(exit).toContain("from public.workspaces where id = p_workspace_id for update");
+  });
   it("counts existing restored recovery reservations using the declared net-capacity contract", () => {
     const dispatch = forward.slice(forward.indexOf("create function public.assert_governed_payout_dispatch"), forward.indexOf("do $$declare f regprocedure"));
     expect(dispatch).toContain("coalesce(sum(public.split_reserved_net(split_id)),0)");

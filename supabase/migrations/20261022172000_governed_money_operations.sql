@@ -109,6 +109,11 @@ begin
  if jsonb_typeof(p_command) is distinct from 'object' or (select array_agg(k order by k) from jsonb_object_keys(p_command) k) is distinct from array['agreementVersion','rateReference','sourceRevisionId','workspaceId'] then raise exception 'governed_money_invalid';end if;
  perform 1 from public.users where id=p_user_id and verified_at is not null and lower(btrim(email))=lower(btrim(p_verified_email)) for share;
  if not found then raise exception 'governed_money_denied';end if;
+ -- Exit owns this same workspace row FOR UPDATE. Acquire its conflicting
+ -- row lock before membership/source locks, then recheck completed exit after
+ -- all admission waits. A later FK wait cannot admit a post-exit listing.
+ perform 1 from public.workspaces where id=workspace for share;
+ if not found then raise exception 'governed_money_denied';end if;
  perform public.connect_assert_manager(workspace,p_user_id,p_verified_email);
  -- Only the actual existing source registry chooses its definition identity.
  -- An arbitrary definition ID cannot be paired with somebody else's revision.
@@ -162,7 +167,7 @@ begin
  ('public.read_governed_money_configuration(uuid,uuid,text)','cb48f96fadd0536308c1cdf9784145cd','s',array['p_workspace_id','p_user_id','p_verified_email']::text[]),
  ('public.read_governed_money_preparation(uuid,uuid,text)','069ebd4ec0274185bf97814ea64f6523','s',array['p_workspace_id','p_user_id','p_verified_email']::text[]),
  ('public.prepare_governed_collection_terms(uuid,text,jsonb)','d76caf2ab026b72931ce6af8570b7d36','v',array['p_user_id','p_verified_email','p_command']::text[]),
- ('public.register_governed_creator_listing(uuid,text,jsonb)','3971564a6293d3f7aba4c51a37d3b5c2','v',array['p_user_id','p_verified_email','p_command']::text[]),
+ ('public.register_governed_creator_listing(uuid,text,jsonb)','e67a0cb58c80c3622be80e31bfa98940','v',array['p_user_id','p_verified_email','p_command']::text[]),
  ('public.assert_governed_payout_dispatch(uuid,uuid,text,text,text,text,bigint,text,bigint)','b8fb6dd56365665db132b300ce564d70','v',array['p_payout_id','p_user_id','p_verified_email','p_profile_version','p_recipient','p_charge','p_amount','p_currency','p_available']::text[])) v(signature,source_hash,volatility,arg_names) loop
   if (select count(*) from pg_proc where pronamespace='public'::regnamespace and proname=split_part(split_part(expected.signature,'.',2),'(',1))<>1 then raise exception 'governed_money_catalog_drift';end if;
   select f.*,l.lanname into p from pg_proc f join pg_language l on l.oid=f.prolang where f.oid=to_regprocedure(expected.signature);

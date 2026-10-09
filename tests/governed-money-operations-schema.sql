@@ -63,6 +63,16 @@ select pg_temp.gm_refused(format('select public.assert_governed_payout_dispatch(
 select public.record_split_transfer(id,'tr_FictionalGovernedAccepted',171,'cad') from gm_payout;
 select pg_temp.gm_assert(public.assert_governed_payout_dispatch(id,'d1720000-0000-4000-8000-000000000002','gm-operator@example.test','fictional-gm-profile','acct_FictionalGovernedRecipient','ch_FictionalGovernedSource',171,'cad',1000)->>'transfer_id'='tr_FictionalGovernedAccepted','accepted receipt recovered without fresh operator grant') from gm_payout;
 update public.super_admins set revoked_at=null where user_id='d1720000-0000-4000-8000-000000000002';
+-- Completed creator exit refuses a future listing command while preserving
+-- already accepted listing/transfer bytes. Controlled two-session wait proof
+-- additionally uses tests/support/governed-creator-exit-race-*.sql.
+create temporary table gm_creator_retained as select
+ (select jsonb_agg(to_jsonb(l) order by l.id) from public.creator_listings l where creator_workspace_id='d1720000-0000-4000-8000-000000000020') listings,
+ (select jsonb_agg(to_jsonb(r) order by r.payout_id) from public.split_transfer_receipts r where payout_id in(select id from gm_payout)) receipts;
+select public.complete_workspace_exit('d1720000-0000-4000-8000-000000000020','d1720000-0000-4000-8000-000000000002','gm-operator@example.test','cancel','revoke','{"kind":"stop"}','fictional-governed-creator-exit',repeat('a',64));
+select pg_temp.gm_assert(public.workspace_exit_completed('d1720000-0000-4000-8000-000000000020'),'actual creator exit completed');
+select pg_temp.gm_refused(format('select public.register_governed_creator_listing(%L,%L,%L)','d1720000-0000-4000-8000-000000000002','gm-operator@example.test',jsonb_build_object('workspaceId','d1720000-0000-4000-8000-000000000020','sourceRevisionId',source_revision_id,'agreementVersion','fictional-gm-written-agreement','rateReference','fictional-gm-written-rate')),'workspace_exit_future_work_blocked') from public.offering_package_sources where definition_id='private_staff_requests' and definition_version='1.0.0';
+select pg_temp.gm_assert(listings is not distinct from (select jsonb_agg(to_jsonb(l) order by l.id) from public.creator_listings l where creator_workspace_id='d1720000-0000-4000-8000-000000000020') and receipts is not distinct from (select jsonb_agg(to_jsonb(r) order by r.payout_id) from public.split_transfer_receipts r where payout_id in(select id from gm_payout)),'creator exit refusal preserves prior listing and accepted effect bytes') from gm_creator_retained;
 -- Both ports are STABLE; the independent full readonly-RPC qualification
 -- must additionally execute these inside a genuine READ ONLY transaction.
 set local role service_role;
