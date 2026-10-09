@@ -83,6 +83,37 @@ change still requires the existing separate authorization.
 
 ## Remaining streams and integration order
 
+Opened-work composition [PR #621](https://github.com/Strelva/Strelva-OFFICIAL/pull/621)
+is independently reviewed at `3b898fe5f5c338a02ee28f5258223a6850a34ca3`.
+Its runtime is unchanged from `e7fe129a5ee706de91d4c071edd69c0e2b888ff3`;
+the later commit clarifies the combined acceptance gate. Inspection found no
+introduced dispatch, callback or permission blocker. The website peer's
+unconditional scope/revision guard closes an inherited initial-read gap in the
+intended union. This inspection is not combined execution proof.
+
+Two other reviewed heads need correction before integration:
+
+- Website [PR #620](https://github.com/Strelva/Strelva-OFFICIAL/pull/620), original
+  head `8ff3578f485f4b207fbbf5be5af2a78d13faa70c`: malformed initial input can
+  become an immutable unknown attempt before any service claim exists. Reject
+  deterministic input errors before admission; retain exact replay for uncertain
+  writes. The owning stream is preparing a corrected head.
+- Location [PR #619](https://github.com/Strelva/Strelva-OFFICIAL/pull/619), original
+  head `ebbeda6e2ea0402220461c0a050c6f36c4cd70ba`: same-work save refresh clears
+  selected work before awaiting the snapshot, remounting Website and losing its
+  settled notice. A callback from a departed creation instance can also be
+  admitted after Home then Back restores the same URL. The owning stream is
+  preparing refresh preservation and instance-generation regressions.
+
+Mandatory union cases use the real WorkspaceApp and tools: defer the same-work
+snapshot after an acknowledged save and preserve work, attempt and notice while
+pending, after success and after refresh failure; depart and return before an old
+save settles and refuse its callback; reject a successful wrong-work/workspace
+website envelope through both entrances; and retain revision 2 against a delayed
+revision 1. Fast batched fixture runs do not substitute for deferred settlement.
+Preserve permission epochs, workspace/work keys and optional History/domain
+unavailability without treating those reads as unknown writes.
+
 - Domain and Version changes: reviewed and held at the head above; retain the
   separate System-kind decision when integrating.
 - Website acceptance/recovery: retain submitted payloads and stable public
