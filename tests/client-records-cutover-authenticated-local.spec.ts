@@ -1,3 +1,4 @@
+import "../src/register-workspace-ports"; // Register the actual tenant/workspace adapters in this Playwright worker.
 import { syntheticJourneyParityTenantIds } from "./support/journeys";
 import { recordOrder } from "../src/lib/orders";
 import { randomUUID } from "node:crypto";

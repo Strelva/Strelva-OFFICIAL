@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+import { configuredPackageReviewer } from "./support/configured-package-reviewer";
 import { ordinaryAgencyMaker, ordinaryCustomerBusiness } from "./support/ordinary-agency-maker";
 import { createClient } from "@supabase/supabase-js";
 import { expect, test, type APIRequestContext } from "@playwright/test";
@@ -91,6 +93,7 @@ test("scheduling, generated applications and two-source investigation persist wi
   const admin = createClient(env.url, env.service, { auth: { persistSession: false, autoRefreshToken: false } });
   const owner = await signedInContext(browser, admin, "horizontal-owner");
   let maker: Awaited<ReturnType<typeof ordinaryAgencyMaker>> | undefined;
+  let reviewer: Awaited<ReturnType<typeof configuredPackageReviewer>> | undefined;
   try {
     const workspaceId = await ordinaryCustomerBusiness(owner, "Native horizontal operations business");
     maker = await ordinaryAgencyMaker(browser, admin, owner, workspaceId);
@@ -103,16 +106,60 @@ test("scheduling, generated applications and two-source investigation persist wi
     app = await post(maker.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: app.id, command: { kind: "rehearse", expectedRevision: 0 } });
     app = await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: app.id, command: { kind: "install", expectedRevision: app.payload.revision } });
     app = await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: app.id, command: { kind: "submit", expectedRevision: app.payload.revision, record: { id: "project-1", values: { name: "Kitchen renovation" } } } });
-    // Reuse an agency-owned released definition; customer records remain private.
-    let reusable = await post(maker.context.request, "/api/bounded-work", { action: "create", productId: "applications", workspaceId: maker.agencyId, input: { title: "Reusable project portal", fields: [{ id: "name", label: "Project", type: "text", required: true }], components: [{ kind: "form", fields: ["name"] }, { kind: "list", fields: ["name"] }] } }, 201);
-    reusable = await post(maker.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: reusable.id, command: { kind: "rehearse", expectedRevision: reusable.payload.revision } });
-    reusable = await post(maker.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: reusable.id, command: { kind: "install", expectedRevision: reusable.payload.revision } });
-    reusable = await post(maker.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: reusable.id, command: { kind: "submit", expectedRevision: reusable.payload.revision, record: { id: "agency-private", values: { name: "Private agency project" } } } });
-    await post(owner.context.request, "/api/bounded-work", { action: "from_source", productId: "applications", workspaceId, sourceWorkId: reusable.id }, 403);
-    const installedCopy = await post(maker.context.request, "/api/bounded-work", { action: "from_source", productId: "applications", workspaceId, sourceWorkId: reusable.id }, 201);
+    // Agency owners author reusable sources through the dedicated definition path.
+    // Generic app creation remains a customer provider operation.
+    const reusableDefinition = { kind: "internal_app", title: "Reusable project portal",
+      fields: [{ id: "name", label: "Project", type: "text", required: true }],
+      components: [{ kind: "form", fields: ["name"] }, { kind: "list", fields: ["name"] }] };
+    await post(maker.context.request, "/api/bounded-work", { action: "create", productId: "applications", workspaceId: maker.agencyId,
+      input: { title: reusableDefinition.title, fields: reusableDefinition.fields, components: reusableDefinition.components } }, 403);
+    const reusable = await post(maker.context.request, "/api/workspace/version-sources", { action: "create", workspaceId: maker.agencyId,
+      name: "Reusable project portal source", commandId: randomUUID() }, 201);
+    const revision = await post(maker.context.request, "/api/workspace/version-sources", { action: "publish", workspaceId: maker.agencyId,
+      systemId: reusable.source.systemId, commandId: randomUUID(), expectedRevision: 0, definition: reusableDefinition,
+      summary: "Reusable project portal definition without customer records" }, 201);
+    const checks = await post(maker.context.request, "/api/workspace/packages", { action: "qualify", workspaceId: maker.agencyId,
+      revisionId: revision.source.revisionId });
+    expect(checks.revisionId).toBe(revision.source.revisionId);
+    expect(checks.evidence.every((item: { status: string }) => item.status === "passed")).toBe(true);
+    await post(maker.context.request, "/api/workspace/packages", { action: "review", workspaceId: maker.agencyId,
+      revisionId: revision.source.revisionId, approve: true, note: "Ordinary maker cannot issue platform qualification." }, 403);
+    reviewer = await configuredPackageReviewer(browser, admin);
+    const reviewed = await post(reviewer.context.request, "/api/workspace/packages", { action: "review", workspaceId: maker.agencyId,
+      revisionId: revision.source.revisionId, approve: true, note: "Reviewed actual isolated native project portal rehearsal under the configured local policy." });
+    expect(reviewed.status).toBe("qualified");
+    expect(reviewed.humanReview.state).toBe("approved");
+    expect(reviewed.humanReview.reviewerId).toBe(reviewer.userId);
+    await post(maker.context.request, "/api/workspace/version-sources", { action: "share", workspaceId: maker.agencyId,
+      systemId: reusable.source.systemId, businessId: workspaceId, shared: true });
+    const copyCommandId = randomUUID();
+    await post(maker.context.request, "/api/workspace/version-sources", { action: "install", workspaceId,
+      source: revision.source, name: "Reusable project portal", commandId: copyCommandId }, 403);
+    const grant = await post(owner.context.request, "/api/workspace/version-sources", { action: "grant_install", workspaceId,
+      agencyWorkspaceId: maker.agencyId, revisionId: revision.source.revisionId, commandId: copyCommandId,
+      expiresAt: new Date(Date.now() + 3_600_000).toISOString() });
+    expect(grant.commandId).toBe(copyCommandId);
+    const copiedVersion = await post(maker.context.request, "/api/workspace/version-sources", { action: "install", workspaceId,
+      source: revision.source, name: "Reusable project portal", commandId: copyCommandId }, 201);
+    const nativeCopy = await admin.rpc("read_version_native_runtime", { p_workspace_id: workspaceId,
+      p_user_id: owner.userId, p_verified_email: owner.email, p_version_id: copiedVersion.versionId });
+    expect(nativeCopy.error).toBeNull();
+    expect(nativeCopy.data.kind).toBe("internal_app");
+    const copyResponse = await owner.context.request.get(`/api/bounded-work?productId=applications&workId=${nativeCopy.data.workId}`);
+    expect(copyResponse.status(), await copyResponse.text()).toBe(200);
+    const installedCopy = await copyResponse.json();
+    expect(installedCopy.id).not.toBe(app.id);
+    expect(installedCopy.payload.status).toBe("draft");
     expect(installedCopy.payload.records).toEqual([]);
-    expect(installedCopy.payload.installation.sourceWorkId).toBe(reusable.id);
-    expect(JSON.stringify(installedCopy)).not.toContain("Private agency project");
+    expect(installedCopy.payload.spec.fields).toEqual(reusableDefinition.fields);
+    expect(JSON.stringify(installedCopy)).not.toContain("Kitchen renovation");
+    const lineage = await admin.from("system_versions").select("source_system_id,installed_source_revision_id")
+      .eq("id", copiedVersion.versionId).single();
+    expect(lineage.error).toBeNull();
+    expect(lineage.data).toMatchObject({ source_system_id: reusable.source.systemId, installed_source_revision_id: revision.source.revisionId });
+    const originalResponse = await owner.context.request.get(`/api/bounded-work?productId=applications&workId=${app.id}`);
+    expect(originalResponse.status(), await originalResponse.text()).toBe(200);
+    expect((await originalResponse.json()).payload.records).toEqual(app.payload.records);
     const left = await post(owner.context.request, "/api/documents", { action: "create", workspaceId, input: { title: "Published hours", text: "Open at nine" } });
     const right = await post(owner.context.request, "/api/documents", { action: "create", workspaceId, input: { title: "Staff hours", text: "Open at ten" } });
     let investigation = await post(owner.context.request, "/api/bounded-work", { action: "create", productId: "investigations", workspaceId, input: { title: "Keep hours consistent", intervalMinutes: 60, sources: [{ workId: left.workId }, { workId: right.workId }] } }, 201);
@@ -121,5 +168,5 @@ test("scheduling, generated applications and two-source investigation persist wi
     const reopened = await owner.context.request.get(`/api/bounded-work?productId=investigations&workId=${investigation.id}`);
     expect((await reopened.json()).payload.runs).toHaveLength(1);
     await post(owner.context.request, "/api/bounded-work", { action: "run", productId: "investigations", workId: investigation.id, command: { expectedRevision: 1, requestId: "too-early" } }, 409);
-  } finally { await maker?.context.close(); await owner.context.close(); }
+  } finally { await reviewer?.context.close(); await maker?.context.close(); await owner.context.close(); }
 });
