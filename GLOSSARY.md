@@ -232,15 +232,22 @@ _Avoid_: Responsibility, membership, unlimited delegation
 These terms follow ADR 0012's neutral platform decision. Agency is defined in
 On screen.
 
-**Strelva agency**:
+**Strelva Agency**:
 Strelva's own agency, with the same standing and powers as every other agency.
-_Avoid_: Strelva staff, house agency, operator, platform (as synonyms)
+It is always named "Strelva Agency" on screen, so its work is never mistaken
+for something the platform, "Strelva", did.
+_Avoid_: Strelva (alone, for the agency), Strelva staff, house agency, operator, platform
+
+**Agency basis**:
+Why a business has the agency it has: an existing contract with that agency,
+or the owner's own choice.
+_Avoid_: default agency, assignment, provider attribution
 
 **Platform operator**:
 Strelva staff acting for the platform in support, incidents or release. Its
 actions are logged. It never sells to or serves a client; client work follows
 the ordinary agency path.
-_Avoid_: Strelva agency, super admin, operator override
+_Avoid_: Strelva Agency, super admin, operator override
 
 **Payer**:
 Who pays Strelva for one business: the business itself or its agency, chosen
