@@ -1,5 +1,7 @@
 "use client";
 
+import { actorCopy, actorPresentation } from "@/platform/presentation/actor";
+import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
 import type { CSSProperties, ReactNode } from "react";
 import { ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -63,7 +65,10 @@ export function NeedsYouSection({ state, pending, notices, onDecide, onRetry, ex
         const openHref = item.openHref ? `${appBase}${item.openHref}` : null;
         const look = decisionPresentation(item);
         const Icon = look.icon;
-        const effects = <small className={styles.effects}>Approve: {item.approveEffect} Not yet: {item.notYetEffect}{item.operatorNote ? ` Strelva's note: ${item.operatorNote}` : ""}</small>;
+        const actor = actorPresentation(item.actor);
+        const noteActor = actorPresentation(item.noteActor?.kind === "operator" ? item.noteActor : { kind: "operator" });
+        const effects = <small className={styles.effects}>Approve: {actorCopy(item.approveEffect, item.actor)} Not yet: {actorCopy(item.notYetEffect, item.actor)}{item.operatorNote ? ` ${noteActor.name ?? "Support"}: ${item.operatorNote}` : ""}</small>;
+        const attribution = actor.name ? <small>{actor.name}{actor.credit ? ` · ${actor.credit}` : ""}</small> : null;
         const status = notice ? <small role="status" className={notice.tone === "error" ? styles.decisionError : styles.decisionNotice}>{notice.text}</small> : null;
         // A source with a separate review is decided only where every value shows.
         const decidable = canDecide && item.review !== null;
@@ -84,6 +89,7 @@ export function NeedsYouSection({ state, pending, notices, onDecide, onRetry, ex
             {look.amount ? <p className={styles.amount}>{look.amount}</p> : null}
             <h3>{item.title}</h3>
             {detail}
+            {attribution}
             {effects}
             {unavailable}
             {status}
@@ -95,6 +101,7 @@ export function NeedsYouSection({ state, pending, notices, onDecide, onRetry, ex
           <div className={styles.decisionBody}>
             <strong>{item.title}</strong>
             {review ?? (item.detail ? <p>{item.detail}</p> : null)}
+            {attribution}
             {effects}
             {unavailable}
             {status}
@@ -122,22 +129,24 @@ export function StrelvaHandledSection({ state, pending, notices, onUndo, fallbac
   if (state.status === "disabled") return null;
   const canUndo = state.status === "ready" && state.role !== "member";
   return <section className={styles.handled} aria-labelledby="home-handled">
-    <header className={styles.handledHeader}><h2 id="home-handled">Strelva handled</h2><span>This week</span></header>
-    {state.status === "loading" ? <p role="status" className={styles.muted}>Checking what Strelva did…</p>
-      : state.status === "error" ? <p role="status" className={styles.muted}>What Strelva did this week could not be loaded.</p>
-      : !state.handledAvailable ? <p role="status" className={styles.muted}>What Strelva did this week could not be loaded. Nothing about it changed.</p>
+    <header className={styles.handledHeader}><h2 id="home-handled">{STRELVA_HANDLED_LABEL}</h2><span>This week</span></header>
+    {state.status === "loading" ? <p role="status" className={styles.muted}>Checking recent changes…</p>
+      : state.status === "error" ? <p role="status" className={styles.muted}>This week’s changes could not be loaded.</p>
+      : !state.handledAvailable ? <p role="status" className={styles.muted}>This week’s changes could not be loaded. Nothing about it changed.</p>
       : state.handled.length ? <ul className={styles.list}>{state.handled.map(receipt => {
         const notice = notices[receipt.id];
+        const actor = actorPresentation(receipt.actor);
         return <li key={receipt.id} className={styles.receipt}>
           <div className={styles.decisionBody}>
-            <strong>{receipt.sentence}</strong>
+            <strong>{actorCopy(receipt.sentence, receipt.actor)}</strong>
+            {actor.credit ? <small>{actor.credit}</small> : null}
             <small>{when(receipt.at)}{receipt.changed ? ` · ${receipt.changed}` : ""}{receipt.evidence ? receipt.evidence.readBack === "verified" ? " · Confirmed live" : receipt.evidence.readBack === "not_verified" ? " · Done, not yet confirmed" : " · Accepted" : ""}</small>
             {receipt.undo.state === "undo_needs_review" || receipt.undo.state === "not_undoable" ? <small>{receipt.undo.reason}</small> : receipt.undo.state === "undone" ? <small>Undone.</small> : null}
             {notice && receipt.undo.state !== "undone" ? <small role="status" className={notice.tone === "error" ? styles.decisionError : undefined}>{notice.text}</small> : null}
           </div>
-          {receipt.undo.state === "undo" && canUndo ? <div className={styles.decisionActions}><Button size="sm" variant="ghost" loading={pending === receipt.id} disabled={Boolean(pending)} onClick={() => onUndo(receipt)} aria-label={`Undo: ${receipt.sentence}`}>Undo</Button></div> : null}
+          {receipt.undo.state === "undo" && canUndo ? <div className={styles.decisionActions}><Button size="sm" variant="ghost" loading={pending === receipt.id} disabled={Boolean(pending)} onClick={() => onUndo(receipt)} aria-label={`Undo: ${actorCopy(receipt.sentence, receipt.actor)}`}>Undo</Button></div> : null}
         </li>;
       })}</ul>
-      : fallback ?? <p className={styles.muted}>Nothing this week. When Strelva changes something for you, it shows here with what changed.</p>}
+      : fallback ?? <p className={styles.muted}>Nothing this week. When something changes for you, it shows here with what changed.</p>}
   </section>;
 }

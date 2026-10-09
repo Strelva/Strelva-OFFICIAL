@@ -943,3 +943,14 @@ states. [Browser checks](../../tests/agent-connections-ui.spec.ts) cover keyboar
 focus, wrapping at 320/360/768/1280/1600px, confirmation and recovery, consent,
 and native website fact review. These are local fixtures; actual Supabase owner
 session, physical device, screen reader and native assistant use remain open.
+
+### October 9 recorded actor presentation
+
+NeedsYouSection, BusinessHome receipt feeds and System History use
+`platform/presentation/actor.ts`. Recorded agencies show their display name and
+“Runs on Strelva”; people show their recorded display name; platform operators
+show support attribution. Missing actor data uses neutral copy. Agency shell
+branding never supplies a receipt actor. `STRELVA_HANDLED_LABEL` retains the
+current place name pending D-label. Existing tokens and components are unchanged.
+Local behavior and verification are recorded in the actor-lane handoff; this is
+not deployment or visual acceptance evidence.

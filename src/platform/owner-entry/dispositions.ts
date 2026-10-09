@@ -1,3 +1,4 @@
+import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
 import { systemOriginId } from "@/platform/systems/invariants";
 import type { ReleaseFlag } from "@/platform/release-flags/resolve";
 import { workspaceSiteHref, type SiteTab } from "@/platform/workspaces/site-places";
@@ -123,7 +124,7 @@ export const SETTINGS_ANCHORS: Record<string, (context: DispositionContext) => s
 };
 
 export const DASHBOARD_DISPOSITIONS: readonly DashboardDisposition[] = [
-  { route: "/", home: "Home: Needs you, From your site, Strelva handled, In progress, Recent", state: "ready", use: "always", requires: ["needs_you"],
+  { route: "/", home: `Home: Needs you, From your site, ${STRELVA_HANDLED_LABEL}, In progress, Recent`, state: "ready", use: "always", requires: ["needs_you"],
     parityGaps: [
       "No onboarding checklist or wizard, day-one cards, retention panel or \"Do this next\" suggestion.",
       "No sparklines on the numbers; visits and customer actions are totals with this week's count.",

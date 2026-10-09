@@ -18,7 +18,7 @@ const SYSTEM = "11111111-1111-4111-8111-111111111111";
 
 function decision(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    store: "owner_decisions", id: "22222222-2222-4222-8222-222222222222", at: AT, kind: "customer.commitment",
+    actor: { kind: "platform" }, store: "owner_decisions", id: "22222222-2222-4222-8222-222222222222", at: AT, kind: "customer.commitment",
     title: "Booking request: Dana Reed, Tue, Oct 15 3:00 PM", state: "approved", outcome: "done", outcomeReason: null,
     sourceLifecycle: "booking_request", sourceId: "33333333-3333-4333-8333-333333333333", decidedByKind: "owner_link",
     receiptRef: "booking:33333333-3333-4333-8333-333333333333:confirmed",
@@ -32,7 +32,7 @@ describe("decided Needs you items in Strelva handled", () => {
   it("an approved booking request reads as Strelva confirming it, with why it isn't one-tap undo", () => {
     const receipt = handledFromStore(decision());
     expect(receipt).toEqual({
-      id: "decision:22222222-2222-4222-8222-222222222222", store: "owner_decisions", systemId: SYSTEM, at: AT, evidence: null,
+      id: "decision:22222222-2222-4222-8222-222222222222", store: "owner_decisions", systemId: SYSTEM, at: AT, evidence: null, actor: { kind: "platform" },
       sentence: "Strelva confirmed the booking you approved: Dana Reed, Tue, Oct 15 3:00 PM",
       changed: "The booking is confirmed for this time.",
       undo: { state: "not_undoable", reason: "A confirmed booking isn't undone in one tap. Move or cancel it in Bookings, and the customer is told." },
@@ -60,7 +60,7 @@ describe("decided Needs you items in Strelva handled", () => {
 
   it("a failed or unfinished approval never claims it happened", () => {
     const failed = handledFromStore(decision({ outcome: "failed", outcomeReason: "resolver_failed" }))!;
-    expect(failed.sentence).toBe('Strelva couldn\'t finish "Booking request: Dana Reed, Tue, Oct 15 3:00 PM" after you decided. We\'re on it.');
+    expect(failed.sentence).toBe('Strelva couldn\'t finish "Booking request: Dana Reed, Tue, Oct 15 3:00 PM" after you decided.');
     expect(failed.undo).toMatchObject({ state: "not_undoable" });
     const running = handledFromStore(decision({ outcome: null }))!;
     expect(running.sentence).toMatch(/^Strelva is finishing /);
@@ -75,7 +75,7 @@ describe("decided Needs you items in Strelva handled", () => {
 
   it("names who decided when it wasn't the owner", () => {
     expect(handledFromStore(decision({ decidedByKind: "operator", sourceLifecycle: "website_document", title: "Fix the hours copy" }))!.sentence)
-      .toBe('Strelva did "Fix the hours copy" after Strelva reviewed it.');
+      .toBe('Strelva did "Fix the hours copy" after Platform operator (support) reviewed it.');
     expect(handledFromStore(decision({ decidedByKind: "admin_session" }))!.sentence)
       .toBe("Strelva confirmed the booking (an admin decided): Dana Reed, Tue, Oct 15 3:00 PM");
   });

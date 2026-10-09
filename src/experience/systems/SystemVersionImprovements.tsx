@@ -1,4 +1,5 @@
 "use client";
+import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/Button";
@@ -126,7 +127,7 @@ export function SystemVersionImprovements({ workspaceId, systemId, versionId, re
         || item.sourceLifecycle !== "version_release" || item.sourceId !== versionId || item.revisionHash !== approval.current.revision || item.state !== "approved" || item.outcome !== "done" || !item.receiptRef?.startsWith(`version_release:${versionId}:`)) {
         throw new Error(errorMessage(data, "The release outcome could not be confirmed. Check Needs you before trying another change."));
       }
-      setReleased(true); setSuccess("The Version release went live. Its receipt is in Strelva handled.");
+      setReleased(true); setSuccess(`The Version release went live. Its receipt is in ${STRELVA_HANDLED_LABEL}.`);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The release outcome could not be confirmed. Check Needs you."); }
     finally { inFlight.current = false; setBusy(false); }
   }

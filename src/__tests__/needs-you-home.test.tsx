@@ -18,8 +18,8 @@ const item = (over: Partial<OwnerDecision> = {}): OwnerDecision => ({
   openedAt: "2026-10-06T11:00:00Z", expiresAt: "2026-10-20T11:00:00Z", reminded1At: null, reminded2At: null, deliveries: [], ...over,
 });
 const receipts: HandledReceipt[] = [
-  { id: "record:14", store: "business_record_revisions", systemId: null, sentence: "Strelva updated your hours in your business record", at: "2026-10-06T14:10:00Z", changed: "hours", evidence: null, undo: { state: "undo" } },
-  { id: "tenant_event:9", store: "tenant_events", systemId: null, sentence: "Strelva replied to Dana's review on Google", at: "2026-10-05T21:02:00Z", changed: null, evidence: { providerAccepted: true, readBack: "verified" }, undo: { state: "not_undoable", reason: "Google has the reply; delete it on Google." } },
+  { actor: { kind: "platform" }, id: "record:14", store: "business_record_revisions", systemId: null, sentence: "Strelva updated your hours in your business record", at: "2026-10-06T14:10:00Z", changed: "hours", evidence: null, undo: { state: "undo" } },
+  { actor: { kind: "platform" }, id: "tenant_event:9", store: "tenant_events", systemId: null, sentence: "Strelva replied to Dana's review on Google", at: "2026-10-05T21:02:00Z", changed: null, evidence: { providerAccepted: true, readBack: "verified" }, undo: { state: "not_undoable", reason: "Google has the reply; delete it on Google." } },
 ];
 const ready = (over: Partial<Extract<NeedsYouState, { status: "ready" }>> = {}): NeedsYouState => ({ status: "ready", role: "owner", items: [item()], complete: true, handled: receipts, handledAvailable: true, ...over });
 const needs = (state: NeedsYouState, extra?: { extraCount?: number }) => renderToStaticMarkup(createElement(NeedsYouSection, { state, pending: null, notices: {}, onDecide: noop, onRetry: noop, ...extra }));
@@ -83,6 +83,39 @@ describe("Needs you on Home", () => {
   });
 });
 
+describe("recorded actors on Home", () => {
+  it("shows the agency with platform credit and support as a separate actor", () => {
+    const html = needs(ready({ items: [item({ actor: { kind: "agency", displayName: "Acme Marketing" }, approveEffect: "Strelva sends the reply.", operatorNote: "Check the price.", noteActor: { kind: "operator", displayName: "Taylor" } })] }));
+    expect(html).toContain("Acme Marketing · Runs on Strelva");
+    expect(html).toContain("Approve: Acme Marketing sends the reply.");
+    expect(html).toContain("Taylor (platform support): Check the price.");
+    expect(html).not.toContain("Strelva&#x27;s note");
+  });
+
+  it("cannot label a support note as an agency action", () => {
+    const html = needs(ready({ items: [item({ operatorNote: "Check the price.", noteActor: { kind: "agency", displayName: "Acme Marketing" } })] }));
+    expect(html).toContain("Platform operator (support): Check the price.");
+    expect(html).not.toContain("Acme Marketing");
+  });
+
+  it("renders agency receipts and keeps a missing actor neutral, including Undo", () => {
+    const html = handled(ready({ handled: [
+      { ...receipts[0]!, actor: { kind: "agency", displayName: "Acme Marketing" } },
+      { ...receipts[0]!, id: "record:15", actor: undefined },
+    ] }));
+    expect(html).toContain("Acme Marketing updated your hours");
+    expect(html).toContain("Runs on Strelva");
+    expect(html).toContain('aria-label="Undo: Updated your hours in your business record"');
+    expect(html).not.toContain("Strelva updated");
+  });
+
+  it("does not replace words inside the customer's quoted detail", () => {
+    const html = needs(ready({ items: [item({ detail: '\"Strelva updated my hours\"', approveEffect: "Strelva sends the reply." })] }));
+    expect(html).toContain("Strelva updated my hours");
+    expect(html).toContain("Approve: Sends the reply.");
+  });
+});
+
 describe("Strelva handled on Home", () => {
   it("lists receipts with Strelva as the subject and undo only where it is one tap", () => {
     const html = handled(ready());
@@ -115,7 +148,7 @@ describe("BusinessHome with the Needs you release", () => {
   it("reads Needs you and Strelva handled from the policy model when on", () => {
     const html = render(true);
     expect(html).toContain("Checking what needs you");
-    expect(html).toContain("Checking what Strelva did");
+    expect(html).toContain("Checking recent changes");
   });
 
   it("renders Home exactly as before when off", () => {
