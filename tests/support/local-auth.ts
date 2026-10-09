@@ -1,3 +1,5 @@
+import { localAuthFailure } from "./auth-diagnostic";
+import { localSqlFailure } from "./sql-diagnostic";
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -21,7 +23,9 @@ function localSql(sql: string): string {
   if (!dbUrl || !["localhost", "127.0.0.1"].includes(new URL(dbUrl).hostname)) {
     throw new Error("Set STRELVA_LOCAL_DB_URL to the disposable loopback database for operator fixtures.");
   }
-  return execFileSync("psql", [dbUrl, "--no-psqlrc", "-At", "--set=ON_ERROR_STOP=1"], { input: sql, encoding: "utf8" }).trim();
+  try {
+    return execFileSync("psql", [dbUrl, "--no-psqlrc", "-At", "--set=ON_ERROR_STOP=1"], { input: sql, encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }).trim();
+  } catch (error) { throw localSqlFailure(error, dbUrl); }
 }
 
 const sqlLiteral = (value: string) => `'${value.replace(/'/g, "''")}'`;
@@ -41,7 +45,7 @@ export async function signedInContext(browser: Browser, admin: Pick<SupabaseClie
   const email = `local-${role}-${randomUUID()}@example.test`;
   const password = `${randomUUID()}Aa1!`;
   const created = await admin.auth.admin.createUser({ email, password, email_confirm: true });
-  if (created.error || !created.data.user) throw new Error("Could not create the isolated local test identity.");
+  if (created.error || !created.data.user) throw localAuthFailure("create identity", created.error);
   const context = await browser.newContext({ baseURL: env.app });
   const cookies: Array<Parameters<BrowserContext["addCookies"]>[0][number]> = [];
   const auth = createServerClient(env.url, env.anon, { cookies: {
@@ -51,7 +55,7 @@ export async function signedInContext(browser: Browser, admin: Pick<SupabaseClie
     },
   } });
   const signedIn = await auth.auth.signInWithPassword({ email, password });
-  if (signedIn.error) throw new Error("The real local Auth service rejected the test sign-in.");
+  if (signedIn.error) throw localAuthFailure("sign in", signedIn.error);
   await context.addCookies(cookies);
   return { context, userId: created.data.user.id, email };
 }
