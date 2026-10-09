@@ -53,7 +53,7 @@ export function runPrivateAuthorityWindow(rootInput, workInput) {
   if (!basename(work).startsWith('strelva-full-journeys.') || statSync(work).uid !== process.getuid?.() || statSync(work).mode & 0o077) throw new Error('Fresh private owned proof directory required.');
   for (const [file, hash] of Object.entries({
     'check-private-installed-version-authority.py': '6522cf521d827813f7b59a2afafbbeae59ecd1399d0aa190a0929f72704e5e5a',
-    'check-private-producer-inverse-race.py': '6689dbfe63024952cc8f1897757cf7fed198971dbeb48522600aee4d10c6c39e',
+    'check-private-producer-inverse-race.py': 'c4d056c62bfc14fe99212ed607e6fc8914b358935a4a594f00623749dbc6885c',
   })) if (createHash('sha256').update(readFileSync(join(root, 'scripts', file))).digest('hex') !== hash) throw new Error('Frozen fb740 authority harness bytes differ.');
   const owned = parseLocalStackEnv(readFileSync(join(work, 'env'), 'utf8'));
   if (dirname(realpathSync(owned.STRELVA_AUTH_STACK_DIR)) !== work || process.env.STRELVA_PRIVATE_AUTHORITY_FRESH_PATH !== work) throw new Error('Dedicated fresh stack required; reuse is forbidden.');
