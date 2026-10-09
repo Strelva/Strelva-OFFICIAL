@@ -6,7 +6,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/Button";
 import { TextInput, TextArea, SelectInput } from "@/components/ui/TextInput";
 import { businessEntryInputSchema, businessEntryResultSchema, type BusinessEntryInput } from "@/platform/workspaces/business-entry-contract";
-import { businessStartHref, businessStartRequest, businessStartView, type BusinessStartProduct } from "@/platform/workspaces/business-start";
+import { businessStartHref, businessStartAsk, businessStartView, type BusinessStartProduct } from "@/platform/workspaces/business-start";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
 
 const choicesSchema = z.object({ actorId: z.string().uuid(), businesses: z.array(z.object({ id: z.string().uuid(), name: z.string() })) });
@@ -16,7 +16,7 @@ function message(body: unknown, fallback: string): string {
 }
 
 /** Explicit ownership setup. The server saves the optional request atomically. */
-export function BusinessSetupPanel({ startProduct = "help", initialRequest = businessStartRequest(startProduct) }: { initialRequest?: string; startProduct?: BusinessStartProduct }) {
+export function BusinessSetupPanel({ startProduct = "help", initialRequest = businessStartAsk(startProduct) }: { initialRequest?: string; startProduct?: BusinessStartProduct }) {
   const transport = useWorkspaceRequest();
   const [choices, setChoices] = useState<z.infer<typeof choicesSchema> | null>(null);
   const [selected, setSelected] = useState("new");

@@ -86,9 +86,9 @@
 .startProposalIcon { display:grid; width:36px; height:36px; flex:0 0 36px; place-items:center; border:1px solid var(--gray-border); border-radius:10px; background:var(--surface-raised); color:var(--accent-text); }
 .startProposalHeader h2 { margin-top:3px; color:var(--warm-black); font-size:22px; font-weight:500; line-height:1.35; }
 .startProposalSummary { margin-top:16px; max-width:650px; color:var(--gray-muted); font-size:14px; line-height:1.7; }
-.startRequestEcho { margin-top:14px; max-width:650px; padding:12px 14px; border-left:2px solid var(--accent); background:var(--surface-raised); color:var(--gray-muted); font-size:13px; line-height:1.65; }
-.startRequestEcho strong,.startNextAction strong { color:var(--warm-black); font-weight:500; }
-.startRequestEcho span { display:block; margin-top:4px; color:var(--warm-black); white-space:pre-wrap; overflow-wrap:anywhere; }
+.startAskEcho { margin-top:14px; max-width:650px; padding:12px 14px; border-left:2px solid var(--accent); background:var(--surface-raised); color:var(--gray-muted); font-size:13px; line-height:1.65; }
+.startAskEcho strong,.startNextAction strong { color:var(--warm-black); font-weight:500; }
+.startAskEcho span { display:block; margin-top:4px; color:var(--warm-black); white-space:pre-wrap; overflow-wrap:anywhere; }
 .startNextAction { margin-top:14px; max-width:650px; color:var(--gray-muted); font-size:13px; line-height:1.65; }
 .startParts { margin-top:24px; border-top:1px solid var(--gray-border); }
 .startPart { display:flex; min-width:0; align-items:flex-start; gap:12px; padding:16px 0; border-bottom:1px solid var(--gray-border); color:var(--gray-muted); cursor:pointer; }
@@ -104,8 +104,8 @@
 .startSelect > span { min-width:0; }
 .startSelect > span small { margin-left:5px; color:var(--gray-muted); font-size:11px; }
 .startSelect select { min-height:42px; max-width:320px; border:1px solid var(--gray-border); border-radius:10px; background:var(--surface-base); padding:8px 12px; color:var(--warm-black); font-size:13px; }
-.startRequestField { display:block; margin-top:18px; color:var(--warm-black); font-size:13px; }
-.startRequestField textarea { display:block; width:100%; min-height:132px; margin-top:10px; resize:vertical; border:1px solid var(--gray-border); border-radius:12px; background:var(--surface-base); padding:14px 16px; color:var(--warm-black); font-size:14px; line-height:1.6; }
+.startAskField { display:block; margin-top:18px; color:var(--warm-black); font-size:13px; }
+.startAskField textarea { display:block; width:100%; min-height:132px; margin-top:10px; resize:vertical; border:1px solid var(--gray-border); border-radius:12px; background:var(--surface-base); padding:14px 16px; color:var(--warm-black); font-size:14px; line-height:1.6; }
 .startBlocked,.startHelp { display:flex; align-items:flex-start; gap:10px; margin-top:22px; border:1px solid var(--gray-border); padding:14px 16px; color:var(--gray-muted); font-size:13px; line-height:1.65; }
 .startBlocked svg,.startHelp svg { flex:0 0 auto; margin-top:2px; color:var(--accent-text); }
 .startHelp strong { color:var(--warm-black); font-weight:500; }

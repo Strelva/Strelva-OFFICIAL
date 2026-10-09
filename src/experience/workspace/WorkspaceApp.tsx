@@ -46,7 +46,7 @@ import type { WorkspaceInquiryTarget, WorkspacePlanRenderer } from "./WorkspaceL
 import type { WorkspaceStartContinuation } from "./workspace-start";
 import { selectWorkspaceLocation, isHorizontalView, viewForWork, type HorizontalView, type WorkspaceView as View } from "./workspace-selection";
 import { workspaceExitBlocksChanges, workspaceExitIsStopped } from "./workspace-exit-ui";
-import { NO_OPEN_WORK, leaveWork, startContinuation, startRequest, type OpenWorkContext } from "./open-work";
+import { NO_OPEN_WORK, leaveWork, startContinuation, startAsk, type OpenWorkContext } from "./open-work";
 
 type Notice = { kind: "success" | "error"; message: string } | null;
 
@@ -85,8 +85,8 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   const inquiryStartContext = startContinuation(open, "inquiries", "inquiries");
   const trackerStartContext = startContinuation(open, "tracker", "tracker");
   const documentStartContext = startContinuation(open, "document", "document");
-  const planStartRequest = startRequest(open, "plan");
-  const horizontalRequest = startRequest(open, view);
+  const planStartAsk = startAsk(open, "plan");
+  const horizontalRequest = startAsk(open, view);
   const [home, setHome] = useState(true);
   const [pendingRequest, setPendingRequest] = useState<string | null>(null);
   const [recovering, setRecovering] = useState(false);
@@ -479,7 +479,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
       : <><DocumentExperience key={`${snapshot.workspaceId}:${selectedWork?.productId === "documents" ? selectedWork.id : "new"}:${documentRequestText || "new"}`} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === "documents" ? selectedWork.id : undefined} readOnly={workspaceReadOnly} onSaved={handleDocumentSaved} initialRequestText={documentRequestText} sources={snapshot.work} />{selectedWork?.productId === "documents" ? <WorkAuthorityPanel key={selectedWork.id} workId={selectedWork.id} canManage={!workspaceReadOnly && (currentWorkspace?.role === "owner" || currentWorkspace?.role === "admin")} sources={snapshot.work} /> : null}</>
     : undefined;
   const planContent: WorkspacePlanRenderer | undefined = snapshot && view === "plan"
-    ? onRequest => <WorkPlanExperience systemsRelease={snapshot.releases?.systems === true} onRequest={onRequest} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === "work_plans" ? selectedWork.id : undefined} initialRequest={planStartRequest || undefined} sources={snapshot.work} readOnly={workspaceReadOnly} localPreview={snapshot.actor.localPreview} onSaved={handlePlanSaved} onOpenWork={openWorkFromPlan} />
+    ? onRequest => <WorkPlanExperience systemsRelease={snapshot.releases?.systems === true} onRequest={onRequest} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === "work_plans" ? selectedWork.id : undefined} initialRequest={planStartAsk || undefined} sources={snapshot.work} readOnly={workspaceReadOnly} localPreview={snapshot.actor.localPreview} onSaved={handlePlanSaved} onOpenWork={openWorkFromPlan} />
     : undefined;
 
   function clearPublicSaveQuery() {
