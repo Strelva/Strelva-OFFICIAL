@@ -143,13 +143,64 @@ describe("ordinary website fact revision", () => {
     expect(document.activeElement).toBe(button("Edit fact"));
     expect(container.querySelector('[role="alert"]')).toBeNull();
   });
-  it("sends the exact ordinary candidate identity through the existing HTTP transport and preserves a conflict", async () => {
+  it.each([true,false])("removes only an ordinary contact and focuses a mounted destination when other facts remain: %s", async onlyContact => {
+    const record = approved();
+    const contact = { text: "orders@example.test", kind: "contact" as const, highRisk: false, origin: "owner_stated" as const, sources: [], verification: { supported: true, confidence: 1 } };
+    record.candidate!.facts = { ...(onlyContact ? {} : record.candidate!.facts), email: contact };
+    const next = structuredClone(record); delete next.candidate!.facts.email;
+    next.revision++; next.candidate!.revision++; next.candidate!.contentHash = "d".repeat(64); next.status = "review"; next.approved = false;
+    const mutate = vi.fn(async () => next); const onSaved = vi.fn();
+    await mount(record,mutate,{ onSaved }); container.querySelector("details")!.open = true;
+    const remove = button("Remove contact"); remove.focus(); await act(async () => remove.click());
+    expect(mutate).toHaveBeenCalledExactlyOnceWith(record,"remove",{ factId: "email" });
+    expect(onSaved).toHaveBeenCalledExactlyOnceWith(next.workId);
+    expect(container.textContent).not.toContain("orders@example.test"); expect(container.textContent).not.toContain("This exact preview is approved.");
+    expect(button("Approve this preview").disabled).toBe(true);
+    expect(document.activeElement).toBe(onlyContact ? container.querySelector("#rebuild-decisions-heading") : container.querySelector("summary"));
+    if (!onlyContact) expect(container.querySelectorAll('details button')).toHaveLength(1);
+  });
+  it.each(["readOnly","building"] as const)("blocks ordinary contact removal in %s state", async state => {
+    const record = approved(); record.candidate!.facts.bread!.kind = "contact"; record.candidate!.facts.bread!.text = "orders@example.test";
+    if (state === "building") record.status = "building";
+    const mutate = vi.fn(async () => record); await mount(record,mutate,{ readOnly: state === "readOnly" });
+    expect(button("Remove contact").disabled).toBe(true); button("Remove contact").click(); expect(mutate).not.toHaveBeenCalled();
+  });
+  it("retains a correction after rejected removal, prevents same-batch duplicates and permits explicit retry", async () => {
+    const record = approved(); record.candidate!.facts.bread!.kind = "contact"; record.candidate!.facts.bread!.text = "orders@example.test";
+    const next = structuredClone(record); delete next.candidate!.facts.bread; next.approved = false; next.status = "review"; next.revision++; next.candidate!.revision++; next.candidate!.contentHash = "d".repeat(64);
+    let resolve!: (value: RebuildView) => void; let reject!: (error: Error) => void;
+    const mutate = vi.fn(() => new Promise<RebuildView>((done,fail) => { resolve = done; reject = fail; }));
+    const onSaved = vi.fn(); await mount(record,mutate,{ onSaved }); const field = await edit();
+    const remove = button("Remove contact"); remove.focus();
+    await act(async () => { remove.click(); remove.click(); });
+    expect(mutate).toHaveBeenCalledOnce(); expect(mutate).toHaveBeenLastCalledWith(record,"remove",{ factId: "bread" });
+    expect(field.disabled).toBe(true); expect(field.value).toBe(correction); expect(button("Remove contact").disabled).toBe(true);
+    await act(async () => reject(new Error("Access changed. Reopen the current website.")));
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("Access changed"); expect(field.value).toBe(correction); expect(document.activeElement).toBe(field);
+    expect(container.textContent).toContain("This exact preview is approved."); expect(onSaved).not.toHaveBeenCalled();
+    await act(async () => button("Remove contact").click()); expect(mutate).toHaveBeenCalledTimes(2);
+    await act(async () => resolve(next));
+    expect(container.querySelector("textarea")).toBeNull(); expect(document.activeElement).toBe(container.querySelector("#rebuild-decisions-heading"));
+    expect(onSaved).toHaveBeenCalledExactlyOnceWith(next.workId); expect(container.querySelector('[role="alert"]')).toBeNull();
+  });
+  it("returns focus to the mounted contact action after removal rejection without an open draft", async () => {
+    const record = approved(); record.candidate!.facts.bread!.kind = "contact"; record.candidate!.facts.bread!.text = "orders@example.test";
+    let reject!: (error: Error) => void;
+    const mutate = vi.fn(() => new Promise<RebuildView>((_,fail) => { reject = fail; }));
+    await mount(record,mutate); container.querySelector("details")!.open = true;
+    const remove = button("Remove contact"); remove.focus(); await act(async () => remove.click());
+    container.querySelector<HTMLAnchorElement>("a")!.focus(); expect(document.activeElement).not.toBe(remove);
+    await act(async () => reject(new Error("This website changed. Reopen its current preview.")));
+    expect(button("Remove contact").disabled).toBe(false); expect(document.activeElement).toBe(button("Remove contact"));
+    expect(container.textContent).toContain("This exact preview is approved."); expect(container.querySelector('[role="alert"]')?.textContent).toContain("This website changed");
+  });
+  it.each(["edit","remove"] as const)("sends exact ordinary candidate identity for %s through HTTP and preserves a conflict", async action => {
     const record = approved();
     const fetch = vi.fn(async () => new Response(JSON.stringify({ error: "This website changed. Reload its current preview." }), { status: 409 }));
     vi.stubGlobal("fetch", fetch);
-    await expect(serverRebuildTransport.mutate(record, "edit", { factId: "bread", text: correction })).rejects.toThrow("This website changed");
+    await expect(serverRebuildTransport.mutate(record, action, { factId: "bread", ...(action === "edit" ? { text: correction } : {}) })).rejects.toThrow("This website changed");
     const [path, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
     expect(path).toBe(`/api/websites/${record.workId}/facts/bread`);
-    expect(JSON.parse(String(init.body))).toEqual({ action: "edit", text: correction, expectedRevision: record.revision, candidateRevision: record.candidate!.revision, candidateContentHash: record.candidate!.contentHash });
+    expect(JSON.parse(String(init.body))).toEqual({ action, ...(action === "edit" ? { text: correction } : {}), expectedRevision: record.revision, candidateRevision: record.candidate!.revision, candidateContentHash: record.candidate!.contentHash });
   });
 });

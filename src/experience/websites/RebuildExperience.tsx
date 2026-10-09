@@ -40,23 +40,33 @@ const skippedReason = {
   javascript_only: "This page needs a browser to read.",
   not_html: "This address is a file rather than a website page.",
 };
-function WebsiteFactEditor({ text, origin, disabled, onSave }: {
-  text: string; origin: string; disabled: boolean; onSave(text: string): Promise<boolean>;
+function WebsiteFactEditor({ text, origin, disabled, onSave, onRemove }: {
+  text: string; origin: string; disabled: boolean; onSave(text: string): Promise<boolean>; onRemove?: () => Promise<boolean>;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(text);
   const [focusAttempt, setFocusAttempt] = useState(0);
   const editRef = useRef<HTMLButtonElement>(null);
+  const removeRef = useRef<HTMLButtonElement>(null);
+  const focusRemove = useRef(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const wasEditing = useRef(false);
   const lastFocusAttempt = useRef(0);
   useEffect(() => {
     if (disabled) return;
-    if (editing && (!wasEditing.current || focusAttempt !== lastFocusAttempt.current)) inputRef.current?.focus();
+    if (focusRemove.current && !editing) { removeRef.current?.focus(); focusRemove.current = false; }
+    else if (editing && (!wasEditing.current || focusAttempt !== lastFocusAttempt.current)) inputRef.current?.focus();
     else if (!editing && wasEditing.current) editRef.current?.focus();
     wasEditing.current = editing;
     lastFocusAttempt.current = focusAttempt;
   }, [disabled, editing, focusAttempt]);
+  const removeButton = onRemove ? <Button ref={removeRef} type="button" size="sm" variant="danger" disabled={disabled} onClick={async () => {
+    if (disabled) return;
+    if (!await onRemove()) {
+      focusRemove.current = !editing;
+      setFocusAttempt(value => value + 1);
+    }
+  }}>Remove contact</Button> : null;
   return <article className={styles.fact} aria-label={text}>
     <p className={styles.tag}>{origin === "owner_confirmed" ? "Confirmed in review" : origin === "owner_stated" ? "Provided by the business" : "From the website source"}</p>
     {editing ? <form onSubmit={async event => {
@@ -66,8 +76,8 @@ function WebsiteFactEditor({ text, origin, disabled, onSave }: {
       else setFocusAttempt(value => value + 1);
     }}>
       <TextArea ref={inputRef} label="Corrected fact" value={draft} onChange={event => setDraft(event.target.value)} maxLength={500} required disabled={disabled} helperText="Saving creates a new private preview. Review and approve it before publishing." />
-      <div className={styles.actions}><Button type="submit" size="sm" disabled={disabled || !draft.trim() || draft.trim() === text}>Save correction</Button><Button type="button" size="sm" variant="ghost" disabled={disabled} onClick={() => setEditing(false)}>Cancel</Button></div>
-    </form> : <><p className={styles.factText}>{text}</p><Button ref={editRef} type="button" size="sm" variant="ghost" disabled={disabled} onClick={() => { setDraft(text); setEditing(true); }}>Edit fact</Button></>}
+      <div className={styles.actions}><Button type="submit" size="sm" disabled={disabled || !draft.trim() || draft.trim() === text}>Save correction</Button><Button type="button" size="sm" variant="ghost" disabled={disabled} onClick={() => setEditing(false)}>Cancel</Button>{removeButton}</div>
+    </form> : <><p className={styles.factText}>{text}</p><Button ref={editRef} type="button" size="sm" variant="ghost" disabled={disabled} onClick={() => { setDraft(text); setEditing(true); }}>Edit fact</Button>{removeButton}</>}
   </article>;
 }
 export function RebuildExperience({ workspaceId, workId, readOnly = false, managed = false, allowIntake = false, operator = false, canPublish = false, agency = false, initialRequest = "", initialRecord, transport = serverRebuildTransport, onSaved }: RebuildExperienceProps) {
@@ -91,6 +101,9 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
   const [previewFailed, setPreviewFailed] = useState(false);
   const [previewAttempt, setPreviewAttempt] = useState(0);
   const previewRef = useRef<HTMLIFrameElement>(null);
+  const factsSummaryRef = useRef<HTMLElement>(null);
+  const reviewHeadingRef = useRef<HTMLHeadingElement>(null);
+  const removedContactFocus = useRef(false);
   const requestId = useRef(createWebsiteRequestId());
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
@@ -132,6 +145,11 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
     catch (cause) { if (mounted.current) setError(cause instanceof Error ? cause.message : "The change could not be saved. Your review is preserved."); return false; }
     finally { inFlight.current = false; if (mounted.current) setBusy(false); }
   }
+  useEffect(() => {
+    if (busy || !removedContactFocus.current) return;
+    removedContactFocus.current = false;
+    (factsSummaryRef.current ?? reviewHeadingRef.current)?.focus();
+  }, [record,busy]);
   const decisions = record ? flaggedFacts(record) : [];
   const decisionIds = new Set(decisions.map(([id]) => id));
   const ordinaryFacts = Object.entries(record?.candidate?.facts ?? {}).filter(([id]) => !decisionIds.has(id));
@@ -180,7 +198,7 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
               } catch { setPreviewFailed(true); setPreviewLoaded(true); }
             }} onError={() => setPreviewFailed(true)} />{!previewLoaded ? <p className={styles.meta} role="status">Loading the private preview…</p> : null}{previewFailed ? <div className={styles.error} role="alert"><p>The preview has not opened. Your review decisions are saved.</p><Button variant="secondary" onClick={() => setPreviewAttempt(value => value + 1)}>Reload preview</Button></div> : null}</> : <p className={styles.notice}>The preview address is unavailable. Refresh the saved website before approving.</p>}
           </section>
-          <aside className={styles.decisions} aria-labelledby="rebuild-decisions-heading"><div className={styles.sectionHeader}><h2 id="rebuild-decisions-heading">{decisions.length ? `${decisions.length} ${decisions.length === 1 ? "decision needs" : "decisions need"} you` : "Ready for your review"}</h2><p>Only uncertain facts and sensitive claims appear here.</p></div>
+          <aside className={styles.decisions} aria-labelledby="rebuild-decisions-heading"><div className={styles.sectionHeader}><h2 ref={reviewHeadingRef} tabIndex={-1} id="rebuild-decisions-heading">{decisions.length ? `${decisions.length} ${decisions.length === 1 ? "decision needs" : "decisions need"} you` : "Ready for your review"}</h2><p>Only uncertain facts and sensitive claims appear here.</p></div>
             {decisions.length === 0 ? <p className={styles.notice}><Check size={18} aria-hidden="true" />All flagged facts have been resolved. Review the full site before approving.</p> : decisions.map(([id, fact]) => <article key={id} className={styles.fact}><p className={styles.tag}>{fact.highRisk ? "Sensitive claim · confirmation required" : "Could not confirm"}</p><p className={styles.factText}>{fact.text}</p><div className={styles.source}><strong>Source</strong>{fact.sources.length ? fact.sources.map((source, index) => <blockquote key={index}>“{source.quote}”<span>{source.sourceId.split("#sha256=")[0]}</span></blockquote>) : <p>No source found.</p>}</div>
               {editing === id ? <form onSubmit={event => { event.preventDefault(); if (editedText.trim()) void run(() => transport.mutate(record, "edit", { factId: id, text: editedText.trim() }), "Fact updated in a new revision. Review the changed preview."); }}><TextArea label="Corrected fact" value={editedText} onChange={event => setEditedText(event.target.value)} maxLength={500} disabled={disabled} required /><div className={styles.actions}><Button type="submit" size="sm" disabled={disabled || !editedText.trim()}>Save correction</Button><Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => setEditing(null)}>Cancel</Button></div></form>
                 : <div className={styles.actions}><Button size="sm" variant="secondary" disabled={disabled} onClick={() => void run(() => transport.mutate(record, "confirm", { factId: id }), "Fact confirmed in a new revision.")}>Confirm</Button><Button size="sm" variant="ghost" disabled={disabled} onClick={() => { setEditing(id); setEditedText(fact.text); }}>Edit</Button><Button size="sm" variant="danger" disabled={disabled} onClick={() => void run(() => transport.mutate(record, "remove", { factId: id }), "Fact removed in a new revision.")}>Remove</Button></div>}
@@ -198,9 +216,13 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
           </aside>
         </div> : <p className={styles.notice} role="status">Your preview will appear here after the saved build stages finish.</p>}
         {candidate && ordinaryFacts.length ? <details className={styles.domain}>
-          <summary className="min-h-11 cursor-pointer py-3 text-base font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">Edit website facts</summary>
-          <p>Change the wording in this website without changing what is live. Each saved correction needs a new preview approval.</p>
-          {ordinaryFacts.map(([id, fact]) => <WebsiteFactEditor key={id} text={fact.text} origin={fact.origin} disabled={disabled} onSave={text => run(() => transport.mutate(record, "edit", { factId: id, text }), "Fact updated in a new revision. Review the changed preview before approving.")} />)}
+          <summary ref={factsSummaryRef} className="min-h-11 cursor-pointer py-3 text-base font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">Edit website facts</summary>
+          <p>Change the wording in this website without changing what is live. Each saved correction needs a new preview approval. Removing a contact changes this private preview and needs approval too.</p>
+          {ordinaryFacts.map(([id, fact]) => <WebsiteFactEditor key={id} text={fact.text} origin={fact.origin} disabled={disabled} onSave={text => run(() => transport.mutate(record, "edit", { factId: id, text }), "Fact updated in a new revision. Review the changed preview before approving.")} onRemove={fact.kind === "contact" ? () => run(async () => {
+            const next = await transport.mutate(record,"remove",{ factId: id });
+            removedContactFocus.current = true;
+            return next;
+          },"Contact removed in a new private preview. Review and approve it before publishing.") : undefined} />)}
         </details> : null}
         {candidate && (!managed || operator || canPublish) && transport === serverRebuildTransport ? <WebsiteConnectionSelector key={`${record.workId}:${record.revision}`} workspaceId={workspaceId} workId={record.workId} revision={record.revision} selected={record.capabilitySelection} hasForms={candidate.hasForms} hosted disabled={disabled} onBusyChange={setBusy} onSaved={value => { const next = parseRebuildView(value); setRecord(next); setNotice("Visitor forms saved in a new preview. Review and approve it before publishing."); onSaved?.(next.workId); }} /> : null}
         {record.audit ? <section className={styles.domain} aria-labelledby="rebuild-audit-heading"><h2 id="rebuild-audit-heading">Before and after</h2><p>HTML checks compare the original homepage with the planned rebuilt homepage. Checked {new Date(record.audit.checkedAt).toLocaleString()}.</p><div className={styles.records}><table><caption>HTML scores out of 100 · original → rebuilt</caption><thead><tr><th>Category</th><th>Scores</th><th aria-label="Change">+/−</th></tr></thead><tbody>{record.audit.after.categories.map(after => { const before = record.audit!.before.categories.find(item => item.slug === after.slug); const change = before ? after.score - before.score : null; return <tr key={after.slug}><th scope="row">{after.name}</th><td className="whitespace-nowrap">{before?.score ?? "Unavailable"} → {after.score}</td><td>{change === null ? "Unavailable" : change > 0 ? `+${change}` : change}</td></tr>; })}</tbody></table></div><div className="mt-4 space-y-3">{record.audit.after.categories.map(after => <details key={after.slug}><summary className="cursor-pointer py-2 text-sm text-warm-black">{after.name} · item by item</summary><ul className="mt-3 divide-y divide-gray-border">{after.checks.map((check, index) => { const before = record.audit!.before.categories.find(item => item.slug === after.slug)?.checks.find(item => item.name === check.name); return <li key={`${check.name}:${index}`} className="py-3 text-sm text-gray-muted"><strong className="text-warm-black">{check.name}</strong><p>{before?.status ?? "Not measured"} → {check.status}</p><p>{check.message}</p></li>; })}</ul></details>)}</div><p>These HTML results do not establish a complete live-site audit. Not measured here:</p><ul className="list-disc space-y-2 pl-5 text-sm text-gray-muted">{record.audit.unavailable.map(item => <li key={item}>{item}</li>)}</ul></section> : null}

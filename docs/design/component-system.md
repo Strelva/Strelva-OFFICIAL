@@ -116,6 +116,14 @@ unrelated prose that preserves the exact offered contacts remains editable.
 A correction that collides with another contact fact's normalized destination
 is refused; formatting and repeated corrections to the same fact stay allowed.
 The existing actor/manage, revision/hash, CAS and approval invalidation apply.
+Supported ordinary contact facts also expose an owned Remove contact action,
+including while their correction draft is open. It uses the existing remove
+transport and synchronous mutation guard; read-only, loading, building and busy
+states disable it. Rejection retains the draft and focuses its field (or the
+mounted Remove action). Success adopts the new private candidate and clears
+approval, focusing the remaining facts summary or mounted review heading if the
+last ordinary fact disappeared. Other ordinary facts do not gain removal here.
+
 
 Review, private-preview no-submit, hosted native inquiry capture and published
 connection gates remain separate. An email link opens the visitor's email
