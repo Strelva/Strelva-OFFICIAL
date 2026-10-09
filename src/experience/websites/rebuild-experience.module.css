@@ -8,8 +8,9 @@
 .meta { font-size:12px; line-height:1.5; color:var(--gray-muted); }
 .notice,.error { display:flex; gap:12px; align-items:flex-start; font-size:14px; line-height:1.5; margin:24px 0; color:var(--gray-muted); }
 .notice svg,.error svg { flex-shrink:0; margin-top:2px; }
-.error { padding:16px; border:1px solid var(--critical); border-radius:12px; color:var(--critical); }
+.error { flex-wrap:wrap; padding:16px; border:1px solid var(--critical); border-radius:12px; color:var(--critical); }
 .error p { margin-top:8px; }
+.error > :is(p, div) { min-width:0; max-width:100%; }
 .progress { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:24px; padding:24px 0; margin-bottom:24px; border-block:1px solid var(--gray-border); }
 .progress li { display:flex; gap:8px; color:var(--gray-muted); font-size:12px; line-height:1.5; }
 .progress strong { color:var(--warm-black); text-transform:capitalize; font-weight:500; font-size:14px; }
