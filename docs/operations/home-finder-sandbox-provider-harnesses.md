@@ -22,6 +22,34 @@ fake SDKs, policy seeding, dependency installation or skipped-as-passing cases:
   observations. It then requires actual per-session USD billing evidence and a
   finished accepted provider ledger execution; counts or estimates cannot pass.
 
+The specs are excluded from ordinary `pnpm smoke` discovery and have an explicit
+`playwright.provider.config.ts` with no server startup, one worker and zero
+retries. Each spec also sets zero retries and refuses a stock/additional reporter.
+The isolated config sets `PLAYWRIGHT_NO_COPY_PROMPT=1`: Playwright 1.59.1 can
+otherwise capture an aria snapshot in error-context even with trace/video off.
+The sole custom reporter emits fixed status text only, discards test/locator/
+assertion errors and stdout/stderr, and produces no HTML/JSON/DOM report.
+Sensitive comparisons use booleans; failures expose no buyer/request/token or
+listing address. Do not override reporters or enable capture for these cases.
+
+Before any provider effect, Auth `getUser()` verifies the actual loaded cookie
+session, confirmed email and exact approved owner. Declared identity or a
+post-build receipt cannot substitute. The session is not refreshed or created.
+Admission and session files are lstat-checked current-UID mode-600 regular files,
+opened with NOFOLLOW and checked again through fstat; malformed JSON is redacted.
+The claim directory must be current-UID mode-700 and nonsymlink.
+
+An exclusive mode-600 dispatch journal is fsynced together with its directory
+before the first inquiry click/build call. Its key binds approval reference,
+kind and binding/work-version target; the claim never expires, deletes or
+releases automatically. This blocks retries, repeats and crash reruns under the
+same approval. Home Finder durably records the real request ID on the request
+event before observing its response. If no response arrives, the consumed claim
+still requires operator lookup. Do not change approval references or journal
+directories to evade this hold; subsequent authorization must review prior
+claims and native/provider evidence first. A local claim does not establish
+provider-side exactly-once delivery or prevent intentional operator bypass.
+
 Both fail with a held diagnostic before loading an owner session when explicit
 run inputs are missing. Neither retries an inquiry/build, installs policies,
 creates test owners, publishes, changes licenses, accepts budgets, reconciles a
@@ -29,8 +57,8 @@ fabricated bill, or automatically clears an uncertain attempt. Home Finder
 retains the real request ID before evaluating acceptance; sandbox attempts and
 uncertainty remain in the native store for operator lookup. Default trace/video/
 screenshot artifacts are disabled to avoid copying licensed content, buyer
-contact data or owner sessions. Attachments contain scope/request/artifact IDs
-only, with `fullReleaseQualified:false`.
+contact data or owner sessions. Attachments contain validated scope/request/artifact IDs
+only (no arbitrary approval reference), with `fullReleaseQualified:false`.
 
 ## Necessary inputs and authority
 
@@ -44,7 +72,7 @@ account readiness was established during this preparation.
 
 Both cases require an expiring nonproduction authorization reference, approver,
 owned loopback control plane, current verified owner's existing Auth state and
-exact business/actor identity. The native SQL helper additionally insists on a
+exact business/actor identity and private persistent dispatch journal directory. The native SQL helper additionally insists on a
 disposable loopback database. Browser session files and provider credentials are
 private run inputs and must never enter Git or reports.
 
@@ -93,10 +121,13 @@ remain unverified here.
 
 ## Checks and next action
 
-Admission unit tests cover production/hosted control-plane refusal, expiry,
+All 18 admission unit tests passed. Admission tests cover production/hosted control-plane refusal, expiry,
 future approval, missing billing authority, mutable image, missing permission
 and unbounded/zero spend. A syntactically valid input cannot release the held
-provider profile. Scoped lint passed. No browser, server, provider, native DB,
+provider profile. Filesystem/dispatch tests additionally cover private file and symlink refusal,
+permanent same-scope replay refusal, reporter isolation and actual cookie-session
+verification through a mocked Auth client. Scoped lint passed. Discovery-only checks found 430 ordinary tests with neither
+provider case, and exactly two tests in the isolated provider config. No browser, server, provider, native DB,
 SDK build or paid session was started. Root typecheck and actual execution are
 still pending.
 

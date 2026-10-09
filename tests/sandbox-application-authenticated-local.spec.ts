@@ -1,15 +1,19 @@
 import { expect, test } from "@playwright/test";
 import { z } from "zod";
 import { localSql } from "./support/journeys";
-import { requireProviderProofAdmission, sandboxProofAdmissionSchema } from "./support/provider-harness-admission";
+import { requireProviderProofAdmission, sandboxProofAdmissionSchema, claimProviderDispatch, loadProviderOwnerState, verifyProviderOwner, assertProviderReporter } from "./support/provider-harness-admission";
 
 // One paid attempt maximum. No fake SDK, dependency install, publication or automatic retry.
 test.use({ trace: "off", video: "off", screenshot: "off" });
 test.setTimeout(300_000);
+test.describe.configure({ retries: 0 });
 test("authorized nonproduction sandbox build records actual cleanup and exact billing", async ({ browser }, info) => {
+  assertProviderReporter(info.config);
   const scope = requireProviderProofAdmission("sandbox-application", sandboxProofAdmissionSchema);
-  const owner = await browser.newContext({ baseURL: scope.appOrigin, storageState: scope.ownerAuthStatePath });
+  const owner = await browser.newContext({ baseURL: scope.appOrigin, storageState: loadProviderOwnerState(scope.ownerAuthStatePath) });
+  let claim: ReturnType<typeof claimProviderDispatch> | undefined;
   try {
+    await verifyProviderOwner(owner, scope);
     const path = `/api/custom-applications/${scope.workId}/manage`;
     const beforeResponse = await owner.request.get(path); expect(beforeResponse.status()).toBe(200);
     const before = z.object({ application: z.object({ workId: z.string(), workspaceId: z.string(), currentReleaseVersion: z.number().nullable(),
@@ -23,7 +27,8 @@ test("authorized nonproduction sandbox build records actual cleanup and exact bi
       scope.workId, String(scope.candidateVersion), String(scope.candidateRevision), scope.sourceDigest, scope.teamId, scope.projectId,
       scope.image, scope.policyVersion, scope.ownerUserId, scope.ownerEmail, scope.runtimeQualificationId);
     expect(qualified).toEqual({ qualified: true, id: scope.runtimeQualificationId });
-    const built = await owner.request.post(path, { headers: { origin: scope.appOrigin }, data: { action: "build", input: { expectedCandidateRevision: scope.candidateRevision } } });
+    claim = claimProviderDispatch(scope, `${scope.workId}:${scope.candidateVersion}`);
+    const built = await owner.request.post(path, { maxRetries: 0, maxRedirects: 0, headers: { origin: scope.appOrigin }, data: { action: "build", input: { expectedCandidateRevision: scope.candidateRevision } } });
     // HTTP failure/unknown creation is retained and requires operator lookup; never retry here.
     expect(built.status()).toBe(200);
     const app = z.object({ application: z.object({ currentReleaseVersion: z.number().nullable(), candidate: z.object({ artifact: z.object({
@@ -43,7 +48,7 @@ test("authorized nonproduction sandbox build records actual cleanup and exact bi
     expect(evidence.observations.some(value => value.kind === "stopped" && value.session_id === created!.session_id)).toBe(true);
     expect(evidence.observations.some(value => ["cleanup_failed", "creation_unknown", "build_failed"].includes(value.kind))).toBe(false);
     await info.attach("sandbox-provider-attempt", { contentType: "application/json", body: JSON.stringify({ environment: "nonproduction",
-      authorizationReference: scope.authorizationReference, attemptId: evidence.attempt.id, sessionId: created!.session_id,
+      attemptId: evidence.attempt.id, sessionId: created!.session_id,
       sourceDigest: scope.sourceDigest, artifactDigest: app.candidate.artifact.artifactDigest, cleanupObserved: true, fullReleaseQualified: false }) });
     // A separately authorized trusted resolver must persist/reconcile actual session dollars.
     // Stop counters, an estimated bill or zero-cost synthetic receipt cannot satisfy this.
@@ -53,5 +58,6 @@ test("authorized nonproduction sandbox build records actual cleanup and exact bi
       const execution = z.object({ status: z.literal("finished"), effect: z.literal("accepted"), kind: z.literal("provider"), billable_cents: z.number().int().nonnegative() }).passthrough().safeParse(current.execution);
       return billing.success && billing.data.session_id === created!.session_id && execution.success && execution.data.billable_cents <= scope.maximumCents;
     }, { timeout: 60_000, intervals: [1000, 3000, 5000], message: "Exact trusted per-session billing remains held until actual native evidence is reconciled" }).toBe(true);
-  } finally { await owner.close(); }
+  } catch { throw new Error("Sandbox provider proof failed/held; inspect private dispatch journal and native attempt evidence. Details withheld."); }
+  finally { claim?.close(); await owner.close(); }
 });

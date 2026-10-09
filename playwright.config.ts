@@ -6,6 +6,7 @@ const useBuiltApp = process.env.PLAYWRIGHT_BUILT_APP === "1";
 
 export default defineConfig({
   testDir: "./tests",
+  testIgnore: ["**/home-finder-authenticated-local.spec.ts", "**/sandbox-application-authenticated-local.spec.ts"],
   timeout: 30_000,
   workers: 1,
   // Absorb the occasional cold-compile / dev-server hiccup in CI (a real failure
