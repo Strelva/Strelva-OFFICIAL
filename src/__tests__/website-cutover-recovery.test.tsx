@@ -35,7 +35,7 @@ it('preserves immutable command and authority through permission loss, then chec
 });
 
 it('keeps later authority refusal unknown rather than minting another command',async()=>{
- let count=0;const request=vi.fn(async()=>{count++;return count===1?Response.json({receipt:null}):Response.json({error:'Sign in to open this website rebuild.'},{status:401});});await mount(request);await attest();await act(async()=>button('Restore previous website').click());await act(async()=>button('Check this undo command').click());expect(button('Check this undo command')).toBeDefined();expect(button('Restore previous website').disabled).toBe(true);expect(request.mock.calls[1]![1]!.body).toBe(request.mock.calls[0]![1]!.body);
+ let count=0;const request=vi.fn(async(_input:string|URL|Request,_init?:RequestInit)=>{count++;return count===1?Response.json({receipt:null}):Response.json({error:'Sign in to open this website rebuild.'},{status:401});});await mount(request);await attest();await act(async()=>button('Restore previous website').click());await act(async()=>button('Check this undo command').click());expect(button('Check this undo command')).toBeDefined();expect(button('Restore previous website').disabled).toBe(true);expect(request.mock.calls[1]![1]!.body).toBe(request.mock.calls[0]![1]!.body);
 });
 
 it('keeps target immutable when current candidate changes during an unknown command',async()=>{
