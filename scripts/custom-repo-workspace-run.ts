@@ -1,3 +1,4 @@
+import { runLocalPinnedConsumerChecks } from "./custom-repo-pinned-check";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import {
@@ -16,7 +17,12 @@ if (!existsSync(manifestPath)) {
   process.exitCode = 1;
 } else {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as WorkspaceManifest;
-  const results = runWorkspaceChecks(manifest, workspaceRoot, cwd, {
+  const localPinned = process.env.CUSTOM_REPO_MATERIALIZE_PINS === "1"
+    ? runLocalPinnedConsumerChecks({ cwd, sourceRoot: process.env.CUSTOM_REPO_LOCAL_SOURCE_ROOT ?? workspaceRoot,
+      outputParent: process.env.CUSTOM_REPO_PROOF_OUTPUT_ROOT })
+    : null;
+  if (localPinned) console.log(`Local pinned source receipt: ${localPinned.receiptPath}`);
+  const results = localPinned?.results ?? runWorkspaceChecks(manifest, workspaceRoot, cwd, {
     verifyPins: process.env.CUSTOM_REPO_VERIFY_PINS === "1",
     checkoutRoot: process.env.CUSTOM_REPO_CHECKOUTS_ROOT
       ? path.resolve(process.env.CUSTOM_REPO_CHECKOUTS_ROOT)
