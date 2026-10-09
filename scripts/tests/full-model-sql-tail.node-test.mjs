@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 
 const root = new URL('../../', import.meta.url).pathname;
 test('composed tail executes migrations once, in order, with rollback fixtures before successors', () => {
-  const output = execFileSync('bash', ['-c', 'repo_root="$1"; psql_args=(); psql() { printf "%s\\n" "$*"; }; source "$repo_root/scripts/sql/full-model-current-tail.sh"; check_full_model_current_tail', 'test', root], { encoding: 'utf8' });
+  const output = execFileSync('bash', ['-c', 'repo_root="$1"; psql_args=(); psql() { printf "%s\\n" "$*"; }; source "$repo_root/scripts/sql/full-model-current-tail.sh"; check_full_model_current_tail historical-upgrade', 'test', root], { encoding: 'utf8' });
   assert.ok(!output.includes("/migrations/rollback-"), "release inverses must never run destructively on the shared final schema");
   const migrations = [...output.matchAll(/supabase\/migrations\/(202610211\w+\.sql)/g)].map(x => x[1]);
   const expected = readdirSync(`${root}supabase/migrations`).filter(file => /^202610211\d+_.*\.sql$/.test(file)).sort();

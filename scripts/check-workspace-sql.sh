@@ -1712,7 +1712,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/native-business-billing-home-sch
 psql "${psql_args[@]}" --file="$repo_root/tests/native-business-billing-conversion-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261021096000_agency_release_flag_lock_order.sql"
 source "$repo_root/scripts/sql/full-model-current-tail.sh"
-check_full_model_current_tail
+check_full_model_current_tail focused-workspace
 source "$repo_root/tests/support/runtime-data-tenant-generation-races.sh"
 check_tenant_connection_generation_lifecycle
 # Saved-main guarded teardown composes final export/retention owners.
@@ -1762,3 +1762,9 @@ psql "${psql_args[@]}" --file="$repo_root/tests/operator-inquiry-audit-schema.sq
 
 # #251: atomic platform support access logging, additive to READ ONLY APIs.
 source "$repo_root/scripts/platform-operator-read-audit-checks.sh"
+
+# The focused cluster never had the exact legacy reviews/events/proposals schema.
+# Success includes the actual fresh historical owner: no invented prerequisite
+# DDL and no omitted upgrade assertions. Failure propagates under set -e.
+printf 'Rehearsing review retention against every actual historical forward migration.\n'
+STRELVA_GOOGLE_REVIEW_RETENTION_SQL_PROOF=1 bash "$repo_root/scripts/check-guarded-teardown-fresh.sh"
