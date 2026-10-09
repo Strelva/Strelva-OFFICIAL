@@ -668,6 +668,10 @@ export async function reconcileInquiryProviderEvent(input: {
   if (claim.status === "processing") return { status: "unavailable", tenantId: target.tenantId, inquiryId: target.inquiryId, action: target.action, reason: "provider_outcome_processing" };
   try {
     if (checkpoint.providerEventId === eventId) {
+      // A prior Redis outcome is not proof of the selected native checkpoint.
+      // Confirm/repair it before timeline, dedupe completion or webhook ACK.
+      await store.markProviderOutcome({ tenantId: target.tenantId, inquiryId: target.inquiryId, action: target.action,
+        providerMessageId, providerEventId: eventId, outcome, at: outcomeAt, reason: providerReason(type, data) });
       if (target.action === "owner_notification" && process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1") {
         const { copyInquiryEvent } = await import("@/platform/infra/inquiry-records");
         const copied = await copyInquiryEvent({ tenantId: target.tenantId, inquiryId: target.inquiryId.replace(/_notice_repair_[a-f0-9]{32}$/, ""), kind: "delivery", actor: "system",

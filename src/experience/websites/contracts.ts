@@ -19,6 +19,15 @@ export function websiteDocumentVersion(value: unknown): 2 | undefined {
   return item.version === 2 || item.rebuild?.version === 2 ? 2 : undefined;
 }
 
+/** Bind reader selection to the website identity, using the bounded server projection.
+ * Older same-origin snapshots may still carry a raw payload; that fallback
+ * only chooses a reader and never grants write or publication authority. */
+export function websiteWorkDocumentVersion(work: { productId: string; resourceKind: string; website?: { version: 1 | 2 }; payload: unknown } | null | undefined): 2 | undefined {
+  if (!work || work.productId !== "websites" || work.resourceKind !== "website") return undefined;
+  if (work.website) return work.website.version === 2 ? 2 : undefined;
+  return websiteDocumentVersion(work.payload);
+}
+
 /**
  * Browser transport for the website product. The product contract owns the
  * lifecycle and revisions; this interface only adds the workspace context the

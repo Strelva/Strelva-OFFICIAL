@@ -10,7 +10,7 @@ function redisStore() {
   const redis = { get: vi.fn(async (key: string) => values.get(key) ?? null), set: vi.fn(async (key: string, value: unknown, opts?: { nx?: boolean }) => { if (opts?.nx && values.has(key)) return null; values.set(key, value); return "OK"; }), eval: vi.fn(async () => 1), del: vi.fn(async () => 1), zadd: vi.fn(async () => 1), zrange: vi.fn(async () => []), scan: vi.fn(async (_cursor: unknown, _options: { match: string }) => ["0", [...values.keys()]]) };
   return { values, redis, store: createRedisInquiryDeliveryStore(redis as never) };
 }
-beforeEach(() => { vi.clearAllMocks(); mocks.stores.mockReturnValue(new Set(["inquiry_delivery"])); mocks.source.mockResolvedValue("postgres"); mocks.rows.mockResolvedValue([]); mocks.mirror.mockResolvedValue({ status: "recorded" }); });
+beforeEach(() => { vi.clearAllMocks(); mocks.stores.mockReturnValue(new Set(["inquiry_delivery"])); mocks.source.mockResolvedValue("postgres"); mocks.rows.mockResolvedValue([]); mocks.mirror.mockResolvedValue({ status: "recorded" }); mocks.rpc.mockResolvedValue({ data: { status: "recorded" }, error: null }); });
 describe("durable inquiry delivery operational data", () => {
   it("recovers accepted send markers after cache expiry and blocks another send", async () => {
     const input = redisStore(); mocks.rows.mockResolvedValue([inquiryDeliveryRecord("checkpoint", "inquiry-a:reply", accepted)]);

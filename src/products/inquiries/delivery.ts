@@ -14,6 +14,7 @@
  * "delivered" unless a transport supplies verification evidence.
  */
 
+import { clientRecordReadStores } from "@/platform/client-records/move";
 import { ownerNoticeEmail, businessRecordReadsEnabled } from "@/lib/owner-recipient";
 import { readReleasedTenantBusinessContext } from "@/platform/business-record/public-reader";
 
@@ -24,7 +25,7 @@ import { getTenantConfig } from "@/lib/tenants";
 import { addTenantActivity } from "@/lib/tenant-crm";
 import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
 import { createEmailInquiryTransport } from "./delivery-email";
-import { createRedisInquiryDeliveryStore } from "./delivery-store";
+import { createRedisInquiryDeliveryStore, InquiryDeliveryDurableWriteError } from "./delivery-store";
 import { claimInquiryMessagePurpose, releaseRejectedInquiryMessagePurpose } from "./message-purpose";
 import { inquiryMessageRouteAtUse } from "./inquiry-policy-at-use";
 import { inquiryRecordsEnabled } from "@/platform/infra/inquiry-records";
@@ -480,7 +481,7 @@ export async function deliverInquiryAction(
   const deps = options.deps || {};
   const store = deps.store || createRedisInquiryDeliveryStore();
   const transport = deps.transport || createEmailInquiryTransport({ allowExternalSends: deps.allowExternalSends });
-  if (!store.durable) {
+  if (!store.durable && !clientRecordReadStores().has("inquiry_delivery")) {
     return { inquiryId: inquiry.id, tenantId: inquiry.tenantId, action, status: "unavailable", reason: "durable_delivery_state_required", retryable: false };
   }
   const now = deps.now?.() || new Date();
@@ -586,6 +587,20 @@ export async function deliverInquiryAction(
     return { ...evaluated, status: "failed", reason: checkpoint.failureReason || "provider_failed", acceptedAt: checkpoint.acceptedAt, providerMessageId: checkpoint.providerMessageId, verificationEvidence: checkpoint.verificationEvidence, retryable: Boolean(checkpoint.retryable) };
   }
   if (checkpoint?.status === "accepted" || checkpoint?.status === "accepted_unverified") {
+    if (!store.durable) {
+      return { ...evaluated, status: "accepted_unverified", reason: "durable_acceptance_recovered_atomic_store_unavailable",
+        attemptId: checkpoint.attemptId, acceptedAt: checkpoint.acceptedAt, providerMessageId: checkpoint.providerMessageId, retryable: false };
+    }
+    if (store.repairAcceptedProjections) {
+      if (!checkpoint.acceptedAt) return { ...evaluated, status: "reconciliation_required", reason: "acceptance_evidence_unavailable", attemptId: checkpoint.attemptId, retryable: false };
+      try {
+        checkpoint = await store.repairAcceptedProjections({ tenantId: inquiry.tenantId, inquiryId: inquiry.id, action,
+          attemptId: checkpoint.attemptId, acceptedAt: checkpoint.acceptedAt, providerMessageId: checkpoint.providerMessageId, replyTo: checkpoint.replyTo });
+      } catch {
+        return { ...evaluated, status: "reconciliation_required", reason: "provider_acceptance_repair_unavailable",
+          attemptId: checkpoint.attemptId, acceptedAt: checkpoint.acceptedAt, providerMessageId: checkpoint.providerMessageId, retryable: false };
+      }
+    }
     const acceptance = { status: "accepted" as const, ...(checkpoint.providerMessageId ? { providerMessageId: checkpoint.providerMessageId } : {}), ...(checkpoint.acceptedAt ? { acceptedAt: checkpoint.acceptedAt } : {}) };
     let verification: InquiryVerificationResult;
     try {
@@ -715,6 +730,9 @@ export async function deliverInquiryAction(
   if (!budget || !Number.isInteger(budget.limit) || budget.limit < 1 || !budget.timezone.trim()) {
     return { ...evaluated, status: "unavailable", reason: "daily_budget_state_required", retryable: false };
   }
+  if (!store.durable) {
+    return { ...evaluated, status: "unavailable", reason: "durable_delivery_state_required", retryable: false };
+  }
   if (!store.atomicBudget) {
     return { ...evaluated, status: "unavailable", reason: "atomic_daily_budget_required", retryable: false };
   }
@@ -819,7 +837,10 @@ export async function deliverInquiryAction(
       try {
         await store.markAccepted({ tenantId: inquiry.tenantId, inquiryId: inquiry.id, action, attemptId, acceptedAt, providerMessageId: sent.providerMessageId, replyTo: message.replyTo });
         acceptanceRecorded = true;
-      } catch {
+      } catch (error) {
+        // A cached acceptance cannot prove all selected durable projections.
+        // Retry the same attempt's recording, never the provider send.
+        if (error instanceof InquiryDeliveryDurableWriteError) continue;
         // A concurrent writer may have recorded it, or the store is down.
         const current = await store.getCheckpoint({ tenantId: inquiry.tenantId, inquiryId: inquiry.id, action }).catch(() => null);
         if (current?.attemptId === attemptId && current.status !== "sending") acceptanceRecorded = true;

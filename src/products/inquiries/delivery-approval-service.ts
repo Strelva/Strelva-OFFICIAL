@@ -899,6 +899,14 @@ export async function reconcileInquiryMessageReview(input: {
   if (checkpointAccepted(checkpoint) && binding === "different") {
     return { accepted: false, safeToResolve: false, receiptPersisted: false, verified: false, status: "different_message_sent", reason: DIFFERENT_MESSAGE_SENT };
   }
+  if (checkpointAccepted(checkpoint) && checkpoint?.acceptedAt && store.repairAcceptedProjections) {
+    try {
+      checkpoint = await store.repairAcceptedProjections({ tenantId: input.tenantId, inquiryId: metadata.inquiryId, action: metadata.action,
+        attemptId: checkpoint.attemptId, acceptedAt: checkpoint.acceptedAt, providerMessageId: checkpoint.providerMessageId, replyTo: checkpoint.replyTo });
+    } catch {
+      return { accepted: true, safeToResolve: false, receiptPersisted: false, verified: false, status: "reconciliation_required", reason: "provider_acceptance_repair_unavailable" };
+    }
+  }
   if (!checkpointAccepted(checkpoint)) {
     return { accepted: false, safeToResolve: false, receiptPersisted: false, verified: false, status: checkpoint?.status === "unknown" || checkpoint?.status === "sending" ? "reconciliation_required" : "unavailable", reason: "delivery_acceptance_unavailable" };
   }

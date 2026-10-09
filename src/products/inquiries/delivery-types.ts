@@ -253,6 +253,8 @@ export interface InquiryDeliveryStore {
     /** Digest of the exact message this attempt will hand to the provider. */
     messageDigest?: string;
   }): Promise<InquiryDeliveryClaim>;
+  /** Confirm the exact accepted attempt's durable projections before readback. */
+  repairAcceptedProjections?(input: { tenantId: string; inquiryId: string; action: InquiryDeliveryAction; attemptId: string; acceptedAt: string; providerMessageId?: string; replyTo?: string }): Promise<InquiryDeliveryCheckpoint>;
   markAccepted(input: {
     tenantId: string;
     inquiryId: string;

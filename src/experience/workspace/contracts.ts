@@ -56,6 +56,8 @@ export interface WorkspaceWork<TPayload = WorkspaceWorkPayload> {
   creatorDraft?: boolean;
   operation?: { status: string; reason?: string };
   workPlan?: { summary: string; status: "ready" | "needs_scoping"; outputCount?: number };
+  /** Saved website reader discriminator only; no content or publication authority. */
+  website?: { version: 1 | 2 };
   document?: Pick<import("@/products/documents/contracts").WorkspaceDocument, "title" | "revision">;
   id: string;
   workspaceId: string;
