@@ -34,7 +34,7 @@ async function fixture(page: Page, info: TestInfo, width: number, enlarged: bool
   await expect(page.getByText("Fictional routing recovery · no DNS, Auth, provider or publication proof", { exact: true })).toBeVisible();
   const report = page.getByRole("region", { name: "Monthly website report", exact: true });
   return { report, reads, blocked, errors,
-    respond(value: typeof response, deferred = false) { response = value; hold = deferred; },
+    respond(value: "wrong-period" | "malformed" | "valid", deferred = false) { response = value; hold = deferred; },
     async complete(month: string) { await expect.poll(() => Boolean(pending)).toBe(true); await pending!.fulfill({ json: reportBrowserFixture(month) }); pending = undefined; hold = false; },
   };
 }
