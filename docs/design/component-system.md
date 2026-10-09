@@ -1522,3 +1522,21 @@ retry after response loss, unmounted observation, and unqualified installation
 refusal. Genuine 1440px/390px Auth screenshots and keyboard journeys are prepared
 in `tests/ordinary-source-authenticated-local.spec.ts` but remain unrun. This is
 component adoption in isolated source, not a visual acceptance or deployment.
+
+## Needs you heading and full-page touch evidence, October 9, prepared
+
+The clay dot in both Home Needs you headings uses the existing 7px `.dot` as an
+aria-hidden child. It preserves the heading name, focus target, count and clay
+foreground while separating decoration from its actual solid text paint. The
+bounded checker remains unchanged.
+
+The fictional recovery browser fixture keeps its original customer viewport,
+enlarged text, coarse-pointer and complete recovery assertions. Chromium147
+full-page capture beyond the viewport clears touch emulation and paints fine
+pointer CSS. The owned capture helper fits document height at the same width
+only for the full-page image, refuses changed critical geometry/text paint or
+unbounded height feedback, and restores the exact viewport, focus and scroll
+even on capture failure. Each phase retains the exact capture mode and device
+metadata. Expanded capture height grants no customer-device qualification.
+Closed local synthetic controls and focused source tests are preparation; the
+unchanged complete45-case HTTP/UI job must pass on the composed source.

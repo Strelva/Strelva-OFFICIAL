@@ -257,7 +257,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
       extraCount={home.attention.length} extra={home.attention.length ? attentionRows : null} empty={needsYouEmpty} />
     : <section className={styles.section} aria-labelledby="home-attention">
       <header className={styles.sideHeader}>
-        <h2 id="home-attention" className={styles.eyebrow} data-tone="clay">Needs you{!busy && !deliveryPending && attentionCount > 0 ? <span className={styles.count}>{attentionCount}</span> : null}</h2>
+        <h2 id="home-attention" className={styles.eyebrow} data-tone="clay"><span className={styles.dot} aria-hidden="true" />Needs you{!busy && !deliveryPending && attentionCount > 0 ? <span className={styles.count}>{attentionCount}</span> : null}</h2>
         {!busy && !deliveryPending ? <p className={styles.sideTitle}>{attentionCount ? `${decisionCount(attentionCount)} waiting on you.` : "Nothing needs a decision right now."}</p> : null}
       </header>
       {busy || deliveryPending ? <p role="status" className={styles.muted}>Checking your work…</p> : attentionCount ? <ul className={styles.decisions}>

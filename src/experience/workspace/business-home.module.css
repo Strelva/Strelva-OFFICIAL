@@ -158,13 +158,7 @@
 }
 
 .eyebrow[data-tone="clay"] { color: var(--home-clay-text); }
-.eyebrow[data-tone="clay"]::before {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--home-clay);
-  content: "";
-}
+.eyebrow[data-tone="clay"] .dot { background: var(--home-clay); }
 .eyebrow[data-tone="aurora"] { color: var(--home-aurora); }
 .eyebrow[data-tone="aurora"] .dot { background: var(--home-ivory-subtle); }
 .eyebrow[data-tone="aurora"] .dot[data-live] { background: var(--home-aurora); }

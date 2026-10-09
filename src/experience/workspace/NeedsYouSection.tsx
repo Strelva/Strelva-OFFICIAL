@@ -68,7 +68,7 @@ export function NeedsYouSection({ state, pending, notices, onDecide, onRetry, ex
   const deck = variant === "deck";
   return <section className={deck ? styles.deckSection : styles.section} aria-labelledby="home-attention">
     <header className={deck ? styles.srOnly : styles.sideHeader}>
-      <h2 ref={heading} tabIndex={-1} id="home-attention" className={styles.eyebrow} data-tone="clay">Needs you{state.status === "ready" && count > 0 ? <span className={styles.count}>{count}</span> : null}</h2>
+      <h2 ref={heading} tabIndex={-1} id="home-attention" className={styles.eyebrow} data-tone="clay"><span className={styles.dot} aria-hidden="true" />Needs you{state.status === "ready" && count > 0 ? <span className={styles.count}>{count}</span> : null}</h2>
       {!deck && state.status === "ready" && state.complete && count > 0 ? <p className={styles.sideTitle}>{decisionCount(count)} waiting on {state.role === "member" ? "the owner" : "you"}.</p> : null}
     </header>
     {state.status === "loading" ? <p role="status" className={styles.muted}>Checking what needs you…</p> : null}

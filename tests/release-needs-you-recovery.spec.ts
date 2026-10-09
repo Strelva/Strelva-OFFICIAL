@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page, type Request, type Route, type T
 import { fictionalAsk, needsYouBrowserRead, workspaceId } from "./support/needs-you-browser-fixture";
 import { reportBrowserOrigin } from "./support/website-report-browser-fixture";
 import { assertReadableText } from "./support/assert-readable-text";
+import { touchScreenshotCapture } from "./support/touch-screenshot-capture";
 
 test.use({ hasTouch: true, trace: "on" });
 async function fixture(page: Page, info: TestInfo, view: "home" | "needs-you", width: number) {
@@ -56,7 +57,7 @@ async function settledPaint(target: Locator) {
     return true;
   })).toBe(true);
 }
-async function evidence(page: Page, queue: Locator, info: TestInfo, label: string, view: "home" | "needs-you") {
+async function evidence(page: Page, queue: Locator, info: TestInfo, label: string, view: "home" | "needs-you", screenshots: Awaited<ReturnType<typeof touchScreenshotCapture>>) {
   await settledPaint(queue);
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   const viewport = await page.evaluate(() => innerWidth);
@@ -74,20 +75,21 @@ async function evidence(page: Page, queue: Locator, info: TestInfo, label: strin
   await settledPaint(heading);
   await assertReadableText(heading, info, `${label}-heading`);
   await info.attach(`${label}-geometry`, { body: JSON.stringify({ boxes, viewportWidth: await page.evaluate(() => innerWidth), enlargedRootText: await page.evaluate(() => getComputedStyle(document.documentElement).fontSize) }), contentType: "application/json" });
-  await queue.scrollIntoViewIfNeeded(); const path = info.outputPath(`${label}.png`); await page.screenshot({ path, fullPage: true }); await info.attach(label, { path, contentType: "image/png" });
+  await queue.scrollIntoViewIfNeeded(); const path = info.outputPath(`${label}.png`); const capture = await screenshots.capture(path); await info.attach(`${label}-capture-device`, { body: JSON.stringify(capture), contentType: "application/json" }); await info.attach(label, { path, contentType: "image/png" });
 }
 for (const [view, width] of [["home", 390], ["needs-you", 320]] as const) {
   test(`real decision discovery recovers truthful ${view} at ${width}px${width === 320 ? " with enlarged text" : ""}`, async ({ page }, info) => {
     const f = await fixture(page, info, view, width), address = page.url();
+    const screenshots = await touchScreenshotCapture(page);
     const retry = () => f.queue.getByRole("button", { name: "Check again", exact: true });
     const outside = page.getByRole("button", { name: "Outside decision control", exact: true });
     await notClear(page);
     if (view === "home") await expect(page.getByText("What Strelva did this week could not be loaded. Nothing about it changed.", { exact: true })).toBeVisible();
-    await evidence(page, f.queue, info, "partial-empty", view);
+    await evidence(page, f.queue, info, "partial-empty", view, screenshots);
     f.fail(true); await retry().focus(); await page.keyboard.press("Enter");
     await expect(f.queue.getByRole("status")).toContainText("Your decisions could not be checked. Nothing about them changed.");
     await expect(retry()).toBeFocused(); expect(f.reads).toHaveLength(f.initialReads + 1); await notClear(page);
-    await evidence(page, f.queue, info, "failed-retry", view);
+    await evidence(page, f.queue, info, "failed-retry", view, screenshots);
     f.fail(false); f.state("known"); f.hold(); await page.keyboard.press("Enter"); await expect.poll(() => f.reads.length).toBe(f.initialReads + 2);
     await outside.focus(); await f.finish();
     await expect(f.queue.getByText(fictionalAsk.title, { exact: true })).toBeVisible();
@@ -95,14 +97,14 @@ for (const [view, width] of [["home", 390], ["needs-you", 320]] as const) {
     await expect(f.queue.getByRole("button", { name: `Approve: ${fictionalAsk.title}`, exact: true })).toBeEnabled();
     await expect(outside).toBeFocused(); await notClear(page);
     if (view === "home") await expect(page.getByText(/Nothing this week\. When Strelva changes/)).toBeVisible();
-    await evidence(page, f.queue, info, "known-partial", view);
+    await evidence(page, f.queue, info, "known-partial", view, screenshots);
     f.state("complete"); await retry().focus(); await page.keyboard.press("Enter");
     await expect(page.getByText(view === "home" ? "Nothing needs you right now." : "Nothing needs you.", { exact: true })).toBeVisible();
     const target = view === "home" ? f.queue.getByRole("heading", { name: "Needs you", exact: true }) : page.getByRole("heading", { level: 1, name: "Needs you", exact: true });
     await expect(target).toBeFocused(); await expect(retry()).toHaveCount(0); expect(f.reads).toHaveLength(f.initialReads + 3);
     if (view === "needs-you") await expect(page.getByText("Nothing is waiting on you.", { exact: true })).toBeVisible();
     await assertReadableText(page.getByText(view === "home" ? "Nothing needs you right now." : "Nothing needs you.", { exact: true }), info, "complete-empty-result");
-    await evidence(page, f.queue, info, "complete-empty", view);
+    await evidence(page, f.queue, info, "complete-empty", view, screenshots);
     expect(f.requests.slice(f.initialReads).map(request => request.failure())).toEqual([null, null, null]);
     expect(page.url()).toBe(address); expect(f.writes).toEqual([]); expect(f.blocked).toEqual([]); expect(f.errors).toEqual([]);
     await info.attach("fictional-qualification", { body: JSON.stringify({ source: "actual BusinessHome/useNeedsYou default HTTP", exactWorkspaceGets: f.reads.length, initialDevelopmentReadFailures: f.requests.slice(0, f.initialReads).map(request => request.failure()?.errorText ?? null), httpWrites: f.writes.length, noForcedNavigation: page.url() === address, nativeQualified: false, deliveryQualified: false, providerQualified: false }), contentType: "application/json" });
