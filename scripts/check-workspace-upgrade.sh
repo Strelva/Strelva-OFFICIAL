@@ -539,6 +539,8 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022174500_pri
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/private-source-current-contract.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022175000_reward_durable_mutations.sql"
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/reward-durable-catalog-contract.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022182000_booking_settings_atomic_patch.sql"
+psql "${psql_args[@]}" --file="$repo_root/scripts/sql/booking-settings-current-contract.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/function-exposure-schema.sql"
 node --import tsx "$repo_root/scripts/check-readonly-rpcs.mjs" "postgresql:///postgres?host=$cluster_socket&port=$cluster_port"
 psql "${psql_args[@]}" --file="$repo_root/tests/guarded-tenant-teardown-schema.sql"

@@ -31,7 +31,7 @@ if str(cluster)!='.' and cluster.exists():
   if item.is_file() and not item.is_symlink():
    target=evidence/item.name;shutil.copyfile(item,target);target.chmod(0o600)
    receipt['artifacts'][item.name]=hashlib.sha256(target.read_bytes()).hexdigest()
-for name in ['scripts/check-creator-maintenance-operations.sh','scripts/temp-postgres.sh','scripts/sql/local-supabase-shim.sql','supabase/migrations/20261022170000_creator_maintenance_operations.sql','supabase/migrations/rollback-20261022170000_creator_maintenance_operations.sql','tests/creator-maintenance-operations-schema.sql','tests/money-apps-creator-quote-ledger-schema.sql','tests/function-exposure-schema.sql','scripts/check-readonly-rpcs.mjs','scripts/lib/readonly-rpcs.mjs','scripts/release-safety/postgres.ts', "scripts/sql/native-google-hash-portability-contract.sql", "scripts/sql/reward-durable-catalog-contract.sql", "scripts/sql/private-source-current-contract.sql", "supabase/migrations/rollback-20261022174000_private_source_exit_admission.sql", "supabase/migrations/rollback-20261022174500_private_source_exit_lock_order.sql", "supabase/migrations/rollback-20261021140100_native_google_hash_portability.sql", "supabase/migrations/rollback-20261022175000_reward_durable_mutations.sql"]:
+for name in ['scripts/check-creator-maintenance-operations.sh','scripts/temp-postgres.sh','scripts/sql/local-supabase-shim.sql','supabase/migrations/20261022170000_creator_maintenance_operations.sql','supabase/migrations/rollback-20261022170000_creator_maintenance_operations.sql','tests/creator-maintenance-operations-schema.sql','tests/money-apps-creator-quote-ledger-schema.sql','tests/function-exposure-schema.sql','scripts/check-readonly-rpcs.mjs','scripts/lib/readonly-rpcs.mjs','scripts/release-safety/postgres.ts', "scripts/sql/native-google-hash-portability-contract.sql", "scripts/sql/reward-durable-catalog-contract.sql", "scripts/sql/booking-settings-current-contract.sql", "supabase/migrations/rollback-20261022182000_booking_settings_atomic_patch.sql", "scripts/sql/private-source-current-contract.sql", "supabase/migrations/rollback-20261022174000_private_source_exit_admission.sql", "supabase/migrations/rollback-20261022174500_private_source_exit_lock_order.sql", "supabase/migrations/rollback-20261021140100_native_google_hash_portability.sql", "supabase/migrations/rollback-20261022175000_reward_durable_mutations.sql"]:
  receipt['source'][name]=hashlib.sha256((repo/name).read_bytes()).hexdigest()
 receipt['forwardInventory']=[{'file':item.name,'sha256':hashlib.sha256(item.read_bytes()).hexdigest()} for item in sorted((repo/'supabase/migrations').glob('20*.sql'))]
 with (evidence/'receipt.json').open('x') as f:json.dump(receipt,f,indent=2);f.write('\n')
@@ -67,6 +67,7 @@ done
 psql "${psql_args[@]}" -f "$repo_root/scripts/sql/private-source-current-contract.sql" >"$cluster_root/private-source-current-contract.log" 2>&1
 psql "${psql_args[@]}" -f "$repo_root/scripts/sql/native-google-hash-portability-contract.sql" >"$cluster_root/native-google-hash-portability-contract.log" 2>&1
 psql "${psql_args[@]}" -f "$repo_root/scripts/sql/reward-durable-catalog-contract.sql" >"$cluster_root/reward-durable-catalog-contract.log" 2>&1
+psql "${psql_args[@]}" -f "$repo_root/scripts/sql/booking-settings-current-contract.sql" >"$cluster_root/booking-settings-current-contract.log" 2>&1
 # Snapshot definition, owner, ACL, column/constraint/policy metadata AND journal
 # rows. A refusal is not green merely because the mutation itself failed.
 snapshot(){
@@ -141,6 +142,7 @@ cmp "$cluster_root/history-before" "$cluster_root/history-after"
 psql "${psql_args[@]}" -f "$forward" >"$cluster_root/reapply.log" 2>&1
 psql "${psql_args[@]}" -f "$repo_root/scripts/sql/native-google-hash-portability-contract.sql" >"$cluster_root/reapplied-native-google-hash-portability-contract.log" 2>&1
 psql "${psql_args[@]}" -f "$repo_root/scripts/sql/reward-durable-catalog-contract.sql" >"$cluster_root/reapplied-reward-durable-catalog-contract.log" 2>&1
+psql "${psql_args[@]}" -f "$repo_root/scripts/sql/booking-settings-current-contract.sql" >"$cluster_root/reapplied-booking-settings-current-contract.log" 2>&1
 psql "${psql_args[@]}" -f "$repo_root/scripts/sql/private-source-current-contract.sql" >"$cluster_root/reapplied-private-source-current-contract.log" 2>&1
 psql "${psql_args[@]}" -f "$repo_root/tests/function-exposure-schema.sql" >"$cluster_root/exposure.log" 2>&1
 node --import tsx "$repo_root/scripts/check-readonly-rpcs.mjs" "postgresql:///postgres?host=$cluster_socket&port=$cluster_port" >"$cluster_root/readonly.log" 2>&1

@@ -5,9 +5,10 @@
  * createBooking, updateBooking) read/write the Postgres `bookings` table;
  * otherwise they use the dev-file store.
  *
- * NOTE: only the `bookings` table exists in Postgres. There is no table for
- * BookingConfig or DateOverride — those are tableless per-tenant config, stored
- * as a Redis blob (`reb:booking:config:*` / `reb:booking:overrides:*`, the same
+ * Config and date overrides use qualified client-record blobs or native
+ * booking settings after cutover, with authoritative writes matching reads.
+ * Before cutover they use Redis blobs (`reb:booking:config:*` /
+ * `reb:booking:overrides:*`, the same
  * pattern as report-cadence/CRM) with the dev-file store as the local fallback
  * when Redis is absent. The Redis slot-lock layer is a separate concern and is
  * preserved as-is.
@@ -22,16 +23,17 @@
  *                                        (after 7 days of parity). Hours and
  *                                        services come from the business record;
  *                                        a paused bookings System offers no
- *                                        times. The legacy stores still receive
- *                                        every write, so switching back is the
- *                                        rollback.
+ *                                        times. Config writes commit to the
+ *                                        selected authority; legacy rollback
+ *                                        copies are best effort and must be
+ *                                        reconciled before switching back.
  */
 
 import type { BookingConfig, DateOverride, Booking } from "@/lib/types";
 import { DEFAULT_BOOKING_CONFIG, generateBookingId, generateSlots } from "@/lib/booking";
 import { getRedis } from "@/platform/infra/redis";
-import { mirrorClientRecord } from "@/platform/client-records/mirror";
-import { readThroughFlag } from "@/platform/client-records/move";
+import { mirrorClientRecord, writeClientRecord } from "@/platform/client-records/mirror";
+import { clientRecordReadSource, readThroughFlag } from "@/platform/client-records/move";
 import { DEFAULT_TENANT, readDevContent, writeDevContent } from "@/lib/storage/core";
 import { getContent } from "@/lib/storage/content-store";
 import { dataSourceIsPostgres } from "@/platform/infra/db/source-flags";
@@ -49,6 +51,8 @@ import {
   storeGetBookingConfig,
   storeGetBookings,
   storeGetDateOverrides,
+  setStoreBookingConfig,
+  setStoreDateOverrides,
   type SiteService,
 } from "@/platform/bookings/tenant";
 import { setBookingStatus, type BookingContext } from "@/platform/bookings/store";
@@ -164,97 +168,83 @@ export async function getBookingConfig(
   tenant: string = DEFAULT_TENANT
 ): Promise<BookingConfig> {
   if ((await bookingReadSource()) === "postgres") {
-    return storeOrLegacy("config read", tenant, () => storeGetBookingConfig(tenant), () => legacyGetBookingConfig(tenant));
+    return storeGetBookingConfig(tenant);
   }
   return legacyGetBookingConfig(tenant);
 }
 
 async function legacyGetBookingConfig(tenant: string): Promise<BookingConfig> {
-  const redis = getRedis();
-  if (redis) {
-    // Fail CLOSED: let a Redis error propagate (the caller fails the request)
-    // rather than swallow it and serve DEFAULT_BOOKING_CONFIG — default hours
-    // could offer slots on a day the tenant is actually closed, or hide a day
-    // it's open, on a live booking surface. A genuine miss (null) means "no
-    // custom config yet" → DEFAULT is the correct answer.
-    return readThroughFlag("booking_config", tenant,
-      async () => (await redis.get<BookingConfig>(bookingConfigKey(tenant))) ?? DEFAULT_BOOKING_CONFIG,
-      (records) => (records.find((r) => r.recordId === "config")?.payload.value as BookingConfig | undefined) ?? DEFAULT_BOOKING_CONFIG);
-  }
-  const store = await readDevContent(tenant);
-  return (store[`__bookingConfig_${tenant}`] as BookingConfig) ?? DEFAULT_BOOKING_CONFIG;
-}
-
-export async function setBookingConfig(
-  config: BookingConfig,
-  tenant: string = DEFAULT_TENANT
-): Promise<void> {
-  const redis = getRedis();
-  if (redis) {
-    // Let a real Redis write failure surface (route → 500) rather than pretend
-    // the save succeeded.
-    await redis.set(bookingConfigKey(tenant), config);
-    await mirrorClientRecord("booking_config", tenant, { recordId: "config", payload: { value: JSON.parse(JSON.stringify(config)) }, capturedAt: new Date().toISOString() });
-  } else {
+  return readThroughFlag("booking_config", tenant, async () => {
+    const redis = getRedis();
+    if (redis) return (await redis.get<BookingConfig>(bookingConfigKey(tenant))) ?? DEFAULT_BOOKING_CONFIG;
     const store = await readDevContent(tenant);
-    store[`__bookingConfig_${tenant}`] = config;
-    await writeDevContent(store, tenant);
+    return (store[`__bookingConfig_${tenant}`] as BookingConfig) ?? DEFAULT_BOOKING_CONFIG;
+  }, records => (records.find(r => r.recordId === "config")?.payload.value as BookingConfig | undefined) ?? DEFAULT_BOOKING_CONFIG);
+}
+
+/** Commit to the selected reader's authority before updating rollback copies. */
+async function saveSettingsValue(tenant: string, kind: "config" | "overrides", value: BookingConfig | DateOverride[]): Promise<boolean> {
+  const native = (await bookingReadSource()) === "postgres";
+  const record = { recordId: kind, payload: { value: JSON.parse(JSON.stringify(value)) }, capturedAt: new Date().toISOString() };
+  const durableBlob = !native && (await clientRecordReadSource("booking_config")) === "postgres";
+  if (native) {
+    if (kind === "config") await setStoreBookingConfig(tenant, value as BookingConfig);
+    else await setStoreDateOverrides(tenant, value as DateOverride[]);
+  } else if (durableBlob) {
+    const result = await writeClientRecord("booking_config", tenant, record, "dual_write");
+    if (result.status !== "recorded" && result.status !== "updated" && result.status !== "unchanged") {
+      throw new Error("Booking settings durable write failed");
+    }
   }
-  if (bookingStoreWriteEnabled()) {
-    await mirrorLegacySettings(tenant, config, await legacyGetDateOverrides(tenant).catch(() => []));
+  const redis = getRedis();
+  const copyLegacy = async () => {
+    if (redis) await redis.set(kind === "config" ? bookingConfigKey(tenant) : dateOverridesKey(tenant), value);
+    else if (!native && !durableBlob) {
+      const store = await readDevContent(tenant);
+      store[kind === "config" ? `__bookingConfig_${tenant}` : `__dateOverrides_${tenant}`] = value;
+      await writeDevContent(store, tenant);
+    }
+  };
+  if (native || durableBlob) {
+    try { await copyLegacy(); } catch { console.warn("[bookings] committed settings; legacy cache copy failed"); }
+  } else await copyLegacy();
+  if (!durableBlob && (redis || native)) await mirrorClientRecord("booking_config", tenant, record);
+  return native;
+}
+
+export async function setBookingConfig(config: BookingConfig, tenant: string = DEFAULT_TENANT): Promise<void> {
+  const native = await saveSettingsValue(tenant, "config", config);
+  if (!native && bookingStoreWriteEnabled()) {
+    try { await mirrorLegacySettings(tenant, config, await legacyGetDateOverrides(tenant)); }
+    catch { console.warn("[bookings] settings mirror skipped: companion overrides unavailable"); }
   }
 }
 
-export async function getDateOverrides(
-  tenant: string = DEFAULT_TENANT
-): Promise<DateOverride[]> {
-  if ((await bookingReadSource()) === "postgres") {
-    return storeOrLegacy("overrides read", tenant, () => storeGetDateOverrides(tenant), () => legacyGetDateOverrides(tenant));
-  }
+export async function getDateOverrides(tenant: string = DEFAULT_TENANT): Promise<DateOverride[]> {
+  if ((await bookingReadSource()) === "postgres") return storeGetDateOverrides(tenant);
   return legacyGetDateOverrides(tenant);
 }
 
 async function legacyGetDateOverrides(tenant: string): Promise<DateOverride[]> {
-  // Closed-dates / special-hours overrides persist as a Redis blob (mirrors
-  // getBookingConfig), written by setDateOverrides from the owner's Schedule
-  // availability editor. The dev-file store is the local fallback when Redis is
-  // absent. (These were previously authored in Sanity Studio, now decommissioned.)
-  const redis = getRedis();
-  if (redis) {
-    // Fail CLOSED like getBookingConfig: propagate a Redis error rather than
-    // silently dropping a "closed" override and accepting a booking on a day the
-    // owner blocked off.
-    return readThroughFlag("booking_config", tenant,
-      async () => {
-        const raw = await redis.get<DateOverride[]>(dateOverridesKey(tenant));
-        return Array.isArray(raw) ? raw : [];
-      },
-      (records) => {
-        const value = records.find((r) => r.recordId === "overrides")?.payload.value;
-        return Array.isArray(value) ? (value as DateOverride[]) : [];
-      });
-  }
-  const store = await readDevContent(tenant);
-  return (store[`__dateOverrides_${tenant}`] as DateOverride[]) ?? [];
+  return readThroughFlag("booking_config", tenant, async () => {
+    const redis = getRedis();
+    if (redis) {
+      const raw = await redis.get<DateOverride[]>(dateOverridesKey(tenant));
+      return Array.isArray(raw) ? raw : [];
+    }
+    const store = await readDevContent(tenant);
+    return (store[`__dateOverrides_${tenant}`] as DateOverride[]) ?? [];
+  }, records => {
+    const value = records.find(r => r.recordId === "overrides")?.payload.value;
+    return Array.isArray(value) ? value as DateOverride[] : [];
+  });
 }
 
-export async function setDateOverrides(
-  overrides: DateOverride[],
-  tenant: string = DEFAULT_TENANT
-): Promise<void> {
-  const redis = getRedis();
-  if (redis) {
-    // Let a real Redis write failure surface (route → 500) rather than pretend
-    // the save succeeded — same contract as setBookingConfig.
-    await redis.set(dateOverridesKey(tenant), overrides);
-    await mirrorClientRecord("booking_config", tenant, { recordId: "overrides", payload: { value: JSON.parse(JSON.stringify(overrides)) }, capturedAt: new Date().toISOString() });
-  } else {
-    const store = await readDevContent(tenant);
-    store[`__dateOverrides_${tenant}`] = overrides;
-    await writeDevContent(store, tenant);
-  }
-  if (bookingStoreWriteEnabled()) {
-    await mirrorLegacySettings(tenant, await legacyGetBookingConfig(tenant).catch(() => DEFAULT_BOOKING_CONFIG), overrides);
+export async function setDateOverrides(overrides: DateOverride[], tenant: string = DEFAULT_TENANT): Promise<void> {
+  const native = await saveSettingsValue(tenant, "overrides", overrides);
+  if (!native && bookingStoreWriteEnabled()) {
+    try { await mirrorLegacySettings(tenant, await legacyGetBookingConfig(tenant), overrides); }
+    catch { console.warn("[bookings] settings mirror skipped: companion config unavailable"); }
   }
 }
 

@@ -74,10 +74,10 @@ test('complete composed forward inventory has no unclassified workspace migratio
 });
 
 
-test('combined351 schedules both reviewed additions once before complete current catalog/exposure checks', () => {
+test('combined352 schedules both reviewed additions once before complete current catalog/exposure checks', () => {
   const inventory = JSON.parse(readFileSync(`${root}scripts/sql/historical-forward-inventory.json`, 'utf8'));
-  assert.equal(inventory.forwardCount, 351);
-  assert.equal(new Set(inventory.forwardFiles).size, 351);
+  assert.equal(inventory.forwardCount, 352);
+  assert.equal(new Set(inventory.forwardFiles).size, 352);
   const google = '20261021140100_native_google_hash_portability.sql';
   const rewards = '20261022175000_reward_durable_mutations.sql';
   const tail = readFileSync(`${root}scripts/sql/full-model-current-tail.sh`, 'utf8');
@@ -114,7 +114,7 @@ test('current contracts retain complete accepted catalog guards and both native 
 });
 
 
-test('current351 preserves historical phase checks and applies1740 then1745 once in both final owners', () => {
+test('current352 preserves historical phase checks and applies1740 then1745 once in both final owners', () => {
  const read = path => readFileSync(`${root}${path}`,'utf8');
  for (const name of ['check-workspace-sql.sh','check-workspace-upgrade.sh']) {
   const source=read(`scripts/${name}`), a=source.indexOf('/supabase/migrations/20261022174000_private_source_exit_admission.sql'), b=source.indexOf('/supabase/migrations/20261022174500_private_source_exit_lock_order.sql');

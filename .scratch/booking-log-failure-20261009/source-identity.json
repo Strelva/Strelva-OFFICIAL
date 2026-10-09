@@ -1,0 +1,10 @@
+{
+  "base": "8584a856d9a47386ee8060825c1f3cdd3ee5e407",
+  "source_sha256": {
+    "scripts/sql/booking-settings-atomicity.sh": "6416be7d4bc2d0bed14a07bffccdef66b1b430128e264e54e2e630ecbf2632c2",
+    "scripts/tests/booking-transport-signal.node-test.mjs": "64dafb494b317f5a8c073ac87f607ec141f9e94f22d768054418980eb9f0af8a"
+  },
+  "migrations_compared": 589,
+  "changed_migrations": [],
+  "native_qualification": "pending"
+}

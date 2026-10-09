@@ -1,6 +1,6 @@
 {
-  "source": "Prepared exact combined351 current forwards: accepted private source1740/1745 alongside preserved Google1401 and event-fenced rewards1750; actual current schema/catalog/native/Auth/provider and generated types qualification UNRUN",
-  "forwardCount": 351,
+  "source": "Prepared exact combined352 forwards: accepted booking793 atomic settings1820 alongside preserved Creator1740/1745, Google1401 and event-fenced rewards1750; actual current schema/catalog/native/Auth/provider and generated types qualification UNRUN",
+  "forwardCount": 352,
   "workspaceBoundary": "20260905190000_release_one_workspaces.sql",
   "focusedLegacyExceptions": {
     "20260920060000_content_version_request_id.sql": "Requires legacy content_versions, omitted from the purpose-built workspace fixture; real upgrade/fresh full-schema rehearsal owns it.",
@@ -358,6 +358,7 @@
     "20261022173000_neutral_creator_version_money.sql",
     "20261022174000_private_source_exit_admission.sql",
     "20261022174500_private_source_exit_lock_order.sql",
-    "20261022175000_reward_durable_mutations.sql"
+    "20261022175000_reward_durable_mutations.sql",
+    "20261022182000_booking_settings_atomic_patch.sql"
   ]
 }

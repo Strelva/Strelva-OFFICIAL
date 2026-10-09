@@ -1885,6 +1885,19 @@
           "rollbackStatus": "Prepared exact owner/body/properties/normalized ACL predecessor/successor inverse; original source/Version/paid/history bytes and prior writer preserved; managed/native drift/refusal/inverse/reapply qualification UNRUN"
         }
       ]
+    },
+    {
+      "id": "booking-settings-atomic-patch",
+      "status": "Prepared accepted booking793 selected-authority writes and atomic settings field groups; actual functional SQL, both concurrency orders, creation/default ACL refusal, guarded inverse/reapply, current352 Auth/native and generated types qualification UNRUN; no provider/commercial permission",
+      "items": [
+        {
+          "file": "20261022182000_booking_settings_atomic_patch.sql",
+          "sha256": "6497dd7346ce3f9e9e77409b5fc933871ac931dc266e792dd4806ffcf0b07ce6",
+          "rollback": "rollback-20261022182000_booking_settings_atomic_patch.sql",
+          "rollbackSha256": "cf5cc60da8923e2256e30f82d5aa080d1134c76083050c8e3c3ee053b9240c65",
+          "rollbackStatus": "Prepared exact body/properties/owner/normalized ACL guarded inverse; remove application consumer first; settings rows/history retained; actual inverse/refusal/reapply and managed deployment qualification UNRUN"
+        }
+      ]
     }
   ]
 }

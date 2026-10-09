@@ -163,3 +163,17 @@ do $$declare f regprocedure:=to_regprocedure('public.system_version_assert_sourc
   if has_function_privilege(r,f,'EXECUTE') then raise exception 'private source manager exposed directly';end if;
  end loop;end if;
 end$$;
+
+-- Additive1820 is a private service command; public/customer Auth cannot execute.
+do $booking_settings_exposure$
+declare target oid:=to_regprocedure('public.write_tenant_booking_settings_fields(text,text,jsonb,jsonb)'); p pg_proc%rowtype; service_owner oid:='service_role'::regrole;
+begin
+ if target is not null then
+  select * into p from pg_proc where oid=target;
+  if has_function_privilege('anon',target,'EXECUTE') or has_function_privilege('authenticated',target,'EXECUTE')
+   or not has_function_privilege('service_role',target,'EXECUTE')
+   or p.proacl is null or (select count(*) from aclexplode(p.proacl))<>2
+   or exists(select 1 from aclexplode(p.proacl) a where a.grantee not in(p.proowner,service_owner) or a.grantor<>p.proowner or a.privilege_type<>'EXECUTE' or a.is_grantable)
+   then raise exception 'booking settings atomic command exposed or authority drifted';end if;
+ end if;
+end $booking_settings_exposure$;

@@ -360,6 +360,27 @@ export async function upsertBookingSettings(tenant: string, settings: Partial<Bo
   return { status: data.status, revision: data.revision };
 }
 
+export type LegacyBookingConfigFields = Pick<BookingSettings,
+  "bufferMinutes" | "minNoticeMinutes" | "maxAdvanceDays" | "defaultLengthMinutes" |
+  "timezone" | "bookableHours" | "legacyRequiresPayment">;
+
+/** Atomic primary write: updates only the requested fields, even on native-owned rows. */
+export async function writeBookingSettingsFields(
+  tenant: string,
+  kind: "config" | "overrides",
+  settings: LegacyBookingConfigFields | Pick<BookingSettings, "bookableOverrides">,
+  initialConfig: LegacyBookingConfigFields,
+  db?: BookingStoreDb | null,
+): Promise<{ status: "recorded" | "updated"; revision: number }> {
+  const data = await call<{ status?: string; revision?: number }>("write_tenant_booking_settings_fields", {
+    p_tenant_id: tenant, p_kind: kind, p_settings: settings, p_initial_config: initialConfig,
+  }, db);
+  if ((data?.status !== "recorded" && data?.status !== "updated") || typeof data.revision !== "number" || !Number.isSafeInteger(data.revision) || data.revision < 1) {
+    throw new BookingStoreError("failed", "booking_store_unexpected_response");
+  }
+  return { status: data.status, revision: data.revision };
+}
+
 export async function readWorkspaceBookingRequests(workspaceId: string, db?: BookingStoreDb | null): Promise<StoreBooking[]> {
   const data = await call<unknown>("read_workspace_booking_requests", { p_workspace_id: workspaceId }, db);
   if (!Array.isArray(data)) throw new BookingStoreError("failed", "booking_store_malformed");

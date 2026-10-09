@@ -6,8 +6,8 @@ import { journeyProfile, validateReport } from '../full-model-journey-profile.mj
 import { privateAuthorityProfile } from '../private-authority-journey-window.mjs';
 import { creatorMaintenanceProfile } from '../creator-maintenance-journey-profile.mjs';
 import { ordinarySourceProfile } from '../ordinary-source-journey-profile.mjs';
-test('actual351 registration preserves32 distinct controlled cases and primary34 scope',()=>{
- const r=creatorSourceProofRegistry(),p=journeyProfile('full-native');assert.equal(r.schemaForwardCount,351);assert.equal(JSON.parse(readFileSync('scripts/sql/historical-forward-inventory.json')).forwardCount,351);assert.deepEqual(p.supplementalProofs,r);
+test('actual352 registration preserves32 distinct controlled cases and primary34 scope',()=>{
+ const r=creatorSourceProofRegistry(),p=journeyProfile('full-native');assert.equal(r.schemaForwardCount,352);assert.equal(JSON.parse(readFileSync('scripts/sql/historical-forward-inventory.json')).forwardCount,352);assert.deepEqual(p.supplementalProofs,r);
  assert.equal(r.controlledNative.count,32);assert.equal(r.controlledNative.originalCount,12);assert.equal(r.controlledNative.supplementalCount,20);assert.equal(r.controlledNative.cases.length,32);assert.equal(new Set(r.controlledNative.cases.map(c=>JSON.stringify(c))).size,32);
  assert.equal(p.specs.reduce((n,s)=>n+s.count,0),34);assert.equal(r.execution,'UNRUN');assert.equal(r.fullReleaseQualified,false);assert.equal(r.providerActions,'held');assert.equal(r.substitutionAllowed,false);
  assert.equal(journeyProfile('full-dark').supplementalProofs,undefined);assert.equal(journeyProfile('full-provider').supplementalProofs,undefined);

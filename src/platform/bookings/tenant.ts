@@ -13,6 +13,7 @@ import { contextForService, servicePolicy, validateBookingIntake } from "./servi
 import { pausedBookingMessage } from "./errors";
 import { getRedis } from "@/platform/infra/redis";
 import { alertOnce } from "@/platform/infra/monitoring";
+import { DEFAULT_BOOKING_CONFIG } from "@/lib/booking";
 import type { Booking, BookingConfig, DateOverride } from "@/lib/types";
 import {
   composeLegacyConfig,
@@ -34,6 +35,8 @@ import {
   recordBooking,
   setBookingStatus,
   upsertBookingSettings,
+  writeBookingSettingsFields,
+  type LegacyBookingConfigFields,
   type BookingContext,
   type StoreBooking,
   type StoreBookingActor,
@@ -148,6 +151,23 @@ export async function storeGetBookingConfig(tenant: string): Promise<BookingConf
 
 export async function storeGetDateOverrides(tenant: string): Promise<DateOverride[]> {
   return composeLegacyOverrides(await context(tenant));
+}
+
+function legacyConfigFields(config: BookingConfig): LegacyBookingConfigFields {
+  const mapped = legacyConfigToSettings(config, []);
+  return { bufferMinutes: mapped.bufferMinutes, minNoticeMinutes: mapped.minNoticeMinutes,
+    maxAdvanceDays: mapped.maxAdvanceDays, defaultLengthMinutes: mapped.defaultLengthMinutes,
+    timezone: mapped.timezone, bookableHours: mapped.bookableHours, legacyRequiresPayment: mapped.legacyRequiresPayment };
+}
+
+/** No companion snapshot: SQL atomically updates only these owner-configurable fields. */
+export async function setStoreBookingConfig(tenant: string, config: BookingConfig): Promise<void> {
+  await writeBookingSettingsFields(tenant, "config", legacyConfigFields(config), legacyConfigFields(DEFAULT_BOOKING_CONFIG));
+}
+
+export async function setStoreDateOverrides(tenant: string, overrides: DateOverride[]): Promise<void> {
+  const mapped = legacyConfigToSettings(DEFAULT_BOOKING_CONFIG, overrides);
+  await writeBookingSettingsFields(tenant, "overrides", { bookableOverrides: mapped.bookableOverrides }, legacyConfigFields(DEFAULT_BOOKING_CONFIG));
 }
 
 export type SiteService = { id: string; name: string; duration?: string | number | null; comingSoon?: boolean };
