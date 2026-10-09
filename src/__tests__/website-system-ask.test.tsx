@@ -72,7 +72,7 @@ describe("Ask for a change on a managed website files a Request", () => {
     expect(onAsk).not.toHaveBeenCalled();
   });
 
-  it("a refusal says so and keeps the words", async () => {
+  it("an unconfirmed permission-looking response preserves the words and request uncertainty", async () => {
     const request = server(() => new Response(JSON.stringify({ error: "Only an owner or admin of this business can ask for a change here." }), { status: 403 }));
     const { node } = await mount(request as unknown as typeof fetch, managed);
     await act(async () => buttons(node, "Ask for a change")[0]!.click());
@@ -81,7 +81,9 @@ describe("Ask for a change on a managed website files a Request", () => {
     await settle();
     const alert = [...node.querySelectorAll("[role=alert]")].map(item => item.textContent).join(" ");
     expect(alert).toContain("Only an owner or admin");
-    expect(alert).toContain("your words are still here");
+    expect(alert).toContain("Your words are preserved.");
+    expect(alert).toContain("The request couldn't be confirmed.");
+    expect(alert).toContain("Check this same request");
     expect(node.querySelector("textarea")!.value).toBe("Change the hero photo");
   });
 

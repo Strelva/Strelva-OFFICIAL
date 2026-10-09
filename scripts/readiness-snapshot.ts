@@ -112,6 +112,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261021094000": "provider_client_queue_catalog_guard",
   "20261021100000": "investigation_history_events",
   "20261021100700": "google_listing_receipt_payloads",
+  "20261021140000": "native_google_oauth_attempts",
   "20261022090100": "tenant_deprovision_cleanup",
   "20261022120000": "agency_created_application_predecessors",
   "20261022123000": "private_definition_function_receipts",
