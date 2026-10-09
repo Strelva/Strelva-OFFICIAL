@@ -1,13 +1,18 @@
 "use client";
 
+import { useEffect } from "react";
+import { captureException } from "@sentry/nextjs";
 import Link from "next/link";
 
 export default function GlobalError({
+  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => { captureException(error); }, [error]);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-zinc-100 px-6">
       <div className="text-center max-w-md">
