@@ -63,7 +63,7 @@ test("Home search retains its query and request review retains the owner's words
   await page.keyboard.press("Escape");
   const goal = "Create an equipment request application for my team";
   await page.getByLabel("What do you want to accomplish?", { exact: true }).fill(goal);
-  await page.getByRole("button", { name: "Continue with this request", exact: true }).click();
+  await page.getByRole("button", { name: "Continue with this ask", exact: true }).click();
   await expect(page.getByLabel("What do you want to accomplish?", { exact: true })).toHaveValue(goal);
   await page.getByRole("button", { name: "Prepare a plan", exact: true }).click();
   await expect(page.getByLabel("The result you want", { exact: true })).toHaveValue(goal);
@@ -73,7 +73,7 @@ for (const start of ["home", "new"]) test(`${start} carries the full multi-part 
   await page.goto(start === "home" ? "/preview/strelva?scenario=business" : "/preview/strelva/workspace?scenario=business&view=start");
   const request = "Build a staff request app and turn our supplier spreadsheet into a tracker.";
   await page.getByLabel("What do you want to accomplish?", { exact: true }).fill(request);
-  await page.getByRole("button", { name: "Continue with this request", exact: true }).click();
+  await page.getByRole("button", { name: "Continue with this ask", exact: true }).click();
   await expect(page.getByRole("heading", { name: "A plan that keeps the whole request", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Prepare a plan", exact: true }).click();
   await expect(page.getByLabel("The result you want", { exact: true })).toHaveValue(request);
