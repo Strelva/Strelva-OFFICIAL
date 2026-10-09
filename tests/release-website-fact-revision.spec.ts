@@ -24,7 +24,7 @@ for (const [width, enlarged] of [[1440, false], [390, false], [320, true]] as co
     await review.getByRole("button", { name: "Confirm", exact: true }).first().click();
     await review.getByRole("button", { name: "Confirm", exact: true }).click();
     await review.getByRole("button", { name: "Approve this preview", exact: true }).click();
-    await expect(review.getByText("This exact preview is approved.", { exact: true })).toBeVisible();
+    await expect(review.getByRole("status").filter({ hasText: /^This exact preview is approved\.$/ })).toBeVisible();
     const summary = review.locator("summary", { hasText: /^Edit website facts$/ });
     await summary.focus(); await page.keyboard.press("Enter");
     const fact = review.getByRole("article", { name: "[Office hours could not be confirmed]", exact: true });
