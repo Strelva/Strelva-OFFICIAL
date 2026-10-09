@@ -49,6 +49,9 @@ export type Readback = "matched" | "differs" | "failed" | "held_by_google";
 export interface ListingReceipt {
   /** Immutable original write identity; absent on unqualified legacy receipts. */
   intentDigest?: string | null;
+  authoredInput?: Record<string,unknown> | null;
+  providerPayloadExpiresAt?: string | null;
+  providerPayloadExpired?: boolean;
   id: string;
   workspaceId: string;
   bindingId: string | null;

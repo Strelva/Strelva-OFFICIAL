@@ -11,6 +11,8 @@ import type { ListingAction, ListingAuthority, ListingReceipt, Readback, Receipt
  */
 
 export interface RecordReceiptInput {
+  afterOrigin?: "authored" | "provider";
+  providerPayloadExpiresAt?: string | null;
   workspaceId: string;
   bindingId: string | null;
   locationId: string;
@@ -31,6 +33,7 @@ export function googleReceiptIntentDigest(input: RecordReceiptInput): string {
 }
 
 export interface SettleReceiptInput {
+  afterOrigin?: "authored" | "provider";
   status: Exclude<ReceiptStatus, "posting" | "undone">;
   readback?: Readback | null;
   after?: Record<string, unknown> | null;
@@ -72,28 +75,44 @@ export function authorityAllowedFor(action: ListingAction, authority: ListingAut
 
 export function createMemoryReceiptStore(now: () => string = () => new Date().toISOString()): ListingReceiptStore & { all(): ListingReceipt[] } {
   const rows = new Map<string, ListingReceipt>();
+  const providerFields = new Map<string, { before:boolean; after:boolean; undo:boolean }>();
+  const project = (row: ListingReceipt): ListingReceipt => {
+    const out = { ...row };
+    if (row.providerPayloadExpiresAt && Date.parse(now()) >= Date.parse(row.providerPayloadExpiresAt)) {
+      const fields = providerFields.get(row.id);
+      if (fields?.before) row.before = out.before = null;
+      if (fields?.after) row.after = out.after = null;
+      if (fields?.undo) row.undo = out.undo = null;
+      row.providerPayloadExpired = out.providerPayloadExpired = true;
+    }
+    return out;
+  };
   return {
-    all: () => [...rows.values()],
+    all: () => [...rows.values()].map(project),
     async record(input) {
       const existing = [...rows.values()].find((row) => row.workspaceId === input.workspaceId && row.idempotencyKey === input.idempotencyKey);
-      if (existing) return { receipt: { ...existing }, replayed: true };
+      if (existing) return { receipt: project(existing), replayed: true };
       if (!authorityAllowedFor(input.action, input.authority)) throw new ListingReceiptError("google_listing_receipts_check");
       if (input.undoesReceiptId && rows.get(input.undoesReceiptId)?.workspaceId !== input.workspaceId) throw new ListingReceiptError("google_receipt_not_found");
       const at = now();
       const receipt: ListingReceipt = {
-        intentDigest: googleReceiptIntentDigest(input), id: randomUUID(), workspaceId: input.workspaceId, bindingId: input.bindingId, locationId: input.locationId, action: input.action,
+        authoredInput: input.afterOrigin === "provider" ? null : structuredClone(input.after), providerPayloadExpiresAt: new Date(Math.min(input.providerPayloadExpiresAt ? Date.parse(input.providerPayloadExpiresAt) : Infinity, Date.parse(at)+29*86400000)).toISOString(), providerPayloadExpired:false, intentDigest: googleReceiptIntentDigest(input), id: randomUUID(), workspaceId: input.workspaceId, bindingId: input.bindingId, locationId: input.locationId, action: input.action,
         targetRef: input.targetRef, status: "posting", authority: input.authority, before: input.before, after: input.after,
         readback: null, providerRef: null, undo: input.undo ?? null, undoesReceiptId: input.undoesReceiptId ?? null,
         undoneByReceiptId: null, idempotencyKey: input.idempotencyKey, error: null, createdAt: at, updatedAt: at, completedAt: null,
       };
+      providerFields.set(receipt.id,{before: Boolean(input.before),after: input.afterOrigin === "provider",undo: input.undo?.kind === "restore_reply" || input.undo?.kind === "patch_snapshot"});
       rows.set(receipt.id, receipt);
-      return { receipt: { ...receipt }, replayed: false };
+      return { receipt: project(receipt), replayed: false };
     },
     async settle(id, workspaceId, input) {
       const row = rows.get(id);
       if (!row || row.workspaceId !== workspaceId) throw new ListingReceiptError("google_receipt_not_found");
       if (!receiptTransitionAllowed(row.status, input.status)) throw new ListingReceiptError("google_receipt_transition_invalid");
       const at = now();
+      const fields = providerFields.get(row.id)!;
+      if(input.after !== undefined) fields.after = input.afterOrigin === "provider";
+      if(input.undo !== undefined) fields.undo = input.undo?.kind === "restore_reply" || input.undo?.kind === "patch_snapshot";
       Object.assign(row, {
         status: input.status, readback: input.readback ?? null, after: input.after ?? row.after,
         providerRef: input.providerRef ?? row.providerRef, error: input.error ?? null,
@@ -103,11 +122,11 @@ export function createMemoryReceiptStore(now: () => string = () => new Date().to
         const original = rows.get(row.undoesReceiptId);
         if (original && ACCEPTED.includes(original.status)) Object.assign(original, { status: "undone", undoneByReceiptId: row.id, updatedAt: at });
       }
-      return { ...row };
+      return project(row);
     },
     async get(id, workspaceId) {
       const row = rows.get(id);
-      return row && row.workspaceId === workspaceId ? { ...row } : null;
+      return row && row.workspaceId === workspaceId ? project(row) : null;
     },
   };
 }
@@ -130,7 +149,7 @@ export function createSupabaseReceiptStore(db: Db | null = getSupabase() as unkn
   return {
     async record(input) {
       const data = await call("record_google_listing_receipt", { p_input: {
-        intentDigest: googleReceiptIntentDigest(input), workspaceId: input.workspaceId, bindingId: input.bindingId, locationId: input.locationId, action: input.action,
+        afterOrigin:input.afterOrigin ?? "authored", providerPayloadExpiresAt:input.providerPayloadExpiresAt ?? null, intentDigest: googleReceiptIntentDigest(input), workspaceId: input.workspaceId, bindingId: input.bindingId, locationId: input.locationId, action: input.action,
         targetRef: input.targetRef, authority: input.authority, before: input.before, after: input.after,
         undo: input.undo ?? null, undoesReceiptId: input.undoesReceiptId ?? null, idempotencyKey: input.idempotencyKey,
       } });
@@ -139,7 +158,7 @@ export function createSupabaseReceiptStore(db: Db | null = getSupabase() as unkn
     },
     async settle(id, workspaceId, input) {
       const payload: Record<string, unknown> = { status: input.status };
-      for (const key of ["readback", "after", "providerRef", "error"] as const) if (input[key] !== undefined) payload[key] = input[key];
+      for (const key of ["afterOrigin", "readback", "after", "providerRef", "error"] as const) if (input[key] !== undefined) payload[key] = input[key];
       if (input.undo !== undefined) payload.undo = input.undo;
       return (await call("settle_google_listing_receipt", { p_receipt_id: id, p_workspace_id: workspaceId, p_input: payload })) as unknown as ListingReceipt;
     },

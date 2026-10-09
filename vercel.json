@@ -5,6 +5,10 @@
   },
   "crons": [
     {
+      "path": "/api/cron/google-content-retention",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/workspace-export-recovery",
       "schedule": "*/10 * * * *"
     },

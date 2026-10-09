@@ -61,7 +61,7 @@ export type ListingWriteOutcome =
   | { status: "failed"; receipt: ListingReceipt; message: string; accessPending: boolean }
   | { status: "refused"; reason: ListingRefusal; message: string };
 
-export type ListingRefusal = "paused" | "authority" | "provider" | "invalid" | "snapshot_unavailable" | "api_access_pending" | "not_undoable" | "unsafe_url" | "nothing_to_change";
+export type ListingRefusal = "paused" | "authority" | "provider" | "invalid" | "snapshot_unavailable" | "api_access_pending" | "not_undoable" | "snapshot_expired" | "unsafe_url" | "nothing_to_change";
 
 const MESSAGES = {
   paused: "The Google listing is paused, so Strelva isn't changing it.",
@@ -71,6 +71,7 @@ const MESSAGES = {
   snapshot_unavailable: "Strelva couldn't read Google's current listing, so nothing was changed.",
   api_access_pending: "Waiting for Google to approve API access. Your draft is kept. Nothing was sent.",
   not_undoable: "This change can't be undone.",
+  snapshot_expired: "Google's saved snapshot expired. Review the current listing before making another change.",
   unsafe_url: "That link can't be used on Google.",
   nothing_to_change: "Google already matches.",
 } satisfies Record<ListingRefusal, string>;
@@ -115,6 +116,8 @@ export function receiptHeadline(receipt: Pick<ListingReceipt, "status" | "action
 }
 
 interface WritePlan<T> {
+  afterOrigin?: "authored" | "provider";
+  providerPayloadExpiresAt?: string | null;
   action: ListingAction;
   targetRef: string | null;
   authority: ListingAuthority;
@@ -131,6 +134,8 @@ interface WritePlan<T> {
 }
 
 async function governedWrite<T>(ctx: ListingContext, plan: WritePlan<T>): Promise<ListingWriteOutcome> {
+  const snapshotExpired=()=>plan.afterOrigin === "provider" && Boolean(plan.providerPayloadExpiresAt) && Date.parse(plan.providerPayloadExpiresAt!)<=Date.now();
+  if(snapshotExpired()) return refused("snapshot_expired");
   const parsed = authoritySchema.safeParse(plan.authority);
   if (!parsed.success || !authorityAllowedFor(plan.action, parsed.data)) return refused("authority");
   const undoKinds = parsed.data.kind === "owner_undo" || parsed.data.kind === "operator_undo";
@@ -145,7 +150,7 @@ async function governedWrite<T>(ctx: ListingContext, plan: WritePlan<T>): Promis
   const idempotencyKey = plan.idempotencyKey ?? `${plan.action}:${key([plan.targetRef, plan.after, plan.undoesReceiptId ?? null, ctx.location.locationId])}`;
   const receiptInput = {
     workspaceId: ctx.workspaceId, bindingId: ctx.bindingId, locationId: ctx.location.locationId, action: plan.action,
-    targetRef: plan.targetRef, authority: parsed.data, before: plan.before, after: plan.after,
+    afterOrigin:plan.afterOrigin ?? "authored", providerPayloadExpiresAt:plan.providerPayloadExpiresAt ?? null, targetRef: plan.targetRef, authority: parsed.data, before: plan.before, after: plan.after,
     undoesReceiptId: plan.undoesReceiptId ?? null, idempotencyKey,
   };
   let { receipt, replayed } = await ctx.receipts.record(receiptInput);
@@ -184,6 +189,7 @@ async function governedWrite<T>(ctx: ListingContext, plan: WritePlan<T>): Promis
     });
     return { status: "failed", receipt: settled, accessPending: false, message: MESSAGES.provider };
   }
+  if(snapshotExpired()) return refused("snapshot_expired");
   let written: GoogleResult<T>;
   try { written = await plan.write(); }
   catch {
@@ -198,7 +204,7 @@ async function governedWrite<T>(ctx: ListingContext, plan: WritePlan<T>): Promis
     const accessPending = written.kind === "setup_pending";
     const settled = await ctx.receipts.settle(receipt.id, ctx.workspaceId, {
       status: "failed",
-      error: accessPending ? "Google API access is still pending." : `Google said ${written.status || "no"}: ${written.detail.slice(0, 200)}`,
+      error: accessPending ? "Google API access is still pending." : `Google refused the change (HTTP ${written.status || "unknown"}).`,
       undo: null,
     });
     return {
@@ -217,7 +223,7 @@ async function governedWrite<T>(ctx: ListingContext, plan: WritePlan<T>): Promis
   }
   const status = readback.readback === "matched" ? "posted" : readback.readback === "held_by_google" ? "held_by_google" : "posted_unverified";
   const settled = await ctx.receipts.settle(receipt.id, ctx.workspaceId, {
-    status, readback: readback.readback, after: readback.after ?? plan.after,
+    afterOrigin: readback.after ? "provider" : plan.afterOrigin ?? "authored", status, readback: readback.readback, after: readback.after ?? plan.after,
     providerRef: plan.providerRef?.(written.data) ?? null, undo: plan.undo(written.data),
   });
   return { status, receipt: settled, message: receiptHeadline(settled) };
@@ -419,6 +425,7 @@ export async function undoListingChange(ctx: ListingContext, input: {
   const paused = checkRefusal(ctx);
   if (paused) return paused;
   const original = await ctx.receipts.get(input.receiptId, ctx.workspaceId);
+  if(original && original.locationId === ctx.location.locationId && original.bindingId === ctx.bindingId && !original.undo && original.providerPayloadExpired) return refused("snapshot_expired");
   if (!original || original.locationId !== ctx.location.locationId || original.bindingId !== ctx.bindingId || !original.undo || !["posted", "posted_unverified", "held_by_google"].includes(original.status)) return refused("not_undoable");
   const undo = original.undo;
   const common = { targetRef: original.targetRef, authority: input.authority, undoesReceiptId: original.id, idempotencyKey: input.idempotencyKey ?? `undo:${original.id}`, retryFailed: input.retryFailed };
@@ -435,7 +442,7 @@ export async function undoListingChange(ctx: ListingContext, input: {
       });
     case "restore_reply":
       return governedWrite(ctx, {
-        ...common, action: "reply_update", before: original.after, after: { reply: undo.previous },
+        ...common, providerPayloadExpiresAt:original.providerPayloadExpiresAt, afterOrigin:"provider", action: "reply_update", before: original.after, after: { reply: undo.previous },
         write: () => ctx.client.updateReply(ctx.location, undo.reviewId, undo.previous),
         verify: async () => {
           const live = await readReview(ctx, undo.reviewId);
@@ -455,7 +462,7 @@ export async function undoListingChange(ctx: ListingContext, input: {
       });
     case "patch_snapshot":
       return governedWrite(ctx, {
-        ...common, action: original.action as "hours_patch" | "info_patch", before: original.after, after: undo.snapshot,
+        ...common, providerPayloadExpiresAt:original.providerPayloadExpiresAt, afterOrigin:"provider", action: original.action as "hours_patch" | "info_patch", before: original.after, after: undo.snapshot,
         // A field Google didn't have is cleared: it stays in the mask, out of the body.
         write: () => ctx.client.patchLocation(ctx.location, undo.updateMask,
           Object.fromEntries(Object.entries(undo.snapshot).filter(([, value]) => value !== null))),
