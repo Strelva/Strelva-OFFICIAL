@@ -8,7 +8,7 @@ import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { websiteDocumentStore, createWebsiteDocumentStore, invalidatePublishedSiteDocument, type OwnerLinkWebsiteSession, type WebsiteDocumentStore, type WebsiteDocumentRevision, type WebsiteAgencyPublishPermission } from "./document-store";
 import { siteDocumentHash, siteDocumentSchema, siteIdSchema, catalogNodeSchema, unresolvedSiteFacts, type SiteDocument } from "./site-document";
-import { runWebsiteRebuild, isHighRiskWebsiteClaim, type RebuildCheckpoint, type RebuildOptions, type WebsiteRebuildInput } from "./rebuild-pipeline";
+import { extractBusinessFacts, runWebsiteRebuild, isHighRiskWebsiteClaim, type RebuildCheckpoint, type RebuildOptions, type WebsiteRebuildInput } from "./rebuild-pipeline";
 import { normalizeRebuildUrl } from "./rebuild-crawl";
 import { prepareSitePatch, prepareSiteUndo } from "./site-operations";
 import { checkWebsiteHealth } from "./site-health";
@@ -26,6 +26,7 @@ import { normalizeCustomDomain } from "@/lib/domains";
 import { bindWebsiteBusinessRecord, projectWebsiteBusinessFacts } from "./business-facts";
 import { readCandidateBusinessFacts } from "./business-facts-server";
 import { askExistingPagesSchema, existingWebsitePageOperations } from "./ask-existing-pages";
+import { descriptionContactBindings, rebuildContactLink } from "./rebuild-contact";
 
 interface Loaded { work: SavedWork; rebuild: WebsiteRebuild }
 type WebsiteOwnerReviewRecord = WebsiteRebuildRecord & { agencyPublishPermission?: WebsiteAgencyPublishPermission | null };
@@ -215,41 +216,85 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     const document = structuredClone(candidate.document); const fact = document.facts[factId];
     await documents.manage(actor,{ workspaceId: loaded.work.workspaceId, workId });
     if (!fact) throw new WorkspaceConflictError("This fact is no longer in the current document.");
+    const contactLink = fact.kind === "contact" ? rebuildContactLink(fact.text) : null;
+    const contactHref = (value: unknown) => contactLink && (value === contactLink.href || value === `${contactLink.href.split(":")[0]}:${fact.text}`);
+    const descriptionFacts = "description" in loaded.rebuild.input ? extractBusinessFacts(loaded.rebuild.input) : null;
+    const currentDescription = descriptionFacts ? { ...descriptionFacts, facts: document.facts } : null;
+    const bindings = currentDescription ? descriptionContactBindings(currentDescription) : [];
+    if (currentDescription && fact.kind === "claim" && ["edit","remove"].includes(input.action)) {
+      const nextFacts = { ...document.facts };
+      if (input.action === "remove") delete nextFacts[factId];
+      else nextFacts[factId] = { ...fact, text: input.text! };
+      const offered = (current: NonNullable<typeof currentDescription>) => descriptionContactBindings(current).map(binding => [binding.claimId,binding.contactId,current.facts[binding.claimId]!.text.slice(binding.start,binding.end)]);
+      if (JSON.stringify(offered(currentDescription)) !== JSON.stringify(offered({ ...currentDescription, facts: nextFacts }))) throw new WorkspaceConflictError("Edit the separate email or phone fact first to change or remove this contact. Your current preview is unchanged.");
+    }
+    const claimChanges: Array<{ id: string; before: string; after: string }> = [];
+    const updateDescriptionClaims = (text: string) => {
+      const claimIds = [...new Set(bindings.filter(binding => binding.contactId === factId).map(binding => binding.claimId))];
+      for (const id of claimIds) {
+        const claim = document.facts[id]!; const before = claim.text; let next = before;
+        for (const span of bindings.filter(binding => binding.contactId === factId && binding.claimId === id).sort((a,b) => b.start - a.start)) next = next.slice(0,span.start) + text + next.slice(span.end);
+        next = next.trim();
+        if (next !== before) { claimChanges.push({ id, before, after: next }); claim.text = next; claim.highRisk = isHighRiskWebsiteClaim(next); }
+      }
+    };
+    const rewriteClaimCopy = (value: string, factIds?: string[], max?: number) => {
+      let next = value;
+      for (const claim of claimChanges.filter(claim => !factIds || factIds.includes(claim.id))) {
+        if (max && claim.before.startsWith(next) && next.length >= 30) next = claim.after.slice(0,max);
+        else next = next.split("\n\n").map(paragraph => paragraph === claim.before ? claim.after : paragraph).join("\n\n");
+      }
+      return next;
+    };
     if (input.action === "remove") {
       delete document.facts[factId];
-      const removeCopy = (value: string) => {
+      updateDescriptionClaims("");
+      const removeCopy = (value: string, factIds?: string[], max?: number) => {
+        if (contactLink) return rewriteClaimCopy(value,factIds,max).split("\n\n").map(paragraph => paragraph === fact.text ? "" : paragraph).join("\n\n").trim();
         if (fact.text.startsWith(value) && value.length >= 30) return "";
         return value.includes(fact.text) ? value.replaceAll(fact.text,"").trim() : value;
       };
-      const rewrite = (value: unknown): unknown => {
-        if (typeof value === "string") return removeCopy(value);
+      const rewrite = (value: unknown, factIds: string[]): unknown => {
+        if (typeof value === "string") return removeCopy(value,factIds);
         if (typeof value === "number" && String(value) === fact.text) return undefined;
-        if (Array.isArray(value)) return value.map(rewrite).filter(child => child !== undefined);
-        if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).flatMap(([key,child]) => { const next = rewrite(child); return next === undefined ? [] : [[key,next]]; }));
+        if (Array.isArray(value)) return value.map(child => rewrite(child,factIds)).filter(child => child !== undefined);
+        if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).flatMap(([key,child]) => { const next = key === "href" && contactLink ? contactHref(child) ? undefined : child : rewrite(child,factIds); return next === undefined ? [] : [[key,next]]; }));
         return value;
       };
       for (const [id,node] of Object.entries(document.nodes)) if (node.factIds.includes(factId)) {
         const factIds = node.factIds.filter(value => value !== factId);
         const verification = factIds.length ? node.verification : { supported:true,confidence:1,needsReview:false };
-        const updated = catalogNodeSchema.safeParse({ ...node,props:rewrite(node.props),factIds,verification });
+        const updated = catalogNodeSchema.safeParse({ ...node,props:rewrite(node.props,node.factIds),factIds,verification });
         // Some required typed fields (for example a link's href) cannot remain
         // valid after removal. Preserve the surrounding graph and other evidence.
         document.nodes[id] = updated.success ? updated.data : { id,type:"Section",variant:"container",props:{},children:node.children,factIds,...(verification ? {verification} : {}) };
       }
       document.siteName = removeCopy(document.siteName) || "Business website";
-      for (const page of document.pages) { page.title = removeCopy(page.title) || document.siteName.slice(0,70); page.description = removeCopy(page.description); }
+      for (const page of document.pages) { page.title = removeCopy(page.title,undefined,70) || document.siteName.slice(0,70); page.description = removeCopy(page.description,undefined,160); }
     } else {
       if (input.action === "edit") {
         const before = fact.text; let replaced = false;
-        const rewrite = (value: unknown): unknown => {
-          if (typeof value === "string") { if (value.includes(before)) { replaced = true; return value.replaceAll(before,input.text!); } return value; }
-          if (Array.isArray(value)) return value.map(rewrite);
-          if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key,child]) => [key,rewrite(child)]));
+        const nextContactLink = contactLink ? rebuildContactLink(input.text!) : null;
+        if (contactLink && !nextContactLink) throw new WorkspaceConflictError("Enter a valid email address or phone number for this contact. Your current preview is unchanged.");
+        if (contactLink && nextContactLink!.label !== contactLink.label) throw new WorkspaceConflictError("Keep this contact as the same kind of email address or phone number. Your current preview is unchanged.");
+        updateDescriptionClaims(input.text!);
+        const rewrite = (value: unknown, factIds: string[]): unknown => {
+          if (typeof value === "string") { const next = contactLink ? rewriteClaimCopy(value,factIds).split("\n\n").map(paragraph => paragraph === before ? input.text! : paragraph).join("\n\n") : value.replaceAll(before,input.text!); if (next !== value) replaced = true; return next; }
+          if (Array.isArray(value)) return value.map(child => rewrite(child,factIds));
+          if (value && typeof value === "object") {
+            const link = value as Record<string, unknown>;
+            return Object.fromEntries(Object.entries(value).map(([key,child]) => {
+              if (key === "href" && contactLink) { if (contactHref(child)) { replaced = true; return [key,nextContactLink!.href]; } return [key,child]; }
+              if (key === "label" && contactHref(link.href) && child === contactLink?.label) return [key,nextContactLink!.label];
+              return [key,rewrite(child,factIds)];
+            }));
+          }
           return value;
         };
-        for (const node of Object.values(document.nodes)) if (node.factIds.includes(factId)) node.props = rewrite(node.props) as typeof node.props;
+        for (const node of Object.values(document.nodes)) if (node.factIds.includes(factId)) node.props = rewrite(node.props,node.factIds) as typeof node.props;
         if (document.siteName === before) { document.siteName = input.text!.slice(0,160); replaced = true; }
         const rewriteMeta = (value: string,max: number) => {
+          if (contactLink) { const next = value === before ? input.text! : rewriteClaimCopy(value,undefined,max); if (next !== value) replaced = true; return next.slice(0,max); }
           const truncated = before.startsWith(value) && value.length >= 30;
           if (truncated || value.includes(before)) replaced = true;
           return (truncated ? input.text! : value.replaceAll(before,input.text!)).slice(0,max);

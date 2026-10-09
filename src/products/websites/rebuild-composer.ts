@@ -4,6 +4,7 @@ import { catalogNodeSchema, safeSitePathSchema, siteDocumentSchema, type Catalog
 import type { CrawlResult } from "./rebuild-crawl";
 import type { BusinessFacts, ContentBlock, RebuildContent } from "./rebuild-pipeline";
 import { isHighRiskWebsiteClaim } from "./rebuild-risk";
+import { rebuildContactLink } from "./rebuild-contact";
 
 export interface CompositionQuestion { id: string; candidates: string[] }
 export interface CompositionDecision { choices: Record<string, string>; confidence: number; confidenceSource?: "model_self_reported" | "provider_probability" | "deterministic" }
@@ -67,9 +68,11 @@ export async function composeRebuildSite(facts: BusinessFacts, content: RebuildC
     const remaining = page.blocks.filter((block) => !services.includes(block) && !people.includes(block) && !reviews.includes(block) && !(page.path === "/" && block === primary) && !block.factIds.includes(facts.nameFactId));
     for (let offset = 0; offset < remaining.length; offset += 12) { const group = remaining.slice(offset, offset + 12); add("RichText", "standard", { text: group.map((block) => block.text).join("\n\n") }, group); }
     if (page.path === "/contact" || page.path === "/") {
-      const location = facts.locations.find(id => facts.facts[id]?.verification?.supported); const phone = facts.contact.find(id => /^\+?[\d() .-]{7,}$/.test(facts.facts[id]!.text));
+      const location = facts.locations.find(id => facts.facts[id]?.verification?.supported);
+      const contacts = facts.contact.flatMap(id => { const fact = facts.facts[id]; if (!fact) return []; const link = rebuildContactLink(fact.text); return link ? [{ id, fact, link }] : []; });
+      const phone = contacts.find(contact => contact.link.href.startsWith("tel:"))?.id;
       if (location) { const ids = [facts.nameFactId, location, ...(phone ? [phone] : [])]; add("Locations", "list", { title: "Contact", items: [{ name: facts.name, address: facts.facts[location]!.text, ...(phone ? { phone: facts.facts[phone]!.text } : {}) }] }, ids.map(id => ({ id, type: "location" as const, text: facts.facts[id]!.text, factIds: [id] }))); }
-      if (phone) add("Cta", "card", { body: facts.facts[phone]!.text, cta: { label: "Call us", href: `tel:${facts.facts[phone]!.text}` } }, [{ id: phone, type: "contact", text: facts.facts[phone]!.text, factIds: [phone] }]);
+      for (const { id, fact, link } of contacts.slice(0, 8)) add("Cta", "card", { body: fact.text, cta: link }, [{ id, type: "contact", text: fact.text, factIds: [id] }]);
       const inquiryFacts = Object.entries(facts.facts).filter(([, fact]) => fact.kind === "claim" && /(?:do not|without).{0,70}(?:names|details)|share.{0,60}contact|general inquiry|do not include|contact information/i.test(fact.text)).slice(0, 1);
       const nextFacts = Object.entries(facts.facts).filter(([, fact]) => fact.kind === "claim" && /conflict check|respond.{0,30}inquiry|confirm.{0,30}availability/i.test(fact.text)).slice(0, 1);
       const faqs = [{ question: "What information should I send?", facts: inquiryFacts }, { question: "What happens next?", facts: nextFacts }].filter(entry => entry.facts.length);

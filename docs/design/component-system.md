@@ -94,6 +94,35 @@ editing or publication authority. Focused component proof belongs to
 `website-fact-revision.test.tsx`; actual Auth and desktop/mobile native proof are
 separate release checks.
 
+### Supplied website contact destinations, October 9, local
+
+No-site description intake keeps the immutable original input and separately
+records positively offered safe email and phone details as owner-stated facts.
+Email needs email/contact/reach/write language; phones need call/phone/tel or
+direct reach/contact context, including international + numbers. Negated,
+retired, date-shaped, identifier-shaped and unlabelled numbers are not routes.
+The existing catalog Cta renders Email us and Call us on Home and Contact with
+exact fact references and validated mailto/tel destinations. Phone hrefs omit
+display separators; equivalent offered formats share one destination fact.
+
+A contact correction projects the same-kind safe destination and its exact
+positively offered spans in originating current description claims and copy.
+Ordered claim context survives chunk boundaries; contact tokens remain whole.
+Historical/negated mentions, unrelated facts, input/provenance and published
+versions remain intact. Recomposition uses corrected current claims. Editing
+or removing an ordinary claim that would change a currently bound contact
+returns a conflict directing the owner to edit the separate contact fact first;
+unrelated prose that preserves the exact offered contacts remains editable.
+The existing actor/manage, revision/hash, CAS and approval invalidation apply.
+
+Review, private-preview no-submit, hosted native inquiry capture and published
+connection gates remain separate. An email link opens the visitor's email
+client; it does not configure form delivery. Focused extraction/composition and
+static/native render serialization proof belongs to
+`website-description-contact.test.ts`; correction and recomposition proof to
+`rebuild-service.test.ts`. Actual browser/native contact use remains a separate
+release check.
+
 ### Website owner consent for agency publication, October 7, local
 
 `RebuildExperience` uses the owned Button and a labelled native checkbox for

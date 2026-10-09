@@ -6,6 +6,7 @@ import { factSchema, safeSitePathSchema, siteDocumentSchema, type Fact, type Sit
 import { crawlWebsite, normalizeRebuildUrl, type CrawledPage, type CrawlResult, type PageFetcher, type SourceRef } from "./rebuild-crawl";
 import { composeRebuildSite, verifyRebuildSite, type SiteComposer, type SiteVerifier } from "./rebuild-composer";
 import { isHighRiskWebsiteClaim } from "./rebuild-risk";
+import { descriptionContactBindings, descriptionContactSpans, descriptionContacts } from "./rebuild-contact";
 export { isHighRiskWebsiteClaim } from "./rebuild-risk";
 
 export const websiteRebuildInputSchema = z.union([
@@ -27,7 +28,16 @@ export class WebsiteRebuildStageError extends Error { constructor(public readonl
 
 const clean = (text: string) => text.replace(/\s+/g, " ").trim();
 const factId = (text: string, kind: string) => `fact_${createHash("sha256").update(`${kind}:${text}`).digest("hex").slice(0, 20)}`;
-function chunks(text: string): string[] { const words = clean(text).split(" "); const result: string[] = []; let current = ""; for (const word of words) { if ((current + " " + word).trim().length > 290 && current) { result.push(current); current = ""; } current = (current + " " + word).trim(); } if (current) result.push(current.slice(0, 300)); return result; }
+function chunks(text: string, keepContacts = false): string[] {
+  const normalized = clean(text);
+  const spans = keepContacts ? descriptionContactSpans(normalized).sort((a,b) => a.start - b.start) : [];
+  const tokens = [...normalized.matchAll(/\S+/g)]; const words: string[] = [];
+  for (let index = 0; index < tokens.length; index++) {
+    const token = tokens[index]!; let end = token.index! + token[0].length;
+    const contact = spans.find(span => span.start >= token.index! && span.start < end);
+    if (contact) while (end < contact.end && index + 1 < tokens.length) { index++; end = tokens[index]!.index! + tokens[index]![0].length; }
+    words.push(normalized.slice(token.index!,end));
+  } const result: string[] = []; let current = ""; for (const word of words) { if ((current + " " + word).trim().length > 290 && current) { result.push(current); current = ""; } current = (current + " " + word).trim(); } if (current) result.push(current.slice(0, 300)); return result; }
 const sourceQuote = (sourceId: string, quote: string): SourceRef => ({ sourceId, quote: clean(quote).slice(0, 300) });
 
 export function extractBusinessFacts(input: WebsiteRebuildInput, crawl?: CrawlResult): BusinessFacts {
@@ -43,7 +53,8 @@ export function extractBusinessFacts(input: WebsiteRebuildInput, crawl?: CrawlRe
   };
   if ("description" in input) {
     result.name = input.businessName; result.nameFactId = insert(input.businessName, "claim");
-    for (const span of chunks(input.description)) insert(span, "claim");
+    for (const span of chunks(input.description,true)) insert(span, "claim");
+    for (const contact of descriptionContacts(clean(input.description))) insert(contact, "contact");
     return result;
   }
   if (!crawl?.pages.length) throw new Error("The crawl has no readable pages.");
@@ -96,7 +107,15 @@ export function extractBusinessFacts(input: WebsiteRebuildInput, crawl?: CrawlRe
 
 function canonicalPagePath(url: string): string { const path = new URL(url).pathname.replace(/\.(?:html?|php|aspx?)$/i, "").replace(/\/+$/, ""); const normalized = path.split("/").map((part) => part.toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-|-$/g, "")).join("/") || "/"; return safeSitePathSchema.safeParse(normalized).success ? normalized : `/pages${normalized}`; }
 export function writeSourceContent(facts: BusinessFacts): RebuildContent {
-  const block = (id: string): ContentBlock => { const fact = facts.facts[id]!; return { id: `block_${id}`, type: ["service", "person", "contact", "hours", "location", "review"].includes(fact.kind) ? fact.kind as ContentBlock["type"] : "paragraph", text: fact.text, factIds: [id] }; };
+  const bindings = descriptionContactBindings(facts);
+  const block = (id: string): ContentBlock => {
+    const fact = facts.facts[id]!;
+    // Exact owner-stated contact tokens remain linked when they also occur in
+    // the supplied prose. A correction can update that copy without granting
+    // authority over an unrelated source sentence or inventing new evidence.
+    const contactIds = [...new Set(bindings.filter(binding => binding.claimId === id).map(binding => binding.contactId))];
+    return { id: `block_${id}`, type: ["service", "person", "contact", "hours", "location", "review"].includes(fact.kind) ? fact.kind as ContentBlock["type"] : "paragraph", text: fact.text, factIds: [id, ...contactIds] };
+  };
   const pages: RebuildPageContent[] = []; const used = new Set<string>();
   for (const source of facts.sourcePages.slice(0, 10)) { let path = canonicalPagePath(source.url); if (used.has(path)) continue; if (pages.length === 0) path = "/"; used.add(path); pages.push({ path, title: (source.title || facts.name).slice(0, 70), sourceIds: [source.sourceId], blocks: source.factIds.map(block).slice(0, 180) }); }
   if (!pages.length) pages.push({ path: "/", title: facts.name.slice(0, 70), sourceIds: [], blocks: Object.keys(facts.facts).map(block).slice(0, 180) });
