@@ -8,7 +8,8 @@ test('composed tail executes migrations once, in order, with rollback fixtures b
   const output = execFileSync('bash', ['-c', 'repo_root="$1"; psql_args=(); psql() { printf "%s\\n" "$*"; }; source "$repo_root/scripts/sql/full-model-current-tail.sh"; check_full_model_current_tail', 'test', root], { encoding: 'utf8' });
   assert.ok(!output.includes("/migrations/rollback-"), "release inverses must never run destructively on the shared final schema");
   const migrations = [...output.matchAll(/supabase\/migrations\/(202610211\w+\.sql)/g)].map(x => x[1]);
-  assert.equal(migrations.length, 15);
+  const expected = readdirSync(`${root}supabase/migrations`).filter(file => /^202610211\d+_.*\.sql$/.test(file)).sort();
+  assert.deepEqual(migrations, expected);
   assert.equal(new Set(migrations).size, migrations.length);
   assert.deepEqual(migrations, [...migrations].sort());
   assert.ok(output.indexOf('agent-oauth-connection-schema.sql') < output.indexOf('20261021131100'));
@@ -46,7 +47,8 @@ test('legacy superadmin fixture restores exact prior ACLs before the current aud
 
 test('complete composed forward inventory has no unclassified workspace migration omissions', () => {
   const inventory = JSON.parse(readFileSync(`${root}scripts/sql/historical-forward-inventory.json`, 'utf8'));
-  assert.equal(inventory.forwardCount, 330);
+  const actualForwards = readdirSync(`${root}supabase/migrations`).filter(file => /^20\d+_.*\.sql$/.test(file)).sort();
+  assert.deepEqual(inventory.forwardFiles, actualForwards);
   for (const file of readdirSync(`${root}supabase/migrations`).filter(file => /^20\d+_.*\.sql$/.test(file))) assert.ok(inventory.forwardFiles.includes(file), `inventory must classify new forward migration: ${file}`);
   assert.equal(inventory.forwardFiles.length, inventory.forwardCount);
   assert.equal(new Set(inventory.forwardFiles).size, inventory.forwardCount);
