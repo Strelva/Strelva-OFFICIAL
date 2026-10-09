@@ -59,6 +59,10 @@ async function coherent(page: Page, parent: Locator, title: string, status: stri
   const select = page.getByLabel("Saved website work", { exact: true }); await expect(select).toHaveValue(workId);
   await expect.poll(() => select.evaluate(node => (node as HTMLSelectElement).selectedOptions[0]!.textContent)).toBe(`${title} · ${status}`);
   await expect(parent.getByRole("heading", { name: title, exact: true })).toBeVisible();
+  const helper = page.getByText(`Last known saved work: ${title} · ${status}`, { exact: true });
+  await expect(helper).toBeVisible();
+  const helperId = await helper.getAttribute("id"); expect(helperId).toBeTruthy();
+  expect((await select.getAttribute("aria-describedby"))?.split(/\s+/)).toContain(helperId);
 }
 async function evidence(page: Page, parent: Locator, info: TestInfo, state: string) {
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -71,6 +75,12 @@ async function evidence(page: Page, parent: Locator, info: TestInfo, state: stri
   }
   await assertReadableText(parent.locator("h1"), info, `entry-${state}-heading`);
   await assertReadableText(page.getByLabel("Saved website work", { exact: true }), info, `entry-${state}-selection`);
+  const helper = page.getByText(/^Last known saved work: /);
+  await expect(helper).toHaveCount(1); await expect(helper).toBeVisible();
+  const helperBox = await helper.boundingBox(); expect(helperBox).not.toBeNull();
+  expect(helperBox!.x).toBeGreaterThanOrEqual(0); expect(helperBox!.x + helperBox!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  expect(await helper.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+  await assertReadableText(helper, info, `entry-${state}-last-known-selection`);
   await assertReadableText(page.getByText("Fictional saved-work recovery · no Auth, provider or publication proof", { exact: true }), info, `entry-${state}-disclosure`);
   await page.screenshot({ path: info.outputPath(`entry-${state}.png`), fullPage: true });
 }

@@ -1855,14 +1855,14 @@
     },
     {
       "id": "reward-durable-mutations",
-      "status": "Prepared exact native reward receipt/writer/fence and complete owner/body/ACL/catalog guards; source checks only; actual native refusal/inverse/reapply/Auth qualification UNRUN; no provider or commercial authority",
+      "status": "Prepared exact native reward receipt/writer/fence and complete owner/body/ACL/catalog guards with enabled-event-hook refusal before DDL; source checks only; actual native refusal/inverse/reapply/Auth qualification UNRUN; forward/inverse require actual superuser and no enabled event hooks, managed/provider-hook feasibility HOLD; no provider or commercial authority",
       "items": [
         {
           "file": "20261022175000_reward_durable_mutations.sql",
-          "sha256": "e8839e25aabbcc8091e3e236b368fe61407e517a3b7f74840b641220bdbfc44d",
+          "sha256": "f828c26f6459cca410dd1120df0bf1332905f194f9cc06400110e9ba4b1587b7",
           "rollback": "rollback-20261022175000_reward_durable_mutations.sql",
-          "rollbackSha256": "b954108fd69e80443bde2f38c514f6bcfed61d0b47e651d55520677d41cfba69",
-          "rollbackStatus": "Prepared exact three-function/full table/catalog/ACL/trigger guarded inverse under ordered native writer fence and ACCESS EXCLUSIVE receipt locks; refuses retained mutation receipts; requires superuser catalog exclusion and refuses managed inverse without it; actual native qualification UNRUN"
+          "rollbackSha256": "0ad295c0a4e864f3d9deb7140c7f00ba95d5fe465b901f912957117cfff5a238",
+          "rollbackStatus": "Prepared exact three-function/full table/catalog/ACL/trigger guarded inverse under ordered native writer fence and ACCESS EXCLUSIVE receipt locks; refuses retained mutation receipts; forward and inverse require actual superuser catalog/event-hook exclusion and refuse every enabled event hook; managed/provider-hook feasibility HOLD and actual native qualification UNRUN"
         }
       ]
     }

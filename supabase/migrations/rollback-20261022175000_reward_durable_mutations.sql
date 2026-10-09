@@ -1,7 +1,7 @@
 begin;
 set local lock_timeout='3s';
--- Complete catalog exclusion currently needs a superuser. Managed migration
--- owners do not receive a weaker inverse: refuse before DDL/receipt inspection.
+-- Conservative catalog/event-trigger exclusion requires the actual superuser.
+-- Refuse managed roles rather than allowing a same-session DDL hook past review.
 do $$begin if not (select rolsuper from pg_roles where rolname=current_user) then raise exception 'rewards_inverse_catalog_lock_unavailable';end if;end $$;
 -- Exclude every native command BEFORE inspecting empty receipts. Legacy writers
 -- also finish before these relation locks; recheck population only while held.
@@ -14,6 +14,17 @@ lock table pg_catalog.pg_proc,pg_catalog.pg_class,pg_catalog.pg_attribute,
  pg_catalog.pg_trigger,pg_catalog.pg_constraint,pg_catalog.pg_index,
  pg_catalog.pg_policy,pg_catalog.pg_inherits,pg_catalog.pg_rewrite
  in share row exclusive mode;
+-- These catalog writers are excluded before the first trigger-capable DDL.
+-- Relation locks cannot stop an enabled event trigger in this same session.
+-- Disabled triggers cannot be enabled while pg_event_trigger remains locked.
+lock table pg_catalog.pg_event_trigger,pg_catalog.pg_authid,
+ pg_catalog.pg_auth_members,pg_catalog.pg_namespace,pg_catalog.pg_default_acl
+ in share row exclusive mode;
+do $reward_no_event_hooks$
+begin
+ if not (select rolsuper from pg_roles where rolname=current_user) then raise exception 'rewards_catalog_authority_changed';end if;
+ if exists(select 1 from pg_event_trigger where evtenabled<>'D') then raise exception 'rewards_unreviewed_event_trigger';end if;
+end $reward_no_event_hooks$;
 -- BEGIN EXACT REWARDS CATALOG GUARD
 -- A grant to an unknown role, inherited default grant or grant option aborts
 -- this transaction. These same reviewed body/structure guards precede inverse DDL.
