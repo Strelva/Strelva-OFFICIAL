@@ -54,16 +54,16 @@ export const TENANT_SCOPED_TABLES = [
   "proposals", "weekly_briefs",
 ] as const;
 
-// Tables that carry a tenant_id but belong to a business workspace's own
-// website (20261001120000_website_documents.sql). They are deliberately NOT
-// swept: their tenant foreign keys are `on delete restrict`. A tenant that a
-// workspace website still publishes to, or reserved, is refused before any
-// deletion (refusalReason "workspace_website"); release it through the
-// workspace first. The Postgres purge itself is one transaction
-// (deprovision_tenant_rows, 20261007100000_atomic_tenant_teardown.sql), so a
-// late failure never leaves the tenant partially erased.
+// Workspace-owned history/targets are never slug-swept. Website targets have
+// explicit native preflight guards; immutable newsletter issues retain their
+// tenant FK (NO ACTION), so the atomic delete refuses linked issue history.
+// Nullable native issues belong to the workspace without any tenant target.
+// A failed transaction leaves Systems and workspace history unchanged. The
+// dry-run website reader does not yet report newsletter holds; no dry run is
+// a guarantee that the subsequent atomic delete will succeed.
 export const WORKSPACE_OWNED_TENANT_TABLES = [
   "website_document_publications", "website_hosted_tenant_reservations",
+  "workspace_newsletter_issues",
 ] as const;
 
 // The tenant delete removes these through ON DELETE CASCADE. Count them for
@@ -82,6 +82,18 @@ export const TENANT_TABLES_RETAINED_AS_RECEIPTS = [
 // This receipt outlives tenant deletion and fences slug reuse until cleanup.
 // It is read through service-role RPCs, never counted by a direct table sweep.
 export const TENANT_CLEANUP_RECEIPT_TABLES = ["tenant_deprovision_cleanup"] as const;
+
+// Closed RPC-owned evidence: tenant_id is a historical routing/scope hint,
+// not a foreign key or permission to erase the workspace's records. Neither
+// table permits direct service-role counting; report unknown counts honestly.
+// Notice removal belongs to the expired orphan-lead purge (business-attached
+// leads survive). Google attempts preserve idempotency and outside-write
+// uncertainty; their receipt FK restricts deletion. Provider payload retention
+// is a separate policy: the listing-payload 29-day purge does not currently
+// cover attempt.request, and teardown must not pretend that it does.
+export const RPC_OWNED_TENANT_EVIDENCE_TABLES = [
+  "connected_inquiry_owner_notices", "operator_google_write_attempts",
+] as const;
 
 // Tables keyed on the tenant's stable_id are not swept by slug either; the
 // `tenants` delete settles them through their foreign keys:
@@ -401,6 +413,10 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
       summary.postgres!.push({ target: table, found: await countRows(table, tenantId), deleted: false,
         detail: "kept as historical receipts; outstanding draft grants expire on teardown" });
     }
+  }
+  for (const table of RPC_OWNED_TENANT_EVIDENCE_TABLES) {
+    summary.postgres!.push({ target: table, found: "?", deleted: false,
+      detail: "kept under its native evidence lifecycle; historical tenant scope is not deletion ownership" });
   }
   const receipt = executed ? await deleteTenantRowsAtomically(tenantId, force) : null;
   const removed = receipt?.counts ?? {};
