@@ -27342,6 +27342,14 @@ export type Database = {
         }
         Returns: Json
       }
+      read_creator_maintenance_operations: {
+        Args: {
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       read_decision_policies: {
         Args: {
           p_user_id: string
@@ -29363,6 +29371,20 @@ export type Database = {
           p_operator_email: string
           p_resource_kind: string
           p_resource_ref: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      record_creator_maintenance_from_workspace: {
+        Args: {
+          p_agreement: string | null
+          p_effective: string
+          p_listing_id: string
+          p_rate: string | null
+          p_source_revision_id: string
+          p_state: string
+          p_user_id: string
+          p_verified_email: string
           p_workspace_id: string
         }
         Returns: Json
