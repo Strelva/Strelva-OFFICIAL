@@ -135,3 +135,28 @@ Native full-schema two-worker execution and actual Auth reload UI remain pending
 in coordinator resource windows. The next integration must include 9e2d02f8 and
 this successor before any native adapter execution. Retain all existing unknown
 provider/mirror repair evidence and the prior accidental native failure record.
+
+
+Legacy Redis fixture successor: the coordinator's whole-suite run on a541 retained
+an original failure in `deprovision-redis-client-data.test.ts`: its old blocker RPC,
+guarded counts-only mock and success expectation no longer matched native cleanup
+receipts/provider-disabled pending behavior. Only that owned test is repaired.
+Baseline alignment 09fae14a copies the coordinator's existing fixture edits for a
+minimal successor diff and must NOT be cherry-picked. The successor models the
+current booking-aware dry reader, guarded pending receipt, receipt recovery and
+revision CAS/monotonic account-target finish contract. The dry preview asserts no
+write RPC and unchanged shared grouping, without requiring a discovery claim the
+application does not make. Execution expects database deletion + Redis completion
+but provider pending/overall false, with acknowledged account checkpoint/final
+revision. Actual Redis tenant isolation and shared subscription/provider identity
+preservation remain asserted. Mirror dual-write is explicitly disabled for this
+Redis-focused fixture; the separate actual native race/mirror proof is unchanged.
+The PostgreSQL behavior here is expressly mocked, never native qualification.
+
+Scoped ESLint and diff checks pass. This source-only successor was not executed:
+the file automatically starts isolated Redis and root's whole suite is running
+on frozen source. No gate/skip was added, no original failing record was removed,
+and no product/root harness changed. Root must review/cherry-pick only the narrow
+successor, run the actual Redis fixture in its window, then resume whole-suite
+qualification. Prior native root-reported concurrency pass is evidence for its own
+composed source; standalone actual Auth recovery remains unrun.

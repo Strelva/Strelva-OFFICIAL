@@ -1,7 +1,13 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { isolatedRedisAvailable, startIsolatedRedis, type IsolatedRedis } from "./support/isolated-redis";
 
-const holder = vi.hoisted(() => ({ client: null as unknown, db: null as unknown, rpcs: [] as string[] }));
+// Postgres is a contract mock in this Redis-focused fixture. Native guarded
+// teardown/CAS behavior is qualified by the separate migrated-DB race fixture.
+const holder = vi.hoisted(() => ({
+  client: null as unknown, db: null as unknown, rpcs: [] as string[],
+  receipt: { id: "27410000-0000-4000-8000-000000000020", tenantId: "acme", revision: 0, databaseDeleted: true,
+    redisComplete: false, providerComplete: false, complete: false, summary: { redis: [] as Array<{ target: string; deleted: boolean }> } },
+}));
 vi.mock("@/platform/infra/redis", () => ({ getRedis: () => holder.client }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => holder.db }));
 vi.mock("@/lib/vercel", () => ({ isVercelConfigured: () => false, deleteVercelProject: vi.fn() }));
@@ -36,16 +42,37 @@ describe.skipIf(!isolatedRedisAvailable)("deprovision clears the client's Redis 
   afterAll(async () => { if (redis) await redis.stop(); });
   beforeEach(() => {
     cli("FLUSHDB"); holder.rpcs.length = 0;
+    vi.stubEnv("STRELVA_LEADS_AUTHORITY", "redis");
+    vi.stubEnv("STRELVA_TENANT_RECEIPT_RETENTION", "0");
+    vi.stubEnv("STRELVA_CLIENT_RECORDS_DUAL_WRITE", "0");
+    Object.assign(holder.receipt, { revision: 0, redisComplete: false, providerComplete: false, complete: false, summary: { redis: [] } });
     holder.db = {
       from: () => ({ select: () => ({ eq: async () => ({ count: 0, error: null }) }) }),
-      rpc: async (name: string) => {
+      rpc: async (name: string, args: Record<string, unknown>) => {
         holder.rpcs.push(name);
-        if (name === "tenant_teardown_blockers") return { data: { publications: 0, reservations: 0 }, error: null };
-        if (name === "deprovision_tenant_guarded") return { data: { counts: {}, paused: 0 }, error: null };
+        if (name === "tenant_cleanup_teardown_blockers") return { data: [{ publications: 0, reservations: 0, booking_grants: 0, bookings: 0 }], error: null };
+        if (name === "deprovision_tenant_guarded") return { data: { counts: { tenants: 1 }, paused: 0, cleanup: structuredClone(holder.receipt) }, error: null };
+        if (name === "tenant_cleanup_receipt") return { data: structuredClone(holder.receipt), error: null };
+        if (name === "finish_tenant_deprovision_cleanup") {
+          if (args.p_receipt_id !== holder.receipt.id || args.p_tenant_id !== holder.receipt.tenantId) return { data: null, error: { message: "tenant_cleanup_receipt_changed" } };
+          if (args.p_expected_revision !== holder.receipt.revision) return { data: null, error: { message: "tenant_cleanup_revision_conflict" } };
+          const incoming = structuredClone(args.p_summary as typeof holder.receipt.summary);
+          const previous = holder.receipt.summary.redis.filter(action => action.target.startsWith("account:"));
+          if (args.p_redis_complete === true && previous.some(old => !incoming.redis.some(action => action.target === old.target && action.deleted === true))) return { data: null, error: { message: "tenant_cleanup_pending_account" } };
+          incoming.redis.push(...previous.filter(old => !incoming.redis.some(action => action.target === old.target)));
+          holder.receipt.summary = incoming;
+          holder.receipt.revision++;
+          holder.receipt.redisComplete ||= args.p_redis_complete === true;
+          holder.receipt.providerComplete ||= args.p_provider_complete === true;
+          holder.receipt.complete = holder.receipt.redisComplete && holder.receipt.providerComplete;
+          return { data: structuredClone(holder.receipt), error: null };
+        }
         throw new Error(`Unexpected teardown RPC: ${name}`);
       },
     };
   });
+
+  afterEach(() => vi.unstubAllEnvs());
 
   it("covers every client store the spec lists, pinned to the tenant", () => {
     const patterns = tenantRedisPatterns("acme");
@@ -63,23 +90,29 @@ describe.skipIf(!isolatedRedisAvailable)("deprovision clears the client's Redis 
     seedClient("acmeco");
     cli("SET", "account-of:acme", "acct-1");
     cli("SET", "account-of:acmeco", "acct-1");
-    cli("SET", "account:acct-1", JSON.stringify({ id: "acct-1", name: "Acme", tenantIds: ["acme", "acmeco"], status: "active", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }));
+    const sharedAccount = { id: "acct-1", name: "Acme", tenantIds: ["acme", "acmeco"], status: "active", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z", stripeCustomerId: "retained-fictional", subscription: { items: [{ tenantId: "acmeco", amountCents: 1234 }] } };
+    cli("SET", "account:acct-1", JSON.stringify(sharedAccount));
     const before = (cli("DBSIZE") as number);
 
     const dry = await runDeprovision({ tenantId: "acme", tenant: null, dryRun: true });
     expect(dry.ok).toBe(true);
     const found = dry.summary.redis!.map((a) => a.target);
-    expect(found).toEqual(expect.arrayContaining(["leads:acme", "order:acme:ord_1", "event:evt_acme", "connections:acme:google", "reb:spam-pit:item:acme:spam_1", "account-of:acme", "account:acct-1"]));
+    expect(found).toEqual(expect.arrayContaining(["leads:acme", "order:acme:ord_1", "event:evt_acme", "connections:acme:google", "reb:spam-pit:item:acme:spam_1", "account-of:acme"]));
     expect(found).not.toContain("event:evt_acmeco");
     expect(cli("DBSIZE")).toBe(before);
+    expect(JSON.parse(cli("GET", "account:acct-1") as string)).toEqual(sharedAccount);
+    expect(holder.rpcs).toEqual(["tenant_cleanup_teardown_blockers"]);
 
     const done = await runDeprovision({ tenantId: "acme", tenant: null, dryRun: false });
-    expect(done.ok).toBe(true);
+    expect(done).toMatchObject({ ok: false, databaseDeleted: true, cleanup: { id: holder.receipt.id, revision: 2, redisComplete: true, providerComplete: false, complete: false } });
+    expect(done.summary.vercel).toContainEqual(expect.objectContaining({ deleted: false }));
+    expect(holder.receipt.summary.redis).toContainEqual(expect.objectContaining({ target: "account:acct-1", deleted: true }));
+    expect(holder.rpcs.filter(name => name === "finish_tenant_deprovision_cleanup")).toHaveLength(2);
     expect(holder.rpcs).toContain("deprovision_tenant_guarded");
     const left = (cli("KEYS", "*") as string[]).sort();
     expect(left.filter((k) => /(^|:)acme(:|$)/.test(k))).toEqual(["crm:acme"]);
     expect(cli("EXISTS", "leads:acmeco", "event:evt_acmeco", "connections:acmeco:google", "account-of:acmeco")).toBe(4);
-    expect(JSON.parse(cli("GET", "account:acct-1") as string).tenantIds).toEqual(["acmeco"]);
+    expect(JSON.parse(cli("GET", "account:acct-1") as string)).toMatchObject({ tenantIds: ["acmeco"], stripeCustomerId: sharedAccount.stripeCustomerId, subscription: sharedAccount.subscription });
   });
 
   it("refuses execution when PostgreSQL is unavailable and preserves Redis", async () => {
