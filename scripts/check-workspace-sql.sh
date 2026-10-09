@@ -1730,6 +1730,9 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022170000_cre
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/creator-maintenance-operations-contract.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022171000_checkout_final_admission.sql"
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/checkout-final-admission-contract.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022172000_governed_money_operations.sql"
+psql "${psql_args[@]}" --file="$repo_root/scripts/sql/governed-money-operations-contract.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/governed-money-operations-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/function-exposure-schema.sql"
 node --import tsx "$repo_root/scripts/check-readonly-rpcs.mjs" "postgresql:///postgres?host=$cluster_socket&port=$cluster_port"
 # Full legacy teardown behavior is proved by check-guarded-teardown-fresh.sh.

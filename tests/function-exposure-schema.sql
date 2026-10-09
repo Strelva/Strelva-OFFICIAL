@@ -94,3 +94,14 @@ end $$;
 do $$declare f regprocedure:=to_regprocedure('public.assert_business_checkout_admission(uuid,text,bigint,uuid,text,text)');begin
  if f is not null and (not has_function_privilege('service_role',f,'EXECUTE') or has_function_privilege('anon',f,'EXECUTE') or has_function_privilege('authenticated',f,'EXECUTE')) then raise exception 'Checkout admission lost private service-only boundary';end if;
 end$$;
+
+-- Additive ordinary money producers are all service-only supplied-actor ports.
+-- Older focused fixtures contain none; a partially installed group is refused.
+do $$declare signature text; f regprocedure; installed integer;begin
+ select count(*) into installed from pg_proc where pronamespace='public'::regnamespace and proname in('record_governed_money_configuration','read_governed_money_configuration','read_governed_money_preparation','prepare_governed_collection_terms','register_governed_creator_listing','assert_governed_payout_dispatch');
+ if installed not in(0,6) then raise exception 'governed money incomplete supplied-actor boundary';end if;
+ if installed=6 then foreach signature in array array['public.record_governed_money_configuration(uuid,text,jsonb)','public.read_governed_money_configuration(uuid,uuid,text)','public.read_governed_money_preparation(uuid,uuid,text)','public.prepare_governed_collection_terms(uuid,text,jsonb)','public.register_governed_creator_listing(uuid,text,jsonb)','public.assert_governed_payout_dispatch(uuid,uuid,text,text,text,text,bigint,text,bigint)'] loop
+  f:=to_regprocedure(signature);
+  if f is null or not has_function_privilege('service_role',f,'EXECUTE') or has_function_privilege('anon',f,'EXECUTE') or has_function_privilege('authenticated',f,'EXECUTE') then raise exception 'governed money lost private service-only boundary';end if;
+ end loop;end if;
+end$$;

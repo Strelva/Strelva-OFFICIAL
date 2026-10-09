@@ -1,6 +1,6 @@
 {
-  "source": "Prepared exact full-model344 inventory; Checkout final new-session admission qualification pending",
-  "forwardCount": 344,
+  "source": "Prepared exact full-model345 inventory; governed money producer current authority/native qualification pending",
+  "forwardCount": 345,
   "workspaceBoundary": "20260905190000_release_one_workspaces.sql",
   "focusedLegacyExceptions": {
     "20260920060000_content_version_request_id.sql": "Requires legacy content_versions, omitted from the purpose-built workspace fixture; real upgrade/fresh full-schema rehearsal owns it.",
@@ -351,6 +351,7 @@
     "20261022123000_private_definition_versions.sql",
     "20261022130000_tenant_newsletter_teardown_hold.sql",
     "20261022170000_creator_maintenance_operations.sql",
-    "20261022171000_checkout_final_admission.sql"
+    "20261022171000_checkout_final_admission.sql",
+    "20261022172000_governed_money_operations.sql"
   ]
 }

@@ -116,4 +116,19 @@ describe("generate-database-types render", () => {
     for(const name of ["p_actor_id","p_verified_email","p_accepted_email"])expect(generated).toContain(`${name}: string | null`);
     expect(generated).toContain("p_payment_id: string\n");expect(generated).toContain("p_account: string\n");expect(generated).toContain("p_generation: number\n");expect(generated).not.toContain("p_actor_id?:");expect(generated).toContain("Returns: boolean");
   });
+  it("keeps governed money actor/source/profile/amount arguments required and command nullability inside typed JSON", () => {
+    const functions = [
+      ...["record_governed_money_configuration", "prepare_governed_collection_terms", "register_governed_creator_listing"].map((name, i) => ({ name, oid: 10 + i, retset: false, rettype: T.jsonb, argnames: ["p_user_id", "p_verified_email", "p_command"], argmodes: null, alltypes: null, argtypes: [T.uuid, T.text, T.jsonb], ndefaults: 0 })),
+      ...["read_governed_money_configuration", "read_governed_money_preparation"].map((name, i) => ({ name, oid: 13 + i, retset: false, rettype: T.jsonb, argnames: ["p_workspace_id", "p_user_id", "p_verified_email"], argmodes: null, alltypes: null, argtypes: [T.uuid, T.uuid, T.text], ndefaults: 0 })),
+      { name: "assert_governed_payout_dispatch", oid: 15, retset: false, rettype: T.jsonb, argnames: ["p_payout_id", "p_user_id", "p_verified_email", "p_profile_version", "p_recipient", "p_charge", "p_amount", "p_currency", "p_available"], argmodes: null, alltypes: null, argtypes: [T.uuid, T.uuid, T.text, T.text, T.text, T.text, T.int4, T.text, T.int4], ndefaults: 0 },
+    ];
+    const generated = render({ ...catalog, functions });
+    for (const f of functions) {
+      expect(generated).toContain(`${f.name}: {`);
+      for (const name of f.argnames) expect(generated).not.toContain(`${name}?:`);
+    }
+    expect(generated).toContain("p_command: Json\n");
+    for (const name of ["p_workspace_id", "p_user_id", "p_verified_email", "p_profile_version", "p_recipient", "p_charge", "p_currency"]) { expect(generated).toContain(`${name}: string\n`); expect(generated).not.toContain(`${name}: string | null`); }
+    expect(generated).toContain("p_amount: number\n"); expect(generated).toContain("p_available: number\n");
+  });
 });
