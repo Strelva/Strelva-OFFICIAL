@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
-import { fixture, investigation, run } from "./support/runtime-data-native";
+import { fixture, investigation, run, runAt } from "./support/runtime-data-native";
 
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires real isolated loopback Auth, current migrations and workspace flags.");
 test.setTimeout(240_000);
@@ -10,7 +10,8 @@ test("real owner pages committed investigation runs, retries an evicted exact re
     const created = await investigation(f);
     let current = created;
     // These are real native document comparisons, no seeded provider/public results.
-    for (let i = 1; i <= 201; i++) current = await run(f, created.id, i - 1, `native-history-${i}`);
+    const startedAt = Date.parse(created.payload.nextRunAt);
+    for (let i = 1; i <= 201; i++) current = await runAt(f, created.id, i - 1, `native-history-${i}`, new Date(startedAt + i * 60 * 60_000));
     expect(current.payload.runs).toHaveLength(200);
     expect(current.payload.runs.some((row: { requestId: string }) => row.requestId === "native-history-1")).toBe(false);
     const first = await f.owner.context.request.get(`/api/bounded-work?productId=investigations&workId=${created.id}&view=history&limit=100`);

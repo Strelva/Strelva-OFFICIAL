@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { expect, type APIRequestContext, type Browser } from "@playwright/test";
 import { localEnvironment, signedInContext } from "./local-auth";
@@ -11,7 +11,16 @@ export function localSql(sql: string): string {
   localEnvironment();
   const url = process.env.STRELVA_LOCAL_DB_URL || "";
   if (!url || !["localhost", "127.0.0.1"].includes(new URL(url).hostname)) throw new Error("Requires disposable loopback STRELVA_LOCAL_DB_URL.");
-  return execFileSync("psql", [url, "--no-psqlrc", "-At", "--set=ON_ERROR_STOP=1"], { input: sql, encoding: "utf8" }).trim();
+  const parsed = new URL(url);
+  const result = spawnSync("psql", ["--no-psqlrc", "-At", "--set=ON_ERROR_STOP=1"], {
+    input:sql, encoding:"utf8", env:{...process.env,PGHOST:parsed.hostname,PGPORT:parsed.port || "5432",PGUSER:decodeURIComponent(parsed.username),PGPASSWORD:decodeURIComponent(parsed.password),PGDATABASE:decodeURIComponent(parsed.pathname.slice(1))},
+  });
+  if (result.error || result.status !== 0) {
+    const line = (result.stderr || "").split("\n").find(line=>/^(ERROR|FATAL):/.test(line)) || "psql did not complete";
+    const safe = line.replace(/postgres(?:ql)?:\/\/\S+/g,"[redacted database]").replaceAll(secretMarker,"[redacted fixture secret]");
+    throw new Error(`Local fixture SQL failed: ${safe.slice(0,400)}`);
+  }
+  return result.stdout.trim();
 }
 export async function post(request: APIRequestContext, path: string, data: unknown, status = 200) {
   const response = await request.post(path, { headers: { origin: localEnvironment().app }, data });
@@ -32,12 +41,22 @@ export async function fixture(browser: Browser, role: string) {
   expect((await admin.from("workspace_memberships").insert({ workspace_id: workspaceId, user_id: owner.userId, role: "owner", created_by: owner.userId })).error).toBeNull();
   const tenants: string[] = [];
   return { env, admin, owner, workspaceId, tenants, async close() {
-    // Links deliberately restrict deletion; remove only this fixture's links first.
-    localSql(`delete from public.tenant_workspace_links where workspace_id=${literal(workspaceId)}::uuid;`);
-    for (const id of tenants) await admin.from("tenants").delete().eq("id", id);
-    await admin.from("workspaces").delete().eq("id", workspaceId);
-    await owner.context.close();
-    await admin.auth.admin.deleteUser(owner.userId);
+    try {
+      // The real teardown deletes exactly this test's tenants and retains
+      // immutable link evidence through its existing FK behavior.
+      for (const id of tenants) {
+        const result = await admin.rpc("deprovision_tenant_guarded",{p_tenant_id:id,p_force:false,p_require_inquiry_export:false,p_retain_receipts:false});
+        expect(result.error, `Fixture tenant teardown failed: ${result.error?.message}`).toBeNull();
+        expect((await admin.from("tenants").select("id").eq("id",id)).data).toHaveLength(0);
+      }
+      const retained = Number(localSql(`select count(*) from public.tenant_workspace_links where workspace_id=${literal(workspaceId)}::uuid;`));
+      // Conversion history restricts workspace/person deletion by design. Its
+      // fictional rows remain until the disposable proof database is removed.
+      if (!retained) {
+        await admin.from("workspaces").delete().eq("id",workspaceId);
+        await admin.auth.admin.deleteUser(owner.userId);
+      }
+    } finally { await owner.context.close(); }
   } };
 }
 export async function investigation(f: Awaited<ReturnType<typeof fixture>>) {
@@ -81,4 +100,12 @@ export async function seedStores(admin: SupabaseClient, tenantId: string) {
     const result = await admin.rpc("record_tenant_client_record", { p_tenant_id: tenantId, p_store: store, p_record_id: store === "provider_connections" || store === "provider_metadata" ? "google" : "native-record", p_payload: payload, p_payload_hash: createHash("sha256").update(JSON.stringify(payload)).digest("hex"), p_captured_at: "2026-10-08T12:00:00Z", p_via: "backfill", p_mode: store === "inquiry_reply" ? "keep_first" : "replace" });
     expect(result.error, `${store}: ${result.error?.message}`).toBeNull();
   }
+}
+
+/** Native product execution with an explicit advancing clock, real Auth and RPC. */
+export async function runAt(f: Awaited<ReturnType<typeof fixture>>, workId:string, revision:number, requestId:string, now:Date) {
+  const user = await f.admin.auth.admin.getUserById(f.owner.userId);
+  expect(user.error).toBeNull(); expect(user.data.user?.email_confirmed_at).toBeTruthy();
+  const { runWorkspaceInvestigation } = await import("../../src/products/investigations/server");
+  return runWorkspaceInvestigation({userId:f.owner.userId,verifiedEmail:user.data.user!.email!.toLowerCase()},workId,{expectedRevision:revision,requestId},now);
 }

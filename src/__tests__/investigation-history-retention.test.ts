@@ -1,3 +1,4 @@
+import { createDocument } from "@/products/documents/engine";
 import { describe, expect, it } from "vitest";
 import { createInvestigationService } from "@/products/investigations/server";
 import { investigationSchema } from "@/products/investigations/contracts";
@@ -5,6 +6,20 @@ import type { InvestigationHistory, InvestigationRun } from "@/products/investig
 import { memoryBoundedStore, owner } from "./fixtures/bounded-store";
 
 describe("standing-check durable history", () => {
+ it("normalizes native PostgreSQL source timestamps before committing evidence",async()=>{
+  const store=memoryBoundedStore();
+  const sources=[];
+  for(let i=0;i<2;i++) {
+   const doc=await store.create(owner,"workspace-a",{productId:"documents",resourceKind:"document",title:"Native document",payload:createDocument({title:"Native document",text:"Same source"},owner.userId)});
+   sources.push({workId:doc.id});
+  }
+  const read=store.read.bind(store);
+  store.read=async(...args)=>{const row=await read(...args);return row?.productId==="documents"?{...row,updatedAt:"2026-10-08T23:38:48.423079+00:00"}:row;};
+  const service=createInvestigationService(store);
+  const work=await service.create(owner,"workspace-a",{title:"Native comparison",intervalMinutes:60,sources});
+  const checked=await service.run(owner,work.id,{expectedRevision:0,requestId:"native-timestamp"},new Date(Date.now()+60*60_000));
+  expect(checked.payload.runs[0].sources.map(source=>source.updatedAt)).toEqual(["2026-10-08T23:38:48.423Z","2026-10-08T23:38:48.423Z"]);
+ });
  it("survives 501 runs, failures, restart and old-key retries without truncating complete evidence", async () => {
   const store = memoryBoundedStore();
   const rows: Array<{ revision: number; run: InvestigationRun }> = [];

@@ -48,6 +48,9 @@ function sourceIdentity(source: InvestigationSource): string {
 }
 
 function sourceReference(source: InvestigationSource, reference: { revision: number; updatedAt: string }): InvestigationReference {
+  // Native PostgreSQL timestamps carry offsets and microseconds; run evidence
+  // uses the same UTC ISO form as provider observations and authored content.
+  reference = { ...reference, updatedAt: new Date(reference.updatedAt).toISOString() };
   if ("kind" in source) {
     return { workId: sourceIdentity(source), kind: "public_website", sourceUrl: source.url, ...reference };
   }
