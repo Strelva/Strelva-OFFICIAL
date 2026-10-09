@@ -952,7 +952,12 @@ NeedsYouSection, BusinessHome receipt feeds and System History use
 show support attribution. Receipt sentences are attributed once in their source
 projection and rendered unchanged, including Undo labels. Missing actor data uses
 neutral copy. Agency shell
-branding never supplies a receipt actor. `STRELVA_HANDLED_LABEL` retains the
+branding never supplies a receipt actor. The business-record projection carries
+recorded actor kind/ID through the shared receipt decoder; a recorded name
+snapshot is retained, and an ID-only agency receipt stays neutral. The existing
+actor-checked History read supplies up to 200 recent revisions, including agency
+actions omitted by the legacy feed source filter. No current name lookup or
+new persisted snapshot is introduced. `STRELVA_HANDLED_LABEL` retains the
 current place name pending D-label. Existing tokens and components are unchanged.
 Local behavior and verification are recorded in the actor-lane handoff; this is
 not deployment or visual acceptance evidence.

@@ -269,6 +269,9 @@ export type UndoState =
 export const handledReceiptSchema = z.object({
   id: z.string(), store: z.string(), systemId: z.string().nullable(), sentence: z.string(), at: z.string(), changed: z.string().nullable(),
   actor: recordedActorSchema.optional().catch(undefined),
+  /** Recorded principal identity survives even when no action-time name exists. */
+  actorKind: z.enum(["member", "agency", "operator"]).optional(),
+  actorId: z.string().optional(),
   evidence: z.object({ providerAccepted: z.boolean(), readBack: z.enum(["verified", "not_verified", "not_checked"]) }).nullable(),
   undo: z.discriminatedUnion("state", [
     z.object({ state: z.literal("undo") }),
@@ -284,6 +287,8 @@ export interface HandledReceipt {
   systemId: string | null;
   /** Recorded executor, when the read model supplies it. Missing attribution stays neutral. */
   actor?: RecordedActor;
+  actorKind?: "member" | "agency" | "operator";
+  actorId?: string;
   /** Who acted and what changed, in plain words. */
   sentence: string;
   at: string;

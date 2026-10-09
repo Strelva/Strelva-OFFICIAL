@@ -46,8 +46,10 @@ export function handledFromStore(row: Record<string, unknown>): HandledReceipt |
   if (!at || !id) return null;
   const recorded = recordedActor(row.actor);
   // A recorded support source cannot be relabeled as agency client work.
-  const actor = row.source === "operator" ? (recorded?.kind === "operator" ? recorded : { kind: "operator" as const }) : recorded;
-  const attribution = actor ? { actor } : {};
+  const actor = row.actorKind === "operator" || (row.actorKind === undefined && row.source === "operator")
+    ? (recorded?.kind === "operator" ? recorded : { kind: "operator" as const }) : recorded;
+  const actorKind: HandledReceipt["actorKind"] = row.actorKind === "member" || row.actorKind === "agency" || row.actorKind === "operator" ? row.actorKind : undefined;
+  const attribution = { ...(actor ? { actor } : {}), ...(actorKind ? { actorKind, actorId: str(row.actorId) ?? undefined } : {}) };
   switch (row.store) {
     case "business_record_revisions": {
       const { sentence, changed } = recordSentence(row.changes, actor);
