@@ -59,6 +59,13 @@ select 'authority '||p.oid::regprocedure::text||' '||encode(sha256(convert_to((t
  from pg_proc p where p.pronamespace='public'::regnamespace order by p.oid::regprocedure::text;
 select 'owner '||c.relname||' '||pg_get_userbyid(c.relowner) from pg_class c
  where c.relnamespace='public'::regnamespace and c.relkind in ('r','p') order by c.relname;
+select 'journal-security '||encode(sha256(convert_to(jsonb_build_object('owner',c.relowner,'rls',c.relrowsecurity,'forceRls',c.relforcerowsecurity,'acl',c.relacl)::text,'UTF8')),'hex')
+ from pg_class c where c.oid=to_regclass('public.native_google_lifecycle_prior_functions');
+select 'journal-policy '||p.polname||' '||encode(sha256(convert_to(to_jsonb(p)::text,'UTF8')),'hex')
+ from pg_policy p where p.polrelid=to_regclass('public.native_google_lifecycle_prior_functions') order by p.polname;
+select 'journal-column-acl '||a.attname||' '||coalesce(a.attacl::text,'NULL')
+ from pg_attribute a where a.attrelid=to_regclass('public.native_google_lifecycle_prior_functions')
+ and a.attnum>0 and not a.attisdropped order by a.attnum;
 create function pg_temp.native_qualification_rows() returns setof text language plpgsql as $$
 declare relation record; digest text; begin
  for relation in select relname from pg_class where relnamespace='public'::regnamespace and relkind in ('r','p') order by relname loop
@@ -112,6 +119,16 @@ late_marker="marker text := '  perform pg_advisory_xact_lock(hashtextextended(v_
 assert f.count(late_marker)==1
 write('forward-late-marker-refusal',f.replace(late_marker,"marker text := 'missing_marker perform pg_advisory_xact_lock(hashtextextended(v_workspace::text || '",1))
 write('inverse-extra-acl',injected(i,'grant execute on function '+target+' to authenticated;'))
+write('inverse-owner-acl',injected(i,"do $qualification$ begin execute 'revoke execute on function "+target+" from '||quote_ident(pg_get_userbyid((select relowner from pg_class where oid='public.workspace_account_bindings'::regclass))); end $qualification$;"))
+for name,sql in {
+ 'inverse-journal-owner': 'alter table public.native_google_lifecycle_prior_functions owner to authenticated;',
+ 'inverse-journal-rls': 'alter table public.native_google_lifecycle_prior_functions disable row level security;',
+ 'inverse-journal-force-rls': 'alter table public.native_google_lifecycle_prior_functions force row level security;',
+ 'inverse-journal-policy': 'create policy unexpected_journal_policy on public.native_google_lifecycle_prior_functions for select to authenticated using(true);',
+ 'inverse-journal-table-acl': 'grant select on public.native_google_lifecycle_prior_functions to authenticated;',
+ 'inverse-journal-column-acl': 'grant update(prior_properties) on public.native_google_lifecycle_prior_functions to service_role;',
+}.items(): write(name,injected(i,sql))
+
 # Coordinate live ACL drift with both mutable journal snapshots. The immutable
 # inverse policy must refuse before restoration even when those three agree.
 rebaseline_acl="""grant execute on function public.upsert_workspace_account_binding(jsonb,text) to authenticated;
@@ -124,6 +141,15 @@ update public.native_google_lifecycle_prior_functions journal set prior_properti
  where journal.signature='public.upsert_workspace_account_binding(jsonb,text)';"""
 write('inverse-coordinated-acl-journal-drift',injected(i,rebaseline_acl))
 write('inverse-security-drift',injected(i,'alter function '+target+' security invoker;'))
+for name,sql in {
+ 'inverse-catalog-cost': 'alter function '+target+' cost 101;',
+ 'inverse-catalog-volatility': 'alter function '+target+' stable;',
+ 'inverse-catalog-strict': 'alter function '+target+' strict;',
+ 'inverse-catalog-grant-option': 'grant execute on function '+target+' to service_role with grant option;',
+ 'inverse-prior-properties': "update public.native_google_lifecycle_prior_functions set prior_properties=prior_properties||'{\"procost\":101}'::jsonb where signature='"+target+"';",
+ 'inverse-applied-properties': "update public.native_google_lifecycle_prior_functions set applied_properties=applied_properties||'{\"procost\":101}'::jsonb where signature='"+target+"';",
+}.items(): write(name,injected(i,sql))
+
 write('inverse-owner-drift',injected(i,'alter function '+target+' owner to authenticated;'))
 write('inverse-search-path-drift',injected(i,'alter function '+target+' set search_path=pg_temp,public;'))
 write('inverse-deleted-journal',injected(i,"delete from public.native_google_lifecycle_prior_functions where signature='"+target+"';"))
@@ -139,11 +165,14 @@ write('inverse-populated',injected(i,populate))
 PY
  local label
  # All inverse refusal scenarios exercise the actual current inverse guards.
- for label in inverse-extra-acl inverse-coordinated-acl-journal-drift inverse-security-drift inverse-owner-drift inverse-search-path-drift; do
+ for label in inverse-journal-owner inverse-journal-rls inverse-journal-force-rls inverse-journal-policy inverse-journal-table-acl inverse-journal-column-acl; do
+  native_qualification_refuse "$label" "$qualification_dir/$label.sql" native_google_rollback_journal_authority_drift
+ done
+ for label in inverse-extra-acl inverse-owner-acl inverse-coordinated-acl-journal-drift inverse-security-drift inverse-owner-drift inverse-search-path-drift inverse-catalog-cost inverse-catalog-volatility inverse-catalog-strict inverse-catalog-grant-option; do
   native_qualification_refuse "$label" "$qualification_dir/$label.sql" 'native_google_rollback_(source|authority)_drift'
  done
  native_qualification_refuse inverse-deleted-journal "$qualification_dir/inverse-deleted-journal.sql" native_google_rollback_archive_incomplete
- for label in inverse-tampered-journal inverse-tampered-journal-rehashed; do
+ for label in inverse-tampered-journal inverse-tampered-journal-rehashed inverse-prior-properties inverse-applied-properties; do
   native_qualification_refuse "$label" "$qualification_dir/$label.sql" native_google_rollback_archive_drift
  done
  native_qualification_refuse inverse-populated "$qualification_dir/inverse-populated.sql" native_google_rollback_populated_review_required

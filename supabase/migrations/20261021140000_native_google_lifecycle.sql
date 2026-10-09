@@ -222,6 +222,7 @@ create table public.native_google_lifecycle_prior_functions(signature text prima
  prior_definition_hash text not null check(prior_definition_hash ~ '^[a-f0-9]{64}$'),
  prior_source_hash text not null check(prior_source_hash ~ '^[a-f0-9]{64}$'),prior_properties jsonb not null,
  applied_hash text check(applied_hash is null or applied_hash ~ '^[a-f0-9]{64}$'),applied_properties jsonb);
+alter table public.native_google_lifecycle_prior_functions enable row level security;
 revoke all on public.native_google_lifecycle_prior_functions from public,anon,authenticated,service_role;
 DO $$ declare definition text; marker text := '  select * into v_binding from public.workspace_account_bindings where id = p_binding_id for update;'; writer_signature text := 'public.upsert_workspace_google_location(uuid,text,text,text)';
  expected_source text := $historical_writer$

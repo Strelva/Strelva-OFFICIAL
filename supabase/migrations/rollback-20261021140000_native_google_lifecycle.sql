@@ -5,6 +5,18 @@ set local lock_timeout='3s';
 set local statement_timeout='10s';
 select pg_advisory_xact_lock(771904091);
 do $$ declare prior record; properties jsonb; restored_source text; applied_definition text; expected_prior_source_hash text; expected_applied_source_hash text; catalog pg_proc%rowtype; expected_arguments text[]; begin
+ -- The archive is private authority, not an ordinary service-writable table.
+ if not exists(select 1 from pg_class c where c.oid='public.native_google_lifecycle_prior_functions'::regclass
+   and c.relowner=(select relowner from pg_class where oid='public.workspace_account_bindings'::regclass)
+   and c.relrowsecurity and not c.relforcerowsecurity
+   and coalesce(c.relacl,acldefault('r',c.relowner))=acldefault('r',c.relowner))
+  or exists(select 1 from pg_policy where polrelid='public.native_google_lifecycle_prior_functions'::regclass)
+  or exists(select 1 from pg_class c cross join lateral aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a
+   where c.oid='public.native_google_lifecycle_prior_functions'::regclass
+    and (a.grantee<>c.relowner or a.grantor<>c.relowner or a.is_grantable))
+  or exists(select 1 from pg_attribute where attrelid='public.native_google_lifecycle_prior_functions'::regclass
+   and attnum>0 and not attisdropped and attacl is not null)
+  then raise exception 'native_google_rollback_journal_authority_drift'; end if;
  if exists(select 1 from public.native_google_disconnect_receipts) or exists(select 1 from public.native_google_oauth_attempts) then raise exception 'native_google_rollback_populated_review_required'; end if;
  if (select count(*) from public.native_google_lifecycle_prior_functions)<>2
   or not exists(select 1 from public.native_google_lifecycle_prior_functions where signature='public.upsert_workspace_google_location(uuid,text,text,text)')
