@@ -20,7 +20,10 @@ manifest="$root/scripts/full-model-journey-profile.mjs"
 if [[ "$list" == 1 ]]; then node "$manifest" manifest "$profile"; exit; fi
 # Missing required specs and held qualification fail before a stack is touched.
 node "$manifest" preflight "$profile" "$root"
-if [[ "$profile" == full-native ]]; then node scripts/tenant-cleanup-journey-window.mjs preflight "$root"; fi
+if [[ "$profile" == full-native ]]; then
+  node scripts/tenant-cleanup-journey-window.mjs preflight "$root"
+  node scripts/no-login-journey-window.mjs preflight "$root"
+fi
 for file in .env .env.local .env.development .env.development.local; do
   [[ ! -e "$file" ]] || { echo "Remove $file from this prepared proof checkout first." >&2; exit 1; }
 done
@@ -138,6 +141,7 @@ for variant in "${variants[@]}"; do
   # Keep the original 34-case contract and this owned app/Redis alive.
   if [[ "$profile" == full-native ]]; then
     run_clean node scripts/tenant-cleanup-journey-window.mjs run "$root" "$work" > "$work/cleanup-window.log" 2>&1 || status=1
+    run_clean node scripts/no-login-journey-window.mjs run "$root" "$work" > "$work/no-login-window.log" 2>&1 || status=1
   fi
   stop_app; stop_redis
   [[ "$status" == 0 ]] || { echo "Closed $profile/$variant failed; see retained reports." >&2; exit 1; }
