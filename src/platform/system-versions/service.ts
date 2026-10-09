@@ -79,6 +79,19 @@ export function applyOverrides(baseline: JsonObject, overrides: readonly Version
   return result;
 }
 
+/** A restore edits only the draft; release appends and sets current to latest.
+ * This describes a candidate, never authority, approval or native verification. */
+export function determineVersionRelease(lineage: VersionLineage) {
+  const definition = applyOverrides(lineage.baseline.definition, lineage.overrides);
+  const release = lineage.releases.at(-1);
+  return {
+    definition, release,
+    needsRelease: !release || !jsonEqual(release.definition, definition),
+    nextRelease: (release?.number ?? 0) + 1,
+    changedPaths: changedPaths(release?.definition ?? {}, definition),
+  };
+}
+
 export function createSystemVersions(deps: SystemVersionsDeps) {
   const { store, connections } = deps;
   const now = deps.now ?? (() => new Date().toISOString());
@@ -471,7 +484,7 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
     async release(actor: VersionActor, versionId: string, input: { expectedRowRevision: number }): Promise<VersionLineage> {
       const lineage = await loadOwned(actor, versionId, true);
       if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
-      const definition = working(lineage);
+      const { definition, needsRelease, nextRelease: number } = determineVersionRelease(lineage);
       const baseline = await store.getRevision(actor, lineage.source, lineage.baseline.revision);
       if (baseline?.declaration) {
         if (!isRevisionQualified(baseline)) throw new VersionValidationError("This exact revision needs qualification and human review before release.");
@@ -480,9 +493,7 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
       const baselineForLocks = await store.getRevision(actor, lineage.source, lineage.baseline.revision);
       if (!baselineForLocks) throw new VersionAccessError();
       assertLockedDefinition(componentRevision(lineage, baselineForLocks), definition);
-      const latest = lineage.releases.at(-1);
-      if (latest && jsonEqual(latest.definition, definition)) throw new VersionValidationError("Nothing changed since the current release.");
-      const number = (latest?.number ?? 0) + 1;
+      if (!needsRelease) throw new VersionValidationError("Nothing changed since the current release.");
       return save(actor, {
         ...lineage,
         releases: [...lineage.releases, {

@@ -2,7 +2,8 @@ import {z} from "zod";
 import {prepareBundleInquiryUpdate,durableState} from "@/products/inquiries";
 import {prepareBundleWebsiteUpdate} from "@/products/websites";
 import type {InquiryEngineState} from "@/products/inquiries/contracts";
-import {applyOverrides,VersionValidationError,type VersionLineage} from "@/platform/system-versions";
+import {determineVersionRelease} from "@/platform/system-versions/service";
+import {VersionValidationError,type VersionLineage} from "@/platform/system-versions/types";
 import {nativeVersionPreparationReceiptSchema,nativeVersionConflictSchema,type NativeVersionResolution} from "@/platform/system-versions/native-preparation-contracts";
 import {mapVersionsError,type VersionsDb} from "@/platform/system-versions/supabase-store";
 import type {WorkspaceActor} from "@/platform/workspaces/types";
@@ -12,8 +13,8 @@ export async function prepareNativeBundleVersion(actor:WorkspaceActor,lineage:Ve
  const read=await db.rpc("read_bundle_native_preparation",args);if(read.error)mapVersionsError(read.error,"The bound native draft could not be read. Nothing went live.");
  const data=z.record(z.string(),z.unknown()).parse(read.data);
  if(data.existing)return nativeVersionPreparationReceiptSchema.parse(data.existing);
- if(lineage.releases.at(-1)&&JSON.stringify(lineage.releases.at(-1)?.definition)===JSON.stringify(applyOverrides(lineage.baseline.definition,lineage.overrides)))return null;
- const working=applyOverrides(lineage.baseline.definition,lineage.overrides),now=new Date().toISOString();let artifact:unknown;
+ const {definition:working,needsRelease}=determineVersionRelease(lineage);if(!needsRelease)return null;
+ const now=new Date().toISOString();let artifact:unknown;
  if(data.kind==="inquiry_pattern"){
  const result=prepareBundleInquiryUpdate(working,{state:data.state as InquiryEngineState,businessId:lineage.version.businessId,capabilityId:z.string().parse(data.capabilityId),sourceBusinessId:lineage.source.businessId,sourceVersion:lineage.baseline.revision,actorId:actor.userId,now,resolutions});
  if(!result.work)return nativeVersionConflictSchema.parse({kind:"native_conflict",workspaceId:lineage.version.businessId,versionId:lineage.id,rowRevision:lineage.rowRevision,nativeKind:"inquiry_pattern",conflicts:result.conflicts.map(c=>({path:c.path,local:c.localValue,source:c.sourceAfter}))});

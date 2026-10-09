@@ -5,8 +5,7 @@ import { WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/
 import type { NeedsYouStore } from "@/platform/needs-you/repository";
 import { PostgresNeedsYouStore } from "@/platform/needs-you/repository";
 import { versionReleaseItem } from "@/platform/needs-you/sources/version-release";
-import { changedPaths, jsonEqual } from "./compare";
-import { applyOverrides } from "./service";
+import { determineVersionRelease } from "./service";
 import type { VersionLineage } from "./types";
 import { mapVersionsError, versionsDb, type VersionsDb } from "./supabase-store";
 import { requireVersionRuntime } from "./native-runtime";
@@ -16,16 +15,14 @@ export type VersionPreparationReceipt = z.infer<typeof receiptSchema>;
 
 export async function prepareVersionRelease(actor: WorkspaceActor, lineage: VersionLineage,
   deps: { decisions?: Pick<NeedsYouStore, "policies" | "open">; db?: VersionsDb } = {}): Promise<VersionPreparationReceipt | null> {
-  const working = applyOverrides(lineage.baseline.definition, lineage.overrides);
-  const latest = lineage.releases.at(-1);
-  if (latest && jsonEqual(latest.definition, working)) return null;
+  const { needsRelease, nextRelease, changedPaths } = determineVersionRelease(lineage);
+  if (!needsRelease) return null;
   await requireVersionRuntime(actor, lineage, deps.db ?? versionsDb());
   const decisions = deps.decisions ?? PostgresNeedsYouStore;
   // Unreadable policy is a failed preparation, never an invented permission.
   const policies = await decisions.policies(actor, lineage.version.businessId);
   const proposed = versionReleaseItem({ versionId: lineage.id, systemId: lineage.version.systemId, label: lineage.context.label,
-    rowRevision: lineage.rowRevision, nextRelease: (latest?.number ?? 0) + 1,
-    changedPaths: changedPaths(latest?.definition ?? lineage.baseline.definition, working),
+    rowRevision: lineage.rowRevision, nextRelease, changedPaths,
   }, lineage.version.businessId, policies);
   if (!proposed) throw new WorkspaceStoreError("No release decision could be prepared. Nothing went live.");
   const item = await decisions.open(lineage.version.businessId, proposed);
