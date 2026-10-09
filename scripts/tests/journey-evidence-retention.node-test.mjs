@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { test } from 'node:test';
-import { inventoryJourneyArtifacts, retainJourneyEnd, validateTraceArchive, withJourneyAdmission } from '../journey-evidence-retention.mjs';
-import { runNoLoginWindow, noLoginWindowProfile } from '../no-login-journey-window.mjs';
+import { browserWasStarted, inventoryJourneyArtifacts, retainJourneyEnd, validateTraceArchive, withJourneyAdmission } from '../journey-evidence-retention.mjs';
+import { readOwnedJourneyFile, writeOwnedJourneyFile } from '../journey-evidence-files.mjs';
+import { runNoLoginWindow, noLoginWindowProfile, retainNoLoginReport } from '../no-login-journey-window.mjs';
 function fixture(t) {
   const work = mkdtempSync(join(tmpdir(), 'strelva-full-journeys.'));
   t.after(() => rmSync(work, { recursive: true, force: true }));
@@ -139,4 +140,75 @@ test('a refused symlink report is never parsed for attachments', t => {
   assert.equal(inventory.integrityValidated, false); assert.ok(inventory.issues.includes('unowned-or-symbolic-file'));
   assert.ok(!inventory.files.some(item => item.path.includes('proof-that-refused-report')));
   assert.ok(!JSON.stringify(inventory).includes(outsideReport));
+});
+
+
+test('a real ENOBUFS child remains dispatched/failed with exact signal rather than not-run', t => {
+  const { work,output } = fixture(t);
+  const browser = spawnSync(process.execPath,['-e','process.stdout.write("x".repeat(1024))'],{ encoding:'utf8',maxBuffer:128,env:{ PATH:'/usr/bin:/bin' } });
+  assert.ok(browser.pid > 0); assert.equal(browser.error?.code,'ENOBUFS'); assert.equal(browserWasStarted(browser),true);
+  const terminal = retainJourneyEnd({ work,output,sourceBefore:{ same:1 },captureSource:() => ({ same:1 }),qualify:() => ({ qualified:true }),browser });
+  assert.equal(terminal.browserStarted,true); assert.equal(terminal.browserLaunchFailed,false); assert.equal(terminal.browserErrorCode,'ENOBUFS');
+  assert.equal(terminal.browserExit,browser.status); assert.equal(terminal.browserSignal,browser.signal); assert.equal(terminal.fullReleaseQualified,false);
+  assert.throws(() => withJourneyAdmission(work,'dispatch-overflow',noLoginWindowProfile(),(_output,update) => {
+    update('browser'); update('terminal-evidence',browserWasStarted(browser)); throw new Error('Report rejected');
+  }));
+  const admission = JSON.parse(readFileSync(join(work,'dispatch-overflow','admission-terminal.json')));
+  assert.equal(admission.state,'failed'); assert.equal(admission.browserStarted,true); assert.equal(admission.required,2);
+});
+test('an actual ENOENT spawn remains not-run while terminal source and stack are attempted', t => {
+  const { work,output } = fixture(t), calls = [];
+  const browser = spawnSync(join(work,'missing-executable'),[],{ env:{ PATH:'/usr/bin:/bin' } });
+  assert.equal(browser.error?.code,'ENOENT'); assert.equal(browserWasStarted(browser),false);
+  const terminal = retainJourneyEnd({ work,output,sourceBefore:{},captureSource:() => { calls.push('source'); return {}; },qualify:() => { calls.push('stack'); return { qualified:true }; },browser });
+  assert.deepEqual(calls,['source','stack']); assert.equal(terminal.browserStarted,false); assert.equal(terminal.browserLaunchFailed,true); assert.equal(terminal.browserErrorCode,'ENOENT');
+  assert.equal(terminal.browserExit,browser.status); assert.equal(terminal.browserSignal,browser.signal); assert.equal(terminal.fullReleaseQualified,false);
+});
+test('actual no-login report redaction refuses a symlink before any outside read or write', t => {
+  const { work,output } = fixture(t), outside = mkdtempSync(join(tmpdir(),'outside-redaction.'));
+  t.after(() => rmSync(outside,{ recursive:true,force:true }));
+  const target = join(outside,'fictional-report.json'), raw = join(output,'results-raw.json');
+  const before = JSON.stringify({ value:'fixture-secret',marker:'outside-only' }); writeFileSync(target,before); symlinkSync(target,raw);
+  assert.throws(() => retainNoLoginReport(work,output,raw,{ APPROVE_LINK_SECRET:'fixture-secret' }),/Owned regular evidence/);
+  assert.equal(readFileSync(target,'utf8'),before); assert.throws(() => readFileSync(join(output,'results.json')));
+});
+test('report reader refuses a symlink ancestor even when its target is inside the owned tree', t => {
+  const { work,output } = fixture(t), real = join(work,'actual'); mkdirSync(real,{ mode:0o700 });
+  const file = join(real,'report.json'); writeFileSync(file,'{}'); const link = join(output,'link'); symlinkSync(real,link);
+  assert.throws(() => readOwnedJourneyFile(work,join(link,'report.json')),/ancestor/);
+  assert.throws(() => writeOwnedJourneyFile(work,join(link,'new.json'),'{}'),/ancestor/);
+  assert.throws(() => readFileSync(join(real,'new.json')));
+});
+test('guarded report read is bounded and never treats a directory as JSON bytes', t => {
+  const { work,output } = fixture(t), report = join(output,'report.json'); writeFileSync(report,'x'.repeat(128));
+  assert.throws(() => readOwnedJourneyFile(work,report,32),/bounded/);
+  assert.throws(() => readOwnedJourneyFile(work,output),/regular/);
+  assert.equal(readOwnedJourneyFile(work,report,128),'x'.repeat(128));
+});
+test('actual no-login redaction atomically retains both owned reports with no temporary files', t => {
+  const { work,output } = fixture(t), raw = join(output,'results-raw.json');
+  writeFileSync(raw,JSON.stringify({ suites:[],value:'fixture-secret' }),{ mode:0o600 });
+  const report = retainNoLoginReport(work,output,raw,{ APPROVE_LINK_SECRET:'fixture-secret' });
+  assert.equal(report.value,'fixture-secret');
+  const evidence = JSON.parse(readOwnedJourneyFile(work,raw)); assert.equal(evidence.value,'[redacted-local-secret]');
+  assert.deepEqual(JSON.parse(readOwnedJourneyFile(work,join(output,'results.json'))),evidence);
+  assert.equal(statSync(raw).mode & 0o777,0o600); assert.equal(statSync(raw).nlink,1);
+  const inventory = inventoryJourneyArtifacts({ work,proofFiles:[output] });
+  assert.deepEqual(inventory.issues,[]); assert.ok(!inventory.files.some(file => file.path.includes('.retention-')));
+});
+test('atomic owned writes preserve existing evidence and refuse a dangling symlink destination', t => {
+  const { work,output } = fixture(t), existing = join(output,'existing.json'); writeFileSync(existing,'original');
+  assert.throws(() => writeOwnedJourneyFile(work,existing,'new'),/Existing evidence/); assert.equal(readFileSync(existing,'utf8'),'original');
+  const target = join(work,'never-created.json'), link = join(output,'dangling.json'); symlinkSync(target,link);
+  assert.throws(() => writeOwnedJourneyFile(work,link,'{}',{ replace:true }),/Existing evidence/);
+  assert.throws(() => readFileSync(target));
+});
+test('primary profile CLI refuses an unowned symlink report before closed-manifest interpretation', t => {
+  const { output } = fixture(t), outside = mkdtempSync(join(tmpdir(),'outside-primary-report.'));
+  t.after(() => rmSync(outside,{ recursive:true,force:true }));
+  const outsideReport = join(outside,'report.json'); writeFileSync(outsideReport,'{}'); const report = join(output,'results.json'); symlinkSync(outsideReport,report);
+  const root = resolve(import.meta.dirname,'../..');
+  const result = spawnSync(process.execPath,[join(root,'scripts/full-model-journey-profile.mjs'),'validate','full-native',report],{ cwd:root,encoding:'utf8',env:{ PATH:'/usr/bin:/bin' } });
+  assert.equal(result.status,1); assert.match(result.stderr,/Owned regular evidence file required/); assert.equal(result.stdout,'');
+  assert.equal(readFileSync(outsideReport,'utf8'),'{}');
 });

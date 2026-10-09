@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { basename, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readOwnedJourneyFile } from './journey-evidence-files.mjs';
 
 // Closed inclusion inventory. Environment cleaning in the runner is the other
 // half of this contract: an unlisted inherited switch must never become live.
@@ -279,7 +280,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     else if (action === 'specs') console.log(profile.specs.map(item => item.file).join('\n'));
     else if (action === 'manifest') console.log(JSON.stringify(profile, null, 2));
     else if (action === 'preflight') { preflight(profile, resolve(input || '.')); console.log('Closed profile preflight passed; no release qualification is implied.'); }
-    else if (action === 'validate') console.log(JSON.stringify(validateReport(JSON.parse(readFileSync(input, 'utf8')), profile), null, 2));
+    else if (action === 'validate') console.log(JSON.stringify(validateReport(JSON.parse(readOwnedJourneyFile(dirname(resolve(input)),resolve(input))), profile), null, 2));
     else if (action === 'stack-env') console.log(shellEnvironment(parseLocalStackEnv(readFileSync(input, 'utf8'))));
     else if (action === 'source') console.log(JSON.stringify(sourceInventory(resolve(input || '.')), null, 2));
     else if (action === 'schema') console.log(JSON.stringify(readdirSync(input).filter(file => /^\d{14}_.*\.sql$/.test(file)).sort()

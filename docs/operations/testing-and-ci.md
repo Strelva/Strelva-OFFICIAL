@@ -671,3 +671,12 @@ mail delivery, providers, commercial approval, client qualification or release.
 
 Lightweight regression command (no services, browser or provider calls):
 `node --test scripts/tests/journey-evidence-retention.node-test.mjs scripts/tests/no-login-runner-hook.node-test.mjs scripts/tests/no-login-journey-window.node-test.mjs scripts/tests/tenant-cleanup-journey-window.node-test.mjs scripts/private-authority-journey-window.test.mjs scripts/tests/full-model-journey-profile.node-test.mjs`.
+
+Report interpretation now uses the shared owned regular-file reader before JSON
+parsing or no-login redaction. Reads are bounded to 64 MiB and reject symlink
+leaves/ancestors, nonregular files, changed descriptors and linked files. Redacted
+reports are published atomically with mode 0600 in the private owned directory;
+existing proof is preserved unless replacing the admitted raw report entry.
+A dispatched child killed by output overflow remains a failed dispatched window,
+with its original status/signal and a fixed error code. An ENOENT launch remains
+not-run; neither distinction qualifies native cases or outside delivery.

@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync, existsSync, realpathSync, statSync } from 'node:fs';
+import { mkdirSync, readFileSync, existsSync, realpathSync, statSync } from 'node:fs';
 import { join, resolve, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readOwnedJourneyFile, writeOwnedJourneyFile } from './journey-evidence-files.mjs';
 import { retainJourneyEnd } from './journey-evidence-retention.mjs';
 import { journeyProfile, parseLocalStackEnv, preflight, sourceInventory, validateReport } from './full-model-journey-profile.mjs';
 
@@ -60,13 +61,13 @@ export function runPrivateAuthorityWindow(rootInput, workInput) {
   if (dirname(realpathSync(owned.STRELVA_AUTH_STACK_DIR)) !== work || process.env.STRELVA_PRIVATE_AUTHORITY_FRESH_PATH !== work) throw new Error('Dedicated fresh stack required; reuse is forbidden.');
   const browserEnv = closedPrivateEnvironment(process.env, owned, work);
   const source = sourceInventory(root);
-  if (JSON.stringify(source) !== readFileSync(join(work, 'source.json'), 'utf8').trim()) {
-    if (JSON.stringify(source) !== JSON.stringify(JSON.parse(readFileSync(join(work, 'source.json'), 'utf8')))) throw new Error('Source differs from fresh orchestration snapshot.');
+  if (JSON.stringify(source) !== readOwnedJourneyFile(work,join(work,'source.json')).trim()) {
+    if (JSON.stringify(source) !== JSON.stringify(JSON.parse(readOwnedJourneyFile(work,join(work,'source.json'))))) throw new Error('Source differs from fresh orchestration snapshot.');
   }
   const output = join(work, 'private-authority');
   if (existsSync(output)) throw new Error('Authority evidence already exists; create a fresh stack.');
   mkdirSync(output, { mode: 0o700 });
-  const save = (file, data) => writeFileSync(join(output, file), JSON.stringify(data, null, 2), { mode: 0o600, flag: 'wx' });
+  const save = (file,data) => writeOwnedJourneyFile(work,join(output,file),JSON.stringify(data,null,2));
   save('manifest.json', profile); save('source.json', source); save('primary-contract.json', profile.primaryWindows);
   const qualify = () => {
     const value = JSON.parse(execFileSync(process.execPath, [join(root, 'scripts/full-model-stack-qualification.mjs'), 'verify', root, join(work, 'env')], {
@@ -80,13 +81,13 @@ export function runPrivateAuthorityWindow(rootInput, workInput) {
   const browser = spawnSync('pnpm', ['exec', 'playwright', 'test', profile.specs[0].file, '--workers=1', '--retries=0', '--reporter=line,json', `--output=${join(output, 'artifacts')}`], {
     cwd: root, encoding: 'utf8', env: { ...browserEnv, PLAYWRIGHT_JSON_OUTPUT_FILE: resultPath }, maxBuffer: 32 * 1024 * 1024,
   });
-  writeFileSync(join(output, 'browser.log'), `${browser.stdout || ''}\n${browser.stderr || ''}`, { mode: 0o600, flag: 'wx' });
+  writeOwnedJourneyFile(work,join(output,'browser.log'),`${browser.stdout || ''}\n${browser.stderr || ''}`);
   const terminal = retainJourneyEnd({ work, output, sourceBefore: source, captureSource: () => sourceInventory(root), qualify, browser,
     artifactDir: join(output, 'artifacts'), reportPath: resultPath, proofFiles: [output] });
   if (!terminal.retentionValidated) throw new Error('Authority terminal evidence is unqualified.');
-  const after = JSON.parse(readFileSync(join(output, 'stack-after.json'), 'utf8'));
+  const after = JSON.parse(readOwnedJourneyFile(work,join(output,'stack-after.json')));
   if (JSON.stringify(before) !== JSON.stringify(after)) throw new Error('Authority catalog/identity changed; retained evidence is unqualified.');
-  const validated = validateReport(JSON.parse(readFileSync(resultPath, 'utf8')), profile);
+  const validated = validateReport(JSON.parse(readOwnedJourneyFile(work,resultPath)), profile);
   if (browser.error || browser.status !== 0) throw new Error(`Authority browser failed; retain ${output}.`);
   const result = { ...validated, primaryWindows: profile.primaryWindows, nativeExecuted: true, productionQualification: false, fullReleaseQualified: false };
   save('receipt.json', result); return result;

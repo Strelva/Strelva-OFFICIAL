@@ -1,8 +1,9 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { retainJourneyEnd, withJourneyAdmission } from './journey-evidence-retention.mjs';
+import { retainJourneyEnd, withJourneyAdmission, browserWasStarted } from './journey-evidence-retention.mjs';
+import { readOwnedJourneyFile, writeOwnedJourneyFile } from './journey-evidence-files.mjs';
 import { journeyProfile, parseLocalStackEnv, preflight, validateReport } from './full-model-journey-profile.mjs';
 import { assertCleanupEnvironment } from './tenant-cleanup-journey-window.mjs';
 
@@ -96,6 +97,14 @@ export function noLoginReportEvidence(raw, runtime) {
   }
 }
 
+/** Guard the actual report before interpreting or rewriting its bytes. */
+export function retainNoLoginReport(work, output, rawResult, runtime) {
+  const { report,evidence } = noLoginReportEvidence(readOwnedJourneyFile(work,rawResult),runtime);
+  writeOwnedJourneyFile(work,rawResult,JSON.stringify(evidence,null,2),{ replace:true });
+  writeOwnedJourneyFile(work,join(output,'results.json'),JSON.stringify(evidence,null,2));
+  return report;
+}
+
 /** The child sees only the finite OS baseline and this owner's parsed runtime.
  * PGOPTIONS, SDK secrets, preloads and arbitrary inherited switches stay out. */
 export function noLoginChildEnvironment(parent, runtime) {
@@ -118,17 +127,17 @@ export function runNoLoginWindow(rootInput, workInput) {
     const childEnv = noLoginChildEnvironment(process.env, runtime);
     assertNoLoginAuthConfiguration(readFileSync(join(owned.STRELVA_AUTH_STACK_DIR, 'supabase/config.toml'), 'utf8'));
     if (native.specs.reduce((sum, item) => sum + item.count, 0) !== 34
-      || JSON.stringify(native) !== JSON.stringify(JSON.parse(readFileSync(join(work, 'manifest-native.json'), 'utf8')))) throw new Error('Unchanged exact native manifest is required.');
+      || JSON.stringify(native) !== JSON.stringify(JSON.parse(readOwnedJourneyFile(work,join(work,'manifest-native.json'))))) throw new Error('Unchanged exact native manifest is required.');
     const captureSource = () => JSON.parse(execFileSync(process.execPath, [join(root, 'scripts/full-model-journey-profile.mjs'), 'source', 'full-native', root],
       { cwd: root, env: childEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 16 * 1024 * 1024 }));
     const source = captureSource();
-    if (JSON.stringify(source) !== JSON.stringify(JSON.parse(readFileSync(join(work, 'source.json'), 'utf8')))) throw new Error('Source changed after the native runner pin.');
+    if (JSON.stringify(source) !== JSON.stringify(JSON.parse(readOwnedJourneyFile(work,join(work,'source.json'))))) throw new Error('Source changed after the native runner pin.');
     let nativeReportState = { state: 'not-run', required: 34, fullReleaseQualified: false };
     if (existsSync(join(work, 'results-native.json'))) {
-      try { nativeReportState = { state: 'passed', ...validateReport(JSON.parse(readFileSync(join(work, 'results-native.json'), 'utf8')), native) }; }
+      try { nativeReportState = { state: 'passed', ...validateReport(JSON.parse(readOwnedJourneyFile(work,join(work,'results-native.json'))), native) }; }
       catch { nativeReportState = { state: 'failed', required: 34, fullReleaseQualified: false, evidence: '../results-native.json' }; }
     }
-    const save = (name, data) => writeFileSync(join(output, name), JSON.stringify(redactNoLoginEvidence(data, runtime), null, 2), { mode: 0o600 });
+    const save = (name,data) => writeOwnedJourneyFile(work,join(output,name),JSON.stringify(redactNoLoginEvidence(data,runtime),null,2));
     save('manifest.json', profile); save('source.json', source); save('native-contract.json', native); save('native-report-state.json', nativeReportState);
     const qualify = () => JSON.parse(execFileSync(process.execPath,
       [join(root, 'scripts/full-model-stack-qualification.mjs'), 'verify', root, join(work, 'env')], { cwd: root, env: childEnv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 16 * 1024 * 1024 }));
@@ -138,14 +147,13 @@ export function runNoLoginWindow(rootInput, workInput) {
     const browser = spawnSync('pnpm', ['exec', 'playwright', 'test', fixedSpec, '--workers=1', '--retries=0', '--reporter=line,json', `--output=${join(output, 'artifacts')}`], {
       cwd: root, encoding: 'utf8', env: { ...childEnv, PLAYWRIGHT_JSON_OUTPUT_FILE: rawResult }, maxBuffer: 16 * 1024 * 1024,
     });
-    writeFileSync(join(output, 'browser.log'), redactNoLoginEvidence(`${browser.stdout || ''}\n${browser.stderr || ''}`, runtime), { mode: 0o600 });
-    update('terminal-evidence', !browser.error);
+    update('terminal-evidence',browserWasStarted(browser));
+    writeOwnedJourneyFile(work,join(output,'browser.log'),redactNoLoginEvidence(`${browser.stdout || ''}\n${browser.stderr || ''}`,runtime));
     // Redact structured evidence before inventory and retain terminal observations
     // even when the report is missing, malformed or rejected.
-    let report, evidence;
-    try { ({ report, evidence } = noLoginReportEvidence(readFileSync(rawResult, 'utf8'), runtime));
-      writeFileSync(rawResult, JSON.stringify(evidence, null, 2), { mode: 0o600 }); save('results.json', evidence);
-    } catch { save('report-failure.json', { reason: 'browser-report-missing', fullReleaseQualified: false }); }
+    let report;
+    try { report = retainNoLoginReport(work,output,rawResult,runtime); }
+    catch { save('report-failure.json',{ reason:'browser-report-unreadable',fullReleaseQualified:false }); }
     const terminal = retainJourneyEnd({ work, output, sourceBefore: source, captureSource, qualify, browser,
       artifactDir: join(output, 'artifacts'), reportPath: join(output, 'results.json'), proofFiles: [output] });
     let receipt;

@@ -1,7 +1,8 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readOwnedJourneyFile, writeOwnedJourneyFile } from './journey-evidence-files.mjs';
 import { retainJourneyEnd } from './journey-evidence-retention.mjs';
 import { journeyProfile, parseLocalStackEnv, preflight, sourceInventory, validateReport } from './full-model-journey-profile.mjs';
 
@@ -44,18 +45,18 @@ export function runCleanupWindow(rootInput, workInput) {
   // 34-case report. It can retain useful recovery evidence even if an unrelated
   // native case failed; the caller's original failure status remains unchanged.
   if (native.specs.reduce((sum, item) => sum + item.count, 0) !== 34
-    || JSON.stringify(native) !== JSON.stringify(JSON.parse(readFileSync(join(work, 'manifest-native.json'), 'utf8')))) throw new Error('Unchanged exact native manifest is required.');
+    || JSON.stringify(native) !== JSON.stringify(JSON.parse(readOwnedJourneyFile(work,join(work,'manifest-native.json'))))) throw new Error('Unchanged exact native manifest is required.');
   let nativeReportState = { state: 'not-run', required: 34, fullReleaseQualified: false };
   if (existsSync(join(work, 'results-native.json'))) {
-    try { nativeReportState = { state: 'passed', ...validateReport(JSON.parse(readFileSync(join(work, 'results-native.json'), 'utf8')), native) }; }
+    try { nativeReportState = { state: 'passed', ...validateReport(JSON.parse(readOwnedJourneyFile(work,join(work,'results-native.json'))), native) }; }
     catch { nativeReportState = { state: 'failed', required: 34, fullReleaseQualified: false, evidence: '../results-native.json' }; }
   }
   const source = sourceInventory(root);
-  if (JSON.stringify(source) !== JSON.stringify(JSON.parse(readFileSync(join(work, 'source.json'), 'utf8')))) throw new Error('Source changed after native proof.');
+  if (JSON.stringify(source) !== JSON.stringify(JSON.parse(readOwnedJourneyFile(work,join(work,'source.json'))))) throw new Error('Source changed after native proof.');
   const output = join(work, 'tenant-cleanup-recovery');
   if (existsSync(output)) throw new Error('Cleanup recovery evidence already exists; use a new owned proof directory.');
   mkdirSync(output, { mode: 0o700 });
-  const save = (name, data) => writeFileSync(join(output, name), JSON.stringify(data, null, 2), { mode: 0o600 });
+  const save = (name,data) => writeOwnedJourneyFile(work,join(output,name),JSON.stringify(data,null,2));
   save('manifest.json', profile); save('source.json', source); save('native-contract.json', native); save('native-report-state.json', nativeReportState);
   const qualify = () => JSON.parse(execFileSync(process.execPath,
     [join(root, 'scripts/full-model-stack-qualification.mjs'), 'verify', root, join(work, 'env')], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 16 * 1024 * 1024 }));
@@ -66,11 +67,11 @@ export function runCleanupWindow(rootInput, workInput) {
     cwd: root, encoding: 'utf8', env: { ...process.env, STRELVA_TENANT_CLEANUP_UI_PROOF: '1', PLAYWRIGHT_JSON_OUTPUT_FILE: resultPath },
     maxBuffer: 16 * 1024 * 1024,
   });
-  writeFileSync(join(output, 'browser.log'), `${browser.stdout || ''}\n${browser.stderr || ''}`, { mode: 0o600 });
+  writeOwnedJourneyFile(work,join(output,'browser.log'),`${browser.stdout || ''}\n${browser.stderr || ''}`);
   const terminal = retainJourneyEnd({ work, output, sourceBefore: source, captureSource: () => sourceInventory(root), qualify,
     artifactDir: join(output, 'artifacts'), reportPath: resultPath, proofFiles: [output], browser });
   let receipt;
-  try { receipt = validateReport(JSON.parse(readFileSync(resultPath, 'utf8')), profile); }
+  try { receipt = validateReport(JSON.parse(readOwnedJourneyFile(work,resultPath)), profile); }
   catch (error) { throw new Error(`Cleanup recovery report rejected; retain ${output}: ${error.message}`); }
   if (browser.error || browser.status !== 0) throw new Error(`Cleanup recovery browser failed; retain ${output}.`);
   if (!terminal.retentionValidated) throw new Error('Cleanup recovery terminal evidence is unqualified.');
