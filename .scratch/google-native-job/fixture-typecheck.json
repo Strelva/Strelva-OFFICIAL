@@ -1,0 +1,1 @@
+{"extends":"../../tsconfig.json","compilerOptions":{"incremental":false,"plugins":[]},"include":["../../src/__tests__/publishing-google-execution.test.ts"],"exclude":["../../node_modules","../../.next"]}

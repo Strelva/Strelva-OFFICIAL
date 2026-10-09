@@ -1,10 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { encryptSecret } from "@/platform/infra/crypto/secrets";
+import type { AccountBindingWithSecrets } from "@/platform/account-bindings/contracts";
+import type { readGoogleBindingForTenant } from "@/platform/account-bindings/store";
+import type { GoogleGrant } from "@/lib/google-access";
+import type { TenantReplyDeps } from "@/products/google-listing/tenant-replies";
+import { nativeGoogleGrantGeneration, nativeGoogleGrantPinSchema } from "@/products/google-listing/native/contracts";
 import type { UnifiedEvent } from "@/platform/infra/event-contract";
 import type { GoogleListingClient, GoogleLocationState } from "@/products/google-listing/client";
 import { createMemoryReceiptStore } from "@/products/google-listing/receipts";
 
 const m = vi.hoisted(() => ({
-  rpc: vi.fn(), snapshot: vi.fn(), deps: vi.fn(), record: vi.fn(), add: vi.fn(), mark: vi.fn(), unconfirmed: vi.fn(), mirror: vi.fn(),
+  binding: vi.fn<typeof readGoogleBindingForTenant>(), rpc: vi.fn(), snapshot: vi.fn(), deps: vi.fn(), record: vi.fn(), add: vi.fn(), mark: vi.fn(), unconfirmed: vi.fn(), mirror: vi.fn(),
 }));
 vi.mock("@/products/google-listing/tenant-replies", () => ({ defaultTenantReplyDeps: m.deps }));
 vi.mock("@/products/publishing/server", () => ({
@@ -17,23 +23,33 @@ vi.mock("@/platform/owner-entry/linked-sites", () => ({ readLinkedSite: async ()
 vi.mock("@/platform/infra/auth", () => ({ hasTenantPermission: async () => true }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: m.rpc }) }));
 vi.mock("@/platform/infra/tenant-publishing", () => ({ tenantPublishingPorts: async () => ({ addEvent: m.add, markExecutionExternalAccepted: m.mark, markExecutionExternalUnconfirmed: m.unconfirmed, mirrorPublishedReviewReply: m.mirror }) }));
-vi.mock("@/platform/account-bindings/store", () => ({ readGoogleBindingForTenant: async () => ({ workspaceId: "5e000000-0000-4000-8000-000000000010", locations: [{ accountId: "account", locationId: "location" }] }) }));
+vi.mock("@/platform/account-bindings/store", async importOriginal => ({ ...await importOriginal<typeof import("@/platform/account-bindings/store")>(), readGoogleBindingForTenant: m.binding }));
 vi.mock("@/products/google-listing/controls", () => ({ readListingControl: async () => ({ paused: false }), noteListingAccess: async () => undefined, setListingPaused: vi.fn() }));
 vi.mock("@/products/google-listing/pacing", () => ({ paceGoogleWrites: (client: GoogleListingClient) => client }));
 
 import { changeWorkspaceGoogleReply, executeGoogleListingEvent, prepareGoogleListingDraft, undoWorkspaceGoogleChange } from "@/products/google-listing/workspace";
 const originalSystemsRelease = process.env.STRELVA_SYSTEMS_RELEASE;
 const originalWorkspaceRelease = process.env.STRELVA_WORKSPACE_RELEASE;
-afterEach(() => { if (originalSystemsRelease === undefined) delete process.env.STRELVA_SYSTEMS_RELEASE; else process.env.STRELVA_SYSTEMS_RELEASE = originalSystemsRelease; if (originalWorkspaceRelease === undefined) delete process.env.STRELVA_WORKSPACE_RELEASE; else process.env.STRELVA_WORKSPACE_RELEASE = originalWorkspaceRelease; });
+afterEach(() => { vi.unstubAllEnvs(); if (originalSystemsRelease === undefined) delete process.env.STRELVA_SYSTEMS_RELEASE; else process.env.STRELVA_SYSTEMS_RELEASE = originalSystemsRelease; if (originalWorkspaceRelease === undefined) delete process.env.STRELVA_WORKSPACE_RELEASE; else process.env.STRELVA_WORKSPACE_RELEASE = originalWorkspaceRelease; });
 const workspaceId = "5e000000-0000-4000-8000-000000000010";
 const actor = { userId: "5e000000-0000-4000-8000-000000000001", verifiedEmail: "owner@example.test" };
 const location = { accountId: "account", locationId: "location" };
 const event: UnifiedEvent = { id: "google-approval", tenantId: "fixture", source: "google", type: "content_update", title: "Post", body: "Holiday hours", status: "pending", createdAt: "2026-10-07T14:00:00Z", metadata: { kind: "workspace_google_listing_draft", workspaceId, locationId: location.locationId, draft: { action: "post", post: { topicType: "STANDARD", summary: "Holiday hours" } } } };
+const nativeBinding: AccountBindingWithSecrets = {
+  id: "5e000000-0000-4000-8000-000000000020", workspaceId, provider: "google",
+  subject: "fictional-native-google-principal", originTenantId: null, originTenantStableId: null,
+  scopes: ["openid", "https://www.googleapis.com/auth/business.manage"], status: "connected",
+  accessTokenCiphertext: "fictional-access-ciphertext", refreshTokenCiphertext: "fictional-refresh-ciphertext",
+  tokenExpiresAt: "2099-01-01T00:00:00Z", lastCheckedAt: null, lastError: null, migratedFrom: "oauth",
+  createdAt: "2026-10-07T14:00:00Z", updatedAt: "2026-10-07T14:00:00Z",
+  locations: [{ accountId: "accounts/account", locationId: "location", title: "Fictional native place", isPrimary: true }],
+};
 let client: GoogleListingClient;
 beforeEach(() => {
   vi.resetAllMocks();
   process.env.STRELVA_SYSTEMS_RELEASE = "1";
   process.env.STRELVA_WORKSPACE_RELEASE = "1";
+  m.binding.mockResolvedValue({ ...nativeBinding, originTenantId: "fixture", originTenantStableId: "5e000000-0000-4000-8000-000000000030" });
   m.rpc.mockResolvedValue({ data: true, error: null });
   m.snapshot.mockResolvedValue({ bindings: [{ id: "5e000000-0000-4000-8000-000000000020", originTenantId: "fixture", locations: [{ locationId: "location" }] }] });
   let reply: string | null = null;
@@ -56,10 +72,35 @@ const execute = (attemptId: string) => executeGoogleListingEvent({ tenantId: "fi
 describe("Google approval recovery", () => {
   it("native Google authoring and execution reuse approval receipts, read-back and undo", async () => {
     const tenantId = `workspace-${workspaceId}`;
-    m.snapshot.mockResolvedValue({ bindings: [{ originTenantId: null, locations: [{ locationId: "location" }] }] });
+    vi.stubEnv("STRELVA_GOOGLE_BINDINGS", "1");
+    vi.stubEnv("STRELVA_NATIVE_GOOGLE_ONLY", "1");
+    vi.stubEnv("SECRETS_ENC_KEY", "fictional-native-google-test-encryption-key");
+    const currentBinding: AccountBindingWithSecrets = {
+      ...nativeBinding,
+      accessTokenCiphertext: encryptSecret("fictional-native-access-token"),
+      refreshTokenCiphertext: encryptSecret("fictional-native-refresh-token"),
+    };
+    m.binding.mockResolvedValue(currentBinding);
+    m.snapshot.mockResolvedValue({ bindings: [currentBinding] });
+    const grant: GoogleGrant = {
+      source: "binding", tenantId, status: "connected", scopes: currentBinding.scopes ?? undefined,
+      accessToken: "fictional-native-access-token", refreshToken: "fictional-native-refresh-token",
+      expiresAt: currentBinding.tokenExpiresAt, bindingId: currentBinding.id, bindingUpdatedAt: currentBinding.updatedAt,
+      workspaceId, location: { accountId: "accounts/account", locationId: "location" }, connection: null,
+    };
+    const nativeReceipts = createMemoryReceiptStore();
+    const nativeDeps = {
+      releaseEnabled: () => true, bindingTarget: async () => ({ workspaceId }), grant: async () => grant,
+      location: vi.fn(async () => { throw new Error("Native fixture must never use a legacy location fallback."); }),
+      accessToken: async (current: GoogleGrant) => current.accessToken, client: () => client,
+      receipts: () => nativeReceipts, notify: vi.fn(),
+    } satisfies TenantReplyDeps;
+    m.deps.mockResolvedValue(nativeDeps);
     const draft = await prepareGoogleListingDraft(actor, { workspaceId, tenantId, locationId: "location", kind: "post", post: { topicType: "STANDARD", summary: "Holiday hours" } });
     expect(client.createPost).not.toHaveBeenCalled();
-    expect(draft).toMatchObject({ tenantId, status: "pending", metadata: { workspaceId } });
+    const pin = nativeGoogleGrantPinSchema.parse(draft.metadata?.nativeGrant);
+    expect(pin).toEqual({ bindingId: currentBinding.id, accountId: "accounts/account", grantGeneration: nativeGoogleGrantGeneration(currentBinding) });
+    expect(draft).toMatchObject({ tenantId, status: "pending", metadata: { workspaceId, nativeGrant: pin } });
     const input = { tenantId, event: draft, actorId: actor.userId, attemptId: "native-attempt" };
     const result = await executeGoogleListingEvent(input);
     expect(result).toMatchObject({ accepted: true, verified: true });
@@ -67,8 +108,10 @@ describe("Google approval recovery", () => {
     expect(client.createPost).toHaveBeenCalledOnce();
     vi.mocked(client.deletePost).mockResolvedValue({ ok: true, data: null });
     vi.mocked(client.getPost).mockResolvedValue({ ok: false, kind: "not_found", status: 404, detail: "Deleted" });
-    expect(await undoWorkspaceGoogleChange(actor, { workspaceId, tenantId, locationId: "location", receiptId: result!.receiptId! })).toMatchObject({ status: "posted" });
+    expect(await undoWorkspaceGoogleChange(actor, { workspaceId, tenantId, locationId: "location", receiptId: result!.receiptId!, nativeGrant: pin })).toMatchObject({ status: "posted" });
     expect(client.deletePost).toHaveBeenCalledOnce();
+    expect(nativeDeps.location).not.toHaveBeenCalled();
+    expect(m.binding).toHaveBeenCalledWith(tenantId);
   });
   it("native Google refuses another business scope and non-owner authoring", async () => {
     m.snapshot.mockResolvedValue({ bindings: [{ originTenantId: null, locations: [{ locationId: "location" }] }] });
