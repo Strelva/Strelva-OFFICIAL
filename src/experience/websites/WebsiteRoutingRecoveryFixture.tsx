@@ -7,7 +7,7 @@ import { RebuildExperience } from "./RebuildExperience";
 /** Fictional browser transport is intercepted before mounting the actual HTTP consumer. */
 export function WebsiteRoutingRecoveryFixture({ domain }: { domain: boolean }) {
   const [operator, setOperator] = useState(domain);
-  return <main data-dashboard className="min-h-screen bg-surface-base">
+  return <main data-dashboard className="min-h-screen bg-surface-base text-warm-black">
     <header className="flex flex-wrap gap-4 border-b border-gray-border p-6 text-sm">
       <p>Fictional routing recovery · no DNS, Auth, provider or publication proof</p>
       <Button variant="secondary" className="max-w-full whitespace-normal" onClick={() => setOperator(value => !value)}>{operator ? "Remove fictional operator access" : "Restore fictional operator access"}</Button>
