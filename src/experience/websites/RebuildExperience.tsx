@@ -122,6 +122,11 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
   const connectionFocus = useRef<FocusRecovery | null>(null);
   const decisionFocus = useRef<FocusRecovery | null>(null);
   const decisionsRef = useRef<HTMLElement>(null);
+  const flaggedInputRef = useRef<HTMLTextAreaElement>(null);
+  const flaggedEditButtons = useRef(new Map<string, HTMLButtonElement>());
+  const lastFlaggedEditing = useRef<string | null>(null);
+  const cancelledFlaggedEdit = useRef<string | null>(null);
+  const decisionEditRecovery = useRef(false);
   const requestId = useRef(createWebsiteRequestId());
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; connectionFocus.current?.cancel(); decisionFocus.current?.cancel(); removedContactFocus.current?.cancel(); }; }, []);
@@ -167,18 +172,20 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
     if (busy) return;
     connectionFocus.current?.recover(connectionHeadingRef.current);
     connectionFocus.current = null;
-    decisionFocus.current?.recover(reviewHeadingRef.current);
+    decisionFocus.current?.recover(decisionEditRecovery.current && editing ? flaggedInputRef.current : reviewHeadingRef.current, decisionEditRecovery.current);
     decisionFocus.current = null;
+    decisionEditRecovery.current = false;
     if (removedContactFocus.current) {
       removedContactFocus.current.recover(factsSummaryRef.current ?? reviewHeadingRef.current);
       removedContactFocus.current = null;
     }
-  }, [record, busy]);
-  function resolveDecision(factId: string, action: "confirm" | "remove") {
+  }, [record, busy, editing]);
+  function resolveDecision(factId: string, action: "confirm" | "remove" | "edit") {
     if (!record || inFlight.current || busy || readOnly || loading) return;
     const recovery = beginFocusRecovery(decisionsRef.current);
     decisionFocus.current = recovery;
-    void run(() => transport.mutate(record, action, { factId }), action === "confirm" ? "Fact confirmed in a new revision." : "Fact removed in a new revision.");
+    decisionEditRecovery.current = action === "edit";
+    void run(() => transport.mutate(record, action, { factId, ...(action === "edit" ? { text: editedText.trim() } : {}) }), action === "confirm" ? "Fact confirmed in a new revision." : action === "remove" ? "Fact removed in a new revision." : "Fact updated in a new revision. Review the changed preview.");
   }
   const decisions = record ? flaggedFacts(record) : [];
   const decisionIds = new Set(decisions.map(([id]) => id));
@@ -186,6 +193,18 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
   const startReady = descriptionMode ? Boolean(businessName.trim() && description.trim()) : Boolean(url.trim());
   const ready = useSyncExternalStore(() => () => {}, () => true, () => false);
   const disabled = !ready || busy || readOnly || loading || record?.status === "building";
+  useEffect(() => {
+    if (cancelledFlaggedEdit.current) {
+      const editButton = flaggedEditButtons.current.get(cancelledFlaggedEdit.current);
+      (editButton && !editButton.disabled ? editButton : reviewHeadingRef.current)?.focus();
+      cancelledFlaggedEdit.current = null;
+    } else {
+      if (disabled) return;
+      if (editing && editing !== lastFlaggedEditing.current) flaggedInputRef.current?.focus();
+    }
+    lastFlaggedEditing.current = editing;
+  }, [editing, disabled]);
+
   const candidate = record?.candidate;
   const agencyPermission = record?.agencyPublishPermission;
   const pathHosted = Boolean(SITES_PATH_ORIGIN && record?.publishedUrl?.startsWith(`${SITES_PATH_ORIGIN}/sites/`));
@@ -230,8 +249,8 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
           </section>
           <aside ref={decisionsRef} className={styles.decisions} aria-labelledby="rebuild-decisions-heading"><div className={styles.sectionHeader}><h2 ref={reviewHeadingRef} tabIndex={-1} id="rebuild-decisions-heading">{decisions.length ? `${decisions.length} ${decisions.length === 1 ? "decision needs" : "decisions need"} you` : "Ready for your review"}</h2><p>Only uncertain facts and sensitive claims appear here.</p></div>
             {decisions.length === 0 ? <p className={styles.notice}><Check size={18} aria-hidden="true" />All flagged facts have been resolved. Review the full site before approving.</p> : decisions.map(([id, fact]) => <article key={id} className={styles.fact}><p className={styles.tag}>{fact.highRisk ? "Sensitive claim · confirmation required" : "Could not confirm"}</p><p className={styles.factText}>{fact.text}</p><div className={styles.source}><strong>Source</strong>{fact.sources.length ? fact.sources.map((source, index) => <blockquote key={index}>“{source.quote}”<span>{source.sourceId.split("#sha256=")[0]}</span></blockquote>) : <p>No source found.</p>}</div>
-              {editing === id ? <form onSubmit={event => { event.preventDefault(); if (editedText.trim()) void run(() => transport.mutate(record, "edit", { factId: id, text: editedText.trim() }), "Fact updated in a new revision. Review the changed preview."); }}><TextArea label="Corrected fact" value={editedText} onChange={event => setEditedText(event.target.value)} maxLength={500} disabled={disabled} required /><div className={styles.actions}><Button type="submit" size="sm" disabled={disabled || !editedText.trim()}>Save correction</Button><Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => setEditing(null)}>Cancel</Button></div></form>
-                : <div className={styles.actions}><Button size="sm" variant="secondary" disabled={disabled} onClick={() => resolveDecision(id, "confirm")}>Confirm</Button><Button size="sm" variant="ghost" disabled={disabled} onClick={() => { setEditing(id); setEditedText(fact.text); }}>Edit</Button><Button size="sm" variant="danger" disabled={disabled} onClick={() => resolveDecision(id, "remove")}>Remove</Button></div>}
+              {editing === id ? <form onSubmit={event => { event.preventDefault(); if (editedText.trim()) resolveDecision(id, "edit"); }}><TextArea ref={flaggedInputRef} label="Corrected fact" value={editedText} onChange={event => setEditedText(event.target.value)} maxLength={500} disabled={disabled} required /><div className={styles.actions}><Button type="submit" size="sm" disabled={disabled || !editedText.trim()}>Save correction</Button><Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => { if (busy || inFlight.current) return; cancelledFlaggedEdit.current = id; setEditing(null); }}>Cancel</Button></div></form>
+                : <div className={styles.actions}><Button size="sm" variant="secondary" disabled={disabled} onClick={() => resolveDecision(id, "confirm")}>Confirm</Button><Button ref={node => { if (node) flaggedEditButtons.current.set(id, node); else flaggedEditButtons.current.delete(id); }} size="sm" variant="ghost" disabled={disabled} onClick={() => { if (disabled || inFlight.current) return; setEditing(id); setEditedText(fact.text); }}>Edit</Button><Button size="sm" variant="danger" disabled={disabled} onClick={() => resolveDecision(id, "remove")}>Remove</Button></div>}
             </article>)}
             {candidate.unmappedPages.length ? <div className={styles.fact}><h3>Old pages not carried over</h3><ul>{candidate.unmappedPages.map(path => <li key={path}>{path}</li>)}</ul><p>Review these pages before authorizing publication.</p></div> : null}
             <div className={styles.approval}><p>{record.status === "published" ? "This revision has been published." : record.approved ? "This exact preview is approved." : decisions.length ? "Resolve the flagged facts before approving." : "Approval applies to this exact revision and its content."}</p>

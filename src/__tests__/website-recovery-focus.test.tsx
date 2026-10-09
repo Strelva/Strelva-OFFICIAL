@@ -199,3 +199,63 @@ it("keeps a contact correction draft and outside focus after rejected removal", 
   expect(document.activeElement).toBe(outside); expect(field.value).toBe("help@example.test");
   expect(field.disabled).toBe(false); expect(container.querySelector('article[aria-label="orders@example.test"]')).not.toBeNull();
 });
+
+it("opens a flagged fact at its correction field and returns Cancel to its mounted Edit action", async () => {
+  const record = fixtureRebuild(); const mutate = vi.fn(async () => record);
+  const transport: RebuildTransport = { read: async () => record, start: async () => record, mutate };
+  await mount(createElement(RebuildExperience, { workspaceId: record.workspaceId, initialRecord: record, transport }));
+  const edit = button("Edit"); edit.focus(); await act(async () => edit.click());
+  expect(document.activeElement).toBe(container.querySelector("textarea"));
+  button("Cancel").focus(); await act(async () => button("Cancel").click());
+  expect(document.activeElement).toBe(button("Edit")); expect(mutate).not.toHaveBeenCalled();
+});
+
+it.each(["success", "failure"])("recovers a flagged correction %s without losing the draft or exact current authority", async outcome => {
+  const record = fixtureRebuild(), next = structuredClone(record); next.candidate!.facts.sensitive!.origin = "owner_confirmed"; next.candidate!.facts.sensitive!.text = "Revised fictional claim"; next.revision += 1; next.approved = false;
+  let resolve!: (value: typeof record) => void, reject!: (cause: Error) => void;
+  const mutate = vi.fn(() => new Promise<typeof record>((done, fail) => { resolve = done; reject = fail; }));
+  const transport: RebuildTransport = { read: async () => record, start: async () => record, mutate };
+  await mount(createElement(RebuildExperience, { workspaceId: record.workspaceId, initialRecord: record, transport }));
+  button("Edit").focus(); await act(async () => button("Edit").click());
+  const field = container.querySelector("textarea")!;
+  await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(field, "Revised fictional claim"); field.dispatchEvent(new Event("input", { bubbles: true })); });
+  const save = button("Save correction"); save.focus(); await act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+  expect(field.disabled).toBe(true); expect(button("Cancel").disabled).toBe(true);
+  expect(mutate).toHaveBeenCalledExactlyOnceWith(record, "edit", { factId: "sensitive", text: "Revised fictional claim" });
+  await act(async () => { if (outcome === "success") resolve(next); else reject(new Error("Revision changed. Reopen this review.")); });
+  if (outcome === "success") { expect(save.isConnected).toBe(false); expect(document.activeElement).toBe(container.querySelector("#rebuild-decisions-heading")); expect(container.textContent).toContain("1 decision needs you"); }
+  else { expect(field.value).toBe("Revised fictional claim"); expect(document.activeElement).toBe(field); expect(field.disabled).toBe(false); expect(container.querySelector('[role="alert"]')?.textContent).toContain("Revision changed"); }
+});
+
+it.each(["success", "failure"])("preserves outside focus when a flagged correction settles with %s", async outcome => {
+  const record = fixtureRebuild(), next = structuredClone(record); next.candidate!.facts.sensitive!.origin = "owner_confirmed"; next.revision += 1;
+  let resolve!: (value: typeof record) => void, reject!: (cause: Error) => void;
+  const transport: RebuildTransport = { read: async () => record, start: async () => record, mutate: () => new Promise((done, fail) => { resolve = done; reject = fail; }) };
+  await mount(createElement(RebuildExperience, { workspaceId: record.workspaceId, initialRecord: record, transport }));
+  button("Edit").focus(); await act(async () => button("Edit").click());
+  button("Save correction").focus(); await act(async () => container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+  const outside = outsideButton(); outside.focus();
+  await act(async () => { if (outcome === "success") resolve(next); else reject(new Error("Access changed.")); });
+  expect(document.activeElement).toBe(outside);
+  if (outcome === "failure") expect(container.querySelector("textarea")).not.toBeNull();
+});
+
+it("returns a focused flagged Cancel control to the remounted Edit button", async () => {
+  const record = fixtureRebuild();
+  const transport: RebuildTransport = { read: async () => record, start: async () => record, mutate: async () => record };
+  await mount(createElement(RebuildExperience, { workspaceId: record.workspaceId, initialRecord: record, transport }));
+  await act(async () => button("Edit").click()); button("Cancel").focus();
+  await act(async () => button("Cancel").click()); expect(document.activeElement).toBe(button("Edit"));
+});
+
+it("blocks saving after access becomes read-only but lets Cancel recover to the review heading", async () => {
+  const record = fixtureRebuild(); const mutate = vi.fn(async () => record);
+  const transport: RebuildTransport = { read: async () => record, start: async () => record, mutate };
+  const props = { workspaceId: record.workspaceId, initialRecord: record, transport };
+  await mount(createElement(RebuildExperience, props));
+  button("Edit").focus(); await act(async () => button("Edit").click());
+  await act(async () => root.render(createElement(RebuildExperience, { ...props, readOnly: true })));
+  expect(container.querySelector("textarea")!.disabled).toBe(true); expect(button("Save correction").disabled).toBe(true);
+  const cancel = button("Cancel"); expect(cancel.disabled).toBe(false); cancel.focus(); await act(async () => cancel.click());
+  expect(document.activeElement).toBe(container.querySelector("#rebuild-decisions-heading")); expect(button("Edit").disabled).toBe(true); expect(mutate).not.toHaveBeenCalled();
+});
