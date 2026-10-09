@@ -293,6 +293,23 @@ describe("checkV1CallSites static analysis", () => {
     expect(failures(run(null))).toContain("mclears:v1:leads:route.ts:file");
   });
 
+  it("recognizes nested booking paths and PATCH/DELETE required fields without confusing the tenant with a suffix", () => {
+    for (const endpoint of ["bookings-reservations", "bookings-change", "bookings-cancel", "bookings-readback"]) {
+      const contract = V1_ROUTE_CONTRACTS[endpoint]!;
+      const site: V1CallSite = { endpoint, file: "booking.ts", bodyFields: contract.required };
+      const source = `fetch('${contract.pathTemplate!.replace("{tenant}", "mclears").replace("{reservationId}", "reservation-abcdefgh")}', { method: '${contract.method}', body: JSON.stringify({ ${contract.required!.join(",")} }) })`;
+      expect(failures(run(source, site, "mclears", [endpoint]))).toEqual([]);
+      expect(failures(run(source.replace("/mclears/", "/other/"), site, "mclears", [endpoint]))).toContain(`mclears:v1:${endpoint}:booking.ts:tenant-segment`);
+      expect(failures(run(source.replace("managementToken", "wrongField"), { ...site, bodyFields: site.bodyFields?.filter(x => x !== "managementToken") }, "mclears", [endpoint]))).toEqual(endpoint === "bookings-reservations" ? [] : [ `mclears:v1:${endpoint}:booking.ts:required-fields` ]);
+    }
+  });
+
+  it("checks collection detail suffixes and interpolated nested tenants", () => {
+    const site: V1CallSite = { endpoint: "collections-entry", file: "client.ts" };
+    expect(failures(run('fetch(`/api/v1/collections/${tenant}/${type}/${slug}`)', site, "mclears", [site.endpoint]))).toEqual([]);
+    expect(failures(run('fetch(`/api/v1/collections/${tenant}/${type}`)', site, "mclears", [site.endpoint]))).toContain("mclears:v1:collections-entry:client.ts:path");
+  });
+
   it("recognises object keys and property assignment as sent fields", () => {
     expect(sendsField("const payload = { event };", "event")).toBe(true);
     expect(sendsField("payload.orderId = x;", "orderId")).toBe(true);

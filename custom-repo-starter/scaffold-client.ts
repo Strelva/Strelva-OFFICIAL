@@ -106,7 +106,9 @@ async function getPreviewHeaders(tenant: string): Promise<Record<string, string>
   if (!secret) return undefined;
   const { createHmac } = await import("node:crypto");
   const timestamp = Date.now().toString();
-  const signature = createHmac("sha256", secret).update(`${timestamp}.preview.${tenant}`).digest("hex");
+  // Match the platform's preview domain separation; revalidation signatures cannot authorize a draft read.
+  const previewKey = createHmac("sha256", secret).update("preview-token-v1").digest("hex");
+  const signature = createHmac("sha256", previewKey).update(`${timestamp}.preview.${tenant}`).digest("hex");
   return { "x-scaffold-preview-ts": timestamp, "x-scaffold-preview-sig": signature };
 }
 
