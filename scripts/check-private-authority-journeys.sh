@@ -34,6 +34,7 @@ done
 docker info >/dev/null 2>&1 || { echo 'Docker is not running.' >&2; exit 1; }
 umask 077
 work="$(mktemp -d "${TMPDIR:-/tmp}/strelva-full-journeys.XXXXXX")"
+work="$(cd "$work" && pwd -P)"
 cli=(npx --yes supabase@2.117.0)
 owned_stack="" app_pid="" redis_pid="" runtime_env="$work/runtime.env"
 stop_app() {
