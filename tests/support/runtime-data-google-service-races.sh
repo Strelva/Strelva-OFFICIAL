@@ -18,7 +18,7 @@ PY
    # An append-only fixture session genuinely crosses its 30-minute deadline.
    psql "${psql_args[@]}" -q <<'SQL'
 insert into public.strelva_service_actions(id,workspace_id,purpose,action,on_behalf_user_id,on_behalf_role,subject,provider_workspace_id,created_at)
-select 'e8211010-0000-4000-8000-000000000060',workspace_id,purpose,action,on_behalf_user_id,on_behalf_role,subject,provider_workspace_id,clock_timestamp()-interval '29 minutes 59 seconds' from public.strelva_service_actions where id=(select session from public.gs_authority_fixture);
+select 'e8211010-0000-4000-8000-000000000060',workspace_id,purpose,action,on_behalf_user_id,on_behalf_role,subject,provider_workspace_id,clock_timestamp()-interval '29 minutes 55 seconds' from public.strelva_service_actions where id=(select session from public.gs_authority_fixture);
 update public.gs_authority_fixture set session='e8211010-0000-4000-8000-000000000060';
 select public.record_strelva_service_action('e8211010-0000-4000-8000-000000000010',(select session from public.gs_authority_fixture),'run','possibility:e8211010-0000-4000-8000-000000000052@1','Clock fixture');
 SQL
@@ -35,7 +35,9 @@ SQL
    fi
    cat <<'SQL'
 select 'google-admission-lock-held';
-select pg_sleep(2);
+SQL
+   if [[ "$case_name" == clock ]];then printf '%s\n' 'select pg_sleep(6);';else printf '%s\n' 'select pg_sleep(2);';fi
+   cat <<'SQL'
 commit;
 SQL
   } >"$race_dir/first.sql"
