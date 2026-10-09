@@ -42,6 +42,30 @@ async function actionBox(control: Locator, coarse: boolean) {
   expect(box!.height).toBeGreaterThanOrEqual(44);
 }
 
+async function emailReplyLinks(page: Page) {
+  const links = page.getByRole("main").getByRole("link", { name: "Reply by email", exact: true });
+  const addresses = ["marta@example.test", "tom@example.test", "ana@example.test"];
+  await expect(links).toHaveCount(addresses.length);
+  const measured = [];
+  for (let index = 0; index < addresses.length; index++) {
+    const link = links.nth(index);
+    await expect(link).toHaveAttribute("href", `mailto:${addresses[index]}`);
+    await actionBox(link, true);
+    await link.focus();
+    await page.keyboard.press("Tab"); await page.keyboard.press("Shift+Tab");
+    await expect(link).toBeFocused();
+    expect(await link.evaluate(element => element.matches(":focus-visible"))).toBe(true);
+    await expect(link).toHaveCSS("outline-style", "solid");
+    await expect(link).toHaveCSS("outline-width", "2px");
+    await expect(link).toHaveCSS("outline-offset", "2px");
+    measured.push(await link.evaluate(element => {
+      const box = element.getBoundingClientRect(), style = getComputedStyle(element);
+      return { href: element.getAttribute("href"), width: box.width, height: box.height, outline: style.outline, offset: style.outlineOffset, focusVisible: element.matches(":focus-visible") };
+    }));
+  }
+  await test.info().attach("fictional-inquiry-mailto-targets", { body: JSON.stringify({ viewport: page.viewportSize(), links: measured }), contentType: "application/json" });
+}
+
 async function reflow(page: Page) {
   try {
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -114,6 +138,7 @@ async function openFixture(page: Page, width: number, enlarged: boolean) {
   expect(await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches)).toBe(true);
   expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(width < 768);
   await reflow(page);
+  if (width < 768) await emailReplyLinks(page);
 }
 
 test("owner sees the exact recipient and message, then one truthful provider receipt", async ({ page }, info) => {
@@ -174,6 +199,7 @@ for (const state of ["empty", "permission", "error"] as const) {
 test("narrow inbox and keyboard reply stay inside the viewport", async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(path);
+  await emailReplyLinks(page);
   await page.getByRole("button", { name: "Reply to Priya S." }).focus();
   await page.keyboard.press("Enter");
   await page.getByLabel("Your reply to Priya S.").fill("Please confirm the details.");

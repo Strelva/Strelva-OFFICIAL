@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/Card";
 import type { HeldInquiries, HeldView, LeadView, WorkspaceLeads } from "@/products/inquiries/linked-leads";
 import { REPLY_OUTCOME, WorkspaceInquiryReply } from "./WorkspaceInquiryReply";
 import { HeldInquiryActions } from "./HeldInquiryActions";
+import styles from "./WorkspaceInquiries.module.css";
 import { NoSiteCard, SiteHeading, WorkspacePlace, whenLabel, type PlaceState } from "./WorkspacePlace";
 
 /**
@@ -34,7 +35,7 @@ function LeadCard({ lead, workspaceId, tenantId, bookingProposals, replies, book
         ) : null}
         {replies && lead.reply && Object.hasOwn(REPLY_OUTCOME, lead.reply.status) ? <p role="status" className="mt-4 text-sm">{REPLY_OUTCOME[lead.reply.status]}{lead.reply.providerMessageId ? <span className="mt-1 block break-all text-xs text-gray-muted">Provider receipt: {lead.reply.providerMessageId}</span> : null}</p> : lead.email && replies && lead.rowId && lead.replyPermission === "none" ? <p className="mt-4 text-sm text-gray-muted">The owner or the assigned team member can reply to this inquiry.</p> : lead.email && replies && lead.rowId ? <WorkspaceInquiryReply workspaceId={workspaceId} rowId={lead.rowId} name={lead.name} email={lead.email} bookingOffers={bookingOffers && lead.replyPermission !== "member"} member={lead.replyPermission === "member"} /> : lead.email ? (
           <p className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-            <a className="inline-flex max-w-full min-h-[40px] items-center rounded-lg bg-warm-black px-3 text-center font-medium text-warm-white" href={`mailto:${encodeURIComponent(lead.email).replace(/%40/g, "@")}`}>Reply by email</a>
+            <a className={`${styles.emailReply} inline-flex max-w-full min-h-[44px] items-center rounded-lg bg-warm-black px-3 text-center font-medium text-warm-white`} href={`mailto:${encodeURIComponent(lead.email).replace(/%40/g, "@")}`}>Reply by email</a>
             <span className="break-all text-gray-muted">{lead.email}</span>
           </p>
         ) : null}
