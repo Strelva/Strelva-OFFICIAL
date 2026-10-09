@@ -6,6 +6,7 @@ import { ArrowUpRight, CircleAlert, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import { SITE_CHANGE_STAGE_LABEL, siteChangeReceiptSchema, siteChangeRequestSchema, siteChangeStage, type SiteChangeReceipt, type SiteChangeRequest } from "@/products/websites/client";
+import { beginFocusRecovery, type FocusRecovery } from "./focus-recovery";
 import styles from "./website-change-requests.module.css";
 
 export interface WebsiteChangeRequestsProps {
@@ -70,6 +71,19 @@ function WebsiteChangeRequestsContent({ workspaceId, systemId, siteLabel, editin
   const recording = useRef(false);
   const stepNeedsReload = useRef(false);
   const [stepUnconfirmed, setStepUnconfirmed] = useState(false);
+  const [stepError, setStepError] = useState("");
+
+  const scope = useRef<HTMLElement>(null);
+  const reloadReceipts = useRef<HTMLButtonElement>(null);
+  const stepAlert = useRef<HTMLParagraphElement>(null);
+  const stepRecovery = useRef<FocusRecovery | null>(null);
+  useEffect(() => () => stepRecovery.current?.cancel(), []);
+  useEffect(() => {
+    if (!busyStep && stepRecovery.current) {
+      stepRecovery.current.recover(stepUnconfirmed ? reloadReceipts.current : stepAlert.current, stepUnconfirmed);
+      stepRecovery.current = null;
+    }
+  }, [busyStep, stepUnconfirmed, stepError]);
 
   const load = useCallback(async () => {
     try {
@@ -135,6 +149,7 @@ function WebsiteChangeRequestsContent({ workspaceId, systemId, siteLabel, editin
     const ownerDecision = payload.kind === "approved" || payload.kind === "declined";
     if ((ownerDecision ? !canDecide : !operator) || recording.current || stepNeedsReload.current) return;
     recording.current = true;
+    stepRecovery.current = beginFocusRecovery(scope.current);
     setBusyStep(requestId);
     setNotice(null);
     try {
@@ -148,20 +163,20 @@ function WebsiteChangeRequestsContent({ workspaceId, systemId, siteLabel, editin
         // Recording has no retry key, and release observation can fail after
         // the receipt commits. Reconcile by reloading before another action.
         stepNeedsReload.current = true; setStepUnconfirmed(true);
-        setNotice({ kind: "error", message: [error.success ? error.data.error : null, UNCONFIRMED_STEP].filter(Boolean).join(" ") });
+        setStepError([error.success ? error.data.error : null, UNCONFIRMED_STEP].filter(Boolean).join(" "));
         return;
       }
       await load();
     } catch {
       stepNeedsReload.current = true; setStepUnconfirmed(true);
-      setNotice({ kind: "error", message: UNCONFIRMED_STEP });
+      setStepError(UNCONFIRMED_STEP);
     } finally {
       recording.current = false;
       setBusyStep(null);
     }
   }
 
-  return <section className={styles.wrap} aria-labelledby="site-changes-title">
+  return <section ref={scope} className={styles.wrap} aria-labelledby="site-changes-title">
     <div className={styles.intro}>
       <h1 id="site-changes-title" className="font-display">Ask for a change to {siteLabel}</h1>
       <p>{editing === "request"
@@ -181,6 +196,9 @@ function WebsiteChangeRequestsContent({ workspaceId, systemId, siteLabel, editin
     </form> : <p className={styles.readOnly}>Only an owner or admin of this business can ask for a change. You can follow each request here.</p>}
 
     {notice ? <p role={notice.kind === "error" ? "alert" : "status"} className={styles.notice} data-kind={notice.kind}>{notice.kind === "error" ? <CircleAlert size={16} aria-hidden="true" /> : null}{notice.message}</p> : null}
+
+    {stepError ? <p ref={stepAlert} tabIndex={-1} role="alert" className={styles.notice} data-kind="error"><CircleAlert size={16} aria-hidden="true" />{stepError}</p> : null}
+    {stepUnconfirmed ? <Button ref={reloadReceipts} type="button" variant="secondary" disabled={busyStep !== null} onClick={() => { if (!recording.current) window.location.reload(); }}>Reload receipts</Button> : null}
 
     <div className={styles.list} aria-labelledby="site-changes-list-title">
       <h2 id="site-changes-list-title">Requests for this site</h2>

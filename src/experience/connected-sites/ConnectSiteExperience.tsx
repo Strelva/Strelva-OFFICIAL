@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/Button";
 import { SelectInput, TextInput } from "@/components/ui/TextInput";
 import { PLATFORMS, type SitePlatform } from "@/products/connected-sites/contracts";
+import { beginFocusRecovery, type FocusRecovery } from "@/experience/websites/focus-recovery";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 
 export interface ConnectableSite {
@@ -27,6 +28,13 @@ const connectedResponse = z.object({ site: z.object({
   id: z.string().uuid(), siteHost: z.string().min(1), siteUrl: z.string().url(), status: z.enum(["active", "revoked"]),
   verifiedAt: z.string().nullable(), systemId: z.string().uuid(), snippet: z.object({ script: z.string(), meta: z.string().nullable() }),
 }) });
+// Confirmation mirrors normalizeSiteUrl's stored address; the server owns validation.
+function submittedAddress(raw: string): { siteUrl: string; siteHost: string } | null {
+  try {
+    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    return { siteUrl: `${url.protocol}//${url.host.toLowerCase()}${url.pathname}`, siteHost: url.hostname.toLowerCase().replace(/\.$/, "") };
+  } catch { return null; }
+}
 const errorResponse = z.object({ error: z.string() });
 
 /**
@@ -50,6 +58,17 @@ function ConnectSiteExperienceContent({ workspaceId, canManage, initialSites, ap
   const inFlight = useRef(false);
   const needsReload = useRef(false);
   const [unconfirmed, setUnconfirmed] = useState(false);
+  const scope = useRef<HTMLDivElement>(null);
+  const reloadAction = useRef<HTMLButtonElement>(null);
+  const alert = useRef<HTMLParagraphElement>(null);
+  const recovery = useRef<FocusRecovery | null>(null);
+  useEffect(() => () => recovery.current?.cancel(), []);
+  useEffect(() => {
+    if (!busy && recovery.current) {
+      recovery.current.recover(unconfirmed ? reloadAction.current : alert.current, unconfirmed);
+      recovery.current = null;
+    }
+  }, [busy, unconfirmed, error]);
   const systemPage = (systemId: string) => `${appBase}/workspace?${new URLSearchParams({ view: "system", system: systemId, workspaceId })}`;
 
   function uncertain(message?: string) {
@@ -63,7 +82,10 @@ function ConnectSiteExperienceContent({ workspaceId, canManage, initialSites, ap
     const parsed = connectedResponse.safeParse(raw), error = errorResponse.safeParse(raw);
     const result = parsed.success ? parsed.data : null;
     const message = error.success ? error.data.error : undefined;
-    if (!response.ok || !result || (body.action === "verify" && result.site.id !== body.siteId)) {
+    const address = body.action === "connect" ? submittedAddress(String(body.siteUrl)) : null;
+    const exact = result && result.site.status === "active" && (body.action === "verify" ? result.site.id === body.siteId
+      : address && result.site.siteUrl === address.siteUrl && result.site.siteHost === address.siteHost);
+    if (!response.ok || !result || !exact) {
       const held = response.status === 503 && message === "Connected sites are not enabled. Nothing changed.";
       // The store can report a malformed saved row as 400 after SQL commits.
       // Unconfirmed writes have no replay key: inspect fresh state on reload.
@@ -78,20 +100,20 @@ function ConnectSiteExperienceContent({ workspaceId, canManage, initialSites, ap
     event.preventDefault();
     if (!canManage || inFlight.current || needsReload.current) return;
     if (!url.trim()) { setError("Enter your site's address, like yourbusiness.com."); return; }
-    inFlight.current = true; setBusy(true); setError("");
+    inFlight.current = true; recovery.current = beginFocusRecovery(scope.current); setBusy(true); setError("");
     try { const next = await post({ action: "connect", siteUrl: url.trim(), platform }); if (next) setSite(next); }
     catch { uncertain(); }
     finally { inFlight.current = false; setBusy(false); }
   }
   async function verify() {
     if (!site || !canManage || inFlight.current || needsReload.current) return;
-    inFlight.current = true; setBusy(true); setError("");
+    inFlight.current = true; recovery.current = beginFocusRecovery(scope.current); setBusy(true); setError("");
     try { const next = await post({ action: "verify", siteId: site.id }); if (next) setSite(next); }
     catch { uncertain(); }
     finally { inFlight.current = false; setBusy(false); }
   }
 
-  return <div className="mx-auto grid w-full max-w-2xl gap-6 px-4 py-10 md:px-8">
+  return <div ref={scope} className="mx-auto grid w-full max-w-2xl gap-6 px-4 py-10 md:px-8">
     <header className="grid gap-2">
       <h1 className="font-display text-[32px] leading-10">Bring the website you already have</h1>
       <p className="text-sm text-gray-muted">Keep your site where it is: Wix, Squarespace, WordPress or anything else. Strelva fills in your confirmed details, takes its inquiries and counts visits. It never edits your pages.</p>
@@ -117,6 +139,7 @@ function ConnectSiteExperienceContent({ workspaceId, canManage, initialSites, ap
       <p className="text-sm text-gray-muted">Publish the site, then check. Strelva reads the live page to confirm it&rsquo;s yours. Nothing is collected until then.</p>
       {canManage ? <Button type="button" loading={busy} disabled={unconfirmed} className="justify-self-start" onClick={() => void verify()}>Check my site</Button> : null}
     </section>}
-    {error ? <p role="alert" className="text-sm text-terra">{error}</p> : null}
+    {error ? <p ref={alert} tabIndex={-1} role="alert" className="text-sm text-terra">{error}</p> : null}
+    {unconfirmed ? <Button ref={reloadAction} type="button" variant="secondary" disabled={busy} className="justify-self-start" onClick={() => { if (!inFlight.current) window.location.reload(); }}>Reload connection</Button> : null}
   </div>;
 }

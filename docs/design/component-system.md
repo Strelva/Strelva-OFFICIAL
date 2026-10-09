@@ -1275,3 +1275,14 @@ The gated places preview has a visible local-rehearsal label naming its fictiona
 `CreatorMaintenance` composes the existing `Card`, labelled `SelectInput`/`TextInput`, and large `Button` controls. One synchronous guard admits a pending command and rejects same-batch field edits; current `canMaintain` removes future controls after workspace exit while history stays mounted. An unconfirmed transport, unavailable response or incomplete/mismatched acknowledgement freezes the submitted listing, source, state, effective date and recorded agreement/rate. Prop refreshes cannot change its selected agreement underneath the unknown command. **Reload maintenance history** performs a full page reload through the existing actor-bound reader; it does not retry a POST, clear uncertainty in the existing mount, or invent an attempt key. The SQL checks the future date before exact replay, so later POST checking is not a reconciliation contract.
 
 Only initial route-proven refusals known to precede mutation or roll back the RPC leave correction available. A consumed success receipt must match the existing wire shape and exact listing/state/agreement/rate/effective instant; server actor/workspace/source checks remain authoritative. Editing new terms clears the previous confirmation notice. Pending completion recovers to the mounted receipt, error or reload action when the customer stayed, and to the stable Recorded listings heading if maintenance authority disappears. Deliberate outside focus is preserved and recovery listeners are canceled on settlement/unmount. These local component checks do not establish rendered desktop/mobile, screen-reader, database, royalty, provider or release qualification; no primitive API or accepted visual direction changes.
+
+### Scoped reload after unconfirmed writes
+
+Unconfirmed connected-site and publication writes expose **Reload connection**
+and **Reload page**; uncertain receipt actions expose **Reload receipts**. These
+read current state by reloading the page and never replay a write. Recovery moves
+focus from the disabled initiating control to the mounted reload action only
+when the person has not moved focus elsewhere. A connection acknowledgement must
+match the submitted canonical URL and host; publication must match the submitted
+handle and publish decision. Generic post-write400 responses cannot unlock a new
+publication; independent read-only block checks keep the uncertainty visible.

@@ -114,7 +114,7 @@ describe("bringing the website a business already has", () => {
       node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     });
     expect(request).toHaveBeenCalledTimes(1);
-    await act(async () => finish(new Response(JSON.stringify({ site }), { status: 201 })));
+    await act(async () => finish(new Response(JSON.stringify({ site: { ...site, siteHost: "second.example", siteUrl: "https://second.example/" } }), { status: 201 })));
     expect(node.textContent).toContain("Add these two lines");
   });
   it("requires reload after an uncertain verification without claiming the site was proven", async () => {
