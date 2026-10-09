@@ -35,3 +35,4 @@ export { undoListingChange } from "./service";
 export { createSupabaseReceiptStore } from "./receipts";
 
 export { googleMakeRealPorts, googleMakeRealDraftDigest } from "./make-real";
+export { purgeExpiredGoogleContent } from "./retention";

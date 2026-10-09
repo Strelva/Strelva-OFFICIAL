@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireCronRequest } from "@/lib/cron-auth";
 import { recordHeartbeat } from "@/platform/infra/heartbeat";
-import { purgeExpiredGoogleContent } from "@/products/google-listing/retention";
+import { purgeExpiredGoogleContent } from "@/products/google-listing/server";
 export async function GET(request:Request){
  const denied=requireCronRequest(request);if(denied)return denied;
  try {
