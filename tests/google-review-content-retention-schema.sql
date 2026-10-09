@@ -31,7 +31,7 @@ begin
  insert into public.proposals(id,tenant_id,source,entity_type,kind,title,body,payload) values
  ('null-review-'||gen_random_uuid(),tenant,'google','review',null,'Provider title','Provider text',null),
  ('scalar-review-'||gen_random_uuid(),tenant,'google','review',null,'Provider title','Provider text','42'::jsonb);
- perform pg_temp.gr_assert(not exists(select 1 from public.unified_events where tenant_id=tenant and source='google' and body<>''),'null/scalar native events scrub safely');
+ perform pg_temp.gr_assert(not exists(select 1 from public.unified_events e where e.tenant_id=tenant and e.source='google' and e.body<>''),'null/scalar native events scrub safely');
  perform public.purge_google_review_content();
  perform pg_temp.gr_assert(not exists(select 1 from public.reviews where tenant_id=tenant and source='google' and provider_content is null and text<>''),'unknown legacy content removed');
  perform pg_temp.gr_assert((select text='Customer review' from public.reviews where id=manual),'customer authored review preserved');
