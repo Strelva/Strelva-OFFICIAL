@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { expect } from "@playwright/test";
+import { expect, type TestInfo } from "@playwright/test";
 import { createSupabaseSystemStore } from "@/platform/systems/supabase-store";
 import { newBookingAccess } from "@/platform/bookings/native";
 import { decryptSecret } from "@/platform/infra/crypto/secrets";
@@ -11,7 +11,7 @@ import type { Person } from "./journeys";
  * Setup is an explicit native adapter fixture, not proof of a public setup UI
  * or delivered customer mail. Only owned local stacks may call this helper.
  */
-export async function nativeBookingJourney(owner: Person, admin: SupabaseClient, workspaceId: string) {
+export async function nativeBookingJourney(owner: Person, admin: SupabaseClient, workspaceId: string, testInfo?: Pick<TestInfo, "attach">) {
   localEnvironment();
   expect(process.env.STRELVA_LOCAL_AUTH_PROOF).toBe("1");
   for (const key of ["STRELVA_BOOKING_MANUAL", "STRELVA_BOOKING_MESSAGES", "STRELVA_BOOKING_MANAGE_PAGE"]) expect(process.env[key], key).toBe("1");
@@ -48,11 +48,25 @@ export async function nativeBookingJourney(owner: Person, admin: SupabaseClient,
   expect(createdServices[0]).toMatchObject({ name: "Site visit", durationMinutes: 60, active: true, source: "owner" });
   const serviceId: string = createdServices[0].id;
   expect(serviceId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+  // This was the verified owner's own write. The native owner-write trigger
+  // confirms it immediately; provider changes alone need a separate decision.
+  const actorArgs = { p_workspace_id: workspaceId, p_user_id: owner.userId, p_verified_email: owner.email };
+  const confirmed = await rpc("read_confirmed_business_facts", actorArgs);
+  expect(confirmed.revision).toBe(configuredRecord.revision);
+  expect(confirmed.facts.display_name).toBe(patch.facts.display_name.value);
+  expect(confirmed.facts.hours).toEqual(patch.facts.hours.value);
+  expect(confirmed.services.filter((service: { name: string }) => service.name === createdServices[0].name)).toHaveLength(1);
+  const review = await rpc("read_business_fact_review", { p_workspace_id: workspaceId });
+  expect(review, "Owner's actual write is already confirmed, not a missing pending ask").toBeNull();
   const factsResponse = await owner.context.request.get(`/api/workspace/needs-you?workspaceId=${workspaceId}`);
   expect(factsResponse.status(), await factsResponse.text()).toBe(200);
-  const facts = (await factsResponse.json()).items.find((item: { sourceLifecycle: string; sourceId: string }) => item.sourceLifecycle === "business_facts" && item.sourceId === workspaceId);
-  expect(facts, "Actual owner confirmation of the record and service").toBeTruthy();
-  expect((await post("/api/workspace/needs-you", { workspaceId, itemId: facts.id, revision: facts.revisionHash, decision: "approve" })).status).toBe("done");
+  const factsResult = await factsResponse.json();
+  const facts = factsResult.items.filter((item: { sourceLifecycle: string; sourceId: string }) => item.sourceLifecycle === "business_facts" && item.sourceId === workspaceId);
+  await testInfo?.attach("native-booking-owner-record-confirmation", { body: JSON.stringify({ workspaceId, serviceId,
+    recordRevision: configuredRecord.revision, confirmedRevision: confirmed.revision, pendingFactReview: review !== null,
+    pendingFactsDecisions: facts.length, needsYouComplete: factsResult.complete === true,
+    qualification: "Actual owner-write and confirmed-copy read-back; provider edits still require owner approval." }), contentType: "application/json" });
+  expect(facts, "No redundant decision after the owner's confirmed edit").toHaveLength(0);
   const systems = createSupabaseSystemStore(admin);
   const draft = await systems.createSystem(actor, workspaceId, { name: "Bookings", kind: "booking" }, randomUUID());
   const ref = { businessId: workspaceId, systemId: draft.id };

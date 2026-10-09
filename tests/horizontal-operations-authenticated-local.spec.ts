@@ -58,13 +58,13 @@ test("approved budgeted work completes a native document edit and refuses anothe
   } finally { await owner.context.close(); await stranger.context.close(); }
 });
 
-test("native scheduling keeps one reservation identity through cancel, reschedule and retry", async ({ browser }) => {
+test("native scheduling keeps one reservation identity through cancel, reschedule and retry", async ({ browser }, testInfo) => {
   const env = localEnvironment();
   const admin = createClient(env.url, env.service, { auth: { persistSession: false, autoRefreshToken: false } });
   const owner = await signedInContext(browser, admin, "scheduling-lifecycle-owner");
   try {
     const workspaceId = await ordinaryCustomerBusiness(owner, "Native scheduling lifecycle business");
-    const bookings = await nativeBookingJourney(owner, admin, workspaceId);
+    const bookings = await nativeBookingJourney(owner, admin, workspaceId, testInfo);
     expect(await bookings.read()).toEqual([]);
     const first = await bookings.reserve("visit-0001", 10, "Site visit");
     await bookings.approve(first.id);
@@ -101,7 +101,7 @@ test("native scheduling keeps one reservation identity through cancel, reschedul
   } finally { await owner.context.close(); }
 });
 
-test("scheduling, generated applications and two-source investigation persist with their native checks", async ({ browser }) => {
+test("scheduling, generated applications and two-source investigation persist with their native checks", async ({ browser }, testInfo) => {
   const env = localEnvironment();
   const admin = createClient(env.url, env.service, { auth: { persistSession: false, autoRefreshToken: false } });
   const owner = await signedInContext(browser, admin, "horizontal-owner");
@@ -110,7 +110,7 @@ test("scheduling, generated applications and two-source investigation persist wi
   try {
     const workspaceId = await ordinaryCustomerBusiness(owner, "Native horizontal operations business");
     maker = await ordinaryAgencyMaker(browser, admin, owner, workspaceId);
-    const bookings = await nativeBookingJourney(owner, admin, workspaceId);
+    const bookings = await nativeBookingJourney(owner, admin, workspaceId, testInfo);
     const visit = await bookings.reserve("combined-visit-0001", 10, "Site visit");
     await bookings.approve(visit.id);
     const beforeConflict = await bookings.read();
