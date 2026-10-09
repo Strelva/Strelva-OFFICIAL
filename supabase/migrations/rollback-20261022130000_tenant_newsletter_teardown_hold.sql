@@ -2,7 +2,7 @@
 begin;
 set local lock_timeout='3s';
 do $inverse_preflight$
-declare item record; p record; current_acl jsonb; a record;
+declare item record; p record; current_acl jsonb; acl_entry record;
 begin
  if not exists(select 1 from pg_class where oid='public.tenant_newsletter_teardown_function_journal'::regclass
   and relowner=(current_user::regrole)::oid and relrowsecurity)
@@ -28,10 +28,10 @@ begin
    order by a.grantor,a.grantee,a.privilege_type,a.is_grantable),'[]'::jsonb) into current_acl
    from aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a;
   if current_acl is distinct from item.after_acl then raise exception 'newsletter_teardown_successor_acl_changed: %',item.signature;end if;
-  for a in select * from aclexplode(item.before_acl) loop
-   if a.grantor<>item.owner_id or a.privilege_type<>'EXECUTE' or a.is_grantable
-    or not exists(select 1 from pg_roles where oid=a.grantor)
-    or (a.grantee<>item.owner_id and (item.signature<>'public.tenant_cleanup_teardown_blockers(text)' or a.grantee<>('service_role'::regrole)::oid)) then
+  for acl_entry in select * from aclexplode(item.before_acl) loop
+   if acl_entry.grantor<>item.owner_id or acl_entry.privilege_type<>'EXECUTE' or acl_entry.is_grantable
+    or not exists(select 1 from pg_roles where oid=acl_entry.grantor)
+    or (acl_entry.grantee<>item.owner_id and (item.signature<>'public.tenant_cleanup_teardown_blockers(text)' or acl_entry.grantee<>('service_role'::regrole)::oid)) then
     raise exception 'newsletter_teardown_unsupported_acl_baseline: %',item.signature;
    end if;
   end loop;
@@ -40,17 +40,17 @@ end $inverse_preflight$;
 drop function public.tenant_cleanup_teardown_blockers(text);
 alter function public.tenant_cleanup_teardown_blockers_before_newsletter(text) rename to tenant_cleanup_teardown_blockers;
 do $restore$
-declare item record; a record; actual_acl jsonb; expected_acl jsonb;
+declare item record; acl_entry record; actual_acl jsonb; expected_acl jsonb;
 begin
  for item in select * from public.tenant_newsletter_teardown_function_journal where before_definition is not null loop
   execute item.before_definition;
   -- Only these two packet-owned functions change. The preflight forbids any
   -- delegated/grant-option graph; no CASCADE or global role cleanup is needed.
-  for a in select distinct acl.grantee from pg_proc p cross join lateral aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) acl where p.oid=item.signature::regprocedure loop
-   execute 'revoke all on function '||item.signature||' from '||case when a.grantee=0 then 'PUBLIC' else quote_ident(pg_get_userbyid(a.grantee)) end;
+  for acl_entry in select distinct acl.grantee from pg_proc p cross join lateral aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) acl where p.oid=item.signature::regprocedure loop
+   execute 'revoke all on function '||item.signature||' from '||case when acl_entry.grantee=0 then 'PUBLIC' else quote_ident(pg_get_userbyid(acl_entry.grantee)) end;
   end loop;
-  for a in select * from aclexplode(item.before_acl) loop
-   execute 'grant EXECUTE on function '||item.signature||' to '||quote_ident(pg_get_userbyid(a.grantee));
+  for acl_entry in select * from aclexplode(item.before_acl) loop
+   execute 'grant EXECUTE on function '||item.signature||' to '||quote_ident(pg_get_userbyid(acl_entry.grantee));
   end loop;
   select coalesce(jsonb_agg(jsonb_build_array(a.grantor,a.grantee,a.privilege_type,a.is_grantable)
    order by a.grantor,a.grantee,a.privilege_type,a.is_grantable),'[]'::jsonb) into expected_acl from aclexplode(item.before_acl) a;

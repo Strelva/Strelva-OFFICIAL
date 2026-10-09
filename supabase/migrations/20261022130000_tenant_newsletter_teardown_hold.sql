@@ -4,7 +4,7 @@ set local lock_timeout='3s';
 -- Bounded canonical341 baseline only. Refuse before CREATE/rename/write:
 -- custom/delegated grants and default grants are never silently discarded.
 do $baseline$
-declare signature text; p record; a record; migrator oid:=(current_user::regrole)::oid;
+declare signature text; p record; acl_entry record; migrator oid:=(current_user::regrole)::oid;
 begin
  if to_regclass('public.tenant_newsletter_teardown_function_journal') is not null
   or to_regprocedure('public.tenant_cleanup_teardown_blockers_before_newsletter(text)') is not null then
@@ -17,12 +17,12 @@ begin
    or p.proconfig is distinct from array['search_path=public, pg_temp']::text[]
    or p.prokind<>'f' or p.proisstrict or p.proleakproof or p.proparallel<>'u'
    or p.provariadic<>0 or p.prosupport<>0 or p.procost<>100 then raise exception 'newsletter_teardown_unsupported_baseline: %',signature; end if;
-  if (select count(*) from aclexplode(p.proacl))<>case when signature='public.tenant_cleanup_teardown_blockers(text)' then 2 else 1 end then
+  if (select count(*) from aclexplode(p.proacl))<>(case when signature='public.tenant_cleanup_teardown_blockers(text)' then 2 else 1 end) then
    raise exception 'newsletter_teardown_unsupported_acl_baseline: %',signature;
   end if;
-  for a in select * from aclexplode(p.proacl) loop
-   if a.grantor<>migrator or a.privilege_type<>'EXECUTE' or a.is_grantable
-    or (a.grantee<>migrator and (signature<>'public.tenant_cleanup_teardown_blockers(text)' or a.grantee<>('service_role'::regrole)::oid)) then
+  for acl_entry in select * from aclexplode(p.proacl) loop
+   if acl_entry.grantor<>migrator or acl_entry.privilege_type<>'EXECUTE' or acl_entry.is_grantable
+    or (acl_entry.grantee<>migrator and (signature<>'public.tenant_cleanup_teardown_blockers(text)' or acl_entry.grantee<>('service_role'::regrole)::oid)) then
     raise exception 'newsletter_teardown_unsupported_acl_baseline: %',signature;
    end if;
   end loop;
@@ -165,7 +165,7 @@ begin
   select * into p from pg_proc where oid=signature::regprocedure;
   expected_service:=signature='public.tenant_cleanup_teardown_blockers(text)';
   if p.proowner<>(current_user::regrole)::oid or p.proacl is null
-   or (select count(*) from aclexplode(p.proacl))<>case when expected_service then 2 else 1 end
+   or (select count(*) from aclexplode(p.proacl))<>(case when expected_service then 2 else 1 end)
    or exists(select 1 from aclexplode(p.proacl) a
    where a.grantor<>p.proowner or a.privilege_type<>'EXECUTE' or a.is_grantable
     or (a.grantee<>p.proowner and (not expected_service or a.grantee<>('service_role'::regrole)::oid)))
