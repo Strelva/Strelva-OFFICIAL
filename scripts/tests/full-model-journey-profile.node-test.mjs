@@ -175,7 +175,7 @@ test('runtime and proof root files change the source pin without a new commit', 
     assert.notDeepEqual(added, deleted, 'untracked root entrypoints must not disappear from the proof');
     for (const file of ['instrumentation-client.ts', 'middleware.ts', 'proxy.ts', 'tailwind.config.ts'])
       assert.ok(added.sourceFiles.find(item => item.file === file)?.sha256);
-    for (const file of ['.env', '.env.local', 'private-proof.env', 'instrumentation-notes.md', 'unrelated.config.mjs'])
+    for (const file of ['.env', '.env.local', 'private-proof.env', 'next.config.private.env', 'playwright.config.private.env', 'instrumentation-notes.md', 'unrelated.config.mjs'])
       writeFileSync(join(root, file), 'excluded private or unrelated fixture');
     assert.deepEqual(sourceInventory(root), added, 'environment and unrelated files remain outside source evidence');
   } finally { rmSync(root, { recursive: true }); }

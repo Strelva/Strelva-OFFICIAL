@@ -270,7 +270,7 @@ const rootProofSource = /^(?:(?:instrumentation(?:-client)?|middleware|proxy)\.(
 export function sourceInventory(root) {
   const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
   const files = [...new Set(git('ls-files', '-z', '--cached', '--others', '--exclude-standard').split('\0'))]
-    .filter(file => /^(src\/|scripts\/|tests\/|supabase\/|package\.json$|pnpm-lock\.yaml$|next\.config\.|playwright\.config\.|tsconfig\.json$)/.test(file) || rootProofSource.test(file)).sort();
+    .filter(file => /^(src\/|scripts\/|tests\/|supabase\/|package\.json$|pnpm-lock\.yaml$|tsconfig\.json$)/.test(file) || rootProofSource.test(file)).sort();
   const sourceFiles = files.map(file => ({ file, sha256: existsSync(join(root, file))
     ? createHash('sha256').update(readFileSync(join(root, file))).digest('hex') : null }));
   return { head: git('rev-parse', 'HEAD'), tree: git('rev-parse', 'HEAD^{tree}'), sourceFiles, fullReleaseQualified: false };
