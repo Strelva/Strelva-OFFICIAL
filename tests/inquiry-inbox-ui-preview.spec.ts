@@ -43,7 +43,34 @@ async function actionBox(control: Locator, coarse: boolean) {
 }
 
 async function reflow(page: Page) {
-  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  try {
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  } finally {
+    // Bounded measurements explain the actual rendered failure without relaxing
+    // the reflow gate. This suite renders only its visibly fictional records.
+    const measurement = await page.evaluate(() => ({
+      viewport: innerWidth,
+      documentWidth: document.documentElement.scrollWidth,
+      rootFontSize: getComputedStyle(document.documentElement).fontSize,
+      overflowing: Array.from(document.querySelectorAll<HTMLElement>("body *"))
+        .filter(element => !["SCRIPT", "STYLE", "SVG", "PATH"].includes(element.tagName))
+        .map(element => {
+          const box = element.getBoundingClientRect(), style = getComputedStyle(element);
+          return {
+            tag: element.tagName, name: element.getAttribute("aria-label"),
+            text: element.innerText?.trim().slice(0, 120), className: element.className,
+            left: box.left, right: box.right, width: box.width,
+            display: style.display, fontSize: style.fontSize, flexShrink: style.flexShrink,
+            minWidth: style.minWidth, maxWidth: style.maxWidth,
+            whiteSpace: style.whiteSpace, overflowWrap: style.overflowWrap,
+          };
+        })
+        .filter(element => element.width > 0 && (element.right > innerWidth + 0.5 || element.left < -0.5))
+        .sort((a, b) => b.right - a.right)
+        .slice(0, 40),
+    }));
+    await test.info().attach("fictional-inquiry-reflow", { body: JSON.stringify(measurement), contentType: "application/json" });
+  }
 }
 
 async function openFixture(page: Page, width: number, enlarged: boolean) {
