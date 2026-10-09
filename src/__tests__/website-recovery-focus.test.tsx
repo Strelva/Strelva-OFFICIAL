@@ -115,7 +115,7 @@ it("guards read-only forms and admits one loading request per React batch", asyn
   await act(async () => resolve(Response.json({ tenants: [] })));
 });
 
-it("retains a selection and current focus when the saved record is malformed", async () => {
+it("retains the selection and focuses actual current-state recovery when the saved record is malformed", async () => {
   const record = fixtureRebuild();
   const fetcher = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => init?.method === "POST"
     ? Response.json({ workId: record.workId, workspaceId: record.workspaceId, rebuild: { malformed: true } })
@@ -128,8 +128,8 @@ it("retains a selection and current focus when the saved record is malformed", a
   const inquiry = container.querySelectorAll("select")[1]!;
   await act(async () => { inquiry.value = "orders"; inquiry.dispatchEvent(new Event("change", { bubbles: true })); });
   const save = button("Update website preview"); save.focus(); await act(async () => save.click());
-  expect(source.value).toBe("bakery"); expect(inquiry.value).toBe("orders"); expect(document.activeElement).toBe(save);
-  expect(save.disabled).toBe(false); expect(container.querySelector('[role="alert"]')).not.toBeNull();
+  expect(source.value).toBe("bakery"); expect(inquiry.value).toBe("orders"); expect(document.activeElement).toBe(button("Reload current state"));
+  expect(save.disabled).toBe(true); expect(button("Reload current state").disabled).toBe(false); expect(container.querySelector('[role="alert"]')).not.toBeNull();
 });
 
 it("retains the flagged decision and useful action after a revision conflict", async () => {

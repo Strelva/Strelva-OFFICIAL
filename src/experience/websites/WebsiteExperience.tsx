@@ -11,7 +11,7 @@ import {
   type WebsiteExperienceTransport,
 } from "./contracts";
 import styles from "./website-experience.module.css";
-import type { FocusRecovery } from "./focus-recovery";
+import { beginFocusRecovery, type FocusRecovery } from "./focus-recovery";
 import { WebsiteConnections } from "./WebsiteConnections";
 import { RebuildExperience } from "./RebuildExperience";
 
@@ -203,11 +203,23 @@ function WebsiteSession({
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
+  const unresolved = useRef(false);
+  const [needsReload, setNeedsReload] = useState(false);
+  const [connectionReadRevision, setConnectionReadRevision] = useState(0);
+  const recoveryRootRef = useRef<HTMLElement>(null);
+  const reloadRef = useRef<HTMLButtonElement>(null);
+  const reviewHeadingRef = useRef<HTMLHeadingElement>(null);
+  const reloadFocus = useRef<FocusRecovery | null>(null);
+  const permission = useRef({ readOnly, revision: 0 });
+  permission.current = { readOnly, revision: permission.current.revision + Number(permission.current.readOnly !== readOnly) };
   useEffect(() => {
-    if (busy || !connectionFocus.current) return;
-    connectionFocus.current.recover(connectionHeadingRef.current);
+    if (busy) return;
+    connectionFocus.current?.recover(connectionHeadingRef.current);
     connectionFocus.current = null;
-  }, [record, busy]);
+    reloadFocus.current?.recover(needsReload ? reloadRef.current : reviewHeadingRef.current, true);
+    reloadFocus.current = null;
+  }, [record, busy, needsReload]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const requestId = useRef(createWebsiteRequestId()).current;
@@ -216,7 +228,7 @@ function WebsiteSession({
   useEffect(() => {
     mountedRef.current = true;
     return () => {
-      mountedRef.current = false;
+      mountedRef.current = false; reloadFocus.current?.cancel();
     };
   }, []);
 
@@ -244,7 +256,8 @@ function WebsiteSession({
   const canSubmitBrief = Boolean(brief.businessName && brief.description);
 
   async function run(label: string, operation: () => Promise<WebsiteRecord>, success: (next: WebsiteRecord) => string) {
-    if (busy || readOnly) return;
+    if (inFlight.current || unresolved.current || busy || readOnly) return;
+    inFlight.current = true;
     setBusy(true);
     setError("");
     setNotice("");
@@ -259,6 +272,7 @@ function WebsiteSession({
       if (!mountedRef.current) return;
       setError(cause instanceof Error ? cause.message : `${label} could not be completed.`);
     } finally {
+      inFlight.current = false;
       if (mountedRef.current) setBusy(false);
     }
   }
@@ -307,20 +321,28 @@ function WebsiteSession({
   }
 
   async function reload() {
-    if (!record || busy) return;
+    if (!record || inFlight.current || busy) return;
+    const started = permission.current.revision;
+    const work = { workspaceId: record.workspaceId, workId: record.workId };
+    if (work.workspaceId !== workspaceId || (workId && work.workId !== workId)) return;
+    inFlight.current = true;
+    reloadFocus.current?.cancel(); reloadFocus.current = beginFocusRecovery(recoveryRootRef.current);
     setBusy(true);
-    setError("");
     try {
-      const next = await transport.read({ workspaceId, workId: record.workId }, new AbortController().signal);
-      if (!mountedRef.current) return;
+      const next = await transport.read(work, new AbortController().signal);
+      if (!mountedRef.current || permission.current.revision !== started) return;
+      if (next.workspaceId !== work.workspaceId || next.workId !== work.workId) throw new Error("The current saved website could not be confirmed.");
+      unresolved.current = false; setNeedsReload(false); setConnectionReadRevision(value => value + 1); setError("");
       setRecord(next);
       setFields(fieldsFromBrief(next.website.brief));
       setNotice("Saved status refreshed.");
-    } catch (cause) {
-      if (!mountedRef.current) return;
-      setError(cause instanceof Error ? cause.message : "The saved website could not be refreshed.");
+    } catch {
+      if (!mountedRef.current || permission.current.revision !== started) return;
+      setError("The current saved website could not be loaded. Your inputs are retained. Reload again to check what was saved.");
     } finally {
+      inFlight.current = false;
       if (mountedRef.current) setBusy(false);
+      if (permission.current.revision !== started) { reloadFocus.current?.cancel(); reloadFocus.current = null; }
     }
   }
 
@@ -335,15 +357,15 @@ function WebsiteSession({
   }
 
   return (
-    <section className={styles.root} aria-label="Website setup" aria-busy={busy || undefined}>
+    <section ref={recoveryRootRef} className={styles.root} aria-label="Website setup" aria-busy={busy || undefined}>
       <header className={styles.header}>
         <p className={styles.eyebrow}>Website</p>
-        <h1>{website?.title || "Create a useful website for your business"}</h1>
+        <h1 ref={reviewHeadingRef} tabIndex={-1}>{website?.title || "Create a useful website for your business"}</h1>
         <p>{record ? "Review your website draft, make changes and see its approval history." : "Describe your business and what visitors should be able to do. Start with a private website preview."}</p>
       </header>
 
       {readOnly ? <div className={styles.status}><ShieldCheck size={16} aria-hidden="true" /><span>You can review this website, but this access level cannot change it.</span></div> : null}
-      {error ? <div className={styles.alert} role="alert">{error}<p className="mt-2 text-xs">Your entered details and saved work are unchanged.</p></div> : null}
+      {error ? <div className={styles.alert} role="alert">{error}<p className="mt-2 text-xs">{needsReload ? "Your entered details remain available. Check the current saved website before continuing." : "Your entered details and saved work remain available."}</p>{needsReload && record ? <Button ref={reloadRef} type="button" variant="secondary" loading={busy} disabled={busy} onClick={() => void reload()}>Reload current state</Button> : null}</div> : null}
       {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
 
       {workId && loadFailed && !record ? (
@@ -356,22 +378,22 @@ function WebsiteSession({
       ) : (
         <>
           <div className={styles.status} data-tone={website?.status === "failed" ? "attention" : undefined}>
-            <StatusIcon website={website!} />
-            <span><strong>{statusLabel(website!)}</strong> · {statusMessage(website!)}</span>
+            {needsReload ? <CircleAlert size={16} aria-hidden="true" /> : <StatusIcon website={website!} />}
+            <span>{needsReload ? "Check the current saved website before reviewing its approval or launch state." : <><strong>{statusLabel(website!)}</strong> · {statusMessage(website!)}</>}</span>
           </div>
 
           <div className={styles.requestCard}>
-            <BriefForm fields={fields} setFields={setFields} onSubmit={() => void createOrRevise()} busy={busy} readOnly={readOnly} submitLabel={canRetryPreview ? "Try generating again" : "Generate a new preview"} canSubmit={canSubmitBrief} compact />
+            <BriefForm fields={fields} setFields={setFields} onSubmit={() => void createOrRevise()} busy={busy || needsReload} readOnly={readOnly} submitLabel={canRetryPreview ? "Try generating again" : "Generate a new preview"} canSubmit={canSubmitBrief} compact />
             <div className={styles.actions}>
-              {!readOnly && canApprove ? <Button type="button" loading={busy} disabled={busy} onClick={() => void approve()} icon={<Check size={16} />}>Approve this preview</Button> : null}
-              {!readOnly && canPrepare ? <Button type="button" loading={busy} disabled={busy} onClick={() => void prepareLaunch()} icon={<Rocket size={16} />}>Prepare launch</Button> : null}
-              {!readOnly && canRetryLaunch ? <Button type="button" loading={busy} disabled={busy} onClick={() => void prepareLaunch()} icon={<RefreshCw size={16} />}>Retry launch preparation</Button> : null}
-              {website!.status === "launch_pending" && !isLocalExportReady(website!) ? <Button type="button" variant="secondary" loading={busy} disabled={busy} onClick={() => void reload()} icon={<RefreshCw size={16} />}>Check saved status</Button> : null}
+              {!readOnly && canApprove ? <Button type="button" loading={busy} disabled={busy || needsReload} onClick={() => void approve()} icon={<Check size={16} />}>Approve this preview</Button> : null}
+              {!readOnly && canPrepare ? <Button type="button" loading={busy} disabled={busy || needsReload} onClick={() => void prepareLaunch()} icon={<Rocket size={16} />}>Prepare launch</Button> : null}
+              {!readOnly && canRetryLaunch ? <Button type="button" loading={busy} disabled={busy || needsReload} onClick={() => void prepareLaunch()} icon={<RefreshCw size={16} />}>Retry launch preparation</Button> : null}
+              {!needsReload && website!.status === "launch_pending" && !isLocalExportReady(website!) ? <Button type="button" variant="secondary" loading={busy} disabled={busy} onClick={() => void reload()} icon={<RefreshCw size={16} />}>Check saved status</Button> : null}
             </div>
             {dirty && !readOnly ? <p className={styles.notice}>Save this wording as a new preview before approving it. The current saved revision stays unchanged.</p> : null}
           </div>
 
-          <WebsiteConnections headingRef={connectionHeadingRef} onFocusRecovery={recovery => { connectionFocus.current?.cancel(); connectionFocus.current = recovery; }} key={`${record.workId}:${record.website.revision}`} record={record} disabled={readOnly || busy || dirty} onBusyChange={setBusy} onSaved={(next) => { setRecord(next); setNotice("Website forms updated. Review and approve the new preview."); onSaved?.(next.workId); }} />
+          <WebsiteConnections headingRef={connectionHeadingRef} onFocusRecovery={recovery => { connectionFocus.current?.cancel(); connectionFocus.current = recovery; }} key={`${record.workId}:${record.website.revision}:${connectionReadRevision}`} record={record} readOnly={readOnly} onUnconfirmed={recovery => { unresolved.current = true; setNeedsReload(true); setNotice(""); setError("The visitor form change could not be confirmed. Reload the current saved website before continuing."); connectionFocus.current?.cancel(); connectionFocus.current = null; reloadFocus.current?.cancel(); reloadFocus.current = recovery; }} disabled={readOnly || busy || dirty || needsReload} onBusyChange={value => { inFlight.current = value; setBusy(value); }} onSaved={(next) => { setRecord(next); setNotice("Website forms updated. Review and approve the new preview."); onSaved?.(next.workId); }} />
 
           {website!.candidate ? (
             <section className={styles.previewSection} aria-labelledby="website-preview-heading">

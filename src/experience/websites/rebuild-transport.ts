@@ -31,9 +31,18 @@ export class RebuildTransportError extends Error { constructor(message: string, 
 export class RebuildUnconfirmedError extends Error {
   constructor(reason?: string) { super(`${reason ? `${reason} ` : ""}The change could not be confirmed. Reload its current saved state before continuing.`); }
 }
+const contactClaimRefusal = "Edit the separate email or phone fact first to change or remove this contact. Your current preview is unchanged.";
+const contactEditRefusals = new Set([
+  "Enter a valid email address or phone number for this contact. Your current preview is unchanged.",
+  "Keep this contact as the same kind of email address or phone number. Your current preview is unchanged.",
+  "This destination already belongs to another contact fact. Edit that existing email or phone instead. Your current preview is unchanged.",
+  contactClaimRefusal,
+]);
 function refusedMutation(error: unknown, action: Parameters<RebuildTransport["mutate"]>[1]) {
   if (!(error instanceof RebuildTransportError)) return false;
   if (error.status === 401) return true;
+  // These exact current-service contact refusals precede saveCandidate.
+  if (error.status === 409 && (action === "edit" && contactEditRefusals.has(error.message) || action === "remove" && error.message === contactClaimRefusal)) return true;
   // RPC success can precede work acknowledgment parsing into a403/409.
   // Only input400 on these candidate commands is precommit; approval and
   // publication can also produce400 after their separate authority writes.

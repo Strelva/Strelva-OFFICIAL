@@ -60,3 +60,14 @@ describe("website connection HTTP boundary", () => {
     expect(state.connect).not.toHaveBeenCalled();
   });
 });
+
+it.each(["invalid selection", "signed out"])("refuses %s before invoking a connection service", async kind => {
+  if (kind === "signed out") state.user = null;
+  const response = await POST(new Request(`https://strelva.test/api/websites/${workId}/connections`, {
+    method: "POST", headers: { origin: "https://strelva.test", "sec-fetch-site": "same-origin", "content-type": "application/json" },
+    body: JSON.stringify(kind === "invalid selection" ? { expectedRevision: -1, selection: null } : { expectedRevision: 2, selection: null }),
+  }), context);
+  expect(response.status).toBe(kind === "signed out" ? 401 : 400);
+  expect(await response.json()).toEqual({ error: kind === "signed out" ? "Sign in to change website connections." : "Check the website connection selection." });
+  expect(state.connect).not.toHaveBeenCalled();
+});

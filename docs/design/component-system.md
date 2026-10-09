@@ -1305,8 +1305,9 @@ The owned `SiteHeading` wraps uninterrupted site names within its available widt
 
 `RebuildExperience` scopes saved review state to the exact workspace/work and
 keeps unknown mutation outcomes frozen across permission changes. Its transport
-separates fact/restore atomic refusals from approval/publication errors that can
-follow a committed authority or public pointer, including later HTTP400/403/409
+retains command input400 refusals where parsing precedes candidate commit.
+HTTP403/409 can follow candidate RPC success and malformed work acknowledgment;
+approval/publication can also fail after authority or pointer writes, including later HTTP400/403/409
 responses. Lost, malformed and failed mutation acknowledgments use truthful
 uncertainty copy; stale approval/publication claims and mutations remain withheld.
 **Reload current state** calls the existing saved-state read, never another POST.
@@ -1318,3 +1319,32 @@ the owner remains in the initiating flow. The shared synchronous guard admits on
 write/read per pending operation, and read-only users can still read saved state.
 Focused service/transport/component tests prove these local boundaries. This is
 not browser, genuine Auth, delivery, provider or production proof.
+
+`WebsiteConnectionSelector` reports unknown visitor-form writes to each owning
+website view, including successful envelopes that fail that owner's parser.
+Only the exact route-proven selection400 and sign-in401 messages retain direct
+correction, before an acknowledgment is received; consumer/parser failures after
+a successful POST remain unknown. Generic400/403/409 do not prove refusal.
+Available-form refresh is an options read and cannot settle a saved website
+mutation. Unknown results retain the entered form selection and disable further
+form writes/options refresh until the parent reads current website state.
+`RebuildExperience` uses its same exact saved-state recovery; legacy
+`WebsiteExperience` also offers **Reload current state** with truthful approval/
+launch uncertainty, synchronous guards and guarded heading focus. Failed reads
+retain entered details; foreign work and older permission-generation responses
+cannot reopen controls. A successful exact read resets the form editor even when
+the saved revision has not changed; failed reads retain its selection and lock.
+Read-only users may read saved state. Valid form-change
+acknowledgments still adopt the new preview and clear earlier approval. The
+producer shares pending state synchronously with both parents; changing business
+or work starts the appropriate scoped state. Focused local component and service
+ports cover both consumers. Auth, SQL, rendered desktop/mobile, delivery and
+production proof remain separate.
+
+The four exact service contact-refusal messages (invalid destination, kind
+change, existing destination collision and a reciprocal description-claim
+contact change) remain precommit for their specific edit/remove actions.
+Transport checks the full messages and exact actions; it does not infer safety
+from a generic409 or an “unchanged” substring. Actual service controls verify no
+candidate commit and retained approval, while component controls retain the
+correction and permit direct retry. Unknown row/authority403/409 stays locked.

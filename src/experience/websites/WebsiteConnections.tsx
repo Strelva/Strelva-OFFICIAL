@@ -6,20 +6,22 @@ import { SelectInput } from "@/components/ui/TextInput";
 import { websiteCapabilityOptionsSchema, type WebsiteCapabilityOptions, type WebsiteCapabilitySelection, type WebsiteRecord } from "@/products/websites/contracts";
 import styles from "./website-experience.module.css";
 import { beginFocusRecovery, type FocusRecovery } from "./focus-recovery";
-import { parseWebsiteRecord } from "./contracts";
+import { parseWebsiteRecord, WebsiteExperienceError } from "./contracts";
 
-export function WebsiteConnections({ record, disabled, onSaved, onBusyChange, headingRef, onFocusRecovery }: {
+export function WebsiteConnections({ record, disabled, onSaved, onBusyChange, headingRef, onFocusRecovery, onUnconfirmed, readOnly = false }: {
   record: WebsiteRecord;
   disabled: boolean;
   onSaved: (record: WebsiteRecord) => void;
   onBusyChange?: (busy: boolean) => void;
   headingRef?: Ref<HTMLHeadingElement>;
   onFocusRecovery?: (recovery: FocusRecovery) => void;
+  onUnconfirmed?: (recovery: FocusRecovery | null) => void;
+  readOnly?: boolean;
 }) {
-  return <WebsiteConnectionSelector workspaceId={record.workspaceId} workId={record.workId} revision={record.website.revision} selected={record.website.publishedCapabilitySelection ?? null} disabled={disabled} headingRef={headingRef} onFocusRecovery={onFocusRecovery} onBusyChange={onBusyChange} onSaved={value => onSaved(parseWebsiteRecord(value, record.workspaceId))} />;
+  return <WebsiteConnectionSelector workspaceId={record.workspaceId} workId={record.workId} revision={record.website.revision} selected={record.website.publishedCapabilitySelection ?? null} disabled={disabled} headingRef={headingRef} onFocusRecovery={onFocusRecovery} onBusyChange={onBusyChange} onUnconfirmed={onUnconfirmed} readOnly={readOnly} onSaved={value => onSaved(parseWebsiteRecord(value, record.workspaceId))} />;
 }
 
-export function WebsiteConnectionSelector({ workspaceId, workId, revision, selected, disabled, onSaved, onBusyChange, hosted = false, hasForms = false, headingRef, onFocusRecovery }: {
+export function WebsiteConnectionSelector({ workspaceId, workId, revision, selected, disabled, onSaved, onBusyChange, hosted = false, hasForms = false, headingRef, onFocusRecovery, onUnconfirmed, readOnly = false }: {
   workspaceId: string;
   workId: string;
   revision: number;
@@ -31,6 +33,8 @@ export function WebsiteConnectionSelector({ workspaceId, workId, revision, selec
   onBusyChange?: (busy: boolean) => void;
   headingRef?: Ref<HTMLHeadingElement>;
   onFocusRecovery?: (recovery: FocusRecovery) => void;
+  onUnconfirmed?: (recovery: FocusRecovery | null) => void;
+  readOnly?: boolean;
 }) {
   const [options, setOptions] = useState<WebsiteCapabilityOptions | null>(null);
   const [tenantId, setTenantId] = useState(selected?.tenantId ?? "");
@@ -38,6 +42,10 @@ export function WebsiteConnectionSelector({ workspaceId, workId, revision, selec
   const [bookingId, setBookingId] = useState(selected?.bookingGrantId ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [needsReload, setNeedsReload] = useState(false);
+  const unresolved = useRef(false);
+  const scope = useRef({ workspaceId, workId, readOnly, permissionRevision: 0 });
+  scope.current = { workspaceId, workId, readOnly, permissionRevision: scope.current.permissionRevision + Number(scope.current.readOnly !== readOnly) };
   const sectionRef = useRef<HTMLElement>(null);
   const localHeadingRef = useRef<HTMLHeadingElement>(null);
   const sourceRef = useRef<HTMLSelectElement>(null);
@@ -48,12 +56,12 @@ export function WebsiteConnectionSelector({ workspaceId, workId, revision, selec
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; focusRecovery.current?.cancel(); }; }, []);
   const endpoint = `/api/websites/${encodeURIComponent(workId)}/connections`;
   const tenant = options?.tenants.find(item => item.tenantId === tenantId);
-  const locked = disabled || busy;
+  const locked = disabled || readOnly || busy || needsReload;
 
   async function request(init?: RequestInit): Promise<unknown> {
     const response = await fetch(endpoint, { credentials: "same-origin", cache: "no-store", ...init });
     const body = await response.json();
-    if (!response.ok) throw new Error(typeof body?.error === "string" ? body.error : "Website forms could not be loaded. Try again.");
+    if (!response.ok) throw new WebsiteExperienceError(typeof body?.error === "string" ? body.error : "Website forms could not be loaded. Try again.", response.status);
     return body;
   }
   useEffect(() => {
@@ -62,7 +70,7 @@ export function WebsiteConnectionSelector({ workspaceId, workId, revision, selec
     focusRecovery.current = null;
   }, [locked, options]);
   async function load() {
-    if (disabled || inFlight.current) return;
+    if (disabled || readOnly || inFlight.current || unresolved.current) return;
     inFlight.current = true;
     focusRecovery.current?.cancel();
     focusRecovery.current = beginFocusRecovery(sectionRef.current);
@@ -72,15 +80,19 @@ export function WebsiteConnectionSelector({ workspaceId, workId, revision, selec
     finally { inFlight.current = false; if (mounted.current) setBusy(false); }
   }
   async function save(selection: WebsiteCapabilitySelection | null) {
-    if (disabled || inFlight.current) return;
+    if (disabled || readOnly || inFlight.current || unresolved.current) return;
     inFlight.current = true;
     focusRecovery.current?.cancel();
     focusRecovery.current = beginFocusRecovery(sectionRef.current);
+    const started = { ...scope.current };
     setBusy(true); setError(""); onBusyChange?.(true);
+    let acknowledged = false;
     try {
       const next = await request({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedRevision: revision, selection }) });
-      if ((next as { workId?: unknown })?.workId !== workId || (next as { workspaceId?: unknown })?.workspaceId !== workspaceId) throw new Error("The response belongs to a different website. Reload your saved work.");
-      if (mounted.current) {
+      acknowledged = true;
+      if ((next as { workId?: unknown })?.workId !== workId || (next as { workspaceId?: unknown })?.workspaceId !== workspaceId) throw new WebsiteExperienceError("The response belongs to a different website. Reload your saved work.", 200);
+      if (mounted.current && scope.current.workspaceId === started.workspaceId && scope.current.workId === started.workId) {
+        if (scope.current.permissionRevision !== started.permissionRevision) throw new Error("Access changed while saving visitor forms.");
         onSaved(next);
         // The parent owns recovery when a new revision remounts this selector.
         if (onFocusRecovery && focusRecovery.current) {
@@ -89,7 +101,22 @@ export function WebsiteConnectionSelector({ workspaceId, workId, revision, selec
         }
         setOptions(null);
       }
-    } catch (cause) { if (mounted.current) setError(cause instanceof Error ? cause.message : "Website forms could not be saved. Your selection is unchanged."); }
+    } catch (cause) {
+      if (mounted.current && scope.current.workspaceId === started.workspaceId && scope.current.workId === started.workId) {
+        const refused = !acknowledged && cause instanceof WebsiteExperienceError && (
+          cause.status === 400 && cause.message === "Check the website connection selection." ||
+          cause.status === 401 && cause.message === "Sign in to change website connections."
+        );
+        if (refused) setError(cause.message);
+        else {
+          unresolved.current = true; setNeedsReload(true);
+          const reason = cause instanceof WebsiteExperienceError && [200,403,409].includes(cause.status ?? 0) ? `${cause.message} ` : "";
+          setError(`${reason}The visitor form change could not be confirmed. Reload the current saved website before continuing.`);
+          onUnconfirmed?.(focusRecovery.current);
+          focusRecovery.current = null;
+        }
+      }
+    }
     finally { inFlight.current = false; if (mounted.current) setBusy(false); onBusyChange?.(false); }
   }
 
