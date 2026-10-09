@@ -3,7 +3,7 @@ import { OwnerBrandIdentity } from "@/components/brand/OwnerBrandIdentity";
 import { STRELVA_BRAND } from "@/platform/infra/agency-brand";
 
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type Ref } from "react";
 import { ArrowRight, Check, CheckCircle2, Share2, XCircle } from "lucide-react";
 import { attributedAiVisibility } from "./attribution";
 import type { AiVisibilityResult, Grade } from "./contracts";
@@ -14,6 +14,7 @@ interface AiVisibilityResultViewProps {
   shareUrl: string | null;
   workspaceEnabled?: boolean;
   onReset: () => void;
+  headingRef?: Ref<HTMLHeadingElement>;
 }
 
 type MonitorState = "idle" | "saving" | "saved" | "error";
@@ -28,7 +29,7 @@ function gradeColor(grade: Grade): string {
   }
 }
 
-export function AiVisibilityResultView({ result: raw, scanId, shareUrl, workspaceEnabled = false, onReset }: AiVisibilityResultViewProps) {
+export function AiVisibilityResultView({ result: raw, scanId, shareUrl, workspaceEnabled = false, onReset, headingRef }: AiVisibilityResultViewProps) {
   const result = attributedAiVisibility(raw, raw.agency);
   const agency = result.agency;
   const [shareStatus, setShareStatus] = useState<"idle" | "copied">("idle");
@@ -93,7 +94,7 @@ export function AiVisibilityResultView({ result: raw, scanId, shareUrl, workspac
             <div className="text-[13px] font-semibold tabular-nums" style={{ color: measured ? gradeColor(result.grade) : "var(--m-text-3)" }}>{measured ? `${result.score}/100` : "Not measured"}</div>
           </div>
         </div>
-        <h2 className="mt-6 text-2xl font-semibold text-m-text sm:text-3xl">{result.business}</h2>
+        <h2 ref={headingRef} tabIndex={headingRef ? -1 : undefined} className="mt-6 text-2xl font-semibold text-m-text sm:text-3xl">{result.business}</h2>
         {result.url && <p className="mt-2 text-[14px] text-m-text-3">{result.url}</p>}
         <p className="mx-auto mt-4 max-w-[560px] text-[16px] font-medium leading-[1.6] text-m-text">{result.verdict}</p>
         {result.measurementNote && <p className="mx-auto mt-2 max-w-[560px] text-[13px] leading-[1.6] text-m-text-3">{result.measurementNote}</p>}

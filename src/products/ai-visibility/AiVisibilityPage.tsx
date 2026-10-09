@@ -2,7 +2,7 @@
 import { OwnerBrandIdentity } from "@/components/brand/OwnerBrandIdentity";
 import { STRELVA_BRAND } from "@/platform/infra/agency-brand";
 
-import { useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { AiVisibilityResultView } from "./AiVisibilityResultView";
 import type { AgencyAttribution } from "@/platform/infra/agency-attribution";
@@ -49,6 +49,15 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
   const [error, setError] = useState("");
   const [invalidField, setInvalidField] = useState<"business" | "url" | null>(null);
   const errorId = useId();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const businessRef = useRef<HTMLInputElement>(null);
+  const previousState = useRef(state);
+  useEffect(() => {
+    if (previousState.current === state) return;
+    previousState.current = state;
+    if (state === "scanning" || state === "done") headingRef.current?.focus();
+    else businessRef.current?.focus();
+  }, [state]);
 
   async function handleScan(event: FormEvent) {
     event.preventDefault();
@@ -145,7 +154,7 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
             <form onSubmit={handleScan} aria-describedby={error ? errorId : undefined} className="mt-8 grid gap-3 sm:grid-cols-2">
               <label className="block">
                 <span className="mb-2 block text-sm text-m-text-2">Business name</span>
-                <input id="business-name" type="text" required aria-invalid={invalidField === "business" || undefined} aria-describedby={invalidField === "business" ? errorId : undefined} value={business} onChange={(event) => setBusiness(event.target.value)} placeholder="Business name" autoComplete="organization" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
+                <input id="business-name" ref={businessRef} type="text" required aria-invalid={invalidField === "business" || undefined} aria-describedby={error && invalidField !== "url" ? errorId : undefined} value={business} onChange={(event) => setBusiness(event.target.value)} placeholder="Business name" autoComplete="organization" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
               </label>
               <label className="block">
                 <span className="mb-2 block text-sm text-m-text-2">Website</span>
@@ -172,7 +181,7 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
         {state === "scanning" && (
           <div className="motion-rise">
             <p className="text-[14px] font-medium text-m-text-3">Auditing</p>
-            <h2 className="mt-4 text-3xl font-semibold text-m-text sm:text-4xl">Checking AI visibility for {business}...</h2>
+            <h2 ref={headingRef} tabIndex={-1} className="mt-4 text-3xl font-semibold text-m-text sm:text-4xl">Checking AI visibility for {business}...</h2>
             <div role="status" className="mt-10 flex items-center gap-3 rounded-2xl border border-m-rule-soft bg-m-panel p-6">
               <Loader2 aria-hidden="true" className="size-5 shrink-0 animate-spin text-m-accent motion-reduce:animate-none" />
               <span className="text-[14px] text-m-text-2">Reading your site and checking AI-crawler access. A live Gemini result will be included when available.</span>
@@ -181,7 +190,7 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
         )}
 
         {state === "done" && result && (
-          <AiVisibilityResultView result={result} scanId={scanId} shareUrl={shareUrl} workspaceEnabled={workspaceEnabled} onReset={handleReset} />
+          <AiVisibilityResultView headingRef={headingRef} result={result} scanId={scanId} shareUrl={shareUrl} workspaceEnabled={workspaceEnabled} onReset={handleReset} />
         )}
       </div>
     </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   ArrowRight,
   CheckCircle2,
@@ -152,6 +152,15 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
   const [error, setError] = useState(initialError || "");
   const [invalidUrl, setInvalidUrl] = useState(false);
   const errorId = useId();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const addressRef = useRef<HTMLInputElement>(null);
+  const previousState = useRef(state);
+  useEffect(() => {
+    if (previousState.current === state) return;
+    previousState.current = state;
+    if (state === "scanning" || state === "done") headingRef.current?.focus();
+    else addressRef.current?.focus();
+  }, [state]);
   const [reportLoading, setReportLoading] = useState(false);
 
 
@@ -279,9 +288,10 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
                 <Globe className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-m-text-3" />
                 <input
                   type="text"
+                  ref={addressRef}
                   aria-label="Website address"
                   aria-invalid={invalidUrl || undefined}
-                  aria-describedby={invalidUrl ? errorId : undefined}
+                  aria-describedby={error ? errorId : undefined}
                   required
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
@@ -329,7 +339,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
             <p className="text-[14px] font-medium text-m-text-3">
               Scanning
             </p>
-            <h2 className="mt-4 text-3xl font-semibold text-m-text sm:text-4xl">
+            <h2 ref={headingRef} tabIndex={-1} className="mt-4 text-3xl font-semibold text-m-text sm:text-4xl">
               Analyzing your site...
             </h2>
             <p className="mt-3 text-[15px] text-m-text-2">
@@ -371,7 +381,7 @@ export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReport
                 </div>
               </div>
 
-              <h2 className="mt-6 text-3xl font-semibold text-m-text sm:text-4xl">
+              <h2 ref={headingRef} tabIndex={-1} className="mt-6 text-3xl font-semibold text-m-text sm:text-4xl">
                 Site Health Report
               </h2>
               <p className="mt-2 text-[15px] text-m-text-2">

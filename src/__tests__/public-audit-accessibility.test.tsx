@@ -65,10 +65,12 @@ describe("public audit feedback", () => {
       await submit();
       expect(container.querySelector('[role="status"]')?.textContent).toMatch(/Reading (your site|the website)/);
       expect(container.querySelector("form")).toBeNull();
+      expect(document.activeElement?.tagName).toBe("H2");
       await act(async () => finish(new Response(JSON.stringify({ error: "Try again later." }), { status: 503 })));
       const field = container.querySelector<HTMLInputElement>(selector)!;
       expect(field.value).toBe("bakery.example");
       expect(field.hasAttribute("aria-invalid")).toBe(false);
+      expect(document.activeElement).toBe(kind === "ai" ? container.querySelector("#business-name") : field);
       expect(document.getElementById(container.querySelector("form")!.getAttribute("aria-describedby")!)?.textContent).toBe("Try again later.");
     });
   }

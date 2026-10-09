@@ -1144,3 +1144,17 @@ The client editor links to recovery after a pending result; a missing tenant at
 its original editor URL routes to the standalone page. No component primitive API
 or accepted visual direction changes. Focused transport/authority checks pass;
 actual Auth desktop/mobile reload/retry/screenshots are prepared, not observed.
+
+
+### Public assessment keyboard recovery (October 8, 2026)
+
+`AiVisibilityPage` and `WebsiteAuditPage` associate validation and request errors
+with retained inputs. Invalid input carries invalid-field state; a server failure
+describes the problem without declaring a valid address invalid. Pending and
+completed assessments receive focus at their current heading. A failed or reset
+assessment returns focus to the retained first field; initial render preserves
+the visitor's focus. `AiVisibilityResultView` accepts an optional heading ref for
+this handoff without changing other consumers. Reduced-motion loading indicators
+use the existing motion utility. Focused unit and Chromium keyboard/recovery
+checks cover these transitions. This is local rendered proof; screen-reader,
+physical-device, other-browser and live-provider operation remain unproven.
