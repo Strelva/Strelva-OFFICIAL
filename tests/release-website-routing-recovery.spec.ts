@@ -173,10 +173,11 @@ test.describe("reverse operator admission", () => {
     f.removePublication(); const before = f.reads.length; await page.getByRole("button", { name: "Reload saved preview and history", exact: true }).click();
     expect(f.reads).toHaveLength(before + 1); await expect(check).toBeVisible();
     await expect(f.parent).toContainText("domain request still needs its exact saved request checked");
-    await expect(undo.getByRole("button", { name: "Restore previous website", exact: true })).toBeDisabled(); expect(f.writes).toHaveLength(1);
+    await expect(undo).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Approve this preview", exact: true })).toBeDisabled(); expect(f.writes).toHaveLength(1);
     f.failDomainRead(true, 403); await check.focus(); await page.keyboard.press("Enter");
     await expect(domain.getByRole("alert")).toContainText("exact saved request"); await expect(check).toBeFocused();
-    await expect(undo.getByRole("button", { name: "Restore previous website", exact: true })).toBeDisabled(); expect(f.writes).toHaveLength(1);
+    await expect(page.getByRole("button", { name: "Approve this preview", exact: true })).toBeDisabled(); expect(f.writes).toHaveLength(1);
     f.failDomainRead(false); await page.keyboard.press("Enter"); await expect(domain.getByRole("status")).toContainText("Domain setup waits for their approval");
     await page.getByRole("button", { name: "Restore fictional operator access", exact: true }).click();
     await expect(domain.getByLabel("Domain to request", { exact: true })).toHaveValue("bakery.example.test");
