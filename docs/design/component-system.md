@@ -1412,6 +1412,11 @@ its submitted URL or description/name/request ID after a lost acknowledgement
 and offers **Check this website request** using that exact idempotent POST with
 current access. Only an initial route401 or accepted owning result releases it.
 
+Fresh native URL intake validates deterministic syntax, scheme, credentials and
+port rules before admission. Invalid addresses leave the form editable and
+return focus to the URL field; a corrected address may start a fresh request.
+This preflight does not revalidate or replace an already admitted command.
+
 Accepted mutation acknowledgement no longer awaits History/domain enrichment.
 The current candidate and cleared approval appear immediately; supplemental
 state is marked unavailable until an explicit **Reload saved History** or

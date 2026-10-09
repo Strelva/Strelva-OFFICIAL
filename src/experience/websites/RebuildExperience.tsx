@@ -10,7 +10,7 @@ import { beginFocusRecovery, type FocusRecovery } from "./focus-recovery";
 import { WebsiteConnectionSelector } from "./WebsiteConnections";
 import { WebsiteRebuildReport } from "./WebsiteRebuildReport";
 import { WebsiteRebuildSharing } from "./WebsiteRebuildSharing";
-import type { WebsiteCutoverUndoReceipt } from "@/products/websites/client";
+import { normalizeWebsiteRebuildUrl, type WebsiteCutoverUndoReceipt } from "@/products/websites/client";
 import { WebsiteCutoverUndo, WebsiteDomainRequest } from "./WebsiteRecoveryControls";
 import { SITES_PATH_ORIGIN } from "@/platform/infra/brand";
 import { WebsiteArchivedVersions } from "./WebsiteArchivedVersions";
@@ -126,6 +126,7 @@ function ScopedRebuildExperience({ workspaceId, workId, readOnly = false, manage
   const [loading, setLoading] = useState(Boolean(workId && !initialRecord));
   const websiteAttempt = useWebsiteAttempt<Parameters<RebuildTransport["start"]>[0]>(`${readOnly}:${canPublish}:${operator}:${allowIntake}:${managed}`);
   const { busy, setBusy, inFlight, unresolved, mounted, needsReload, command: creationAttempt } = websiteAttempt;
+  const intakeUrlRef = useRef<HTMLInputElement | null>(null);
   const [cutoverBlocked, setCutoverBlocked] = useState(false);
   const cutoverBlockedRef = useRef(false);
   const [domainRequestBlocked, setDomainRequestBlocked] = useState(false);
@@ -240,6 +241,17 @@ function ScopedRebuildExperience({ workspaceId, workId, readOnly = false, manage
     finally { websiteAttempt.finish(); }
   }
   async function startWebsite(check = false) {
+    if (!check) {
+      if (inFlight.current || unresolved.current || readOnly || loading || cutoverBlockedRef.current || domainRequestBlockedRef.current) return;
+      if (!descriptionMode) {
+        try { normalizeWebsiteRebuildUrl(url); }
+        catch (cause) {
+          setError(cause instanceof Error ? cause.message : "Enter a valid public website address.");
+          intakeUrlRef.current?.focus();
+          return;
+        }
+      }
+    }
     const submitted = check ? creationAttempt.current : { workspaceId, requestId: createWebsiteRequestId(), ...(descriptionMode ? { businessName: businessName.trim(), description: description.trim() } : { url: url.trim() }) };
     if (!submitted) return;
     await run(() => transport.start(structuredClone(submitted)), "Website work saved. Follow its progress below.", false, submitted, check);
@@ -330,7 +342,7 @@ function ScopedRebuildExperience({ workspaceId, workId, readOnly = false, manage
       : workId && !record ? <Button variant="secondary" onClick={() => setAttempt(value => value + 1)}>Try loading again</Button>
       : !record ? canCreate ? <form className={styles.intake} onSubmit={event => { event.preventDefault(); if (startReady) void startWebsite(); }}>
         {descriptionMode ? <><TextInput label="Business name" value={businessName} onChange={event => { if (!inFlight.current && !unresolved.current && !readOnly) setBusinessName(event.target.value); }} required maxLength={160} disabled={disabled} /><TextArea label="Describe your business" helperText="Tell us what you do and how customers should reach you. These details will be marked as provided by you." value={description} onChange={event => { if (!inFlight.current && !unresolved.current && !readOnly) setDescription(event.target.value); }} maxLength={4000} required disabled={disabled} /></>
-          : <TextInput label="Your current website" inputMode="url" autoComplete="url" placeholder="https://your-business.com" value={url} onChange={event => { if (!inFlight.current && !unresolved.current && !readOnly) setUrl(event.target.value); }} required maxLength={2048} disabled={disabled} />}
+          : <TextInput ref={intakeUrlRef} label="Your current website" inputMode="url" autoComplete="url" placeholder="https://your-business.com" value={url} onChange={event => { if (!inFlight.current && !unresolved.current && !readOnly) setUrl(event.target.value); }} required maxLength={2048} disabled={disabled} />}
         <div className={styles.actions}><Button type="submit" loading={busy} disabled={disabled || !startReady} icon={<Globe size={18} />}>Build a private preview</Button><Button type="button" variant="ghost" disabled={disabled} onClick={() => { if (!inFlight.current && !unresolved.current && !readOnly) setDescriptionMode(value => !value); }}>{descriptionMode ? "Use an existing website" : "No site yet? Describe your business"}</Button></div>
         <p className={styles.meta}>Your preview stays private. Publishing requires an owner&apos;s approval.</p>
       </form> : <p className={styles.notice}>No website preview is waiting for review. Choose an agency with an active provider seat to request website work.</p>

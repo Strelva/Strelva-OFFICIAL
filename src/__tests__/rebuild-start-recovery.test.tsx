@@ -17,6 +17,31 @@ async function intake(transport: RebuildTransport = serverRebuildTransport) {
   await act(async () => root.render(createElement(RebuildExperience, { workspaceId, initialRequest: 'We bake bread for Saturday pickup.', transport })));
   await type(node.querySelector('input')!, 'Fictional Bread');
 }
+it.each(['https://', 'ftp://example.com', 'https://owner:secret@example.com', 'https://example.com:8080'])('keeps invalid URL %s unadmitted and editable until the owner corrects it', async invalid => {
+  const h = harness();
+  const fetchMock = vi.fn(async (_path: string, options?: RequestInit) => {
+    const { workspaceId: ws, ...command } = JSON.parse(String(options?.body));
+    try { return Response.json(await h.service.create(actor, ws, command, true)); }
+    catch (cause) { return rebuildHttpFailure(cause); }
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  await act(async () => root.render(createElement(RebuildExperience, { workspaceId })));
+  const url = node.querySelector('input')!;
+  await type(url, invalid);
+  button('Build a private preview').focus();
+  await act(async () => button('Build a private preview').click());
+  expect(fetchMock).not.toHaveBeenCalled(); expect(h.works.size).toBe(0);
+  expect(url.value).toBe(invalid); expect(url.disabled).toBe(false);
+  expect(button('Check this website request')).toBeUndefined();
+  expect(node.querySelector('[role="alert"]')?.textContent).toContain('website address');
+  expect(document.activeElement).toBe(url);
+  await type(url, 'example.com/path#section');
+  await act(async () => button('Build a private preview').click());
+  expect(fetchMock).toHaveBeenCalledTimes(1); expect(h.works.size).toBe(1);
+  expect(h.pipeline).not.toHaveBeenCalled();
+  expect(node.textContent).toContain('Website work saved.');
+  expect(node.querySelector('[role="alert"]')).toBeNull();
+});
 it.each([false, true])('reopens exactly one committed native request after lost acknowledgement, retaining its original fields and ID (deferred: %s)', async deferred => {
   const h = harness(); const bodies: unknown[] = []; let lose = true;
   vi.stubGlobal('fetch', vi.fn(async (_path: string, options?: RequestInit) => {
@@ -49,6 +74,29 @@ it('does not settle an unknown request with a later authentication refusal', asy
   await intake(); await act(async () => button('Build a private preview').click());
   await act(async () => button('Check this website request').click());
   expect(button('Build a private preview').disabled).toBe(true); expect(button('Check this website request')).toBeDefined();
+});
+it('checks an admitted URL verbatim after lost acknowledgement even when attempted edits contain an invalid URL', async () => {
+  const h = harness(); const bodies: unknown[] = []; let lose = true;
+  vi.stubGlobal('fetch', vi.fn(async (_path: string, options?: RequestInit) => {
+    const body = JSON.parse(String(options?.body)); bodies.push(body);
+    const { workspaceId: ws, ...command } = body;
+    const saved = await h.service.create(actor, ws, command, true);
+    if (lose) { lose = false; throw new Error('Lost acknowledgement after commit'); }
+    return Response.json(saved);
+  }));
+  await act(async () => root.render(createElement(RebuildExperience, { workspaceId })));
+  const url = node.querySelector('input')!;
+  await type(url, ' example.com/path#section ');
+  await act(async () => button('Build a private preview').click());
+  expect(url.disabled).toBe(true); expect(h.works.size).toBe(1);
+  await type(url, 'https://');
+  await act(async () => node.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  expect(bodies).toHaveLength(1); expect(url.value).toBe(' example.com/path#section ');
+  expect(node.textContent).toContain('Check this same request');
+  await act(async () => button('Check this website request').click());
+  expect(bodies).toHaveLength(2); expect(bodies[1]).toEqual(bodies[0]);
+  expect(bodies[0]).toMatchObject({ url: 'example.com/path#section' });
+  expect(h.works.size).toBe(1); expect(node.textContent).toContain('Website work saved.');
 });
 it('admits a fresh command only after the initial authentication refusal', async () => {
   const bodies: Array<{ requestId: string; businessName: string }> = [];

@@ -4,6 +4,7 @@ import { computeVisibleText } from "@/lib/audit/checks";
 import { isSafeFetchUrl } from "@/platform/infra/safe-fetch";
 import { fetchPinnedPublicResponse } from "@/platform/infra/pinned-public-text";
 import { registrableRebuildDomain } from "./rebuild-domain-key";
+import { normalizeWebsiteRebuildUrl } from "./rebuild-url";
 
 export const REBUILD_USER_AGENT = "StrelvaRebuild/1.0";
 export interface SourceRef { sourceId: string; quote: string }
@@ -22,12 +23,8 @@ export interface PageFetchResult { url: string; status: number; html: string; co
 export type PageFetcher = (url: string, options: PageFetchOptions) => Promise<PageFetchResult>;
 
 export function normalizeRebuildUrl(raw: string): string {
-  let url: URL;
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw.trim()) && !/^https?:\/\//i.test(raw.trim())) throw new WebsiteCrawlError("unsafe_url", "Enter a public HTTP or HTTPS website address.");
-  try { url = new URL(/^https?:\/\//i.test(raw.trim()) ? raw.trim() : `https://${raw.trim()}`); } catch { throw new WebsiteCrawlError("unsafe_url", "Enter a valid public website address."); }
-  if (!isSafeFetchUrl(url.href) || url.username || url.password || url.port && !["80", "443"].includes(url.port)) throw new WebsiteCrawlError("unsafe_url", "Enter a public HTTP or HTTPS website address without credentials or a custom port.");
-  url.hash = "";
-  return url.href;
+  try { return normalizeWebsiteRebuildUrl(raw); }
+  catch (cause) { throw new WebsiteCrawlError("unsafe_url", cause instanceof Error ? cause.message : "Enter a valid public website address."); }
 }
 
 /** PSL includes private hosted registries, so unrelated github.io or co.uk

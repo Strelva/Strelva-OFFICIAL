@@ -1,9 +1,21 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { rebuildHttpFailure } from '@/app/api/websites/rebuild-http';
 import { parseRebuildView, RebuildTransportError, RebuildUnconfirmedError, serverRebuildTransport } from '@/experience/websites/rebuild-transport';
+import { normalizeWebsiteRebuildUrl } from '@/products/websites/client';
+import { normalizeRebuildUrl } from '@/products/websites/rebuild-crawl';
 import { WorkspaceAccessError } from '@/platform/workspaces/types';
 import { harness, actor, selection } from './rebuild-recovery-independent-harness';
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+it.each(['test', 'production'])('matches server deterministic URL normalization and rejection under %s rules', environment => {
+  vi.stubEnv('NODE_ENV', environment);
+  const outcome = (normalize: (url: string) => string, url: string) => {
+    try { return { normalized: normalize(url) }; }
+    catch (cause) { return { error: cause instanceof Error ? cause.message : 'Unknown error' }; }
+  };
+  for (const url of ['https://', '', 'ftp://example.com', 'https://owner:secret@example.com', 'https://example.com:8080', ' example.com/path#section ', 'HTTPS://EXAMPLE.COM:443/path?q=1#section', 'https://example.com:80/path', 'http://example.com', 'https://127.0.0.1', 'https://[::1]', 'http://localhost:80']) {
+    expect(outcome(normalizeWebsiteRebuildUrl, url), url).toEqual(outcome(normalizeRebuildUrl, url));
+  }
+});
 it.each(['approve', 'launch'] as const)('marks the actual %s postcommit membership403 unknown, preserving committed document authority', async action => {
   const h = harness();
   const created = await h.create({ requestId: 'phase-probe-request', businessName: 'Fictional Bread', description: 'We bake bread for pickup.' });

@@ -1,5 +1,43 @@
 # Website admission and settlement
 
+## Review correction plan (frozen head `8ff3578f`)
+
+Authorized subtraction refinement before the correction commit: use one
+browser-safe product-owned `rebuild-url.ts`.
+Both intake/acknowledgement and the crawler consume it. Keep `normalizeRebuildUrl`
+as a narrow server wrapper that retains `WebsiteCrawlError` code/message identity.
+Additional owned scope is only that module, the crawler import/function hunk,
+and directly affected URL/crawler tests. No service/API behavior changes. Run
+existing crawler and URL-safety semantics alongside the website repair group.
+
+The owner who types `https://` must be able to correct it before any request is
+admitted. Currently the server rejects this before claiming work, but its generic
+503 cannot prove refusal to the client; the captured invalid command stays locked.
+Validate fresh URL intake before `attempt.begin`, leave its fields editable and
+return focus to the URL. Exact checks of already admitted commands bypass this
+preflight and continue to retain their immutable payload and uncertainty guards.
+
+Reuse the browser-safe `platform/infra/safe-fetch` literal validator in a single
+product-owned `rebuild-url.ts`, exposed through the existing client entry. Intake,
+acknowledgement and the crawler consume it. The crawler keeps `normalizeRebuildUrl`
+and wraps errors in `WebsiteCrawlError` with unchanged codes/messages. No service
+or API behavior changes. Verify test/production literal rules and wrapper
+compatibility; DNS and actual reachability remain server responsibilities.
+
+Owned correction files: `RebuildExperience.tsx`, `rebuild-transport.ts`, the native
+creation/transport uncertainty and existing crawler URL tests, this handoff/evidence,
+and only the relevant component inventory paragraph. The authorized product scope
+adds `rebuild-url.ts`, one client-entry export and the crawler import/function hunk.
+No public props or session keys change.
+
+Checks: retain the new correction test failing on `8ff3578f`; then run the same
+27-suite website group, `pnpm typecheck`, `pnpm check:boundaries`,
+`pnpm check:ontology`, full `pnpm lint` and `git diff --check`.
+Inspect fictional desktop/mobile invalid-input correction and keyboard focus.
+Acceptance: invalid syntax/scheme/credentials/custom port sends no request and
+does not lock intake; correction submits one successful request; lost-ack and
+optional-read acceptance regressions remain passing. No generic503 is reclassified.
+
 Stream: `website`. Base: `reborn-1.0` at `e9511b044b217fc233bde6b174c12988eaa2e950`.
 
 ## Person and job
@@ -140,7 +178,7 @@ settlement, and clears only its domain-unavailable projection when accepted.
   `browser-screenshot-localhost-mv1fntzi-2f1449e3.png` (mobile loading), and
   `browser-screenshot-localhost-mv1foqqi-17fd8cf2.png` (mobile empty).
 
-Runtime source: **+179 / -142, net +37 lines**, separately from tests/docs.
+Initial frozen-head runtime source: **+179 / -142, net +37 lines**, separately from tests/docs.
 Distributed lifecycle code shrank; the retained-command owner, creation recovery
 and supplemental validation add the remaining source. No guard was deleted for
 line count. The relevant inventory entry is the only shared documentation overlap.
@@ -176,3 +214,63 @@ same319-test group plus combined type/boundary/ontology and relevant release
 proofs, and reconcile the proposed evidence delta. No main merge or rollout is
 part of this handoff. Branch, final commit and draft URL are supplied in the
 queued coordinator completion message and PR metadata.
+
+## P2 correction handoff
+
+Fresh native URL intake now validates before generating a request ID or admitting
+an attempt. A typo, unsupported scheme, credentials or custom port reports the
+deterministic error, preserves editable input and focuses the URL field. Correction
+then admits one valid command. Already admitted checks bypass this preflight;
+generic503 remains unknown and the original body/ID remains immutable. The
+normalizer also replaces the transport's existing acknowledgement URL conversion.
+Public props, keyed session lifetime, permission epochs and service/API behavior
+are unchanged. Runtime scope adds `products/websites/rebuild-url.ts`, its single
+client-entry export and only the crawler normalization import/function hunk to the
+two experience files. The existing `WebsiteCrawlError` name/code/message and
+`normalizeRebuildUrl` export remain compatible.
+
+Retained review regression: [four failures and seven passes](./02-website-correction-initial-regression.txt)
+on `8ff3578f` showed invalid input reaching the POST. Final [local proof](./02-website-correction-proof.txt):
+**377 tests / 31 suites, no skips**, typecheck, boundaries, ontology, full
+`pnpm lint` and whitespace check passed. The added URL lost-ack test checks a
+committed schemeless/fragment URL verbatim after attempted invalid edits, with one
+record. Existing description lost-ack, optional-read acceptance, permission,
+double-click, stale scope and focus independent-peer regressions remain passing.
+The shared normalizer and server wrapper are tested under test/production literal
+rules for invalid input, HTTP/private hosts, credentials, ports and canonical URLs.
+
+Croki fictional fixture inspected at 1280×900 and 360×800: `https://` leaves intake
+editable with URL focus, a 2px mobile keyboard outline, and no page overflow.
+Correcting to `example.com/path#section` shows the fixture's owning acknowledgement
+and clears the error. Screenshots:
+`browser-screenshot-localhost-mv1gfrd1-d0213846.png` (desktop error after extraction),
+`browser-screenshot-localhost-mv1gfcif-06807738.png` (mobile error/focus after extraction), and
+`browser-screenshot-localhost-mv1gatyv-73eb525d.png` (mobile accepted fixture).
+This proves local rendering, not crawl reachability, Auth, provider or production.
+The isolated preview server had no runtime repository env files or inherited
+provider credentials; its existing iframe availability limitation remains unqualified.
+
+Correction runtime source **+34/-12 (net +22)**; cumulative runtime from the starting
+base **+209/-150 (net +59)**. Tests and documentation/evidence are counted separately
+in the PR. No dependency was added. The shared literal validator is browser-safe
+today (no imports; only `URL` and compiled `NODE_ENV`). Dependency risk: future
+changes to `safe-fetch.ts` must preserve browser safety and environment parity.
+One product-owned deterministic policy now serves client and crawler; no
+Node/crawler dependency enters the client graph. Its narrow server wrapper must
+retain error compatibility. DNS/fetch safety stays with the server. No domain meaning or
+authority changed, so no SQL/custom-client checks were required or claimed.
+Full suite/build and authenticated/provider proofs remain unrun.
+
+Proposed evidence delta: deterministic native URL refusal now precedes admission;
+committed immutable-request recovery and optional-read acceptance still pass.
+Exact integration action: independently review the new #620 head, then compose it
+with opened-work in the coordinator's isolated union. Preserve mounted role/session
+ownership and optional unavailable fields, run the 377-test group (27 website suites plus crawler, safe-fetch and pinned
+transport/lookup) and combined
+type/boundary/ontology/lint checks, and reconcile evidence in canonical state.
+Keep production/main merge and rollout outside this stream. The new exact SHA is
+in the correction callback `architecture-20261009-website-correction-complete`.
+
+During extraction, tests/typecheck/lint caught a missing normalizer argument in
+the renamed test call. It was corrected before final proof; the intermediate
+[failed run](./02-website-normalizer-review-failure.txt) is retained separately.

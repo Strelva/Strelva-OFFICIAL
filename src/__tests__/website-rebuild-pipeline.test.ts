@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { crawlWebsite, robotsAllows, normalizeRebuildUrl, sameCrawlDomain, type PageFetcher } from "@/products/websites/rebuild-crawl";
+import { crawlWebsite, robotsAllows, normalizeRebuildUrl, sameCrawlDomain, WebsiteCrawlError, type PageFetcher } from "@/products/websites/rebuild-crawl";
 import { runWebsiteRebuild, WebsiteRebuildStageError, validateWrittenContent, writeSourceContent, extractBusinessFacts, createAiRebuildWriter, websiteRebuildInputSchema } from "@/products/websites/rebuild-pipeline";
 import { rebuildInputSchema } from "@/products/websites/rebuild-contracts";
 import { composeRebuildSite, verifyRebuildSite, JevComposer, ModelComposer } from "@/products/websites/rebuild-composer";
@@ -110,6 +110,15 @@ describe("website rebuild pipeline", () => {
 });
 
 describe("bounded safe website crawl", () => {
+  it.each([
+    ["https://", "Enter a valid public website address."],
+    ["file:///etc/passwd", "Enter a public HTTP or HTTPS website address."],
+    ["https://user:secret@example.com", "Enter a public HTTP or HTTPS website address without credentials or a custom port."],
+    ["https://example.com:8443", "Enter a public HTTP or HTTPS website address without credentials or a custom port."],
+  ])("retains crawl error identity, unsafe_url code and message for %s", (url, message) => {
+    expect(() => normalizeRebuildUrl(url)).toThrow(WebsiteCrawlError);
+    expect(() => normalizeRebuildUrl(url)).toThrow(expect.objectContaining({ name: "WebsiteCrawlError", code: "unsafe_url", message }));
+  });
   it("normalizes URL input and rejects non-http and credentials", () => {
     expect(normalizeRebuildUrl("example.com/a#section")).toBe("https://example.com/a");
     expect(() => normalizeRebuildUrl("https://user:secret@example.com")).toThrow();

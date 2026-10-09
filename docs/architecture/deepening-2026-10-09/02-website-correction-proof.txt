@@ -1,0 +1,65 @@
+pnpm exec vitest run $(cat docs/architecture/deepening-2026-10-09/02-website-test-files.txt) src/__tests__/website-rebuild-pipeline.test.ts src/__tests__/safe-fetch.test.ts src/__tests__/pinned-public-text.test.ts src/__tests__/pinned-lookup.test.ts
+
+31 affected suites (exit 0)
+RUN  v4.1.11 /Users/jacobrhinehart/.croki/worktrees/REB/arch-website-settlement-depth-20261009
+
+(node:80248) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:80263) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:80266) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:80262) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:80265) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:80264) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:80260) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:80267) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:80293) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:80294) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:80296) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  31 passed (31)
+      Tests  377 passed (377)
+   Start at  17:04:40
+   Duration  6.07s (transform 27.29s, setup 784ms, import 51.34s, tests 7.94s, environment 8.03s)
+
+pnpm typecheck (exit 0)
+> strelva@0.2.0 typecheck /Users/jacobrhinehart/.croki/worktrees/REB/arch-website-settlement-depth-20261009
+> next typegen && tsc --noEmit
+
+[@sentry/nextjs] DEPRECATION WARNING: disableLogger is deprecated and will be removed in a future version. Use webpack.treeshake.removeDebugLogging instead. (Not supported with Turbopack.)
+Generating route types...
+✓ Types generated successfully
+
+pnpm check:boundaries (exit 0)
+> strelva@0.2.0 check:boundaries /Users/jacobrhinehart/.croki/worktrees/REB/arch-website-settlement-depth-20261009
+> tsx scripts/check-product-boundaries.ts
+
+Product boundaries passed (source and scripts, including untracked files). Baseline, shrink only: 201 workspace -> src/lib imports in 92 files, 42 older boundary imports.
+(node:78825) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+pnpm check:ontology (exit 0)
+> strelva@0.2.0 check:ontology /Users/jacobrhinehart/.croki/worktrees/REB/arch-website-settlement-depth-20261009
+> tsx scripts/check-ontology.ts
+
+check:ontology passed (file-size ceiling + lifecycle CHECK constraints).
+(node:78779) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+pnpm lint (exit 0)
+> strelva@0.2.0 lint /Users/jacobrhinehart/.croki/worktrees/REB/arch-website-settlement-depth-20261009
+> eslint .
+
+[BABEL] Note: The code generator has deoptimised the styling of /Users/jacobrhinehart/.croki/worktrees/REB/arch-website-settlement-depth-20261009/src/platform/infra/db/database.types.ts as it exceeds the max of 500KB.
+
+git diff --check (exit 0): no output.
+Browser: fictional /preview/strelva/rebuild?scenario=empty after shared normalizer extraction, desktop1280x900/mobile360x800. Invalid https:// retains editable value, no exact-check action, URL focused (mobile outline2px), no page overflow. Corrected example.com/path#section accepts fixture record and clears invalid-input error. No Auth/provider/production qualification. Local app started with env -i and no runtime repository env files; only checked-in .env*.example files exist.

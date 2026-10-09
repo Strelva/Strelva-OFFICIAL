@@ -1,0 +1,152 @@
+(node:43475) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+ RUN  v4.1.11 /Users/jacobrhinehart/.croki/worktrees/REB/arch-website-settlement-depth-20261009
+
+(node:43482) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/__tests__/rebuild-start-recovery.test.tsx (11 tests | 4 failed) 154ms
+   × keeps invalid URL https:// unadmitted and editable until the owner corrects it 28ms
+   × keeps invalid URL ftp://example.com unadmitted and editable until the owner corrects it 8ms
+   × keeps invalid URL https://owner:secret@example.com unadmitted and editable until the owner corrects it 6ms
+   × keeps invalid URL https://example.com:8080 unadmitted and editable until the owner corrects it 5ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/rebuild-start-recovery.test.tsx > keeps invalid URL https:// unadmitted and editable until the owner corrects it
+AssertionError: expected "vi.fn()" to not be called at all, but actually been called 1 times
+
+Received:
+
+  1st vi.fn() call:
+
+    Array [
+      "/api/websites/rebuild",
+      Object {
+        "body": "{"workspaceId":"71000000-0000-4000-8000-000000000002","requestId":"8585e7c6-1a2d-4baf-9e53-28c148519d3d","url":"https://"}",
+        "cache": "no-store",
+        "credentials": "same-origin",
+        "headers": Object {
+          "Content-Type": "application/json",
+        },
+        "method": "POST",
+      },
+    ]
+
+
+Number of calls: 1
+
+ ❯ src/__tests__/rebuild-start-recovery.test.tsx:33:25
+     31|   button('Build a private preview').focus();
+     32|   await act(async () => button('Build a private preview').click());
+     33|   expect(fetchMock).not.toHaveBeenCalled(); expect(h.works.size).toBe(…
+       |                         ^
+     34|   expect(url.value).toBe(invalid); expect(url.disabled).toBe(false);
+     35|   expect(button('Check this website request')).toBeUndefined();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/__tests__/rebuild-start-recovery.test.tsx > keeps invalid URL ftp://example.com unadmitted and editable until the owner corrects it
+AssertionError: expected "vi.fn()" to not be called at all, but actually been called 1 times
+
+Received:
+
+  1st vi.fn() call:
+
+    Array [
+      "/api/websites/rebuild",
+      Object {
+        "body": "{"workspaceId":"71000000-0000-4000-8000-000000000002","requestId":"f6654ab0-3fdd-4af7-b8ca-2e8fdbdac59a","url":"ftp://example.com"}",
+        "cache": "no-store",
+        "credentials": "same-origin",
+        "headers": Object {
+          "Content-Type": "application/json",
+        },
+        "method": "POST",
+      },
+    ]
+
+
+Number of calls: 1
+
+ ❯ src/__tests__/rebuild-start-recovery.test.tsx:33:25
+     31|   button('Build a private preview').focus();
+     32|   await act(async () => button('Build a private preview').click());
+     33|   expect(fetchMock).not.toHaveBeenCalled(); expect(h.works.size).toBe(…
+       |                         ^
+     34|   expect(url.value).toBe(invalid); expect(url.disabled).toBe(false);
+     35|   expect(button('Check this website request')).toBeUndefined();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  src/__tests__/rebuild-start-recovery.test.tsx > keeps invalid URL https://owner:secret@example.com unadmitted and editable until the owner corrects it
+AssertionError: expected "vi.fn()" to not be called at all, but actually been called 1 times
+
+Received:
+
+  1st vi.fn() call:
+
+    Array [
+      "/api/websites/rebuild",
+      Object {
+        "body": "{"workspaceId":"71000000-0000-4000-8000-000000000002","requestId":"b4eab06c-487a-4f18-b971-d2ae41eef7ff","url":"https://owner:secret@example.com"}",
+        "cache": "no-store",
+        "credentials": "same-origin",
+        "headers": Object {
+          "Content-Type": "application/json",
+        },
+        "method": "POST",
+      },
+    ]
+
+
+Number of calls: 1
+
+ ❯ src/__tests__/rebuild-start-recovery.test.tsx:33:25
+     31|   button('Build a private preview').focus();
+     32|   await act(async () => button('Build a private preview').click());
+     33|   expect(fetchMock).not.toHaveBeenCalled(); expect(h.works.size).toBe(…
+       |                         ^
+     34|   expect(url.value).toBe(invalid); expect(url.disabled).toBe(false);
+     35|   expect(button('Check this website request')).toBeUndefined();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  src/__tests__/rebuild-start-recovery.test.tsx > keeps invalid URL https://example.com:8080 unadmitted and editable until the owner corrects it
+AssertionError: expected "vi.fn()" to not be called at all, but actually been called 1 times
+
+Received:
+
+  1st vi.fn() call:
+
+    Array [
+      "/api/websites/rebuild",
+      Object {
+        "body": "{"workspaceId":"71000000-0000-4000-8000-000000000002","requestId":"c0e791c2-f319-450e-b56e-8329a7cc0326","url":"https://example.com:8080"}",
+        "cache": "no-store",
+        "credentials": "same-origin",
+        "headers": Object {
+          "Content-Type": "application/json",
+        },
+        "method": "POST",
+      },
+    ]
+
+
+Number of calls: 1
+
+ ❯ src/__tests__/rebuild-start-recovery.test.tsx:33:25
+     31|   button('Build a private preview').focus();
+     32|   await act(async () => button('Build a private preview').click());
+     33|   expect(fetchMock).not.toHaveBeenCalled(); expect(h.works.size).toBe(…
+       |                         ^
+     34|   expect(url.value).toBe(invalid); expect(url.disabled).toBe(false);
+     35|   expect(button('Check this website request')).toBeUndefined();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 7 passed (11)
+   Start at  16:59:09
+   Duration  3.58s (transform 1.77s, setup 79ms, import 2.75s, tests 154ms, environment 524ms)

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { websiteCapabilitySelectionSchema } from "@/products/websites/contracts";
-import { legacyArchiveSummarySchema as legacyArchiveSummaryViewSchema, rebuildSkippedPathSchema, websiteRebuildSchema } from "@/products/websites/client";
+import { legacyArchiveSummarySchema as legacyArchiveSummaryViewSchema, normalizeWebsiteRebuildUrl, rebuildSkippedPathSchema, websiteRebuildSchema } from "@/products/websites/client";
 
 const factSchema = z.object({ text: z.string(), kind: z.string(), highRisk: z.boolean(), origin: z.string(), sources: z.array(z.object({ sourceId: z.string(), quote: z.string() })), verification: z.object({ supported: z.boolean(), confidence: z.number() }).optional() });
 const auditCheckSchema = z.object({ name: z.string(), status: z.string(), score: z.number(), message: z.string() });
@@ -60,9 +60,8 @@ async function request(path: string, options?: RequestInit, submitted?: Paramete
   if (!response.ok) throw new RebuildTransportError(typeof body?.error === "string" ? body.error : "This website could not be opened. Try again.", response.status);
   if (submitted) {
     const envelope = rebuildEnvelopeSchema.parse(body), saved = envelope.rebuild.input;
-    const url = submitted.url ? new URL(/^https?:\/\//i.test(submitted.url.trim()) ? submitted.url.trim() : `https://${submitted.url.trim()}`) : null;
-    if (url) url.hash = "";
-    if (envelope.workspaceId !== submitted.workspaceId || saved.requestId !== submitted.requestId || ("url" in saved ? saved.url !== url?.href : saved.businessName !== submitted.businessName || saved.description !== submitted.description)) throw new RebuildUnconfirmedError();
+    const url = submitted.url ? normalizeWebsiteRebuildUrl(submitted.url) : null;
+    if (envelope.workspaceId !== submitted.workspaceId || saved.requestId !== submitted.requestId || ("url" in saved ? saved.url !== url : saved.businessName !== submitted.businessName || saved.description !== submitted.description)) throw new RebuildUnconfirmedError();
   }
   return parseRebuildView(body);
 }
