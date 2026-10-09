@@ -160,3 +160,27 @@ and no product/root harness changed. Root must review/cherry-pick only the narro
 successor, run the actual Redis fixture in its window, then resume whole-suite
 qualification. Prior native root-reported concurrency pass is evidence for its own
 composed source; standalone actual Auth recovery remains unrun.
+
+
+Closed recovery Auth window prepared: new `scripts/tenant-cleanup-journey-window.mjs`
+reuses current full-native flags, owned stack qualifier, source inventory and strict
+exact-report validator. Its two desktop/mobile cases are separate from the unchanged
+required 34. Prepared runner patch calls it before stopping owned app/Redis and
+keeps any existing native failure status. It checks current native manifest/source,
+owned local endpoints/Auth keys, current flags and disabled providers, adds only
+runner test-admission UI proof, captures source/stack before+after and refuses
+existing evidence directory. Wrong titles/projects/counts/skips/retries/global errors
+remain failures. Three node checks, scoped lint, shell syntax and patch applicability
+pass; Playwright collects both cases without execution. Manifest baseline alignment
+1ae8e741 is NOT for cherry-pick; root already owns its identical profile file.
+
+Units follow-up: private scratch patch/resulting fixture preserves the accepted
+native title/count while replacing unsupported generic source with supported native
+form title/field standards. Actual package producers check/review both exact revisions
+with root's configured fictional local reviewer helper; unqualified create/adopt,
+ordinary review403, owner decisions/pushed standard/local field preservation,
+unit binding and manager revocation/audit remain. No qualified SQL row fabrication
+or reviewer-policy seed. Native execution remains unperformed. Root must compose
+existing reviewer helper/setup, apply the exact inspected Units patch, typecheck and
+run its current reviewer-configured Auth case. Original generic first failure remains
+retained. All source is lane-owned; no root file was edited or native resource started.
