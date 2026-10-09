@@ -1227,7 +1227,10 @@ composition is reused, with semantic sections and actual System links.
 Workspace navigation now consumes the platform location owner for compatible
 System/work/detail hints and complete destinations. Business switches and opens
 preserve Back; acknowledged saves replace creation entries. Location remains a
-navigation hint, with existing server authority and UI read-only gates. Local
+navigation hint, with existing server authority and UI read-only gates. Same-work
+save refreshes keep the mounted tool and its accepted notice; supplemental read
+errors appear separately. Access refusals and actual navigation still reset work,
+and callbacks from a prior visit cannot claim a new instance after Back. Local
 fixture evidence and integration limits are in the [October 9 location handoff](../architecture/deepening-2026-10-09/workspace-location.md).
 
 `WorkspaceHelpForm` and `OfferingInstallView` require an explicit agency choice

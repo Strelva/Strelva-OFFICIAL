@@ -110,6 +110,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   const requestRef = useRef(0);
   const activeWorkspaceRef = useRef<string | null>(null);
   const requestedWorkspaceRef = useRef<string | null>(null);
+  const navigationGenerationRef = useRef(0);
 
   const loadWorkspace = useCallback(async (workspaceId?: string, preserveNotice = false) => {
     const locationWorkspaceId = readWorkspaceLocation(new URLSearchParams(window.location.search)).workspaceId;
@@ -119,13 +120,17 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     // newer workspace selection. Explicit workspace changes set this ref before
     // starting their request; ordinary navigation reads the current URL.
     if (workspaceId && requestedWorkspaceRef.current && requestedWorkspaceRef.current !== workspaceId) return;
+    // A same-workspace save refresh must keep the mounted work until the read
+    // resolves. Authority is still invalidated below; navigation resets selection.
+    const preserveSelection = preserveNotice && selectedId === activeWorkspaceRef.current;
+    if (!preserveNotice) navigationGenerationRef.current += 1;
     requestedWorkspaceRef.current = selectedId;
     const requestId = ++requestRef.current;
     activeWorkspaceRef.current = null;
     setLoading(true);
     setSignInRequired(false);
     if (!preserveNotice) setNotice(null);
-    setSelectedWorkId(null);
+    if (!preserveSelection) setSelectedWorkId(null);
     try {
       const suffix = selectedId ? `?workspaceId=${encodeURIComponent(selectedId)}` : "";
       const response = await request(`/api/workspace${suffix}`, { cache: "no-store" });
@@ -142,9 +147,12 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
       replaceWorkspaceLocation(data.workspaceId, readWorkspaceLocation(params).work);
     } catch (cause) {
       if (requestId !== requestRef.current) return;
-      setSnapshot(null);
+      const accessRefused = cause instanceof WorkspaceRequestError && [401, 403, 404].includes(cause.status);
+      const supplementalFailure = preserveSelection && !accessRefused;
+      if (!supplementalFailure) setSnapshot(null);
       if (cause instanceof WorkspaceRequestError && cause.status === 401) setSignInRequired(true);
-      setNotice({ kind: "error", message: cause instanceof Error ? cause.message : "We couldn’t load this workspace." });
+      const message = cause instanceof Error ? cause.message : "We couldn’t load this workspace.";
+      setNotice({ kind: "error", message: supplementalFailure ? `Your workspace could not be refreshed. ${message}` : message });
     } finally {
       if (requestId === requestRef.current) setLoading(false);
     }
@@ -271,13 +279,17 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   }
 
   const callbackLocation = typeof window === "undefined" ? "" : JSON.stringify(readWorkspaceLocation(new URLSearchParams(window.location.search)));
+  // Back can revisit the identical URL with a new tool instance.
+  const callbackGeneration = navigationGenerationRef.current;
   function acceptsWorkspaceCallback(workspaceId: string): boolean {
     return activeWorkspaceRef.current === workspaceId && requestedWorkspaceRef.current === workspaceId
+      && callbackGeneration === navigationGenerationRef.current
       && callbackLocation === JSON.stringify(readWorkspaceLocation(new URLSearchParams(window.location.search)));
   }
 
   /** Every transition that leaves the current work resets all of its context, then sets only what the next view needs. */
   function leaveCurrentWork(next?: Partial<OpenWorkContext>) {
+    navigationGenerationRef.current += 1;
     setOpen(leaveWork(next));
   }
 
@@ -490,7 +502,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
         onPlan={startPlan}
         onOngoing={openOngoing}
         onHorizontal={startHorizontal}
-        onAgency={() => { setHome(false); setView("agency"); }}
+        onAgency={() => { leaveCurrentWork(); setHome(false); setView("agency"); }}
         onInquiry={chooseInquiry}
         onTracker={startTracker}
         onDocument={startDocument}

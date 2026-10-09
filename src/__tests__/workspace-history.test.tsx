@@ -158,6 +158,26 @@ it("a save callback retained by old work cannot pull a person back after navigat
   expect(window.location.href).toBe(current);
 });
 
+it("a late document callback cannot claim a new instance after Home and Back to the identical URL", async () => {
+  const target = `/workspace?workspaceId=${BUSINESS}&view=document`;
+  window.history.replaceState(null, "", target);
+  const node = await render(productRequest());
+  // Models DocumentExperience's onSaved callback retained across its awaited POST.
+  const obsoleteSave = savedCallbacks.at(-1)!;
+  const home = [...node.querySelectorAll<HTMLAnchorElement>("a")].find(link => link.textContent?.trim() === "Home")!;
+  await act(async () => home.click()); await settle();
+  await back();
+  expect(`/workspace${window.location.search}`).toBe(target);
+  expect(savedCallbacks.at(-1)).not.toBe(obsoleteSave);
+  const historyLength = window.history.length;
+  await act(async () => obsoleteSave("saved-document")); await settle();
+  expect(`/workspace${window.location.search}`).toBe(target);
+  expect(window.history.length).toBe(historyLength);
+  expect(button(node, "Acknowledge document save")).toBeDefined();
+  await act(async () => button(node, "Acknowledge document save").click()); await settle();
+  expect(new URLSearchParams(window.location.search).get("work")).toBe("saved-document");
+});
+
 it("a refused workspace switch signs in back to the selected business, without the old System", async () => {
   window.history.replaceState(null, "", `/workspace?workspaceId=${BUSINESS}&view=system&system=44444444-4444-4444-8444-444444444444`);
   const base = createPreviewRequest("business");

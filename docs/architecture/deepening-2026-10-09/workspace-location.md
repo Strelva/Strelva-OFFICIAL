@@ -2,6 +2,22 @@
 
 Source: reborn-1.0 e9511b044b217fc233bde6b174c12988eaa2e950. Stream: workspace-location.
 
+Follow-up scope: an observed delayed same-work website save refresh clears the
+selected work before GET completes, remounting the tool and losing its success
+notice. Reproduce with the real App and WebsiteExperience and a deliberately
+unresolved workspace read. Preserve selection only for a notice-preserving
+refresh of the currently accepted workspace. Keep authority invalidation,
+workspace navigation resets, failed-read removal and stale-response fencing.
+Check continuity during and after the read, refused refreshes, removed work,
+and a newer workspace selection. Run the focused suite plus the real website
+regression, typecheck, boundaries, ontology and diff check. Render ownership and
+keys remain with composition; integration must rerun this proof on combined code.
+The frozen-commit union review also requires supplemental non-access read errors
+to retain accepted work while reporting refresh failure; 401/403/404 and changed
+access remain authoritative. Add a rendered away→Back-to-identical-URL stale
+callback regression and bind callbacks to a navigation generation, not URL alone.
+Hold integration until both repairs and the combined-source proof are reviewed.
+
 ## Person and job
 
 A business owner moves among Systems and saved work, switches businesses, and returns through browser history or sign-in. An agency opens a client's work and returns to its own workspace. Each destination must reopen consistently without carrying another destination's detail or implying access.
@@ -62,7 +78,7 @@ App transition/history behavior, not product persistence. The agency test uses
 a fictional queue response and the existing agency renderer. Sign-in proof
 checks the encoded destination after a fictional 401; no Auth provider is used.
 
-The final focused job covers the four required files, launch-return,
+The first completion focused job covers the four required files, launch-return,
 template-location, view-for-work, business-start, public-continuation and
 workspace-exit-ui: 162 tests, including System switching, missing and
 malformed links, all saved-kind mappings, product starts/saves, stale callbacks,
@@ -98,7 +114,7 @@ permission contract. Required existing security/SQL checks are unchanged.
 
 ### Integration ownership and proposed evidence delta
 
-Runtime source: +174 / −236 lines, net −62. Tests: +272 / −3.
+At first completion (ebbeda6e2): runtime +174 / −236 lines, net −62. Tests: +272 / −3.
 Docs: +133 / −0. Owned files are location.ts, WorkspaceLayout.tsx,
 workspace-selection.ts, WorkspaceApp.tsx, three focused test files,
 release-workspace-navigation.spec.ts, this document and the relevant canonical
@@ -125,3 +141,57 @@ there is a measured reason to change them; their location rules are shared.
 Existing offering `inquiryWorkspaceId` emission is outside this stream and still
 needs its owner's semantic decision; strict returns continue to reject unknown
 keys. No company/brand/pricing or authority decision is requested here.
+
+### Frozen-commit review correction
+
+The composition peer and independent review reproduced a pre-existing
+same-work website remount during a delayed snapshot GET. The real App and
+WebsiteExperience regression failed before repair: its original Website setup
+node was absent while the read remained unresolved. Retained log:
+`/tmp/workspace-location-refresh-before.log` (16:55:04, one failed/four passed).
+The later union-review regressions also failed: a supplemental 503 erased the
+accepted website, and Home→Back to the identical new-document URL allowed the
+old callback to replace it. `/tmp/workspace-location-correction-before.log`
+retains both failures (16:56:55, two failed/twenty passed).
+
+Same-workspace notice-preserving refreshes now keep selection until the read
+resolves. Non-access read failure retains the accepted tool/notice and adds a
+separate refresh error. 401/403/404 remove the prior snapshot, missing work is
+unavailable, refreshed delegated access removes write controls, and newer
+workspace navigation rejects late reads. App callback authority remains
+invalidated until a successful read; retaining a tool grants no new authority.
+Callbacks also capture a navigation generation. Leaving work and ordinary
+history loads invalidate prior callbacks even when Back revisits the same URL.
+The current document instance can still acknowledge its own save.
+
+Final correction proof: 171 tests across eleven focused files, adding
+workspace-refresh.test.tsx to the exact ten-file command above; typecheck,
+targeted ESLint, boundaries, ontology and diff check pass. The seven existing
+navigation browser cases pass again in the same isolated local Chrome setup.
+Logs: `/tmp/workspace-location-correction-{suite,typecheck,boundaries,ontology,browser}.log`.
+The new Website regression uses the actual renderer with fictional transport
+acknowledgements and a deferred workspace read; it does not prove persistence.
+The document callback regression models its awaited completion in the existing
+navigation acknowledgement fixture. Initial typecheck also caught a missing
+fixture CTA; it was corrected before the final passing job.
+
+Croki additionally observed the actual WebsiteExperience at 1440px and 390px:
+same DOM node and accepted notice during the held GET; unchanged website-read
+count after 200, and retained notice plus separate error after mobile 503. Mobile
+reflow remained within the viewport. This used a disposable fictional fixture
+bridge, restored byte-for-byte before checks/commit, and an in-page transport;
+no real Auth, database or provider was involved. Exact disposable bridge/setup
+and observed values are retained in `/tmp/workspace-location-preview-fixture.patch`,
+`/tmp/workspace-location-refresh-browser-setup.js` and
+`/tmp/workspace-location-refresh-browser-results.json`. The first browser fixture
+omitted its required home page and was rejected by the real transport schema;
+the corrected fictional record was used for the continuity observation.
+
+Correction runtime: +16 / −4. Total against e9511b044: runtime +190 / −240,
+net −50; tests +429 / −3. Renderer imports, dispatch and keys remain unchanged.
+The new App overlap is loadWorkspace, callback ownership/leaveCurrentWork and
+the onAgency navigation callback. Do not integrate the frozen ebbeda6e2 alone.
+Review the correction, reconcile against composition #621 at e7fe129a5, and
+rerun all eleven focused files plus the seven browser cases and required checks
+on the combined source before integration. Hosted/Auth/provider/SQL/custom-client
+proofs remain unrun for the same unchanged-contract reasons above.
