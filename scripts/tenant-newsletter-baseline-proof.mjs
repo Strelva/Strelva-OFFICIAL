@@ -18,6 +18,7 @@ const grantee = "newsletter_342_proof_grantee";
 const delegate = "newsletter_342_proof_delegate";
 const createRole = `create role ${grantee};`;
 const forwardCases = [
+  ["predecessor service execute absent", `revoke execute on function ${signatures[0]} from service_role;`],
   ["custom reader grant", `${createRole} grant execute on function ${signatures[0]} to ${grantee};`],
   ["custom helper grant", `${createRole} grant execute on function ${signatures[1]} to ${grantee};`],
   ["service grant option", `grant execute on function ${signatures[0]} to service_role with grant option;`],
@@ -30,6 +31,7 @@ const forwardCases = [
   ["predecessor properties drift", `alter function ${signatures[0]} volatile;`],
 ];
 const inverseCases = successors.flatMap(signature => [
+  [`successor owner drift ${signature}`, `${createRole} alter function ${signature} owner to ${grantee};`],
   [`successor ACL drift ${signature}`, `${createRole} grant execute on function ${signature} to ${grantee};`],
   [`successor body drift ${signature}`, `select prosrc into src from pg_proc where oid=${quote(signature)}::regprocedure; execute replace(pg_get_functiondef(${quote(signature)}::regprocedure),src,src||chr(10)||'-- fictional body drift'||chr(10));`],
 ]);
