@@ -1,0 +1,71 @@
+--- a/src/app/api/cron/domain-monitor/route.ts
++++ b/src/app/api/cron/domain-monitor/route.ts
+@@ -33,6 +33,10 @@
+   try {
+     const results = await scanPortfolioDomains();
+     await saveDomainHealth(results, { requireStore: operatorQueueReleaseEnabled() });
++    if (operatorQueueReleaseEnabled()) {
++      const { down, expiring } = summarizeDomainAlerts(results);
++      return NextResponse.json({ scanned: results.length, down: down.length, expiring: expiring.length, alerts: "provider_queue" });
++    }
+
+     const { down, expiring, signature } = summarizeDomainAlerts(results);
+     const prev = (await getAlertSignature()) ?? "";
+--- a/src/app/api/cron/website-domain-verification/route.ts
++++ b/src/app/api/cron/website-domain-verification/route.ts
+@@ -35,7 +35,7 @@
+    const listed=await websiteDocumentStore.listPublished();
+    const released=await Promise.all(listed.map(row=>websiteRebuildReleaseEnabledForWorkspace(row.workspaceId,OPERATOR_VIEWER)));
+    return listed.filter((row,index)=>released[index]&&row.tenantId).map(row=>({tenantId:row.tenantId!}));
+-  },claims:listTenantDomainClaims,refresh:refreshDomainClaim,...(alerting?{alert:async(value:{tenantId:string;hostname:string;createdAt:string;checkedAt:string})=>{
++  },claims:listTenantDomainClaims,refresh:refreshDomainClaim,...(!coverageEnabled&&alerting?{alert:async(value:{tenantId:string;hostname:string;createdAt:string;checkedAt:string})=>{
+    // Per site under `workspace`: alert only where the client's business has the rebuild on (operators count).
+    if(!(await websiteRebuildReleaseEnabledForTenant(value.tenantId,OPERATOR_VIEWER).catch(()=>false)))return;
+    const digest=createHash("sha256").update(`${value.tenantId}:${value.hostname}`).digest("hex").slice(0,32);
+@@ -46,7 +46,7 @@
+   // New owner receipts are isolated behind the rebuild release; the checker
+   // reads provider state and never retries an attachment.
+   const proposals=alerting?await (await import("@/products/websites/index")).reconcileWebsiteDomainRequests():null;
+-  failed+=proposals?.failed??0;ok=failed===0;return NextResponse.json({...result,...(proposals?{domainRequests:proposals}:{}),...(coverageEnabled?{mode:alerting?"alerting":"report_only"}:{})},{status:failed?207:200});
++  failed+=proposals?.failed??0;ok=failed===0;return NextResponse.json({...result,...(proposals?{domainRequests:proposals}:{}),...(coverageEnabled?{mode:"report_only",alertRouting:"provider_queue"}:{})},{status:failed?207:200});
+  }catch{failed=Math.max(1,failed);return NextResponse.json({error:"Website domain verification could not be confirmed."},{status:503});}
+  finally{await recordHeartbeat("website-domain-verification",{ok,processed,failed,durationMs:Date.now()-started});}
+ }
+--- a/src/app/api/cron/website-health/route.ts
++++ b/src/app/api/cron/website-health/route.ts
+@@ -39,7 +39,7 @@
+   if(websiteRebuildReleaseMayBeOn()){
+    let retention:{status:"pruned";removed:number}|{status:"failed"};
+    try{retention={status:"pruned",removed:await websiteDocumentStore.pruneCrawls()};}catch{retention={status:"failed"};failed++;}
+-   const result=await scanWebsiteHealth({list:async()=>{const listed=await websiteDocumentStore.listPublished();const released=await Promise.all(listed.map(row=>websiteRebuildReleaseEnabledForWorkspace(row.workspaceId,OPERATOR_VIEWER).catch(()=>false)));const rows=listed.filter((_row,index)=>released[index]);return Promise.all(rows.filter(row=>row.tenantId).map(async row=>{return{workspaceId:row.workspaceId,workId:row.workId,tenantId:row.tenantId!,revision:row.revision,contentHash:row.contentHash,url:currentHostedUrl({tenantId:row.tenantId!,receipt:row.receipt},SITES_ROOT_DOMAIN)};}));},save:receipt=>websiteDocumentStore.recordHealth(receipt),alert:async receipts=>{await sendEmailWithReceipt({audience:"operator",to:resolveLeadNotifyRecipients(),fromAddress:"health@updates.strelva.com",subject:`Strelva: ${receipts.length} hosted website checks need attention`,idempotencyKey:`website-health:${new Date().toISOString().slice(0,10)}`,options:{heading:"Hosted website checks need attention",paragraphs:["The published revision could not be verified. Each result is saved as a health receipt; no content was republished."],rows:receipts.map(value=>({label:value.tenantId,value:`${value.status}: ${value.url}`})),button:{label:"Open operator workspace",url:OPERATOR_URL}}});}});
++   const result=await scanWebsiteHealth({list:async()=>{const listed=await websiteDocumentStore.listPublished();const released=await Promise.all(listed.map(row=>websiteRebuildReleaseEnabledForWorkspace(row.workspaceId,OPERATOR_VIEWER).catch(()=>false)));const rows=listed.filter((_row,index)=>released[index]);return Promise.all(rows.filter(row=>row.tenantId).map(async row=>{return{workspaceId:row.workspaceId,workId:row.workId,tenantId:row.tenantId!,revision:row.revision,contentHash:row.contentHash,url:currentHostedUrl({tenantId:row.tenantId!,receipt:row.receipt},SITES_ROOT_DOMAIN)};}));},save:receipt=>websiteDocumentStore.recordHealth(receipt),alert:async receipts=>{if(coverageEnabled)return;await sendEmailWithReceipt({audience:"operator",to:resolveLeadNotifyRecipients(),fromAddress:"health@updates.strelva.com",subject:`Strelva: ${receipts.length} hosted website checks need attention`,idempotencyKey:`website-health:${new Date().toISOString().slice(0,10)}`,options:{heading:"Hosted website checks need attention",paragraphs:["The published revision could not be verified. Each result is saved as a health receipt; no content was republished."],rows:receipts.map(value=>({label:value.tenantId,value:`${value.status}: ${value.url}`})),button:{label:"Open operator workspace",url:OPERATOR_URL}}});}});
+    processed+=result.processed;failed+=result.failed;receipts=result.results;hosted={processed:result.processed,failed:result.failed,crawlRetention:retention};
+   }
+   const coverage=coverageEnabled?await coverEverySite(receipts):null;if(coverage){processed+=coverage.sites;failed+=coverage.failed;}
+--- a/src/__tests__/website-domain-verification-cron.test.ts
++++ b/src/__tests__/website-domain-verification-cron.test.ts
+@@ -76,11 +76,11 @@
+     expect(deps.heartbeat).toHaveBeenCalledWith("website-domain-verification", expect.objectContaining({ ok: true, processed: 2 }));
+   });
+
+-  it("keeps the seven-day operator email when the rebuild release is on", async () => {
++  it("keeps seven-day evidence in the provider queue without global email when rebuild is on", async () => {
+     deps.release.mockReturnValue(true);
+     const body = await (await GET(authenticatedCronRequest())).json();
+-    expect(body).toMatchObject({ mode: "alerting", alerted: 1 });
+-    expect(deps.send).toHaveBeenCalledWith(expect.objectContaining({ audience: "operator" }));
++    expect(body).toMatchObject({ mode: "report_only", alertRouting: "provider_queue", alerted: 0 });
++    expect(deps.send).not.toHaveBeenCalled();
+   });
+
+   it("skips without a provider token and reports a provider failure as failed, not verified", async () => {
+--- a/src/__tests__/website-health-cron.test.ts
++++ b/src/__tests__/website-health-cron.test.ts
+@@ -96,6 +96,6 @@
+   expect(deps.heartbeat).toHaveBeenLastCalledWith("website-health",expect.objectContaining({ok:false,processed:0,failed:1}));
+  });
+  it("prunes expired crawl pages independently of published document health",async()=>{deps.prune.mockResolvedValue(3);deps.fetch.mockResolvedValue(`<meta name="strelva-site-hash" content="${"a".repeat(64)}">`);const response=await GET(authenticatedCronRequest());expect(response.status).toBe(200);expect(await response.json()).toMatchObject({crawlRetention:{status:"pruned",removed:3},hosted:{processed:1,failed:0},failed:0});expect(deps.save).toHaveBeenCalledWith(expect.objectContaining({status:"healthy"}));deps.prune.mockRejectedValue(Error("retention unavailable"));const failed=await GET(authenticatedCronRequest());expect(failed.status).toBe(207);expect(await failed.json()).toMatchObject({crawlRetention:{status:"failed"},hosted:{processed:1},failed:1});expect(deps.save).toHaveBeenCalledTimes(2);expect(deps.heartbeat).toHaveBeenLastCalledWith("website-health",expect.objectContaining({ok:false,failed:1}));});
+- it("records missing hash, feeds it into the site's health, and alerts only through shared operator transport",async()=>{deps.fetch.mockResolvedValue("<html>unexpected</html>");expect((await GET(authenticatedCronRequest())).status).toBe(207);expect(deps.save).toHaveBeenCalledWith(expect.objectContaining({status:"hash_missing",contentHash:"a".repeat(64)}));expect(deps.send).toHaveBeenCalledWith(expect.objectContaining({audience:"operator",fromAddress:"health@updates.strelva.com"}));expect(savedCoverage().results.find(result=>result.tenantId==="mooney")!.reasons.some(reason=>reason.signal==="site.published_revision")).toBe(true);expect(deps.heartbeat).toHaveBeenCalledWith("website-health",expect.objectContaining({ok:false,failed:1}));});
++ it("records missing hash and feeds the provider queue without global lead-recipient mail",async()=>{deps.fetch.mockResolvedValue("<html>unexpected</html>");expect((await GET(authenticatedCronRequest())).status).toBe(207);expect(deps.save).toHaveBeenCalledWith(expect.objectContaining({status:"hash_missing",contentHash:"a".repeat(64)}));expect(deps.send).not.toHaveBeenCalled();expect(savedCoverage().results.find(result=>result.tenantId==="mooney")!.reasons.some(reason=>reason.signal==="site.published_revision")).toBe(true);expect(deps.heartbeat).toHaveBeenCalledWith("website-health",expect.objectContaining({ok:false,failed:1}));});
+  it("records healthy checks without notifying and does not conceal receipt storage failures",async()=>{deps.fetch.mockResolvedValue(`<meta name="strelva-site-hash" content="${"a".repeat(64)}">`);expect((await GET(authenticatedCronRequest())).status).toBe(200);expect(deps.send).not.toHaveBeenCalled();deps.save.mockRejectedValue(Error("durable storage down"));expect((await GET(authenticatedCronRequest())).status).toBe(503);expect(deps.heartbeat).toHaveBeenLastCalledWith("website-health",expect.objectContaining({ok:false,failed:1}));});
+ });

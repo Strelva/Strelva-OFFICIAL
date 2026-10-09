@@ -8,6 +8,7 @@ import {
   setAlertSignature,
 } from "@/lib/domain-monitor-store";
 import { sendDomainAlertEmail } from "@/products/domain-monitor/server";
+import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
 import { OPERATOR_URL } from "@/platform/infra/brand";
 
 export const maxDuration = 300;
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
   let ok = true;
   try {
     const results = await scanPortfolioDomains();
-    await saveDomainHealth(results);
+    await saveDomainHealth(results, { requireStore: operatorQueueReleaseEnabled() });
 
     const { down, expiring, signature } = summarizeDomainAlerts(results);
     const prev = (await getAlertSignature()) ?? "";
