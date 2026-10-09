@@ -88,6 +88,7 @@ export async function saveConnection(connection: Connection): Promise<void> {
 }
 
 async function saveConnectionAt(connection: Connection, capturedAt: string): Promise<void> {
+  if (connection.provider === "google" && process.env.STRELVA_NATIVE_GOOGLE_ONLY === "1") throw new Error("Legacy Google grant writes are disabled in native-only admission mode.");
   const redis = getRedis();
   const durable = await durableRecordAuthority("provider_connections");
   const encoded = encodeConnection(connection);
@@ -106,6 +107,7 @@ async function saveConnectionAt(connection: Connection, capturedAt: string): Pro
  * removed cache value. Reconnects use saveConnection, not this mutation path. */
 export async function saveConnectionMutation(expected: Connection, patch: Partial<Connection>, capturedAt: string): Promise<void> {
   const next = { ...expected, ...patch };
+  if (next.provider === "google" && process.env.STRELVA_NATIVE_GOOGLE_ONLY === "1") throw new Error("Legacy Google grant mutations are disabled in native-only admission mode.");
   const encoded = encodeConnection(next);
   const durable = await durableRecordAuthority("provider_connections");
   const raw = storedConnections.get(expected);

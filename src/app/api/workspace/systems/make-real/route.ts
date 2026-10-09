@@ -19,6 +19,7 @@ export const dynamic = "force-dynamic";
 const input = z.object({
   workspaceId: z.string().uuid(),
   possibilityId: z.string().min(1).max(120),
+  expectedPlan: z.object({ candidateRevision: z.number().int().positive(), fingerprint: z.string().regex(/^[a-f0-9]{64}$/) }).strict().optional(),
 }).strict();
 
 /**
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
     }
     const exit = await readWorkspaceExit(actor, workspace.id).catch(() => null);
     if (!exit || exit.state?.status === "completed") return workspaceJson({ error: "Work in this business has stopped, or its state could not be confirmed. Nothing changed." }, 409);
-    const path = await makeRealPath(actor, workspace.id, body.possibilityId, await liveMakeRealPorts());
+    const path = await makeRealPath(actor, workspace.id, body.possibilityId, await liveMakeRealPorts(body.expectedPlan));
     if (!path) return workspaceJson({ error: "This possibility is not available. Nothing changed." }, 404);
     if (path.kind === "live") return workspaceJson({ live: path.result });
     if (needsYouReleaseEnabled()) {

@@ -1,3 +1,4 @@
+import { activationProviderReferenceSchema } from "@/platform/make-real/google-provider-reference";
 import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -13,7 +14,7 @@ const command = z.discriminatedUnion("action", [
   z.object({ action: z.literal("resume"), ...ids }).strict(),
   z.object({ action: z.literal("rollback"), ...ids, confirm: z.literal(true) }).strict(),
   z.object({ action: z.literal("reconcile"), ...ids, stepId: z.string().min(1).max(80), resolution: z.enum(["completed", "not_applied"]),
-    evidence: z.string().trim().min(10).max(2000), providerRef: z.string().max(240).optional() }).strict(),
+    evidence: z.string().trim().min(10).max(2000), providerRef: activationProviderReferenceSchema.optional() }).strict(),
 ]);
 
 /**

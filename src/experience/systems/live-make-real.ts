@@ -48,7 +48,7 @@ export async function makeRealPath(actor: WorkspaceActor, workspaceId: string, p
 }
 
 /** The production ports. The approval goes through the one Make real Needs you source. */
-export async function liveMakeRealPorts(): Promise<LiveMakeRealPorts> {
+export async function liveMakeRealPorts(expectedPlan?: { candidateRevision: number; fingerprint: string }): Promise<LiveMakeRealPorts> {
   const [{ createSupabasePossibilityRepository, isStoredPossibilityId }, server, { makeRealThroughNeedsYou }, { PostgresNeedsYouStore }, { sendEmailWithReceipt }] = await Promise.all([
     import("@/platform/possibilities/supabase-repository"),
     import("@/experience/systems/live-server"),
@@ -65,7 +65,7 @@ export async function liveMakeRealPorts(): Promise<LiveMakeRealPorts> {
     liveEnabled: server.anyMakeRealChannelEnabled,
     async approve(actor, workspaceId, possibilityId) {
       const decided = await makeRealThroughNeedsYou(actor, workspaceId, possibilityId, {
-        google: server.googleMakeRealPorts, store: PostgresNeedsYouStore, sendEmail: sendEmailWithReceipt,
+        expectedPlan, google: server.googleMakeRealPorts, store: PostgresNeedsYouStore, sendEmail: sendEmailWithReceipt,
         appOrigin: process.env.NEXT_PUBLIC_APP_URL || CONTROL_PLANE_URL,
       });
       if (!decided) return null;

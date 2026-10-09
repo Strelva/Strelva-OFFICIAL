@@ -36,6 +36,7 @@ export interface EffectAdapter extends IsolatedEffectRehearsal {
    * before invoking it. `ok: false` means it was refused without taking effect
    * and may be retried. If the provider cannot establish its outcome, throw so
    * the activation records it as unknown and requires evidence before retrying. */
+  verifyCompensation?(input: { businessId: string; providerRef: string }): Promise<{ ok: boolean; detail: string }>;
   compensate?(input: { businessId: string; providerRef: string; idempotencyKey: string }): Promise<{ ok: boolean; detail: string }>;
 }
 

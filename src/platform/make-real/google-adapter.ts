@@ -3,7 +3,8 @@ import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { DeclaredEffect } from "@/platform/possibilities/contracts";
 import type { EffectAdapter } from "./ports";
 import type { LiveChannelContext } from "./live-adapters";
-export const googleMakeRealRequestSchema = z.object({ tenantId:z.string().min(1).max(200),locationId:z.string().min(1).max(64),eventId:z.string().min(1).max(200),draftDigest:z.string().regex(/^[a-f0-9]{64}$/) }).strict();
+import { googleMakeRealRequestSchema } from "./google-provider-reference";
+export { googleMakeRealRequestSchema } from "./google-provider-reference";
 export type GoogleMakeRealRequest = z.infer<typeof googleMakeRealRequestSchema>;
 export interface GoogleMakeRealState {
  ready:boolean; reason?:string; resolved?:boolean;
@@ -14,7 +15,8 @@ export interface GoogleMakeRealPorts {
  inspect(actor:WorkspaceActor,businessId:string,request:GoogleMakeRealRequest):Promise<GoogleMakeRealState>;
  approve(actor:WorkspaceActor,businessId:string,request:GoogleMakeRealRequest):Promise<{changed:boolean;reason?:string}>;
  verify(actor:WorkspaceActor,businessId:string,request:GoogleMakeRealRequest,receiptId:string|null):Promise<{ok:boolean;detail:string}>;
- undo(actor:WorkspaceActor,businessId:string,request:GoogleMakeRealRequest,receiptId:string):Promise<{status:string}>;
+ verifyUndo?(actor:WorkspaceActor,businessId:string,request:GoogleMakeRealRequest,receiptId:string):Promise<{ok:boolean;detail:string}>;
+ undo(actor:WorkspaceActor,businessId:string,request:GoogleMakeRealRequest,receiptId:string):Promise<{status:string;receipt?:{id:string;readback:string|null}}>;
 }
 const refSchema=z.object({businessId:z.string(),request:googleMakeRealRequestSchema,receiptId:z.string().nullable()});
 const accepted=(state:GoogleMakeRealState)=>state.receipt && ["posted","posted_unverified","held_by_google"].includes(state.receipt.status);
@@ -44,14 +46,14 @@ export function createGoogleListingAdapter(ports:GoogleMakeRealPorts,ctx:LiveCha
    const result=await ports.approve(ctx.actor,businessId,req);
    const after=await ports.inspect(ctx.actor,businessId,req);
    if(accepted(after))return {status:"accepted",providerRef:ref(businessId,req,after)};
-   if(!after.receipt && after.resolved && (await ports.verify(ctx.actor,businessId,req,null)).ok)return {status:"accepted",providerRef:ref(businessId,req,after)};
+   if(!req.nativeGrant && !after.receipt && after.resolved && (await ports.verify(ctx.actor,businessId,req,null)).ok)return {status:"accepted",providerRef:ref(businessId,req,after)};
    if(after.receipt?.status==="posting" || result.changed || ["google_write_unconfirmed","already_resolved","action_reconciliation_required"].includes(result.reason??""))throw new Error("Google's effect is unconfirmed. Reconcile the existing receipt before retrying.");
    return {status:"rejected",reason:result.reason??after.reason??"Google refused this change."};
   },
   async find({businessId,effect}){
    const req=request(effect);const state=await ports.inspect(ctx.actor,businessId,req);
    if(accepted(state))return {found:true,providerRef:ref(businessId,req,state)};
-   if(!state.receipt && state.resolved && (await ports.verify(ctx.actor,businessId,req,null)).ok)return {found:true,providerRef:ref(businessId,req,state)};
+   if(!req.nativeGrant && !state.receipt && state.resolved && (await ports.verify(ctx.actor,businessId,req,null)).ok)return {found:true,providerRef:ref(businessId,req,state)};
    if(state.receipt?.status==="failed")return {found:false};
    return null; // Absence cannot prove an interrupted provider write did not land.
   },
@@ -59,13 +61,22 @@ export function createGoogleListingAdapter(ports:GoogleMakeRealPorts,ctx:LiveCha
    const {parsed}=await inspectRef(businessId,providerRef);
    return ports.verify(ctx.actor,businessId,parsed.request,parsed.receiptId);
   },
+  async verifyCompensation({businessId,providerRef}){
+   const {parsed}=await inspectRef(businessId,providerRef);
+   if(!parsed.receiptId || !ports.verifyUndo)return {ok:false,detail:"Exact Google inverse readback unavailable."};
+   return ports.verifyUndo(ctx.actor,businessId,parsed.request,parsed.receiptId);
+  },
   async compensate({businessId,providerRef}){
    const {parsed,state}=await inspectRef(businessId,providerRef);
-   if(state.receipt?.status==="undone")return {ok:true,detail:"The Google change is already undone."};
+   if(state.receipt?.status==="undone") {
+    if(parsed.request.nativeGrant) { if(!parsed.receiptId || !ports.verifyUndo)throw new Error("Native Google compensating readback is unavailable."); const inverse=await ports.verifyUndo(ctx.actor,businessId,parsed.request,parsed.receiptId); if(!inverse.ok)throw new Error("Native Google compensating readback is unconfirmed; do not repeat the write."); return inverse; }
+    return {ok:true,detail:"The Google change is already undone."};
+   }
    if(!parsed.receiptId)return {ok:true,detail:"Google already matched; there is no change to undo."};
    if(!state.receipt?.undo)return {ok:false,detail:"This Google change requires manual recovery."};
    const result=await ports.undo(ctx.actor,businessId,parsed.request,parsed.receiptId);
-   if(result.status==="posted")return {ok:true,detail:"Google confirmed the compensating change."};
+   if(result.status==="posted" && (!parsed.request.nativeGrant || result.receipt?.readback==="matched"))return {ok:true,detail:"Google confirmed the compensating change."};
+   if(result.status==="posted" && parsed.request.nativeGrant)throw new Error("Native Google undo readback is unconfirmed; reconcile before another attempt.");
    if(["write_unconfirmed","posted_unverified","held_by_google"].includes(result.status))throw new Error("Google undo is unconfirmed; reconcile before another attempt.");
    return {ok:false,detail:"Google refused the compensating change."};
   },

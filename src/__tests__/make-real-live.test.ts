@@ -1,3 +1,5 @@
+import { createGoogleListingAdapter } from "@/platform/make-real/google-adapter";
+import { createSupabaseActivationRepository } from "@/platform/make-real/supabase-repository";
 import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
@@ -680,4 +682,32 @@ describe("live plans name their source rebuild", () => {
     const fromRebuild = { ...p, changes: p.changes.map((change) => ({ ...change, candidate: { ...change.candidate, content: { ...change.candidate.content, rebuildWorkId: "rebuild-w1" } } })) };
     expect(liveReadyPlan(fromRebuild, new Map()).sourceRebuild).toBe("rebuild-w1");
   });
+});
+
+describe("real runner Google canonical recovery and repository checkpoint", () => {
+ it("finds and confirms unknown Google without replay, stores canonical reference and supports compensation", async () => {
+  const request = { tenantId: `workspace-${BIZ}`, locationId: "exact", eventId: "exact", draftDigest: "a".repeat(64) };
+  const effect = { ...hostedEffect("google"), channel: "google_listing" as const, request };
+  const { p, live } = await readyPossibility({ effects: [effect] });
+  let accepted = false;
+  const receipt = { id: "b1000000-0000-4000-8000-000000000099", status: "posted", readback: "matched", undo: true };
+  const approve = vi.fn(async () => { accepted = true; throw new Error("outside accepted, response lost"); });
+  const verify = vi.fn(async () => ({ ok: true, detail: "actual adapter fixture readback" }));
+  const undo = vi.fn(async () => ({ status: "posted" }));
+  const adapter = createGoogleListingAdapter({ inspect: async () => ({ ready: !accepted, receipt: accepted ? receipt : null }), approve, verify, undo }, ctx());
+  const { svc, possibilities, approvals } = service({ p, live, adapters: [adapter] });
+  await possibilities.create(p); approvals.record({ id: "google-plan", businessId: BIZ, subject: planApprovalSubject(p), status: "approved" });
+  const unknown = await svc.startApproved({ actor: OWNER, workspaceId: BIZ, possibilityId: p.id, approvalId: "google-plan" });
+  expect(unknown.steps.find(step => step.kind === "effect")!.status).toBe("unknown");
+  await expect(svc.reconcile(OWNER, BIZ, unknown.id, { stepId: "effect:google", resolution: "completed", evidence: "real receipt", providerRef: receipt.id })).rejects.toThrow("exact provider-found");
+  const recovered = await svc.reconcile(OWNER, BIZ, unknown.id, { stepId: "effect:google", resolution: "completed", evidence: "adapter finds exact receipt" });
+  const step = recovered.steps.find(value => value.kind === "effect")!;
+  expect(step.readBack?.status).toBe("confirmed"); expect(step.receipt!.providerRef!.length).toBeGreaterThan(240); expect(approve).toHaveBeenCalledTimes(1);
+  let row: unknown;
+  const repository = createSupabaseActivationRepository(OWNER, { rpc: async (_name, args) => { if (args.p_activation) row = structuredClone(args.p_activation); return { data: row, error: null }; } });
+  await repository.create(recovered);
+  const read = await repository.get(BIZ, recovered.id);
+  expect(read!.steps.find(value => value.kind === "effect")!.receipt!.providerRef).toBe(step.receipt!.providerRef);
+  await svc.rollback(OWNER, BIZ, recovered.id); expect(undo).toHaveBeenCalledTimes(1); expect(approve).toHaveBeenCalledTimes(1);
+ });
 });

@@ -1758,6 +1758,13 @@
           "rollbackStatus": "Prepared guarded or forward-only inverse; native inverse/reapply and populated refusal qualification pending"
         },
         {
+          "file": "20261021140000_native_google_lifecycle.sql",
+          "sha256": "59241d2c2a6eb89dba9b2daa7956911a0b6e25fe5864d75612599879a6397382",
+          "rollback": "rollback-20261021140000_native_google_lifecycle.sql",
+          "rollbackSha256": "c0e976d586aa86da6cbd33af9ddb0655e2ffa9d67b93622ba281c42291ddb380",
+          "rollbackStatus": "Prepared source-drift and populated-state guarded inverse; native inverse/reapply, concurrency and populated refusal qualification pending"
+        },
+        {
           "file": "20261022090100_tenant_cleanup_receipts.sql",
           "sha256": "8d94b1c8c40fe58dcf719b7c749bac1e7b8a83873a8166b27ceaef6d20cc78de",
           "rollback": "rollback-20261022090100_tenant_cleanup_receipts.sql",

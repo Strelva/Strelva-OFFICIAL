@@ -66,6 +66,7 @@ async function fetchLocations(accessToken: string, accountName: string): Promise
 }
 
 export async function GET(req: Request) {
+  if (process.env.STRELVA_NATIVE_GOOGLE_ONLY === "1") return NextResponse.json({ error: "Use the native workspace Google connection in this admission mode." }, { status: 503 });
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");

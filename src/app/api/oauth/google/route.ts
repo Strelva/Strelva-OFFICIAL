@@ -28,6 +28,7 @@ const SCOPES = [
 ];
 
 export async function GET() {
+  if (process.env.STRELVA_NATIVE_GOOGLE_ONLY === "1") return NextResponse.json({ error: "Use the native workspace Google connection in this admission mode." }, { status: 503 });
   const authed = await verifyAuth();
   if (!authed) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

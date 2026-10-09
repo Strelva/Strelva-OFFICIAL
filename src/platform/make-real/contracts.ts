@@ -1,3 +1,4 @@
+import { activationProviderReferenceSchema } from "./google-provider-reference";
 import { z } from "zod";
 import { authorityScopeSchema, effectKindSchema, reversibilitySchema } from "@/platform/possibilities/contracts";
 
@@ -67,7 +68,7 @@ export const activationStepSchema = z.object({
   finishedAt: DATE.optional(),
   reason: z.string().max(2000).optional(),
   receipt: z.object({
-    providerRef: z.string().max(240).optional(),
+    providerRef: activationProviderReferenceSchema.optional(),
     adapterMode: z.enum(["isolated", "live", "internal"]),
     grantId: z.string().max(120).optional(),
     approvalId: z.string().max(120).optional(),

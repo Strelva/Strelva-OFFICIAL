@@ -139,7 +139,7 @@ export function createLiveMakeRealService(deps: LiveMakeRealDeps) {
       const { makeReal } = await forActivation(actor, workspaceId, activationId, service);
       return makeReal.resume(actor, workspaceId, activationId, note);
     },
-    async reconcile(actor: WorkspaceActor, workspaceId: string, activationId: string, input: { stepId: string; resolution: "completed" | "not_applied"; evidence: string; providerRef?: string; note?: string }, service?: ServiceSession): Promise<Activation> {
+    async reconcile(actor: WorkspaceActor, workspaceId: string, activationId: string, input: { stepId: string; resolution: "completed" | "not_applied"; evidence: string; providerRef?: string; note?: string; target?: "effect" | "compensation" }, service?: ServiceSession): Promise<Activation> {
       const { makeReal } = await forActivation(actor, workspaceId, activationId, service);
       return makeReal.reconcile(actor, workspaceId, activationId, input);
     },

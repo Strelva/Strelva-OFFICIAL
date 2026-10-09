@@ -1,3 +1,4 @@
+import { assertExtendedProviderReference } from "./google-provider-reference";
 import { randomUUID } from "node:crypto";
 import { WorkspaceAccessError, WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { EFFECT_SCOPE, type DeclaredEffect, type Possibility, type SystemTarget } from "@/platform/possibilities/contracts";
@@ -182,6 +183,8 @@ export function createMakeReal(deps: MakeRealDeps) {
           return { status: "unknown", effect: "unknown", reason: "The provider did not confirm an outcome. Reconcile before continuing." };
         }
         if (result.status === "rejected") return { status: "failed", effect: "none", reason: result.reason };
+        try { assertExtendedProviderReference(result.providerRef, a.businessId, effect); }
+        catch { return { status: "unknown", effect: "unknown", reason: "Accepted provider reference does not match this approved effect. Reconcile before continuing." }; }
         const approval = a.approvals.find((x) => x.effectId === effect.id && !x.consumedAt);
         let readBack: ActivationStep["readBack"];
         try {
@@ -422,6 +425,7 @@ export function createMakeReal(deps: MakeRealDeps) {
           const found = await adapter.find({ businessId, idempotencyKey: step.idempotencyKey, effect });
           step.leaseId = undefined;
           if (found?.found) {
+            assertExtendedProviderReference(found.providerRef, businessId, effect);
             const rb = await adapter.readBack({ businessId, providerRef: found.providerRef }).catch((e: unknown) => ({ ok: false, detail: e instanceof Error ? e.message : "Read-back failed." }));
             step.status = "completed"; step.effect = "accepted"; step.finishedAt = now();
             step.receipt = { providerRef: found.providerRef, adapterMode: adapter.mode, acceptedAt: now(), reconciledBy: "provider_lookup" };
@@ -498,6 +502,14 @@ export function createMakeReal(deps: MakeRealDeps) {
         }
         const evidence = input.evidence.slice(0, 2000);
         if (input.resolution === "completed") {
+          const declared = (await loadPossibility(businessId, a.possibilityId)).effects.find(effect => effect.id === step.target);
+          if (declared?.channel === "google_listing" && declared.request.nativeGrant) {
+            const adapter = adapterFor(declared);
+            if (!step.receipt?.providerRef || !adapter.verifyCompensation) conflict("Native Google compensation needs exact inverse readback.");
+            assertExtendedProviderReference(step.receipt.providerRef, businessId, declared);
+            const inverse = await adapter.verifyCompensation({ businessId, providerRef: step.receipt.providerRef });
+            if (!inverse.ok) conflict("Native Google compensation readback is unconfirmed. Nothing was repeated.");
+          }
           step.status = "compensated";
           step.compensation = { status: "compensated", detail: evidence, at: now() };
           step.reason = undefined;
@@ -514,9 +526,21 @@ export function createMakeReal(deps: MakeRealDeps) {
       if (step.status !== "unknown") conflict("Reconciliation needs an unknown step and evidence of its outcome.");
       if (input.resolution === "not_applied" && step.effect === "accepted") conflict("An accepted write cannot be declared safe to replay.");
       if (input.resolution === "completed") {
-        step.status = "completed"; step.effect = "accepted";
         const declared = step.kind === "effect" ? (await loadPossibility(businessId, a.possibilityId)).effects.find((e) => e.id === step.target) : undefined;
-        step.receipt = { adapterMode: declared ? adapterFor(declared).mode : "internal", acceptedAt: now(), reconciledBy: "operator_evidence", ...(input.providerRef ? { providerRef: input.providerRef } : {}) };
+        let providerRef = input.providerRef;
+        if (declared?.channel === "google_listing") {
+          const adapter = adapterFor(declared);
+          const found = await adapter.find({ businessId, effect: declared, idempotencyKey: step.idempotencyKey });
+          if (!found?.found || (providerRef !== undefined && providerRef !== found.providerRef)) conflict("Google recovery requires the exact provider-found receipt reference.");
+          providerRef = found.providerRef;
+          assertExtendedProviderReference(providerRef, businessId, declared);
+          const readBack = await adapter.readBack({ businessId, providerRef });
+          if (!readBack.ok) conflict("Google recovery requires confirmed provider read-back.");
+          step.readBack = { status: "confirmed", detail: readBack.detail.slice(0, 1000), at: now() };
+        }
+        if (providerRef !== undefined) assertExtendedProviderReference(providerRef, businessId, declared);
+        step.status = "completed"; step.effect = "accepted";
+        step.receipt = { adapterMode: declared ? adapterFor(declared).mode : "internal", acceptedAt: now(), reconciledBy: "operator_evidence", ...(providerRef ? { providerRef } : {}) };
       } else {
         step.status = "failed"; step.effect = "none";
       }

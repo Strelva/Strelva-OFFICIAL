@@ -112,7 +112,7 @@ export async function makeRealThroughNeedsYou(
   actor: WorkspaceActor,
   workspaceId: string,
   possibilityId: string,
-  deps: { google?: GoogleMakeRealPorts; store: NeedsYouStore; appOrigin: string; sendEmail: NeedsYouDeps["sendEmail"]; adapter?: (onResult: (result: WorkspaceMakeRealResult) => void) => SourceAdapter },
+  deps: { expectedPlan?: { candidateRevision: number; fingerprint: string }; google?: GoogleMakeRealPorts; store: NeedsYouStore; appOrigin: string; sendEmail: NeedsYouDeps["sendEmail"]; adapter?: (onResult: (result: WorkspaceMakeRealResult) => void) => SourceAdapter },
 ): Promise<{ status: DecideStatus; result: WorkspaceMakeRealResult | null; reason: string | null; receiptRef: string | null } | null> {
   let captured: WorkspaceMakeRealResult | null = null;
   const capture = (result: WorkspaceMakeRealResult) => { captured = result; };
@@ -127,6 +127,7 @@ export async function makeRealThroughNeedsYou(
   const item = (await deps.store.list(actor, workspaceId, false))
     .find((row) => row.state === "open" && row.sourceLifecycle === "make_real" && row.sourceId.startsWith(`${possibilityId}@`));
   if (!item) return null;
+  if (deps.expectedPlan && (item.sourceId !== `${possibilityId}@${deps.expectedPlan.candidateRevision}` || item.revisionHash !== deps.expectedPlan.fingerprint)) throw new Error("The approved plan changed before the decision. Nothing was approved.");
   const decided = await service.decide({ workspaceId, itemId: item.id, revision: item.revisionHash, decision: "approve", by: { kind: "session", actor } });
   return { status: decided.status, result: captured, reason: decided.item?.outcomeReason ?? null, receiptRef: decided.item?.receiptRef ?? null };
 }

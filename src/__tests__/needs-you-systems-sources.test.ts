@@ -321,6 +321,16 @@ describe("the System page's Make it live, through Needs you", () => {
     expect(again).toBeNull();
   });
 
+  it("refuses the native expected plan when a newer candidate appears during decision sync", async () => {
+    const mem = needsYouMemoryStore({ clock: { now: Date.parse(at) }, roles: { [owner.userId]: "owner" } });
+    for (const changed of [plan({ candidateRevision: 2 }), plan({ fingerprint: "b".repeat(64) })]) {
+      const { ports, start } = makeRealPorts({ plans: [changed] });
+      await expect(makeRealThroughNeedsYou(owner, BIZ, changed.possibilityId, { store: mem.store, appOrigin: "https://app.example.test", sendEmail: vi.fn(), adapter: () => makeRealAdapter(ports), expectedPlan: { candidateRevision: 1, fingerprint: "a".repeat(64) } })).rejects.toThrow("changed before the decision");
+      expect(start).not.toHaveBeenCalled();
+      expect([...mem.items.values()].some(item => item.state === "approved")).toBe(false);
+    }
+  });
+
   it("a possibility with no open decision is not found", async () => {
     const mem = needsYouMemoryStore({ clock: { now: Date.parse(at) }, roles: { [owner.userId]: "owner" } });
     const adapter = () => makeRealAdapter(makeRealPorts({ plans: [] }).ports);

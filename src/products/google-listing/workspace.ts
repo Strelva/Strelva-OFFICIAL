@@ -1,3 +1,5 @@
+import { nativeGoogleGrantGeneration, assertCurrentNativeGoogleGrant } from "./native/contracts";
+import { nativeGoogleGrantPinSchema } from "@/platform/make-real/google-provider-reference";
 import { assertGoogleDispatchGrant } from "./dispatch-grant";
 import { maintenancePinSchema, checkBundleMaintenanceEvent } from "./maintenance";
 import { googleVersionPinSchema, googleVersionDraftCurrent, type GoogleVersionPin } from "./versions";
@@ -32,7 +34,7 @@ const draftSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("post"), post: postInputSchema }),
   z.object({ action: z.literal("reply"), reviewId: z.string().regex(/^[A-Za-z0-9_-]{1,200}$/), text: z.string().min(1).max(4096) }),
 ]);
-const metadataSchema = z.object({ kind: z.literal("workspace_google_listing_draft"), workspaceId: z.string().uuid(), locationId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/), draft: draftSchema, version: googleVersionPinSchema.optional(), maintenance: maintenancePinSchema.optional() });
+const metadataSchema = z.object({ kind: z.literal("workspace_google_listing_draft"), workspaceId: z.string().uuid(), locationId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/), draft: draftSchema, version: googleVersionPinSchema.optional(), maintenance: maintenancePinSchema.optional(), nativeGrant: nativeGoogleGrantPinSchema.optional() });
 
 /** Existing approval events own the exact frozen copy, never a separate approval store. */
 export async function prepareGoogleListingDraft(actor: WorkspaceActor, raw: z.infer<typeof googleDraftInputSchema>, version?: { pin: GoogleVersionPin; hours?: z.infer<typeof factValueSchemas.hours> | null }): Promise<UnifiedEvent> {
@@ -44,6 +46,15 @@ export async function prepareGoogleListingDraft(actor: WorkspaceActor, raw: z.in
   if (version && (binding?.id !== version.pin.bindingId || !(await systemsReleasedFor(actor, input.workspaceId)))) throw new Error("This Google Version is unavailable.");
   if (!binding) throw new Error("This Google listing does not belong to this website.");
   if ((await readListingControl(input.workspaceId, input.locationId)).paused) throw new Error("The Google listing is paused.");
+  let nativeGrant: z.infer<typeof nativeGoogleGrantPinSchema> | undefined;
+  if (publishingWorkspaceId(input.tenantId)) {
+    const { readGoogleBindingForTenant } = await import("@/platform/account-bindings/store");
+    const native = await readGoogleBindingForTenant(input.tenantId);
+    const location = native?.locations.find(item => item.locationId === input.locationId);
+    if (!native || !location || !native.subject) throw new Error("Reconnect the exact native Google account before preparing this draft.");
+    nativeGrant = { bindingId: native.id, accountId: location.accountId, grantGeneration: nativeGoogleGrantGeneration(native) };
+    await assertCurrentNativeGoogleGrant(input.workspaceId, input.locationId, nativeGrant);
+  }
   const record = await readBusinessRecord(actor, input.workspaceId);
   if (input.expectedRecordRevision !== undefined && record.revision !== input.expectedRecordRevision) throw new Error("Your record changed before this Google draft could be prepared. Nothing was approved on Google.");
   let draft: z.infer<typeof draftSchema>;
@@ -77,7 +88,7 @@ export async function prepareGoogleListingDraft(actor: WorkspaceActor, raw: z.in
     const reserved = await redis.set(commandKey, { digest }, { nx: true, ex: 90 * 24 * 60 * 60 });
     if (!reserved) throw new Error("This draft is already being prepared.");
   }
-  const event = await (await tenantPublishingPorts()).addEvent({ tenantId: input.tenantId, source: "google", type: "content_update", title: draft.action === "post" ? "Review your Google post" : `Review your Google ${draft.action}`, body: JSON.stringify(display, null, 2), status: "pending", metadata: { kind: "workspace_google_listing_draft", workspaceId: input.workspaceId, locationId: input.locationId, draft, reviewAudience: "owner", recordRevision: record.revision, ...(version ? { version: version.pin } : {}) } }, { requirePersistence: true });
+  const event = await (await tenantPublishingPorts()).addEvent({ tenantId: input.tenantId, source: "google", type: "content_update", title: draft.action === "post" ? "Review your Google post" : `Review your Google ${draft.action}`, body: JSON.stringify(display, null, 2), status: "pending", metadata: { kind: "workspace_google_listing_draft", workspaceId: input.workspaceId, locationId: input.locationId, draft, reviewAudience: "owner", recordRevision: record.revision, ...(nativeGrant ? { nativeGrant } : {}), ...(version ? { version: version.pin } : {}) } }, { requirePersistence: true });
   if (commandKey && redis) await redis.set(commandKey, { digest, eventId: event.id }, { ex: 90 * 24 * 60 * 60 });
   return event;
 }
@@ -94,7 +105,7 @@ export function asActingProvider(ctx: ListingContext, actor: WorkspaceActor): Li
   return { ...ctx, authorizeProvider: async () => { await assertActingProvider(actor, ctx.workspaceId, { effect: "google", kind: "google_location", ref: ctx.location.locationId }); } };
 }
 
-export async function tenantListingContext(tenantId: string, workspaceId: string, locationId: string): Promise<ListingContext> {
+export async function tenantListingContext(tenantId: string, workspaceId: string, locationId: string, nativeGrant?: z.infer<typeof nativeGoogleGrantPinSchema>): Promise<ListingContext> {
   const deps = await defaultTenantReplyDeps();
   const nativeWorkspace = publishingWorkspaceId(tenantId);
   const target = nativeWorkspace ? { workspaceId: nativeWorkspace } : await deps.bindingTarget(tenantId);
@@ -111,6 +122,7 @@ export async function tenantListingContext(tenantId: string, workspaceId: string
   const token = await deps.accessToken(grant);
   if (!token) throw new Error("Reconnect Google to continue.");
   return { workspaceId, bindingId: grant.bindingId ?? null, lifecycle: control.paused ? "paused" : "live", location: { accountId: location.accountId, locationId }, client: paceGoogleWrites(deps.client(token), workspaceId, locationId, undefined, async () => {
+    if (nativeGrant) await assertCurrentNativeGoogleGrant(workspaceId, locationId, nativeGrant);
     const current = await deps.grant(tenantId);
     const liveBinding = await readGoogleBindingForTenant(tenantId);
     assertGoogleDispatchGrant(grant, current, liveBinding, workspaceId, locationId);
@@ -142,13 +154,15 @@ export async function executeGoogleListingEvent(input: { tenantId: string; event
     // Fail closed before token refresh or any provider read, not only before the write.
     await deps.maintenance({preparationId:metadata.maintenance.preparationId,eventId:input.event.id,workspaceId:metadata.workspaceId,bindingId:metadata.maintenance.bindingId,locationId:metadata.locationId,draft:metadata.draft});
   }
-  const ctx = await deps.context(input.tenantId, metadata.workspaceId, metadata.locationId);
+  if (metadata.nativeGrant) await assertCurrentNativeGoogleGrant(metadata.workspaceId, metadata.locationId, metadata.nativeGrant);
+  const ctx = await deps.context(input.tenantId, metadata.workspaceId, metadata.locationId, metadata.nativeGrant);
   if (metadata.version && (!(await systemsReleaseEnabledForWorkspace(metadata.workspaceId, authorization.viewer)) || !(await googleVersionDraftCurrent({ workspaceId: metadata.workspaceId, locationId: metadata.locationId, bindingId: ctx.bindingId, pin: metadata.version, draft: metadata.draft })))) return { accepted: false, reason: "This Google Version changed. Prepare a fresh draft." };
   if (metadata.maintenance) {
     const recheck = () => deps.maintenance({preparationId:metadata.maintenance!.preparationId,eventId:input.event.id,workspaceId:metadata.workspaceId,bindingId:ctx.bindingId,locationId:metadata.locationId,draft:metadata.draft});
     await recheck();
   }
   ctx.authorizeService = async () => {
+    if (metadata.nativeGrant) await assertCurrentNativeGoogleGrant(metadata.workspaceId, metadata.locationId, metadata.nativeGrant);
     const current = await deps.authorize(input);
     if (!current.allowed || (input.actorId.startsWith("make-real-service:") && current.bindingId !== ctx.bindingId)) throw new Error("Google service authority ended before dispatch.");
     if (metadata.maintenance) await deps.maintenance({preparationId:metadata.maintenance.preparationId,eventId:input.event.id,workspaceId:metadata.workspaceId,bindingId:ctx.bindingId,locationId:metadata.locationId,draft:metadata.draft});
@@ -178,10 +192,10 @@ export async function executeGoogleListingEvent(input: { tenantId: string; event
   }
 }
 
-export async function undoWorkspaceGoogleChange(actor: WorkspaceActor, input: { workspaceId: string; tenantId: string; locationId: string; receiptId: string }): Promise<ListingWriteOutcome> {
+export async function undoWorkspaceGoogleChange(actor: WorkspaceActor, input: { workspaceId: string; tenantId: string; locationId: string; receiptId: string; nativeGrant?: z.infer<typeof nativeGoogleGrantPinSchema> }): Promise<ListingWriteOutcome> {
   if (!(await publishingEnabledForWorkspace(input.workspaceId, actor)) || !(await googleTargetAllowed(actor, input.workspaceId, input.tenantId))) throw new Error("Only an authorized owner can undo this Google change.");
   if ((await readBusinessRecord(actor, input.workspaceId)).access !== "owner") throw new Error("This Google change needs the business owner's instruction.");
-  return undoListingChange(await tenantListingContext(input.tenantId, input.workspaceId, input.locationId), { receiptId: input.receiptId, authority: { kind: "owner_undo", actor: actor.userId }, retryFailed: true });
+  return undoListingChange(await tenantListingContext(input.tenantId, input.workspaceId, input.locationId, input.nativeGrant), { receiptId: input.receiptId, authority: { kind: "owner_undo", actor: actor.userId }, retryFailed: true });
 }
 
 export async function readWorkspaceGoogle(actor: WorkspaceActor, workspaceId: string) {

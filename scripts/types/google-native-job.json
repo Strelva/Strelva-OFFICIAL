@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "plugins": []
+  },
+  "include": [
+    "../../src/products/google-listing/native/**/*.ts",
+    "../../src/app/api/workspace/publishing/google/**/*.ts",
+    "../../src/platform/make-real/google-provider-reference.ts",
+    "../../src/platform/make-real/runner.ts",
+    "../../tests/google-make-real-authenticated-local.spec.ts",
+    "../../tests/support/google-provider-proof-scope.ts",
+    "../../tests/support/google-native-inspection.ts"
+  ],
+  "exclude": [
+    "../../node_modules",
+    "../../.next",
+    "../../src/__tests__"
+  ]
+}

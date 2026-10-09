@@ -1,6 +1,6 @@
 {
-  "source": "Prepared exact full-model345 inventory; governed money producer current authority/native qualification pending",
-  "forwardCount": 345,
+  "source": "Prepared exact full-model346 inventory; composed native Google and governed money qualification pending",
+  "forwardCount": 346,
   "workspaceBoundary": "20260905190000_release_one_workspaces.sql",
   "focusedLegacyExceptions": {
     "20260920060000_content_version_request_id.sql": "Requires legacy content_versions, omitted from the purpose-built workspace fixture; real upgrade/fresh full-schema rehearsal owns it.",
@@ -345,6 +345,7 @@
     "20261021131200_agent_website_tools.sql",
     "20261021132000_money_effect_admission.sql",
     "20261021132100_agent_payment_exit_admission.sql",
+    "20261021140000_native_google_lifecycle.sql",
     "20261022090000_guarded_tenant_teardown.sql",
     "20261022090100_tenant_cleanup_receipts.sql",
     "20261022120000_agency_created_application_authority.sql",

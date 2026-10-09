@@ -22,5 +22,5 @@ export async function checkGoogleMakeRealService(input:{workspaceId:string;actor
 }
 export async function authorizeGoogleServiceEvent(input:{tenantId:string;event:UnifiedEvent;actorId:string}) {
  const m=input.event.metadata;if(m?.kind!=="workspace_google_listing_draft" || typeof m.workspaceId!=="string" || typeof m.locationId!=="string")throw new Error("Google service target is unavailable.");
- return checkGoogleMakeRealService({workspaceId:m.workspaceId,actorId:input.actorId,request:{tenantId:input.tenantId,eventId:input.event.id,locationId:m.locationId,draftDigest:googleMakeRealDraftDigest(m)},mode:"approve"});
+ return checkGoogleMakeRealService({workspaceId:m.workspaceId,actorId:input.actorId,request:{tenantId:input.tenantId,eventId:input.event.id,locationId:m.locationId,draftDigest:googleMakeRealDraftDigest(m),...(m.nativeGrant?{nativeGrant:m.nativeGrant as import("zod").infer<typeof import("@/platform/make-real/google-provider-reference").nativeGoogleGrantPinSchema>}:{})},mode:"approve"});
 }
