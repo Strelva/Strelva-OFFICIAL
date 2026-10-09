@@ -1,3 +1,4 @@
+import { assertGoogleDispatchGrant } from "./dispatch-grant";
 import { maintenancePinSchema, checkBundleMaintenanceEvent } from "./maintenance";
 import { googleVersionPinSchema, googleVersionDraftCurrent, type GoogleVersionPin } from "./versions";
 import { systemsReleasedFor, systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";
@@ -111,9 +112,8 @@ export async function tenantListingContext(tenantId: string, workspaceId: string
   if (!token) throw new Error("Reconnect Google to continue.");
   return { workspaceId, bindingId: grant.bindingId ?? null, lifecycle: control.paused ? "paused" : "live", location: { accountId: location.accountId, locationId }, client: paceGoogleWrites(deps.client(token), workspaceId, locationId, undefined, async () => {
     const current = await deps.grant(tenantId);
-    if (!current || current.status !== "connected" || current.bindingId !== grant.bindingId || current.accessToken !== grant.accessToken || current.refreshToken !== grant.refreshToken) throw new Error("Google grant changed before dispatch.");
     const liveBinding = await readGoogleBindingForTenant(tenantId);
-    if (grant.bindingId && (!liveBinding || liveBinding.id !== grant.bindingId || liveBinding.workspaceId !== workspaceId || liveBinding.status !== "connected" || !liveBinding.locations.some(value => value.locationId === locationId) || (grant.bindingUpdatedAt && Date.parse(liveBinding.updatedAt) !== Date.parse(grant.bindingUpdatedAt)))) throw new Error("Google location authority ended before dispatch.");
+    assertGoogleDispatchGrant(grant, current, liveBinding, workspaceId, locationId);
   }), receipts: deps.receipts() };
 }
 

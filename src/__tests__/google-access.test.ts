@@ -301,3 +301,35 @@ describe("Google resource names", () => {
     expect(googleLocationIdFromName(undefined)).toBeUndefined();
   });
 });
+
+it("dispatch accepts this operation's admitted refresh and rejects a same-ID reconnect generation",async()=>{
+ const {assertGoogleDispatchGrant}=await import("@/products/google-listing/dispatch-grant");
+ const {accountBindingWithSecretsSchema}=await import("@/platform/account-bindings/contracts");
+ vi.stubEnv("STRELVA_GOOGLE_BINDINGS","1");
+ const scope=`workspace-${WORKSPACE}`;
+ let saved=bindingRow({originTenantId:null,originTenantStableId:null});
+ rpc.mockImplementation((name,args)=>{
+  if(name==="read_native_workspace_google_binding")return {data:saved,error:null};
+  if(name==="mutate_google_binding_generation"){
+   if(args.p_expected_updated_at!==saved.updatedAt)return {data:null,error:{message:"account_binding_superseded_or_revoked"}};
+   saved={...saved,...args.p_mutation as Record<string,unknown>,updatedAt:"2026-10-08T00:00:01.123456+00:00"};
+   return {data:saved.updatedAt,error:null};
+  }
+  return {data:null,error:null};
+ });
+ vi.stubGlobal("fetch",vi.fn(async()=>({ok:true,json:async()=>({access_token:"admitted-refreshed",refresh_token:"admitted-rotated",expires_in:3600})})));
+ const captured=await getGoogleGrant(scope);expect(captured).not.toBeNull();
+ const priorGeneration=captured!.bindingUpdatedAt;
+ expect(await getValidGoogleAccessToken(captured!,Date.parse("2026-10-08T00:00:00Z"))).toBe("admitted-refreshed");
+ expect(captured).toMatchObject({accessToken:"admitted-refreshed",refreshToken:"admitted-rotated",bindingUpdatedAt:saved.updatedAt});
+ expect(captured!.bindingUpdatedAt).not.toBe(priorGeneration);
+ const current=await getGoogleGrant(scope);
+ expect(()=>assertGoogleDispatchGrant(captured!,current,accountBindingWithSecretsSchema.parse(saved),WORKSPACE,"333")).not.toThrow();
+ // Formatting can differ across RPC readers; fractional generation cannot.
+ expect(()=>assertGoogleDispatchGrant({...captured!,bindingUpdatedAt:"2026-10-08T00:00:01.123456Z"},current,accountBindingWithSecretsSchema.parse(saved),WORKSPACE,"333")).not.toThrow();
+ saved={...saved,updatedAt:"2026-10-08T00:00:01.123457+00:00"};
+ expect(()=>assertGoogleDispatchGrant(captured!,current,accountBindingWithSecretsSchema.parse(saved),WORKSPACE,"333")).toThrow(/generation changed/);
+ saved={...saved,accessTokenCiphertext:encryptSecret("reconnected-access"),refreshTokenCiphertext:encryptSecret("reconnected-refresh")};
+ const reconnected=await getGoogleGrant(scope);
+ expect(()=>assertGoogleDispatchGrant(captured!,reconnected,accountBindingWithSecretsSchema.parse(saved),WORKSPACE,"333")).toThrow(/grant changed/);
+});
