@@ -1,3 +1,4 @@
+import { bookingCalendarConnectionStates, readBookingCalendarEvidence } from "./calendar-evidence";
 import { getInquiryRepository } from "@/products/inquiries/server";
 import type { InquiryWorkspaceSnapshot } from "@/products/inquiries/server";
 import { publishingEnabledForWorkspace } from "@/products/publishing/server";
@@ -204,6 +205,7 @@ export async function projectWorkspaceSystems(input: SystemsProjectionInput): Pr
     connections: connections.map((item) => item.connection),
     observations: input.observations,
   }), input.now);
+  const calendarStates = bookingCalendarConnectionStates(input.listing, input.observations, input.now);
   const names = new Map(listings.map((item) => [item.system.id, item.system.name]));
   return {
     status: "ready",
@@ -231,7 +233,7 @@ export async function projectWorkspaceSystems(input: SystemsProjectionInput): Pr
         kind: connection.kind,
         targetSystemId,
         targetLabel: targetSystemId ? names.get(targetSystemId) ?? "Another system" : connection.purpose ?? connection.target.type.replace("_", " "),
-        state: connection.state,
+        state: calendarStates.get(connection.id) ?? connection.state,
         purpose: connection.purpose,
       };
     }), ...listings.flatMap(item => {
@@ -391,7 +393,7 @@ async function liveProjectionInput(deps: LiveSystemsDeps): Promise<SystemsProjec
     listing,
     siteDomains: deps.siteDomains,
     candidates: deps.savedWork.flatMap((work) => websiteRebuildCandidate(work) ?? []),
-    observations: [...homeFinderObservations, ...await readSystemsEvidence(listing, now), ...savedCheckEvidence(listing, deps.siteDomains, deps.savedWork), ...(published?.observations ?? []),
+    observations: [...homeFinderObservations, ...await readBookingCalendarEvidence(listing, deps.actor, now), ...await readSystemsEvidence(listing, now), ...savedCheckEvidence(listing, deps.siteDomains, deps.savedWork), ...(published?.observations ?? []),
       ...toolNoticeObservations(noticeRows ?? [], listing.systems.map(item => ({ systemId: item.system.id, workId: item.references.savedWorkId })))],
     actorId: deps.actor.userId,
     now,
