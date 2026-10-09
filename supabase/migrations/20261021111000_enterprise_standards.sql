@@ -59,7 +59,7 @@ revoke all on function public.system_version_source_locks_guard() from public,an
 -- Published source revisions and historical releases keep their existing guards.
 create function public.system_version_enforce_standards() returns trigger
 language plpgsql security definer set search_path=public,pg_temp as $$
-declare v public.system_versions; r public.system_version_source_revisions; o record; definition jsonb; source_definition jsonb; paths text[]; path text;
+declare v public.system_versions; r public.system_version_source_revisions; o record; definition jsonb; source_definition jsonb; paths text[]; locked_path text;
 begin
  if tg_table_name='system_versions' then select * into v from public.system_versions where id=new.id;
  else select * into v from public.system_versions where id=new.version_id; end if;
@@ -74,13 +74,13 @@ begin
  if tg_table_name='system_version_releases' then definition:=new.definition;
  else
   definition:=v.baseline_definition;
-  for o in select * from public.system_version_overrides where version_id=v.id order by length(path),position loop
+  for o in select overrides.* from public.system_version_overrides overrides where overrides.version_id=v.id order by length(overrides.path),overrides.position loop
    if o.path='*' then definition:=o.value;
    else definition:=jsonb_set(definition,string_to_array(o.path,'.'),o.value,true); end if;
   end loop;
  end if;
- foreach path in array paths loop
-  if (case when path='*' then definition else definition #> string_to_array(path,'.') end) is distinct from (case when path='*' then source_definition else source_definition #> string_to_array(path,'.') end) then raise exception 'system_version_standard_locked'; end if;
+ foreach locked_path in array paths loop
+  if (case when locked_path='*' then definition else definition #> string_to_array(locked_path,'.') end) is distinct from (case when locked_path='*' then source_definition else source_definition #> string_to_array(locked_path,'.') end) then raise exception 'system_version_standard_locked'; end if;
  end loop;
  return null;
 end;$$;
