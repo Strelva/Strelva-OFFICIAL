@@ -50,9 +50,9 @@ export type RouteContract = {
   pathTemplate?: string;
   query?: { reads: string[]; required: string[] };
   /** Documentation of the seam; runtime fixtures assert these semantics. */
-  auth?: "public" | "spam-pit-write-key" | "management-token-body" | "signed-preview";
+  auth?: "public" | "spam-pit-write-key" | "management-token-body" | "signed-preview" | "public-clicks-signed-orders";
   successStatuses?: number[];
-  replay?: "read-only" | "request-id-optional" | "management-token" | "readback-only" | "not-idempotent";
+  replay?: "read-only" | "request-id-optional" | "management-token" | "readback-only" | "not-idempotent" | "bounded-lead-dedup" | "click-window-and-signed-order-id";
   /** Platform route file, relative to the control-plane checkout. */
   routeFile: string;
   /** Body fields the route reads (write methods only). */
@@ -67,13 +67,13 @@ export const V1_ROUTE_CONTRACTS: Record<string, RouteContract> = {
     method: "POST",
     routeFile: "src/app/api/v1/leads/[tenant]/route.ts",
     reads: ["name", "email", "message", "source", "website", "company", "capabilityId", "capabilityVersion", "fields"],
-    required: ["name"], auth: "public", successStatuses: [200], replay: "not-idempotent",
+    required: ["name"], auth: "public", successStatuses: [200], replay: "bounded-lead-dedup",
   },
   track: {
     method: "POST",
     routeFile: "src/app/api/v1/track/[tenant]/route.ts",
     reads: ["event", "serviceId", "amountCents", "currency", "items", "orderId"],
-    required: ["event"], auth: "public", successStatuses: [200], replay: "not-idempotent",
+    required: ["event"], auth: "public-clicks-signed-orders", successStatuses: [200], replay: "click-window-and-signed-order-id",
   },
   "spam-pit": {
     method: "POST",

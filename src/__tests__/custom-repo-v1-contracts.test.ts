@@ -187,6 +187,7 @@ describe("each client repo's v1 calls, run against the real route handlers", () 
         params: Promise.resolve({ tenant: repo.tenant }),
       });
       expect(res.status).toBe(fixture.expectStatus);
+      expect(V1_ROUTE_CONTRACTS[site.endpoint]!.successStatuses).toContain(res.status);
       const body = await res.json();
       if (fixture.expectBody) expect(body).toMatchObject(fixture.expectBody);
 
@@ -212,6 +213,16 @@ describe("each client repo's v1 calls, run against the real route handlers", () 
       }
     });
   }
+
+  it("preserves a retrying old beacon's 200/ok contract with additive dedup guidance", async () => {
+    const site: V1CallSite = { endpoint: "track", file: "x", transport: "beacon-text" };
+    const context = { params: Promise.resolve({ tenant: "mclears" }) };
+    const first = await TRACK_POST(request("mclears", site, { event: "page-view" }), context);
+    const retry = await TRACK_POST(request("mclears", site, { event: "page-view" }), context);
+    expect(first.status).toBe(200); expect(retry.status).toBe(200);
+    expect(await retry.json()).toEqual({ ok: true, deduped: true });
+    expect(mocks.trackClick).toHaveBeenCalledTimes(1);
+  });
 
   it("a spam-pit call without the write key is refused (cocard falls back to its log)", async () => {
     const res = await SPAM_PIT_POST(

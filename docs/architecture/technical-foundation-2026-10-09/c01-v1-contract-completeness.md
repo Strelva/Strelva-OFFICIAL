@@ -33,3 +33,5 @@ Source limitations: pins are current manifest source assertions, not verified de
 - Not run: broad unit suite, Next build, browser/Auth stack, native SQL, hosted/provider checks, production reads or writes. No UI behavior changed.
 
 Proposed coordinator evidence delta: mark C01 implementation/local contract behavior prepared, with the starter preview signing correction and strict unknown-field booking limit recorded. F01 remains a declared integration dependency; re-run contracts on its approved union. No deployed source or customer-mapping claim changes. Next action: C02 local-only runner using existing reviewed manifest pins; cross-private-repo CI access and new secrets remain gated.
+
+C01 follow-up during C02 review: existing source confirms five-minute lead capture deduplication and best-effort ten-second click deduplication (signed orders additionally use orderId). Contract metadata names those bounded semantics, rather than claiming no idempotency. A real repeat-beacon fixture confirms preserved 200/ok with additive `deduped:true` and a single click write. Consumer success fixtures also assert the table's declared success status.
