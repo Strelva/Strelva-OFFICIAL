@@ -1695,6 +1695,62 @@
           "rollbackStatus": "guarded or forward-only; exact native refusal/reapply and operating recovery remain release gates"
         }
       ]
+    },
+    {
+      "batch": "23",
+      "description": "Full-model audit corrections: exact grant identity, receipt intent, money effect admission, durable cleanup and unpublished agency drafts",
+      "status": "Prepared source only; selected fresh native checks pass, exact-source historical upgrade/recovery, complete Auth/UI and external production qualification remain pending; no production authority",
+      "items": [
+        {
+          "file": "20261021100500_google_grant_generation.sql",
+          "sha256": "35b511ae6c7bb87b75ee1506b4525e705e24a1a9e037605ab7b2b69edc149edd",
+          "rollback": "rollback-20261021100500_google_grant_generation.sql",
+          "rollbackSha256": "3f006b13b5d4b23749af49584f0dd4b7d1eb68eee77c6fed4d69be38890df4e8",
+          "rollbackStatus": "Prepared guarded or forward-only inverse; native inverse/reapply and populated refusal qualification pending"
+        },
+        {
+          "file": "20261021100600_google_receipt_intent.sql",
+          "sha256": "6b1a80cec0ce959d33ea0171d05a9251933036986b16d1fbb20751506aefdf0d",
+          "rollback": "rollback-20261021100600_google_receipt_intent.sql",
+          "rollbackSha256": "501ba64f48e0207c18ee2aa1572e6c48ade1488d2ad70bede274469faed1c21c",
+          "rollbackStatus": "Prepared guarded or forward-only inverse; native inverse/reapply and populated refusal qualification pending"
+        },
+        {
+          "file": "20261021100800_tenant_connection_generation.sql",
+          "sha256": "86ca37051ffa99bd00c877d00f9f1ffd205dafe35abc595cd661ef942dc0d0ae",
+          "rollback": "rollback-20261021100800_tenant_connection_generation.sql",
+          "rollbackSha256": "8352b37f578add1305202296a8ddd53011469793a20b7519a89f2680463f714d",
+          "rollbackStatus": "Prepared guarded or forward-only inverse; native inverse/reapply and populated refusal qualification pending"
+        },
+        {
+          "file": "20261021132000_money_effect_admission.sql",
+          "sha256": "4591c92190328b18dfa4ef5a6140a1f843b8bf4169dc4d0d1fc635cdacd3b6d3",
+          "rollback": "rollback-20261021132000_money_effect_admission.sql",
+          "rollbackSha256": "fd3240836b7805a391a5bb6d9706a23e0f99e2965328d64809881c6629a62b0f",
+          "rollbackStatus": "Prepared guarded or forward-only inverse; native inverse/reapply and populated refusal qualification pending"
+        },
+        {
+          "file": "20261021132100_agent_payment_exit_admission.sql",
+          "sha256": "13e22080cf43e9810c8513817e3c510d4429746ec3fe7168d75f293ea2c757f0",
+          "rollback": "rollback-20261021132100_agent_payment_exit_admission.sql",
+          "rollbackSha256": "4682a88142cc6028353fba148808957924cc9700c078ac80ca4b9391db8df146",
+          "rollbackStatus": "Prepared guarded or forward-only inverse; native inverse/reapply and populated refusal qualification pending"
+        },
+        {
+          "file": "20261022090100_tenant_cleanup_receipts.sql",
+          "sha256": "8d94b1c8c40fe58dcf719b7c749bac1e7b8a83873a8166b27ceaef6d20cc78de",
+          "rollback": "rollback-20261022090100_tenant_cleanup_receipts.sql",
+          "rollbackSha256": "4be53e4525b400576427a02e89eb2e29612752a08ffbd9e9e5d496117ac74edd",
+          "rollbackStatus": "Prepared guarded or forward-only inverse; native inverse/reapply and populated refusal qualification pending"
+        },
+        {
+          "file": "20261022120000_agency_created_application_authority.sql",
+          "sha256": "2b6b704628eac68f608451498821af9b078fae27993a0bac754d239b99eb6929",
+          "rollback": "rollback-20261022120000_agency_created_application_authority.sql",
+          "rollbackSha256": "55ba7d7016a2799a8b52477a0fd5642672c91f863f45705d16ea392d194d59f8",
+          "rollbackStatus": "Prepared guarded or forward-only inverse; native inverse/reapply and populated refusal qualification pending"
+        }
+      ]
     }
   ]
 }
