@@ -40,7 +40,7 @@ const literal = value => `'${String(value).replaceAll("'", "''")}'`;
 const identifier = value => `"${String(value).replaceAll('"', '""')}"`;
 const inventory = JSON.parse(readFileSync(join(root, 'scripts/sql/historical-forward-inventory.json'), 'utf8'));
 const fixtureFiles = ['setup', 'holder', 'worker', 'observe'].map(kind => `tests/support/governed-creator-exit-race-${kind}.sql`);
-const sourceFiles = ['scripts/check-governed-creator-exit-races.mjs', 'scripts/lib/governed-creator-exit-proof.mjs', 'scripts/lib/retained-native-child.mjs', 'scripts/sql/governed-creator-clone-state.sql', 'scripts/full-model-stack-qualification.mjs', 'scripts/check-workspace-target.mjs', 'scripts/full-model-journey-profile.mjs', 'scripts/journey-evidence-files.mjs', 'scripts/sql/governed-money-operations-contract.sql', 'scripts/sql/historical-forward-inventory.json', 'scripts/release-safety/batches.json', 'supabase/migrations/rollback-20261022172000_governed_money_operations.sql', ...fixtureFiles, ...inventory.forwardFiles.map(file => `supabase/migrations/${file}`)];
+const sourceFiles = ['scripts/check-governed-creator-exit-races.mjs', 'scripts/lib/governed-creator-exit-proof.mjs', 'scripts/lib/retained-native-child.mjs', 'scripts/sql/governed-creator-clone-state.sql', 'scripts/full-model-stack-qualification.mjs', 'scripts/check-workspace-target.mjs', 'scripts/full-model-journey-profile.mjs', 'scripts/journey-evidence-files.mjs', 'scripts/sql/governed-money-operations-contract.sql', 'scripts/sql/neutral-creator-version-money-contract.sql', 'scripts/sql/historical-forward-inventory.json', 'scripts/release-safety/batches.json', 'supabase/migrations/rollback-20261022172000_governed_money_operations.sql', ...fixtureFiles, ...inventory.forwardFiles.map(file => `supabase/migrations/${file}`)];
 const snapshot = () => ({ files: Object.fromEntries(sourceFiles.map(path => [path, hash(readFileSync(join(root, path)))])), qualification: hash(privateFile(qualificationPath)), parentQualification: hash(privateFile(qualification.parentQualification)), parentOwnerSettings: hash(privateFile(qualification.parentOwnerSettingsEvidence)), parentBootstrapBaseline: hash(privateFile(baselinePath)) });
 const sourceBefore = snapshot(); retain('source-before.json', JSON.stringify(sourceBefore, null, 2));
 const parentCurrent = validateParentQualification(parentQualification, inventory, sourceBefore.files, qualification);
@@ -91,6 +91,7 @@ try {
   // SET ROLE uses the actually observed canonical migrator; privileged probe
   // mutations are separate and never redefine what the canonical owner is.
   await run('source-contract', `set role ${identifier(owner)};\n\\i ${root}/scripts/sql/governed-money-operations-contract.sql`);
+  await run('neutral-source-contract', `set role ${identifier(owner)};\n\\i ${root}/scripts/sql/neutral-creator-version-money-contract.sql`);
   if (await run('fixture-collision', "select exists(select 1 from public.users where id::text like 'd1720000-%') or exists(select 1 from public.offering_package_sources where definition_id='private_staff_requests' and definition_version='1.0.0')") !== 'f') throw Error('Requires a fresh fictional fixture scope; existing rows are not replaced.');
   await run('fixture-setup', `\\i ${root}/${fixtureFiles[0]}`);
   // Establish that the exact listing command was admissible before exit,
@@ -149,6 +150,7 @@ try {
   if (await run('removed-new-port', `select to_regprocedure('${signature}') is null`) !== 't' || await run('history-after-inverse', historySql) !== retainedHistory) throw Error('Legitimate inverse removal/history mismatch.');
   await run('legitimate-reapply', `set role ${identifier(owner)};\n\\i ${forward}`);
   await run('reapplied-source-contract', `set role ${identifier(owner)};\n\\i ${root}/scripts/sql/governed-money-operations-contract.sql`);
+  await run('reapplied-neutral-source-contract', `set role ${identifier(owner)};\n\\i ${root}/scripts/sql/neutral-creator-version-money-contract.sql`);
   if (await run('catalog-after-reapply', catalogSql) !== baseline || await run('history-after-reapply', historySql) !== retainedHistory) throw Error('Reapply changed catalog or retained history.');
   const ledgerAfter = JSON.parse(await run('ledger-after-reapply', ledgerSql));
   if (JSON.stringify(ledgerAfter) !== JSON.stringify(installedLedger)) throw Error('Inverse/reapply changed ledger identity.');

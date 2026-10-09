@@ -1,6 +1,6 @@
 {
-  "source": "Prepared exact full-model346 inventory; composed native Google and governed money qualification pending",
-  "forwardCount": 346,
+  "source": "Prepared exact full-model347 inventory; neutral source-money native/Auth/provider qualification pending",
+  "forwardCount": 347,
   "workspaceBoundary": "20260905190000_release_one_workspaces.sql",
   "focusedLegacyExceptions": {
     "20260920060000_content_version_request_id.sql": "Requires legacy content_versions, omitted from the purpose-built workspace fixture; real upgrade/fresh full-schema rehearsal owns it.",
@@ -353,6 +353,7 @@
     "20261022130000_tenant_newsletter_teardown_hold.sql",
     "20261022170000_creator_maintenance_operations.sql",
     "20261022171000_checkout_final_admission.sql",
-    "20261022172000_governed_money_operations.sql"
+    "20261022172000_governed_money_operations.sql",
+    "20261022173000_neutral_creator_version_money.sql"
   ]
 }

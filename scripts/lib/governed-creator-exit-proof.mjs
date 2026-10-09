@@ -4,7 +4,7 @@ export function exactCreatorWait(witness, holder, workerPid, applicationName) {
 }
 export function exactForwardLedger(inventory, installed) {
   const expected = inventory.forwardFiles?.map(file => /^([0-9]+)_/.exec(file)?.[1]).sort();
-  if (inventory.forwardCount !== 346 || expected?.length !== 346 || expected.some(version => !version) || new Set(expected).size !== 346 || JSON.stringify(installed) !== JSON.stringify(expected)) throw Error('Requires the exact unique sorted 346-migration identity; same-count substitutions are refused.');
+  if (inventory.forwardCount !== 347 || expected?.length !== 347 || expected.some(version => !version) || new Set(expected).size !== 347 || JSON.stringify(installed) !== JSON.stringify(expected)) throw Error('Requires the exact unique sorted 347-migration identity; same-count substitutions are refused.');
   return expected;
 }
 /** Same sorted-key compact ASCII JSON used by capture-db-owner-settings.py. */

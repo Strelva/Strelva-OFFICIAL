@@ -105,3 +105,24 @@ do $$declare signature text; f regprocedure; installed integer;begin
   if f is null or not has_function_privilege('service_role',f,'EXECUTE') or has_function_privilege('anon',f,'EXECUTE') or has_function_privilege('authenticated',f,'EXECUTE') then raise exception 'governed money lost private service-only boundary';end if;
  end loop;end if;
 end$$;
+
+-- Neutral source-money ports are either all absent on older focused fixtures
+-- or installed as an exact eight-port service-only group. Inverse keeps paid
+-- history, so an absent port group does not imply an absent history table.
+do $$declare signature text; f regprocedure; installed integer;t regclass:=to_regclass('public.creator_version_paid_periods');r text;begin
+ select count(*) into installed from pg_proc where pronamespace='public'::regnamespace and proname in('register_neutral_creator_listing','record_neutral_creator_money','prepare_neutral_version_collection','record_neutral_version_settlement','observe_neutral_creator_settlement','read_neutral_creator_sources','read_neutral_version_money','export_neutral_creator_paid_periods');
+ if installed not in(0,8) then raise exception 'neutral source money incomplete private boundary';end if;
+ if installed=8 then
+  if t is null then raise exception 'neutral source money retained history missing';end if;
+  foreach signature in array array['public.register_neutral_creator_listing(uuid,text,jsonb)','public.record_neutral_creator_money(uuid,text,jsonb)','public.prepare_neutral_version_collection(uuid,text,jsonb)','public.record_neutral_version_settlement(uuid,text,text,bigint,text,text,text)','public.observe_neutral_creator_settlement(uuid)','public.read_neutral_creator_sources(uuid,uuid,text)','public.read_neutral_version_money(uuid,uuid,text)','public.export_neutral_creator_paid_periods(uuid,uuid,text,text,integer,integer)'] loop
+   f:=to_regprocedure(signature);
+   if f is null or not has_function_privilege('service_role',f,'EXECUTE') or has_function_privilege('anon',f,'EXECUTE') or has_function_privilege('authenticated',f,'EXECUTE') then raise exception 'neutral source money lost private service-only boundary';end if;
+  end loop;
+ end if;
+ if t is not null then
+  if not exists(select 1 from pg_class where oid=t and relrowsecurity) then raise exception 'neutral source money retained history lost RLS';end if;
+  foreach r in array array['anon','authenticated','service_role'] loop
+   if has_table_privilege(r,t,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') or has_any_column_privilege(r,t,'SELECT,INSERT,UPDATE,REFERENCES') then raise exception 'neutral source money retained history exposed directly';end if;
+  end loop;
+ end if;
+end$$;

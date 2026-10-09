@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { exactCreatorWait, exactForwardLedger, qualifiedCreatorClone, validateParentQualification, ownerSettingsCanonical, normalizedOwnerSettings, canonicalSchemaDump } from '../../scripts/lib/governed-creator-exit-proof.mjs';
 const holder = { holderPid: 101, holderXid: '701' }, workerPid = 202, applicationName = 'owned-worker';
 const witness = { workerPid, workerApplication: applicationName, holderPid: 101, holderXid: '701', blockedOnHolder: true, matchingHolderXidWait: true, workspaceRelationHeld: true, holderRelationHeld: true, holderTransactionAlive: true, blockingPids: [101], observedAt: '2026-10-09T08:00:00Z' };
-const inventory = { forwardCount: 346, forwardFiles: Array.from({ length: 346 }, (_, i) => `${20260000000000 + i}_fictional.sql`) };
+const inventory = { forwardCount: 347, forwardFiles: Array.from({ length: 347 }, (_, i) => `${20260000000000 + i}_fictional.sql`) };
 const installed = inventory.forwardFiles.map(file => file.split('_')[0]!).sort();
 const qualification = { format: 2, ownerSettingsSha256: 'd'.repeat(64), parentOwnerSettingsEvidence: '/private/tmp/owned/parent-owner-settings.json', qualified: true, scope: 'owned-local-native-clone-schema-and-database-settings', database: 'governed_creator_exit_fictional', databaseOwner: 'postgres', databaseSettingsEqual: true, databaseSettingsSha256: 'a'.repeat(64), parentSchemaSha256: 'b'.repeat(64), cloneSchemaSha256: 'b'.repeat(64), parentQualification: '/private/tmp/owned/parent.json', fullReleaseQualified: false };
 describe('creator exit native evidence admission', () => {
@@ -16,9 +16,9 @@ describe('creator exit native evidence admission', () => {
   it('rejects another blocking PID even when all reported admission booleans are true', () => {
     expect(exactCreatorWait({ ...witness, blockingPids: [303] }, holder, workerPid, applicationName)).toBe(false);
   });
-  it('consumes exact sorted unique346 identities rather than equal counts', () => {
+  it('consumes exact sorted unique347 identities rather than equal counts', () => {
     expect(exactForwardLedger(inventory, installed)).toEqual(installed);
-    expect(() => exactForwardLedger(inventory, [...installed.slice(0, -1), '20990000000000'])).toThrow('exact unique sorted 346');
+    expect(() => exactForwardLedger(inventory, [...installed.slice(0, -1), '20990000000000'])).toThrow('exact unique sorted 347');
     expect(() => exactForwardLedger(inventory, [...installed].reverse())).toThrow();
     expect(() => exactForwardLedger({ ...inventory, forwardCount: 345 }, installed)).toThrow();
     expect(() => exactForwardLedger({ ...inventory, forwardFiles: [...inventory.forwardFiles.slice(0, -1), inventory.forwardFiles[0]] }, installed)).toThrow();

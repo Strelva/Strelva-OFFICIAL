@@ -1,3 +1,4 @@
+import {readFileSync} from "node:fs";
 import { describe, expect, it } from "vitest";
 import { render, type Catalog } from "../../scripts/generate-database-types";
 
@@ -6,11 +7,12 @@ import { render, type Catalog } from "../../scripts/generate-database-types";
 // committed file was produced by it (Strelva Reborn section 7); 66 of the 70
 // tables the previous file had came out byte-identical.
 
-const T = { text: 25, int4: 23, uuid: 2950, bool: 16, jsonb: 3802, timestamptz: 1184, textArray: 1009, void: 2278, rowtype: 90001, enum: 90002 };
+const T = { text: 25, int4: 23, int8:20, uuid: 2950, bool: 16, jsonb: 3802, timestamptz: 1184, textArray: 1009, void: 2278, rowtype: 90001, enum: 90002 };
 const catalog: Catalog = {
   types: [
     { oid: T.text, name: "text", type: "b", category: "S", elem: 0, base: 0, relid: 0, labels: null },
     { oid: T.int4, name: "int4", type: "b", category: "N", elem: 0, base: 0, relid: 0, labels: null },
+    { oid: T.int8, name: "int8", type: "b", category: "N", elem: 0, base: 0, relid: 0, labels: null },
     { oid: T.uuid, name: "uuid", type: "b", category: "U", elem: 0, base: 0, relid: 0, labels: null },
     { oid: T.bool, name: "bool", type: "b", category: "B", elem: 0, base: 0, relid: 0, labels: null },
     { oid: T.jsonb, name: "jsonb", type: "b", category: "U", elem: 0, base: 0, relid: 0, labels: null },
@@ -131,4 +133,14 @@ describe("generate-database-types render", () => {
     for (const name of ["p_workspace_id", "p_user_id", "p_verified_email", "p_profile_version", "p_recipient", "p_charge", "p_currency"]) { expect(generated).toContain(`${name}: string\n`); expect(generated).not.toContain(`${name}: string | null`); }
     expect(generated).toContain("p_amount: number\n"); expect(generated).toContain("p_available: number\n");
   });
+});
+
+it("renders required arguments from all eight actual neutral source-money signatures without fabricating generated database types",()=>{
+ const source=readFileSync('supabase/migrations/20261022173000_neutral_creator_version_money.sql','utf8');
+ const actual=[...source.matchAll(/create function public\.([a-z_]+)\(([^\n]*)\)\nreturns jsonb/g)];expect(actual).toHaveLength(8);
+ const oidByType:Record<string,number>={uuid:T.uuid,text:T.text,jsonb:T.jsonb,integer:T.int4,bigint:T.int8};
+ const functions=actual.map((item,i)=>{const args=item[2]!.split(',').map(arg=>arg.trim().split(/\s+/));return {name:item[1]!,oid:100+i,retset:false,rettype:T.jsonb,argnames:args.map(arg=>arg[0]!),argmodes:null,alltypes:null,argtypes:args.map(arg=>{const oid=oidByType[arg[1]!];expect(oid).toBeDefined();return oid!;}),ndefaults:0};});
+ const rendered=render({...catalog,functions});
+ for(const f of functions){expect(rendered).toContain(`${f.name}: {`);for(const name of f.argnames){expect(rendered).toContain(`${name}: `);expect(rendered).not.toContain(`${name}?:`);expect(rendered).not.toMatch(new RegExp(`${name}: [^\\n]*\\| null`));}}
+ expect(rendered).toContain('p_command: Json');expect(rendered).toContain('p_amount: number');expect(rendered).toContain('p_offset: number');expect(rendered).toContain('p_limit: number');
 });

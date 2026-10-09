@@ -1832,6 +1832,19 @@
           "rollbackStatus": "Prepared canonical exact6 source/owner/full props/args/ACL/overload refusal before dropping additive ports only; written terms/periods/listings/approvals/accepted receipts and historical writers retained; native UNRUN"
         }
       ]
+    },
+    {
+      "id": "neutral-creator-version-money",
+      "status": "Prepared exact qualified native source/listing/installation and explicitly accepted paid-period lineage; source/unit checks only; native/inverse/Auth/UI/provider and commercial authority remain unqualified",
+      "items": [
+        {
+          "file": "20261022173000_neutral_creator_version_money.sql",
+          "sha256": "4bffee7bfa300d0f62e110dc793a04e4fb81ac2620e8374c45d32ea753a72a87",
+          "rollback": "rollback-20261022173000_neutral_creator_version_money.sql",
+          "rollbackSha256": "bf4cb07eab599c86aa436eb35e3754fb2f935212be73867e898fc237387f00be",
+          "rollbackStatus": "Prepared exact eight-port owner/body/config/signature/normalized ACL and locked retained-table shape inverse; removes additive ports only and retains every immutable paid Version row and original writer; native refusal/inverse/reapply UNRUN"
+        }
+      ]
     }
   ]
 }
