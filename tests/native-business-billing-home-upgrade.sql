@@ -22,3 +22,7 @@ select public.workspace_payer_transition_command('{"action":"propose","workspace
 select public.workspace_payer_transition_command(jsonb_build_object('action','accept','transitionId',id),'7f000000-0000-4000-8000-000000000002','home-agency@example.test') from public.workspace_payer_transitions where workspace_id='7f000000-0000-4000-8000-000000000011';
 insert into proof_home.snapshots select 'transition',jsonb_agg(to_jsonb(t) order by t.id) from public.workspace_payer_transitions t;
 select proof_home.assert(not exists(select 1 from public.accounts where workspace_id='7f000000-0000-4000-8000-000000000011'),'baseline accepted client has no billing account');
+
+-- Aggregate rehearsals may already hold other fictional billing intents.
+-- Snapshot every byte: the migration must add none and preserve existing rows.
+insert into proof_home.snapshots select 'billing-intents-before',coalesce(jsonb_agg(to_jsonb(i) order by i.id),'[]'::jsonb) from public.agency_billing_intents i;
