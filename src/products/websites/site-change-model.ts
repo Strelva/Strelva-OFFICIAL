@@ -44,10 +44,10 @@ export function siteChangeStage(request: SiteChangeRequest): SiteChangeStage {
 }
 
 export const SITE_CHANGE_STAGE_LABEL: Record<SiteChangeStage, string> = {
-  asked: "Asked · Your agency agrees scope and timing with you next",
+  asked: "Asked · Scope and timing need agreement with the selected agency",
   in_progress: "In progress · Your agency is building it on a copy of the site",
   ready_for_review: "Ready for your review · open the preview, then approve or decline",
-  approved: "Approved · Your agency deploys it next",
+  approved: "Approved · Deployment requires current provider authority",
   declined: "Declined · nothing on the site changed",
   done: "Done · live and checked on the site",
   done_unconfirmed: "Deployed · not yet confirmed on the live site",

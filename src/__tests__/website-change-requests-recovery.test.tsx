@@ -67,7 +67,7 @@ it.each(["lost reply", "failed list read", "wrong saved request"])("explicitly c
   expect(new Set(bodies).size).toBe(1);
   expect(JSON.parse(bodies[0]!)).toMatchObject({ workspaceId: BUSINESS, systemId: SYSTEM, request: words, page: "Events" });
   expect(node.querySelector("textarea")?.value).toBe("");
-  expect(node.textContent).toContain("Filed for Strelva");
+  expect(node.textContent).toContain("Filed with the selected agency");
 });
 
 it("does not attach an old pending result or attempt to another business/System", async () => {
@@ -85,7 +85,7 @@ it("does not attach an old pending result or attempt to another business/System"
   const otherSystem = "55555555-5555-4555-8555-555555555555";
   await render({ workspaceId: otherBusiness, systemId: otherSystem });
   await act(async () => finish(reply()));
-  expect(node.textContent).not.toContain("Filed for Strelva");
+  expect(node.textContent).not.toContain("Filed with the selected agency");
   expect(node.querySelector("textarea")?.value).toBe("");
   await fill(node, "Change this other business");
   await act(async () => { submit(node); });

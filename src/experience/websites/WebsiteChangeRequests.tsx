@@ -19,7 +19,7 @@ export interface WebsiteChangeRequestsProps {
   canAsk: boolean;
   /** Only owners approve or decline a preview. */
   canDecide: boolean;
-  /** A Strelva operator records previews and deploys. */
+  /** An authorized operator records previews and deploys; server authority still applies. */
   operator: boolean;
   request?: typeof fetch;
 }
@@ -38,16 +38,16 @@ function when(value: string): string {
 }
 
 function receiptLine(receipt: SiteChangeReceipt): string {
-  if (receipt.kind === "preview") return "Strelva built a preview.";
+  if (receipt.kind === "preview") return "A preview was recorded.";
   if (receipt.kind === "approved") return "Approved by the owner.";
   if (receipt.kind === "declined") return "Declined by the owner. Nothing on the site changed.";
-  const read = receipt.readBack === "confirmed" ? "Checked on the live site." : receipt.readBack === "not_confirmed" ? "Not yet confirmed on the live site; Strelva is checking." : "Not checked on the live site yet.";
+  const read = receipt.readBack === "confirmed" ? "Checked on the live site." : receipt.readBack === "not_confirmed" ? "Not yet confirmed on the live site." : "Not checked on the live site yet.";
   return `Deployed (commit ${receipt.commitSha?.slice(0, 7)}). ${read}`;
 }
 
 /**
  * "Ask for a change" on a website whose changes go through its own repo.
- * Filing makes a Request to Strelva at Asked: nothing on the site changes and
+ * Filing makes a Request to the selected agency at Asked: nothing on the site changes and
  * nothing is accepted until scope and timing are agreed. Each Request shows
  * its receipts in order: preview, the owner's decision, the deploy with its
  * read-back.
@@ -135,7 +135,7 @@ function WebsiteChangeRequestsContent({ workspaceId, systemId, siteLabel, editin
       setWords("");
       setPage("");
       setState({ kind: "ready", requests: result.data.requests });
-      setNotice({ kind: "success", message: "Filed for Strelva. It's at Asked; Strelva agrees scope and timing with you next. Nothing on the site changed." });
+      setNotice({ kind: "success", message: "Filed with the selected agency. Scope and timing still need agreement. Nothing on the site changed." });
     } catch {
       setUnconfirmed(true);
       setNotice({ kind: "error", message: UNCONFIRMED_REQUEST });
@@ -180,8 +180,8 @@ function WebsiteChangeRequestsContent({ workspaceId, systemId, siteLabel, editin
     <div className={styles.intro}>
       <h1 id="site-changes-title" className="font-display">Ask for a change to {siteLabel}</h1>
       <p>{editing === "request"
-        ? "This site runs on its own code, so Strelva makes every change for you. You get a preview to approve before anything goes live."
-        : "Text and photos change in the editor. For a new page, a new feature or a design change, ask here: Strelva builds it and sends you a preview to approve."}</p>
+        ? "This site runs on its own code. Request a change from the selected agency and review its preview before approving publication."
+        : "Text and photos change in the editor. Request a new page, feature or design change from the selected agency, then review its preview."}</p>
     </div>
 
     {canAsk ? <form className={styles.form} onSubmit={(event) => void ask(event)}>
@@ -190,8 +190,8 @@ function WebsiteChangeRequestsContent({ workspaceId, systemId, siteLabel, editin
       <label htmlFor="site-change-page">Which page? <span>Optional</span></label>
       <input id="site-change-page" maxLength={200} value={page} readOnly={sending || unconfirmed} placeholder="Home, Menu, a new page…" onChange={(event) => { if (!filing.current && !attempt.current) setPage(event.target.value); }} />
       <div className={styles.formFoot}>
-        <small>A Request isn&apos;t accepted work until Strelva agrees scope and timing with you.</small>
-        <Button type="submit" loading={sending} disabled={!unconfirmed && words.trim().length < 3}>{unconfirmed ? "Check this request" : "Ask Strelva"}</Button>
+        <small>A Request isn&apos;t accepted work until the selected agency agrees scope and timing with you.</small>
+        <Button type="submit" loading={sending} disabled={!unconfirmed && words.trim().length < 3}>{unconfirmed ? "Check this request" : "Ask for a change"}</Button>
       </div>
     </form> : <p className={styles.readOnly}>Only an owner or admin of this business can ask for a change. You can follow each request here.</p>}
 
@@ -221,7 +221,7 @@ function WebsiteChangeRequestsContent({ workspaceId, systemId, siteLabel, editin
             {stage === "ready_for_review" ? canDecide ? <div className={styles.decide}>
               <Button size="sm" loading={busyStep === item.id} disabled={busyStep !== null || stepUnconfirmed} onClick={() => void step(item.id, { kind: "approved" })}>Approve the preview</Button>
               <Button size="sm" variant="secondary" disabled={busyStep !== null || stepUnconfirmed} onClick={() => void step(item.id, { kind: "declined" })}>Not yet</Button>
-              <small>Approving lets Strelva deploy {preview ? "this preview" : "it"}. A deploy can be rolled back by redeploying the earlier version.</small>
+              <small>Approving authorizes {preview ? "this preview" : "it"} for publication. Deployment still requires current provider authority.</small>
             </div> : <p className={styles.muted}>Waiting on the owner to approve or decline the preview.</p> : null}
             {operator && item.status === "requested" ? <OperatorStep stage={stage} busy={busyStep === item.id} blocked={busyStep !== null || stepUnconfirmed} onRecord={(payload) => void step(item.id, payload)} /> : null}
           </li>;
@@ -230,14 +230,14 @@ function WebsiteChangeRequestsContent({ workspaceId, systemId, siteLabel, editin
   </section>;
 }
 
-/** Strelva's side: record a preview, or the deploy after the owner approved. Operators only; the database checks it. */
+/** Record a preview, or the deploy after the owner approved. Operators only; the database checks it. */
 function OperatorStep({ stage, busy, blocked, onRecord }: { stage: ReturnType<typeof siteChangeStage>; busy: boolean; blocked: boolean; onRecord: (payload: Record<string, unknown>) => void }) {
   const [url, setUrl] = useState("");
   const [commit, setCommit] = useState("");
   const [readBack, setReadBack] = useState<"confirmed" | "not_confirmed" | "not_checked">("not_checked");
   if (stage === "approved") {
     return <form className={styles.operator} onSubmit={(event) => { event.preventDefault(); if (!blocked) onRecord({ kind: "deployed", commitSha: commit.trim(), deploymentUrl: url.trim(), readBack }); }}>
-      <p>Strelva: record the deploy</p>
+      <p>Record the deploy</p>
       <label>Commit<input value={commit} readOnly={blocked} onChange={(event) => setCommit(event.target.value)} placeholder="abc1234" /></label>
       <label>Deployment URL<input value={url} readOnly={blocked} onChange={(event) => setUrl(event.target.value)} placeholder="https://…" /></label>
       <label>Read-back<select value={readBack} disabled={blocked} onChange={(event) => setReadBack(event.target.value as typeof readBack)}><option value="confirmed">Confirmed on the live site</option><option value="not_confirmed">Not confirmed</option><option value="not_checked">Not checked yet</option></select></label>
@@ -246,7 +246,7 @@ function OperatorStep({ stage, busy, blocked, onRecord }: { stage: ReturnType<ty
   }
   if (stage === "ready_for_review" || stage === "done" || stage === "done_unconfirmed") return null;
   return <form className={styles.operator} onSubmit={(event) => { event.preventDefault(); if (!blocked) onRecord({ kind: "preview", previewUrl: url.trim() }); }}>
-    <p>Strelva: record a preview for the owner</p>
+    <p>Record a preview for the owner</p>
     <label>Preview URL<input value={url} readOnly={blocked} onChange={(event) => setUrl(event.target.value)} placeholder="https://…vercel.app" /></label>
     <Button size="sm" type="submit" loading={busy} disabled={blocked}>Record preview</Button>
   </form>;
