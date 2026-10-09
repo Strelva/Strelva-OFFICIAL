@@ -1812,6 +1812,19 @@
           "rollbackStatus": "Prepared canonical owner/body/full props/args/ACL/overload refusal before dropping only additive admission; accepted effects/history survive; native UNRUN"
         }
       ]
+    },
+    {
+      "id": "governed-money-ordinary-producers",
+      "status": "Prepared exact owner/operator supplied-command producers and current payout dispatch; focused unit/source checks only; native/inverse/Auth/UI/provider qualification pending, no prices/terms/commercial permission inferred",
+      "items": [
+        {
+          "file": "20261022172000_governed_money_operations.sql",
+          "sha256": "b50228f6645c671834ec0c19519e4b28de0d6ce1f5860ec5e3fb8ea23241497d",
+          "rollback": "rollback-20261022172000_governed_money_operations.sql",
+          "rollbackSha256": "a1413e4cc68d070335f75c116bac49bc443574069dcd8484b7912d8a9e9d9e1c",
+          "rollbackStatus": "Prepared canonical exact6 source/owner/full props/args/ACL/overload refusal before dropping additive ports only; written terms/periods/listings/approvals/accepted receipts and historical writers retained; native UNRUN"
+        }
+      ]
     }
   ]
 }

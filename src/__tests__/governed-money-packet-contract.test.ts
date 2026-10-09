@@ -1,0 +1,27 @@
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+const forward = readFileSync("supabase/migrations/20261022172000_governed_money_operations.sql", "utf8");
+const inverse = readFileSync("supabase/migrations/rollback-20261022172000_governed_money_operations.sql", "utf8");
+describe("governed money source packet", () => {
+  it("binds inverse to all six actual current bodies, owners, ACLs and properties", () => {
+    const bodies = [...forward.matchAll(/create function public\.(\w+)\((.*?)\)\nreturns jsonb language plpgsql( stable)? security definer set search_path=public,pg_temp as \$\$([\s\S]*?)\$\$;/g)];
+    expect(bodies).toHaveLength(6);
+    for (const match of bodies) { const hash = createHash("md5").update(match[4]!).digest("hex"); expect(forward).toContain(hash); expect(inverse).toContain(hash); expect(inverse).toContain(`drop function public.${match[1]}(`); }
+    for (const needle of ["p.proowner<>migrator", "count(*) from aclexplode(p.proacl))<>2", "a.is_grantable", "p.pronargdefaults<>0", "p.proargnames is distinct from expected.arg_names", "p.provolatile::text<>expected.volatility"]) expect(inverse).toContain(needle);
+    expect(inverse).not.toMatch(/drop table|delete from|update public\.|execute .*definition|create or replace/i);
+  });
+  it("does not widen existing actor-supplied ACLs or alter any historical producer", () => {
+    expect(forward).not.toMatch(/create or replace|alter function|rename to|grant .*authenticated|grant .*anon|insert into public\.super_admins|default.*rate_bps|default.*amount_cents/i);
+    expect(forward).toContain("grant execute on function %s to service_role");
+    expect(forward).toContain("lower(btrim(s.email))=lower(btrim(p_verified_email)) and s.revoked_at is null for share of u,s");
+  });
+  it("derives listing identity and collection payer from current native rows, checking current clocks after waits", () => {
+    expect(forward).toContain("select s.definition_id into definition from public.offering_package_sources"); expect(forward).toContain("r.creator_workspace_id=workspace for share of r,s"); expect(forward).toContain("public.lock_system_revision_qualification(revision)");
+    expect(forward).toContain("a.stripe_customer_id,price.version"); expect(forward).not.toContain("p_command->>'customerId'");
+    const owner = forward.slice(forward.indexOf("create function public.prepare_governed_collection_terms"), forward.indexOf("create function public.register_governed_creator_listing"));
+    expect(owner.indexOf("price.effective_until<=clock_timestamp()")).toBeGreaterThan(owner.indexOf("perform pg_advisory_xact_lock"));
+    expect(owner.indexOf("public.accept_platform_collection_terms")).toBeLessThan(owner.indexOf("public.freeze_platform_collection_period"));
+    expect(owner).toContain("m.role='owner' for share of m,w");
+  });
+});

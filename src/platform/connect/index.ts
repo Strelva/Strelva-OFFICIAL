@@ -28,7 +28,7 @@ export function connectProfile(): ConnectProfile {
  return profile.data;
 }
 export function stripeClient() { if (!process.env.STRIPE_SECRET_KEY) throw new WorkspaceStoreError("Payments provider is unavailable."); return new Stripe(process.env.STRIPE_SECRET_KEY); }
-export interface ConnectDependencies { db?:RpcDb|null; stripe?:Stripe; beforeProviderMutation?:()=>Promise<void>; checkoutAuthority?:{actor:WorkspaceActor;acceptedEmail:string|null}; }
+export interface ConnectDependencies { db?:RpcDb|null; stripe?:Stripe; beforeProviderMutation?:()=>Promise<void>; checkoutAuthority?:{actor:WorkspaceActor;acceptedEmail:string|null}; payoutAuthority?:{actor:WorkspaceActor;profileVersion:string}; }
 export async function manageConnectedAccount(actor:WorkspaceActor,workspaceId:string,action:"read"|"reserve"|"disconnect",db:RpcDb|null=connectDb()) {
  return moneyRpc<ConnectedAccount|null>("manage_connected_account",{p_workspace_id:z.string().uuid().parse(workspaceId),p_user_id:actor.userId,p_verified_email:actor.verifiedEmail,p_action:action},db);
 }
