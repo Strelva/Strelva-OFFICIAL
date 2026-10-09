@@ -290,6 +290,20 @@ Wellness currently means operational-lite Schedule, Roster, and read-only Member
 visibility. Classes, capacity, waitlists, packages, member authentication, and
 Stripe Connect are not implied by that set.
 
+### Lifetime System kind
+
+A System keeps the kind selected at creation while its name, purpose, content
+and behavior evolve. A proposal can gain onboarding without becoming a different
+kind or rewriting accepted outputs. Native resource authority still comes from
+its exact origin/record bindings and current grants, never from a kind label.
+
+The application update contract accepts name and purpose only. The prepared
+forward SQL contract rejects changed kind on every persisted update path;
+legacy SQL may repeat the unchanged kind. It preserves current authority,
+identity, lifecycle, revision and exit protections. This does not qualify or
+rewrite existing populated kinds. The [scoped proof and release preflight](
+./deepening-2026-10-09/06-lifetime-system-kind.md) own evidence and remaining gates.
+
 ### Provider, Connection, and account connection
 
 A Provider is an outside system only, such as Google, Resend, Stripe or a

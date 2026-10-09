@@ -1746,6 +1746,8 @@ psql "${psql_args[@]}" --file="$repo_root/scripts/sql/legacy-google-operation-cu
 psql "${psql_args[@]}" --file="$repo_root/tests/legacy-google-operation-authority-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022182000_booking_settings_atomic_patch.sql"
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/booking-settings-current-contract.sql"
+source "$repo_root/scripts/sql/lifetime-system-kind-checks.sh"
+check_lifetime_system_kind
 psql "${psql_args[@]}" --file="$repo_root/tests/function-exposure-schema.sql"
 node --import tsx "$repo_root/scripts/check-readonly-rpcs.mjs" "postgresql:///postgres?host=$cluster_socket&port=$cluster_port"
 # Full legacy teardown behavior is proved by check-guarded-teardown-fresh.sh.

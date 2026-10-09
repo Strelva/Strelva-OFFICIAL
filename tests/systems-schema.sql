@@ -86,12 +86,13 @@ select pg_temp.sy_assert((public.create_business_system('5e000000-0000-4000-8000
   '5e000000-0000-4000-8000-0000000000c1', repeat('1', 64))->>'id')::uuid = (select id from sy_ids where name = 'proposal'), 'replay returns the same System');
 select pg_temp.sy_expect($$select public.create_business_system('5e000000-0000-4000-8000-000000000010','5e000000-0000-4000-8000-000000000001','sy-owner@example.test','{"name":"Other","kind":"proposal"}','5e000000-0000-4000-8000-0000000000c1',repeat('2',64))$$, 'system_command_conflict');
 
--- Kind changes; identity does not.
+-- The proposal's job grows; identity and kind stay the same. The forward
+-- lifetime contract separately proves changed-kind refusal on the final schema.
 do $$ declare s jsonb; begin
   s := public.update_business_system('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000001', 'sy-owner@example.test',
-    (select id from sy_ids where name = 'proposal'), 1, '{"kind":"portal","name":"Catering portal"}');
-  perform pg_temp.sy_assert((s->>'id')::uuid = (select id from sy_ids where name = 'proposal') and s->>'kind' = 'portal'
-    and (s->>'changeNumber')::int = 2 and s->>'businessId' = '5e000000-0000-4000-8000-000000000010', 'kind change keeps identity');
+    (select id from sy_ids where name = 'proposal'), 1, '{"purpose":"Proposal and onboarding","name":"Catering portal"}');
+  perform pg_temp.sy_assert((s->>'id')::uuid = (select id from sy_ids where name = 'proposal') and s->>'kind' = 'proposal'
+    and (s->>'changeNumber')::int = 2 and s->>'businessId' = '5e000000-0000-4000-8000-000000000010', 'evolving purpose keeps identity and kind');
 end $$;
 select pg_temp.sy_expect(format($$select public.update_business_system('5e000000-0000-4000-8000-000000000010','5e000000-0000-4000-8000-000000000001','sy-owner@example.test',%L,1,'{"name":"Stale"}')$$, (select id from sy_ids where name = 'proposal')), 'system_change_conflict');
 select pg_temp.sy_expect(format($$update public.systems set business_workspace_id = '5e000000-0000-4000-8000-000000000011' where id = %L$$, (select id from sy_ids where name = 'proposal')), 'system_identity_immutable');
