@@ -7,7 +7,7 @@ import {
   ServiceRequestValidationError,
   type ServiceRequest,
   type ServiceRequestActor,
-  serviceRequestProviderSchema,
+  serviceRequestAgencySchema,
 } from "./types";
 
 const uuid = z.string().uuid();
@@ -17,7 +17,7 @@ const context = z.record(z.string(), z.unknown()).superRefine((value, ctx) => {
   if (JSON.stringify(value).length > 16_000) ctx.addIssue({ code: "custom", message: "Context is too large." });
 });
 
-const providerChoice = serviceRequestProviderSchema;
+const agencyChoice = serviceRequestAgencySchema;
 const saveSchema = z.object({
   action: z.literal("save"),
   businessId: uuid,
@@ -28,7 +28,7 @@ const saveSchema = z.object({
   outcome: shortText,
   context,
   scope,
-  provider: providerChoice,
+  provider: agencyChoice,
   idempotencyKey: z.string().trim().min(1).max(128).regex(/^[A-Za-z0-9][A-Za-z0-9_.:-]*$/),
 }).strict();
 type SaveCommand = z.infer<typeof saveSchema>;

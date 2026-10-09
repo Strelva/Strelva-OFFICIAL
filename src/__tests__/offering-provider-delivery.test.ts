@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   OfferingAccessError,
   OfferingConflictError,
-  ProviderDeliveryService,
+  AgencyDeliveryService,
   type OfferingActor,
   type OfferingInstallation,
-  type ProviderAssignmentGateway,
-  type ProviderDelivery,
-  type ProviderDeliveryStore,
-  type ProviderOfferingGateway,
+  type AgencyAssignmentGateway,
+  type AgencyDelivery,
+  type AgencyDeliveryStore,
+  type AgencyOfferingGateway,
 } from "@/platform/offerings";
 import type { OperationalAssignment } from "@/platform/work-participation";
 
@@ -49,8 +49,8 @@ function assignment(status: OperationalAssignment["status"] = "offered"): Operat
   };
 }
 
-class MemoryStore implements ProviderDeliveryStore {
-  current: ProviderDelivery | null = null;
+class MemoryStore implements AgencyDeliveryStore {
+  current: AgencyDelivery | null = null;
   failNextAccept = false;
   afterRevoke: (() => void) | null = null;
   async list() { return this.current ? [structuredClone(this.current)] : []; }
@@ -100,14 +100,14 @@ function harness() {
   let app = installation();
   let assigned = assignment();
   let workStatus = "ready";
-  const offerings: ProviderOfferingGateway = {
+  const offerings: AgencyOfferingGateway = {
     async read(_actor, businessId, installationId) {
       if (businessId !== BUSINESS || installationId !== INSTALLATION) throw new OfferingAccessError();
       return structuredClone(app);
     },
     async canManage(actor) { return actor.userId === OWNER_ID; },
   };
-  const assignments: ProviderAssignmentGateway = {
+  const assignments: AgencyAssignmentGateway = {
     async inspect(actor, assignmentId) {
       if (assignmentId !== ASSIGNMENT || ![OWNER_ID, PROVIDER_ID].includes(actor.userId)) throw new OfferingAccessError();
       return { assignment: structuredClone(assigned), responsibility: { workspaceId: BUSINESS, payload: { status: workStatus, steps: [{ workId: APPLICATION }] } } };
@@ -125,7 +125,7 @@ function harness() {
   };
   store.afterRevoke = () => { assigned = assignment("revoked"); };
   return {
-    store, service: new ProviderDeliveryService(store, offerings, assignments),
+    store, service: new AgencyDeliveryService(store, offerings, assignments),
     setInstallation(next: OfferingInstallation) { app = next; },
     setAssignment(next: OperationalAssignment) { assigned = next; },
     complete() { workStatus = "completed"; },
@@ -134,7 +134,7 @@ function harness() {
 
 const request = { action: "request", businessId: BUSINESS, installationId: INSTALLATION, assignmentId: ASSIGNMENT, idempotencyKey: "delivery:first" } as const;
 
-describe("offering provider delivery", () => {
+describe("offering agency delivery", () => {
   it("keeps a customer request pending until the exact Strelva assignee accepts", async () => {
     const test = harness();
     const first = await test.service.execute(owner, request);
@@ -149,7 +149,7 @@ describe("offering provider delivery", () => {
     expect((await test.service.execute(provider, { action: "accept", deliveryId: first.id })).id).toBe(first.id);
   });
 
-  it("uses the named agency workspace as the provider boundary without changing the delivery lifecycle", async () => {
+  it("uses the named agency workspace as the agency boundary without changing the delivery lifecycle", async () => {
     const test = harness();
     test.setInstallation(installation({
       kind: "provider_requested", providerKind: "agency", providerName: "Northstar Agency",
@@ -176,7 +176,7 @@ describe("offering provider delivery", () => {
     const test = harness();
     for (const responsibility of [
       { kind: "customer_operated", providerName: "Example business" } as const,
-      { kind: "provider_requested", providerKind: "named_third_party", providerName: "Other provider" } as const,
+      { kind: "provider_requested", providerKind: "named_third_party", providerName: "Other agency" } as const,
     ]) {
       test.setInstallation(installation(responsibility));
       await expect(test.service.execute(owner, request)).rejects.toBeInstanceOf(OfferingConflictError);

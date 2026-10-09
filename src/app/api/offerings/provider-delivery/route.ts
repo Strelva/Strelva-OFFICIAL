@@ -10,8 +10,8 @@ import {
   OfferingStoreError,
   OfferingValidationError,
   PostgresOfferingStore,
-  ProviderDeliveryService,
-  postgresProviderDeliveries,
+  AgencyDeliveryService,
+  postgresAgencyDeliveries,
   type OfferingActor,
 } from "@/platform/offerings";
 import {
@@ -35,7 +35,7 @@ async function actor(): Promise<OfferingActor | null> {
 
 function service() {
   const offerings = new OfferingService(new PostgresOfferingStore());
-  return new ProviderDeliveryService(postgresProviderDeliveries, {
+  return new AgencyDeliveryService(postgresAgencyDeliveries, {
     read: (current, businessId, installationId) => offerings.read(current, businessId, installationId),
     async canManage(current, businessId) { return (await offerings.list(current, businessId)).permissions.canManage; },
   }, {
