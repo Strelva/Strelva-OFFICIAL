@@ -137,7 +137,7 @@ function Session({ initialRequest, workspaceId, workId, productId, readOnly = fa
     <header><p className="text-sm text-gray-muted">{labels[productId]}</p><h1 className="font-display text-3xl">{displayTitle || (productId === "applications" ? "Make a place for your team’s work" : productId === "scheduling" ? "Keep a time available" : "Monitor a public page")}</h1></header>
     {initialRequest && !saved ? <details className="text-sm"><summary className="cursor-pointer">Your original request</summary><p className="mt-3 whitespace-pre-wrap">{initialRequest}</p></details> : null}
     {readOnly ? <p role="status" className="text-sm text-gray-muted">{workspaceStopped ? "Work in this workspace has stopped. Existing records remain available for review." : "You can inspect this work. Changes require workspace membership."}</p> : null}
-    {draftEditOnly ? <p role="status" className="text-sm text-gray-muted">You can revise this exact application draft and run its checks. The customer reviews and publishes it.</p> : null}
+    {draftEditOnly ? <p role="status" className="text-sm text-gray-muted">You can revise this exact application draft and run its checks. The client reviews and publishes it.</p> : null}
     {error ? <div role="alert" className="space-y-2 text-sm text-critical"><p>{error}</p>{workId ? <Button variant="secondary" disabled={busy} onClick={() => setReload(value => value + 1)}>Reload current work</Button> : null}</div> : null}
     {notice ? <p role="status" className="text-sm">{notice}</p> : null}
     {handingOff && saved ? <p role="status" className="text-sm text-gray-muted">Saved. Opening your work before the next change. <a className="underline underline-offset-4" href={`?workspaceId=${encodeURIComponent(workspaceId)}&view=${productId}&work=${encodeURIComponent(saved.id)}`}>Open saved work</a></p> : workId && !saved ? <p role="status">{busy ? "Loading your work…" : "No result is available to display."}</p> : saved ? <>
@@ -326,8 +326,8 @@ function ApplicationReview({ value, command, disabled, canPublish = true }: { va
         {!checksPassed ? <Button variant="secondary" disabled={disabled} onClick={() => void command({ kind: "rehearse", expectedDesignRevision: value.candidate?.designRevision ?? value.designRevision ?? 0 })}>{rehearsal ? "Run checks again" : "Check proposed change"}</Button> : null}
         {canPublish ? <Button disabled={disabled || !checksPassed} onClick={() => void command({ kind: "publish", expectedCandidateRevision: value.candidate?.designRevision ?? value.designRevision ?? 0, expectedReleaseVersion: liveRelease?.version ?? null })}>Publish</Button> : null}
       </div>
-      {!checksPassed ? <p className="text-sm text-gray-muted">{canPublish ? "Publish is available after every check passes." : "The customer can publish after every check passes."}</p> : null}
-      {!canPublish && checksPassed ? <p className="text-sm text-gray-muted">Checks passed. Return this draft to the customer for review and publication.</p> : null}
+      {!checksPassed ? <p className="text-sm text-gray-muted">{canPublish ? "Publish is available after every check passes." : "The client can publish after every check passes."}</p> : null}
+      {!canPublish && checksPassed ? <p className="text-sm text-gray-muted">Checks passed. Return this draft to the client for review and publication.</p> : null}
     </div>
   </details>;
 }
