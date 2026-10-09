@@ -5,6 +5,9 @@ import { AdminRail } from "./AdminRail";
 import { AdminMobileNav } from "./AdminMobileNav";
 import { CommandPalette } from "./CommandPalette";
 
+// Operator identity and durable read admission are evaluated for each request.
+export const dynamic = "force-dynamic";
+
 export default async function AdminLayout({
   children,
 }: {
