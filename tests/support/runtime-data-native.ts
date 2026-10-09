@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { expect, type APIRequestContext, type Browser } from "@playwright/test";
 import { localEnvironment, signedInContext } from "./local-auth";
+import { encryptSecret } from "../../src/platform/infra/crypto/secrets";
 
 export const stores = ["spam_held", "inquiry_timeline", "inquiry_reply", "inquiry_delivery", "booking_config", "account_grouping", "orders", "provider_connections", "provider_metadata", "reward_members", "reward_transactions", "threads", "tenant_settings"] as const;
 export const secretMarker = "fictional-runtime-proof-secret-never-a-provider-credential";
@@ -83,7 +84,11 @@ export function storePayload(store: typeof stores[number], tenantId: string) {
   const at = "2026-10-08T12:00:00Z";
   const common = { id: "native-record", fixture: true, createdAt: at, updatedAt: at };
   switch (store) {
-    case "provider_connections": return { ...common, tenantId, provider: "google", status: "connected", accessToken: secretMarker, connectedAt: at };
+    case "provider_connections": {
+      const accessToken = encryptSecret(secretMarker);
+      if (!accessToken.startsWith("enc:v1:")) throw new Error("The fictional provider fixture requires the disposable local encryption key.");
+      return { ...common, tenantId, provider: "google", status: "connected", accessToken, connectedAt: at };
+    }
     case "provider_metadata": return { value: { accountName: "Fictional Google account", locationId: "fixture-only-location" } };
     case "tenant_settings": return { value: "Fictional goal" };
     case "booking_config": return { value: { timezone: "UTC", enabled: false } };

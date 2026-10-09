@@ -44,6 +44,7 @@ test("owner downloads real schema-3 categories after exit pauses work; linked-te
     for (const category of V3_CATEGORIES) expect(classified).toContain(category);
     for (const category of ["orders", "reward_members", "reward_transactions", "threads", "tenant_settings", "provider_metadata", "inquiry_delivery", "spam_held", "inquiry_timelines", "inquiry_first_replies", "booking_config", "investigation_history"]) expect(document.data[category].length, category).toBeGreaterThan(0);
     const body = JSON.stringify(document); expect(body).not.toContain(outside.id); expect(body).not.toContain(secretMarker);
+    expect(body, "Provider ciphertext must be excluded along with plaintext secrets.").not.toContain("enc:v1:");
     expect(document.workspaceSnapshot.lifecycle.exit).toMatchObject({ status: "completed", futureWork: "paused" });
     const category = await f.admin.rpc("export_workspace_v3_category", { p_workspace_id: f.workspaceId, p_user_id: f.owner.userId, p_verified_email: f.owner.email, p_category: "orders", p_offset: 0, p_limit: 1 });
     expect(category.error).toBeNull(); expect(category.data.items[0].tenantId).toBe(linked.id); expect(category.data.next).toBe(1);

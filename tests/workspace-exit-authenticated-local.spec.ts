@@ -53,20 +53,33 @@ test("owner records a local exit choice through the real Auth route and can stil
     const exportPage = await owner.context.newPage();
     await exportPage.setViewportSize({ width: 390, height: 844 });
     await exportPage.goto(`/workspace/export?workspaceId=${workspaceId}`);
-    await expect(exportPage.getByRole("heading", { name: "Download current workspace data" })).toBeVisible();
+    const schema3 = process.env.STRELVA_EXPORT_SCHEMA_3 === "1";
+    await expect(exportPage.getByRole("heading", { name: schema3 ? "Take your business records with you" : "Download current workspace data", exact: true })).toBeVisible();
     expect(await exportPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    const exportResponsePromise = exportPage.waitForResponse(response => response.url().includes("/api/workspace-export") && response.request().method() === "POST");
-    const downloadPromise = exportPage.waitForEvent("download");
-    await exportPage.getByRole("button", { name: "Download workspace JSON" }).click();
+    const exportResponsePromise = exportPage.waitForResponse(response => new URL(response.url()).pathname === (schema3 ? "/api/workspace-export/v3" : "/api/workspace-export") && response.request().method() === "POST");
+    let downloadPromise = schema3 ? undefined : exportPage.waitForEvent("download");
+    await exportPage.getByRole("button", { name: schema3 ? "Prepare business export" : "Download workspace JSON", exact: true }).click();
     const exportResponse = await exportResponsePromise;
-    expect(exportResponse.status()).toBe(200);
-    expect(exportResponse.headers()["content-disposition"]).toMatch(/^attachment; filename=/);
+    if (schema3) {
+      expect(exportResponse.status()).toBe(202);
+      const prepared = await exportResponse.json();
+      expect(prepared.buildId).toMatch(/^[0-9a-f-]{36}$/);
+      const archive = exportPage.getByRole("link", { name: "Download business archive", exact: true });
+      await expect(archive).toHaveAttribute("href", `/api/workspace-export/v3/owner-download?build=${prepared.buildId}`);
+      downloadPromise = exportPage.waitForEvent("download");
+      await archive.click();
+    } else {
+      expect(exportResponse.status()).toBe(200);
+      expect(exportResponse.headers()["content-disposition"]).toMatch(/^attachment; filename=/);
+    }
+    if (!downloadPromise) throw new Error("Export download was not armed.");
     const download = await downloadPromise;
     const downloadPath = await download.path();
     if (!downloadPath) throw new Error("Export download path unavailable");
-    const snapshot = JSON.parse(await readFile(downloadPath, "utf8")) as { lifecycle?: { exit?: { status?: string } } };
-    expect(snapshot.lifecycle?.exit?.status).toBe("completed");
-    await expect(exportPage.getByText("Workspace JSON prepared. The export action was recorded without storing its contents.", { exact: true })).toBeVisible();
+    const snapshot = JSON.parse(await readFile(downloadPath, "utf8")) as { schemaVersion?: number; lifecycle?: { exit?: { status?: string } }; workspaceSnapshot?: { lifecycle?: { exit?: { status?: string } } } };
+    if (schema3) expect(snapshot.schemaVersion).toBe(3);
+    expect((schema3 ? snapshot.workspaceSnapshot : snapshot)?.lifecycle?.exit?.status).toBe("completed");
+    await expect(exportPage.getByText(schema3 ? "Your business export is ready. Download it below." : "Workspace JSON prepared. The export action was recorded without storing its contents.", { exact: true })).toBeVisible();
     await exportPage.close();
     await expect(page.getByText(/does not change billing or stop an outside provider service/)).toBeVisible();
     await expect(page.getByRole("link", { name: "review it in website billing settings" })).toHaveAttribute("href", "/dashboard/settings#plan");
