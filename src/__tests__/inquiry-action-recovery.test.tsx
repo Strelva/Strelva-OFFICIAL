@@ -9,6 +9,11 @@ const workspaceId = "11111111-1111-4111-8111-111111111111", rowId = "22222222-22
 let root: Root, container: HTMLDivElement;
 const receipt = { status: "accepted", providerMessageId: "fictional-provider", acceptedAt: "2026-10-09T00:00:00Z", retryable: false };
 function button(name: string) { return Array.from(container.querySelectorAll("button")).find(item => item.textContent?.trim() === name)!; }
+function immutableDraft() {
+  for (const field of [container.querySelector("input")!, container.querySelector("textarea")!]) {
+    expect(field.disabled).toBe(false); expect(field.readOnly).toBe(true);
+  }
+}
 async function mount(element: ReturnType<typeof createElement>) {
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
   await act(async () => root.render(element));
@@ -43,7 +48,7 @@ it.each([400, 401, 403, 404, 409, 429, 503])("retains an unknown attempt after a
   await act(async () => button("Approve and send reply").click());
   const original = fetcher.mock.calls[0]?.[1]?.body;
   await act(async () => button("Check this reply").click());
-  expect(container.querySelector("textarea")!.disabled).toBe(true); expect(button("Close draft")).toBeUndefined();
+  immutableDraft(); expect(button("Close draft")).toBeUndefined();
   expect(button("Check this reply")).toBeDefined(); expect(container.querySelector('[role="alert"]')?.textContent).toContain("couldn't be confirmed");
   await write(container.querySelector("textarea")!, "Must not change an attempted message");
   await write(container.querySelector("input")!, "Must not change the subject");
@@ -55,7 +60,7 @@ it.each([400, 401, 403, 404, 409, 429, 503])("retains an unknown attempt after a
 it.each([400, 403, 404, 409])("does not assume an initial generic %s refusal precedes the durable reply claim", async status => {
   const fetcher = vi.fn(async () => Response.json({ error: "Claim readback unavailable." }, { status })); vi.stubGlobal("fetch", fetcher); await reply();
   await act(async () => button("Approve and send reply").click());
-  expect(container.querySelector("textarea")!.disabled).toBe(true); expect(button("Check this reply")).toBeDefined();
+  immutableDraft(); expect(button("Check this reply")).toBeDefined();
   expect(container.querySelector('[role="alert"]')?.textContent).toContain("couldn't be confirmed"); expect(fetcher).toHaveBeenCalledOnce();
 });
 
@@ -70,7 +75,7 @@ it.each([401, 429])("unlocks a first route-proven %s preclaim refusal for correc
 
 it.each([{ status: "accepted" }, { ...receipt, providerMessageId: { bad: true } }, { ...receipt, retryable: true }])("refuses a malformed receipt instead of claiming success: %j", async malformed => {
   vi.stubGlobal("fetch", vi.fn(async () => Response.json({ outcome: malformed }))); await reply(); await act(async () => button("Approve and send reply").click());
-  expect(container.querySelector('[role="status"]')).toBeNull(); expect(button("Check this reply")).toBeDefined(); expect(container.querySelector("textarea")!.disabled).toBe(true);
+  expect(container.querySelector('[role="status"]')).toBeNull(); expect(button("Check this reply")).toBeDefined(); immutableDraft();
 });
 
 it.each([
@@ -122,7 +127,7 @@ it("does not apply a later release-gate 'Nothing sent' claim to the unknown orig
   const fetcher = vi.fn(async () => { if (fetcher.mock.calls.length === 1) throw new Error("Response lost"); return Response.json({ error: "Workspace replies aren't open yet. Nothing sent." }, { status: 503 }); });
   vi.stubGlobal("fetch", fetcher); await reply(); await act(async () => button("Approve and send reply").click()); await act(async () => button("Check this reply").click());
   expect(container.querySelector('[role="alert"]')?.textContent).toContain("couldn't be confirmed");
-  expect(container.querySelector('[role="alert"]')?.textContent).not.toContain("Nothing sent"); expect(container.querySelector("textarea")!.disabled).toBe(true);
+  expect(container.querySelector('[role="alert"]')?.textContent).not.toContain("Nothing sent"); immutableDraft();
 });
 
 it.each(["success", "unknown", "refusal"])("recovers a deferred reply %s only when the customer stayed", async result => {
@@ -153,5 +158,32 @@ it("allows an ordinary member to correct an exact initial preclaim owner-approva
 it("does not unlock an unknown original reply after a later owner-approval refusal", async () => {
   const fetcher = vi.fn(async () => { if (fetcher.mock.calls.length === 1) throw new Error("Response lost"); return Response.json({ error: "Prices, dates and promises need the business owner’s approval." }, { status: 409 }); });
   vi.stubGlobal("fetch", fetcher); await reply(true); await act(async () => button("Send reply").click()); await act(async () => button("Check this reply").click());
-  expect(container.querySelector("textarea")!.disabled).toBe(true); expect(button("Check this reply")).toBeDefined();
+  immutableDraft(); expect(button("Check this reply")).toBeDefined();
+});
+
+it("keeps attempted subject and body keyboard-focusable for inspection while retaining exact immutable payload", async () => {
+  let resolve!: (value: Response) => void;
+  const fetcher = vi.fn((_url: RequestInfo | URL, _init?: RequestInit) => new Promise<Response>(done => { resolve = done; }));
+  vi.stubGlobal("fetch", fetcher); await reply();
+  const subject = container.querySelector("input")!, body = container.querySelector("textarea")!;
+  await write(subject, "Full exact fictional pickup subject");
+  const words = "Inspect the complete fictional inquiry body before checking its receipt. ".repeat(8);
+  await write(body, words); const send = button("Approve and send reply"); send.focus();
+  await act(async () => send.click());
+  expect(subject.disabled).toBe(true); expect(body.disabled).toBe(true);
+  const original = String(fetcher.mock.calls[0]?.[1]?.body);
+  await act(async () => resolve(Response.json({ error: "Receipt unavailable" }, { status: 503 })));
+  expect(subject.readOnly).toBe(true); expect(body.readOnly).toBe(true);
+  expect(subject.disabled).toBe(false); expect(body.disabled).toBe(false);
+  subject.focus(); expect(document.activeElement).toBe(subject); subject.select(); expect(subject.value.slice(subject.selectionStart!, subject.selectionEnd!)).toBe("Full exact fictional pickup subject");
+  body.focus(); expect(document.activeElement).toBe(body); body.select(); expect(body.value.slice(body.selectionStart, body.selectionEnd)).toBe(words);
+  await write(subject, "Must not replace attempted subject"); await write(body, "Must not replace attempted body");
+  await act(async () => button("Check this reply").click());
+  expect(subject.disabled).toBe(true); expect(body.disabled).toBe(true);
+  expect(fetcher.mock.calls[1]?.[1]?.body).toBe(original);
+  await act(async () => resolve(Response.json({ outcome: { ...receipt, status: "unknown" } })));
+  expect(subject.disabled).toBe(false); expect(body.disabled).toBe(false);
+  expect(subject.readOnly).toBe(true); expect(body.readOnly).toBe(true);
+  expect(subject.value).toBe("Full exact fictional pickup subject"); expect(body.value).toBe(words);
+  body.focus(); expect(document.activeElement).toBe(body); expect(fetcher).toHaveBeenCalledTimes(2);
 });

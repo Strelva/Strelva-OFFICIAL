@@ -89,8 +89,8 @@ export function WorkspaceInquiryReply({ workspaceId, rowId, name, email, booking
   return (
     <div ref={sectionRef} className="mt-4 grid min-w-0 gap-4">
       <p className="text-sm break-all">To {email}</p>
-      <TextInput className="min-w-0" ref={subjectRef} label="Subject" value={subject} onChange={(event) => { if (!inFlight.current && !attempt.current) setSubject(event.target.value); }} maxLength={200} disabled={saving || requestId !== null} />
-      <TextArea className="min-w-0" label={`Your reply to ${name}`} value={body} onChange={(event) => { if (!inFlight.current && !attempt.current) setBody(event.target.value); }} maxLength={5000} disabled={saving || requestId !== null} />
+      <TextInput className="min-w-0" ref={subjectRef} label="Subject" value={subject} onChange={(event) => { if (!inFlight.current && !attempt.current) setSubject(event.target.value); }} maxLength={200} disabled={saving} readOnly={requestId !== null} />
+      <TextArea className="min-w-0" label={`Your reply to ${name}`} value={body} onChange={(event) => { if (!inFlight.current && !attempt.current) setBody(event.target.value); }} maxLength={5000} disabled={saving} readOnly={requestId !== null} />
       {bookingOffers ? <InquiryBookingOfferComposer workspaceId={workspaceId} rowId={rowId} disabled={saving || requestId !== null} append={text => { if (inFlight.current || attempt.current) return false; const next = body ? `${body}\n\n${text}` : text; if (next.length > 5000) return false; setBody(next); return true; }} /> : null}
       <p className="text-xs text-gray-muted">{member ? "You can send an ordinary reply for inquiries assigned or routed to you. Prices, dates and promises need the owner’s approval. A sent reply cannot be undone." : "Sending approves this exact message, including any price, date or promise. A sent reply cannot be undone."}</p>
       {outcome ? <p ref={outcomeRef} tabIndex={-1} role="status" className="text-sm">{REPLY_OUTCOME[outcome.status]}</p> : (

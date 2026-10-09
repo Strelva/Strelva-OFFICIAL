@@ -172,7 +172,9 @@ test("uncertain response retains the exact immutable draft and rechecks the same
   await page.getByLabel("Your reply to Priya S.").fill("Can you confirm your pickup time?");
   await page.getByRole("button", { name: "Approve and send reply" }).click();
   await expect(page.getByRole("main").getByRole("alert")).toContainText("Receipt unavailable");
-  await expect(page.getByLabel("Your reply to Priya S.")).toBeDisabled();
+  await expect(page.getByLabel("Your reply to Priya S.")).toBeEnabled();
+  await expect(page.getByLabel("Your reply to Priya S.")).toHaveAttribute("readonly", "");
+  await expect(page.getByLabel("Your reply to Priya S.")).not.toBeEditable();
   await page.getByRole("button", { name: "Check this reply" }).click();
   await expect(page.getByRole("status")).toContainText("send couldn't be confirmed");
   expect(requests).toHaveLength(2);
@@ -249,11 +251,40 @@ for (const [width, enlarged] of [[1440, false], [390, false], [320, true]] as co
         const check = article.getByRole("button", { name: "Check this reply", exact: true });
         await expect(article.getByRole("alert")).toContainText("couldn't be confirmed");
         await expect(check).toBeFocused();
-        await expect(subject).toBeDisabled(); await expect(body).toBeDisabled();
+        await expect(subject).toBeEnabled(); await expect(body).toBeEnabled();
+        await expect(subject).toHaveAttribute("readonly", ""); await expect(body).toHaveAttribute("readonly", "");
+        await expect(subject).not.toBeEditable(); await expect(body).not.toBeEditable();
         await expect(subject).toHaveValue("Fictional pickup inquiry"); await expect(body).toHaveValue(words);
         await expect(article.getByRole("button", { name: "Close draft", exact: true })).toHaveCount(0);
         expect(requests).toHaveLength(1);
         const attempt = JSON.parse(requests[0]!);
+        // An immutable attempted message stays reachable for full keyboard
+        // inspection. Native read-only selection/scroll never changes the body.
+        const readField = async (field: Locator, expected: string) => {
+          await expect(field).toBeFocused();
+          await page.keyboard.press("ControlOrMeta+A");
+          expect(await field.evaluate(element => {
+            const input = element as HTMLInputElement | HTMLTextAreaElement;
+            return input.value.slice(input.selectionStart!, input.selectionEnd!);
+          })).toBe(expected);
+          await page.keyboard.press("ArrowRight");
+          expect(await field.evaluate(element => {
+            const input = element as HTMLInputElement | HTMLTextAreaElement;
+            return [input.selectionStart, input.selectionEnd];
+          })).toEqual([expected.length, expected.length]);
+          await page.keyboard.press("Backspace"); await page.keyboard.type("Must not replace the attempted draft");
+          await expect(field).toHaveValue(expected); await expect(field).not.toBeEditable();
+        };
+        await page.keyboard.press("Shift+Tab"); await expect(body).toBeFocused();
+        await readField(body, words);
+        const bodyScroll = await body.evaluate(element => ({ height: element.scrollHeight, visible: element.clientHeight, top: element.scrollTop }));
+        if (bodyScroll.height > bodyScroll.visible + 1) expect(bodyScroll.top).toBeGreaterThan(0);
+        await page.keyboard.press("Shift+Tab"); await expect(subject).toBeFocused();
+        await readField(subject, attempt.subject);
+        if (enlarged) expect(await subject.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+        await page.keyboard.press("Tab"); await expect(body).toBeFocused();
+        await page.keyboard.press("Tab"); await expect(check).toBeFocused();
+        expect(requests).toHaveLength(1);
         expect(attempt).toMatchObject({ workspaceId: "5e000000-0000-4000-8000-000000000010", rowId: "5e000000-0000-4000-8000-0000000000d4", subject: "Fictional pickup inquiry", body: words });
         expect(attempt.requestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
         expect(attempt).not.toHaveProperty("to");
@@ -271,6 +302,7 @@ for (const [width, enlarged] of [[1440, false], [390, false], [320, true]] as co
         await page.keyboard.press("Enter");
         await expect.poll(() => requests.length).toBe(3);
         await expect(check).toBeDisabled();
+        await expect(subject).toBeDisabled(); await expect(body).toBeDisabled();
         const outside = page.getByRole("button", { name: "Release the message from Ana", exact: true });
         await outside.focus(); await page.keyboard.press("Tab");
         const outsideDestination = page.getByRole("button", { name: "Confirm the message from Ana is spam", exact: true });
