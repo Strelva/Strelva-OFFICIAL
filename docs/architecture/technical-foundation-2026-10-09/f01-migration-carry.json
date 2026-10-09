@@ -1,0 +1,60 @@
+{
+  "canonicalHead": "6ddc03f4d0f854997ff3f54481d5066625bf62fe",
+  "deploymentAuthorized": false,
+  "promotion": "blocked",
+  "reason": "No approved current applied ledger available; preserve original versions and bytes outside active migration inventory. No staging/rename/current-tail claim.",
+  "candidates": [
+    {
+      "sourceHead": "083e992fd3a2bb8b9a3ff339d351d34c6206aa0f",
+      "originalFile": "20261020110000_content_publication_authority.sql",
+      "versionDisposition": "blocked-pending-approved-applied-ledger",
+      "activeMigration": false,
+      "retimestamped": false,
+      "forward": {
+        "path": "docs/architecture/technical-foundation-2026-10-09/f01-candidate-sql/20261020110000_content_publication_authority.sql",
+        "sha256": "7ede6209f1c40f785a5a4934fb6ffedc9643676f5c7795f19fc12925222a4078"
+      },
+      "inverse": {
+        "path": "docs/architecture/technical-foundation-2026-10-09/f01-candidate-sql/rollback-20261020110000_content_publication_authority.sql",
+        "sha256": "29af630cbbbd32a349ea7b0b495641f2dc683f3e57035ca28c6fbd155def40fe"
+      },
+      "originalBatch": "12",
+      "originalManifestEntry": {
+        "file": "20261020110000_content_publication_authority.sql",
+        "sha256": "7ede6209f1c40f785a5a4934fb6ffedc9643676f5c7795f19fc12925222a4078",
+        "rollback": "rollback-20261020110000_content_publication_authority.sql"
+      },
+      "canonicalBatch": "unassigned-pending-ledger-and-current-tail-order-review",
+      "inverseAuthority": "Quarantined original source only; does not authorize rollback or restoring insecure privileges. Current successor/catalog and refusal proof required."
+    },
+    {
+      "sourceHead": "8d5e8eaadc329a82721abbd9de3138d05b34fac3",
+      "originalFile": "20261020143000_provider_health_alerts.sql",
+      "versionDisposition": "blocked-pending-approved-applied-ledger",
+      "activeMigration": false,
+      "retimestamped": false,
+      "forward": {
+        "path": "docs/architecture/technical-foundation-2026-10-09/f01-candidate-sql/20261020143000_provider_health_alerts.sql",
+        "sha256": "412550da8b83094487126a1d0b44a883672bf96504aeee6a00ec30d05a6023f6"
+      },
+      "inverse": {
+        "path": "docs/architecture/technical-foundation-2026-10-09/f01-candidate-sql/rollback-20261020143000_provider_health_alerts.sql",
+        "sha256": "0d1fd0971f14ded3e8353836c76fd1d543def76f11ece1a0cded9eca7c4bf6fd"
+      },
+      "originalBatch": "17",
+      "originalManifestEntry": {
+        "file": "20261020143000_provider_health_alerts.sql",
+        "sha256": "412550da8b83094487126a1d0b44a883672bf96504aeee6a00ec30d05a6023f6",
+        "rollback": "rollback-20261020143000_provider_health_alerts.sql",
+        "rollbackSha256": "0d1fd0971f14ded3e8353836c76fd1d543def76f11ece1a0cded9eca7c4bf6fd"
+      },
+      "canonicalBatch": "unassigned-pending-ledger-and-current-tail-order-review",
+      "inverseAuthority": "Quarantined original source only; does not authorize rollback or restoring insecure privileges. Current successor/catalog and refusal proof required."
+    }
+  ],
+  "historicalEvidence": {
+    "trackedHashInventory": "docs/operations/launch-integration601-deployed-migration-hashes.json",
+    "trackedRenameReceipt": "docs/operations/launch-integration601-migrations.json",
+    "limit": "Historical deployed266 claim and file hashes are not an approved applied-version ledger. No filename-derived ledger, stage or current-tail run."
+  }
+}
