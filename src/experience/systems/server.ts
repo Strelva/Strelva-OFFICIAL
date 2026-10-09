@@ -298,13 +298,20 @@ export function connectedSiteObservation(subjectId: string, site: { siteHost: st
 
 /** Only readback for the currently live version establishes publication health. */
 export function inquiryPublicationObservation(subjectId: string, snapshot: InquiryWorkspaceSnapshot | null): Observation {
-  const capability = snapshot?.state.capabilities.find(capability => capability.live !== null);
-  const current = capability?.live;
-  if (!capability || !current) return inquiryFormUnchecked(subjectId);
-  const receipt = [...(snapshot?.state.changes ?? [])].reverse().find(change => change.capabilityId === capability.id && change.verification?.version === current.version);
-  const verification = receipt?.verification;
-  if (!verification) return inquiryFormUnchecked(subjectId);
-  return { subjectId, signal: "inquiry.publication", outcome: verification.verified ? "pass" : "fail", observedAt: verification.checkedAt, maxAgeSeconds: 7 * 24 * 3600, source: "inquiry-capability", message: verification.verified ? "The current form passed publication readback." : "The current form failed publication readback." };
+  const capabilities = snapshot?.state.capabilities.filter(capability => capability.live !== null) ?? [];
+  if (!capabilities.length) return inquiryFormUnchecked(subjectId);
+  const verifications = capabilities.map(capability => {
+    const receipt = [...(snapshot?.state.changes ?? [])].reverse().find(change => change.capabilityId === capability.id && change.verification?.version === capability.live!.version);
+    return receipt?.verification;
+  });
+  const failed = verifications.filter(verification => verification && !verification.verified);
+  const unchecked = verifications.some(verification => !verification || !Number.isFinite(Date.parse(verification.checkedAt)));
+  const outcome = failed.length ? "fail" : unchecked ? "unknown" : "pass";
+  // The oldest readback bounds a claim about every live form: a fresh form
+  // cannot hide a stale sibling. Unknown evidence never receives a timestamp.
+  const dates = verifications.flatMap(verification => verification && Number.isFinite(Date.parse(verification.checkedAt)) ? [verification.checkedAt] : []);
+  const observedAt = outcome === "unknown" ? null : dates.sort((a, b) => Date.parse(a) - Date.parse(b))[0] ?? null;
+  return { subjectId, signal: "inquiry.publication", outcome, observedAt, maxAgeSeconds: 7 * 24 * 3600, source: "inquiry-capability", message: outcome === "fail" ? "At least one current form failed publication readback." : outcome === "unknown" ? "At least one current form has not passed a dated publication readback." : "Every current form passed publication readback." };
 }
 
 /** Follow-ups running says nothing about whether the form on the site works. */
