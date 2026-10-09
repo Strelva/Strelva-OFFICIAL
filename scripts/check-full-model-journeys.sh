@@ -52,7 +52,7 @@ stop_redis() {
   fi
 }
 cleanup() {
-  local status=$?
+  local status=$? original_status=$? stop_status=null stack_state=not-created
   trap - EXIT INT TERM
   stop_app; stop_redis
   # prepare-launch-auth-stack writes its owned path before starting services.
@@ -63,15 +63,32 @@ cleanup() {
     if [[ "$attempted" == "$work"/strelva-auth.* && -f "$attempted/supabase/config.toml" ]]; then owned_stack="$attempted"; fi
   fi
   if [[ -n "$owned_stack" && "$keep" == 0 ]]; then
-    env -i "${base_env[@]}" "${cli[@]}" stop --workdir "$owned_stack" --no-backup >/dev/null 2>&1 || true
+    if env -i "${base_env[@]}" "${cli[@]}" stop --workdir "$owned_stack" --no-backup > "$work/stack-stop.log" 2>&1; then
+      stop_status=0
+      stack_state=stop-succeeded
+    else
+      stop_status=$?
+      stack_state=stop-failed
+      [[ "$status" != 0 ]] || status="$stop_status"
+    fi
+  elif [[ -n "$owned_stack" && "$keep" == 1 ]]; then
+    stack_state=retained
+  elif [[ -n "$reuse" ]]; then
+    stack_state=reused
   fi
+  # Keep raw proof/interrupt status distinct from the actual owned stop result.
+  # CLI success alone never qualifies resource absence; reused stacks are untouched.
+  printf '{"originalExitStatus":%s,"finalExitStatus":%s,"stackState":"%s","stackStopExitStatus":%s,"teardownQualified":false}\n' \
+    "$original_status" "$status" "$stack_state" "$stop_status" > "$work/teardown-status.json" || { [[ "$status" != 0 ]] || status=1; }
   echo "Retained manifests, source and results: $work"
   if [[ "$keep" == 1 || -n "$reuse" ]]; then
     echo "Reuse: bash scripts/check-full-model-journeys.sh --profile $profile --bundler $bundler --reuse $work"
   fi
   exit "$status"
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 if [[ -n "$reuse" ]]; then
   reuse="$(cd "$reuse" && pwd)"
   [[ -f "$reuse/env" ]] || { echo 'Reuse needs the directory containing the owned env file.' >&2; exit 1; }
