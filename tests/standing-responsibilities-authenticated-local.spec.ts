@@ -189,7 +189,8 @@ test("an owner can discover, create, and reopen ongoing work in the workspace", 
       action: "create", productId: "investigations", workspaceId,
       input: { title: "Saved supplier check", intervalMinutes: 15, sources: [{ workId: left.workId }, { workId: right.workId }] },
     }, 201);
-    expect(investigation.id || investigation.workId || investigation.work?.id).toBeTruthy();
+    const investigationId = investigation.id || investigation.workId || investigation.work?.id;
+    expect(investigationId).toBeTruthy();
     const page = await owner.context.newPage();
     await page.goto(`/workspace?workspaceId=${workspaceId}&view=operations`);
     await expect(page.getByRole("heading", { name: "Saved checks that can run again", exact: true })).toBeVisible();
@@ -197,8 +198,32 @@ test("an owner can discover, create, and reopen ongoing work in the workspace", 
     await page.getByLabel("Name", { exact: true }).fill("UI supplier check");
     await page.getByLabel("Result", { exact: true }).fill("Compare the supplier records whenever a check is needed.");
     await page.getByLabel("Saved check", { exact: true }).selectOption({ label: "Saved supplier check" });
-    await page.getByRole("button", { name: "Start running it", exact: true }).click();
-    await expect(page).toHaveURL(/standingId=/);
+    // Wait for this form's real native creation receipt before checking its
+    // destination. A cold dev refresh can outlast the URL assertion's 5s bound.
+    const [createdResponse] = await Promise.all([
+      page.waitForResponse(response => {
+        const request = response.request();
+        if (new URL(response.url()).pathname !== "/api/operations" || request.method() !== "POST") return false;
+        const body = request.postDataJSON();
+        return body?.action === "standing_create" && body.workspaceId === workspaceId
+          && body.input?.scope?.steps?.[0]?.workId === investigationId;
+      }, { timeout: 15_000 }),
+      page.getByRole("button", { name: "Start running it", exact: true }).click(),
+    ]);
+    expect(createdResponse.status(), await createdResponse.text()).toBe(201);
+    const created = await createdResponse.json();
+    expect(created.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    expect(created).toMatchObject({
+      workspaceId,
+      policy: {
+        title: "UI supplier check", status: "proposed",
+        scope: { steps: [{ operation: "investigation.run", workId: investigationId }] },
+      },
+    });
+    await expect(page).toHaveURL(url => url.pathname === "/workspace"
+      && url.searchParams.get("workspaceId") === workspaceId
+      && url.searchParams.get("view") === "operations"
+      && url.searchParams.get("standingId") === created.id);
     await expect(page.getByRole("heading", { name: "UI supplier check", level: 1, exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Runs", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Decisions", exact: true })).toBeVisible();

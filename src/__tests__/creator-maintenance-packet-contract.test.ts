@@ -27,7 +27,7 @@ describe("creator maintenance SQL packet source contracts (not native execution)
   const fixture=realpathSync(mkdtempSync(join(tmpdir(),"strelva-creator-retention-contract."))),cluster=join(fixture,"cluster"),evidence=join(fixture,"evidence");mkdirSync(cluster,{mode:0o700});mkdirSync(evidence,{mode:0o700});writeFileSync(join(cluster,"fictional-failure.log"),"fictional native diagnostic\n");
   try {
    const shell='set -euo pipefail\nsource "$3/scripts/temp-postgres.sh"\ncluster_root="$1";cluster_data="$cluster_root/data";evidence_dir="$2";repo_root="$3"\n'+script.slice(start,end)+'trap preserve_and_cleanup EXIT\nexit "$4"\n';
-   const result=spawnSync("bash",["-c",shell,"retention-contract",cluster,evidence,process.cwd(),String(raw)],{env:{PATH:process.env.PATH,LC_ALL:"C"},encoding:"utf8"});expect(result.status).toBe(raw);expect(result.stderr).toBe("");
+   const result=spawnSync("bash",["-c",shell,"retention-contract",cluster,evidence,process.cwd(),String(raw)],{env:{PATH:process.env.PATH,LC_ALL:"C",NODE_ENV:"test"},encoding:"utf8"});expect(result.status).toBe(raw);expect(result.stderr).toBe("");
    const receipt=JSON.parse(readFileSync(join(evidence,"receipt.json"),"utf8"));expect(receipt.rawExitCode).toBe(raw);expect(receipt.fullReleaseQualified).toBe(false);expect(receipt.providerEffects).toBe(false);expect(readFileSync(join(evidence,"fictional-failure.log"),"utf8")).toBe("fictional native diagnostic\n");expect(receipt.artifacts["fictional-failure.log"]).toBe(sha256("fictional native diagnostic\n"));for(const [name,hash] of Object.entries(receipt.source))expect(hash).toBe(sha256(readFileSync(name)));expect(receipt.source["scripts/sql/local-supabase-shim.sql"]).toBe(sha256(readFileSync("scripts/sql/local-supabase-shim.sql")));expect(readFileSync(join(evidence,"receipt.sha256"),"utf8")).toBe(sha256(readFileSync(join(evidence,"receipt.json")))+"  receipt.json\n");expect(statSync(evidence).mode&0o777).toBe(0o700);for(const name of ["fictional-failure.log","receipt.json","receipt.sha256"])expect(statSync(join(evidence,name)).mode&0o777).toBe(0o600);expect(existsSync(cluster)).toBe(false);
   }finally{rmSync(fixture,{recursive:true,force:true});}
  });
@@ -36,7 +36,7 @@ describe("creator maintenance SQL packet source contracts (not native execution)
   const fixture=realpathSync(mkdtempSync(join(tmpdir(),"strelva-creator-directory-contract."))),parent=join(fixture,"parent");mkdirSync(parent,{mode:0o700});let evidence=join(parent,"evidence");
   try {
    if(kind==="shared parent")chmodSync(parent,0o755);if(kind==="ancestor symlink"){const link=join(fixture,"link");symlinkSync(parent,link,"dir");evidence=join(link,"evidence");}if(kind==="existing run")mkdirSync(evidence,{mode:0o700});if(kind==="noncanonical path")evidence=parent+"/../parent/evidence";
-   const result=spawnSync("bash",["-c",script.slice(start,end)+'validate_fresh_evidence_directory "$1"',"directory-contract",evidence],{env:{PATH:process.env.PATH,LC_ALL:"C"},encoding:"utf8"});expect(result.status).toBe(kind==="private canonical"?0:1);
+   const result=spawnSync("bash",["-c",script.slice(start,end)+'validate_fresh_evidence_directory "$1"',"directory-contract",evidence],{env:{PATH:process.env.PATH,LC_ALL:"C",NODE_ENV:"test"},encoding:"utf8"});expect(result.status).toBe(kind==="private canonical"?0:1);
   }finally{rmSync(fixture,{recursive:true,force:true});}
  });
 });

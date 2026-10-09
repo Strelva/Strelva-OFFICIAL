@@ -3,6 +3,7 @@ import { expect, test, type APIRequestContext, type Page, type Response } from "
 import { localEnvironment, signedInContext } from "./support/local-auth";
 import { ordinaryAgencyMaker, ordinaryCustomerBusiness } from "./support/ordinary-agency-maker";
 import { websiteRebuildSchema, type WebsiteRebuild } from "../src/products/websites/client";
+import { unresolvedSiteFacts } from "../src/products/websites/site-document";
 import type { WorkspaceSnapshot } from "../src/experience/workspace/contracts";
 
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local Supabase and real local Auth.");
@@ -39,15 +40,15 @@ const contacts = [
   { text:"orders@example.test", href:"mailto:orders@example.test", label:"Email us" },
   { text:"716-555-0100", href:"tel:7165550100", label:"Call us" },
 ];
-function suppliedContactFacts(rebuild: WebsiteRebuild) {
+function suppliedContactFacts(rebuild: WebsiteRebuild, reviewed = false) {
   const document = rebuild.candidate!.document;
   const claim = Object.entries(document.facts).find(([,fact]) => fact.kind === "claim" && fact.text === contactParagraph);
-  expect(claim).toBeDefined(); expect(claim![1]).toMatchObject({ origin:"owner_stated",sources:[] });
+  expect(claim).toBeDefined(); expect(claim![1]).toMatchObject({ origin:reviewed ? "owner_confirmed" : "owner_stated",sources:[] });
   return contacts.map(contact => {
     const entry = Object.entries(document.facts).find(([,fact]) => fact.kind === "contact" && fact.text === contact.text);
     expect(entry, `The native document must retain the explicitly supplied ${contact.text}.`).toBeDefined();
     const [id,fact] = entry!;
-    expect(fact).toMatchObject({ origin:"owner_stated",sources:[],verification:{ supported:true } });
+    expect(fact).toMatchObject({ origin:reviewed && contact.text === "716-555-0100" ? "owner_confirmed" : "owner_stated",sources:[],verification:{ supported:true } });
     const cta = Object.values(document.nodes).find(node => node.type === "Cta" && node.factIds.includes(id));
     expect(cta?.props).toMatchObject({ cta:{ label:contact.label,href:contact.href } });
     expect(Object.values(document.nodes).some(node => node.factIds.includes(claim![0]) && node.factIds.includes(id))).toBe(true);
@@ -57,6 +58,51 @@ function suppliedContactFacts(rebuild: WebsiteRebuild) {
 function exactContactHtml(html: string) {
   for (const contact of contacts) expect(html).toContain(`href="${contact.href}"`);
   expect(html).not.toContain('href="tel:716-555-0100"');
+}
+
+
+async function confirmSuppliedContactDecisions(page: Page, request: APIRequestContext, workspaceId: string, workId: string, generated: WebsiteRebuild, observed: Response[], app: string) {
+  const ids = unresolvedSiteFacts(generated.candidate!.document);
+  expect(ids.map(id => generated.candidate!.document.facts[id]!.text).sort()).toEqual([contactParagraph, "716-555-0100"].sort());
+  await expect(page.getByRole("button", { name: "Approve this preview", exact: true })).toBeDisabled();
+  // The native policy must refuse the exact unconfirmed candidate too. The
+  // owner then performs each displayed decision through the real review UI.
+  const refused = await request.post(`/api/websites/${workId}/approve`, {
+    headers: { origin: app },
+    data: { expectedRevision: generated.revision, candidateRevision: generated.candidate!.revision, candidateContentHash: generated.candidate!.contentHash },
+  });
+  expect(refused.status(), await refused.text()).toBe(409);
+  let current = generated;
+  for (const id of ids) {
+    const previous = current;
+    const fact = previous.candidate!.document.facts[id]!;
+    const path = `/api/websites/${workId}/facts/${encodeURIComponent(id)}`;
+    const confirming = mutation(page, path);
+    const decision = page.getByRole("complementary").getByRole("article").filter({ has: page.getByText(fact.text, { exact: true }) });
+    await decision.getByRole("button", { name: "Confirm", exact: true }).click();
+    const confirmed = await confirming;
+    expect(confirmed.request().postDataJSON()).toEqual({ expectedRevision: previous.revision, candidateRevision: previous.candidate!.revision, candidateContentHash: previous.candidate!.contentHash, action: "confirm" });
+    expect(confirmed.status(), await confirmed.text()).toBe(200);
+    current = websiteRebuildSchema.parse((await confirmed.json()).rebuild);
+    expect(current.status).toBe("review_ready");
+    expect(current.revision).toBe(previous.revision + 1);
+    expect(current.candidate!.revision).toBe(previous.candidate!.revision + 1);
+    expect(current.candidate!.contentHash).not.toBe(previous.candidate!.contentHash);
+    expect(current.approvedCandidateRevision).toBeNull();
+    expect(current.candidate!.document.facts[id]).toEqual({ ...fact, origin: "owner_confirmed", verification: { supported: true, confidence: 1 } });
+    for (const [otherId, other] of Object.entries(previous.candidate!.document.facts)) {
+      if (otherId !== id) expect(current.candidate!.document.facts[otherId]).toEqual(other);
+    }
+    expect(current.history.at(-1)).toMatchObject({ kind: "fact_confirm" });
+    expect((await readRebuild(request, workspaceId, workId)).candidate).toEqual(current.candidate);
+    const rendered = await exactPreview(page, observed, current.candidate!.previewHref, current.candidate!.contentHash, app);
+    exactContactHtml(await rendered.text());
+    await expect(page.frameLocator('iframe[title="Private website preview for Juniper Bread"]').locator('meta[name="strelva-site-hash"]')).toHaveAttribute("content", current.candidate!.contentHash);
+  }
+  expect(unresolvedSiteFacts(current.candidate!.document)).toEqual([]);
+  expect(Object.values(current.candidate!.document.nodes).some(node => node.verification?.needsReview)).toBe(false);
+  await expect(page.getByRole("button", { name: "Approve this preview", exact: true })).toBeEnabled();
+  return current;
 }
 
 for (const width of [1440, 390]) {
@@ -113,11 +159,11 @@ for (const width of [1440, 390]) {
       // a failed or stalled real pipeline must fail before preview assertions.
       await expect.poll(async () => (await readRebuild(owner.context.request, workspaceId, workId)).status,
         { timeout: 30_000, intervals: [500, 1000, 2500], message: "The native website build must reach review_ready; no fixture candidate is substituted." }).toBe("review_ready");
-      const first = await readRebuild(owner.context.request, workspaceId, workId);
+      let first = await readRebuild(owner.context.request, workspaceId, workId);
       expect(first.status).toBe("review_ready");
       expect(first.candidate).not.toBeNull();
       expect(first.stages.filter(stage => stage.status === "completed").map(stage => stage.stage)).toEqual(expect.arrayContaining(["crawl", "extract", "write", "compose", "verify"]));
-      const initialContacts = suppliedContactFacts(first);
+      suppliedContactFacts(first);
       const initialPreview = await exactPreview(page, previewResponses, first.candidate!.previewHref, first.candidate!.contentHash, env.app);
       exactContactHtml(await initialPreview.text());
       const preview = page.frameLocator('iframe[title="Private website preview for Juniper Bread"]');
@@ -133,6 +179,8 @@ for (const width of [1440, 390]) {
       expect(connectionOptions.status(), await connectionOptions.text()).toBe(200);
       await expect(page.getByText("No published forms are available from websites connected to this business.", { exact: true })).toBeVisible();
 
+      first = await confirmSuppliedContactDecisions(page, owner.context.request, workspaceId, workId, first, previewResponses, env.app);
+      const initialContacts = suppliedContactFacts(first, true);
       const approving = mutation(page, `/api/websites/${workId}/approve`);
       await page.getByRole("button", { name: "Approve this preview", exact: true }).click();
       const approvedResponse = await approving;
@@ -177,7 +225,7 @@ for (const width of [1440, 390]) {
       expect(revised.approvedCandidateRevision).toBeNull();
       expect(revised.candidate!.contentHash).not.toBe(first.candidate!.contentHash);
       expect(revised.input).toEqual(first.input);
-      expect(suppliedContactFacts(revised)).toEqual(initialContacts);
+      expect(suppliedContactFacts(revised, true)).toEqual(initialContacts);
       const oldLive = await servedSite(publication.launch.receipt!.providerUrl);
       expect(oldLive.status()).toBe(200);
       expect(await oldLive.text()).toContain(`content="${first.candidate!.contentHash}"`);
@@ -224,7 +272,7 @@ for (const width of [1440, 390]) {
       expect(await freshLive.text()).toContain(`content="${revised.candidate!.contentHash}"`);
       expect(await freshLive.text()).toContain(correction);
       exactContactHtml(await freshLive.text());
-      expect(suppliedContactFacts(final)).toEqual(initialContacts);
+      expect(suppliedContactFacts(final, true)).toEqual(initialContacts);
 
       const archiveHref = await page.getByRole("link", { name: "Export website and evidence", exact: true }).getAttribute("href");
       expect(archiveHref).toContain(`contentHash=${revised.candidate!.contentHash}`);
