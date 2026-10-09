@@ -61,11 +61,12 @@ function ConnectSiteExperienceContent({ workspaceId, canManage, initialSites, ap
   const scope = useRef<HTMLDivElement>(null);
   const reloadAction = useRef<HTMLButtonElement>(null);
   const alert = useRef<HTMLParagraphElement>(null);
+  const resultHeading = useRef<HTMLHeadingElement>(null);
   const recovery = useRef<FocusRecovery | null>(null);
   useEffect(() => () => recovery.current?.cancel(), []);
   useEffect(() => {
     if (!busy && recovery.current) {
-      recovery.current.recover(unconfirmed ? reloadAction.current : alert.current, unconfirmed);
+      recovery.current.recover(unconfirmed ? reloadAction.current : error ? alert.current : resultHeading.current, unconfirmed);
       recovery.current = null;
     }
   }, [busy, unconfirmed, error]);
@@ -128,12 +129,12 @@ function ConnectSiteExperienceContent({ workspaceId, canManage, initialSites, ap
       <Button type="submit" loading={busy} disabled={unconfirmed} className="justify-self-start">Get my two lines</Button>
     </form> : <p className="text-sm text-gray-muted">An owner or admin of this business connects its website.</p>
     : site.verifiedAt ? <section className="grid gap-3" aria-labelledby="connected-done">
-      <h2 id="connected-done" className="text-base font-medium">{site.siteHost} is connected</h2>
+      <h2 ref={resultHeading} tabIndex={-1} id="connected-done" className="text-base font-medium">{site.siteHost} is connected</h2>
       <p className="text-sm text-gray-muted">It&rsquo;s proven to be yours. Inquiries from it now arrive in Strelva, and visits show on its page.</p>
       <a className="justify-self-start text-sm underline" href={systemPage(site.systemId)}>Open your website</a>
     </section>
     : <section className="grid gap-3" aria-labelledby="connected-install">
-      <h2 id="connected-install" className="text-base font-medium">Add these two lines to {site.siteHost}</h2>
+      <h2 ref={resultHeading} tabIndex={-1} id="connected-install" className="text-base font-medium">Add these two lines to {site.siteHost}</h2>
       <p className="text-sm text-gray-muted">Paste them into your site&rsquo;s header code (most builders call it &ldquo;custom code&rdquo;), on every page. Someone else runs your site? Send them these lines; they&rsquo;re safe to share.</p>
       <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-gray-bg p-3 text-xs" aria-label="Lines to add to your site">{[site.snippet.meta, site.snippet.script].filter(Boolean).join("\n")}</pre>
       <p className="text-sm text-gray-muted">Publish the site, then check. Strelva reads the live page to confirm it&rsquo;s yours. Nothing is collected until then.</p>

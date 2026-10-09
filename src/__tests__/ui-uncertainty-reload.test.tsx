@@ -2,7 +2,7 @@
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { ConnectSiteExperience } from "@/experience/connected-sites/ConnectSiteExperience";
+import { ConnectSiteExperience, type ConnectableSite } from "@/experience/connected-sites/ConnectSiteExperience";
 import { ServerVisibility } from "@/experience/connected-sites/ServerVisibility";
 import { WebsiteChangeRequests } from "@/experience/websites/WebsiteChangeRequests";
 import { WorkspaceRequestContext } from "@/experience/workspace/WorkspaceRequest";
@@ -94,7 +94,7 @@ it("admits one page mutation during same-batch submits", async () => {
   await act(async () => finish(new Response(JSON.stringify({ page: { handle: "bread", published: true, url: "https://app.example.test/b/bread" } }))));
 });
 
-const connection = { id: REQUEST, systemId: SYSTEM, siteHost: "bakery.example", siteUrl: "https://bakery.example/", status: "active", verifiedAt: null, snippet: { script: "<script></script>", meta: null } };
+const connection: ConnectableSite = { id: REQUEST, systemId: SYSTEM, siteHost: "bakery.example", siteUrl: "https://bakery.example/", status: "active", verifiedAt: null, snippet: { script: "<script></script>", meta: null } };
 it("rejects a valid connection acknowledgement for another submitted address", async () => {
   const request = vi.fn(async () => new Response(JSON.stringify({ site: connection }), { status: 201 }));
   const node = await mount(createElement(ConnectSiteExperience, { workspaceId: BUSINESS, canManage: true, initialSites: [] }), request as unknown as typeof fetch);
@@ -155,4 +155,29 @@ it("does not attach an old page flight or its recovery focus to a newly selected
   expect(node.querySelector("input")?.value).toBe("other"); expect(current.disabled).toBe(false);
   expect(button(node, "Reload page")).toBeUndefined(); expect(document.activeElement).toBe(current);
   expect(request).toHaveBeenCalledTimes(1);
+});
+it.each([false, true])("recovers a completed connection to its instructions without overriding outside focus (outside: %s)", async outside => {
+  let finish!: (response: Response) => void;
+  const pending = new Promise<Response>(resolve => { finish = resolve; });
+  const request = vi.fn(async () => pending);
+  const node = await mount(createElement(ConnectSiteExperience, { workspaceId: BUSINESS, canManage: true, initialSites: [] }), request as unknown as typeof fetch);
+  await fill(node, "bakery.example");
+  const trigger = button(node, "Get my two lines")!; trigger.focus();
+  await act(async () => trigger.click());
+  const elsewhere = document.createElement("button"); document.body.appendChild(elsewhere); if (outside) elsewhere.focus();
+  await act(async () => finish(new Response(JSON.stringify({ site: connection }), { status: 201 })));
+  expect(node.querySelector("h2")?.textContent).toBe("Add these two lines to bakery.example");
+  expect(document.activeElement).toBe(outside ? elsewhere : node.querySelector("h2"));
+});
+it.each([false, true])("recovers a completed verification to its connected result without overriding outside focus (outside: %s)", async outside => {
+  let finish!: (response: Response) => void;
+  const pending = new Promise<Response>(resolve => { finish = resolve; });
+  const request = vi.fn(async () => pending);
+  const node = await mount(createElement(ConnectSiteExperience, { workspaceId: BUSINESS, canManage: true, initialSites: [connection] }), request as unknown as typeof fetch);
+  const trigger = button(node, "Check my site")!; trigger.focus();
+  await act(async () => trigger.click());
+  const elsewhere = document.createElement("button"); document.body.appendChild(elsewhere); if (outside) elsewhere.focus();
+  await act(async () => finish(new Response(JSON.stringify({ site: { ...connection, verifiedAt: "2026-10-09T00:00:00Z" } }))));
+  expect(node.querySelector("h2")?.textContent).toBe("bakery.example is connected");
+  expect(document.activeElement).toBe(outside ? elsewhere : node.querySelector("h2"));
 });

@@ -1286,3 +1286,7 @@ when the person has not moved focus elsewhere. A connection acknowledgement must
 match the submitted canonical URL and host; publication must match the submitted
 handle and publish decision. Generic post-write400 responses cannot unlock a new
 publication; independent read-only block checks keep the uncertainty visible.
+
+Successful connection/verification recovers a removed initiating control to the
+mounted instruction/connected heading, with the same outside-focus safeguard.
+The heading is programmatically focusable and does not add a Tab stop.
