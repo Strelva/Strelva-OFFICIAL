@@ -1,0 +1,20 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+const mocks=vi.hoisted(()=>({session:vi.fn(),release:vi.fn(),read:vi.fn(),record:vi.fn(),limited:vi.fn()}));
+vi.mock("@/platform/infra/db/server-client",()=>({getSessionUser:mocks.session}));
+vi.mock("@/platform/workspace-release",()=>({workspaceReleaseEnabled:mocks.release}));
+vi.mock("@/platform/infra/rate-limit",()=>({isRateLimitedWindowedAsync:mocks.limited}));
+vi.mock("@/platform/connect/creator-maintenance",async original=>({...await original<typeof import("@/platform/connect/creator-maintenance")>(),readCreatorMaintenance:mocks.read,recordCreatorMaintenance:mocks.record}));
+import { GET,POST } from "@/app/api/workspace/creator-maintenance/route";
+import { WorkspaceAccessError,WorkspaceConflictError } from "@/platform/workspaces/types";
+const workspaceId="11111111-1111-4111-8111-111111111111",userId="44444444-4444-4444-8444-444444444444";
+const input={workspaceId,listingId:"22222222-2222-4222-8222-222222222222",sourceRevisionId:"33333333-3333-4333-8333-333333333333",state:"takeover",effectiveFrom:"2099-01-01T10:00:00Z"};
+const url="https://strelva.test/api/workspace/creator-maintenance";
+const post=(body:unknown=input,headers:Record<string,string>={})=>new Request(url,{method:"POST",headers:{origin:"https://strelva.test","content-type":"application/json",...headers},body:JSON.stringify(body)});
+describe("creator maintenance private HTTP",()=>{
+ beforeEach(()=>{vi.clearAllMocks();vi.stubEnv("STRELVA_REVENUE_SPLITS","1");mocks.release.mockReturnValue(true);mocks.session.mockResolvedValue({id:userId,email:"Creator@Example.test",email_confirmed_at:"2026-10-09"});mocks.limited.mockResolvedValue(false);mocks.record.mockResolvedValue({id:"fictional-receipt"});mocks.read.mockResolvedValue({workspaceId,listings:[],agreements:[]});});
+ it("requires both release flags before authentication or calls",async()=>{vi.stubEnv("STRELVA_REVENUE_SPLITS","0");expect((await POST(post())).status).toBe(503);expect((await GET(new Request(`${url}?workspaceId=${workspaceId}`))).status).toBe(503);expect(mocks.session).not.toHaveBeenCalled();vi.stubEnv("STRELVA_REVENUE_SPLITS","1");mocks.release.mockReturnValue(false);expect((await POST(post())).status).toBe(503);});
+ it("binds reads and writes to actual verified session, refusing forged actor/rates",async()=>{expect((await POST(post())).status).toBe(200);expect(mocks.record).toHaveBeenCalledWith({userId,verifiedEmail:"creator@example.test"},input);expect((await POST(post({...input,userId}))).status).toBe(400);expect((await POST(post({...input,rateBps:999}))).status).toBe(400);mocks.session.mockResolvedValue({id:userId,email:"creator@example.test"});expect((await POST(post())).status).toBe(401);});
+ it("blocks cross-origin/type/oversize/missing date before mutation",async()=>{expect((await POST(post(input,{origin:"https://foreign.test"}))).status).toBe(403);expect((await POST(post(input,{"content-type":"text/plain"}))).status).toBe(415);expect((await POST(post({...input,extra:"x".repeat(9000)}))).status).toBe(413);expect((await POST(post({...input,effectiveFrom:"2099-01-01T10:00:00"}))).status).toBe(400);expect(mocks.record).not.toHaveBeenCalled();});
+ it("returns private no-store and passes exact workspace selector",async()=>{const response=await GET(new Request(`${url}?workspaceId=${workspaceId}`));expect(response.status).toBe(200);expect(response.headers.get("cache-control")).toBe("private, no-store");expect(mocks.read).toHaveBeenCalledWith({userId,verifiedEmail:"creator@example.test"},workspaceId);expect((await GET(new Request(url))).status).toBe(400);});
+ it("retains current authority, conflict and throttle refusals",async()=>{mocks.record.mockRejectedValueOnce(new WorkspaceAccessError());expect((await POST(post())).status).toBe(403);mocks.record.mockRejectedValueOnce(new WorkspaceConflictError("Reload."));expect((await POST(post())).status).toBe(409);mocks.limited.mockResolvedValueOnce(true);expect((await POST(post())).status).toBe(429);});
+});
