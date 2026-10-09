@@ -4,6 +4,7 @@ import { ArrowRight, Check, ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import type { OfferingCollection, OfferingCommand, OfferingConfigurationField, OfferingDefinitionView, OfferingInstallation, AgencyDelivery, AgencyDeliveryCommand, OfferingResponsibility } from "@/platform/offerings";
 import { Button } from "@/components/ui/Button";
+import { agencyDeliveryReason } from "@/platform/presentation/agency-delivery";
 import { workspaceWorkLabel } from "./work-label";
 import type { WorkspaceWork } from "./contracts";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
@@ -254,7 +255,7 @@ function AgencyDeliveryPanel({ collection, installation, work }: {
       const value: unknown = await response.json().catch(() => null);
       if (!response.ok) throw new Error(errorMessage(value, "The selected work has no available agency assignment."));
       const assignmentId = (value as { id?: unknown } | null)?.id;
-      if (typeof assignmentId !== "string") throw new Error("Offer this approved work to a Strelva assignee before requesting delivery.");
+      if (typeof assignmentId !== "string") throw new Error("Offer this approved work to a Strelva Agency assignee before requesting delivery.");
       const idempotencyKey = requestKey.current ?? crypto.randomUUID();
       requestKey.current = idempotencyKey;
       const saved = await command({ action: "request", businessId: collection.businessId, installationId: installation.id, assignmentId, idempotencyKey });
@@ -273,13 +274,14 @@ function AgencyDeliveryPanel({ collection, installation, work }: {
   return <section className={styles.section} aria-labelledby={`provider-delivery-${installation.id}`}>
     <h3 id={`provider-delivery-${installation.id}`}>Agency delivery</h3>
     {!current ? <>
-      <p>No agency has accepted this request. First approve exact zero-cost work and offer it to a verified Strelva assignee in Ongoing.</p>
+      <p>No agency has accepted this request. First approve exact zero-cost work and offer it to a verified Strelva Agency assignee in Running.</p>
       {collection.permissions.canManage ? <form onSubmit={requestDelivery} className={styles.retireForm}>
         <label><span>Approved assigned work</span><select required value={selectedWorkId} onChange={(event) => setSelectedWorkId(event.target.value)}><option value="">Choose work</option>{responsibilities.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
         <button className={styles.primary} type="submit" disabled={saving || !selectedWorkId}>{saving ? "Requesting…" : "Request Strelva Agency delivery"}</button>
       </form> : <p className={styles.note}>A business owner manages agency requests.</p>}
     </> : <>
-      <p>{current.status === "requested" ? "Requested. Strelva Agency has not accepted this work." : current.status === "accepted" ? "Accepted by the exact assigned Strelva operator." : "Revoked. No new assigned action is permitted."}</p>
+      <p>{current.status === "requested" ? "Requested. Strelva Agency has not accepted this work." : current.status === "accepted" ? "Accepted by the assigned Strelva Agency staff member." : "Revoked. No new assigned action is permitted."}</p>
+      {current.status === "revoked" && current.revocationReason ? <p>{agencyDeliveryReason(current.revocationReason)}</p> : null}
       <p className={styles.note}>Your review: {current.customerDecision === "pending" ? "Pending" : current.customerDecision === "confirmed" ? "Confirmed" : "Changes requested"}</p>
       <a href={`/workspace?workspaceId=${encodeURIComponent(current.businessId)}&view=operations&assignmentId=${encodeURIComponent(current.assignmentId)}`}>Open assigned work</a>
       {current.canAccept ? <button className={styles.primary} type="button" disabled={saving} onClick={() => void command({ action: "accept", deliveryId: current.id })}>{saving ? "Accepting…" : "Accept assigned delivery"}</button> : null}

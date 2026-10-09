@@ -147,7 +147,7 @@ export interface SystemView {
   offers?: ReadonlyArray<{ kind: "connect_google"; label: string }>;
   /** Make real in progress or partly live that changes this System. */
   activations?: SystemActivation[];
-  /** The last changes, newest first: revisions and Strelva handled receipts. */
+  /** The last changes, newest first: revisions and What changed receipts. */
   history?: SystemHistoryRow[];
 }
 

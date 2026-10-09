@@ -250,7 +250,7 @@ export function activationViews(rows: ReadonlyArray<{ possibility: Possibility; 
 }
 
 /**
- * Strelva handled receipts from Make real: one per accepted live effect and
+ * What changed receipts from Make real: one per accepted live effect and
  * one summary per activation. An isolated receipt is never shown as a real
  * change. Plus Strelva's idle withdraws of Possibilities.
  */
@@ -282,8 +282,8 @@ export function makeRealReceipts(rows: ReadonlyArray<{ possibility: Possibility;
 
 const IMPLEMENTATION_SENTENCE: Record<string, string> = {
   tenant_content: "Website content changed",
-  website_document: "Strelva published a new version of the site",
-  application_release: "Strelva released a new version",
+  website_document: "Strelva published a new release of the site",
+  application_release: "Strelva published a new release",
   inquiry_config: "The inquiry form changed",
   schedule: "Booking settings changed",
 };

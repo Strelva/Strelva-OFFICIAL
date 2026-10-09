@@ -1,5 +1,5 @@
 /**
- * Strelva handled: one read model over receipt stores that already exist
+ * What changed: one read model over receipt stores that already exist
  * (read_strelva_handled in SQL, plus the linked tenant's events). It adds no
  * receipt store. Each receipt says, with the recorded actor as the subject, what was
  * done, and its undo state honestly: only a business record revision with
@@ -58,9 +58,9 @@ export function handledFromStore(row: Record<string, unknown>): HandledReceipt |
     case "website_document_receipts":
       return {
         ...attribution, id: `website:${id}`, store: "website_document_receipts", systemId: null,
-        sentence: typeof row.revision === "number" ? actorSentence(actor, `saved version ${row.revision} of your website`) : actorSentence(actor, "saved a new version of your website"),
+        sentence: typeof row.revision === "number" ? actorSentence(actor, `saved your website to History (entry ${row.revision})`) : actorSentence(actor, "saved your website to History"),
         at, changed: str(row.action), evidence: null,
-        undo: { state: "undo_needs_review", reason: "Restoring an earlier version saves it as a new draft for your approval." },
+        undo: { state: "undo_needs_review", reason: "Restoring from History saves a new draft for your approval." },
       };
     case "decision_policy_history": {
       const kind = str(row.kind) ?? "a kind of change";
@@ -99,7 +99,7 @@ export function approvedDecisionUndo(lifecycle: string | null, kind: string | nu
         ? { state: "not_undoable", reason: "It ran on an isolated copy, so nothing live changed." }
         : { state: "undo_needs_review", reason: "Rolling it back is its own change. Ask Strelva and it rolls back step by step." };
     case "website_document":
-      return { state: "undo_needs_review", reason: "Restoring an earlier version saves it as a new draft for your approval." };
+      return { state: "undo_needs_review", reason: "Restoring from History saves a new draft for your approval." };
     case "version_release":
     case "application_release":
       return { state: "undo_needs_review", reason: "Going back to the earlier release is a new release you approve." };

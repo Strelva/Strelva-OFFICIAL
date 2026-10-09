@@ -145,7 +145,7 @@ describe("the workspace section", () => {
     expect(html).toContain("Publish page");
     expect(html).toContain("&lt;script type=&quot;application/ld+json&quot; data-strelva-schema=&quot;1&quot;&gt;");
     expect(html).toContain("Check barber.example");
-    expect(html).toContain("Version 0123456789abcdef");
+    expect(html).toContain("History reference 0123456789abcdef");
   });
   it("shows a member the block but not the publish form", () => {
     const html = render({ canManage: false });

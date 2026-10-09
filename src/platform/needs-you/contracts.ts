@@ -1,5 +1,5 @@
 /**
- * Needs you and Strelva handled (docs/product/specs/needs-you.md).
+ * Needs you and What changed (docs/product/specs/needs-you.md).
  *
  * Change kinds, routes, floors and defaults. The same table lives in SQL in
  * supabase/migrations/20261007120000_needs_you.sql (needs_you_kind_floor,
@@ -257,7 +257,7 @@ export function nextChaseStep(item: Pick<OwnerDecision, "state" | "route" | "ope
   return "none";
 }
 
-// Strelva handled ---------------------------------------------------------------
+// What changed ---------------------------------------------------------------
 
 export type UndoState =
   | { state: "undo" }

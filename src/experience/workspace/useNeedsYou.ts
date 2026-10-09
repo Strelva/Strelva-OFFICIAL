@@ -34,7 +34,7 @@ const DECIDE_COPY: Record<string, ItemNotice> = {
   sign_in: { tone: "error", text: "Sign in again to decide this." },
 };
 
-/** Needs you and Strelva handled for one business, with Approve / Not yet / Undo. */
+/** Needs you and What changed for one business, with Approve / Not yet / Undo. */
 export function useNeedsYou(workspaceId: string | undefined) {
   const transport = useWorkspaceRequest();
   const [result, setResult] = useState<{ workspaceId: string; state: NeedsYouState } | null>(null);

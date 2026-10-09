@@ -124,7 +124,7 @@ interface HandledProps {
   fallback?: ReactNode;
 }
 
-/** Strelva handled: the last 7 days of what Strelva did, with honest undo. */
+/** What changed: the last 7 days of recorded changes, with honest undo. */
 export function StrelvaHandledSection({ state, pending, notices, onUndo, fallback }: HandledProps) {
   if (state.status === "disabled") return null;
   const canUndo = state.status === "ready" && state.role !== "member";

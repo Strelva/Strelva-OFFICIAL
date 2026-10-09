@@ -1,10 +1,17 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { agencyDeliveryReason } from "@/platform/presentation/agency-delivery";
 import { WorkspaceOfferingDirectory } from "@/experience/workspace/WorkspaceOfferings";
 import type { OfferingCollection } from "@/platform/offerings";
 
 describe("agency delivery offering UI", () => {
+  it("maps the legacy revocation reason only for display and preserves authored notes", () => {
+    expect(agencyDeliveryReason("Customer stopped provider delivery.")).toBe("Your business stopped agency delivery.");
+    expect(agencyDeliveryReason("The customer inquiry is still open.")).toBe("The customer inquiry is still open.");
+    expect(agencyDeliveryReason(null)).toBeNull();
+  });
+
   it("places the agency lifecycle in the installed offering without claiming acceptance", () => {
     const businessId = "11111111-1111-4111-8111-111111111111";
     const installationId = "22222222-2222-4222-8222-222222222222";

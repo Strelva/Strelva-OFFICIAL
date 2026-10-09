@@ -138,7 +138,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   const deliveries = useBusinessDeliveries(deliveryScope);
   const deliveryItems = deliveries.state.status === "ready" ? deliveries.state.items : [];
   const deliveryAttention = deliveryItems.filter(item => item.attention);
-  // STRELVA_NEEDS_YOU_RELEASE: Needs you and Strelva handled come from the
+  // STRELVA_NEEDS_YOU_RELEASE: Needs you and What changed come from the
   // policy model. Request decisions arrive there as items, so the delivery
   // list no longer adds its own.
   const needsYouReleased = snapshot.releases?.needsYou === true && customer && !readOnly;
@@ -167,7 +167,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   const requestRows = businessRequestRows(deliveryItems, snapshot.work, item => deliveryProviderName(item, agencyNames));
   const handled = requestRows.filter(row => row.stage === "done").slice(0, 5);
   const inProgress = requestRows.filter(row => row.stage === "in_progress" || row.stage === "asked");
-  // With Systems released, Strelva handled is the receipt feed, not done Requests,
+  // With Systems released, What changed is the receipt feed, not done Requests,
   // and In progress also lists every Make real that is running or partly live.
   const receipts = systemsReleased ? snapshot.systems?.handled ?? [] : [];
   const making = systemsReleased ? snapshot.systems?.activations ?? [] : [];
@@ -203,7 +203,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   const attentionRows = home.attention.map(({ work, reason }) => <li key={work.id}><button type="button" aria-label={`Open ${work.title}`} className={styles.row} onClick={() => onOpen(work.id)}><span><strong>{work.title}</strong><small>{reason}</small></span><ArrowRight size={16} aria-hidden="true" /></button></li>);
   const receiptList = <ul className={styles.list} aria-label="This week’s changes">{receipts.slice(0, 7).map(receipt => <li key={receipt.id}><span className={styles.row}><span><strong>{receipt.sentence}</strong>{actorPresentation(receipt.actor).credit ? <small>{actorPresentation(receipt.actor).credit}</small> : null}<small>{new Date(receipt.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {receipt.undo}</small></span></span></li>)}</ul>;
 
-  // ---- Strelva is working (ink-moss): what is moving now, then what Strelva handled.
+  // ---- Strelva is working (ink-moss): what is moving now, then recorded changes.
   const lead = making[0];
   const otherMaking = making.slice(lead ? 1 : 0);
   const leadRequest = lead ? undefined : inProgress[0];

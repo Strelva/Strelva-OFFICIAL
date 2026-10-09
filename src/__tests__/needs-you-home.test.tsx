@@ -120,7 +120,7 @@ describe("recorded actors on Home", () => {
   });
 });
 
-describe("Strelva handled on Home", () => {
+describe("What changed on Home", () => {
   it("lists receipts with Strelva as the subject and undo only where it is one tap", () => {
     const html = handled(ready());
     expect(html).toContain("Strelva updated your hours in your business record");
@@ -149,7 +149,7 @@ describe("BusinessHome with the Needs you release", () => {
     onOpen: noop, onStart: noop, onRequest: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account",
   }));
 
-  it("reads Needs you and Strelva handled from the policy model when on", () => {
+  it("reads Needs you and What changed from the policy model when on", () => {
     const html = render(true);
     expect(html).toContain("Checking what needs you");
     expect(html).toContain("Checking recent changes");

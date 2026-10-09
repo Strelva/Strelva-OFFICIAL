@@ -156,7 +156,7 @@ describe("Make real on Home and the System page", () => {
       .toBe("Making the rebuilt attymooney.com live: 0 of 3 done");
   });
 
-  it("Strelva handled lists each live accepted effect and the settled summary, never an isolated one", () => {
+  it("What changed lists each live accepted effect and the settled summary, never an isolated one", () => {
     const receipts = makeRealReceipts([{ possibility: p, activation: activation({ status: "made_real" }) }], Date.parse(AT) - 1000);
     expect(receipts.map((r) => r.sentence)).toEqual(["Publish the rebuilt attymooney.com", 'Made "A rebuilt attymooney.com" live']);
     expect(receipts[0]!.undo).toBe("Undo from History");

@@ -1,2 +1,2 @@
-/** D-label remains Jacob's decision. Keep the current place name until it is decided. */
-export const STRELVA_HANDLED_LABEL = "Strelva handled";
+/** Jacob-approved place label; legacy identifiers and addresses remain compatible. */
+export const STRELVA_HANDLED_LABEL = "What changed";

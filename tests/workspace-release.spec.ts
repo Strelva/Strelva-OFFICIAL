@@ -523,7 +523,7 @@ test("keeps My work and Shared with me context-local and read-only", async ({ pa
   await page.goto("/workspace");
   await page.getByLabel("Current workspace").selectOption(CUSTOMER_ID);
   await expect(page.getByRole("heading", { name: "Review what was shared.", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Strelva handled", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What changed", exact: true })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("region", { name: "Recent work", exact: true }).getByRole("link", { name: "Customer-owned assessment" })).toBeVisible();
   await page.getByRole("link", { name: "All apps and files", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();

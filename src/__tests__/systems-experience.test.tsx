@@ -83,7 +83,7 @@ describe("Systems read adapter over the spine projection", () => {
       [INBOX, "inquiries", "The Mooney Firm inquiries", "live", "unknown"],
       [INTAKE_SYSTEM, "app", "Mediation intake", "live", "unknown"],
     ]);
-    expect(systems[0]!).toMatchObject({ detail: "The Mooney Firm", surface: { kind: "website", liveUrl: "https://www.attymooney.com", previewSrc: "https://www.attymooney.com", manageHref: "/dashboard" }, operatedBy: "Strelva" });
+    expect(systems[0]!).toMatchObject({ detail: "The Mooney Firm", surface: { kind: "website", liveUrl: "https://www.attymooney.com", previewSrc: "https://www.attymooney.com", manageHref: "/dashboard" }, operatedBy: "Strelva Agency" });
     // The inquiry inbox opens for the tenant of the site its form appears on.
     expect(systems[1]!.surface).toEqual({ kind: "inquiries", tenantId: "mooney-firm" });
     expect(systems[1]!.connections[0]!).toMatchObject({ kind: "appear", systemId: SITE, sentence: "Inquiry form on the site", status: "connected" });
@@ -187,7 +187,7 @@ describe("Make real and the System page", () => {
     id: SITE, kind: "website", name: "attymooney.com", detail: "The Mooney Firm", lifecycle: "live",
     health: { state: "unknown", summary: "Nothing has checked this yet." },
     surface: { kind: "website", domain: "attymooney.com", liveUrl: "https://www.attymooney.com", previewSrc: "https://www.attymooney.com", previewLabel: "attymooney.com, as visitors see it now", manageHref: "/dashboard" },
-    operatedBy: "Strelva", connections: [], versions: [],
+    operatedBy: "Strelva Agency", connections: [], versions: [],
     possibilities: [{ id: "website-rebuild:rebuild", title: "A rebuilt attymooney.com", summary: "Rebuilt.", status: "ready", affects: [SITE], previewSrc: "/preview/x" }],
   };
   const render = (overrides: Partial<Parameters<typeof SystemPage>[0]> = {}) => renderToStaticMarkup(createElement(SystemPage, {

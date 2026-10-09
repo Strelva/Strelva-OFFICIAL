@@ -96,12 +96,12 @@ describe("publishing in the workspace", () => {
     expect(newsletter?.basis).toContain("approved issues and receipts stay here");
   });
 
-  it("renders the listing page with Strelva handled, and an empty state", async () => {
+  it("renders the listing page with What changed, and an empty state", async () => {
     const all = views(await project("on"));
     const listing = all.find((item) => item.kind === "listing")!;
     const props = { systems: all, workspaceId: BUSINESS, readOnly: false, sources: [], systemHref: (id: string) => id, onHome: () => undefined, onAsk: () => undefined };
     const html = renderToStaticMarkup(<SystemPage {...props} system={listing} />);
-    expect(html).toContain("Strelva handled");
+    expect(html).toContain("What changed");
     expect(html).toContain("Replied to a review on Google.");
     const empty = renderToStaticMarkup(<SystemPage {...props} system={{ ...listing, surface: { kind: "listing", healthMessage: "Google listing read recently.", receipts: [] } }} />);
     expect(empty).toContain("Nothing yet.");

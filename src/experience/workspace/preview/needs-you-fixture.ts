@@ -1,5 +1,5 @@
 /**
- * Local fixture for Needs you and Strelva handled on Home. Fictional asks for
+ * Local fixture for Needs you and What changed on Home. Fictional asks for
  * The Mooney Firm (spec section 1). Nothing leaves the browser; decisions
  * only change this in-memory list.
  */
@@ -50,7 +50,7 @@ function initialItems(): OwnerDecision[] {
     item(3, {
       kind: "customer.commitment", urgent: true,
       title: "Reply to Jordan's mediation inquiry, quoting the consult fee",
-      actor: { kind: "agency", displayName: "Acme Marketing" },
+      actor: { kind: "agency", displayName: "Strelva Agency" },
       detail: "\"Thanks for reaching out. An initial consultation is $150 and takes about an hour. I have openings Thursday afternoon.\"",
       approveEffect: "The reply sends to Jordan.", notYetEffect: "Nothing sends.",
     }),
@@ -72,7 +72,7 @@ const HANDLED: HandledReceipt[] = [
     title: "Booking request: Dana Reed, Tue, Oct 13 3:00 PM", state: "approved", outcome: "done", sourceLifecycle: "booking_request",
     actor: { kind: "platform" }, decidedByKind: "owner_link", approveEffect: "The booking is confirmed for this time.", systemId: null,
   })].flatMap(receipt => receipt ?? []),
-  { actor: { kind: "agency", displayName: "Acme Marketing" }, id: "record:14", store: "business_record_revisions", systemId: null, sentence: "Acme Marketing updated your hours in your business record", at: "2026-10-06T14:10:00Z", changed: "hours", evidence: null, undo: { state: "undo" } },
+  { actor: { kind: "agency", displayName: "Strelva Agency" }, id: "record:14", store: "business_record_revisions", systemId: null, sentence: "Strelva Agency updated your hours in your business record", at: "2026-10-06T14:10:00Z", changed: "hours", evidence: null, undo: { state: "undo" } },
   { actor: { kind: "platform" }, id: "tenant_event:evt-9", store: "tenant_events", systemId: null, sentence: "Strelva replied to Dana's review on Google", at: "2026-10-05T21:02:00Z", changed: null, evidence: { providerAccepted: true, readBack: "verified" }, undo: { state: "not_undoable", reason: "Google has the reply; delete it on Google." } },
   { id: "tenant_event:evt-7", store: "tenant_events", systemId: null, sentence: "Updated your website: Friday hours", at: "2026-10-05T14:12:00Z", changed: "hours", evidence: null, undo: { state: "undo_needs_review", reason: "Undo drafts a revert for review before it goes live." } },
 ];

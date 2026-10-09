@@ -227,7 +227,7 @@ function SystemSurface({ system, workspaceId, readOnly, useReadOnly = readOnly, 
   return <p className="p-6 text-sm text-gray-muted">This system opens in its own view. <Link className="underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&work=${encodeURIComponent(workId)}`}>Open it</Link></p>;
 }
 
-/** The listing's own surface: its health in words and Strelva handled. */
+/** The listing's own surface: its health in words and What changed. */
 function ListingSurface({ surface }: { surface: Extract<SystemView["surface"], { kind: "listing" }> }) {
   const when = (at: string) => {
     const date = new Date(at);

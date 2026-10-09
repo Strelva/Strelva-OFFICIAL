@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-// Strelva handled lists the owner's decided Needs you items
+// What changed lists the owner's decided Needs you items
 // (20261009130000_strelva_handled_decisions.sql): what Strelva did after an
 // approval or a Not yet, and the honest undo for that lifecycle. None is a
 // one-tap undo; each says why or what undoing takes.
@@ -28,7 +28,7 @@ function decision(overrides: Record<string, unknown> = {}): Record<string, unkno
   };
 }
 
-describe("decided Needs you items in Strelva handled", () => {
+describe("decided Needs you items in What changed", () => {
   it("an approved booking request reads as Strelva confirming it, with why it isn't one-tap undo", () => {
     const receipt = handledFromStore(decision());
     expect(receipt).toEqual({

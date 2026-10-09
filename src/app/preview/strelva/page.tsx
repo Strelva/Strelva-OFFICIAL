@@ -25,7 +25,7 @@ export default async function StrelvaPreviewPage({ searchParams }: { searchParam
   const systems = await previewSystems(selected, { installedStaffRequest: previewSetup === "staff-request", seededRequests: previewSetup === "requests", systems: released,
     // STRELVA_PUBLISHING_RELEASE decides; `publishing=on|off|pending|disconnected|none` overrides here only.
     publishing: previewPublishingMode(publishingParam, publishingReleaseEnabled()),
-    // Fixture-only: `makeReal=partly|live` shows the spec's walk-through (Make real in progress, History, Strelva handled).
+    // Fixture-only: `makeReal=partly|live` shows the spec's walk-through (Make real in progress, History, What changed).
     makeReal: previewMakeRealMode(makeReal), sibling: sibling === "empty" || sibling === "unavailable" ? sibling : "ready" });
   // Needs you on Home is fixture-only here: `needsYou=on` shows the policy model's Home.
   // Ask Strelva is fixture-only here: `ask=on|off|error|forbidden|unsaved` picks the state.

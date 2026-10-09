@@ -8,7 +8,7 @@ import {
 // operator converts a fixture tenant, designates Strelva's agency workspace,
 // invites the owner; the owner accepts the signed link, lands in the
 // workspace on the client admin host, sees Systems and Needs you, approves a
-// booking request by the one-tap email link, and sees Strelva handled with
+// booking request by the one-tap email link, and sees What changed with
 // a working undo.
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local Supabase Auth and Postgres (see docs/operations/testing-and-ci.md).");
 test.beforeAll(() => { journeyEnvironment(); });
@@ -110,10 +110,10 @@ test("operator converts and invites; the owner accepts, lands on the admin host 
     await expect(replayed.getByRole("button", { name: /Confirm/ })).toHaveCount(0);
     await replayed.context().close();
 
-    // 8. Home: the ask is gone; Strelva handled shows what Strelva did, with a one-tap undo.
+    // 8. Home: the ask is gone; What changed shows what Strelva did, with a one-tap undo.
     await home.reload();
     await expect(home.getByRole("region", { name: "Needs you" }).getByText(/^Booking request: Dana Reed/)).toHaveCount(0);
-    const handled = home.getByRole("region", { name: "Strelva handled" });
+    const handled = home.getByRole("region", { name: "What changed" });
     const undo = handled.getByRole("button", { name: /^Undo: Strelva updated your .* in your business record$|^Undo: Strelva updated your business record$/ }).first();
     await expect(undo).toBeVisible();
     await undo.focus();
@@ -130,12 +130,12 @@ test("operator converts and invites; the owner accepts, lands on the admin host 
   }
 });
 
-// The decision itself under Strelva handled
+// The decision itself under What changed
 // (20261009130000_strelva_handled_decisions.sql): after the owner approves a
 // booking request by one-tap link, Home says Strelva confirmed it, and says
 // honestly why it isn't a one-tap undo (a confirmed booking is moved or
 // cancelled in Bookings, and the customer is told).
-test("Strelva handled lists the approved booking decision with its undo state", async ({ browser }, testInfo) => {
+test("What changed lists the approved booking decision with its undo state", async ({ browser }, testInfo) => {
   const admin = adminClient();
   let setup: Awaited<ReturnType<typeof convertedBusinessWithOwner>> | null = null;
   try {
@@ -156,7 +156,7 @@ test("Strelva handled lists the approved booking decision with its undo state", 
     expect(await bookingStatus(admin, tenantId, booking.id)).toBe("confirmed");
 
     await home.reload();
-    const handled = home.getByRole("region", { name: "Strelva handled" });
+    const handled = home.getByRole("region", { name: "What changed" });
     const receipt = handled.getByRole("listitem").filter({ hasText: /Strelva confirmed the booking you approved: Dana Reed/ });
     await expect(receipt).toHaveCount(1);
     await expect(receipt.getByText("A confirmed booking isn't undone in one tap. Move or cancel it in Bookings, and the customer is told.")).toBeVisible();
