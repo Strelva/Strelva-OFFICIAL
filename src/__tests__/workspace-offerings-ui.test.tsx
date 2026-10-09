@@ -216,7 +216,7 @@ describe("workspace offering experience", () => {
       }],
     };
     const html = renderDirectory({ status: "ready", collection: installed, saving: false }, installationId);
-    expect(html).toContain("Strelva has been requested as the agency");
+    expect(html).toContain("Strelva Agency has been requested as the agency");
     expect(html).toContain("Checking agency delivery");
   });
 

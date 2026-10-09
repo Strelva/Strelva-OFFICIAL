@@ -39,7 +39,7 @@ function shortDate(value: string): string {
 
 /** Who is doing a request, by name. */
 export function deliveryProviderName(item: BusinessDeliveryItem, agencyNames: ReadonlyMap<string, string>): string {
-  return item.provider?.kind === "agency" ? agencyNames.get(item.provider.agencyWorkspaceId) || "your agency" : item.provider?.kind === "strelva" ? "Strelva" : "";
+  return item.provider?.kind === "agency" ? agencyNames.get(item.provider.agencyWorkspaceId) || "your agency" : item.provider?.kind === "strelva" ? "Strelva Agency" : "";
 }
 
 export function businessRequestRows(deliveries: readonly BusinessDeliveryItem[], work: readonly WorkspaceWork[], providerName: (item: BusinessDeliveryItem) => string): BusinessRequestRow[] {

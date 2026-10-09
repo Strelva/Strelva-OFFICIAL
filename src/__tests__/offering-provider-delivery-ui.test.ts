@@ -26,7 +26,7 @@ describe("agency delivery offering UI", () => {
       state: { status: "ready", collection, saving: false }, businessName: "Harbor Dental", work: [], managedSites: [], selectedId: installationId,
       onSelect: () => undefined, onOpenWork: () => undefined, onRetry: () => undefined, onCommand: async () => null, onWebsiteCommand: async () => null,
     }));
-    expect(html).toContain("Strelva has been requested as the agency");
+    expect(html).toContain("Strelva Agency has been requested as the agency");
     expect(html).toContain("Checking agency delivery");
     expect(html).not.toContain("Accepted by the exact assigned Strelva operator");
   });

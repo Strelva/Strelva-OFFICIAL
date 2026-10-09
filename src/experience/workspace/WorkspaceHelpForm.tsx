@@ -45,7 +45,7 @@ const defaultAgency: ServiceRequestAgency = { kind: "strelva" };
 function agencyLabel(agency: ServiceRequestAgency, options: readonly WorkspaceHelpAgencyOption[]): string {
   const match = options.find((option) => JSON.stringify(option.agency) === JSON.stringify(agency));
   if (match) return match.label;
-  return agency.kind === "strelva" ? "Strelva" : "Agency";
+  return agency.kind === "strelva" ? "Strelva Agency" : "Agency";
 }
 
 function sameValues(left: readonly string[], right: readonly string[]): boolean {
@@ -81,7 +81,7 @@ function responseMessage(value: unknown, fallback: string): string {
 export function WorkspaceHelp({ workspaceName, hasManagedService, onAgency, initialRequest = "", requestSubject = "Strelva — product help or request", workspaceId, agencyOptions, providerOptions, scope = ["help_request"], onSaved }: WorkspaceHelpProps) {
   const [request, setRequest] = useState(initialRequest);
   const [outcome, setOutcome] = useState("");
-  const recipients = useMemo(() => agencyOptions?.length ? agencyOptions : providerOptions?.length ? providerOptions.map(option => ({ label: option.label, agency: option.provider })) : [{ label: "Strelva", agency: defaultAgency }], [agencyOptions, providerOptions]);
+  const recipients = useMemo(() => agencyOptions?.length ? agencyOptions : providerOptions?.length ? providerOptions.map(option => ({ label: option.label, agency: option.provider })) : [{ label: "Strelva Agency", agency: defaultAgency }], [agencyOptions, providerOptions]);
   const [agency, setAgency] = useState<ServiceRequestAgency>(recipients[0]!.agency);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<ServiceRequest | null>(null);
@@ -90,7 +90,7 @@ export function WorkspaceHelp({ workspaceName, hasManagedService, onAgency, init
     if (!editingRequest || recipients.some((option) => JSON.stringify(option.agency) === JSON.stringify(editingRequest.provider))) return recipients;
     return [
       {
-        label: editingRequest.provider.kind === "agency" ? "Current agency" : "Strelva",
+        label: editingRequest.provider.kind === "agency" ? "Current agency" : "Strelva Agency",
         agency: editingRequest.provider,
       },
       ...recipients,

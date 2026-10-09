@@ -172,7 +172,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
     && current.access !== "delegated_read"
     && (current.role === "owner" || current.role === "admin");
   const serviceRequestAgencies = canSaveServiceRequest ? [
-    { label: "Strelva", agency: { kind: "strelva" as const } },
+    { label: "Strelva Agency", agency: { kind: "strelva" as const } },
     ...snapshot.workspaces
       .filter((workspace) => workspace.kind === "agency" && workspace.access !== "delegated_read")
       .map((workspace) => ({ label: workspace.name, agency: { kind: "agency" as const, agencyWorkspaceId: workspace.id } })),

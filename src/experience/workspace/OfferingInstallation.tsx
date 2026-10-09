@@ -163,7 +163,7 @@ export function OfferingInstallationView({
       <h3 id={`offering-responsibility-${installation.id}`}>Who operates it</h3>
       <p>{installation.responsibility.kind === "customer_operated"
         ? `${installation.responsibility.providerName} operates this offering.`
-        : `${installation.responsibility.providerName} has been requested as the agency. This record does not confirm they accepted the work.`}</p>
+        : `${installation.responsibility.providerKind === "strelva" ? "Strelva Agency" : installation.responsibility.providerName} has been requested as the agency. This record does not confirm they accepted the work.`}</p>
     </section>
 
     {installation.responsibility.kind === "provider_requested" && installation.responsibility.providerKind === "strelva"
@@ -276,10 +276,10 @@ function AgencyDeliveryPanel({ collection, installation, work }: {
       <p>No agency has accepted this request. First approve exact zero-cost work and offer it to a verified Strelva assignee in Ongoing.</p>
       {collection.permissions.canManage ? <form onSubmit={requestDelivery} className={styles.retireForm}>
         <label><span>Approved assigned work</span><select required value={selectedWorkId} onChange={(event) => setSelectedWorkId(event.target.value)}><option value="">Choose work</option>{responsibilities.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
-        <button className={styles.primary} type="submit" disabled={saving || !selectedWorkId}>{saving ? "Requesting…" : "Request Strelva delivery"}</button>
+        <button className={styles.primary} type="submit" disabled={saving || !selectedWorkId}>{saving ? "Requesting…" : "Request Strelva Agency delivery"}</button>
       </form> : <p className={styles.note}>A business owner manages agency requests.</p>}
     </> : <>
-      <p>{current.status === "requested" ? "Requested. Strelva has not accepted this work." : current.status === "accepted" ? "Accepted by the exact assigned Strelva operator." : "Revoked. No new assigned action is permitted."}</p>
+      <p>{current.status === "requested" ? "Requested. Strelva Agency has not accepted this work." : current.status === "accepted" ? "Accepted by the exact assigned Strelva operator." : "Revoked. No new assigned action is permitted."}</p>
       <p className={styles.note}>Your review: {current.customerDecision === "pending" ? "Pending" : current.customerDecision === "confirmed" ? "Confirmed" : "Changes requested"}</p>
       <a href={`/workspace?workspaceId=${encodeURIComponent(current.businessId)}&view=operations&assignmentId=${encodeURIComponent(current.assignmentId)}`}>Open assigned work</a>
       {current.canAccept ? <button className={styles.primary} type="button" disabled={saving} onClick={() => void command({ action: "accept", deliveryId: current.id })}>{saving ? "Accepting…" : "Accept assigned delivery"}</button> : null}
@@ -382,7 +382,7 @@ export function OfferingInstallView({
       <label className={styles.radioField}><input type="radio" name="responsibility" checked={operator === "customer_operated"} onChange={() => { setOperator("customer_operated"); setAgencyName(businessName); }} /><span>Your business operates it</span></label>
       <label className={styles.radioField}><input type="radio" name="responsibility" checked={operator === "provider_requested"} onChange={() => { setOperator("provider_requested"); setAgencyName("Strelva"); }} /><span>Request an agency</span></label>
       {operator === "provider_requested" ? <div className={styles.nestedFields}>
-        <label><span>Requested agency</span><select value={agencyKind} onChange={(event) => { const next = event.target.value as typeof agencyKind; setAgencyKind(next); setAgencyName(next === "strelva" ? "Strelva" : ""); }}><option value="strelva">Strelva</option><option value="named_third_party">Named third party</option></select></label>
+        <label><span>Requested agency</span><select value={agencyKind} onChange={(event) => { const next = event.target.value as typeof agencyKind; setAgencyKind(next); setAgencyName(next === "strelva" ? "Strelva" : ""); }}><option value="strelva">Strelva Agency</option><option value="named_third_party">Named third party</option></select></label>
         {agencyKind === "named_third_party" ? <label><span>Agency name</span><input required maxLength={120} value={agencyName} onChange={(event) => setAgencyName(event.target.value)} /></label> : null}
         <label><span>Request note</span><textarea maxLength={500} value={requestNote} onChange={(event) => setRequestNote(event.target.value)} /></label>
         <p className={styles.blocked}>This records your request. It does not confirm Strelva or a third party accepted the work.</p>
