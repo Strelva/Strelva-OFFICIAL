@@ -126,3 +126,32 @@ do $$declare signature text; f regprocedure; installed integer;t regclass:=to_re
   end loop;
  end if;
 end$$;
+
+-- Native Google hash portability preserves both exact service-only ports. Older
+-- fixtures have neither; overloads or a partly installed group are refused.
+do $$declare signature text; f regprocedure; installed integer;begin
+ select count(*) into installed from pg_proc where pronamespace='public'::regnamespace and proname in('native_google_owner_lifecycle','verify_native_google_inverse_intent');
+ if installed not in(0,2) then raise exception 'native Google lifecycle incomplete private boundary';end if;
+ if installed=2 then foreach signature in array array['public.native_google_owner_lifecycle(uuid,text,uuid,text,jsonb)','public.verify_native_google_inverse_intent(uuid,uuid,text,jsonb,uuid,uuid,text)'] loop
+  f:=to_regprocedure(signature);
+  if f is null or not has_function_privilege('service_role',f,'EXECUTE') or has_function_privilege('anon',f,'EXECUTE') or has_function_privilege('authenticated',f,'EXECUTE') then raise exception 'native Google lifecycle lost private service-only boundary';end if;
+ end loop;end if;
+end$$;
+
+-- Rewards canonicalization/fence helpers stay owner-only; the one supplied
+-- tenant mutation port is service-only. No direct receipt/table/column access.
+-- Complete custom/default ACL and catalog checks belong to the current contract.
+do $$declare signature text; f regprocedure; installed integer;t regclass:=to_regclass('public.tenant_reward_mutations');r text;begin
+ select count(*) into installed from pg_proc where pronamespace='public'::regnamespace and proname in('reward_record_canonical_json','reward_record_native_fence','mutate_tenant_reward_record');
+ if installed not in(0,3) or (installed=0)<>(t is null) then raise exception 'rewards native mutation incomplete private boundary';end if;
+ if installed=3 then
+  foreach signature in array array['public.reward_record_canonical_json(jsonb)','public.reward_record_native_fence()','public.mutate_tenant_reward_record(text,text,jsonb)'] loop
+   f:=to_regprocedure(signature);
+   if f is null or has_function_privilege('anon',f,'EXECUTE') or has_function_privilege('authenticated',f,'EXECUTE') or has_function_privilege('service_role',f,'EXECUTE')<>(signature='public.mutate_tenant_reward_record(text,text,jsonb)') then raise exception 'rewards native mutation lost exact helper/writer boundary';end if;
+  end loop;
+  if not exists(select 1 from pg_class where oid=t and relrowsecurity) then raise exception 'rewards mutation receipts lost RLS';end if;
+  foreach r in array array['anon','authenticated','service_role'] loop
+   if has_table_privilege(r,t,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') or has_any_column_privilege(r,t,'SELECT,INSERT,UPDATE,REFERENCES') then raise exception 'rewards mutation receipts exposed directly';end if;
+  end loop;
+ end if;
+end$$;

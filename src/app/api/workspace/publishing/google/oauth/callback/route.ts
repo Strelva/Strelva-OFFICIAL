@@ -1,5 +1,5 @@
 import { type NextRequest } from "next/server";
-import { finishNativeGoogleOAuth, NATIVE_GOOGLE_OAUTH_COOKIE } from "@/products/google-listing/native/oauth";
+import { finishNativeGoogleOAuth, NATIVE_GOOGLE_OAUTH_COOKIE } from "@/products/google-listing/server";
 import { workspaceHttpActor, workspaceHttpFailure, workspaceJson } from "@/platform/workspaces/http";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 export const dynamic="force-dynamic";

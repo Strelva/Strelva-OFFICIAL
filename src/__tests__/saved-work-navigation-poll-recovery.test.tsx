@@ -157,3 +157,46 @@ it("holds the initiated view during a pending postcommit write, then reconciles 
   expect(node.textContent).toContain("Saved state refreshed"); expect(node.querySelector('section[aria-label="Website rebuild"] > [role="alert"]')).toBeNull();
   expect(select.selectedOptions[0]!.textContent).toBe(`${committed.rebuild.title} · review`); expect(document.activeElement).toBe(select); expect(posts).toBe(1);
 });
+
+
+it("keeps the existing saved selection until a held exact current HTTP read from the real service is consumed", async () => {
+  const h = harness(); const envelope = await h.launch(await h.create()); const current = parseRebuildView(envelope);
+  const factId = Object.keys(current.candidate!.facts)[0]!; let posts = 0, holdRead = false, heldReads = 0;
+  let releaseRead!: () => void;
+  const readBarrier = new Promise<void>(resolve => { releaseRead = resolve; });
+  const delegate = actualReadRequest(h,envelope.workId,async init => {
+    posts++; await h.service.resolveFact(actor,envelope.workId,factId,JSON.parse(String(init.body)));
+    return Response.json({ error:"Actual memory commit acknowledgment withheld" },{ status:503 });
+  });
+  const request = vi.fn<typeof fetch>(async (path,init) => {
+    if (holdRead && String(path).includes("/rebuild?")) {
+      const url = new URL(String(path),"https://fixture.example.test");
+      expect(url.pathname).toBe(`/api/websites/${envelope.workId}/rebuild`);
+      expect([...url.searchParams]).toEqual([["workspaceId",current.workspaceId]]);
+      heldReads++; await readBarrier;
+    }
+    return delegate(path,init);
+  });
+  vi.stubGlobal("fetch",request); await mount(current);
+  const field = await ordinaryDraft("Held real-service current read correction");
+  await act(async () => button("Save correction")!.click());
+  const committed = await h.service.read(actor,envelope.workId);
+  expect(committed.rebuild.revision).toBeGreaterThan(current.revision);
+  expect(committed.rebuild.candidate!.document.facts[factId]!.text).toBe("Held real-service current read correction");
+  expect(committed.rebuild.approvedCandidateRevision).toBeNull(); expect(posts).toBe(1);
+  holdRead = true;
+  await act(async () => button("Reload current state")!.click());
+  const select = node.querySelector("select")!; select.focus();
+  expect(heldReads).toBe(1); expect(select.value).toBe(current.workId);
+  expect(select.selectedOptions[0]!.textContent).toBe(`${current.title} · published`);
+  expect(node.querySelector("h1")!.textContent).toBe(current.title);
+  expect(button("Reload current state")!.disabled).toBe(true); expect(field.disabled).toBe(true);
+  expect(document.activeElement).toBe(select);
+  await act(async () => releaseRead());
+  expect(select.value).toBe(current.workId);
+  expect(select.selectedOptions[0]!.textContent).toBe(`${committed.rebuild.title} · review`);
+  expect(node.querySelector("h1")!.textContent).toBe(committed.rebuild.title);
+  expect(node.textContent).toContain("Saved state refreshed. Review the current preview before continuing.");
+  expect(button("Reload current state")).toBeUndefined(); expect(document.activeElement).toBe(select);
+  expect(posts).toBe(1); expect(heldReads).toBe(1);
+});

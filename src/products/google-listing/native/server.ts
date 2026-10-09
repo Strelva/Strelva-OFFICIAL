@@ -1,6 +1,6 @@
 import { assertActingProvider } from "@/platform/workspaces/acting-provider";
 import { publishingEnabledForWorkspace } from "@/products/publishing/server";
-import { makeRealChannelEnabled } from "@/platform/make-real/live-server";
+import { createServerLiveMakeReal, makeRealChannelEnabled } from "@/platform/make-real/live-server";
 import { readBusinessRecord } from "@/platform/business-record/service";
 import { createSupabasePossibilityRepository } from "@/platform/possibilities/supabase-repository";
 import { readGoogleBindingForTenant } from "@/platform/account-bindings/store";
@@ -11,11 +11,12 @@ import { decryptSecret } from "@/platform/infra/crypto/secrets";
 import { revokeProviderAuthorization } from "@/platform/infra/provider-revocation";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";
-import { liveMakeReal, googleMakeRealPorts } from "@/experience/systems/live-server";
+import { googleMakeRealPorts } from "../make-real";
 import { createGoogleListingAdapter } from "@/platform/make-real/google-adapter";
 import { assertCurrentNativeGoogleGrant, assertNativeGooglePlan, nativeGoogleCommandSchema, type NativeGooglePlan } from "./contracts";
 import { z } from "zod";
 import { createHash } from "node:crypto";
+const liveMakeReal = createServerLiveMakeReal(googleMakeRealPorts);
 async function owner(actor: WorkspaceActor, workspaceId: string) {
   if ((await readBusinessRecord(actor, workspaceId)).access !== "owner") throw new WorkspaceAccessError("Only the current business owner can change Google.");
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { useRef, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { ArrowRight, Check, Circle, FileText, LayoutGrid, LoaderCircle, Plus, ShieldCheck, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { StrelvaShell, pinnedApps, pinnedSystems, pinnedWebsites, type StrelvaSection } from "@/experience/app-frame/StrelvaShell";
@@ -124,6 +124,7 @@ function liveChips(siteSummary: SiteSummaryState, systems: readonly SystemView[]
 
 /** The start and return surface, using the same frame as every saved result. */
 export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignmentsKnown, offerings, busy, notice, onOpen, onStart, onCreateWebsite, onRequest, onDraftChange, onNavigate, onWorkspace, onOfferings, appBase = "", accountHref, signOut, managedWorkUnavailable, onWebsiteCommand, onRetryWebsiteAssignments, files, systemHref, onOpenSystem, systemsLoading = false, systemsUnavailable = false, systems: knownSystems = [], systemsReleased = false, view = "home" }: Props) {
+  const needsYouHeading = useRef<HTMLHeadingElement>(null);
   // An incomplete list would misplace a System; show none until it loads.
   const systems = systemsReleased && !systemsLoading ? knownSystems : [];
   const current = snapshot.workspaces.find(space => space.id === snapshot.workspaceId);
@@ -148,7 +149,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   const minute = useSyncExternalStore(subscribeMinute, minuteNow, noMinute);
   const { greeting, line } = greetingFor(minute);
   const attentionCount = home.attention.length + deliveryAttention.length;
-  const decisionsWaiting = needsYou.state.status === "ready" ? needsYou.state.items.length + home.attention.length : null;
+  const decisionsWaiting = needsYou.state.status === "ready" && needsYou.state.complete ? needsYou.state.items.length + home.attention.length : null;
   const fileIds = systemsReleased && files ? new Set(files.map(item => item.id)) : null;
   const results = fileIds ? home.results.filter(work => fileIds.has(work.id)) : home.results;
   const savedResultCount = results.length;
@@ -324,10 +325,10 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   const deckCards = home.attention.map(({ work, reason }) => <li key={work.id} className={styles.decisionCard} data-shape="plain"><div className={styles.cardBody}><p className={styles.cardMeta}><span className={styles.dot} aria-hidden="true" />{workspaceWorkLabel(work)}</p><h3>{work.title}</h3><p>{reason}</p></div><div className={styles.decisionActions}><Button size="sm" onClick={() => onOpen(work.id)} aria-label={`Open ${work.title}`}>Open</Button></div></li>);
   const needsYouPage = <div className={styles.home} aria-busy={busy || undefined}>
     <header className={`${styles.pageHeader} ${styles.reveal}`}>
-      <h1 className="font-display">Needs you</h1>
+      <h1 ref={needsYouHeading} tabIndex={-1} className="font-display">Needs you</h1>
       <p>{decisionsWaiting === null ? `Decisions only you can make for ${name}.` : decisionsWaiting ? `${decisionCount(decisionsWaiting)} only you can make.` : "Nothing is waiting on you."}</p>
     </header>
-    <NeedsYouSection variant="deck" state={needsYou.state} pending={needsYou.pending} notices={needsYou.notices} onDecide={needsYou.decide} onRetry={needsYou.refresh} appBase={appBase}
+    <NeedsYouSection retryFocusTarget={needsYouHeading} variant="deck" state={needsYou.state} pending={needsYou.pending} notices={needsYou.notices} onDecide={needsYou.decide} onRetry={needsYou.refresh} appBase={appBase}
       extraCount={home.attention.length} extra={home.attention.length ? deckCards : null}
       empty={<div className={styles.deckEmpty}><Check size={20} aria-hidden="true" /><div><h2>Nothing needs you.</h2><p>When Strelva needs your yes, it shows here first, with what happens either way.</p></div><Button variant="secondary" size="sm" onClick={() => onNavigate("home")}>Back to Home</Button></div>} />
     {policy}

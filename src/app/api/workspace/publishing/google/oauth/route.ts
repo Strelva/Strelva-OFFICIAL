@@ -1,4 +1,4 @@
-import { beginNativeGoogleOAuth, NATIVE_GOOGLE_OAUTH_COOKIE } from "@/products/google-listing/native/oauth";
+import { beginNativeGoogleOAuth, NATIVE_GOOGLE_OAUTH_COOKIE } from "@/products/google-listing/server";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 export const dynamic = "force-dynamic";

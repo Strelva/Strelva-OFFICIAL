@@ -37,3 +37,6 @@ export { createSupabaseReceiptStore } from "./receipts";
 export { googleMakeRealPorts, googleMakeRealDraftDigest } from "./make-real";
 export { purgeExpiredGoogleContent } from "./retention";
 export { authorizeGoogleServiceEvent } from "./make-real-service-authority";
+
+export { commandNativeGoogle } from "./native/server";
+export { beginNativeGoogleOAuth, finishNativeGoogleOAuth, NATIVE_GOOGLE_OAUTH_COOKIE } from "./native/oauth";

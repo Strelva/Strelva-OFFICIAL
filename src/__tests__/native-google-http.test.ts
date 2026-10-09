@@ -1,7 +1,7 @@
 import { beforeEach,describe,expect,it,vi } from "vitest";
 const mocks=vi.hoisted(()=>({actor:vi.fn(),released:vi.fn(()=>true),command:vi.fn(),makeReal:vi.fn()}));
 vi.mock("@/platform/workspace-release",()=>({workspaceReleaseEnabled:mocks.released}));
-vi.mock("@/products/google-listing/native/server",()=>({commandNativeGoogle:mocks.command}));
+vi.mock("@/products/google-listing/server",()=>({commandNativeGoogle:mocks.command}));
 vi.mock("@/app/api/workspace/systems/make-real/route",()=>({POST:mocks.makeReal}));
 vi.mock("@/platform/workspaces/http",async()=>({...await vi.importActual<typeof import("@/platform/workspaces/http")>("@/platform/workspaces/http"),workspaceHttpActor:mocks.actor}));
 import {POST} from "@/app/api/workspace/publishing/google/route";

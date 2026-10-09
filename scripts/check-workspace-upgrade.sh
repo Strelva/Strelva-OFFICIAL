@@ -534,6 +534,8 @@ psql "${psql_args[@]}" --file="$repo_root/tests/governed-money-operations-schema
 # Exact additive neutral source/Version lineage; no external/provider calls.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022173000_neutral_creator_version_money.sql"
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/neutral-creator-version-money-contract.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022175000_reward_durable_mutations.sql"
+psql "${psql_args[@]}" --file="$repo_root/scripts/sql/reward-durable-catalog-contract.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/function-exposure-schema.sql"
 node --import tsx "$repo_root/scripts/check-readonly-rpcs.mjs" "postgresql:///postgres?host=$cluster_socket&port=$cluster_port"
 psql "${psql_args[@]}" --file="$repo_root/tests/guarded-tenant-teardown-schema.sql"

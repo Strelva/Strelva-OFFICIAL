@@ -57,7 +57,7 @@ async function fixture(page: Page, info: TestInfo, mode: "progress" | "pending",
 }
 async function coherent(page: Page, parent: Locator, title: string, status: string) {
   const select = page.getByLabel("Saved website work", { exact: true }); await expect(select).toHaveValue(workId);
-  expect(await select.evaluate(node => (node as HTMLSelectElement).selectedOptions[0]!.textContent)).toBe(`${title} · ${status}`);
+  await expect.poll(() => select.evaluate(node => (node as HTMLSelectElement).selectedOptions[0]!.textContent)).toBe(`${title} · ${status}`);
   await expect(parent.getByRole("heading", { name: title, exact: true })).toBeVisible();
 }
 async function evidence(page: Page, parent: Locator, info: TestInfo, state: string) {

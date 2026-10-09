@@ -1,6 +1,6 @@
 {
-  "source": "Prepared exact full-model347 inventory; neutral source-money native/Auth/provider qualification pending",
-  "forwardCount": 347,
+  "source": "Prepared exact combined349 forward inventory: reviewed Google hash portability and rewards durable mutations; current schema/catalog/native/Auth/provider qualification UNRUN",
+  "forwardCount": 349,
   "workspaceBoundary": "20260905190000_release_one_workspaces.sql",
   "focusedLegacyExceptions": {
     "20260920060000_content_version_request_id.sql": "Requires legacy content_versions, omitted from the purpose-built workspace fixture; real upgrade/fresh full-schema rehearsal owns it.",
@@ -346,6 +346,7 @@
     "20261021132000_money_effect_admission.sql",
     "20261021132100_agent_payment_exit_admission.sql",
     "20261021140000_native_google_lifecycle.sql",
+    "20261021140100_native_google_hash_portability.sql",
     "20261022090000_guarded_tenant_teardown.sql",
     "20261022090100_tenant_cleanup_receipts.sql",
     "20261022120000_agency_created_application_authority.sql",
@@ -354,6 +355,7 @@
     "20261022170000_creator_maintenance_operations.sql",
     "20261022171000_checkout_final_admission.sql",
     "20261022172000_governed_money_operations.sql",
-    "20261022173000_neutral_creator_version_money.sql"
+    "20261022173000_neutral_creator_version_money.sql",
+    "20261022175000_reward_durable_mutations.sql"
   ]
 }

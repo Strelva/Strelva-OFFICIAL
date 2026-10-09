@@ -49,6 +49,7 @@ select current_setting('data_directory')=:'owned_data'
 SQL
  local forward="$repo_root/supabase/migrations/20261021140000_native_google_lifecycle.sql"
  local inverse="$repo_root/supabase/migrations/rollback-20261021140000_native_google_lifecycle.sql"
+ local hash_successor="$repo_root/supabase/migrations/20261021140100_native_google_hash_portability.sql"
  # Snapshots contain hashes, object names and catalog properties only. Rows,
  # function SQL and any credentials are never printed into diagnostic logs.
  cat >"$qualification_dir/snapshot.sql" <<SQL
@@ -92,10 +93,10 @@ SQL
  # Generate variants from the reviewed source. Drift is introduced inside its
  # transaction before the real guard; on refusal that entire transaction must
  # roll back. No replacement guard or fake lifecycle outcome is used.
- python3 - "$forward" "$inverse" "$qualification_dir" <<'PY'
+ python3 - "$forward" "$inverse" "$qualification_dir" "$hash_successor" <<'PY'
 from pathlib import Path
 import re,sys
-forward,inverse,destination=map(Path,sys.argv[1:])
+forward,inverse,destination,hash_successor=map(Path,sys.argv[1:])
 f,i=forward.read_text(),inverse.read_text()
 assert len(re.findall(r'^begin;$',f,re.M))==1 and len(re.findall(r'^begin;$',i,re.M))==1
 target='public.upsert_workspace_account_binding(jsonb,text)'
@@ -169,6 +170,25 @@ insert into public.workspaces(id,kind,name,created_by) values('e7140044-0000-400
 insert into public.native_google_oauth_attempts(id,workspace_id,requested_by,account_id,location_id,nonce_hash,state_hash,expected_locations,status)
 values('e7140044-0000-4000-8000-000000000100','e7140044-0000-4000-8000-000000000010','e7140044-0000-4000-8000-000000000001','accounts/qualification','qualification-place',repeat('a',64),repeat('b',64),'[]'::jsonb,'pending');"""
 write('inverse-populated',injected(i,populate))
+# These target the extension-independent successor after the original lifecycle
+# forward is reapplied. They run the real guarded source, never a fake guard.
+h=hash_successor.read_text()
+owner='public.native_google_owner_lifecycle(uuid,text,uuid,text,jsonb)'
+verifier='public.verify_native_google_inverse_intent(uuid,uuid,text,jsonb,uuid,uuid,text)'
+for name,sql in {
+ 'hash-owner-extra-acl': 'grant execute on function '+owner+' to authenticated;',
+ 'hash-inverse-extra-acl': 'grant execute on function '+verifier+' to authenticated;',
+ 'hash-owner-search-path': 'alter function '+owner+' set search_path=pg_temp,public;',
+ 'hash-owner-cost': 'alter function '+owner+' cost 101;',
+ 'hash-inverse-owner': 'alter function '+verifier+' owner to authenticated;',
+}.items(): write(name,injected(h,sql))
+for name,signature,marker in [('hash-owner-source',owner,'declare b public.workspace_account_bindings%rowtype;'),('hash-inverse-source',verifier,'declare binding public.workspace_account_bindings%rowtype;')]:
+ sql="do $qualification$ declare definition text; begin definition:=pg_get_functiondef('"+signature+"'::regprocedure); execute replace(definition,'"+marker+"','-- source drift'||chr(10)||'"+marker+"'); end $qualification$;"
+ write(name,injected(h,sql))
+# A changed optional service actor default must not be blessed by source-only pins.
+sql="do $qualification$ declare definition text; begin definition:=pg_get_functiondef('"+verifier+"'::regprocedure); if strpos(definition,'DEFAULT NULL::text')=0 then raise exception 'native_hash_qualification_default_marker_missing'; end if; execute replace(definition,'DEFAULT NULL::text',$default$DEFAULT 'unexpected'::text$default$); end $qualification$;"
+write('hash-inverse-default',injected(h,sql))
+
 PY
  local label
  # All inverse refusal scenarios exercise the actual current inverse guards.
@@ -194,12 +214,17 @@ PY
  done
  native_qualification_refuse forward-late-marker-refusal "$qualification_dir/forward-late-marker-refusal.sql" native_google_binding_writer_source_changed
  psql "${psql_args[@]}" -X -q -f "$forward" >"$qualification_dir/reapply.log" 2>&1
+ for label in hash-owner-extra-acl hash-inverse-extra-acl hash-owner-search-path hash-owner-cost hash-inverse-owner hash-owner-source hash-inverse-source hash-inverse-default; do
+  native_qualification_refuse "$label" "$qualification_dir/$label.sql" 'native_google_hash_(predecessor|authority)_drift'
+ done
+ psql "${psql_args[@]}" -X -q -f "$hash_successor" >"$qualification_dir/hash-reapply.log" 2>&1
  native_qualification_snapshot "$qualification_dir/applied-after.snapshot"
  cmp "$qualification_dir/applied-before.snapshot" "$qualification_dir/applied-after.snapshot"
  psql "${psql_args[@]}" -X -q -f "$inverse" >"$qualification_dir/second-empty-inverse.log" 2>&1
  native_qualification_snapshot "$qualification_dir/historical-after.snapshot"
  cmp "$qualification_dir/historical-before.snapshot" "$qualification_dir/historical-after.snapshot"
  psql "${psql_args[@]}" -X -q -f "$forward" >"$qualification_dir/final-reapply.log" 2>&1
+ psql "${psql_args[@]}" -X -q -f "$hash_successor" >"$qualification_dir/final-hash-reapply.log" 2>&1
  native_qualification_snapshot "$qualification_dir/final-applied.snapshot"
  cmp "$qualification_dir/applied-before.snapshot" "$qualification_dir/final-applied.snapshot"
  printf 'PASS empty native inverse/reapply preserved exact writer authority, catalog and rows.\n'

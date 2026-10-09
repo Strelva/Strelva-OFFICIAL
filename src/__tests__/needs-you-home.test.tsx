@@ -176,7 +176,7 @@ describe("The Needs you place", () => {
 
   it("opens as its own page with the place selected in the sidebar", () => {
     const html = renderToStaticMarkup(createElement(BusinessHome, { ...props, view: "needs-you" }));
-    expect(html).toContain("<h1 class=\"font-display\">Needs you</h1>");
+    expect(html).toContain("<h1 tabindex=\"-1\" class=\"font-display\">Needs you</h1>");
     expect(html).toContain("Checking what needs you");
     expect(html).toMatch(/aria-current="page" href="\/workspace\?view=needs-you&amp;workspaceId=/);
     expect(html).not.toContain("Good morning");

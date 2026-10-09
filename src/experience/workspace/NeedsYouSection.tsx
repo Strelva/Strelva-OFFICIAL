@@ -1,6 +1,7 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { beginFocusRecovery, type FocusRecovery } from "@/experience/websites/focus-recovery";
 import { ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { HandledReceipt, OwnerDecision } from "@/platform/needs-you/contracts";
@@ -32,28 +33,47 @@ interface NeedsYouProps {
   variant?: "rows" | "deck";
   /** Shown instead of disappearing when nothing needs the owner. Without it the section is gone. */
   empty?: ReactNode;
+  /** Mounted caller heading when the section heading is hidden or the complete empty section disappears. */
+  retryFocusTarget?: RefObject<HTMLElement | null>;
 }
 
 /**
  * Needs you: only the owner's decisions, oldest first, with the same Approve
- * and Not yet the email carries. Gone when empty. A member sees the asks but
+ * and Not yet the email carries. Gone after a complete empty read. A member sees the asks but
  * can't decide them; asks that need editing open their own page.
  */
-export function NeedsYouSection({ state, pending, notices, onDecide, onRetry, extra, extraCount = 0, appBase = "", variant = "rows", empty }: NeedsYouProps) {
+export function NeedsYouSection({ state, pending, notices, onDecide, onRetry, extra, extraCount = 0, appBase = "", variant = "rows", empty, retryFocusTarget }: NeedsYouProps) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  const retryButton = useRef<HTMLButtonElement>(null);
+  const recovery = useRef<FocusRecovery | null>(null);
+  useEffect(() => {
+    const pending = recovery.current;
+    if (!pending) return;
+    recovery.current = null;
+    if (state.status === "ready" || state.status === "error") pending.recover(retryButton.current ?? retryFocusTarget?.current ?? heading.current);
+    else pending.cancel();
+  }, [state, retryFocusTarget]);
+  useEffect(() => () => recovery.current?.cancel(), []);
+  const retry = () => {
+    recovery.current?.cancel();
+    recovery.current = beginFocusRecovery(retryButton.current);
+    onRetry();
+  };
   const outcomes = Object.entries(notices).filter(([id]) => state.status !== "ready" || !state.items.some(item => item.id === id));
   if (state.status === "disabled") return null;
-  const nothing = state.status === "ready" && state.items.length === 0 && extraCount === 0;
+  const nothing = state.status === "ready" && state.complete && state.items.length === 0 && extraCount === 0;
   if (nothing && outcomes.length === 0 && !empty) return null;
   const count = (state.status === "ready" ? state.items.length : 0) + extraCount;
   const canDecide = state.status === "ready" && state.role !== "member";
   const deck = variant === "deck";
   return <section className={deck ? styles.deckSection : styles.section} aria-labelledby="home-attention">
     <header className={deck ? styles.srOnly : styles.sideHeader}>
-      <h2 id="home-attention" className={styles.eyebrow} data-tone="clay">Needs you{state.status === "ready" && count > 0 ? <span className={styles.count}>{count}</span> : null}</h2>
-      {!deck && state.status === "ready" && count > 0 ? <p className={styles.sideTitle}>{decisionCount(count)} waiting on {state.role === "member" ? "the owner" : "you"}.</p> : null}
+      <h2 ref={heading} tabIndex={-1} id="home-attention" className={styles.eyebrow} data-tone="clay">Needs you{state.status === "ready" && count > 0 ? <span className={styles.count}>{count}</span> : null}</h2>
+      {!deck && state.status === "ready" && state.complete && count > 0 ? <p className={styles.sideTitle}>{decisionCount(count)} waiting on {state.role === "member" ? "the owner" : "you"}.</p> : null}
     </header>
     {state.status === "loading" ? <p role="status" className={styles.muted}>Checking what needs you…</p> : null}
-    {state.status === "error" ? <p role="status" className={styles.notice}>{state.message} <button type="button" onClick={onRetry}>Check again</button></p> : null}
+    {state.status === "error" ? <p role="status" className={styles.notice}>{state.message} <Button ref={retryButton} type="button" variant="secondary" size="sm" onClick={retry}>Check again</Button></p> : null}
+    {state.status === "ready" && !state.complete ? <p role="status" className={styles.notice}>Some decisions could not be checked. <Button ref={retryButton} type="button" variant="secondary" size="sm" onClick={retry}>Check again</Button></p> : null}
     {nothing && empty ? empty : null}
     {state.status === "ready" && state.role === "member" && state.items.length ? <p className={styles.muted}>Only the owner can decide these. You can see what is waiting.</p> : null}
     {state.status === "ready" && (state.items.length || extra) ? <ul className={deck ? styles.deck : styles.decisions}>

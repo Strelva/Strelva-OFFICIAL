@@ -7,7 +7,7 @@ import { planFingerprint } from "@/platform/make-real/approvals";
 const mocks = vi.hoisted(() => ({ owner: vi.fn(), publishing: vi.fn(), channel: vi.fn(), proposal: vi.fn(), binding: vi.fn(), rpc: vi.fn(), scan: vi.fn(), revoke: vi.fn(), decrypt: vi.fn(), live: vi.fn(), provider: vi.fn() }));
 vi.mock("@/platform/business-record/service", () => ({ readBusinessRecord: mocks.owner }));
 vi.mock("@/products/publishing/server", () => ({ publishingEnabledForWorkspace: mocks.publishing }));
-vi.mock("@/platform/make-real/live-server", () => ({ makeRealChannelEnabled: mocks.channel }));
+vi.mock("@/platform/make-real/live-server", () => ({ makeRealChannelEnabled: mocks.channel, createServerLiveMakeReal: () => ({ read: mocks.live, resume: mocks.live, reconcile: mocks.live, rollback: mocks.live }) }));
 vi.mock("@/platform/possibilities/supabase-repository", () => ({ createSupabasePossibilityRepository: () => ({ get: mocks.proposal }) }));
 vi.mock("@/platform/account-bindings/store", () => ({ readGoogleBindingForTenant: mocks.binding, googleBindingsEnabled: () => true }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mocks.rpc }) }));
@@ -16,7 +16,7 @@ vi.mock("@/platform/infra/redis", () => ({ getRedis: () => ({ scan: mocks.scan }
 vi.mock("@/platform/infra/provider-revocation", () => ({ revokeProviderAuthorization: mocks.revoke }));
 vi.mock("@/platform/infra/crypto/secrets", () => ({ decryptSecret: mocks.decrypt }));
 vi.mock("@/platform/workspaces/acting-provider", () => ({ assertActingProvider: mocks.provider }));
-vi.mock("@/experience/systems/live-server", () => ({ liveMakeReal: { read: mocks.live, resume: mocks.live, reconcile: mocks.live, rollback: mocks.live }, googleMakeRealPorts: { inspect: mocks.provider, approve: mocks.provider, verify: mocks.provider, undo: mocks.provider } }));
+vi.mock("@/products/google-listing/make-real", () => ({ googleMakeRealPorts: { inspect: mocks.provider, approve: mocks.provider, verify: mocks.provider, undo: mocks.provider } }));
 import { commandNativeGoogle } from "@/products/google-listing/native/server";
 import { nativeGoogleGrantGeneration, type NativeGooglePlan } from "@/products/google-listing/native/contracts";
 import { workspaceHttpFailure } from "@/platform/workspaces/http";

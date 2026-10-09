@@ -108,6 +108,7 @@ export const SEPT30_EXTRA_APPLIED = ["20260930120000"];
 export const MIGRATION_SENTINELS: Record<string, string> = {
   // Full-model additions: private/denied probes remain unknown.
   "20261022173000": "creator_version_paid_periods",
+  "20261022175000": "tenant_reward_mutations",
   "20261021090031": "agent_business_discovery_days",
   "20261021093000": "agency_release_flag_ceilings",
   "20261021094000": "provider_client_queue_catalog_guard",

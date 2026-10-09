@@ -1,6 +1,6 @@
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
-import { commandNativeGoogle } from "@/products/google-listing/native/server";
+import { commandNativeGoogle } from "@/products/google-listing/server";
 import { POST as makeReal } from "@/app/api/workspace/systems/make-real/route";
 export const dynamic = "force-dynamic";
 export async function POST(request: Request) {

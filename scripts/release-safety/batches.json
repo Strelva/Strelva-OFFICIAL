@@ -1765,6 +1765,13 @@
           "rollbackStatus": "Prepared source-drift and populated-state guarded inverse; native inverse/reapply, concurrency and populated refusal qualification pending"
         },
         {
+          "file": "20261021140100_native_google_hash_portability.sql",
+          "sha256": "08de631d52c7d8f809e6308abc360550cabe9d6077a1a7a3324de772d2d1a4e6",
+          "rollback": "rollback-20261021140100_native_google_hash_portability.sql",
+          "rollbackSha256": "6b95affeb413a982dc82c2c039ed073934e6fbc39b8b3c3ea5507da26b5dbab4",
+          "rollbackStatus": "Forward-only core SHA-256 correction; extension-shadow vectors and immutable predecessor/authority refusal qualification prepared, unrun"
+        },
+        {
           "file": "20261022090100_tenant_cleanup_receipts.sql",
           "sha256": "8d94b1c8c40fe58dcf719b7c749bac1e7b8a83873a8166b27ceaef6d20cc78de",
           "rollback": "rollback-20261022090100_tenant_cleanup_receipts.sql",
@@ -1843,6 +1850,19 @@
           "rollback": "rollback-20261022173000_neutral_creator_version_money.sql",
           "rollbackSha256": "bf4cb07eab599c86aa436eb35e3754fb2f935212be73867e898fc237387f00be",
           "rollbackStatus": "Prepared exact eight-port owner/body/config/signature/normalized ACL and locked retained-table shape inverse; removes additive ports only and retains every immutable paid Version row and original writer; native refusal/inverse/reapply UNRUN"
+        }
+      ]
+    },
+    {
+      "id": "reward-durable-mutations",
+      "status": "Prepared exact native reward receipt/writer/fence and complete owner/body/ACL/catalog guards; source checks only; actual native refusal/inverse/reapply/Auth qualification UNRUN; no provider or commercial authority",
+      "items": [
+        {
+          "file": "20261022175000_reward_durable_mutations.sql",
+          "sha256": "e8839e25aabbcc8091e3e236b368fe61407e517a3b7f74840b641220bdbfc44d",
+          "rollback": "rollback-20261022175000_reward_durable_mutations.sql",
+          "rollbackSha256": "b954108fd69e80443bde2f38c514f6bcfed61d0b47e651d55520677d41cfba69",
+          "rollbackStatus": "Prepared exact three-function/full table/catalog/ACL/trigger guarded inverse under ordered native writer fence and ACCESS EXCLUSIVE receipt locks; refuses retained mutation receipts; requires superuser catalog exclusion and refuses managed inverse without it; actual native qualification UNRUN"
         }
       ]
     }
