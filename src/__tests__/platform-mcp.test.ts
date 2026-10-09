@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const ports = vi.hoisted(() => ({
   enabled: vi.fn(), limited: vi.fn(), services: vi.fn(), slots: vi.fn(), request: vi.fn(), lookup: vi.fn(),
@@ -155,6 +155,103 @@ describe("modern MCP 2026-07-28", () => {
     const throttled = await tool("list_services", { business: "fixture" });
     expect(throttled.status).toBe(429);
     expect((await throttled.json()).error.code).toBe(-31029);
+    expect(ports.services).not.toHaveBeenCalled();
+  });
+});
+
+describe.each([
+  ["public", "list_services", { business: "fixture" }, 200],
+  ["protected", "read_business_context", {}, 401],
+] as const)("%s MCP request body admission", (_kind, name, args, acceptedStatus) => {
+  function body(padding = "") {
+    return JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args }, padding });
+  }
+  function streamed(chunks: string[], declared?: string) {
+    let pulls = 0;
+    const cancel = vi.fn();
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        const chunk = chunks[pulls++];
+        if (chunk === undefined) controller.close();
+        else controller.enqueue(new TextEncoder().encode(chunk));
+      }, cancel,
+    }, { highWaterMark: 0 });
+    const init: RequestInit & { duplex: "half" } = {
+      method: "POST", duplex: "half", body: stream,
+      headers: { "content-type": "application/json", "mcp-protocol-version": "2025-11-25",
+        // A browser cookie must not replace bearer authority on protected calls.
+        cookie: "fixture-session=present", ...(declared ? { "content-length": declared } : {}) },
+    };
+    return { request: new Request(url(), init), cancel, pulls: () => pulls };
+  }
+  beforeEach(() => {
+    vi.stubEnv("STRELVA_MCP_OAUTH", "1");
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    ports.services.mockResolvedValue({ services: [], timeZone: "UTC", paused: false });
+  });
+  afterEach(() => vi.unstubAllEnvs());
+  it("cancels declared oversize bodies without reading or checking authority", async () => {
+    const input = streamed([body()], "30001");
+    expect((await platform(input.request)).status).toBe(400);
+    expect(input.pulls()).toBe(0);
+    expect(input.cancel).toHaveBeenCalledOnce();
+    expect(ports.limited).not.toHaveBeenCalled();
+    expect(ports.rpc).not.toHaveBeenCalled();
+    expect(ports.services).not.toHaveBeenCalled();
+  });
+  it("stops and cancels chunked bodies at the byte cap", async () => {
+    const input = streamed(Array.from({ length: 100 }, () => "x".repeat(10000)));
+    expect((await platform(input.request)).status).toBe(400);
+    expect(input.pulls()).toBe(4);
+    expect(input.cancel).toHaveBeenCalledOnce();
+    expect(ports.limited).not.toHaveBeenCalled();
+    expect(ports.rpc).not.toHaveBeenCalled();
+    expect(ports.services).not.toHaveBeenCalled();
+  });
+  it("rejects multibyte JSON exceeding the byte cap even below the character cap", async () => {
+    const raw = body("🦬".repeat(8000));
+    expect(raw.length).toBeLessThan(30000);
+    const input = streamed([raw]);
+    expect((await platform(input.request)).status).toBe(400);
+    expect(input.cancel).toHaveBeenCalledOnce();
+    expect(ports.limited).not.toHaveBeenCalled();
+    expect(ports.rpc).not.toHaveBeenCalled();
+    expect(ports.services).not.toHaveBeenCalled();
+  });
+  it("accepts valid JSON at exactly 30000 bytes", async () => {
+    const raw = body("x".repeat(30000 - Buffer.byteLength(body())));
+    expect(Buffer.byteLength(raw)).toBe(30000);
+    const input = streamed([raw.slice(0, 20000), raw.slice(20000)], "30000");
+    expect((await platform(input.request)).status).toBe(acceptedStatus);
+    expect(input.cancel).not.toHaveBeenCalled();
+  });
+  it("accepts chunked multibyte JSON split inside a UTF-8 character", async () => {
+    const bytes = new TextEncoder().encode(body("🦬".repeat(7000)));
+    const boundary = bytes.indexOf(240) + 1;
+    const init: RequestInit & { duplex: "half" } = {
+      method: "POST", duplex: "half", headers: { "content-type": "application/json" },
+      body: new ReadableStream<Uint8Array>({ start(controller) {
+        controller.enqueue(bytes.slice(0, boundary)); controller.enqueue(bytes.slice(boundary)); controller.close();
+      } }),
+    };
+    expect((await platform(new Request(url(), init))).status).toBe(acceptedStatus);
+  });
+  it("rejects invalid UTF-8 before authority or tools", async () => {
+    const bytes = new TextEncoder().encode(body("x"));
+    bytes[bytes.length - 3] = 0xff;
+    const init: RequestInit & { duplex: "half" } = {
+      method: "POST", duplex: "half", headers: { "content-type": "application/json" },
+      body: new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(bytes); controller.close(); } }),
+    };
+    expect((await platform(new Request(url(), init))).status).toBe(400);
+    expect(ports.limited).not.toHaveBeenCalled();
+    expect(ports.rpc).not.toHaveBeenCalled();
+    expect(ports.services).not.toHaveBeenCalled();
+  });
+  it("rejects empty and malformed JSON before tools or authority checks", async () => {
+    for (const raw of ["", " ", "{", "[]"]) expect((await platform(streamed([raw]).request)).status).toBe(400);
+    expect(ports.limited).not.toHaveBeenCalled();
+    expect(ports.rpc).not.toHaveBeenCalled();
     expect(ports.services).not.toHaveBeenCalled();
   });
 });
