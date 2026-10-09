@@ -1918,7 +1918,7 @@
       "items": [
         {
           "file": "20261022175100_legacy_google_operation_authority.sql",
-          "sha256": "291954094b3a29a7a27d1f14113795ad67d29e1b8382867878e680393f975718",
+          "sha256": "6ee4cd91f5aa7912f6ac997b7bff2949dc52e06621d46ce29827d8c8df622139",
           "rollback": "rollback-20261022175100_legacy_google_operation_authority.sql",
           "rollbackSha256": "ff278eb307e6619dd83b396b4ec04a33fbdddfa5279055ad4d91afa3fa48fb80",
           "rollbackStatus": "Forward-only operation watermark and authority ports; populated or empty inverse deliberately refuses; no DROP/inverse/reapply claim; actual refusal qualification UNRUN"
