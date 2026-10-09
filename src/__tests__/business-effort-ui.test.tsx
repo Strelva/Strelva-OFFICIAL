@@ -92,8 +92,8 @@ describe("human minutes on Internal work", () => {
 
   it("shows an honest empty state", async () => {
     render(createElement(BusinessEffortPortfolio, { load: await readyLoad({ entries: [], businesses: [] }) }));
-    expect(container.textContent).toContain("No customer businesses exist yet");
-    expect(container.textContent).toContain("No customer businesses exist yet");
+    expect(container.textContent).toContain("No client businesses exist yet");
+    expect(container.textContent).toContain("No client businesses exist yet");
     expect(container.textContent).toContain("No entries recorded yet.");
     expect(container.querySelector("form")).toBeNull();
   });
@@ -201,7 +201,7 @@ describe("human minutes on a client", () => {
 
   it("explains an unattached site instead of guessing a business", async () => {
     render(createElement(BusinessEffortForSite, { load: await readyLoad(), tenantId: "gldf" }));
-    expect(container.textContent).toContain("not attached to a customer business");
+    expect(container.textContent).toContain("not attached to a client business");
     expect(container.querySelector("form")).toBeNull();
   });
 

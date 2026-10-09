@@ -59,7 +59,7 @@ export function AccountPayerInbox() {
     {jobs.map(job => <article key={job.id} className="rounded-xl border border-gray-border p-4">
       <h3 className="text-sm font-medium text-warm-black">{job.workspaceName} · {job.productId.replaceAll("_", " ")}</h3>
       <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2"><div><dt className="text-gray-muted">Maximum</dt><dd>{money(job.maxAuthorizedCents)}</dd></div><div><dt className="text-gray-muted">Status</dt><dd className="capitalize">{job.status}</dd></div><div><dt className="text-gray-muted">Estimate</dt><dd>{job.estimateCents === null ? "Unknown" : money(job.estimateCents)}</dd></div><div><dt className="text-gray-muted">Reserved or held</dt><dd>{money(job.reservedCents)}</dd></div><div><dt className="text-gray-muted">Recorded use</dt><dd>{money(job.usedCents)}</dd></div><div><dt className="text-gray-muted">Final actual</dt><dd>{job.actualKnown && job.actualCents !== null ? money(job.actualCents) : "Unresolved"}</dd></div></dl>
-      <p className="mt-3 text-xs leading-relaxed text-gray-muted">This financial receipt does not include the saved work’s title, content, or customer data.</p>
+      <p className="mt-3 text-xs leading-relaxed text-gray-muted">This financial receipt does not include the saved work’s title, content, or business data.</p>
       {job.status === "draft" ? <Button className="mt-4" disabled={busy === job.id} onClick={() => void acceptJob(job.id)}>Accept {money(job.maxAuthorizedCents)} job limit</Button> : null}
     </article>)}
   </div>;

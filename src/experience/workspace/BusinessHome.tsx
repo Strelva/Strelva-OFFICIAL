@@ -129,7 +129,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   // An incomplete list would misplace a System; show none until it loads.
   const systems = systemsReleased && !systemsLoading ? knownSystems : [];
   const current = snapshot.workspaces.find(space => space.id === snapshot.workspaceId);
-  const providerSeat = current?.access === "provider_seat";
+  const agencySeat = current?.access === "provider_seat";
   const readOnly = current?.access === "delegated_read" || current?.access === "provider_seat";
   const customer = current?.kind === "customer";
   const name = current?.name || "Your business";
@@ -281,8 +281,8 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
     <section className={`${styles.dusk} ${styles.reveal}`} aria-labelledby="business-start-title">
       <div className={styles.duskMain}>
         <p className={styles.duskLine}>{readOnly ? systemsReleased ? "Shared with you" : "Shared workspace" : line}{(readOnly || line) ? " · " : ""}{name}</p>
-        <h1 id="business-start-title" className="font-display">{providerSeat ? "Your client’s website work." : readOnly ? "Review what was shared." : greeting}</h1>
-        {readOnly ? <p className={styles.duskNote}>{providerSeat ? `Your agency has assigned you to ${name}. Open a saved website to continue working.` : `${name} shared this with your agency to review.`}</p> : composer}
+        <h1 id="business-start-title" className="font-display">{agencySeat ? "Your client’s website work." : readOnly ? "Review what was shared." : greeting}</h1>
+        {readOnly ? <p className={styles.duskNote}>{agencySeat ? `Your agency has assigned you to ${name}. Open a saved website to continue working.` : `${name} shared this with your agency to review.`}</p> : composer}
       </div>
       {chips.length || systemsLine ? <ul className={styles.chips} aria-label="Right now">
         {chips.map(chip => <li key={chip.id} data-tone={chip.tone}><span className={styles.dot} aria-hidden="true" />{chip.text}</li>)}
@@ -317,7 +317,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
       {!business ? <p className={styles.contextLine} aria-label="Current Strelva context"><span>Working in <strong>{name}</strong></span>{savedResultCount ? <span>{savedResultCount} saved {savedResultCount === 1 ? "result" : "results"}</span> : null}{sites.length ? <span>{sites.length} connected {sites.length === 1 ? "website" : "websites"}</span> : null}</p> : null}
     </section> : null}
 
-    {unassignedSites.length ? <details className={styles.details} aria-label="Websites available to your account"><summary>Websites available to your account <span>{unassignedSites.length}</span></summary><p className={styles.muted}>{current?.kind !== "customer" ? "These websites are available through your account. Assign them from the appropriate customer business." : siteAssignmentsKnown ? "These websites are not yet assigned to this business." : "Business assignments could not be confirmed."}</p>{current?.kind !== "customer" ? <ul className={styles.list}>{unassignedSites.map(site => <li key={site.id}><a className={styles.row} href={site.href}><span><strong>{site.title}</strong><small>Account-authorized website</small></span><ArrowRight size={16} /></a></li>)}</ul> : <WebsiteAssignmentHandoff businessName={name} state={managedWorkUnavailable ? { status: "unavailable", reason: "Linked website access is unavailable right now." } : offerings} sites={unassignedSites} onRetry={onRetryWebsiteAssignments} onCommand={onWebsiteCommand} />}</details> : null}
+    {unassignedSites.length ? <details className={styles.details} aria-label="Websites available to your account"><summary>Websites available to your account <span>{unassignedSites.length}</span></summary><p className={styles.muted}>{current?.kind !== "customer" ? "These websites are available through your account. Assign them from the appropriate client business." : siteAssignmentsKnown ? "These websites are not yet assigned to this business." : "Business assignments could not be confirmed."}</p>{current?.kind !== "customer" ? <ul className={styles.list}>{unassignedSites.map(site => <li key={site.id}><a className={styles.row} href={site.href}><span><strong>{site.title}</strong><small>Account-authorized website</small></span><ArrowRight size={16} /></a></li>)}</ul> : <WebsiteAssignmentHandoff businessName={name} state={managedWorkUnavailable ? { status: "unavailable", reason: "Linked website access is unavailable right now." } : offerings} sites={unassignedSites} onRetry={onRetryWebsiteAssignments} onCommand={onWebsiteCommand} />}</details> : null}
 
     <details className={styles.details} aria-label="Usage and connected services"><summary>Usage and connected services</summary><div className={styles.connections}>{customer && !readOnly ? <WorkspaceAllowanceSummary businessId={snapshot.workspaceId} enabled compact onOpenSettings={() => onNavigate("settings")} /> : null}<BusinessOfferingSummary state={offerings} work={snapshot.work} onOpen={onOfferings} systemsReleased={systemsReleased} /></div></details>
   </div>;

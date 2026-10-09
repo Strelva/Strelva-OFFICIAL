@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NO_OPEN_WORK, leaveWork, startContinuation, startRequest, type OpenWorkContext } from "@/experience/workspace/open-work";
+import { NO_OPEN_WORK, leaveWork, startContinuation, startAsk, type OpenWorkContext } from "@/experience/workspace/open-work";
 import type { WorkspaceStartContinuation } from "@/experience/workspace/workspace-start";
 
 const continuation = (route: WorkspaceStartContinuation["route"], request = "Organize supplier onboarding"): WorkspaceStartContinuation => ({ route, request, includedPartIds: [] });
@@ -39,7 +39,7 @@ describe("open work context", () => {
       for (const key of Object.keys(NO_OPEN_WORK) as Array<keyof OpenWorkContext>) {
         expect(open[key]).toEqual(key in overrides ? overrides[key] : NO_OPEN_WORK[key]);
       }
-      expect(startRequest(open, "onboarding")).toBeUndefined();
+      expect(startAsk(open, "onboarding")).toBeUndefined();
     }
   });
 
@@ -49,8 +49,8 @@ describe("open work context", () => {
     expect(startContinuation(tracker, "document", "document")).toBeNull();
     expect(startContinuation(tracker, "work", "assessment")).toBeNull();
     const websites = leaveWork({ start: { view: "websites", request: "A new site" } });
-    expect(startRequest(websites, "websites")).toBe("A new site");
-    expect(startRequest(websites, "scheduling")).toBeUndefined();
-    expect(startRequest(websites, "plan")).toBeUndefined();
+    expect(startAsk(websites, "websites")).toBe("A new site");
+    expect(startAsk(websites, "scheduling")).toBeUndefined();
+    expect(startAsk(websites, "plan")).toBeUndefined();
   });
 });

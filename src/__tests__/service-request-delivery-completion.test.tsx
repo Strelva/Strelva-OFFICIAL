@@ -81,7 +81,7 @@ describe("service request delivery completion", () => {
 
     const checkboxes = container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
     expect(checkboxes).toHaveLength(3);
-    const create = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find((button) => button.textContent?.includes("Create exact provider assignment"))!;
+    const create = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find((button) => button.textContent?.includes("Create exact agency assignment"))!;
     expect(create.disabled).toBe(true);
     await act(async () => checkboxes.forEach((checkbox) => checkbox.click()));
     const email = container.querySelector<HTMLInputElement>('input[type="email"]')!;

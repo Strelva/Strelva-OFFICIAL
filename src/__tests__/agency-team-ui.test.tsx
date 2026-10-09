@@ -41,7 +41,7 @@ it("keeps members read only with no invitation or assignment controls", async ()
 });
 it("renders loading, empty, forbidden/error and retry states", async () => {
   const loading = await render("loading"); expect(loading.node.textContent).toContain("Loading team");
-  const empty = await render("empty"); expect(empty.node.textContent).toContain("No clients have an active provider seat");
+  const empty = await render("empty"); expect(empty.node.textContent).toContain("No clients have an active agency seat");
   const failed = await render("permission"); expect(failed.node.querySelector('[role="alert"]')).toBeTruthy();
   await click(button(failed.node, "Retry team")); expect(failed.request).toHaveBeenCalledTimes(2);
 });

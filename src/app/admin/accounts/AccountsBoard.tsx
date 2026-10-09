@@ -155,7 +155,7 @@ export function AccountsBoard({
         <AdminEmpty
           icon={<span className="text-lg">◇</span>}
           title="No accounts yet"
-          description="Create an account to group a customer's sites under one bundled subscription."
+          description="Create an account to group a client's sites under one bundled subscription."
         />
       ) : (
         <div className="space-y-4">

@@ -219,12 +219,12 @@ async function providerSeatWorkspaceIds(input: WorkspaceActor): Promise<string[]
   const { data, error } = await rpc("read_version_actor", {
     p_user_id: a.userId, p_verified_email: a.verifiedEmail,
   });
-  if (error) workspaceDbFailure(error, "Provider seat access is unavailable");
+  if (error) workspaceDbFailure(error, "Agency access is unavailable");
   const result = z.object({ userId: z.string(), memberships: z.array(z.object({
     businessId: z.string().uuid(), role: z.enum(["owner", "admin", "member"]),
     via: z.enum(["membership", "provider_seat"]),
   })) }).safeParse(data);
-  if (!result.success || result.data.userId !== a.userId) throw new WorkspaceStoreError("Provider seat access is unavailable");
+  if (!result.success || result.data.userId !== a.userId) throw new WorkspaceStoreError("Agency access is unavailable");
   return result.data.memberships.filter(row => row.via === "provider_seat").map(row => row.businessId);
 }
 

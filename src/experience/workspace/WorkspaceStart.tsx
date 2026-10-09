@@ -70,7 +70,7 @@ function WebsiteRequestHandoff({ handoff, onBack }: { handoff: WorkspaceStartWeb
   const requestRef = useRef<HTMLTextAreaElement>(null);
   const requestId = useId();
 
-  async function copyRequest() {
+  async function copyAsk() {
     try {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(handoff.request);
@@ -85,17 +85,17 @@ function WebsiteRequestHandoff({ handoff, onBack }: { handoff: WorkspaceStartWeb
       setCopyError("");
     } catch {
       setCopied(false);
-      setCopyError("Copy was unavailable. Select the request below and copy it before opening the website.");
+      setCopyError("Copy was unavailable. Select the ask below and copy it before opening the website.");
     }
   }
 
   return <section className={styles.startProposal} aria-labelledby="website-request-handoff-title">
-    <div className={styles.startProposalHeader}><div className={styles.startProposalIcon}><Globe2 size={19} aria-hidden="true" /></div><div><p className={styles.eyebrow}>Website work</p><h2 id="website-request-handoff-title">Open {handoff.site.title} with your request ready.</h2></div></div>
-    <p className={styles.startProposalSummary}>The website opens in a separate step, so this request cannot travel there automatically. Copy it first, then open the website. Nothing has been sent.</p>
-    <label className={styles.startRequestField} htmlFor={requestId}><span>Request to carry with you</span><textarea ref={requestRef} id={requestId} value={handoff.request} readOnly rows={5} /></label>
+    <div className={styles.startProposalHeader}><div className={styles.startProposalIcon}><Globe2 size={19} aria-hidden="true" /></div><div><p className={styles.eyebrow}>Website work</p><h2 id="website-request-handoff-title">Open {handoff.site.title} with your ask ready.</h2></div></div>
+    <p className={styles.startProposalSummary}>The website opens in a separate step, so this ask cannot travel there automatically. Copy it first, then open the website. Nothing has been sent.</p>
+    <label className={styles.startAskField} htmlFor={requestId}><span>Ask to carry with you</span><textarea ref={requestRef} id={requestId} value={handoff.request} readOnly rows={5} /></label>
     {copyError ? <p className={styles.startError} role="alert">{copyError}</p> : null}
-    <div className={styles.startProposalActions}><button type="button" className={styles.primaryAction} onClick={() => void copyRequest()}>{copied ? <Check size={16} /> : <Clipboard size={16} />}{copied ? "Copied" : "Copy request"}</button><a className={styles.secondaryAction} href={handoff.site.href} target="_blank" rel="noreferrer">Open website<ArrowRight size={16} /></a>{onBack ? <button type="button" className={styles.secondaryAction} onClick={onBack}>Back to request</button> : null}</div>
-    {copied ? <p className={styles.startFootnote} role="status">Your request is on the clipboard. Paste it into the website conversation when you are ready.</p> : null}
+    <div className={styles.startProposalActions}><button type="button" className={styles.primaryAction} onClick={() => void copyAsk()}>{copied ? <Check size={16} /> : <Clipboard size={16} />}{copied ? "Copied" : "Copy ask"}</button><a className={styles.secondaryAction} href={handoff.site.href} target="_blank" rel="noreferrer">Open website<ArrowRight size={16} /></a>{onBack ? <button type="button" className={styles.secondaryAction} onClick={onBack}>Back to ask</button> : null}</div>
+    {copied ? <p className={styles.startFootnote} role="status">Your ask is on the clipboard. Paste it into the website conversation when you are ready.</p> : null}
   </section>;
 }
 
@@ -197,11 +197,11 @@ export function WorkspaceStart({ context, systemsReleased = false, initialReques
     </section>
 
     {websiteHandoff ? <WebsiteRequestHandoff handoff={websiteHandoff} onBack={onWebsiteHandoffBack} /> : plan ? <section className={styles.startProposal} aria-labelledby={`${formId}-proposal`} aria-live="polite">
-      <div className={styles.startProposalHeader}><div className={styles.startProposalIcon}>{renderPlanIcon(plan.route)}</div><div><p className={styles.eyebrow}>{plan.kind === "help" ? (plan.matchedRoutes?.length ? "Multiple outcomes" : "Request to review") : "Proposed next step"}</p><h2 id={`${formId}-proposal`}>{plan.title}</h2></div></div>
+      <div className={styles.startProposalHeader}><div className={styles.startProposalIcon}>{renderPlanIcon(plan.route)}</div><div><p className={styles.eyebrow}>{plan.kind === "help" ? (plan.matchedRoutes?.length ? "Multiple outcomes" : "Ask to review") : "Proposed next step"}</p><h2 id={`${formId}-proposal`}>{plan.title}</h2></div></div>
       <p className={styles.startProposalSummary}>{plan.summary}</p>
-      {plan.kind === "help" ? <p className={styles.startRequestEcho}><strong>Your request stays intact:</strong> <span>{plan.request}</span></p> : null}
+      {plan.kind === "help" ? <p className={styles.startAskEcho}><strong>Your ask stays intact:</strong> <span>{plan.request}</span></p> : null}
       <p className={styles.startNextAction}><strong>Next:</strong> {plan.nextAction}</p>
-        {plan.kind === "help" ? <><div className={styles.startHelp}><CircleHelp size={17} aria-hidden="true" /><p><strong>Choose a supported next step.</strong> Strelva can assess a business, turn a CSV into a tracker, handle inquiries for an authorized business, open work on a connected managed website, start a private document, organize onboarding requirements, build an application, set up scheduling, compare saved sources, or carry a bounded responsibility. No work has started from this request. {context.readOnly ? "Switch to a workspace where you can start work before preparing a plan." : "You can ask about the closest path when none of these fits."}</p></div>{plan.reason ? <div className={styles.startBlocked} role="status"><CircleHelp size={17} aria-hidden="true" /><p>{plan.reason}</p></div> : null}</> : <>
+        {plan.kind === "help" ? <><div className={styles.startHelp}><CircleHelp size={17} aria-hidden="true" /><p><strong>Choose a supported next step.</strong> Strelva can assess a business, turn a CSV into a tracker, handle inquiries for an authorized business, open work on a connected managed website, start a private document, organize onboarding requirements, build an application, set up scheduling, compare saved sources, or carry a bounded responsibility. No work has started from this ask. {context.readOnly ? "Switch to a workspace where you can start work before preparing a plan." : "You can ask about the closest path when none of these fits."}</p></div>{plan.reason ? <div className={styles.startBlocked} role="status"><CircleHelp size={17} aria-hidden="true" /><p>{plan.reason}</p></div> : null}</> : <>
         <div className={styles.startParts} aria-label="Proposed result">{plan.parts.map((part) => renderPart(part, selectedPartIds.includes(part.id), () => togglePart(part.id), `${formId}-${part.id}`))}</div>
         {selection ? <label className={styles.startSelect} htmlFor={`${formId}-selection`}><span>{selection}</span><select id={`${formId}-selection`} value={plan.needsSelection === "business" ? businessId : siteId} onChange={(event) => plan.needsSelection === "business" ? setBusinessId(event.target.value) : setSiteId(event.target.value)} required><option value="">Choose one</option>{(plan.needsSelection === "business" ? selectedBusiness : selectedSites).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label> : null}
         {templates.length ? <label className={styles.startSelect} htmlFor={`${formId}-template`}><span>Starting template <small>Optional</small></span><select id={`${formId}-template`} value={trackerTemplateId} onChange={(event) => setTrackerTemplateId(event.target.value)}><option value="">Start from a blank tracker</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.label}</option>)}</select></label> : null}

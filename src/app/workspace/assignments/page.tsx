@@ -18,7 +18,7 @@ export default async function WorkspaceAssignmentsPage() {
         <header className="border-b border-gray-border pb-8">
           <p className="text-[14px] font-medium leading-5 text-accent-text">Your work inbox</p>
           <h1 className="mt-4 font-display text-[40px] font-normal leading-[48px] text-warm-black">Assigned work</h1>
-          <p className="mt-4 max-w-xl text-[14px] leading-relaxed text-gray-muted">Work appears here only when an approved assignment or provider request addresses this verified account. Acceptance remains explicit.</p>
+          <p className="mt-4 max-w-xl text-[14px] leading-relaxed text-gray-muted">Work appears here only when an approved assignment or agency request addresses this verified account. Acceptance remains explicit.</p>
         </header>
         <section className="py-8"><OperationalInbox mode="assigned" /></section>
       </div>

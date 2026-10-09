@@ -13,8 +13,8 @@ const providerRequests = [
   "Have Strelva build our website.",
 ];
 
-describe("provider-first website requests", () => {
-  it.each(providerRequests)("keeps %s on provider review even when generation is available", request => {
+describe("agency-first website requests", () => {
+  it.each(providerRequests)("keeps %s on agency review even when generation is available", request => {
     const plan = planWorkspaceStart(request, context);
     expect(plan).toMatchObject({ route: "help", deliveryMode: "service", request, helpRequest: request, canContinue: true });
     expect(plan.nextAction).toContain("separate acceptance");
@@ -30,11 +30,11 @@ describe("provider-first website requests", () => {
     "Create a website myself.",
     "I do not want Strelva to build a website.",
     "Strelva, please show me how to design our website.",
-  ])("does not turn %s into provider delivery", request => {
+  ])("does not turn %s into agency delivery", request => {
     expect(planWorkspaceStart(request, context).deliveryMode).toBeUndefined();
   });
 
-  it("keeps a provider-first multi-part brief intact", () => {
+  it("keeps an agency-first multi-part brief intact", () => {
     const request = "Strelva, please design our website and organize supplier onboarding.";
     expect(planWorkspaceStart(request, context)).toMatchObject({ deliveryMode: "service", helpRequest: request, request });
   });

@@ -228,7 +228,7 @@ function Checklist({ onboarding, workspaceHref, addClient }: { onboarding: Onboa
       </ul>
     </>,
     first_client: onboarding.clients > 0
-      ? <p>{onboarding.clients} {onboarding.clients === 1 ? "client has" : "clients have"} chosen {agency.name} as their provider.</p>
+      ? <p>{onboarding.clients} {onboarding.clients === 1 ? "client has" : "clients have"} chosen {agency.name} as their agency.</p>
       : <>
         <p>Each client keeps ownership of their business. Your agency works inside the access they give it.</p>
         {addClient && agency.role !== "member"

@@ -2,21 +2,27 @@ import { z } from "zod";
 import { deliveryCommitmentSchema } from "./delivery-commitment";
 
 export interface ServiceRequestActor { userId: string; verifiedEmail: string; }
-export const serviceRequestProviderSchema = z.discriminatedUnion("kind", [
+export const serviceRequestAgencySchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("strelva") }).strict(),
   z.object({ kind: z.literal("agency"), agencyWorkspaceId: z.string().uuid() }).strict(),
 ]);
-export type ServiceRequestProvider = z.infer<typeof serviceRequestProviderSchema>;
+export type ServiceRequestAgency = z.infer<typeof serviceRequestAgencySchema>;
+/** @deprecated Use ServiceRequestAgency. Wire keys retain their original names. */
+export type ServiceRequestProvider = ServiceRequestAgency;
+/** @deprecated Use serviceRequestAgencySchema. */
+export const serviceRequestProviderSchema = serviceRequestAgencySchema;
 export const serviceRequestStatusSchema = z.enum(["draft", "requested", "withdrawn"]);
-export const serviceRequestProviderAcceptanceSchema = z.object({
+export const serviceRequestAgencyAcceptanceSchema = z.object({
   status: z.enum(["pending", "accepted", "declined"]),
   actorId: z.string().uuid().nullable(), acceptedAt: z.string().datetime({ offset: true }).nullable(), note: z.string().nullable(),
 }).strict();
+/** @deprecated Use serviceRequestAgencyAcceptanceSchema. */
+export const serviceRequestProviderAcceptanceSchema = serviceRequestAgencyAcceptanceSchema;
 export const serviceRequestSchema = z.object({
   id: z.string().uuid(), businessId: z.string().uuid(), status: serviceRequestStatusSchema,
   request: z.string().min(1).max(3_000), outcome: z.string().min(1).max(3_000),
   context: z.record(z.string(), z.unknown()), scope: z.array(z.string().min(1).max(120)).min(1).max(16),
-  provider: serviceRequestProviderSchema, providerAcceptance: serviceRequestProviderAcceptanceSchema,
+  provider: serviceRequestAgencySchema, providerAcceptance: serviceRequestAgencyAcceptanceSchema,
   installationId: z.string().uuid().nullable(), deliveryId: z.string().uuid().nullable(),
   deliveryCommitment: deliveryCommitmentSchema.nullable().optional(),
   revision: z.number().int().positive(), createdBy: z.string().uuid(),

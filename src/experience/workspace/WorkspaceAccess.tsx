@@ -53,7 +53,7 @@ export function AccessPanel({ snapshot, currentKind, currentAccess, currentRole,
   // Local handoff/revoke state belongs to the exact workspace + selected work.
   // Remounting on that boundary prevents a created token or a pending spinner
   // from leaking into another work item while an old request resolves.
-  if (currentAccess === "provider_seat") return <div className="mx-auto max-w-3xl"><h1 className="font-display text-[36px]">Agency provider access.</h1><p className="mt-3 text-gray-muted">Your agency has an active provider seat and has assigned you to this business. You can work on its website. The business controls ownership and access to customer records.</p></div>;
+  if (currentAccess === "provider_seat") return <div className="mx-auto max-w-3xl"><h1 className="font-display text-[36px]">Agency access.</h1><p className="mt-3 text-gray-muted">Your agency has an active agency seat and has assigned you to this business. You can work on its website. The business controls ownership and access to customer records.</p></div>;
   if (currentAccess === "delegated_read") return <DelegatedAccessSurface key={contextKey} />;
   if (currentKind === "personal") return <CreateAgency key={contextKey} postAction={postAction} isActive={isActive} onCreated={onAgencyCreated} />;
   if (currentKind === "customer") return <CustomerAccess key={contextKey} snapshot={snapshot} currentRole={currentRole} postAction={postAction} isActive={isActive} onChanged={onChanged} setNotice={setNotice} />;
@@ -77,8 +77,8 @@ function DelegatedAccessSurface() {
   return (
     <div className="mx-auto max-w-3xl">
       <LockKeyhole className="h-6 w-6 text-accent-text" strokeWidth={1.5} />
-      <h1 className="mt-5 font-display text-[36px] font-medium text-warm-black">Customer work shared read-only.</h1>
-      <p className="mt-3 max-w-xl text-[14px] leading-relaxed text-gray-muted">Your agency can review the work the customer shared. The customer owns it and controls access. You cannot create, change, hand off, or revoke anything from this view.</p>
+      <h1 className="mt-5 font-display text-[36px] font-medium text-warm-black">Client work shared read-only.</h1>
+      <p className="mt-3 max-w-xl text-[14px] leading-relaxed text-gray-muted">Your agency can review the work the client shared. The client owns it and controls access. You cannot create, change, hand off, or revoke anything from this view.</p>
     </div>
   );
 }
@@ -102,8 +102,8 @@ function CreateAgency({ postAction, isActive, onCreated }: { postAction: AccessA
   return (
     <div className="mx-auto max-w-2xl">
       <Building2 className="h-6 w-6 text-accent-text" strokeWidth={1.5} />
-      <h1 className="mt-5 font-display text-[36px] font-medium leading-tight text-warm-black">Prepare useful work before the customer arrives.</h1>
-      <p className="mt-4 max-w-xl text-[14px] leading-relaxed text-gray-muted">An agency workspace keeps your drafts separate. Hand off a finished assessment to its named customer, who receives their own copy and decides whether you retain read-only access.</p>
+      <h1 className="mt-5 font-display text-[36px] font-medium leading-tight text-warm-black">Prepare useful work before the client arrives.</h1>
+      <p className="mt-4 max-w-xl text-[14px] leading-relaxed text-gray-muted">An agency workspace keeps your drafts separate. Hand off a finished assessment to its named client, who receives their own copy and decides whether you retain read-only access.</p>
       <form onSubmit={submit} className="mt-8 max-w-md">
         <TextInput label="Agency name" autoFocus required value={name} onChange={(event) => setName(event.target.value)} placeholder="Northstar Agency" className="min-h-12" />
         {error ? <p role="alert" className="mt-3 text-[13px] text-critical">{error}</p> : null}
@@ -128,13 +128,13 @@ function AgencyHandoff({ snapshot, currentRole, selectedWork, postAction, isActi
     if (!selectedWork) return;
     setSubmitting(true); setNotice(null); setCreatedLink(""); setCopyState("idle");
     try {
-      const body = await postAction<{ token: string }>({ action: "handoff", workId: selectedWork.id, recipientEmail: recipientEmail.trim() }, "The customer handoff couldn’t be created.");
+      const body = await postAction<{ token: string }>({ action: "handoff", workId: selectedWork.id, recipientEmail: recipientEmail.trim() }, "The client handoff couldn’t be created.");
       const link = `${window.location.origin}/workspace#handoff=${encodeURIComponent(body.token)}`;
       if (!isActive()) return;
       setCreatedLink(link);
       setNotice({ kind: "success", message: `Handoff created for ${recipientEmail.trim()}. It has not been accepted yet.` });
       onChanged();
-    } catch (cause) { if (isActive()) setNotice({ kind: "error", message: cause instanceof Error ? cause.message : "The customer handoff couldn’t be created." }); }
+    } catch (cause) { if (isActive()) setNotice({ kind: "error", message: cause instanceof Error ? cause.message : "The client handoff couldn’t be created." }); }
     finally { if (isActive()) setSubmitting(false); }
   }
 
@@ -154,16 +154,16 @@ function AgencyHandoff({ snapshot, currentRole, selectedWork, postAction, isActi
   return (
     <div className="mx-auto max-w-3xl">
       <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-accent-text">Agency handoff</p>
-      <h1 className="mt-4 font-display text-[36px] font-medium leading-tight text-warm-black">Put finished work in the customer’s hands.</h1>
-      <p className="mt-4 max-w-2xl text-[14px] leading-relaxed text-gray-muted">The link is bound to the recipient’s signed-in email. Acceptance creates an independent, customer-owned copy. Agency access is never assumed.</p>
+      <h1 className="mt-4 font-display text-[36px] font-medium leading-tight text-warm-black">Put finished work in the client’s hands.</h1>
+      <p className="mt-4 max-w-2xl text-[14px] leading-relaxed text-gray-muted">The link is bound to the recipient’s signed-in email. Acceptance creates an independent, client-owned copy. Agency access is never assumed.</p>
       {currentRole === "owner" ? <div className="mt-5 flex flex-wrap gap-3"><a href={`/workspace/invitations?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-10 items-center rounded-xl border border-gray-border px-4 text-[13px] font-medium text-warm-black hover:bg-gray-bg">Manage workspace invitations</a><a href={`/workspace/export?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-10 items-center rounded-xl border border-gray-border px-4 text-[13px] font-medium text-warm-black hover:bg-gray-bg">Export workspace data</a></div> : null}
       {selectedWork && !isDelegatedCustomerWork && !isUnsupportedWork ? (
         <form onSubmit={createHandoff} className="mt-8 border-y border-gray-border py-6">
           <p className="text-[12px] text-gray-muted">Handoff</p><p className="mt-1 text-[15px] font-medium text-warm-black">{selectedWork.title}</p>
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end"><TextInput label="Customer email" type="email" autoComplete="email" required value={recipientEmail} onChange={(event) => setRecipientEmail(event.target.value)} placeholder="owner@business.com" className="min-h-11 sm:min-w-[300px]" /><Button type="submit" size="lg" loading={submitting} icon={<Link2 className="h-4 w-4" />}>Create private handoff</Button></div>
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end"><TextInput label="Client email" type="email" autoComplete="email" required value={recipientEmail} onChange={(event) => setRecipientEmail(event.target.value)} placeholder="owner@business.com" className="min-h-11 sm:min-w-[300px]" /><Button type="submit" size="lg" loading={submitting} icon={<Link2 className="h-4 w-4" />}>Create private handoff</Button></div>
           {createdLink ? <div className="mt-4 flex flex-col gap-2 rounded-xl bg-gray-bg px-4 py-3 sm:flex-row sm:items-center"><code className="min-w-0 flex-1 truncate text-[11px] text-gray-muted">{createdLink}</code><Button type="button" size="sm" variant="secondary" icon={<Copy className="h-3.5 w-3.5" />} onClick={() => void copyLink()}>Copy link</Button>{copyState === "copied" ? <span role="status" className="text-[11px] text-positive">Copied</span> : copyState === "error" ? <span role="status" className="text-[11px] text-critical">Copy unavailable</span> : null}</div> : null}
         </form>
-      ) : <p className="mt-8 border-y border-gray-border py-6 text-[14px] text-gray-muted">{isDelegatedCustomerWork ? "This is a customer-owned copy shared with your agency as read-only. It cannot be handed to someone else." : isUnsupportedWork ? "This product cannot be handed off in this release. Its saved record remains available." : "Create or select an assessment before preparing a handoff."}</p>}
+      ) : <p className="mt-8 border-y border-gray-border py-6 text-[14px] text-gray-muted">{isDelegatedCustomerWork ? "This is a client-owned copy shared with your agency as read-only. It cannot be handed to someone else." : isUnsupportedWork ? "This product cannot be handed off in this release. Its saved record remains available." : "Create or select an assessment before preparing a handoff."}</p>}
       <section className="mt-8"><h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">Handoff history</h2>{snapshot.handoffs.length ? <ul className="mt-3 divide-y divide-gray-border border-y border-gray-border">{snapshot.handoffs.map((handoff) => <li key={handoff.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[13px] font-medium text-warm-black">{handoff.recipientEmail}</p><p className="mt-1 text-[11px] capitalize text-gray-muted">{handoff.status} · created {formatDate(handoff.createdAt)}</p></div>{handoff.status === "pending" ? <Button type="button" size="sm" variant="danger" disabled={submitting} onClick={() => void revoke(handoff.id)}>Revoke</Button> : null}</li>)}</ul> : <p className="mt-3 text-[13px] text-gray-muted">No handoffs from this workspace yet.</p>}</section>
     </div>
   );
@@ -287,7 +287,7 @@ export function AccessHandoffOverlay({ loading, token, preview, postAction, onAc
             <div className="mt-8 border-y border-gray-border py-7">{isAiVisibilityPreview ? <AiVisibilityAssessmentResult work={preview.work} accessLabel="Prepared handoff preview" /> : isTrackerPreview ? <TrackerHandoffPreview preview={isTrackerPreview} /> : <p className="text-[14px] text-gray-muted">This handoff preview is unavailable. The saved work remains unchanged.</p>}</div>
             {preview.accepted ? <p className="mt-7 flex items-center gap-2 text-[14px] text-positive"><Check className="h-4 w-4" />This handoff has already been accepted.</p> : (
               <div className="mt-7">
-                <p className="text-[14px] font-medium text-warm-black">Accept your own copy</p><p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-gray-muted">This creates customer-owned work in your account. The agency’s original remains separate.</p>
+                <p className="text-[14px] font-medium text-warm-black">Accept your own copy</p><p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-gray-muted">This creates your own work in your account. The agency’s original remains separate.</p>
                 <fieldset className="mt-5 rounded-xl border border-gray-border bg-surface-inset p-4">
                   <legend className="px-1 text-[13px] font-medium text-warm-black">Which business is this for?</legend>
                   <p className="mt-1 text-[12px] leading-relaxed text-gray-muted">The business you choose will own this copy.</p>

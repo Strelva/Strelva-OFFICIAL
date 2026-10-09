@@ -3,9 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const rpc = vi.hoisted(() => vi.fn());
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc }) }));
 
-import { postgresProviderDeliveries } from "@/platform/offerings/provider-delivery-repository";
+import { postgresAgencyDeliveries } from "@/platform/offerings/provider-delivery-repository";
 
-describe("provider delivery repository", () => {
+describe("agency delivery repository", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("accepts PostgreSQL offset timestamps from the connected RPC boundary", async () => {
@@ -24,7 +24,7 @@ describe("provider delivery repository", () => {
         { kind: "accepted", actorId: "10000000-0000-4000-8000-000000000006", at: "2026-09-18T12:01:00+00:00", note: null }],
     }] });
 
-    const deliveries = await postgresProviderDeliveries.list(
+    const deliveries = await postgresAgencyDeliveries.list(
       { userId: "10000000-0000-4000-8000-000000000005", verifiedEmail: "owner@example.test" },
       "10000000-0000-4000-8000-000000000002",
     );

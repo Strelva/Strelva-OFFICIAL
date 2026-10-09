@@ -9,8 +9,8 @@ vi.mock("resend", () => ({
 }));
 
 import { batchEmailSuppression, sendEmailWithReceipt } from "@/platform/infra/email/send";
-import { senderDomain, setProviderGateDb, type ProviderGateDb } from "@/platform/infra/email/provider-gate";
-import { actingProviderRefusal, assertActingProvider, type ActingProviderDb } from "@/platform/workspaces/acting-provider";
+import { senderDomain, setAgencyGateDb, type AgencyGateDb } from "@/platform/infra/email/provider-gate";
+import { actingAgencyRefusal, assertActingAgency, type ActingAgencyDb } from "@/platform/workspaces/acting-provider";
 import { WorkspaceStoreError } from "@/platform/workspaces/types";
 import type { SendEmailInput } from "@/platform/infra/email/send";
 
@@ -18,7 +18,7 @@ const business = "11111111-1111-4111-8111-111111111111";
 const agency = "22222222-2222-4222-8222-222222222222";
 const person = { userId: "33333333-3333-4333-8333-333333333333", verifiedEmail: "staff@agency.example.test" };
 
-function gateDb(allowed: boolean | "error"): ProviderGateDb & { calls: Array<Record<string, unknown>> } {
+function gateDb(allowed: boolean | "error"): AgencyGateDb & { calls: Array<Record<string, unknown>> } {
   const calls: Array<Record<string, unknown>> = [];
   return {
     calls,
@@ -40,7 +40,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  setProviderGateDb(null);
+  setAgencyGateDb(null);
   vi.unstubAllEnvs();
 });
 
@@ -48,20 +48,20 @@ const mail = (over: Partial<SendEmailInput> = {}): SendEmailInput => ({
   audience: "client", to: "owner@example.test", subject: "Hello", html: "<p>Hi</p>", text: "Hi", ...over,
 } as SendEmailInput);
 
-describe("the acting-provider refusal words", () => {
+describe("the acting-agency refusal words", () => {
   it("maps each SQL reason and nothing else", () => {
-    expect(actingProviderRefusal("P0001 acting_provider_not_staffed")).toMatch(/not on this business/);
-    expect(actingProviderRefusal("acting_provider_unverified")).toMatch(/isn't verified/);
-    expect(actingProviderRefusal("acting_provider_no_mandate")).toMatch(/owner hasn't given your agency permission/);
-    expect(actingProviderRefusal("workspace_access_denied")).toBeNull();
-    expect(actingProviderRefusal(undefined)).toBeNull();
+    expect(actingAgencyRefusal("P0001 acting_provider_not_staffed")).toMatch(/not on this business/);
+    expect(actingAgencyRefusal("acting_provider_unverified")).toMatch(/isn't verified/);
+    expect(actingAgencyRefusal("acting_provider_no_mandate")).toMatch(/owner hasn't given your agency permission/);
+    expect(actingAgencyRefusal("workspace_access_denied")).toBeNull();
+    expect(actingAgencyRefusal(undefined)).toBeNull();
   });
 });
 
-describe("assertActingProvider", () => {
+describe("assertActingAgency", () => {
   it("asks the database for this person, effect and resource, and returns the agency", async () => {
     const rpc = vi.fn(async () => ({ data: agency, error: null }));
-    await expect(assertActingProvider(person, business, { effect: "google", kind: "google_location", ref: "loc1" }, { rpc } as ActingProviderDb)).resolves.toBe(agency);
+    await expect(assertActingAgency(person, business, { effect: "google", kind: "google_location", ref: "loc1" }, { rpc } as ActingAgencyDb)).resolves.toBe(agency);
     expect(rpc).toHaveBeenCalledWith("assert_acting_provider", {
       p_workspace_id: business, p_user_id: person.userId, p_verified_email: person.verifiedEmail,
       p_effect: "google", p_resource_kind: "google_location", p_resource_ref: "loc1",
@@ -70,27 +70,27 @@ describe("assertActingProvider", () => {
 
   it("refuses with the agency's words, and fails closed on anything else", async () => {
     const refused = { rpc: async () => ({ data: null, error: { message: "acting_provider_no_mandate" } }) };
-    await expect(assertActingProvider(person, business, { effect: "publish", kind: "domain", ref: "www.example.test" }, refused))
+    await expect(assertActingAgency(person, business, { effect: "publish", kind: "domain", ref: "www.example.test" }, refused))
       .rejects.toMatchObject({ name: "WorkspaceAccessError", message: expect.stringMatching(/permission/) });
     const broken = { rpc: async () => ({ data: null, error: { message: "connection reset" } }) };
-    await expect(assertActingProvider(person, business, { effect: "email", kind: "sender", ref: "mail.example.test" }, broken)).rejects.toBeInstanceOf(WorkspaceStoreError);
+    await expect(assertActingAgency(person, business, { effect: "email", kind: "sender", ref: "mail.example.test" }, broken)).rejects.toBeInstanceOf(WorkspaceStoreError);
     const garbage = { rpc: async () => ({ data: "not-a-uuid", error: null }) };
-    await expect(assertActingProvider(person, business, { effect: "email", kind: "sender", ref: "mail.example.test" }, garbage)).rejects.toBeInstanceOf(WorkspaceStoreError);
-    await expect(assertActingProvider({ ...person, userId: "nope" }, business, { effect: "email", kind: "sender", ref: "x.test" }, garbage)).rejects.toThrow();
+    await expect(assertActingAgency(person, business, { effect: "email", kind: "sender", ref: "mail.example.test" }, garbage)).rejects.toBeInstanceOf(WorkspaceStoreError);
+    await expect(assertActingAgency({ ...person, userId: "nope" }, business, { effect: "email", kind: "sender", ref: "x.test" }, garbage)).rejects.toThrow();
   });
 });
 
 describe("email sent for a business by its agency", () => {
-  it("leaves sends without a provider unchanged", async () => {
+  it("leaves sends without an agency unchanged", async () => {
     const db = gateDb(false);
-    setProviderGateDb(db);
+    setAgencyGateDb(db);
     expect((await sendEmailWithReceipt(mail())).status).toBe("accepted");
     expect(db.calls).toHaveLength(0);
   });
 
   it("needs the agency's gate for the actual sending domain", async () => {
     const db = gateDb(true);
-    setProviderGateDb(db);
+    setAgencyGateDb(db);
     const result = await sendEmailWithReceipt(mail({ provider: { businessWorkspaceId: business, agencyWorkspaceId: agency }, fromAddress: "report@Mail.Strelva.com" }));
     expect(result.status).toBe("accepted");
     expect(db.calls).toEqual(Array(2).fill({ p_workspace_id: business, p_agency_workspace_id: agency, p_sender: "mail.strelva.com" }));
@@ -100,7 +100,7 @@ describe("email sent for a business by its agency", () => {
 
   it("rechecks revocation immediately before dispatch", async () => {
     const rpc = vi.fn().mockResolvedValueOnce({ data: true, error: null }).mockResolvedValueOnce({ data: false, error: null });
-    setProviderGateDb({ rpc });
+    setAgencyGateDb({ rpc });
     expect(await sendEmailWithReceipt(mail({ provider: { businessWorkspaceId: business } }))).toMatchObject({ status: "suppressed", reason: "provider_not_cleared" });
     expect(send).not.toHaveBeenCalled();
     expect(rpc).toHaveBeenCalledTimes(2);
@@ -108,7 +108,7 @@ describe("email sent for a business by its agency", () => {
 
   it("suppresses when the agency is not cleared, or the gate cannot answer", async () => {
     for (const answer of [false, "error"] as const) {
-      setProviderGateDb(gateDb(answer));
+      setAgencyGateDb(gateDb(answer));
       expect(await sendEmailWithReceipt(mail({ provider: { businessWorkspaceId: business } }))).toEqual({ status: "suppressed", reason: "email_suppressed_or_unconfigured" });
     }
     expect(send).not.toHaveBeenCalled();
@@ -117,15 +117,15 @@ describe("email sent for a business by its agency", () => {
   it("never asks the gate while the audience itself is off", async () => {
     vi.stubEnv("EMAIL_SENDING_ENABLED", "");
     const db = gateDb(true);
-    setProviderGateDb(db);
+    setAgencyGateDb(db);
     expect((await sendEmailWithReceipt(mail({ provider: { businessWorkspaceId: business } }))).status).toBe("suppressed");
     expect(db.calls).toHaveLength(0);
   });
 
   it("gates a batch on its from address", async () => {
-    setProviderGateDb(gateDb(false));
+    setAgencyGateDb(gateDb(false));
     expect(await batchEmailSuppression({ audience: "client", provider: { businessWorkspaceId: business }, fromAddress: "news@mail.strelva.com" })).toBe("not sent: provider not cleared");
-    setProviderGateDb(gateDb(true));
+    setAgencyGateDb(gateDb(true));
     expect(await batchEmailSuppression({ audience: "client", provider: { businessWorkspaceId: business }, fromAddress: "news@mail.strelva.com" })).toBeNull();
   });
 

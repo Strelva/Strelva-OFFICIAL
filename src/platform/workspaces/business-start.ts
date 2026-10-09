@@ -16,6 +16,9 @@ export function businessStartView(product: BusinessStartProduct): Exclude<Busine
 }
 
 /** Static intent only. User-written briefs and credentials never travel in this URL. */
-export function businessStartRequest(product: BusinessStartProduct): string {
+export function businessStartAsk(product: BusinessStartProduct): string {
   return product === "website" ? "Have Strelva build a website for my business." : "";
 }
+
+/** @deprecated Use businessStartAsk. Existing launch tooling may keep this name. */
+export const businessStartRequest = businessStartAsk;

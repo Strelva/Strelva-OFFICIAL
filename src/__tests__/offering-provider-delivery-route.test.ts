@@ -9,8 +9,8 @@ vi.mock("@/platform/offerings", async () => {
     ...actual,
     PostgresOfferingStore: class {},
     OfferingService: class { list = mocks.offeringList; },
-    postgresProviderDeliveries: {},
-    ProviderDeliveryService: class { list = mocks.list; execute = mocks.execute; },
+    postgresAgencyDeliveries: {},
+    AgencyDeliveryService: class { list = mocks.list; execute = mocks.execute; },
   };
 });
 vi.mock("@/products/operations/server", () => ({
@@ -31,7 +31,7 @@ function post(body: unknown, headers: Record<string, string> = {}) {
   });
 }
 
-describe("provider delivery route", () => {
+describe("agency delivery route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.release.mockReturnValue(true);

@@ -56,7 +56,7 @@ function NotReady({ load }: { load: Exclude<BusinessEffortLoad, { state: "ready"
   }
   return (
     <p className="text-[12px] leading-5 text-gray-muted">
-      Human minutes are recorded against customer businesses, which are unavailable while the workspace release is off.
+      Human minutes are recorded against client businesses, which are unavailable while the workspace release is off.
     </p>
   );
 }
@@ -110,7 +110,7 @@ export function BusinessEffortPortfolio({ load }: { load: BusinessEffortLoad }) 
       bodyClassName="space-y-5 px-[18px] pb-[18px]"
     >
       <p className="max-w-3xl text-[12px] leading-5 text-gray-muted">
-        The factory test: human minutes needed per business each month must fall. Months are UTC calendar months; the latest month is the last complete one. Every customer business counts. A month without a non-voided entry is not logged; record 0 explicitly to confirm no human work. Portfolio medians and averages require logs for every business.
+        The factory test: human minutes needed per business each month must fall. Months are UTC calendar months; the latest month is the last complete one. Every client business counts. A month without a non-voided entry is not logged; record 0 explicitly to confirm no human work. Portfolio medians and averages require logs for every business.
       </p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Vital
@@ -138,7 +138,7 @@ export function BusinessEffortPortfolio({ load }: { load: BusinessEffortLoad }) 
         {measured.length > 0 ? (
           <BusinessRows rows={measured} latestMonth={measure.latestMonth} />
         ) : (
-          <p className="py-3 text-[12px] leading-5 text-gray-muted">No customer businesses exist yet. Every business will appear here, including those not logged.</p>
+          <p className="py-3 text-[12px] leading-5 text-gray-muted">No client businesses exist yet. Every business will appear here, including those not logged.</p>
         )}
       </section>
 
@@ -155,7 +155,7 @@ export function BusinessEffortPortfolio({ load }: { load: BusinessEffortLoad }) 
         {options.length > 0 ? (
           <EffortLogForm businesses={options} today={today} />
         ) : (
-          <p className="text-[12px] leading-5 text-gray-muted">No customer businesses exist yet. Minutes are recorded against a customer business.</p>
+          <p className="text-[12px] leading-5 text-gray-muted">No client businesses exist yet. Minutes are recorded against a client business.</p>
         )}
       </section>
 
@@ -181,7 +181,7 @@ export function BusinessEffortForSite({ load, tenantId }: { load: BusinessEffort
     return (
       <Panel title="Human minutes" bodyClassName="px-[18px] pb-[18px]">
         <p className="text-[12px] leading-5 text-gray-muted">
-          This site is not attached to a customer business, so its human minutes cannot be recorded here yet. Minutes belong to the business; attach the site through that business&apos;s website binding. Other businesses are measured on Internal work.
+          This site is not attached to a client business, so its human minutes cannot be recorded here yet. Minutes belong to the business; attach the site through that business&apos;s website binding. Other businesses are measured on Internal work.
         </p>
       </Panel>
     );

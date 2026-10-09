@@ -46,7 +46,7 @@ export default async function AdminAccountsPage() {
           Accounts
         </h1>
         <p className="text-sm text-gray-muted mt-1">
-          One customer, many sites. Group a multi-site owner under one account + bundled subscription.
+          One client, many sites. Group a multi-site owner under one account + bundled subscription.
         </p>
       </div>
 

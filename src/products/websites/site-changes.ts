@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
-import { actingProviderRefusal } from "@/platform/workspaces/acting-provider";
+import { actingAgencyRefusal } from "@/platform/workspaces/acting-provider";
 import { siteChangeReceiptSchema, siteChangeRequestSchema, type RecordSiteChange, type SiteChangeReceipt, type SiteChangeRequest } from "./site-change-model";
 import { observeWebsiteSystemRelease } from "./system-releases";
 
@@ -29,7 +29,7 @@ function failure(error: DbError): never {
   if (detail.includes("website_change_access_denied") || detail.includes("website_change_not_found")) throw new WorkspaceAccessError("This change request is unavailable to your account.");
   if (detail.includes("website_change_owner_required")) throw new WorkspaceAccessError("Only an owner of this business can approve or decline a preview.");
   if (detail.includes("website_change_operator_required")) throw new WorkspaceAccessError("Only the business's agency records previews and deploys.");
-  const refusal = actingProviderRefusal(detail);
+  const refusal = actingAgencyRefusal(detail);
   if (refusal) throw new WorkspaceAccessError(refusal);
   if (detail.includes("website_change_out_of_order")) throw new SiteChangeOrderError("That step doesn't follow from where this request is. Reload it.");
   if (detail.includes("website_change_closed")) throw new SiteChangeOrderError("This request is closed.");
