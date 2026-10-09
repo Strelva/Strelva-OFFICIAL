@@ -344,6 +344,7 @@ export interface SiteCapabilityManifest {
 // --- Review Types ---
 
 export interface ReviewItem {
+  providerContent?: import("@/platform/google-review-content").GoogleReviewContent;
   id: string;
   source: "google" | "yelp" | "manual";
   author: string;

@@ -51,6 +51,19 @@ function fakeRpc(options: { role?: "owner" | "operator"; leadCount?: number; lea
 }
 
 describe("export schema 3", () => {
+  it("redacts expired or unknown Google rows before writing export parts while preserving customer replies", async () => {
+    const base = fakeRpc().rpc;
+    const rpc: V3Rpc = async (name, args) => name === "export_workspace_v3_category" && args.p_category === "reviews"
+      ? { data: { items: [{ source: "google", text: "Expired provider comment", author: "Provider author", rating: 5, reply: "Customer reply" }, { source: "manual", text: "Customer review" }], next: null }, error: null }
+      : base(name, args);
+    const document = await collectWorkspaceExportV3(actor, "w-1", rpc, snapshot);
+    const json = JSON.stringify(document);
+    expect(json).not.toContain("Expired provider comment");
+    expect(json).not.toContain("Provider author");
+    expect(json).toContain("Customer reply");
+    expect(json).toContain("Customer review");
+  });
+
   it("collects every category page by page and lists included, omitted and unavailable", async () => {
     const { rpc } = fakeRpc({ leadCount: 2500, missing: ["reviews"] });
     const doc = await collectWorkspaceExportV3(actor, "w-1", rpc, snapshot);

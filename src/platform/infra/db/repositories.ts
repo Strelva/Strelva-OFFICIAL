@@ -1,3 +1,4 @@
+import { projectGoogleReviewEvent } from "@/platform/google-review-content";
 /**
  * Typed Postgres repositories — the Supabase side of the migration.
  *
@@ -100,7 +101,7 @@ export async function listEvents(tenantId: string, limit = 50): Promise<Row<"uni
       .order("created_at", { ascending: false })
       .limit(limit);
     if (error) throw error;
-    return data ?? [];
+    return (data ?? []).map(row => projectGoogleReviewEvent(row));
   }, []);
 }
 

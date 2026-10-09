@@ -1,3 +1,4 @@
+import { projectGoogleReviewExport } from "@/platform/google-review-content";
 /**
  * Workspace export schema 3 (money-and-data spec, part c).
  *
@@ -121,7 +122,7 @@ export async function collectWorkspaceExportV3(
       if (page.error) throw rpcError(page.error.message);
       const body = page.data as { items?: unknown[] | null; next?: number | null } | null;
       if (!body || body.items === null || body.items === undefined) { missing = true; break; }
-      items.push(...body.items);
+      items.push(...body.items.map(item => projectGoogleReviewExport(item, now().getTime())));
       offset = typeof body.next === "number" && body.next > offset ? body.next : null;
     }
     if (missing) {
@@ -147,7 +148,7 @@ export async function collectWorkspaceExportV3(
   } else unavailable.push({ category: "assets_manifest", reason: "The asset manifest reader is unavailable." });
   let workspaceSnapshot: WorkspaceExportSnapshot | null = null;
   if (requesterRole === "owner" || includeOperatorSnapshot) {
-    workspaceSnapshot = await snapshot(actor, workspaceId);
+    workspaceSnapshot = projectGoogleReviewExport(await snapshot(actor, workspaceId), now().getTime()) as WorkspaceExportSnapshot;
     included.push({ category: "workspace_snapshot_schema_2", count: 1 });
   } else {
     unavailable.push({ category: "workspace_snapshot_schema_2", reason: "Saved work, apps and onboarding files are exported by the owner's own export; the operator's export carries the business and its sites." });

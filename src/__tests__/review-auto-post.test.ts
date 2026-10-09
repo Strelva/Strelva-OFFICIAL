@@ -1,3 +1,4 @@
+import { googleReviewContent } from "@/platform/google-review-content";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UnifiedEvent } from "@/lib/types";
 
@@ -54,6 +55,7 @@ function draft(over: Partial<UnifiedEvent> & { autoPostAt?: string | null } = {}
     time: new Date(NOW).toISOString(),
     metadata: {
       kind: "review_reply_draft",
+      providerContent: googleReviewContent(new Date(NOW)),
       reviewId: "rev1",
       rating: 5,
       ...(autoPostAt !== undefined ? { autoPostAt } : {}),
@@ -69,6 +71,14 @@ describe("runDueAutoPosts", () => {
     mockGetReplyVoice.mockResolvedValue({ mode: "auto" });
     mockResolveEventAction.mockResolvedValue({ changed: true });
     mockUpdateEvent.mockResolvedValue({ changed: true });
+  });
+
+  it("never auto-posts an expired provider context", async () => {
+    const expired = draft({ autoPostAt: new Date(NOW - 60_000).toISOString() });
+    expired.metadata!.providerContent = googleReviewContent(new Date(NOW - 30 * 86400000));
+    mockGetEvents.mockResolvedValue([expired]);
+    expect((await runDueAutoPosts(NOW)).posted).toBe(0);
+    expect(mockResolveEventAction).not.toHaveBeenCalled();
   });
 
   it("posts a draft whose window has elapsed", async () => {
@@ -160,7 +170,7 @@ describe("runDueAutoPosts", () => {
 // replies on. Guards under test (Deep Audit #2, #35): Google-only, respect a
 // durable dismissal, per-tenant cap, and the auto-mode autoPostAt stamp.
 function review(over: Record<string, unknown> = {}) {
-  return { id: "r1", externalId: "ext1", source: "google", author: "Sam", rating: 5, text: "great", reply: null, ...over };
+  return { providerContent: googleReviewContent(new Date(NOW)), id: "r1", externalId: "ext1", source: "google", author: "Sam", rating: 5, text: "great", reply: null, ...over };
 }
 
 describe("draftReplyBacklog", () => {

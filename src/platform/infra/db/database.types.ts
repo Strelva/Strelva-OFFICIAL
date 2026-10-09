@@ -6546,6 +6546,7 @@ export type Database = {
       }
       reviews: {
         Row: {
+          provider_content: Json | null
           author: string
           created_at: string
           external_id: string | null
@@ -6560,6 +6561,7 @@ export type Database = {
           text: string
         }
         Insert: {
+          provider_content?: Json | null
           author?: string
           created_at?: string
           external_id?: string | null
@@ -6574,6 +6576,7 @@ export type Database = {
           text?: string
         }
         Update: {
+          provider_content?: Json | null
           author?: string
           created_at?: string
           external_id?: string | null
@@ -12105,6 +12108,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      purge_google_review_content: { Args: Record<PropertyKey, never>; Returns: Json }
       rotate_tenant_track_signing_key: {
         Args: {
           p_public_key: string | null

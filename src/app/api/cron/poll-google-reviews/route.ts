@@ -1,3 +1,4 @@
+import { googleReviewContent } from "@/platform/google-review-content";
 import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 /**
  * Google Reviews Polling Cron
@@ -165,15 +166,17 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
   // Review replies are customer-facing copy — ALWAYS pending (never auto-published).
   for (const review of newReviews) {
     const rating = starRatingToNumber(review.starRating);
+    const providerContent = googleReviewContent();
 
     await addEvent({
       tenantId,
       source: "google",
       type: "review",
       title: `New ${rating}-star Google review from ${review.reviewer.displayName}`,
-      body: review.comment || "(no comment)",
+      body: "A new Google review is available in Reviews.",
       status: "pending",
       metadata: {
+        providerContent,
         reviewId: review.reviewId,
         rating,
         author: review.reviewer.displayName,
@@ -186,6 +189,7 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
     // gated on new-only above, so a write blip never blocks the poll.
     await addReview(tenantId, {
       source: "google",
+      providerContent,
       author: review.reviewer.displayName,
       rating,
       text: review.comment || "",
@@ -230,6 +234,7 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
           status: "pending",
           metadata: {
             kind: "review_reply_draft",
+            providerContent,
             reviewId: review.reviewId,
             rating,
             author: review.reviewer.displayName,

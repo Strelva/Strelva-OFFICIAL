@@ -1,3 +1,4 @@
+import { projectGoogleReview } from "@/platform/google-review-content";
 import { promises as fs } from "fs";
 import path from "path";
 import type { ReviewItem } from "./types";
@@ -12,7 +13,7 @@ function devReviewsPath(tenant: string): string {
 async function readDevReviews(tenant: string): Promise<ReviewItem[]> {
   try {
     const raw = await fs.readFile(devReviewsPath(tenant), "utf-8");
-    return JSON.parse(raw);
+    return (JSON.parse(raw) as ReviewItem[]).map(row => projectGoogleReview(row));
   } catch {
     return [];
   }
@@ -36,16 +37,18 @@ function reviewDb(operation: string): NonNullable<ReturnType<typeof getSupabase>
 }
 
 function rowToReview(r: Row<"reviews">): ReviewItem {
+  const row = projectGoogleReview(r);
   return {
-    id: r.id,
-    source: r.source as ReviewItem["source"],
-    author: r.author,
-    rating: r.rating ?? 0,
-    text: r.text,
-    date: r.review_date ?? r.created_at,
-    reply: r.reply ?? undefined,
-    repliedAt: r.replied_at ?? undefined,
-    externalId: r.external_id ?? undefined,
+    providerContent: (row.provider_content ?? undefined) as ReviewItem["providerContent"],
+    id: row.id,
+    source: row.source as ReviewItem["source"],
+    author: row.author,
+    rating: row.rating ?? 0,
+    text: row.text,
+    date: row.review_date ?? row.created_at,
+    reply: row.reply ?? undefined,
+    repliedAt: row.replied_at ?? undefined,
+    externalId: row.external_id ?? undefined,
   };
 }
 
@@ -64,6 +67,7 @@ async function pgInsertReview(tenant: string, review: Omit<ReviewItem, "id">): P
   const db = reviewDb(`insert ${tenant}`);
   const insert: Insert<"reviews"> = {
     tenant_id: tenant,
+    provider_content: review.providerContent ?? null,
     source: review.source,
     author: review.author,
     rating: review.rating,
@@ -152,7 +156,7 @@ export async function addReview(
 
   if (!dataSourceIsPostgres()) {
     const id = generateId();
-    const newReview: ReviewItem = { ...review, id };
+    const newReview: ReviewItem = projectGoogleReview({ ...review, id });
     const reviews = await readDevReviews(tenant);
     reviews.push(newReview);
     await writeDevReviews(tenant, reviews);

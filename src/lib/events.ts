@@ -1,3 +1,4 @@
+import { projectGoogleReviewEvent } from "@/platform/google-review-content";
 /**
  * UnifiedEvent data layer - Redis-backed event queue for dashboard.
  * Uses sorted sets with timestamp scores for efficient time-range queries.
@@ -228,7 +229,7 @@ export async function addEvent(
 ): Promise<UnifiedEvent> {
   const id = `evt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const createdAt = new Date().toISOString();
-  const full: UnifiedEvent = { ...event, id, createdAt };
+  const full: UnifiedEvent = projectGoogleReviewEvent({ ...event, id, createdAt });
   const requiresPersistence =
     opts.requirePersistence ||
     (process.env.NODE_ENV === "production" &&
@@ -330,7 +331,7 @@ export async function getEventsRaw(
     const event = (ref.id ? byId.get(ref.id) : null) ?? ref.embedded;
     if (!event) continue;
     if (!opts?.status || event.status === opts.status) {
-      events.push(event);
+      events.push(projectGoogleReviewEvent(event));
       if (!opts?.all && events.length >= limit) break;
     }
   }
@@ -373,7 +374,7 @@ async function hydrateGovernedFromPg(
   // could miss an old-but-selected event and serve a mixed Redis/PG view (#31).
   const pgEvents = await listGovernedEventsForTenant(tenantId, { ids: governedIds });
   const pgById = new Map(pgEvents.map((e) => [e.id, e]));
-  return events.map((e) => (isGovernedScopeEvent(e) ? pgById.get(e.id) ?? e : e));
+  return events.map((e) => (projectGoogleReviewEvent(isGovernedScopeEvent(e) ? pgById.get(e.id) ?? e : e)));
 }
 
 export async function getEvent(id: string): Promise<UnifiedEvent | null> {
@@ -386,9 +387,9 @@ export async function getEvent(id: string): Promise<UnifiedEvent | null> {
   // falls back to the Redis event.
   if (governedWorkReadPgEnabled() && isGovernedScopeEvent(event)) {
     const pg = await getGovernedEventById(id);
-    if (pg) return pg;
+    if (pg) return projectGoogleReviewEvent(pg);
   }
-  return event;
+  return projectGoogleReviewEvent(event);
 }
 
 /**
@@ -403,7 +404,8 @@ export async function getEvent(id: string): Promise<UnifiedEvent | null> {
 export async function getEventRaw(id: string): Promise<UnifiedEvent | null> {
   const redis = getRedis();
   if (!redis) return null;
-  return (await redis.get<UnifiedEvent>(eventKey(id))) || null;
+  const event = await redis.get<UnifiedEvent>(eventKey(id));
+  return event ? projectGoogleReviewEvent(event) : null;
 }
 
 /**
@@ -472,8 +474,14 @@ export async function updateEvent(
     const existing = await redis.get<UnifiedEvent>(eventKey(id));
     if (!existing) return { event: null, changed: false };
 
-    const updated = updater(existing);
-    await redis.set(eventKey(id), updated, { ex: remainingEventTtlSeconds(updated) });
+    const proposed = updater(projectGoogleReviewEvent(existing));
+    if (existing.type === "review" && (existing.source === "google" || existing.metadata?.kind === "review_reply_draft")) {
+      proposed.metadata = { ...proposed.metadata };
+      if (existing.metadata?.providerContent !== undefined) proposed.metadata.providerContent = existing.metadata.providerContent;
+      else delete proposed.metadata.providerContent;
+    }
+    const updated = projectGoogleReviewEvent(proposed);
+    await redis.set(eventKey(id), projectGoogleReviewEvent(updated), { ex: remainingEventTtlSeconds(updated) });
     return { event: updated, changed: true };
   } finally {
     await redis.del(lockKey);
@@ -559,7 +567,7 @@ async function resolveEventLocked(
   };
 
   // The zset member is the stable id; only the event:{id} record changes.
-  await redis.set(eventKey(id), updated, { ex: remainingEventTtlSeconds(updated) });
+  await redis.set(eventKey(id), projectGoogleReviewEvent(updated), { ex: remainingEventTtlSeconds(updated) });
 
   // Postgres shadow-write: mirror the status transition AND the updated metadata
   // (resolutionHistory) so the shadow row stays in parity, not status-frozen.

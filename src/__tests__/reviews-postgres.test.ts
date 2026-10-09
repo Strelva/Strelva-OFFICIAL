@@ -1,3 +1,4 @@
+import { googleReviewContent } from "@/platform/google-review-content";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const supa = vi.hoisted(() => ({
@@ -32,7 +33,7 @@ vi.mock("@/platform/infra/db/client", async (orig) => ({
   getSupabase: () => ({ from: (t: string) => { supa.lastTable = t; return builder(); } }),
 }));
 
-import { getReviews, addReview, replyToReview } from "@/lib/reviews";
+import { getReviews, getReviewById, addReview, replyToReview } from "@/lib/reviews";
 
 beforeEach(() => {
   vi.stubEnv("DATA_SOURCE", "postgres");
@@ -53,6 +54,7 @@ describe("reviews Postgres dual-path", () => {
         id: "11111111-1111-1111-1111-111111111111",
         tenant_id: "gldf",
         source: "google",
+        provider_content: googleReviewContent(),
         author: "Jane",
         rating: 5,
         text: "Great",
@@ -73,6 +75,16 @@ describe("reviews Postgres dual-path", () => {
       date: "2026-06-20T00:00:00.000Z",
     });
     expect(r!.reply).toBeUndefined();
+  });
+
+  it("redacts expired and unknown Google cache on actual list/id reads while preserving authored replies", async () => {
+    const row = { id: "expired", source: "google", author: "Provider author", rating: 5, text: "Provider comment", review_date: "2020-01-01", created_at: "2020-01-01", reply: "Customer reply", external_id: "provider-id", provider_content: googleReviewContent(new Date("2020-01-01")) };
+    supa.list = [row, { ...row, id: "unknown", provider_content: null }, { ...row, id: "manual", source: "manual" }];
+    const records = await getReviews("gldf");
+    expect(records.slice(0, 2)).toEqual(expect.arrayContaining([expect.objectContaining({ text: "", author: "", rating: 0, reply: "Customer reply", externalId: "provider-id" })]));
+    expect(records[2].text).toBe("Provider comment");
+    supa.single = row;
+    expect(await getReviewById("gldf", "expired")).toMatchObject({ text: "", author: "", reply: "Customer reply" });
   });
 
   it("addReview inserts snake_case columns and returns the DB-assigned id", async () => {

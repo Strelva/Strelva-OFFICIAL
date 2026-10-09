@@ -1,3 +1,4 @@
+import { googleReviewContentLive } from "@/platform/google-review-content";
 import { workspacePorts } from "../workspace-ports";
 /**
  * The "auto-post" half of done-for-you review replies.
@@ -84,7 +85,7 @@ export async function draftReplyBacklog(
       // Only Google reviews can be published back through the GBP API. Drafting
       // for Yelp/manual reviews queues a reply whose id can never resolve, so it
       // fails every auto-post run forever (alert-event + Slack spam).
-      if (r.source !== "google") continue;
+      if (r.source !== "google" || !googleReviewContentLive(r.providerContent, nowMs)) continue;
       const reviewId = r.externalId ?? r.id;
       if (alreadyDrafted.has(reviewId)) continue;
       // A prior owner dismissal is a durable per-review veto — never re-draft it.
@@ -103,6 +104,7 @@ export async function draftReplyBacklog(
           status: "pending",
           metadata: {
             kind: "review_reply_draft",
+            providerContent: r.providerContent,
             reviewId,
             rating: r.rating,
             author: r.author,
@@ -146,7 +148,7 @@ export async function runDueAutoPosts(nowMs: number): Promise<{ posted: number; 
       () => [] as UnifiedEvent[],
     );
     for (const e of pending) {
-      if (e.metadata?.kind !== "review_reply_draft") continue;
+      if (e.metadata?.kind !== "review_reply_draft" || !googleReviewContentLive(e.metadata.providerContent, nowMs)) continue;
       if (e.metadata?.autoPostFailed === true) continue; // gave up after the cap
       // A draft stamped before the rating rule still goes to the owner.
       if (!autoReplyAllowed(e.metadata?.rating)) continue;
