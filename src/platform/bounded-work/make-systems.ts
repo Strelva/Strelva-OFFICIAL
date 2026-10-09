@@ -23,10 +23,12 @@ export async function requireSystemMaker(store: BoundedStore, actor: WorkspaceAc
 }
 
 /**
- * Changing an internal tool's design (revise, rehearse, publish, roll back,
+ * Changing an internal tool's design (revise, rehearse,
  * retire, adopt an update). A direct member without make_systems is refused
  * here. An actor with no direct membership falls through to the existing
  * checks, so a per-application agency draft grant still decides in SQL.
+ * Publication and release rollback are separate owner/admin approvals of an
+ * already maker-authored candidate or release; neither grants design access.
  */
 export async function requireSystemChanger(store: BoundedStore, actor: WorkspaceActor, workspaceId: string): Promise<void> {
   if (!store.makeSystems) return;

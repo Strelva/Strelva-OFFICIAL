@@ -15,7 +15,7 @@ owner to read the report; a converted business without one is reported as
 
 | Launch promise | Built and tested locally | Remaining production evidence |
 | --- | --- | --- |
-| §3.1 Sentence → Draft → rehearsal → Live → staff use | Maker-only plans and create/change RPCs; contact/person links; atomic member and use-grant submits/edits; gated notices, retries, receipts and operator recovery. Real disposable Supabase Auth takes a sentence through the journey at 1280 and 360px using bounded model/mail fixtures. Owners file Requests; failed maker planning files a pending Request. | Real model quality, provider delivery and use in the Strelva-owned test business. |
+| §3.1 Sentence → Draft → rehearsal → Live → staff use | Maker-only plans, creation, design changes and public rehearsal; owner/admin publication and release rollback of maker-authored candidates; contact/person links; atomic member and use-grant submits/edits; gated notices, retries, receipts and operator recovery. Real disposable Supabase Auth takes a sentence through the journey at 1280 and 360px using bounded model/mail fixtures. Owners file Requests; failed maker planning files a pending Request. | Real model quality, provider delivery and use in the Strelva-owned test business. |
 | §3.2 Store, rewards and subscribers | Website Store Connection with no checkout authority; frozen tenant store/rewards; additive newsletter contact mirror and dry-run backfill. Exact gldf/rohlax subscribe bodies are tested with flags on and off. | Live converted-client parity, newsletter backfill and current store/rewards counts. |
 | §3.3 Wellness | Schedule/roster project as Bookings views; tenant routes remain in place; members stay frozen. | Current wellness usage and converted-client parity. |
 | §3.4 Analytics and reports | Workspace traffic and Search Console evidence distinguish unavailable/stale reads from zero. One recipient rule; send/suppression/failure receipts, operator recovery and monthly Running text. Typed Postgres analytics/report state preserves Redis fallback and monotonic sent markers. | Actual Google access, reviewed live recipient dry run, state backfill and one delivered recap receipt. |
@@ -227,6 +227,12 @@ No fresh production read was made.
   (`src/platform/workspaces/permissions.ts`), with no Strelva-staff entry by
   design. 1.0.0 adds a `make_systems` permission checked in the create RPCs and
   in `workspace_role_allows`, plus the parity test.
+- Creation, revision, public rehearsal, retirement and adoption of an update
+  require maker authority. Owners and admins may approve publication and
+  release rollback of an existing maker-authored candidate or release;
+  those actions grant no design access. The native Version release transaction
+  may rehearse internally after its own exact release approval and scoped
+  authority checks; that service-only RPC is not public rehearsal authority.
 - **Who uses it:** anyone with a use grant. Owners never need to sign in: the
   assigned-person email is the only owner-free path, and none of this needs
   the owner.

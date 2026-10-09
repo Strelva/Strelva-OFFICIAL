@@ -196,6 +196,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     const input = applicationRehearseInputSchema.parse(raw);
     const db = durableDb(store);
     const permission = await load(store, actor, id);
+    await requireSystemChanger(store, actor, permission.work.workspaceId);
     await ensureCandidateEditor(store, actor, permission.work);
     if (db) {
       await durableRpc(db, "rehearse_application_candidate", {

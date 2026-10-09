@@ -61,10 +61,15 @@ describe("operator Make real tools", () => {
     deps.runner.mockResolvedValue({ actor: SERVICE, service: session });
     await post({ action: "resume", workspaceId: WS, activationId: "act-1" });
     expect(deps.record).toHaveBeenCalledWith(session, "resume", "activation:act-1", "Strelva (system) for operator ops@strelva.test");
-    expect(deps.resume).toHaveBeenCalledWith(SERVICE, WS, "act-1", "Strelva (system) for operator ops@strelva.test");
+    expect(deps.resume).toHaveBeenCalledWith(SERVICE, WS, "act-1", "Strelva (system) for operator ops@strelva.test", session);
     expect(deps.record.mock.invocationCallOrder[0]).toBeLessThan(deps.resume.mock.invocationCallOrder[0]!);
     await post({ action: "reconcile", workspaceId: WS, activationId: "act-1", stepId: "effect:x", resolution: "completed", evidence: "Vercel shows the deploy at 12:03" });
     expect(deps.record).toHaveBeenLastCalledWith(session, "reconcile", "activation:act-1", "Strelva (system) for operator ops@strelva.test");
+    expect(deps.reconcile).toHaveBeenLastCalledWith(SERVICE, WS, "act-1", { stepId: "effect:x", resolution: "completed", evidence: "Vercel shows the deploy at 12:03", note: "Strelva (system) for operator ops@strelva.test" }, session);
+    await post({ action: "rollback", workspaceId: WS, activationId: "act-1", confirm: true });
+    expect(deps.record).toHaveBeenLastCalledWith(session, "rollback", "activation:act-1", "Strelva (system) for operator ops@strelva.test");
+    expect(deps.rollback).toHaveBeenLastCalledWith(SERVICE, WS, "act-1", "Strelva (system) for operator ops@strelva.test", session);
+    expect(deps.record.mock.invocationCallOrder.at(-1)).toBeLessThan(deps.rollback.mock.invocationCallOrder.at(-1)!);
     // Not logged, not run.
     deps.record.mockRejectedValueOnce(new Error("log down"));
     deps.resume.mockClear();
@@ -74,11 +79,11 @@ describe("operator Make real tools", () => {
 
   it("runs each action as the starting owner and names the operator", async () => {
     await post({ action: "resume", workspaceId: WS, activationId: "act-1" });
-    expect(deps.resume).toHaveBeenCalledWith(OWNER, WS, "act-1", "operator ops@strelva.test");
+    expect(deps.resume).toHaveBeenCalledWith(OWNER, WS, "act-1", "operator ops@strelva.test", undefined);
     await post({ action: "reconcile", workspaceId: WS, activationId: "act-1", stepId: "effect:x", resolution: "completed", evidence: "Vercel shows the deploy at 12:03" });
-    expect(deps.reconcile).toHaveBeenCalledWith(OWNER, WS, "act-1", { stepId: "effect:x", resolution: "completed", evidence: "Vercel shows the deploy at 12:03", note: "operator ops@strelva.test" });
+    expect(deps.reconcile).toHaveBeenCalledWith(OWNER, WS, "act-1", { stepId: "effect:x", resolution: "completed", evidence: "Vercel shows the deploy at 12:03", note: "operator ops@strelva.test" }, undefined);
     await post({ action: "rollback", workspaceId: WS, activationId: "act-1", confirm: true });
-    expect(deps.rollback).toHaveBeenCalledWith(OWNER, WS, "act-1", "operator ops@strelva.test");
+    expect(deps.rollback).toHaveBeenCalledWith(OWNER, WS, "act-1", "operator ops@strelva.test", undefined);
   });
 
   it("needs evidence to reconcile and an explicit confirm to roll back", async () => {

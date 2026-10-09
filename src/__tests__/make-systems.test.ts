@@ -91,7 +91,7 @@ describe("make_systems for internal tools", () => {
     await expect(createApplicationService(store).create(outsider, workspaceId, spec(outsider.userId))).rejects.not.toBeInstanceOf(WorkspaceMakeSystemsError);
   });
 
-  it("refuses owners and admins changing a tool but keeps member use of a live tool", async () => {
+  it("keeps design and rehearsal maker-only while owners approve release and members use it", async () => {
     const { store } = makerStore();
     const service = createApplicationService(store);
     const app = await service.create(operator, workspaceId, spec(operator.userId));
@@ -102,9 +102,11 @@ describe("make_systems for internal tools", () => {
 
     await service.rehearse(operator, app.id, { expectedDesignRevision: 0 });
     await service.publish(operator, app.id, { expectedCandidateRevision: 0, expectedReleaseVersion: null });
-    await expect(service.publish(owner, app.id, { expectedCandidateRevision: 0, expectedReleaseVersion: 1 })).rejects.toBeInstanceOf(WorkspaceMakeSystemsError);
+    const approved = await service.publish(owner, app.id, { expectedCandidateRevision: 0, expectedReleaseVersion: 1 });
+    expect(approved.payload).toMatchObject({ release: { version: 2, publishedBy: owner.userId }, candidate: { designRevision: 0, spec: { maintenanceOwner: operator.userId } } });
+    await expect(service.revise(owner, app.id, { expectedDesignRevision: 0, spec: { ...spec(operator.userId), title: "Still no owner design grant" } })).rejects.toBeInstanceOf(WorkspaceMakeSystemsError);
 
-    const runtime = await service.submit(member, app.id, { expectedReleaseVersion: 1, expectedRecordsRevision: 0, record: { id: "r1", values: { name: "Acme Co" } } });
+    const runtime = await service.submit(member, app.id, { expectedReleaseVersion: 2, expectedRecordsRevision: 0, record: { id: "r1", values: { name: "Acme Co" } } });
     expect(runtime.records).toEqual([{ id: "r1", values: { name: "Acme Co" } }]);
   });
 
