@@ -69,6 +69,22 @@ describe("booking changes follow the current service contract", () => {
     expect(changed.end).toBe("2026-11-06T16:45:00.000Z");
     expect(changes[0]).toMatchObject({ action: "reschedule", start: changed.start, end: changed.end, forceRequest: false });
   });
+  it("replays the accepted time without a second write or changed owner clock", async () => {
+    for (const status of ["confirmed", "requested"] as const) {
+      booking = { ...booking, status, start: "2026-11-06T15:30:00.000Z", end: "2026-11-06T16:45:00.000Z" };
+      // Current policy/provider evidence cannot revoke an already accepted
+      // identical request. A different time must still recheck it.
+      store.tenants.get(tenant)!.paused = true;
+      const changed = await changeNativeBooking("manage-hash", "reschedule", "2026-11-06T15:30:00Z");
+      expect(changed).toMatchObject(booking);
+      expect(changes).toEqual([]);
+    }
+  });
+  it("does not treat the cancelled time as an accepted reschedule retry", async () => {
+    booking = { ...booking, status: "cancelled" };
+    await expect(changeNativeBooking("manage-hash", "reschedule", booking.start)).rejects.toMatchObject({ code: "not_found" });
+    expect(changes).toEqual([]);
+  });
   it("expired-request alternatives use the current length and omit provider-busy slots", async () => {
     setCalendarBusyPorts({ connection: async () => ({ provider: "google", status: "connected" }), busy: async () => [{ start: "2026-11-06T15:30:00Z", end: "2026-11-06T16:45:00Z" }] });
     const offered = await nativeSlots(tenant, "consult", now.toISOString(), new Date(now.getTime() + 14 * 86400000).toISOString());

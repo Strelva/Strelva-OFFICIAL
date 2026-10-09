@@ -195,6 +195,10 @@ export async function changeNativeBooking(hash: string, action: "cancel" | "resc
   let change: Record<string, unknown> = { action };
   if (action === "reschedule") {
     if (!start || !booking.serviceRef) throw new PublicBookingError("invalid", "Choose an open time.");
+    if (!["requested", "confirmed"].includes(booking.status)) throw new PublicBookingError("not_found", "This booking cannot be rescheduled.");
+    // An accepted retry keeps its commitment and owner clock. Its own occupied
+    // slot is not a new availability request. Never reopen a cancelled booking.
+    if (Date.parse(start) === Date.parse(booking.start)) return booking;
     const current = await context(bookingScopeFor(booking)!);
     if (current.paused) throw new PublicBookingError("conflict", pausedBookingMessage(current.phone));
     const service = current.services.find(s => s.active && (s.id === booking.serviceRef || s.externalRef === booking.serviceRef));
