@@ -234,3 +234,21 @@ describe("WebsiteExperience", () => {
     fetchMock.mockRestore();
   });
 });
+
+
+describe("retired first-party prepare-only creation fallback", () => {
+  it("keeps rollout-off new work unavailable instead of creating a v1 candidate", async () => {
+    const fetcher = vi.spyOn(globalThis, "fetch");
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    await act(async () => root.render(createElement(WebsiteExperience, { workspaceId, rebuildEnabled: false })));
+    expect(container.querySelector('[role="status"]')?.textContent).toContain("Website creation is unavailable");
+    expect(container.textContent).toContain("saved websites remain available");
+    expect(container.querySelector("button")).toBeNull();
+    expect(fetcher).not.toHaveBeenCalled();
+    await act(async () => root.unmount());
+    fetcher.mockRestore();
+    container.remove();
+  });
+});
