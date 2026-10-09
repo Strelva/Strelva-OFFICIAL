@@ -1898,6 +1898,32 @@
           "rollbackStatus": "Prepared exact body/properties/owner/normalized ACL guarded inverse; remove application consumer first; settings rows/history retained; actual inverse/refusal/reapply and managed deployment qualification UNRUN"
         }
       ]
+    },
+    {
+      "id": "native-google-recovery-receipt-grouping",
+      "status": "Prepared additive exact historical source/catalog/service ACL pinned receipt extraction correction; source checks only; actual native recovery/negative assertions/current catalog qualification UNRUN",
+      "items": [
+        {
+          "file": "20261021140200_native_google_recovery_receipt_grouping.sql",
+          "sha256": "e10ff523abac6a441ba0807e2d7f2cfbc665a30780826dfb4706f0ef8b8964a8",
+          "rollback": "rollback-20261021140200_native_google_recovery_receipt_grouping.sql",
+          "rollbackSha256": "7b64374d050dca885836a414dfd5dfe2fd8c74f27457dae016330b223c35e049",
+          "rollbackStatus": "Forward-only receipt extraction correction; immutable lifecycle predecessor retained; actual refusal qualification UNRUN"
+        }
+      ]
+    },
+    {
+      "id": "legacy-google-operation-authority",
+      "status": "Prepared complete unintegrated1751 replacement: trusted and actor-authorized atomic provider records plus canonical binding/location admission, six exact functions/private table guards,31 hostile fresh variants and10 retained-parent-row schedules; source only; actual SQL/native/Auth qualification UNRUN; provider actions held",
+      "items": [
+        {
+          "file": "20261022175100_legacy_google_operation_authority.sql",
+          "sha256": "291954094b3a29a7a27d1f14113795ad67d29e1b8382867878e680393f975718",
+          "rollback": "rollback-20261022175100_legacy_google_operation_authority.sql",
+          "rollbackSha256": "ff278eb307e6619dd83b396b4ec04a33fbdddfa5279055ad4d91afa3fa48fb80",
+          "rollbackStatus": "Forward-only operation watermark and authority ports; populated or empty inverse deliberately refuses; no DROP/inverse/reapply claim; actual refusal qualification UNRUN"
+        }
+      ]
     }
   ]
 }

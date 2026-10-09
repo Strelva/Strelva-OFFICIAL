@@ -177,3 +177,36 @@ begin
    then raise exception 'booking settings atomic command exposed or authority drifted';end if;
  end if;
 end $booking_settings_exposure$;
+
+-- Additive Google recovery remains a single service-only port.
+do $google_recovery_exposure$ declare f regprocedure; installed integer;begin
+ select count(*) into installed from pg_proc where pronamespace='public'::regnamespace and proname='save_native_google_recovered_activation';
+ if installed not in(0,1) then raise exception 'native Google recovery overloaded private boundary';end if;
+ if installed=1 then
+  f:=to_regprocedure('public.save_native_google_recovered_activation(uuid,uuid,text,text,integer,jsonb)');
+  if f is null or not has_function_privilege('service_role',f,'EXECUTE') or has_function_privilege('anon',f,'EXECUTE') or has_function_privilege('authenticated',f,'EXECUTE') then
+   raise exception 'native Google recovery lost private service-only boundary';end if;
+ end if;
+end $google_recovery_exposure$;
+
+-- Three legacy Google helpers stay owner-only; three supplied operation ports
+-- are service-only. Named-role checks complement the exact current catalog guard.
+do $legacy_google_exposure$ declare signature text; f regprocedure; installed integer;t regclass:=to_regclass('public.legacy_google_operation_watermarks');r text;service_port boolean;begin
+ select count(*) into installed from pg_proc where pronamespace='public'::regnamespace and proname in
+ ('legacy_google_canonical_json','legacy_google_location_digest','read_legacy_google_operation','legacy_google_commit','commit_legacy_google_binding_operation','apply_legacy_google_operation');
+ if installed not in(0,6) or (installed=0)<>(t is null) then raise exception 'legacy Google operation incomplete private boundary';end if;
+ if installed=6 then
+  foreach signature in array array['public.legacy_google_canonical_json(jsonb)','public.legacy_google_location_digest(uuid)','public.legacy_google_commit(uuid,text,text,jsonb,jsonb)',
+   'public.read_legacy_google_operation(text)','public.commit_legacy_google_binding_operation(jsonb,jsonb)','public.apply_legacy_google_operation(uuid,text,jsonb,text,jsonb)'] loop
+   f:=to_regprocedure(signature);
+   service_port:=signature in('public.read_legacy_google_operation(text)','public.commit_legacy_google_binding_operation(jsonb,jsonb)','public.apply_legacy_google_operation(uuid,text,jsonb,text,jsonb)');
+   if f is null or has_function_privilege('anon',f,'EXECUTE') or has_function_privilege('authenticated',f,'EXECUTE') or has_function_privilege('service_role',f,'EXECUTE')<>service_port then
+    raise exception 'legacy Google operation lost exact helper/writer boundary';end if;
+  end loop;
+  if not exists(select 1 from pg_class where oid=t and relrowsecurity and not relforcerowsecurity) then raise exception 'legacy Google operation watermarks lost RLS';end if;
+  foreach r in array array['anon','authenticated','service_role'] loop
+   if has_table_privilege(r,t,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') or has_any_column_privilege(r,t,'SELECT,INSERT,UPDATE,REFERENCES') then
+    raise exception 'legacy Google operation watermarks exposed directly';end if;
+  end loop;
+ end if;
+end $legacy_google_exposure$;

@@ -1,6 +1,6 @@
 {
-  "source": "Prepared exact combined352 forwards: accepted booking793 atomic settings1820 alongside preserved Creator1740/1745, Google1401 and event-fenced rewards1750; actual current schema/catalog/native/Auth/provider and generated types qualification UNRUN",
-  "forwardCount": 352,
+  "source": "Prepared exact combined354 forwards: preserves all352 bc43 historical forwards and accepted Booking/Creator/rewards, adds Google recovery receipt grouping1402 and atomic legacy operation authority1751; actual schema/catalog/native/Auth/provider and generated types qualification UNRUN",
+  "forwardCount": 354,
   "workspaceBoundary": "20260905190000_release_one_workspaces.sql",
   "focusedLegacyExceptions": {
     "20260920060000_content_version_request_id.sql": "Requires legacy content_versions, omitted from the purpose-built workspace fixture; real upgrade/fresh full-schema rehearsal owns it.",
@@ -347,6 +347,7 @@
     "20261021132100_agent_payment_exit_admission.sql",
     "20261021140000_native_google_lifecycle.sql",
     "20261021140100_native_google_hash_portability.sql",
+    "20261021140200_native_google_recovery_receipt_grouping.sql",
     "20261022090000_guarded_tenant_teardown.sql",
     "20261022090100_tenant_cleanup_receipts.sql",
     "20261022120000_agency_created_application_authority.sql",
@@ -359,6 +360,7 @@
     "20261022174000_private_source_exit_admission.sql",
     "20261022174500_private_source_exit_lock_order.sql",
     "20261022175000_reward_durable_mutations.sql",
+    "20261022175100_legacy_google_operation_authority.sql",
     "20261022182000_booking_settings_atomic_patch.sql"
   ]
 }

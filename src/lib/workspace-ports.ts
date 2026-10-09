@@ -194,7 +194,18 @@ export interface GoogleBindingWithSecrets {
   locations: GoogleBindingLocation[];
 }
 
+export interface LegacyGoogleOperationPin {
+  tenantId: string; tenantStableId: string; workspaceId: string | null;
+  bindingId: string | null; bindingUpdatedAt: string | null; locationDigest: string | null; startedAt: string;
+}
+export interface LegacyGoogleOperationInput {
+  grant?: { workspaceId: string; originTenantStableId: string | null; subject?: string | null; scopes?: string[] | null; refreshToken?: string | null; accessToken?: string | null; tokenExpiresAt?: string | null; status: BindingStatus; lastError?: string | null };
+  location?: { accountId: string; locationId: string; title?: string | null };
+}
 export interface GoogleBindingsPort {
+  readLegacyGoogleOperation(tenantId: string, startedAt: string): Promise<LegacyGoogleOperationPin>;
+  commitLegacyGoogleBindingOperation(pin: LegacyGoogleOperationPin, input: LegacyGoogleOperationInput): Promise<{ status: "applied"; bindingId: string | null }>;
+  applyLegacyGoogleOperation(actor: { userId: string; verifiedEmail: string }, pin: LegacyGoogleOperationPin, kind: "oauth" | "location", input: LegacyGoogleOperationInput): Promise<{ status: "applied"; bindingId: string | null }>;
   googleBindingsEnabled(): boolean;
   mutateGoogleBinding(bindingId: string, expectedUpdatedAt: string, mutation: { accessToken?: string; expiresAt?: string | null; rotatedRefreshToken?: string | null; status?: BindingStatus; error?: string | null; checkedAt?: string | null }): Promise<string>;
   readBindingTarget(tenantId: string): Promise<{ workspaceId: string; tenantStableId: string } | null>;

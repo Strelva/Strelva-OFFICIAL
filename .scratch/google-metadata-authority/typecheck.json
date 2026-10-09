@@ -1,0 +1,1 @@
+{"extends":"../../tsconfig.json","compilerOptions":{"incremental":false,"plugins":[]},"include":["../../src/lib/google-access.ts","../../src/__tests__/google-metadata-cutover-authority.test.ts"],"exclude":["../../node_modules","../../.next"]}

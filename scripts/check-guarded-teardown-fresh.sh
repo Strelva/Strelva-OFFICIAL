@@ -49,6 +49,26 @@ PYURL
  fi
  count=$((count+1))
 done < <(printf '%s\n' "$repo_root"/supabase/migrations/20*.sql | sort)
+# Complete354 current readback after every actual forward; no authority repair.
+psql "${psql_args[@]}" --file="$repo_root/scripts/sql/native-google-recovery-receipt-grouping-contract.sql"
+psql "${psql_args[@]}" --file="$repo_root/scripts/sql/legacy-google-operation-current-contract.sql"
+if [[ "${STRELVA_GOOGLE_OPERATION_SQL_PROOF:-0}" == 1 ]]; then
+ psql "${psql_args[@]}" --file="$repo_root/tests/native-google-recovery-receipt-grouping-schema.sql"
+ psql "${psql_args[@]}" --file="$repo_root/tests/native-google-completed-undo-schema.sql"
+ psql "${psql_args[@]}" --file="$repo_root/tests/legacy-google-operation-authority-schema.sql"
+ for inverse in rollback-20261021140200_native_google_recovery_receipt_grouping.sql rollback-20261022175100_legacy_google_operation_authority.sql; do
+  if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/$inverse" > "$cluster_root/$inverse.log" 2>&1; then
+   printf "Forward-only Google inverse unexpectedly succeeded: %s\n" "$inverse" >&2;exit 1
+  fi
+  case "$inverse" in
+   rollback-20261021140200*) expected=native_google_recovery_receipt_grouping_forward_only;;
+   rollback-20261022175100*) expected=legacy_google_operation_forward_only;;
+  esac
+  rg -q "$expected" "$cluster_root/$inverse.log" || { cat "$cluster_root/$inverse.log" >&2;exit 1; }
+ done
+ psql "${psql_args[@]}" --file="$repo_root/scripts/sql/native-google-recovery-receipt-grouping-contract.sql"
+ psql "${psql_args[@]}" --file="$repo_root/scripts/sql/legacy-google-operation-current-contract.sql"
+fi
 psql "${psql_args[@]}" --file="$repo_root/tests/guarded-tenant-teardown-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/tenant-teardown-evidence-owners.sql"
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/tenant-newsletter-teardown-hold.sql"

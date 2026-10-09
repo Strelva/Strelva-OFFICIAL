@@ -5,13 +5,13 @@ import { createNeedsYouService } from "@/platform/needs-you/service";
 import { verifyWorkspaceApproveToken } from "@/lib/approve-link";
 
 const mocks = vi.hoisted(() => ({
-  rpc: vi.fn(), release: vi.fn(), override: vi.fn(), event: vi.fn(), record: vi.fn(), upsert: vi.fn(),
+  rpc: vi.fn(), release: vi.fn(), override: vi.fn(), event: vi.fn(), record: vi.fn(), begin: vi.fn(), upsert: vi.fn(),
 }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mocks.rpc }) }));
 vi.mock("@/platform/release-flags/store", () => ({ workspaceReleaseFlagEnabled: mocks.release }));
 vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: mocks.override }));
 vi.mock("@/lib/events", () => ({ getEventRaw: mocks.event }));
-vi.mock("@/lib/google-access", () => ({ recordGoogleConnection: mocks.record }));
+vi.mock("@/lib/google-access", () => ({ recordGoogleConnection: mocks.record, beginGoogleReconnectOperation: mocks.begin }));
 vi.mock("@/platform/account-bindings/store", () => ({ googleBindingsEnabled: () => process.env.STRELVA_GOOGLE_BINDINGS === "1", bindingEncryptionReady: () => !!process.env.SECRETS_ENC_KEY, upsertGoogleBinding: mocks.upsert }));
 
 import { publishingDecisionDeliveryAllowed, publishingNoticesEnabled, requiresGoogleReapprovalAfterReconnect } from "@/platform/needs-you/publishing-delivery";
@@ -25,6 +25,7 @@ const target: ReconnectTarget = { id: ID, bindingId: "ac000000-0000-4000-8000-00
   tenantId: "fixture-firm", tenantStableId: "ac000000-0000-4000-8000-000000000013", recipient: "owner@example.test",
   openedAt: "2026-10-05T11:00:00Z", expiresAt: "2026-10-19T11:00:00Z", noticeStatus: "not_sent" };
 const clock = Date.parse("2026-10-06T11:00:00Z");
+const operation = { tenantId: target.tenantId!, tenantStableId: target.tenantStableId!, workspaceId: WS, bindingId: target.bindingId, bindingUpdatedAt: "2026-10-05T00:00:00Z", locationDigest: "a".repeat(64), startedAt: new Date(clock).toISOString() };
 const accepted = { status: "accepted" as const, providerMessageId: "fixture-receipt", acceptedAt: new Date(clock).toISOString() };
 
 beforeEach(() => {
@@ -35,6 +36,7 @@ beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://app.example.test"); vi.stubEnv("GOOGLE_CLIENT_ID", "fixture-client"); vi.stubEnv("GOOGLE_CLIENT_SECRET", "fixture-secret");
   vi.stubEnv("SECRETS_ENC_KEY", "fixture-encryption-enabled");
   mocks.release.mockResolvedValue(true); mocks.override.mockResolvedValue("inherit"); mocks.record.mockResolvedValue({ binding: "written" });
+  mocks.begin.mockResolvedValue(operation);
   mocks.rpc.mockResolvedValue({ data: target, error: null });
 });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
@@ -82,12 +84,21 @@ describe("signed owner reconnect", () => {
     const tokenResponse = { access_token: "fixture-access", refresh_token: "fixture-refresh", expires_in: 3600, scope: "https://www.googleapis.com/auth/business.manage" };
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(tokenResponse)));
     await finishGoogleReconnect(target, "fixture-code", fetcher);
-    expect(fetcher).toHaveBeenCalledTimes(1); expect(mocks.record).toHaveBeenCalledWith(expect.not.objectContaining({ accountId: expect.anything(), locationId: expect.anything() }));
+    expect(fetcher).toHaveBeenCalledTimes(1); expect(mocks.record).toHaveBeenCalledWith(expect.not.objectContaining({ accountId: expect.anything(), locationId: expect.anything() }), expect.any(Number), operation);
     fetcher.mockResolvedValue(new Response(JSON.stringify({ ...tokenResponse, scope: "other-scope" })));
     await expect(finishGoogleReconnect(target, "fixture-code", fetcher)).rejects.toThrow("permission");
     fetcher.mockResolvedValue(new Response(JSON.stringify(tokenResponse))); mocks.record.mockResolvedValue({ binding: "failed" });
     await expect(finishGoogleReconnect(target, "fixture-code", fetcher)).rejects.toThrow("workspace");
     fetcher.mockResolvedValue(new Response("no", { status: 403 })); await expect(finishGoogleReconnect(target, "fixture-code", fetcher)).rejects.toThrow("Google");
+  });
+  it("carries the operation start from before a delayed token exchange", async () => {
+    const startedAt = Date.now();
+    const fetcher = vi.fn(async () => { vi.setSystemTime(startedAt + 10_000); return new Response(JSON.stringify({ access_token: "fixture-access", refresh_token: "fixture-refresh", expires_in: 3600, scope: "https://www.googleapis.com/auth/business.manage" })); });
+    await finishGoogleReconnect(target, "fixture-code", fetcher);
+    expect(mocks.record.mock.calls.at(-1)?.[1]).toBe(startedAt);
+    expect(mocks.begin).toHaveBeenCalledWith(target.tenantId, startedAt);
+    expect(mocks.begin.mock.invocationCallOrder[0]).toBeLessThan(fetcher.mock.invocationCallOrder[0]!);
+    expect(mocks.record.mock.calls.at(-1)?.[2]).toBe(operation);
   });
   it("storage fails closed when unavailable or malformed", async () => {
     await expect(reconnectStore(null).target("read", ID)).rejects.toThrow("unavailable");

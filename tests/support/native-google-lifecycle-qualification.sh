@@ -1,5 +1,6 @@
 # Prepared, opt-in qualification only. Source this file from a caller that owns
-# an empty disposable cluster already loaded through native_google_lifecycle.
+# an empty disposable cluster already loaded through native_google_lifecycle
+# plus hash_portability (1401) and recovery_receipt_grouping (1402).
 # The caller supplies repo_root, cluster_root/data/socket/port and psql_args.
 # This helper neither starts nor destroys a cluster and never contacts Google.
 # Invoke only with STRELVA_NATIVE_GOOGLE_SQL_QUALIFICATION=owned-disposable.
@@ -49,6 +50,7 @@ select current_setting('data_directory')=:'owned_data'
 SQL
  local forward="$repo_root/supabase/migrations/20261021140000_native_google_lifecycle.sql"
  local inverse="$repo_root/supabase/migrations/rollback-20261021140000_native_google_lifecycle.sql"
+ local recovery_successor="$repo_root/supabase/migrations/20261021140200_native_google_recovery_receipt_grouping.sql"
  local hash_successor="$repo_root/supabase/migrations/20261021140100_native_google_hash_portability.sql"
  # Snapshots contain hashes, object names and catalog properties only. Rows,
  # function SQL and any credentials are never printed into diagnostic logs.
@@ -93,10 +95,10 @@ SQL
  # Generate variants from the reviewed source. Drift is introduced inside its
  # transaction before the real guard; on refusal that entire transaction must
  # roll back. No replacement guard or fake lifecycle outcome is used.
- python3 - "$forward" "$inverse" "$qualification_dir" "$hash_successor" <<'PY'
+ python3 - "$forward" "$inverse" "$qualification_dir" "$hash_successor" "$recovery_successor" <<'PY'
 from pathlib import Path
 import re,sys
-forward,inverse,destination,hash_successor=map(Path,sys.argv[1:])
+forward,inverse,destination,hash_successor,recovery_successor=map(Path,sys.argv[1:])
 f,i=forward.read_text(),inverse.read_text()
 assert len(re.findall(r'^begin;$',f,re.M))==1 and len(re.findall(r'^begin;$',i,re.M))==1
 target='public.upsert_workspace_account_binding(jsonb,text)'
@@ -189,6 +191,25 @@ for name,signature,marker in [('hash-owner-source',owner,'declare b public.works
 sql="do $qualification$ declare definition text; begin definition:=pg_get_functiondef('"+verifier+"'::regprocedure); if strpos(definition,'DEFAULT NULL::text')=0 then raise exception 'native_hash_qualification_default_marker_missing'; end if; execute replace(definition,'DEFAULT NULL::text',$default$DEFAULT 'unexpected'::text$default$); end $qualification$;"
 write('hash-inverse-default',injected(h,sql))
 
+r=recovery_successor.read_text()
+recovery='public.save_native_google_recovered_activation(uuid,uuid,text,text,integer,jsonb)'
+for name,sql in {
+ 'recovery-extra-acl': 'grant execute on function '+recovery+' to authenticated;',
+ 'recovery-grant-option': 'grant execute on function '+recovery+' to service_role with grant option;',
+ 'recovery-owner-drift': 'alter function '+recovery+' owner to authenticated;',
+ 'recovery-search-path': 'alter function '+recovery+' set search_path=pg_temp,public;',
+ 'recovery-security': 'alter function '+recovery+' security invoker;',
+ 'recovery-cost': 'alter function '+recovery+' cost 101;',
+ 'recovery-strict': 'alter function '+recovery+' strict;',
+ 'recovery-owner-acl': "do $qualification$ begin execute 'revoke execute on function "+recovery+" from '||quote_ident(pg_get_userbyid((select relowner from pg_class where oid='public.workspace_account_bindings'::regclass))); end $qualification$;",
+}.items(): write(name,injected(r,sql))
+sql="do $qualification$ declare definition text; marker text:='declare work public.saved_product_work%rowtype;'; begin definition:=pg_get_functiondef('"+recovery+"'::regprocedure); if strpos(definition,marker)=0 then raise exception 'native_recovery_qualification_marker_missing'; end if; execute replace(definition,marker,'-- source drift'||chr(10)||marker); end $qualification$;"
+write('recovery-source',injected(r,sql))
+# Inject after the actual replacement. The guard must roll back the replacement
+# plus late authority drift, not just reject before any CREATE OR REPLACE.
+assert r.count(' execute replacement;')==1
+write('recovery-late-authority',r.replace(' execute replacement;',' execute replacement;\n execute \'alter function '+recovery+' cost 101\';',1))
+
 PY
  local label
  # All inverse refusal scenarios exercise the actual current inverse guards.
@@ -218,6 +239,11 @@ PY
   native_qualification_refuse "$label" "$qualification_dir/$label.sql" 'native_google_hash_(predecessor|authority)_drift'
  done
  psql "${psql_args[@]}" -X -q -f "$hash_successor" >"$qualification_dir/hash-reapply.log" 2>&1
+ for label in recovery-extra-acl recovery-grant-option recovery-owner-drift recovery-search-path recovery-security recovery-cost recovery-strict recovery-owner-acl recovery-source; do
+  native_qualification_refuse "$label" "$qualification_dir/$label.sql" 'native_google_recovery_(predecessor|authority)_drift'
+ done
+ native_qualification_refuse recovery-late-authority "$qualification_dir/recovery-late-authority.sql" native_google_recovery_replacement_drift
+ psql "${psql_args[@]}" -X -q -f "$recovery_successor" >"$qualification_dir/recovery-reapply.log" 2>&1
  native_qualification_snapshot "$qualification_dir/applied-after.snapshot"
  cmp "$qualification_dir/applied-before.snapshot" "$qualification_dir/applied-after.snapshot"
  psql "${psql_args[@]}" -X -q -f "$inverse" >"$qualification_dir/second-empty-inverse.log" 2>&1
@@ -225,6 +251,7 @@ PY
  cmp "$qualification_dir/historical-before.snapshot" "$qualification_dir/historical-after.snapshot"
  psql "${psql_args[@]}" -X -q -f "$forward" >"$qualification_dir/final-reapply.log" 2>&1
  psql "${psql_args[@]}" -X -q -f "$hash_successor" >"$qualification_dir/final-hash-reapply.log" 2>&1
+ psql "${psql_args[@]}" -X -q -f "$recovery_successor" >"$qualification_dir/final-recovery-reapply.log" 2>&1
  native_qualification_snapshot "$qualification_dir/final-applied.snapshot"
  cmp "$qualification_dir/applied-before.snapshot" "$qualification_dir/final-applied.snapshot"
  printf 'PASS empty native inverse/reapply preserved exact writer authority, catalog and rows.\n'

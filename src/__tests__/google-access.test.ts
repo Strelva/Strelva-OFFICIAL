@@ -6,6 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mockGetConnection = vi.hoisted(() => vi.fn());
 const mockSaveConnection = vi.hoisted(() => vi.fn());
 const mockSaveConnectionMutation = vi.hoisted(() => vi.fn());
+const mockDurableAuthority = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/client-records", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/client-records")>(), durableRecordAuthority: mockDurableAuthority,
+}));
 const redis = vi.hoisted(() => ({
   get: vi.fn(), set: vi.fn(), hincrby: vi.fn(), expire: vi.fn(), hgetall: vi.fn(),
 }));
@@ -58,6 +62,7 @@ beforeEach(() => {
   mockGetConnection.mockResolvedValue(redisConnection);
   mockSaveConnection.mockResolvedValue(undefined);
   mockSaveConnectionMutation.mockResolvedValue(undefined);
+  mockDurableAuthority.mockResolvedValue(false);
   redis.get.mockResolvedValue({ accountId: "accounts/9", locationId: "77" });
 });
 
@@ -248,20 +253,22 @@ describe("recording a (re)connect", () => {
   const connect = { tenantId: "mooney", accessToken: "ya29.new", refreshToken: "1//new", expiresAt: "2026-10-07T19:00:00.000Z",
     scopes: ["https://www.googleapis.com/auth/business.manage"], accountId: "accounts/111", locationId: "333", locationTitle: "The Mooney Firm" };
 
-  it("writes Redis as before and the binding beside it (dual-write)", async () => {
+  it("commits qualified credentials, metadata and binding without legacy/cache writes", async () => {
     vi.stubEnv("STRELVA_GOOGLE_BINDINGS", "1");
+    mockDurableAuthority.mockResolvedValue(true);
     rpc.mockImplementation((name) => ({
-      data: name === "read_tenant_binding_target" ? { tenantStableId: STABLE, workspaceId: WORKSPACE }
-        : name === "upsert_workspace_account_binding" ? { status: "updated", id: BINDING } : null,
+      data: name === "read_legacy_google_operation" ? { tenantId: "mooney", tenantStableId: STABLE, workspaceId: WORKSPACE, bindingId: BINDING, bindingUpdatedAt: "2026-10-08T00:00:00Z", locationDigest: "a".repeat(64), startedAt: new Date().toISOString() }
+        : name === "commit_legacy_google_binding_operation" ? { status: "applied", bindingId: BINDING } : null,
       error: null,
     }));
     const result = await recordGoogleConnection(connect);
     expect(result.binding).toBe("written");
-    expect(mockSaveConnection).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "mooney", refreshToken: "1//new", status: "connected" }));
-    expect(redis.set).toHaveBeenCalledWith("google-meta:mooney", { accountId: "accounts/111", locationId: "333" }, expect.any(Object));
-    const upsert = rpc.mock.calls.find(([name]) => name === "upsert_workspace_account_binding")!;
-    expect(upsert[1].p_mode).toBe("oauth");
-    expect(rpc).toHaveBeenCalledWith("upsert_workspace_google_location", expect.objectContaining({ p_binding_id: BINDING, p_location_id: "333", p_title: "The Mooney Firm" }));
+    expect(mockSaveConnection).not.toHaveBeenCalled();
+    expect(redis.set).not.toHaveBeenCalled();
+    expect(rpc.mock.calls.map(([name]) => name)).toEqual(["read_legacy_google_operation", "commit_legacy_google_binding_operation"]);
+    const committed = rpc.mock.calls.find(([name]) => name === "commit_legacy_google_binding_operation")!;
+    expect(JSON.stringify(committed[1])).toContain("The Mooney Firm");
+    expect(JSON.stringify(committed[1])).not.toContain("1//new");
   });
 
   it("with the store off, writes Redis only", async () => {
@@ -270,21 +277,25 @@ describe("recording a (re)connect", () => {
     expect(mockSaveConnection).toHaveBeenCalledTimes(1);
   });
 
-  it("skips the binding for a tenant not linked to a business", async () => {
+  it("persists qualified unlinked records atomically without creating a binding", async () => {
     vi.stubEnv("STRELVA_GOOGLE_BINDINGS", "1");
+    mockDurableAuthority.mockResolvedValue(true);
+    rpc.mockImplementation(name => ({ data: name === "read_legacy_google_operation" ? { tenantId: "mooney", tenantStableId: STABLE, workspaceId: null, bindingId: null, bindingUpdatedAt: null, locationDigest: null, startedAt: new Date().toISOString() } : { status: "applied", bindingId: null }, error: null }));
     expect((await recordGoogleConnection(connect)).binding).toBe("unlinked");
-    expect(rpc.mock.calls.map(([name]) => name)).toEqual(["read_tenant_binding_target"]);
+    expect(rpc.mock.calls.map(([name]) => name)).toEqual(["read_legacy_google_operation", "commit_legacy_google_binding_operation"]);
+    expect(mockSaveConnection).not.toHaveBeenCalled();
   });
 
-  it("never fails the connect when the binding write fails or would be plaintext", async () => {
+  it("reports failure or refused encryption without independent credential writes", async () => {
     vi.stubEnv("STRELVA_GOOGLE_BINDINGS", "1");
-    rpc.mockImplementation((name) => name === "read_tenant_binding_target"
-      ? { data: { tenantStableId: STABLE, workspaceId: WORKSPACE }, error: null }
+    mockDurableAuthority.mockResolvedValue(true);
+    rpc.mockImplementation((name) => name === "read_legacy_google_operation"
+      ? { data: { tenantId: "mooney", tenantStableId: STABLE, workspaceId: WORKSPACE, bindingId: BINDING, bindingUpdatedAt: "2026-10-08T00:00:00Z", locationDigest: "a".repeat(64), startedAt: new Date().toISOString() }, error: null }
       : { data: null, error: { message: "account_binding_tenant_not_linked" } });
     expect((await recordGoogleConnection(connect)).binding).toBe("failed");
     vi.stubEnv("SECRETS_ENC_KEY", "");
     expect((await recordGoogleConnection(connect)).binding).toBe("refused_plaintext");
-    expect(mockSaveConnection).toHaveBeenCalledTimes(2);
+    expect(mockSaveConnection).not.toHaveBeenCalled();
   });
 
   it("still fails the connect when Redis itself fails, as before", async () => {

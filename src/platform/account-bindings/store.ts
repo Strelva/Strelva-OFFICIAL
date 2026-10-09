@@ -2,6 +2,8 @@ import { publishingWorkspaceId } from "@/platform/infra/publishing-scope";
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import { encryptSecret } from "@/platform/infra/crypto/secrets";
+import type { LegacyGoogleOperationPin, LegacyGoogleOperationInput } from "./contracts";
+export type { LegacyGoogleOperationPin, LegacyGoogleOperationInput } from "./contracts";
 import {
   accountBindingWithSecretsSchema,
   bindingTargetSchema,
@@ -87,6 +89,7 @@ export function bindingEncryptionReady(): boolean {
 function classify(error: NonNullable<DbError>): string {
   const detail = `${error.code ?? ""} ${error.message ?? ""}`;
   for (const code of [
+    "legacy_google_operation_superseded", "google_settings_permission_denied", "legacy_google_operation_invalid",
     "account_binding_plaintext_refused", "account_binding_tenant_not_linked", "account_binding_workspace_unknown",
     "account_binding_not_found", "account_binding_invalid",
   ]) {
@@ -94,6 +97,47 @@ function classify(error: NonNullable<DbError>): string {
   }
   if (/PGRST202|42883|42P01/.test(detail)) return "schema_missing";
   return "error";
+}
+
+const legacyGooglePinSchema = z.object({
+  tenantId: z.string().min(1), tenantStableId: z.string().uuid(), workspaceId: z.string().uuid().nullable(),
+  bindingId: z.string().uuid().nullable(), bindingUpdatedAt: z.string().nullable(),
+  locationDigest: z.string().regex(/^[0-9a-f]{64}$/).nullable(), startedAt: z.string().datetime({ offset: true }),
+}).strict();
+const legacyGoogleResultSchema = z.object({ status: z.literal("applied"), bindingId: z.string().uuid().nullable() });
+
+/** Capture canonical authority before provider, persistence, or cache awaits. */
+export async function readLegacyGoogleOperation(tenantId: string, startedAt: string, db?: AccountBindingsDb | null): Promise<LegacyGoogleOperationPin> {
+  z.string().datetime({ offset: true }).parse(startedAt);
+  return call("read_legacy_google_operation", { p_tenant_id: tenantId },
+    data => legacyGooglePinSchema.parse({ ...(data as Record<string, unknown>), startedAt }), db ?? accountBindingsDb());
+}
+
+function legacyGoogleOperationPayload(input: LegacyGoogleOperationInput): Record<string, unknown> {
+  return {
+    ...(input.grant ? { grant: {
+      workspaceId: input.grant.workspaceId, originTenantStableId: input.grant.originTenantStableId,
+      scopes: input.grant.scopes ?? null, subject: input.grant.subject ?? null,
+      refreshTokenCiphertext: encryptForBinding(input.grant.refreshToken),
+      accessTokenCiphertext: encryptForBinding(input.grant.accessToken),
+      tokenExpiresAt: input.grant.tokenExpiresAt ?? null, status: input.grant.status,
+    } } : {}),
+    ...(input.location ? { location: { accountId: input.location.accountId, locationId: input.location.locationId, title: input.location.title ?? null } } : {}),
+  };
+}
+
+/** Trusted service caller's existing authority, with atomic canonical CAS. */
+export async function commitLegacyGoogleBindingOperation(pin: LegacyGoogleOperationPin, input: LegacyGoogleOperationInput, db?: AccountBindingsDb | null): Promise<{ status: "applied"; bindingId: string | null }> {
+  return call("commit_legacy_google_binding_operation", { p_pin: legacyGooglePinSchema.parse(pin), p_input: legacyGoogleOperationPayload(input) },
+    data => legacyGoogleResultSchema.parse(data), db ?? accountBindingsDb());
+}
+
+/** Current settings authority and all durable records commit in one transaction. */
+export async function applyLegacyGoogleOperation(actor: { userId: string; verifiedEmail: string }, pin: LegacyGoogleOperationPin, kind: "oauth" | "location", input: LegacyGoogleOperationInput, db?: AccountBindingsDb | null): Promise<{ status: "applied"; bindingId: string | null }> {
+  return call("apply_legacy_google_operation", {
+    p_user_id: z.string().uuid().parse(actor.userId), p_verified_email: z.string().trim().email().parse(actor.verifiedEmail),
+    p_pin: legacyGooglePinSchema.parse(pin), p_kind: z.enum(["oauth", "location"]).parse(kind), p_input: legacyGoogleOperationPayload(input),
+  }, data => legacyGoogleResultSchema.parse(data), db ?? accountBindingsDb());
 }
 
 async function call<T>(name: string, args: Record<string, unknown>, parse: (data: unknown) => T, db = accountBindingsDb()): Promise<T> {

@@ -2,11 +2,13 @@ import { GA4_READ_SCOPE, GSC_READ_SCOPE, getGoogleAccessToken } from "./google-t
 import { getAnalyticsConfig, setAnalyticsConfig } from "./analytics";
 import { GBP_WRITE_SCOPE } from "./gbp-replies";
 import {
+  beginGoogleTenantOperation,
   getGoogleGrant,
   getGoogleLocation,
   googleLocationIdFromName,
-  recordGoogleLocationSelection,
+  recordAuthorizedGoogleLocationSelection,
   type GoogleGrant,
+  type GoogleOperationActor,
 } from "./google-access";
 
 const GSC_SITES_URL = "https://www.googleapis.com/webmasters/v3/sites";
@@ -200,9 +202,12 @@ export async function selectGoogleResource(
   tenantId: string,
   kind: GoogleResourceKind,
   resourceId: string,
+  actor?: GoogleOperationActor,
 ): Promise<GoogleResourceCatalog> {
   const normalized = resourceId.trim();
   if (!normalized || normalized.length > 512) throw new Error("resource_id_invalid");
+  if (kind === "gbp" && !actor) throw new Error("google_settings_permission_denied");
+  const operation = kind === "gbp" ? await beginGoogleTenantOperation(tenantId, actor!) : undefined;
   const catalog = await discoverGoogleResources(tenantId);
   const group = catalog[kind];
   const chosen = group.resources.find((item) => item.id === normalized);
@@ -216,7 +221,7 @@ export async function selectGoogleResource(
   } else {
     const split = chosen.id.split("|");
     if (split.length !== 2 || !split[0] || !split[1]) throw new Error("resource_id_invalid");
-    await recordGoogleLocationSelection(tenantId, { accountId: split[0], locationId: split[1], title: chosen.label });
+    await recordAuthorizedGoogleLocationSelection(tenantId, { accountId: split[0], locationId: split[1], title: chosen.label }, actor!, operation!);
   }
 
   return discoverGoogleResources(tenantId);

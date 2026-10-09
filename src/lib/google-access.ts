@@ -7,12 +7,12 @@
  * is counted in `reb:google-binding:fallback:{yyyy-mm-dd}` so "30 days with zero
  * fallbacks" can be measured before the cut.
  *
- * Write order: a (re)connect writes Redis exactly as before, then the binding
- * (dual-write), so a reconnect during the move can't strand either side. The
- * binding write never fails the connect: Redis stays the working copy.
+ * Qualified reconnects commit credentials, metadata and binding atomically.
+ * Redis-only compatibility remains when bindings and both durable stores are
+ * off; qualified reconnects omit optional caches rather than reorder grants.
  *
- * Off by default. With STRELVA_GOOGLE_BINDINGS unset, this module reads and
- * writes Redis only, the same calls the callers made before.
+ * Off by default. Redis-only writes require both durable stores to remain
+ * unselected as well as STRELVA_GOOGLE_BINDINGS being off.
  *
  * Callers: google-token.ts (GSC/GA4 reads), google-resources.ts,
  * gbp-replies.ts, gbp-management.ts, the poll-google-reviews cron and the
@@ -24,12 +24,13 @@ import { getConnection, saveConnection, saveConnectionMutation } from "./connect
 import { publishingWorkspaceId } from "@/platform/infra/publishing-scope";
 import { decryptSecret } from "@/platform/infra/crypto/secrets";
 import { refreshGoogleTokens } from "./google-token";
-import { mirrorRecord, readProviderMetadata } from "./client-records";
+import { durableRecordAuthority, writeDurableRecord, mirrorRecord, readProviderMetadata } from "./client-records";
 import { getRedis } from "@/platform/infra/redis";
+import { z } from "zod";
 import type { Connection } from "./types";
 // The business-level binding store (src/platform/account-bindings) through
 // the port src/lib declares (Strelva Reborn section 7).
-import { workspacePorts, type GoogleBindingWithSecrets, type GoogleBindingsPort } from "./workspace-ports";
+import { workspacePorts, type GoogleBindingWithSecrets, type GoogleBindingsPort, type LegacyGoogleOperationPin, type LegacyGoogleOperationInput } from "./workspace-ports";
 
 const bindingStore = (): Promise<GoogleBindingsPort> => workspacePorts().googleBindings();
 
@@ -162,6 +163,8 @@ export function googleLocationIdFromName(name: string | undefined | null): strin
 
 /** The managed location: the binding's primary, else Redis google-meta. */
 export async function getGoogleLocation(tenantId: string, grant?: GoogleGrant | null): Promise<GoogleLocationRef | null> {
+  const nativeWorkspace = publishingWorkspaceId(tenantId);
+  if (nativeWorkspace) return grant?.source === "binding" && grant.tenantId === tenantId && grant.workspaceId === nativeWorkspace && grant.bindingId ? grant.location : null;
   if (grant?.location) return grant.location;
   if (grant?.source === "binding") await noteFallback(tenantId, "no_location");
   const meta = await readProviderMetadata<{ accountId?: unknown; locationId?: unknown }>(tenantId, "google", async () => {
@@ -241,25 +244,53 @@ export async function noteGoogleReadSucceeded(grant: GoogleGrant, now = Date.now
 
 export type BindingWriteOutcome = "written" | "disabled" | "unlinked" | "refused_plaintext" | "failed";
 
-async function writeBinding(
-  tenantId: string,
-  write: (target: { workspaceId: string; tenantStableId: string }, store: GoogleBindingsPort) => Promise<void>,
-): Promise<BindingWriteOutcome> {
+type CapturedBinding = { store: GoogleBindingsPort; pin: LegacyGoogleOperationPin } | BindingWriteOutcome;
+async function captureBindingOperation(tenantId: string, startedAt: string, expected?: LegacyGoogleOperationPin): Promise<CapturedBinding> {
   const store = await bindingStore();
-  if (!store.googleBindingsEnabled()) return "disabled";
+  const [connectionsDurable, metadataDurable] = await Promise.all([
+    durableRecordAuthority("provider_connections"), durableRecordAuthority("provider_metadata"),
+  ]);
+  if (!store.googleBindingsEnabled() && !connectionsDurable && !metadataDurable && !expected) return "disabled";
+  if (!store.googleBindingsEnabled() || !connectionsDurable || !metadataDurable) return "failed";
+  if (expected && (expected.tenantId !== tenantId || expected.startedAt !== startedAt)) return "failed";
   try {
-    const target = await store.readBindingTarget(tenantId);
-    if (!target) return "unlinked";
-    await write(target, store);
-    return "written";
-  } catch (error) {
-    if (error instanceof store.BindingEncryptionRefused) {
-      console.error(`[google-access] binding write refused for ${tenantId}: SECRETS_ENC_KEY is not set`);
-      return "refused_plaintext";
-    }
-    console.error(`[google-access] binding write failed for ${tenantId}: ${error instanceof Error ? error.message : "error"}`);
-    return "failed";
+    const pin = expected ?? await store.readLegacyGoogleOperation(tenantId, startedAt);
+    return { store, pin };
+  } catch { return "failed"; }
+}
+async function commitCapturedBinding(captured: CapturedBinding, input: LegacyGoogleOperationInput): Promise<BindingWriteOutcome> {
+  if (typeof captured === "string") return captured;
+  try { const result = await captured.store.commitLegacyGoogleBindingOperation(captured.pin, input); return result.bindingId ? "written" : "unlinked"; }
+  catch (error) { return error instanceof captured.store.BindingEncryptionRefused ? "refused_plaintext" : "failed"; }
+}
+
+/** A governed reconnect captures exact current authority before token exchange.
+ * The original start also fences a newer completed operation before capture. */
+export async function beginGoogleReconnectOperation(tenantId: string, startedAt: number): Promise<LegacyGoogleOperationPin> {
+  if (publishingWorkspaceId(tenantId) || process.env.STRELVA_NATIVE_GOOGLE_ONLY === "1") throw new Error("Native Google reconnect requires the workspace binding lifecycle.");
+  const captured = await captureBindingOperation(tenantId, new Date(startedAt).toISOString());
+  if (typeof captured === "string") throw new Error("Google reconnect persistence is unavailable.");
+  return captured.pin;
+}
+
+/** Legacy tenant metadata follows its selected read authority; native scopes
+ * use only their verified workspace binding and dedicated OAuth lifecycle. */
+async function recordGoogleMetadata(tenantId: string, value: { accountId?: string; locationId?: string }, capturedAt: string, requireRedis: boolean): Promise<void> {
+  if (publishingWorkspaceId(tenantId)) throw new Error("Native Google metadata requires the workspace binding lifecycle.");
+  const durable = await durableRecordAuthority("provider_metadata");
+  const redis = getRedis();
+  if (durable) {
+    const status = await writeDurableRecord("provider_metadata", tenantId, "google", { value }, capturedAt);
+    if (status === "kept") throw new Error("Google location metadata was superseded by a newer change.");
+    if (redis) await redis.set(`google-meta:${tenantId}`, value, { ex: META_TTL_SECONDS }).catch(() => {});
+    return;
   }
+  if (!redis) {
+    if (requireRedis) throw new Error("persistence_unavailable");
+    return;
+  }
+  await redis.set(`google-meta:${tenantId}`, value, { ex: META_TTL_SECONDS });
+  await mirrorRecord("provider_metadata", tenantId, "google", { value }, capturedAt);
 }
 
 export interface GoogleConnectInput {
@@ -275,10 +306,23 @@ export interface GoogleConnectInput {
 }
 
 /**
- * Record a (re)connect. Redis first, exactly as the callback always wrote it
- * (a Redis failure still fails the connect), then the binding beside it.
+ * Qualified trusted reconnects admit and write every authoritative record in
+ * one transaction. No legacy producer or optional cache precedes admission.
  */
-export async function recordGoogleConnection(input: GoogleConnectInput, now = Date.now()): Promise<{ binding: BindingWriteOutcome }> {
+export async function recordGoogleConnection(input: GoogleConnectInput, now = Date.now(), expected?: LegacyGoogleOperationPin): Promise<{ binding: BindingWriteOutcome }> {
+  if (publishingWorkspaceId(input.tenantId) || process.env.STRELVA_NATIVE_GOOGLE_ONLY === "1") throw new Error("Native Google reconnect requires the workspace binding lifecycle.");
+  const capturedAt = new Date(now).toISOString();
+  const captured = await captureBindingOperation(input.tenantId, capturedAt, expected);
+  if (typeof captured !== "string") {
+    const binding = await commitCapturedBinding(captured, {
+      grant: { workspaceId: captured.pin.workspaceId ?? "", originTenantStableId: captured.pin.tenantStableId,
+        scopes: input.scopes ?? null, refreshToken: input.refreshToken ?? null, accessToken: input.accessToken,
+        tokenExpiresAt: input.expiresAt, status: "connected" },
+      ...(input.accountId && input.locationId ? { location: { accountId: input.accountId, locationId: input.locationId, title: input.locationTitle ?? null } } : {}),
+    });
+    return { binding };
+  }
+  if (captured !== "disabled") return { binding: captured };
   await saveConnection({
     provider: "google",
     tenantId: input.tenantId,
@@ -290,41 +334,64 @@ export async function recordGoogleConnection(input: GoogleConnectInput, now = Da
     scopes: input.scopes,
   });
   if (input.accountId || input.locationId) {
-    const redis = getRedis();
-    if (redis) {
-      const value = { accountId: input.accountId, locationId: input.locationId };
-      await redis.set(`google-meta:${input.tenantId}`, value, { ex: META_TTL_SECONDS });
-      await mirrorRecord("provider_metadata", input.tenantId, "google", { value });
-    }
+    await recordGoogleMetadata(input.tenantId, { accountId: input.accountId, locationId: input.locationId }, capturedAt, false);
   }
-  const binding = await writeBinding(input.tenantId, async (target, store) => {
-    const result = await store.upsertGoogleBinding({
-      workspaceId: target.workspaceId,
-      originTenantStableId: target.tenantStableId,
-      scopes: input.scopes ?? null,
-      refreshToken: input.refreshToken ?? null,
-      accessToken: input.accessToken,
-      tokenExpiresAt: input.expiresAt,
-      status: "connected",
-    }, "oauth");
-    if (input.accountId && input.locationId) {
-      await store.upsertGoogleLocation(result.id, { accountId: input.accountId, locationId: input.locationId, title: input.locationTitle ?? null });
-    }
-  });
-  return { binding };
+  return { binding: "disabled" };
 }
 
-/** The owner picked a different Google location. Redis as before, then the binding. */
+/** Qualified legacy selection uses the trusted atomic metadata transaction;
+ * Redis compatibility remains only before both stores and bindings cut over. */
 export async function recordGoogleLocationSelection(tenantId: string, location: GoogleLocationRef & { title?: string | null }): Promise<{ binding: BindingWriteOutcome }> {
-  const redis = getRedis();
-  if (!redis) throw new Error("persistence_unavailable");
-  const value = { accountId: location.accountId, locationId: location.locationId };
-  await redis.set(`google-meta:${tenantId}`, value, { ex: META_TTL_SECONDS });
-  await mirrorRecord("provider_metadata", tenantId, "google", { value });
-  const binding = await writeBinding(tenantId, async (_target, store) => {
-    const existing = await store.readGoogleBindingForTenant(tenantId);
-    if (!existing) throw new Error("no binding to attach the location to");
-    await store.upsertGoogleLocation(existing.id, location);
-  });
-  return { binding };
+  if (process.env.STRELVA_NATIVE_GOOGLE_ONLY === "1") throw new Error("Legacy Google location writes are disabled in native-only admission mode.");
+  if (publishingWorkspaceId(tenantId)) throw new Error("Native Google metadata requires the workspace binding lifecycle.");
+  const capturedAt = new Date().toISOString();
+  const captured = await captureBindingOperation(tenantId, capturedAt);
+  if (typeof captured !== "string") return { binding: await commitCapturedBinding(captured, { location }) };
+  if (captured !== "disabled") return { binding: captured };
+  await recordGoogleMetadata(tenantId, { accountId: location.accountId, locationId: location.locationId }, capturedAt, true);
+  return { binding: "disabled" };
+}
+
+
+export type GoogleTenantOperation = LegacyGoogleOperationPin;
+export interface GoogleOperationActor { userId: string; verifiedEmail: string }
+const operationActorSchema = z.object({ userId: z.string().uuid(), verifiedEmail: z.string().email() });
+/** Interactive legacy settings operations require selected durable authority;
+ * Redis cannot hold a database permission lock across a later cache mutation. */
+export async function beginGoogleTenantOperation(tenantId: string, actor: GoogleOperationActor): Promise<GoogleTenantOperation> {
+  const startedAt = new Date().toISOString();
+  operationActorSchema.parse(actor);
+  if (publishingWorkspaceId(tenantId) || process.env.STRELVA_NATIVE_GOOGLE_ONLY === "1") throw new Error("Native Google settings require the workspace lifecycle.");
+  const store = await bindingStore();
+  if (!store.googleBindingsEnabled() || !await durableRecordAuthority("provider_connections") || !await durableRecordAuthority("provider_metadata")) throw new Error("persistence_unavailable");
+  return store.readLegacyGoogleOperation(tenantId, startedAt);
+}
+async function applyAuthorizedGoogle(actor: GoogleOperationActor, pin: GoogleTenantOperation, kind: "oauth" | "location", input: LegacyGoogleOperationInput) {
+  operationActorSchema.parse(actor);
+  if (publishingWorkspaceId(pin.tenantId) || process.env.STRELVA_NATIVE_GOOGLE_ONLY === "1") throw new Error("Native Google settings require the workspace lifecycle.");
+  const store = await bindingStore();
+  if (!store.googleBindingsEnabled() || !await durableRecordAuthority("provider_connections") || !await durableRecordAuthority("provider_metadata")) throw new Error("persistence_unavailable");
+  try { return await store.applyLegacyGoogleOperation(actor, pin, kind, input); }
+  catch (error) {
+    if (error instanceof store.AccountBindingStoreError) {
+      if (error.code === "legacy_google_operation_superseded") throw new Error("google_operation_superseded");
+      if (error.code === "google_settings_permission_denied") throw new Error("google_settings_permission_denied");
+    }
+    throw new Error("Google settings could not be committed with current authority.");
+  }
+}
+export async function recordAuthorizedGoogleConnection(input: GoogleConnectInput, actor: GoogleOperationActor, pin: GoogleTenantOperation): Promise<{ binding: BindingWriteOutcome }> {
+  if (input.tenantId !== pin.tenantId) throw new Error("Google operation tenant changed.");
+  const grant = { workspaceId: pin.workspaceId ?? "", originTenantStableId: pin.tenantStableId, scopes: input.scopes ?? null,
+    refreshToken: input.refreshToken ?? null, accessToken: input.accessToken, tokenExpiresAt: input.expiresAt, status: "connected" as const };
+  const location = input.accountId && input.locationId ? { accountId: input.accountId, locationId: input.locationId, title: input.locationTitle ?? null } : undefined;
+  const result = await applyAuthorizedGoogle(actor, pin, "oauth", { grant, ...(location ? { location } : {}) });
+  // Selected durable readers already own this state. Reconstructing a cache
+  // from the response would lose a retained refresh token or reorder grants.
+  return { binding: result.bindingId ? "written" : "unlinked" };
+}
+export async function recordAuthorizedGoogleLocationSelection(tenantId: string, location: GoogleLocationRef & { title?: string | null }, actor: GoogleOperationActor, pin: GoogleTenantOperation): Promise<{ binding: BindingWriteOutcome }> {
+  if (tenantId !== pin.tenantId) throw new Error("Google operation tenant changed.");
+  const result = await applyAuthorizedGoogle(actor, pin, "location", { location });
+  return { binding: result.bindingId ? "written" : "unlinked" };
 }

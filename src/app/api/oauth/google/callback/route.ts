@@ -11,9 +11,10 @@
  */
 
 import { NextResponse } from "next/server";
-import { googleLocationIdFromName, recordGoogleConnection } from "@/lib/google-access";
+import { z } from "zod";
+import { beginGoogleTenantOperation, googleLocationIdFromName, recordAuthorizedGoogleConnection } from "@/lib/google-access";
 import { consumeOAuthState } from "@/lib/oauth-state";
-import { verifyAuth, requireTenantAccess } from "@/platform/infra/auth";
+import { getActorContext, verifyAuth, requireTenantPermission } from "@/platform/infra/auth";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const ACCOUNTS_URL = "https://mybusinessaccountmanagement.googleapis.com/v1/accounts";
@@ -111,8 +112,8 @@ export async function GET(req: Request) {
   }
   const tenantId = verifiedState.tenantId;
 
-  // Confirm the session user still has access to the tenant embedded in the state.
-  const accessDenied = await requireTenantAccess(tenantId);
+  // Viewing this tenant does not authorize replacing its Google credentials.
+  const accessDenied = await requireTenantPermission(tenantId, "settings:write");
   if (accessDenied) {
     return NextResponse.redirect(
       `${connectionsUrl}?error=${encodeURIComponent("Access denied")}`
@@ -132,6 +133,16 @@ export async function GET(req: Request) {
 
   // Exchange code for tokens
   try {
+    const context = await getActorContext(tenantId);
+    const identity = z.object({ userId: z.string().uuid(), verifiedEmail: z.string().trim().email().transform(value => value.toLowerCase()) })
+      .safeParse({ userId: context.userId, verifiedEmail: context.email });
+    if (!identity.success || !["user", "super_admin"].includes(context.type)) {
+      return NextResponse.redirect(`${connectionsUrl}?error=${encodeURIComponent("Access denied")}`);
+    }
+    const actor = identity.data;
+    // The guarded snapshot pins the current tenant/link/binding before external
+    // reads. Commit rechecks settings authority and those pins under SQL locks.
+    const operation = await beginGoogleTenantOperation(tenantId, actor);
     const tokenRes = await fetch(TOKEN_URL, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -145,8 +156,7 @@ export async function GET(req: Request) {
     });
 
     if (!tokenRes.ok) {
-      const errBody = await tokenRes.text();
-      console.error("Google token exchange failed:", errBody);
+      console.error("Google token exchange was refused.");
       return NextResponse.redirect(
         `${connectionsUrl}?error=${encodeURIComponent("Failed to connect Google account")}`
       );
@@ -181,11 +191,9 @@ export async function GET(req: Request) {
       ? tokens.scope.split(" ").filter(Boolean)
       : undefined;
 
-    // Save the connection: Redis exactly as before, then (while
-    // STRELVA_GOOGLE_BINDINGS is on and the tenant is linked to a business)
-    // the business-level binding too, so a reconnect during the move reaches
-    // both stores. The binding write never fails the connect.
-    await recordGoogleConnection({
+    // Credentials, metadata and any linked binding commit together under current
+    // settings authority. Redis can only cache the confirmed durable result.
+    await recordAuthorizedGoogleConnection({
       tenantId,
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
@@ -194,11 +202,11 @@ export async function GET(req: Request) {
       accountId,
       locationId,
       locationTitle,
-    });
+    }, actor, operation);
 
     return NextResponse.redirect(`${connectionsUrl}?success=true`);
-  } catch (err) {
-    console.error("OAuth callback error:", err);
+  } catch {
+    console.error("Google OAuth connection could not be committed.");
     return NextResponse.redirect(
       `${connectionsUrl}?error=${encodeURIComponent("Failed to connect Google account")}`
     );

@@ -34,6 +34,10 @@ const nullableRpcArguments: Readonly<Record<string, readonly string[]>> = {
   record_creator_maintenance_from_workspace: ["p_agreement", "p_rate"],
   // Public Checkout has no agency actor; pay-link admission requires all three.
   assert_business_checkout_admission: ["p_actor_id", "p_verified_email", "p_accepted_email"],
+  // Private trusted-service dispatch has no interactive actor/kind; absent
+  // binding snapshots also deliberately call the private digest with NULL.
+  legacy_google_commit: ["p_user_id", "p_verified_email", "p_kind"],
+  legacy_google_location_digest: ["p_binding_id"],
 };
 
 function arg(name: string): string | undefined {

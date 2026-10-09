@@ -1,3 +1,4 @@
+// Source-authored 20261022175100 additions; actual disposable-catalog generation is UNRUN.
 export type Json =
   | string
   | number
@@ -9098,6 +9099,29 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      legacy_google_operation_watermarks: {
+        Row: {
+          latest_started_at: string
+          tenant_stable_id: string
+        }
+        Insert: {
+          latest_started_at: string
+          tenant_stable_id: string
+        }
+        Update: {
+          latest_started_at?: string
+          tenant_stable_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legacy_google_operation_watermarks_tenant_stable_id_fkey"
+            columns: ["tenant_stable_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["stable_id"]
           },
         ]
       }
@@ -21100,6 +21124,16 @@ export type Database = {
         }
         Returns: Json
       }
+      apply_legacy_google_operation: {
+        Args: {
+          p_input: Json
+          p_kind: string
+          p_pin: Json
+          p_user_id: string
+          p_verified_email: string
+        }
+        Returns: Json
+      }
       approve_native_workspace_newsletter_issue: {
         Args: {
           p_input: Json
@@ -22501,6 +22535,13 @@ export type Database = {
           p_verified_email: string
           p_version_id: string
           p_workspace_id: string
+        }
+        Returns: Json
+      }
+      commit_legacy_google_binding_operation: {
+        Args: {
+          p_input: Json
+          p_pin: Json
         }
         Returns: Json
       }
@@ -25036,6 +25077,28 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: Json
+      }
+      legacy_google_canonical_json: {
+        Args: {
+          p_value: Json
+        }
+        Returns: string
+      }
+      legacy_google_commit: {
+        Args: {
+          p_input: Json
+          p_kind: string | null
+          p_pin: Json
+          p_user_id: string | null
+          p_verified_email: string | null
+        }
+        Returns: Json
+      }
+      legacy_google_location_digest: {
+        Args: {
+          p_binding_id: string | null
+        }
+        Returns: string
       }
       link_bundle_maintenance_event: {
         Args: {
@@ -27595,6 +27658,12 @@ export type Database = {
           p_user_id: string
           p_verified_email: string
           p_work_id: string
+        }
+        Returns: Json
+      }
+      read_legacy_google_operation: {
+        Args: {
+          p_tenant_id: string
         }
         Returns: Json
       }

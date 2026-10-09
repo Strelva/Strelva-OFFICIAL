@@ -113,9 +113,14 @@ export async function chaseGoogleReconnectNotices(deps: { store?: ReconnectStore
  * existing binding and retains the selected location, rather than picking the
  * first profile from the owner's account. */
 export async function finishGoogleReconnect(target: ReconnectTarget, code: string, fetcher: typeof fetch = fetch): Promise<void> {
+  const startedAt = Date.now();
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) throw new Error("Google reconnect is not configured.");
+  const tenantPorts = target.tenantId ? await tenantPublishingPorts() : null;
+  if (target.tenantId && !tenantPorts?.beginGoogleReconnectOperation) throw new Error("Google reconnect persistence is unavailable.");
+  const operation = target.tenantId && tenantPorts?.beginGoogleReconnectOperation ? await tenantPorts.beginGoogleReconnectOperation(target.tenantId, startedAt) : undefined;
+  if (operation && (operation.workspaceId !== target.workspaceId || operation.bindingId !== target.bindingId || operation.tenantStableId !== target.tenantStableId)) throw new Error("Google reconnect target changed.");
   const response = await fetcher("https://oauth2.googleapis.com/token", {
     method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, code,
@@ -127,7 +132,7 @@ export async function finishGoogleReconnect(target: ReconnectTarget, code: strin
   if (!scopes.includes(MANAGE_SCOPE)) throw new Error("Google publishing permission was not granted.");
   const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
   if (target.tenantId) {
-    const outcome = await (await tenantPublishingPorts()).recordGoogleConnection({ tenantId: target.tenantId, accessToken: tokens.access_token, refreshToken: tokens.refresh_token, expiresAt, scopes });
+    const outcome = await tenantPorts!.recordGoogleConnection({ tenantId: target.tenantId, accessToken: tokens.access_token, refreshToken: tokens.refresh_token, expiresAt, scopes }, startedAt, operation);
     if (outcome.binding !== "written") throw new Error("Google access could not be saved in this workspace.");
   } else {
     const saved = await upsertGoogleBinding({ workspaceId: target.workspaceId, originTenantStableId: target.tenantStableId,

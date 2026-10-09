@@ -43,14 +43,16 @@ test('SQL fixture vectors equal Node native compact JSON including escaping, nul
   assert.ok(fixture.includes('native_google_hash_extension_shadow_called'));
   assert.ok(fixture.includes('set local role service_role;') && fixture.endsWith('rollback;\n'));
 });
-test('owned-disposable helper prepares 33 original refusals and eight real hash guard refusals', () => {
+test('owned-disposable helper prepares 33 original refusals, eight hash and ten recovery guard refusals', () => {
   const helper = read('tests/support/native-google-lifecycle-qualification.sh');
   const generator = helper.split("<<'PY'\n")[1].split('\nPY\n')[0];
   const destination = mkdtempSync(join(tmpdir(), 'native-hash-source-'));
   try {
-    execFileSync('python3', ['-c', generator, root + 'supabase/migrations/20261021140000_native_google_lifecycle.sql', root + 'supabase/migrations/rollback-20261021140000_native_google_lifecycle.sql', destination, root + 'supabase/migrations/20261021140100_native_google_hash_portability.sql']);
+    execFileSync('python3', ['-c', generator, root + 'supabase/migrations/20261021140000_native_google_lifecycle.sql', root + 'supabase/migrations/rollback-20261021140000_native_google_lifecycle.sql', destination, root + 'supabase/migrations/20261021140100_native_google_hash_portability.sql', root + 'supabase/migrations/20261021140200_native_google_recovery_receipt_grouping.sql']);
     const variants = readdirSync(destination).filter(file => file.endsWith('.sql'));
-    assert.equal(variants.length, 41);
+    assert.equal(variants.length, 51);
+    assert.equal(variants.filter(file => !file.startsWith('hash-') && !file.startsWith('recovery-')).length, 33);
+    assert.equal(variants.filter(file => file.startsWith('recovery-')).length, 10);
     assert.equal(variants.filter(file => file.startsWith('hash-')).length, 8);
     for (const file of variants) {
       const source = readFileSync(join(destination, file), 'utf8');

@@ -27,5 +27,6 @@ registerTenantPublishingPorts(async () => ({
   listEntriesForType: async (...args) => (await import("@/lib/cms/collections-service")).listEntriesForType(...args),
   resolveEventAction: async (...args) => (await import("@/lib/event-actions")).resolveEventAction(...args),
   mirrorPublishedReviewReply: async (...args) => (await import("@/lib/reviews")).mirrorPublishedReviewReply(...args),
+  beginGoogleReconnectOperation: async (...args) => (await import("@/lib/google-access")).beginGoogleReconnectOperation(...args),
   recordGoogleConnection: async (...args) => (await import("@/lib/google-access")).recordGoogleConnection(...args),
 }));

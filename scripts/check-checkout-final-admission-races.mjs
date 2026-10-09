@@ -24,7 +24,7 @@ const args = [db, "-X", "-qAt", "-v", "ON_ERROR_STOP=1"];
 const literal = value => `'${String(value).replaceAll("'", "''")}'`;
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const inventory = JSON.parse(readFileSync(join(root, "scripts/sql/historical-forward-inventory.json"), "utf8"));
-const sources = ["scripts/check-checkout-final-admission-races.mjs", "scripts/lib/retained-native-child.mjs", "scripts/sql/checkout-final-admission-contract.sql", "supabase/migrations/rollback-20261022171000_checkout_final_admission.sql", "scripts/sql/historical-forward-inventory.json", "scripts/sql/native-google-hash-portability-contract.sql", "scripts/sql/reward-durable-catalog-contract.sql", "scripts/sql/booking-settings-current-contract.sql", "supabase/migrations/rollback-20261022182000_booking_settings_atomic_patch.sql", "scripts/sql/private-source-current-contract.sql", "supabase/migrations/rollback-20261022174000_private_source_exit_admission.sql", "supabase/migrations/rollback-20261022174500_private_source_exit_lock_order.sql", "supabase/migrations/rollback-20261021140100_native_google_hash_portability.sql", "supabase/migrations/rollback-20261022175000_reward_durable_mutations.sql", "scripts/release-safety/batches.json", ...inventory.forwardFiles.map(name => `supabase/migrations/${name}`)];
+const sources = ["scripts/check-checkout-final-admission-races.mjs", "scripts/lib/retained-native-child.mjs", "scripts/sql/checkout-final-admission-contract.sql", "supabase/migrations/rollback-20261022171000_checkout_final_admission.sql", "scripts/sql/historical-forward-inventory.json", "scripts/sql/native-google-hash-portability-contract.sql", "scripts/sql/reward-durable-catalog-contract.sql", "scripts/sql/booking-settings-current-contract.sql", "supabase/migrations/rollback-20261022182000_booking_settings_atomic_patch.sql", "scripts/sql/private-source-current-contract.sql", "supabase/migrations/rollback-20261022174000_private_source_exit_admission.sql", "supabase/migrations/rollback-20261022174500_private_source_exit_lock_order.sql", "supabase/migrations/rollback-20261021140100_native_google_hash_portability.sql", "scripts/sql/native-google-recovery-receipt-grouping-contract.sql", "scripts/sql/legacy-google-operation-current-contract.sql", "supabase/migrations/rollback-20261021140200_native_google_recovery_receipt_grouping.sql", "supabase/migrations/rollback-20261022175100_legacy_google_operation_authority.sql", "supabase/migrations/rollback-20261022175000_reward_durable_mutations.sql", "scripts/release-safety/batches.json", ...inventory.forwardFiles.map(name => `supabase/migrations/${name}`)];
 const hash = bytes => createHash("sha256").update(bytes).digest("hex");
 const sourceSnapshot = () => Object.fromEntries(sources.map(path => [path, hash(readFileSync(join(root, path)))]));
 const sourceBefore = sourceSnapshot();
@@ -95,14 +95,16 @@ try {
   // Catalog-source check and exact installed forward identity bind this rehearsal.
   await run("source-contract", `\\i ${root}/scripts/sql/checkout-final-admission-contract.sql`);
   await run("current-native-google-hash-portability-contract", `\\i ${root}/scripts/sql/native-google-hash-portability-contract.sql`);
+  await run("current-native-google-recovery-receipt-grouping-contract", `\\i ${root}/scripts/sql/native-google-recovery-receipt-grouping-contract.sql`);
+  await run("current-legacy-google-operation-current-contract", `\\i ${root}/scripts/sql/legacy-google-operation-current-contract.sql`);
   await run("current-reward-durable-catalog-contract", `\\i ${root}/scripts/sql/reward-durable-catalog-contract.sql`);
   await run("current-booking-settings-current-contract", `\\i ${root}/scripts/sql/booking-settings-current-contract.sql`);
   await run("current-private-source-current-contract", `\\i ${root}/scripts/sql/private-source-current-contract.sql`);
   const expectedLedger = inventory.forwardFiles.map(file => /^([0-9]+)_/.exec(file)?.[1]).sort();
-  if (inventory.forwardCount !== 352 || expectedLedger.length !== 352 || expectedLedger.some(version => !version) || new Set(expectedLedger).size !== 352) throw new Error("Source inventory must contain the exact unique 352 forward versions");
+  if (inventory.forwardCount !== 354 || expectedLedger.length !== 354 || expectedLedger.some(version => !version) || new Set(expectedLedger).size !== 354) throw new Error("Source inventory must contain the exact unique 354 forward versions");
   installedLedger = JSON.parse(await run("exact-forward-ledger", "select coalesce(jsonb_agg(version::text order by version::text),'[]'::jsonb) from supabase_migrations.schema_migrations"));
   retain("installed-forward-ledger.json", JSON.stringify({ expected: expectedLedger, installed: installedLedger }, null, 2));
-  if (JSON.stringify(installedLedger) !== JSON.stringify(expectedLedger)) throw new Error("Requires the exact sorted qualified 352-migration identity; a same-count substituted ledger is refused.");
+  if (JSON.stringify(installedLedger) !== JSON.stringify(expectedLedger)) throw new Error("Requires the exact sorted qualified 354-migration identity; a same-count substituted ledger is refused.");
   for (const kind of cases) {
     const f = await fixture(kind), label = kind.replaceAll(" ", "-"), app = `checkout-wait-${randomUUID()}`;
     fixtureWorkspaces.push(f.business, f.agency);
@@ -188,6 +190,8 @@ try {
   if (await run("history-after-inverse", history) !== retained) throw new Error("Legitimate inverse changed retained accepted payment/history bytes");
   await run("legitimate-reapply", `set role ${literal(migrationRole)};\n\\i ${forward}`);
   await run("reapplied-native-google-hash-portability-contract", `set role ${literal(migrationRole)};\n\\i ${root}/scripts/sql/native-google-hash-portability-contract.sql`);
+  await run("reapplied-native-google-recovery-receipt-grouping-contract", `set role ${literal(migrationRole)};\n\\i ${root}/scripts/sql/native-google-recovery-receipt-grouping-contract.sql`);
+  await run("reapplied-legacy-google-operation-current-contract", `set role ${literal(migrationRole)};\n\\i ${root}/scripts/sql/legacy-google-operation-current-contract.sql`);
   await run("reapplied-reward-durable-catalog-contract", `set role ${literal(migrationRole)};\n\\i ${root}/scripts/sql/reward-durable-catalog-contract.sql`);
   await run("reapplied-booking-settings-current-contract", `set role ${literal(migrationRole)};\n\\i ${root}/scripts/sql/booking-settings-current-contract.sql`);
   await run("reapplied-private-source-current-contract", `set role ${literal(migrationRole)};\n\\i ${root}/scripts/sql/private-source-current-contract.sql`);

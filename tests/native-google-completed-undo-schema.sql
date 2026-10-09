@@ -5,8 +5,17 @@ begin;
 set local lock_timeout='2s';
 set local statement_timeout='10s';
 create function pg_temp.nu_assert(ok boolean,label text) returns void language plpgsql as $$ begin if ok is not true then raise exception 'native undo fixture failed: %',label; end if; end $$;
-create function pg_temp.nu_expect(statement text,expected text) returns void language plpgsql as $$ begin
- begin execute statement; exception when others then if sqlerrm not like expected then raise exception 'native undo expected %, got %',expected,sqlerrm; end if; return; end;
+create function pg_temp.nu_expect(statement text,expected text) returns void language plpgsql as $$
+declare failure_state text; failure_detail text; failure_context text;
+begin
+ begin execute statement; exception when others then
+  if sqlerrm not like expected then
+   get stacked diagnostics failure_state=returned_sqlstate,failure_detail=pg_exception_detail,failure_context=pg_exception_context;
+   raise exception 'native undo expected %, got %',expected,sqlerrm
+    using detail=format('Original SQLSTATE: %s; original detail: %s',failure_state,failure_detail),hint=failure_context;
+  end if;
+  return;
+ end;
  raise exception 'native undo expected refusal: %',expected;
 end $$;
 insert into public.users(id,email,verified_at) values

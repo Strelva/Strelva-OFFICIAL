@@ -43,6 +43,8 @@ function capture(root, env) {
   const ledger = sql("select coalesce(jsonb_agg(to_jsonb(m) order by version),'[]'::jsonb) from supabase_migrations.schema_migrations m");
   if (canonical(ledger.map(row => row.version)) !== canonical(migrations.map(row => row.version)))
     throw new Error('Applied migration ledger does not match staged forwards.');
+  for (const contract of ['scripts/sql/native-google-recovery-receipt-grouping-contract.sql', 'scripts/sql/legacy-google-operation-current-contract.sql'])
+    run('psql', [env.STRELVA_LOCAL_DB_URL, '-X', '-v', 'ON_ERROR_STOP=1', '-f', join(root, contract)]);
   // pg_dump includes definitions, triggers, policies, ownership, ACL and default ACL.
   // Role flags/membership live outside the schema dump and are captured separately.
   const roles = sql("select jsonb_build_object('roles',(select jsonb_agg(jsonb_build_object('name',rolname,'super',rolsuper,'inherit',rolinherit,'createRole',rolcreaterole,'createDb',rolcreatedb,'login',rolcanlogin,'replication',rolreplication,'bypassRls',rolbypassrls,'config',rolconfig) order by rolname) from pg_roles),'membership',(select coalesce(jsonb_agg(jsonb_build_object('role',r.rolname,'member',m.rolname,'grantor',g.rolname,'admin',a.admin_option,'inherit',a.inherit_option,'set',a.set_option) order by r.rolname,m.rolname,g.rolname),'[]'::jsonb) from pg_auth_members a join pg_roles r on r.oid=a.roleid join pg_roles m on m.oid=a.member join pg_roles g on g.oid=a.grantor))");

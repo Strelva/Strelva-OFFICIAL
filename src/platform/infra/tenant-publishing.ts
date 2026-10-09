@@ -1,5 +1,6 @@
 import type { UnifiedEvent } from "./event-contract";
 import type { CollectionType } from "./collection-types";
+import type { LegacyGoogleOperationPin } from "@/platform/account-bindings/contracts";
 
 /** The app edge supplies the existing tenant stores. Workspace code depends
  * on this contract, never imports the tenant model or creates a second store. */
@@ -21,7 +22,9 @@ export interface TenantPublishingPorts {
   listEntriesForType(tenantId: string, type: CollectionType, options?: { limit?: number }): Promise<Array<{ slug: string; status: string; data: unknown }>>;
   resolveEventAction(tenantId: string, eventId: string, action: "approved" | "dismissed", actorId: string): Promise<{ changed: boolean; reason?: string }>;
   mirrorPublishedReviewReply(tenantId: string, reviewId: string, text: string | null): Promise<unknown>;
-  recordGoogleConnection(input: { tenantId: string; accessToken: string; refreshToken: string; expiresAt: string; scopes: string[] }): Promise<{ binding: string }>;
+  /** Governed reconnect fails closed before provider exchange when absent. */
+  beginGoogleReconnectOperation?(tenantId: string, startedAt: number): Promise<LegacyGoogleOperationPin>;
+  recordGoogleConnection(input: { tenantId: string; accessToken: string; refreshToken: string; expiresAt: string; scopes: string[] }, startedAt?: number, expected?: LegacyGoogleOperationPin): Promise<{ binding: string }>;
 }
 
 const SLOT = Symbol.for("strelva.tenant-publishing-ports");
