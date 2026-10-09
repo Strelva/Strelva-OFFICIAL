@@ -12,13 +12,7 @@ import { ArrowLeft, ArrowUpRight, MessageSquareText } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { InquiryServerWorkspaceExperience } from "@/experience/inquiries/InquiryServerExperience";
 import type { InquirySurfaceAdapter } from "@/experience/inquiries/contracts";
-import { BoundedWorkExperience } from "@/experience/operations/BoundedWorkExperience";
-import { CustomApplicationManageExperience } from "@/experience/custom-applications/CustomApplicationManageExperience";
-import { WebsiteExperience } from "@/experience/websites/WebsiteExperience";
-import { websiteDocumentVersion } from "@/experience/websites/contracts";
-import { DocumentExperience } from "@/experience/workspace/DocumentExperience";
-import { OnboardingWorkspaceExperience } from "@/experience/workspace/OnboardingWorkspaceExperience";
-import { TrackerExperience } from "@/experience/workspace/TrackerExperience";
+import { OpenedWork } from "@/experience/workspace/OpenedWork";
 import type { WorkspaceWork } from "@/experience/workspace/contracts";
 import { possibilityScope } from "./from-workspace";
 import { HealthSignal, LifecyclePill, SYSTEM_ICONS } from "./SystemList";
@@ -208,7 +202,6 @@ export function websiteSandbox(src: string): string {
 }
 
 function SystemSurface({ system, workspaceId, readOnly, versionReadOnly, useReadOnly = readOnly, canEditApplications = false, rebuildEnabled, managed, agency, canMakeReal, sources, localPreview, workspaceStopped, calendarRecoveryAllowed, inquiryAdapter, inquiryInbox }: SystemPageProps & { system: SystemView }) {
-  const noop = () => undefined;
   // A registry-only inquiry System can open the released business inbox
   // without first appearing on a tenant website. Native access still applies.
   if (system.kind === "inquiries" && inquiryInbox) return <WorkspaceInquirySystem key={workspaceId} workspaceId={workspaceId} />;
@@ -224,12 +217,13 @@ function SystemSurface({ system, workspaceId, readOnly, versionReadOnly, useRead
   if (productId === "home_finder") return <div className="p-6"><h2 className="text-sm font-semibold">HomeFinder</h2><p className="mt-2 text-sm text-gray-muted">Open the licensed search settings and installation evidence for this business.</p><a className={styles.linkAction} href={`/workspace/home-finder?${new URLSearchParams({ workspaceId })}`}>Open HomeFinder<ArrowUpRight size={16} aria-hidden="true" /></a></div>;
   const creatorDraft = productId === "applications" && sources.some(source => source.id === workId && source.creatorDraft === true);
   const draftEditOnly = creatorDraft && !workspaceStopped && versionReadOnly === false;
-  if (productId === "applications" || productId === "scheduling") return <BoundedWorkExperience key={workId} workspaceId={workspaceId} workId={workId} productId={productId} sources={[...sources]} readOnly={draftEditOnly ? false : useReadOnly} canManage={draftEditOnly || !readOnly} canEdit={draftEditOnly || (canEditApplications && !readOnly)} draftEditOnly={draftEditOnly} workspaceStopped={workspaceStopped} calendarRecoveryAllowed={calendarRecoveryAllowed} onSaved={noop} />;
-  if (productId === "custom-applications") return <CustomApplicationManageExperience key={workId} workId={workId} readOnly={readOnly} />;
-  if (productId === "documents" && !localPreview) return <DocumentExperience key={workId} workspaceId={workspaceId} workId={workId} readOnly={readOnly} onSaved={noop} sources={[...sources]} />;
-  if (productId === "tracker" && !localPreview) return <TrackerExperience key={workId} workspaceId={workspaceId} workId={workId} readOnly={readOnly} onSaved={noop} />;
-  if (productId === "onboarding") return <OnboardingWorkspaceExperience key={workId} workspaceId={workspaceId} initialCaseId={workId} readOnly={readOnly} onSaved={noop} />;
-  if (productId === "websites") return <WebsiteExperience key={workId} workspaceId={workspaceId} workId={workId} rebuildVersion={websiteDocumentVersion(sources.find(work => work.id === workId)?.payload)} rebuildEnabled={rebuildEnabled} managed={managed} canPublish={canMakeReal === true} agency={agency} readOnly={readOnly} onSaved={noop} />;
+  if (productId === "applications" || productId === "scheduling" || productId === "custom-applications" || productId === "onboarding" || productId === "websites" || ((productId === "documents" || productId === "tracker") && !localPreview)) {
+    return <OpenedWork key={workId} workspaceId={workspaceId} workId={workId} productId={productId} sources={sources}
+      readOnly={productId === "applications" || productId === "scheduling" ? (draftEditOnly ? false : useReadOnly) : readOnly}
+      canManage={draftEditOnly || !readOnly} canEdit={draftEditOnly || (canEditApplications && !readOnly)} draftEditOnly={draftEditOnly}
+      workspaceStopped={workspaceStopped} calendarRecoveryAllowed={calendarRecoveryAllowed}
+      rebuildEnabled={rebuildEnabled} managed={managed} canPublish={canMakeReal === true} agency={agency} />;
+  }
   if (productId === "unknown" && system.views?.length) return <div className="p-6 text-sm">
     <p className="text-gray-muted">These bookings are taken on the site and kept in its own booking store. Open a view of them:</p>
     <ul className="mt-3 space-y-2">{system.views.map(view => <li key={view.id}>{view.href ? <a className="underline" href={view.href}>{view.label}</a> : <span>{view.label} · not available from here</span>}</li>)}</ul>
