@@ -27,6 +27,7 @@ export const SYSTEM_RULE_CODES = [
   "system_command_conflict",
   "system_origin_conflict",
   "system_identity_immutable",
+  "system_kind_immutable",
   "system_lifecycle_invalid",
   "system_revision_required",
   "system_output_requires_revision",
@@ -71,14 +72,13 @@ export function revisionRef(revision: SystemRevision): SystemRevisionRef {
   return { businessId: revision.businessId, systemId: revision.systemId, revisionId: revision.id, number: revision.number };
 }
 
-/** Name, purpose and kind may change; nothing else does through an update.
- * Kind is a descriptor: a proposal can become a portal and stay itself. */
+/** Name and purpose may change. Content and behavior evolve through revisions;
+ * a proposal keeps its identity and proposal kind as its job grows. */
 export function applySystemUpdate(system: System, patch: UpdateSystemInput, at: string): System {
   return {
     ...system,
     name: patch.name ?? system.name,
     purpose: patch.purpose === undefined ? system.purpose : patch.purpose,
-    kind: patch.kind ?? system.kind,
     changeNumber: system.changeNumber + 1,
     updatedAt: at,
   };

@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import { createSupabaseSystemStore, mapSystemsError, SystemRuleError } from "@/platform/systems";
+import type { UpdateSystemInput } from "@/platform/systems";
 import { WorkspaceAccessError, WorkspaceStoreError } from "@/platform/workspaces/types";
 
 const actor = { userId: "11111111-1111-4111-8111-111111111111", verifiedEmail: "Owner@Example.com " };
@@ -47,6 +48,38 @@ describe("Supabase system store", () => {
     expect(() => mapSystemsError({ message: "system_connection_cycle" }, "x")).toThrow(SystemRuleError);
     expect(() => mapSystemsError({ message: "system_output_requires_revision" }, "x")).toThrow(expect.objectContaining({ code: "system_output_requires_revision" }));
     expect(() => mapSystemsError({ message: "connection reset" }, "fallback")).toThrow(WorkspaceStoreError);
+  });
+
+  it("refuses kind updates before dispatching an RPC", async () => {
+    expectTypeOf<keyof UpdateSystemInput>().toEqualTypeOf<"name" | "purpose">();
+    const { rpc, store } = fake(system);
+    await expect(store.updateSystem(actor, { businessId: business, systemId }, 1, { kind: "portal" } as never)).rejects.toThrow();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([{}, { kind: "pricing" }, { name: "Taken", kind: "portal" }, { purpose: 3 }, { purpose: {} },
+    { name: null }, { name: " padded" }, { origin: null }, { lifecycle: "paused" }])(
+    "refuses malformed or unknown application patch %j before RPC", async (patch) => {
+      const { rpc, store } = fake(system);
+      await expect(store.updateSystem(actor, { businessId: business, systemId }, 1, patch as never)).rejects.toThrow();
+      expect(rpc).not.toHaveBeenCalled();
+    },
+  );
+
+  it("sends permitted updates with exact identity and expected change", async () => {
+    const { rpc, store } = fake({ ...system, purpose: null, name: "Packages", changeNumber: 2 });
+    await expect(store.updateSystem(actor, { businessId: business, systemId }, 1, { name: "Packages", purpose: null }))
+      .resolves.toMatchObject({ id: systemId, kind: "pricing", name: "Packages", changeNumber: 2 });
+    expect(rpc).toHaveBeenCalledWith("update_business_system", {
+      p_workspace_id: business, p_user_id: actor.userId, p_verified_email: "owner@example.com",
+      p_system_id: systemId, p_expected_change: 1, p_patch: { name: "Packages", purpose: null },
+    });
+  });
+
+  it("reports kind refusal as a rule error, never an accepted update", async () => {
+    const { store } = fake(null, { message: "system_kind_immutable" });
+    await expect(store.updateSystem(actor, { businessId: business, systemId }, 1, { name: "Packages" }))
+      .rejects.toMatchObject({ code: "system_kind_immutable", message: "A System keeps its kind for life." });
   });
 
   it("rejects a malformed response", async () => {
