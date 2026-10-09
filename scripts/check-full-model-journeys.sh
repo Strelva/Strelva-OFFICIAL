@@ -97,6 +97,11 @@ node "$manifest" source "$profile" "$root" > "$work/source.json"
 node "$manifest" schema "$profile" "$root/supabase/migrations" > "$work/schema.json"
 printf "export PLAYWRIGHT_BASE_URL='%s'\nexport NEXT_PUBLIC_APP_URL='%s'\nexport PLAYWRIGHT_DIST_DIR='.next-full-model-journeys'\nexport STRELVA_BUILD_CACHE='off'\nexport APPROVE_LINK_SECRET='%s'\nexport CRON_SECRET='%s'\nexport SECRETS_ENC_KEY='%s'\nexport PUBLIC_CONTINUATION_SECRET='%s'\n" \
   "$origin" "$origin" "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" > "$work/local.env"
+# Native hosted publication and hash read-back stay on this owned app, using
+# the supported separate sites host. No production DNS or provider is involved.
+if [[ "$profile" == full-native ]]; then
+  printf "export NEXT_PUBLIC_SITES_PATH_ORIGIN='http://sites.localhost:%s'\n" "$port" >> "$work/local.env"
+fi
 bundler_args=(); [[ "$bundler" != webpack ]] || bundler_args=(--webpack)
 variants=(additive-off)
 [[ "$profile" != full-native ]] || variants=(native)

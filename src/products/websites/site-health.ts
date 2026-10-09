@@ -1,10 +1,14 @@
 import { fetchPinnedPublicText } from "@/lib/pinned-public-text";
+import { fetchOwnedProofWebsite } from "./owned-proof-readback";
 export interface HostedWebsiteHealthTarget { workspaceId: string; workId: string; tenantId: string; revision: number; contentHash: string; url: string }
 export interface WebsiteHealthReceipt extends HostedWebsiteHealthTarget { checkedAt: string; status: "healthy" | "unreachable" | "hash_missing" | "hash_mismatch"; observedHash?: string }
 export async function checkWebsiteHealth(target: HostedWebsiteHealthTarget, dependencies: { fetch?: (url: string) => Promise<string | null>; now?: () => Date } = {}): Promise<WebsiteHealthReceipt> {
   const base = { ...target, checkedAt: (dependencies.now?.() ?? new Date()).toISOString() };
   try {
-    const html = await (dependencies.fetch ?? (url => fetchPinnedPublicText(url,{ timeoutMs: 8000, maxBytes: 2_000_000 })))(target.url);
+    const html = dependencies.fetch ? await dependencies.fetch(target.url) : await (async () => {
+      const owned = await fetchOwnedProofWebsite(target);
+      return owned === undefined ? fetchPinnedPublicText(target.url,{ timeoutMs: 8000, maxBytes: 2_000_000 }) : owned;
+    })();
     if (html === null) return { ...base,status: "unreachable" };
     // Renderer emits the authoritative hash on a dedicated meta element.
     const tag = html.match(/<meta\b[^>]*\bname=["']strelva-site-hash["'][^>]*>/i)?.[0];
