@@ -39,7 +39,9 @@ export function siteChangeProviderFromOptions(options: Awaited<ReturnType<typeof
   const ofRecord = options.filter(option => option.providerOfRecord);
   const qualified = ofRecord.length ? ofRecord : options;
   if (qualified.length !== 1) throw new ServiceRequestConflictError(qualified.length ? "Choose one agency for this website Request before continuing." : "No agency has an active provider seat for this business.");
-  return { kind: "agency" as const, agencyWorkspaceId: qualified[0].agencyWorkspaceId };
+  const selected = qualified[0];
+  if (!selected) throw new ServiceRequestConflictError("No agency has an active provider seat for this business.");
+  return { kind: "agency" as const, agencyWorkspaceId: selected.agencyWorkspaceId };
 }
 export async function readSiteChangeProvider(actor: ServiceRequestActor, businessId: string) {
   return siteChangeProviderFromOptions(await readServiceRequestProviders(actor, businessId));
