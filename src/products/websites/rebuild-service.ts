@@ -277,6 +277,7 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
         const nextContactLink = contactLink ? rebuildContactLink(input.text!) : null;
         if (contactLink && !nextContactLink) throw new WorkspaceConflictError("Enter a valid email address or phone number for this contact. Your current preview is unchanged.");
         if (contactLink && nextContactLink!.label !== contactLink.label) throw new WorkspaceConflictError("Keep this contact as the same kind of email address or phone number. Your current preview is unchanged.");
+        if (nextContactLink && Object.entries(document.facts).some(([id, current]) => id !== factId && current.kind === "contact" && rebuildContactLink(current.text)?.href.toLowerCase() === nextContactLink.href.toLowerCase())) throw new WorkspaceConflictError("This destination already belongs to another contact fact. Edit that existing email or phone instead. Your current preview is unchanged.");
         updateDescriptionClaims(input.text!);
         const rewrite = (value: unknown, factIds: string[]): unknown => {
           if (typeof value === "string") { const next = contactLink ? rewriteClaimCopy(value,factIds).split("\n\n").map(paragraph => paragraph === before ? input.text! : paragraph).join("\n\n") : value.replaceAll(before,input.text!); if (next !== value) replaced = true; return next; }

@@ -140,6 +140,31 @@ describe("website rebuild service lifecycle and durable recovery", () => {
     expect(renderSiteDocumentHtml(published.document,"/contact")).toContain(`href="${oldHref}"`);
     expect(h.documents.manage).toHaveBeenLastCalledWith(actor,{ workspaceId, workId: record.workId });
   });
+  it.each([
+    ["Email orders@example.test for orders. Email support@example.test for support.", "orders@example.test", "support@example.test"],
+    ["Call 716-555-0100 for orders. Call (716) 555-0199 for support.", "716-555-0100", "716.555.0199"],
+  ])("refuses a contact correction that would collide with another independently editable destination: %s", async (description, before, after) => {
+    const h = harness(); let record = await h.create({ ...brief, description });
+    for (const id of unresolvedSiteFacts(record.rebuild.candidate!.document)) record = await h.service.resolveFact(actor,record.workId,id,{ ...selection(record), action: "confirm" });
+    record = await h.launch(record); const published = clone(h.publications.get(record.rebuild.tenantId!)!);
+    const [factId] = Object.entries(record.rebuild.candidate!.document.facts).find(([,fact]) => fact.kind === "contact" && fact.text === before)!;
+    const commits = vi.mocked(h.documents.commitCandidate).mock.calls.length;
+    await expect(h.service.resolveFact(actor,record.workId,factId,{ ...selection(record), action: "edit", text: after })).rejects.toThrow("already belongs to another contact fact");
+    expect(h.documents.commitCandidate).toHaveBeenCalledTimes(commits);
+    expect((await h.service.read(actor,record.workId)).rebuild.candidate).toEqual(record.rebuild.candidate);
+    expect(h.publications.get(record.rebuild.tenantId!)!).toEqual(published);
+    expect((await h.service.read(actor,record.workId)).rebuild.input).toEqual(record.rebuild.input);
+  });
+  it("allows formatting corrections and repeated corrections to the same contact fact", async () => {
+    const h = harness(); let record = await h.create({ ...brief, description: "Call (716) 555-0100 for orders." });
+    const [factId] = Object.entries(record.rebuild.candidate!.document.facts).find(([,fact]) => fact.kind === "contact")!;
+    record = await h.service.resolveFact(actor,record.workId,factId,{ ...selection(record), action: "edit", text: "716.555.0100" });
+    expect(renderSiteDocumentHtml(record.rebuild.candidate!.document,"/",{ preview: true })).toContain("Call 716.555.0100 for orders.");
+    record = await h.service.resolveFact(actor,record.workId,factId,{ ...selection(record), action: "edit", text: "716-555-0199" });
+    const html = renderSiteDocumentHtml(record.rebuild.candidate!.document,"/",{ preview: true });
+    expect(html).toContain('href="tel:7165550199"'); expect(html).toContain("Call 716-555-0199 for orders."); expect(html).not.toContain("716.555.0100");
+    expect(record.rebuild.status).toBe("review_ready"); expect(record.rebuild.approvedCandidateRevision).toBeNull();
+  });
   it.each(["javascript:alert(1)", "orders@example.test?subject=unsafe", "2026-10-09"])("refuses an unsafe contact correction before committing: %s", async text => {
     const h = harness(); const record = await h.create({ ...brief, description: "Call 716-555-0100." });
     const [factId] = Object.entries(record.rebuild.candidate!.document.facts).find(([,fact]) => fact.kind === "contact")!;

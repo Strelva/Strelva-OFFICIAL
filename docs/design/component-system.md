@@ -113,6 +113,8 @@ versions remain intact. Recomposition uses corrected current claims. Editing
 or removing an ordinary claim that would change a currently bound contact
 returns a conflict directing the owner to edit the separate contact fact first;
 unrelated prose that preserves the exact offered contacts remains editable.
+A correction that collides with another contact fact's normalized destination
+is refused; formatting and repeated corrections to the same fact stay allowed.
 The existing actor/manage, revision/hash, CAS and approval invalidation apply.
 
 Review, private-preview no-submit, hosted native inquiry capture and published
