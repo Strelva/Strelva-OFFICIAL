@@ -959,7 +959,7 @@ export async function executeInquirySurface(input: {
       });
       if (queued.eventId) {
         const { resolveEventAction } = await import("@/lib/event-actions");
-        const resolved = await resolveEventAction(context.tenantId, queued.eventId, "approved");
+        const resolved = await resolveEventAction(context.tenantId, queued.eventId, "approved", actorId);
         message = resolved.changed ? "The approved configuration was made live. Check its receipt for verification." : "The change remains in Needs you. " + (resolved.reason || "Review its current receipt before trying again.");
       } else message = "The change could not be linked to its approval event.";
     }

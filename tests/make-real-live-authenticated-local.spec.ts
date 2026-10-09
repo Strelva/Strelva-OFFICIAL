@@ -163,9 +163,17 @@ test("a real owner reviews and makes native inquiry/app changes live, proves rec
     const requestId = started.work!.id;
     await inquiryAction({ kind: "accept-shape", requestId, input: { selectedLineIds: ["form", "record"] } });
     await inquiryAction({ kind: "rehearse", requestId });
-    await inquiryAction({ kind: "publish", requestId });
+    const firstPublication = await inquiryAction({ kind: "publish", requestId });
+    expect(firstPublication.message, "Queued or refused publication is not a native baseline.")
+      .toBe("The approved configuration was made live. Check its receipt for verification.");
+    inquiry = await readInquiry(); // Actual owner's independent native read-back.
     const firstInquiry = inquiry.snapshot.state.requests.find(work => work.id === requestId)!;
-    const firstVersion = inquiry.snapshot.state.capabilities.find(capability => capability.id === firstInquiry.capabilityId)!.live!.version;
+    const firstCapability = inquiry.snapshot.state.capabilities.find(capability => capability.id === firstInquiry.capabilityId)!;
+    expect(firstCapability.live, JSON.stringify({ message: firstPublication.message, work: firstInquiry, capability: firstCapability })).not.toBeNull();
+    const firstVersion = firstCapability.live!.version;
+    const firstReceipt = inquiry.snapshot.state.changes.find(change => change.id === firstInquiry.lastLiveChangeId);
+    expect(firstReceipt).toMatchObject({ capabilityId: firstInquiry.capabilityId, targetVersion: firstVersion,
+      status: "published", providerAcceptanceId: expect.any(String), verification: { verified: true, actorId: owner.userId } });
     await inquiryAction({ kind: "edit", requestId, input: { source: "manual", path: "form.title", after: "Reviewed native inquiry form" } });
     await inquiryAction({ kind: "rehearse", requestId });
     expect(inquiry.rehearsal?.passed).toBe(true);
