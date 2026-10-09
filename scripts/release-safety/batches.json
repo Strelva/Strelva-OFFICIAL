@@ -1628,7 +1628,7 @@
         },
         {
           "file": "20261021111000_enterprise_standards.sql",
-          "sha256": "4763d5f8c03aa989c977444161a40e06398982a4fa0dedfa43c5e1e28f648a6e",
+          "sha256": "519bcd8ce0182e8816322bbb4165a1bc038b3d07c9ea586783850aa226637d2f",
           "rollback": "rollback-20261021111000_enterprise_standards.sql",
           "rollbackSha256": "1746ca1cab839f813bc75dbbd15f612d60131668a1c0fc216d5105f03760a364",
           "rollbackStatus": "guarded or forward-only; exact native refusal/reapply and operating recovery remain release gates"

@@ -79,7 +79,15 @@ test('real Auth Units bind business Versions, preserve owner decisions on standa
         values(:'v1'::uuid,:'v2'::uuid,:'v3','internal_app',gen_random_uuid(),repeat('a',64),:'v4'::uuid,:'v4'::uuid);`, id, workspaceId, name, owner.userId);
       return id;
     }
-    const db: VersionsDb = admin;
+    const db: VersionsDb = { async rpc(name, args) {
+      const result = await admin.rpc(name, args);
+      if (name === 'save_system_version' && result.error) {
+        // Preserve structured diagnosis without native details, args, JWTs or identities.
+        const code = typeof result.error.code === 'string' && /^[A-Z0-9]{5}$/.test(result.error.code) ? result.error.code : 'unclassified';
+        await info.attach('units-save-native-error-class', { contentType: 'application/json', body: JSON.stringify({ rpc: 'save_system_version', sqlState: code }) });
+      }
+      return result; // Real errors still reach the unchanged store mapper.
+    } };
     const versions = createSystemVersions({ store: createSupabaseVersionStore(db), connections: createSupabaseConnectionOwnership(db) });
     const identity = { userId: owner.userId, verifiedEmail: owner.email };
     const actor = await readVersionActor(identity, db);
@@ -168,6 +176,14 @@ test('real Auth Units bind business Versions, preserve owner decisions on standa
     expect(adopted.baselineRevision).toBe(2);
     expect(adopted.currentRelease).toBeNull();
     expect(adopted.workingDefinition).toEqual(definition('Organization approved reply', 'Business routing instructions'));
+    // Native transaction committed the deferred trigger with the locked title
+    // and a remaining business fields override; no direct state repair occurs.
+    expect(localSql<unknown>(`select jsonb_build_object('baselineRevision',v.baseline_revision,'lockedPaths',to_jsonb(r.locked_paths),
+      'overridePaths',coalesce((select jsonb_agg(o.path order by o.position) from public.system_version_overrides o where o.version_id=v.id),'[]'::jsonb),
+      'decisionChoices',coalesce((select jsonb_agg(d.choice order by d.position) from public.system_version_decisions d where d.version_id=v.id),'[]'::jsonb),
+      'releaseCount',(select count(*) from public.system_version_releases rr where rr.version_id=v.id))
+      from public.system_versions v join public.system_version_source_revisions r on r.id=v.baseline_revision_id where v.id=:'v1'::uuid;`, version.id))
+      .toEqual({ baselineRevision: 2, lockedPaths: ['title'], overridePaths: ['fields'], decisionChoices: ['declined', 'adopted'], releaseCount: 0 });
     await override('title', 'Must not override a pushed standard', 400);
     await override('fields', fields('Business amended routing instructions'));
 
