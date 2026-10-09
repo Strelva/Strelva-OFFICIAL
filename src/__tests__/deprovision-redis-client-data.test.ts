@@ -50,7 +50,7 @@ describe.skipIf(!isolatedRedisAvailable)("deprovision clears the client's Redis 
       from: () => ({ select: () => ({ eq: async () => ({ count: 0, error: null }) }) }),
       rpc: async (name: string, args: Record<string, unknown>) => {
         holder.rpcs.push(name);
-        if (name === "tenant_cleanup_teardown_blockers") return { data: [{ publications: 0, reservations: 0, booking_grants: 0, bookings: 0 }], error: null };
+        if (name === "tenant_cleanup_teardown_blockers") return { data: [{ publications: 0, reservations: 0, booking_grants: 0, bookings: 0, newsletter_issues: 0 }], error: null };
         if (name === "deprovision_tenant_guarded") return { data: { counts: { tenants: 1 }, paused: 0, cleanup: structuredClone(holder.receipt) }, error: null };
         if (name === "tenant_cleanup_receipt") return { data: structuredClone(holder.receipt), error: null };
         if (name === "finish_tenant_deprovision_cleanup") {

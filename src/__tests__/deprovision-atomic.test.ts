@@ -26,7 +26,7 @@ vi.mock("@/platform/infra/db/client", () => ({
     }),
     rpc: async (name: string, args: Record<string, unknown>) => {
       db.rpcs.push({ name, args });
-      if (name === "tenant_cleanup_teardown_blockers") return { data: [{ ...db.blockers, booking_grants: 0, bookings: 0 }], error: null };
+      if (name === "tenant_cleanup_teardown_blockers") return { data: [{ ...db.blockers, booking_grants: 0, bookings: 0, newsletter_issues: 0 }], error: null };
       if (name === "assert_tenant_inquiry_export") return db.teardownError ? { data: null, error: db.teardownError } : { data: null, error: null };
       if (name === "deprovision_tenant_guarded") return db.teardownError || db.pauseError
         ? { data: null, error: db.teardownError ?? db.pauseError }

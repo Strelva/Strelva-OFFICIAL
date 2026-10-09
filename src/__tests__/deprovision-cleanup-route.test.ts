@@ -15,6 +15,16 @@ beforeEach(() => {
   mocks.run.mockResolvedValue({ ok: false, tenantId: "fictional-cleanup", executed: true, databaseDeleted: true, pgRowTotal: 1, summary: { postgres: [], redis: [], vercel: [] }, cleanup });
 });
 describe("operator cleanup recovery after the tenant row disappears", () => {
+  it("returns the precise immutable newsletter hold to the editor without creating cleanup or auditing a deletion", async () => {
+    const detail = '"fictional-cleanup" is referenced by 2 approved newsletter issues. This immutable workspace history prevents tenant deletion. Keep the tenant while these records reference it. Nothing was deleted.';
+    mocks.run.mockResolvedValueOnce({ ok: false, tenantId: "fictional-cleanup", executed: false,
+      refusalReason: "workspace_newsletter_history", refusalDetail: detail, pgRowTotal: 0,
+      summary: { postgres: [], redis: [], vercel: [] } });
+    const response = await POST(request({ confirmSlug: "fictional-cleanup" }), params);
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ error: detail, refusalReason: "workspace_newsletter_history", executed: false });
+    expect(mocks.audit).not.toHaveBeenCalled();
+  });
   it("reports committed database removal plus pending cleanup as 202, never a successful purge", async () => {
     const response = await POST(request({ confirmSlug: "fictional-cleanup" }), params);
     expect(response.status).toBe(202);

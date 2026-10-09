@@ -6,7 +6,7 @@ const state = vi.hoisted(() => ({
     redisComplete: false, providerComplete: false, complete: false },
   summary: { redis: [] as Array<{ target: string; deleted?: boolean }> },
   calls: [] as string[], keys: new Set<string>(),
-  bookingGrants: 0, bookings: 0, malformedBlocker: false,
+  bookingGrants: 0, bookings: 0, newsletterIssues: 0, newsletterGuardFails: false, malformedBlocker: false,
 }));
 const redis = vi.hoisted(() => ({
   exists: vi.fn(async (key: string) => state.keys.has(key) ? 1 : 0),
@@ -26,8 +26,9 @@ vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({
   from: (table: string) => ({ select: () => ({ eq: async () => ({ count: table === "tenants" ? 1 : 0, error: null }) }) }),
   rpc: async (name: string, args: Record<string, unknown>) => {
     state.calls.push(name);
-    if (name === "tenant_cleanup_teardown_blockers") return { data: [{ publications: 0, reservations: 0, booking_grants: state.malformedBlocker ? null : state.bookingGrants, bookings: state.bookings }], error: null };
+    if (name === "tenant_cleanup_teardown_blockers") return { data: [{ publications: 0, reservations: 0, booking_grants: state.malformedBlocker ? null : state.bookingGrants, bookings: state.bookings, newsletter_issues: state.newsletterIssues }], error: null };
     if (name === "tenant_cleanup_receipt") return { data: { ...state.receipt, summary: state.summary }, error: null };
+    if (name === "deprovision_tenant_guarded" && state.newsletterGuardFails) return { data: null, error: { message: "tenant_teardown_blocked_by_newsletter_history" } };
     if (name === "deprovision_tenant_guarded") return state.guardFails
       ? { data: null, error: { message: "tenant_teardown_blocked_by_workspace_owned_records" } }
       : { data: { counts: { tenants: 1 }, paused: 2, cleanup: state.staleGuard ?? { ...state.receipt } }, error: null };
@@ -56,7 +57,7 @@ beforeEach(() => {
   vi.resetAllMocks(); vi.stubEnv("STRELVA_LEADS_AUTHORITY", "redis"); vi.stubEnv("STRELVA_TENANT_RECEIPT_RETENTION", "0");
   state.staleGuard = null; state.redisAvailable = true; state.configured = true; state.guardFails = false; state.saveFails = false;
   state.calls = []; state.keys = new Set(["connections:fictional-cleanup:google", "connections:other-site:google"]);
-  state.bookingGrants = 0; state.bookings = 0; state.malformedBlocker = false;
+  state.bookingGrants = 0; state.bookings = 0; state.newsletterIssues = 0; state.newsletterGuardFails = false; state.malformedBlocker = false;
   state.summary = { redis: [] };
   Object.assign(state.receipt, { revision: 0, redisComplete: false, providerComplete: false, complete: false });
 });
@@ -130,6 +131,22 @@ describe("truthful committed database removal and retryable cleanup", () => {
     const result = await runDeprovision({ tenantId: state.receipt.tenantId, tenant: null, dryRun: true });
     expect(result).toMatchObject({ ok: false, executed: false, refusalReason: "workspace_website" });
     expect(state.calls).toEqual(["tenant_cleanup_teardown_blockers"]);
+    expect(redis.del).not.toHaveBeenCalled(); expect(provider.deleteVercelProject).not.toHaveBeenCalled();
+  });
+  it.each([true, false])("identifies immutable newsletter history before a dryRun=%s teardown", async dryRun => {
+    state.newsletterIssues = 2;
+    const result = await runDeprovision({ tenantId: state.receipt.tenantId, tenant: null, dryRun });
+    expect(result).toMatchObject({ ok: false, executed: false, refusalReason: "workspace_newsletter_history" });
+    expect(result.refusalDetail).toContain("2 approved newsletter issues");
+    expect(result.refusalDetail).not.toContain("Release");
+    expect(state.calls).toEqual(["tenant_cleanup_teardown_blockers"]);
+    expect(redis.del).not.toHaveBeenCalled(); expect(provider.deleteVercelProject).not.toHaveBeenCalled();
+  });
+  it("maps a new newsletter hold discovered under the atomic lock into a precise refusal", async () => {
+    state.newsletterGuardFails = true;
+    const result = await run();
+    expect(result).toMatchObject({ ok: false, executed: false, refusalReason: "workspace_newsletter_history" });
+    expect(state.calls).toEqual(["tenant_cleanup_teardown_blockers", "deprovision_tenant_guarded"]);
     expect(redis.del).not.toHaveBeenCalled(); expect(provider.deleteVercelProject).not.toHaveBeenCalled();
   });
   it("unknown booking blocker evidence cannot become an eligible zero-count preview", async () => {

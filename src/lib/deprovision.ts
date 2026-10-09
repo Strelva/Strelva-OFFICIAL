@@ -56,11 +56,10 @@ export const TENANT_SCOPED_TABLES = [
 
 // Workspace-owned history/targets are never slug-swept. Website targets have
 // explicit native preflight guards; immutable newsletter issues retain their
-// tenant FK (NO ACTION), so the atomic delete refuses linked issue history.
+// tenant FK (NO ACTION); both preflight and locked atomic guards identify it.
 // Nullable native issues belong to the workspace without any tenant target.
 // A failed transaction leaves Systems and workspace history unchanged. The
-// dry-run website reader does not yet report newsletter holds; no dry run is
-// a guarantee that the subsequent atomic delete will succeed.
+// reader is discovery; the locked guard repeats this check before any pause.
 export const WORKSPACE_OWNED_TENANT_TABLES = [
   "website_document_publications", "website_hosted_tenant_reservations",
   "workspace_newsletter_issues",
@@ -115,7 +114,7 @@ export interface StoreAction {
 export interface DeprovisionResult {
   ok: boolean;
   /** Non-null when a safety guard refused the operation. */
-  refusalReason?: "invalid_tenant_id" | "protected_tenant" | "active_subscription" | "workspace_website";
+  refusalReason?: "invalid_tenant_id" | "protected_tenant" | "active_subscription" | "workspace_website" | "workspace_newsletter_history";
   refusalDetail?: string;
   tenantId: string;
   executed: boolean;
@@ -164,17 +163,17 @@ function rpc(): TeardownRpc | null {
 }
 
 /** Workspace website rows that hold this tenant (service-role SQL; the tables revoke direct reads). */
-async function workspaceWebsiteBlockers(tenantId: string): Promise<{ publications: number; reservations: number; bookingGrants: number; bookings: number }> {
+async function workspaceWebsiteBlockers(tenantId: string): Promise<{ publications: number; reservations: number; bookingGrants: number; bookings: number; newsletterIssues: number }> {
   const call = rpc();
   if (!call) throw new Error("tenant_teardown_blockers_unavailable");
   const { data, error } = await call("tenant_cleanup_teardown_blockers", { p_tenant_id: tenantId });
   if (error) throw new Error(`tenant_teardown_blockers: ${error.message}`);
   const count = z.union([z.number(), z.string().regex(/^\d+$/)]).transform(value => Number(value)).pipe(z.number().int().nonnegative());
-  const row = z.object({ publications: count, reservations: count, booking_grants: count, bookings: count })
+  const row = z.object({ publications: count, reservations: count, booking_grants: count, bookings: count, newsletter_issues: count })
     .safeParse(Array.isArray(data) ? data[0] : data);
   if (!row.success) throw new Error("tenant_teardown_blockers_unavailable");
   return { publications: row.data.publications, reservations: row.data.reservations,
-    bookingGrants: row.data.booking_grants, bookings: row.data.bookings };
+    bookingGrants: row.data.booking_grants, bookings: row.data.bookings, newsletterIssues: row.data.newsletter_issues };
 }
 
 /** Pause every stored System adopted from this tenant (pause_tenant_systems). */
@@ -199,10 +198,18 @@ async function deleteTenantRowsAtomically(tenantId: string, force: boolean): Pro
     p_require_inquiry_export: leadAuthorityIsPostgres(),
     p_retain_receipts: process.env.STRELVA_TENANT_RECEIPT_RETENTION === "1",
   });
+  if (error?.message === "tenant_teardown_blocked_by_newsletter_history") throw new NewsletterHistoryHold();
   if (error) throw new Error(`deprovision_tenant_rows: ${error.message}`);
   const result = data as { counts?: Record<string, unknown>; paused?: number; cleanup?: unknown } | null;
   if (!result?.counts || !Number.isFinite(result.paused)) throw new Error("tenant_teardown_invalid_receipt");
   return { counts: Object.fromEntries(Object.entries(result.counts).map(([table, n]) => [table, Number(n)])), paused: result.paused!, cleanup: cleanupSchema.parse(result.cleanup) };
+}
+
+class NewsletterHistoryHold extends Error {}
+
+function newsletterHistoryRefusal(tenantId: string, summary: Record<string, StoreAction[]>, count?: number): DeprovisionResult {
+  return { ok: false, refusalReason: "workspace_newsletter_history", tenantId, executed: false, pgRowTotal: 0, summary,
+    refusalDetail: `"${tenantId}" is referenced by ${count === undefined ? "approved newsletter history" : `${count} approved newsletter issue${count === 1 ? "" : "s"}`}. This immutable workspace history prevents tenant deletion. Keep the tenant while these records reference it. Nothing was deleted.` };
 }
 
 /** Per-tenant Redis key patterns, with the tenant id pinned to its KNOWN
@@ -374,6 +381,7 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
   // tenant. Refuse before anything is deleted; --force cannot override it
   // because the restricting foreign keys would roll the purge back anyway.
   const blockers = await workspaceWebsiteBlockers(tenantId);
+  if (blockers.newsletterIssues > 0) return newsletterHistoryRefusal(tenantId, summary, blockers.newsletterIssues);
   if (blockers.publications + blockers.reservations + blockers.bookingGrants + blockers.bookings > 0) {
     return {
       ok: false,
@@ -418,7 +426,14 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
     summary.postgres!.push({ target: table, found: "?", deleted: false,
       detail: "kept under its native evidence lifecycle; historical tenant scope is not deletion ownership" });
   }
-  const receipt = executed ? await deleteTenantRowsAtomically(tenantId, force) : null;
+  let receipt: Awaited<ReturnType<typeof deleteTenantRowsAtomically>> | null = null;
+  if (executed) {
+    try { receipt = await deleteTenantRowsAtomically(tenantId, force); }
+    catch (error) {
+      if (error instanceof NewsletterHistoryHold) return newsletterHistoryRefusal(tenantId, summary);
+      throw error;
+    }
+  }
   const removed = receipt?.counts ?? {};
   if (receipt) summary.postgres!.push({ target: "systems", found: receipt.paused, deleted: false, detail: "stored Systems paused; records kept" });
   for (const [table, n] of found) {
