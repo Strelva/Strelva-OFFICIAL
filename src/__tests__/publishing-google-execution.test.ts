@@ -193,3 +193,30 @@ it("refuses an old client when the authorized binding is replaced during pacing"
  expect(result).toMatchObject({accepted:false});expect(rawCreate).not.toHaveBeenCalled();expect(receipts.all()[0]).toMatchObject({status:"failed",undo:null});
  expect(authorize).toHaveBeenCalledTimes(4);
 });
+
+it("rechecks maintenance inside pacing rather than bypassing it through a scoped client",async()=>{
+ const {paceGoogleWrites}=await vi.importActual<typeof import("@/products/google-listing/pacing")>("@/products/google-listing/pacing");
+ const previous=process.env.STRELVA_BUNDLE_MAINTENANCE_RELEASE;process.env.STRELVA_BUNDLE_MAINTENANCE_RELEASE="1";
+ try {
+  let valid=true;const rawUpdate=vi.fn(async()=>({ok:true as const,data:{comment:"Approved"}}));
+  const pacing={limited:vi.fn().mockResolvedValueOnce(true).mockResolvedValue(false),wait:async()=>{valid=false;}};
+  const receipts=createMemoryReceiptStore();const bindingId="5e000000-0000-4000-8000-000000000020";
+  const ctx={workspaceId,bindingId,location,lifecycle:"live" as const,client:paceGoogleWrites({...client,updateReply:rawUpdate},workspaceId,location.locationId,pacing),receipts};
+  const maintenance=vi.fn(async()=>{if(!valid)throw new Error("maintenance withdrawn");});
+  const approval={...event,metadata:{...event.metadata,draft:{action:"reply",reviewId:"review",text:"Approved"},maintenance:{preparationId:workspaceId,bindingId}}};
+  const result=await executeGoogleListingEvent({tenantId:"fixture",event:approval,actorId:actor.userId,attemptId:"maintenance-wait"},{authorize:async()=>({allowed:true,actor,viewer:{operator:false,tester:false}}),context:async()=>ctx,maintenance,events:async()=>({markExecutionExternalAccepted:m.mark,markExecutionExternalUnconfirmed:m.unconfirmed}) as never,noteAccess:vi.fn()});
+  expect(result).toMatchObject({accepted:false});expect(rawUpdate).not.toHaveBeenCalled();expect(receipts.all()[0]).toMatchObject({status:"failed"});
+  expect(maintenance).toHaveBeenCalledTimes(5);
+ } finally {if(previous===undefined)delete process.env.STRELVA_BUNDLE_MAINTENANCE_RELEASE;else process.env.STRELVA_BUNDLE_MAINTENANCE_RELEASE=previous;}
+});
+it.each(["marker","receipt"])("preserves scoped-client acceptance when %s persistence fails",async(failure)=>{
+ const {paceGoogleWrites}=await vi.importActual<typeof import("@/products/google-listing/pacing")>("@/products/google-listing/pacing");
+ const receipts=createMemoryReceiptStore();if(failure==="receipt")vi.spyOn(receipts,"settle").mockRejectedValue(new Error("receipt unavailable"));else m.mark.mockRejectedValue(new Error("marker unavailable"));
+ const rawCreate=vi.fn(async()=>({ok:true as const,data:{name:"post"}}));
+ const ctx={workspaceId,bindingId:"5e000000-0000-4000-8000-000000000020",location,lifecycle:"live" as const,client:paceGoogleWrites({...client,createPost:rawCreate},workspaceId,location.locationId,{limited:async()=>false,wait:async()=>undefined}),receipts};
+ const deps={authorize:async()=>({allowed:true as const,actor,viewer:{operator:false,tester:false}}),context:async()=>ctx,maintenance:vi.fn(),events:async()=>({markExecutionExternalAccepted:m.mark,markExecutionExternalUnconfirmed:m.unconfirmed}) as never,noteAccess:vi.fn()};
+ const input={tenantId:"fixture",event,actorId:actor.userId,attemptId:"accepted"};
+ expect(await executeGoogleListingEvent(input,deps)).toMatchObject({accepted:true,verified:false});
+ expect(await executeGoogleListingEvent({...input,attemptId:"retry"},deps)).toMatchObject({accepted:false,reason:"google_write_unconfirmed"});
+ expect(rawCreate).toHaveBeenCalledTimes(1);
+});

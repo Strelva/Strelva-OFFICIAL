@@ -147,18 +147,19 @@ export async function executeGoogleListingEvent(input: { tenantId: string; event
   if (metadata.maintenance) {
     const recheck = () => deps.maintenance({preparationId:metadata.maintenance!.preparationId,eventId:input.event.id,workspaceId:metadata.workspaceId,bindingId:ctx.bindingId,locationId:metadata.locationId,draft:metadata.draft});
     await recheck();
-    const original = ctx.client;
-    ctx.client = {...original,patchLocation:async (...args) => {await recheck();return original.patchLocation(...args);},updateReply:async (...args)=>{await recheck();return original.updateReply(...args);}};
   }
   ctx.authorizeService = async () => {
     const current = await deps.authorize(input);
     if (!current.allowed || (input.actorId.startsWith("make-real-service:") && current.bindingId !== ctx.bindingId)) throw new Error("Google service authority ended before dispatch.");
+    if (metadata.maintenance) await deps.maintenance({preparationId:metadata.maintenance.preparationId,eventId:input.event.id,workspaceId:metadata.workspaceId,bindingId:ctx.bindingId,locationId:metadata.locationId,draft:metadata.draft});
   };
-  ctx.onWriteAccepted = async () => (await deps.events()).markExecutionExternalAccepted(input.event.id);
-  ctx.onWriteUnconfirmed = async () => (await deps.events()).markExecutionExternalUnconfirmed(input.event.id);
   let accepted = false;
-  const base = ctx.client;
-  ctx.client = { ...base, patchLocation: async (...args) => { const result = await base.patchLocation(...args); if (result.ok) accepted = true; return result; }, createPost: async (...args) => { const result = await base.createPost(...args); if (result.ok) accepted = true; return result; }, updateReply: async (...args) => { const result = await base.updateReply(...args); if(result.ok) accepted=true; return result; } };
+  ctx.onWriteAccepted = async () => {
+    // Observe the accepted provider response before any persistence can fail.
+    accepted = true;
+    await (await deps.events()).markExecutionExternalAccepted(input.event.id);
+  };
+  ctx.onWriteUnconfirmed = async () => (await deps.events()).markExecutionExternalUnconfirmed(input.event.id);
   try {
     const authority = { kind: "owner_approval" as const, actor: input.actorId, approvalRef: input.event.id };
     // The approval owns the write, even if saving the event marker fails.
