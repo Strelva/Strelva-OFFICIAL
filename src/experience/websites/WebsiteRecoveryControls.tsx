@@ -4,23 +4,16 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { TextInput } from "@/components/ui/TextInput";
 import { normalizeTenantDomain } from "@/lib/tenant-urls";
-import { websiteDomainRequestSchema, type WebsiteDomainRequest as DomainReceipt } from "@/products/websites/recovery-contracts";
+import { websiteDomainRequestSchema, websiteCutoverUndoReceiptSchema, type WebsiteDomainRequest as DomainReceipt, type WebsiteCutoverUndoReceipt } from "@/products/websites/recovery-contracts";
 import { beginFocusRecovery, type FocusRecovery } from "./focus-recovery";
 import type { RebuildView } from "./rebuild-transport";
 
-async function post(request: typeof fetch, path: string, body: Record<string, unknown>) {
-  const response = await request(path, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  const result = await response.json().catch(() => null) as { error?: string; receipt?: unknown } | null;
-  if (!response.ok) throw new Error(result?.error || "That couldn't be saved. Try again.");
-  return result;
-}
-
 /** Prepare authority for one hostname before the operator changes its domain. */
-interface DomainRequestProps { workId: string; workspaceId?: string; request?: typeof fetch; readOnly?: boolean; disabled?: boolean }
+interface DomainRequestProps { workId: string; workspaceId?: string; request?: typeof fetch; readOnly?: boolean; disabled?: boolean; canPrepare?: () => boolean }
 export function WebsiteDomainRequest(props: DomainRequestProps) {
   return <DomainRequestSession key={`${props.workspaceId ?? "work"}:${props.workId}`} {...props} />;
 }
-function DomainRequestSession({ workId, workspaceId, request = fetch, readOnly = false, disabled = false }: DomainRequestProps) {
+function DomainRequestSession({ workId, workspaceId, request = fetch, readOnly = false, disabled = false, canPrepare }: DomainRequestProps) {
   const [domain, setDomain] = useState("");
   const [busy, setBusy] = useState(false);
   const [unknown, setUnknown] = useState(false);
@@ -44,7 +37,7 @@ function DomainRequestSession({ workId, workspaceId, request = fetch, readOnly =
     return parsed.data;
   }
   async function submit(check = false) {
-    if (inFlight.current || (!check && (attempt.current || readOnly || disabled || !domain.trim()))) return;
+    if (inFlight.current || (!check && (attempt.current || readOnly || disabled || !domain.trim() || canPrepare?.() === false))) return;
     const command = check ? attempt.current : { workId, workspaceId, requestId: requestId.current, domain: domain.trim(), hostname: normalizeTenantDomain(domain.trim())?.replace(/:\d+$/, "") ?? domain.trim().toLowerCase() };
     if (!command) return;
     const wasUnknown = unknown, started = permission.current.revision;
@@ -86,33 +79,69 @@ function DomainRequestSession({ workId, workspaceId, request = fetch, readOnly =
   </section>;
 }
 
-/** A person restores DNS and attests that they tested the fallback before undo resets routing. */
-export function WebsiteCutoverUndo({ record, request = fetch }: { record: RebuildView; request?: typeof fetch }) {
+/** A person restores DNS and tests the fallback before this exact routing command. */
+interface CutoverUndoProps { record: RebuildView; request?: typeof fetch; readOnly?: boolean; disabled?: boolean; available?: boolean; canSubmit?: () => boolean; onBlockedChange?: (blocked: boolean) => void; onRestored?: (receipt: WebsiteCutoverUndoReceipt) => void }
+export function WebsiteCutoverUndo(props: CutoverUndoProps) {
+  return <CutoverUndoSession key={`${props.record.workspaceId}:${props.record.workId}`} {...props} />;
+}
+function CutoverUndoSession({ record, request = fetch, readOnly = false, disabled = false, available = true, canSubmit, onBlockedChange, onRestored }: CutoverUndoProps) {
   const [domainRestored, setDomainRestored] = useState(false);
   const [fallbackVerified, setFallbackVerified] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState(false);
+  const [unknown, setUnknown] = useState(false);
+  const [saved, setSaved] = useState<WebsiteCutoverUndoReceipt | null>(null);
   const [error, setError] = useState("");
-  const commandId = useRef(crypto.randomUUID());
-  if (!record.tenantId || !record.candidate || !record.publishedUrl) return null;
-  return <section className="mt-6 grid gap-3" aria-labelledby="cutover-undo-heading">
+  const inFlight = useRef(false);
+  const attempt = useRef<{ workId: string; body: { workspaceId: string; tenantId: string; candidateRevision: number; candidateContentHash: string; commandId: string; domainRestored: true; fallbackVerified: true } } | null>(null);
+  const scopeRef = useRef<HTMLElement>(null), checkRef = useRef<HTMLButtonElement>(null), receiptRef = useRef<HTMLParagraphElement>(null);
+  const focus = useRef<FocusRecovery | null>(null), mounted = useRef(true);
+  const permission = useRef({ readOnly, disabled, available, revision: 0 });
+  permission.current = { readOnly, disabled, available, revision: permission.current.revision + Number(permission.current.readOnly !== readOnly || permission.current.disabled !== disabled || permission.current.available !== available) };
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; focus.current?.cancel(); }; }, []);
+  useEffect(() => { if (!busy) { focus.current?.recover(unknown ? checkRef.current : receiptRef.current, true); focus.current = null; } }, [busy, unknown, saved, error]);
+  const eligible = Boolean(available && record.tenantId && record.candidate && record.publishedUrl);
+  if (!eligible && !attempt.current && !saved) return null;
+  async function submit(check = false) {
+    if (inFlight.current || readOnly || disabled || saved || canSubmit?.() === false || (!check && (attempt.current || !eligible || !domainRestored || !fallbackVerified))) return;
+    const command = check ? attempt.current : { workId: record.workId, body: { workspaceId: record.workspaceId, tenantId: record.tenantId!, candidateRevision: record.candidate!.revision, candidateContentHash: record.candidate!.contentHash, commandId: crypto.randomUUID(), domainRestored: true as const, fallbackVerified: true as const } };
+    if (!command) return;
+    const started = permission.current.revision, wasUnknown = unknown;
+    attempt.current = command; inFlight.current = true; onBlockedChange?.(true);
+    focus.current?.cancel(); focus.current = beginFocusRecovery(scopeRef.current);
+    setBusy(true); setError("");
+    try {
+      const response = await request(`/api/websites/${encodeURIComponent(command.workId)}/cutover-undo`, { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(command.body) });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        const reason = typeof result?.error === "string" ? result.error : "The undo result could not be confirmed.";
+        // Only the initial route authentication refusal proves the command was not invoked.
+        if (!wasUnknown && response.status === 401) { attempt.current = null; throw Object.assign(new Error(reason), { refused: true }); }
+        throw new Error(reason);
+      }
+      const parsed = websiteCutoverUndoReceiptSchema.safeParse(result?.receipt);
+      if (!parsed.success || parsed.data.receiptId !== command.body.commandId || parsed.data.workId !== command.workId || parsed.data.tenantId !== command.body.tenantId || parsed.data.revision !== command.body.candidateRevision || parsed.data.contentHash !== command.body.candidateContentHash) throw new Error("The undo result could not be confirmed.");
+      if (!mounted.current) return;
+      if (permission.current.revision !== started) throw new Error("Your access changed while the undo result was being checked.");
+      setSaved(parsed.data); setUnknown(false); if (onRestored) onRestored(parsed.data); else onBlockedChange?.(false);
+    } catch (cause) {
+      if (!mounted.current) return;
+      const refused = cause instanceof Error && "refused" in cause;
+      if (!refused) setUnknown(true); else onBlockedChange?.(false);
+      setError(`${cause instanceof Error ? cause.message : "The previous website result could not be confirmed."}${refused ? "" : " Check this exact undo command before starting another."}`);
+    } finally { inFlight.current = false; if (mounted.current) setBusy(false); }
+  }
+  return <section ref={scopeRef} className="mt-6 grid gap-3" aria-labelledby="cutover-undo-heading" aria-busy={busy || undefined}>
     <h3 id="cutover-undo-heading" className="text-base font-medium">Return to the previous website</h3>
     <p className="text-sm text-gray-muted">Restore the domain&rsquo;s previous DNS records and test the old project first. After you confirm both steps, Strelva switches its routing back. Your saved rebuild and history stay available.</p>
-    {done ? <p role="status" className="text-sm">The previous website was restored. The undo receipt is saved in history.</p> : <form className="grid gap-3" onSubmit={async event => {
-      event.preventDefault();
-      if (busy || !domainRestored || !fallbackVerified) return;
-      setBusy(true); setError("");
-      try {
-        const result = await post(request, `/api/websites/${encodeURIComponent(record.workId)}/cutover-undo`, { tenantId: record.tenantId, candidateRevision: record.candidate!.revision, candidateContentHash: record.candidate!.contentHash, commandId: commandId.current, domainRestored: true, fallbackVerified: true });
-        if (!result?.receipt) throw new Error("The undo result could not be confirmed. Reopen this saved website before retrying.");
-        setDone(true);
-      } catch (cause) { setError(cause instanceof Error ? cause.message : "The previous website couldn't be restored."); }
-      finally { setBusy(false); }
-    }}>
-      <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={domainRestored} disabled={busy} onChange={event => setDomainRestored(event.target.checked)} />I restored the domain&rsquo;s previous DNS records.</label>
-      <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={fallbackVerified} disabled={busy} onChange={event => setFallbackVerified(event.target.checked)} />I opened and tested the previous website.</label>
-      <Button type="submit" variant="secondary" disabled={busy || !domainRestored || !fallbackVerified} loading={busy} className="justify-self-start">Restore previous website</Button>
-      {error ? <p role="alert" className="text-sm text-critical">{error}</p> : null}
-    </form>}
+    {saved ? <p ref={receiptRef} tabIndex={-1} role="status" className="text-sm">The previous website was restored. The undo receipt for website version {saved.revision} is saved.</p> : <>
+      <form className="grid gap-3" onSubmit={event => { event.preventDefault(); void submit(); }}>
+        <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={domainRestored} disabled={busy || unknown || readOnly || disabled} onChange={event => { if (inFlight.current || attempt.current || readOnly || disabled) return; setDomainRestored(event.target.checked); }} />I restored the domain&rsquo;s previous DNS records.</label>
+        <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={fallbackVerified} disabled={busy || unknown || readOnly || disabled} onChange={event => { if (inFlight.current || attempt.current || readOnly || disabled) return; setFallbackVerified(event.target.checked); }} />I opened and tested the previous website.</label>
+        <Button type="submit" variant="secondary" disabled={busy || unknown || readOnly || disabled || !eligible || !domainRestored || !fallbackVerified} loading={busy} className="justify-self-start">Restore previous website</Button>
+      </form>
+      {unknown ? <Button ref={checkRef} type="button" variant="secondary" disabled={busy || readOnly || disabled} loading={busy} onClick={() => void submit(true)} className="justify-self-start">Check this undo command</Button> : null}
+      {unknown ? <p className="text-sm text-gray-muted">This checks the captured undo command with your current access. If already saved, it returns the receipt. Otherwise, it finishes the same routing undo; no new command is created. Strelva does not restore DNS here.</p> : null}
+      {error ? <p ref={receiptRef} tabIndex={-1} role="alert" className="text-sm text-critical">{error}</p> : null}
+    </>}
   </section>;
 }

@@ -21,7 +21,8 @@ export function WebsiteConnections({ record, disabled, onSaved, onBusyChange, he
   return <WebsiteConnectionSelector workspaceId={record.workspaceId} workId={record.workId} revision={record.website.revision} version={1} candidateRevision={record.website.candidate?.revision} selected={record.website.publishedCapabilitySelection ?? null} disabled={disabled} headingRef={headingRef} onFocusRecovery={onFocusRecovery} onBusyChange={onBusyChange} onUnconfirmed={onUnconfirmed} readOnly={readOnly} onSaved={value => onSaved(parseWebsiteRecord(value, record.workspaceId))} />;
 }
 
-export function WebsiteConnectionSelector({ workspaceId, workId, revision, selected, disabled, onSaved, onBusyChange, hosted = false, hasForms = false, headingRef, onFocusRecovery, onUnconfirmed, readOnly = false, version = 1, candidateRevision, candidateContentHash }: {
+export function WebsiteConnectionSelector({ canWrite, workspaceId, workId, revision, selected, disabled, onSaved, onBusyChange, hosted = false, hasForms = false, headingRef, onFocusRecovery, onUnconfirmed, readOnly = false, version = 1, candidateRevision, candidateContentHash }: {
+  canWrite?: () => boolean;
   workspaceId: string;
   workId: string;
   revision: number;
@@ -90,7 +91,7 @@ export function WebsiteConnectionSelector({ workspaceId, workId, revision, selec
     finally { inFlight.current = false; if (mounted.current) setBusy(false); }
   }
   async function save(selection: WebsiteCapabilitySelection | null) {
-    if (disabled || readOnly || inFlight.current || unresolved.current) return;
+    if (disabled || readOnly || inFlight.current || unresolved.current || canWrite?.() === false) return;
     inFlight.current = true;
     focusRecovery.current?.cancel();
     focusRecovery.current = beginFocusRecovery(sectionRef.current);

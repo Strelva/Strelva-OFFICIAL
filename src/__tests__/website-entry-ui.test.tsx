@@ -94,7 +94,7 @@ describe("domain and cutover recovery decisions", () => {
     expect(body).toEqual({ domain: "www.synthetic.example.test", requestId: expect.stringMatching(/^[0-9a-f-]{36}$/) });
     expect(node.querySelector('[role="alert"]')?.textContent).toContain("Not an operator"); expect(node.querySelector("input")?.value).toBe("www.synthetic.example.test");
   });
-  it("requires both manual recovery confirmations, pins the candidate, and retains a retryable refusal", async () => {
+  it("requires both manual confirmations, pins the command, and explicitly checks its exact receipt", async () => {
     const record = fixtureRebuild("published"); record.tenantId = "tenant-zero";
     const request = vi.fn(async (_path: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({ error: "Fallback could not be verified" }), { status: 409 }));
     await mount(createElement(WebsiteCutoverUndo, { record, request }));
@@ -103,11 +103,14 @@ describe("domain and cutover recovery decisions", () => {
     await act(async () => checks[0]!.click()); expect(button("Restore previous website").disabled).toBe(true);
     await act(async () => checks[1]!.click());
     await act(async () => button("Restore previous website").click());
-    expect(JSON.parse(String(request.mock.calls[0]?.[1]?.body))).toEqual({ tenantId: "tenant-zero", candidateRevision: record.candidate!.revision, candidateContentHash: record.candidate!.contentHash, commandId: expect.stringMatching(/^[0-9a-f-]{36}$/), domainRestored: true, fallbackVerified: true });
+    expect(JSON.parse(String(request.mock.calls[0]?.[1]?.body))).toEqual({ workspaceId: record.workspaceId, tenantId: "tenant-zero", candidateRevision: record.candidate!.revision, candidateContentHash: record.candidate!.contentHash, commandId: expect.stringMatching(/^[0-9a-f-]{36}$/), domainRestored: true, fallbackVerified: true });
     expect(node.querySelector('[role="alert"]')?.textContent).toContain("Fallback could not be verified"); expect(checks.every(item => item.checked)).toBe(true);
-    request.mockResolvedValueOnce(new Response(JSON.stringify({ receipt: { kind: "linked_cutover_undone" } }), { status: 200 }));
-    await act(async () => button("Restore previous website").click());
-    expect(node.textContent).toContain("undo receipt is saved in history");
+    const captured = JSON.parse(String(request.mock.calls[0]?.[1]?.body));
+    request.mockResolvedValueOnce(Response.json({ receipt: { kind: "rebuild_cutover_undone", receiptId: captured.commandId, tenantId: captured.tenantId, tenantStableId: "62000000-0000-4000-8000-000000000113", workId: record.workId, revision: captured.candidateRevision, contentHash: captured.candidateContentHash, restoredBy: "62000000-0000-4000-8000-000000000101", restoredAt: "2026-10-09T00:00:00Z", deliveryModel: "custom_repo", domainRestored: true, fallbackVerified: true } }));
+    expect(button("Restore previous website").disabled).toBe(true);
+    await act(async () => button("Check this undo command").click());
+    expect(request.mock.calls[1]?.[1]?.body).toBe(request.mock.calls[0]?.[1]?.body);
+    expect(node.textContent).toContain("undo receipt for website version 1 is saved");
   });
 });
 
