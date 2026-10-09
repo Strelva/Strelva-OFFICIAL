@@ -28,7 +28,7 @@ test.beforeEach(async ({ page }, info) => {
 test.afterEach(async ({ page }, info) => {
   const scope = scopes.get(page);
   await info.attach("fictional-inquiry-ui-scope", {
-    body: JSON.stringify({ origin: scope?.origin, externalRequestsBlocked: scope?.blocked, viewport: page.viewportSize(), fictionalRecords: true, visibleFictionBanner: false, deliveryQualified: false, nativeAuthQualified: false, sqlDecisionQualified: false }),
+    body: JSON.stringify({ origin: scope?.origin, externalRequestsBlocked: scope?.blocked, viewport: page.viewportSize(), fictionalRecords: true, visibleFictionBanner: await page.getByRole("note").filter({ hasText: "Local rehearsal · fictional bakery records." }).isVisible().catch(() => false), deliveryQualified: false, nativeAuthQualified: false, sqlDecisionQualified: false }),
     contentType: "application/json",
   });
 });
@@ -50,6 +50,7 @@ async function openFixture(page: Page, width: number, enlarged: boolean) {
   await page.setViewportSize({ width, height: 900 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto(path);
+  await expect(page.getByRole("note")).toHaveText("Local rehearsal · fictional bakery records. This page is not proof of email delivery or saved inquiry decisions.");
   await expect(page.getByRole("heading", { name: "Juniper Bakery", exact: true })).toBeVisible();
   await expect(page.getByText("Strelva kept these out of your inbox. If one is a real person, release it. Nobody is emailed either way.", { exact: true })).toBeVisible();
   if (enlarged) {
@@ -192,10 +193,12 @@ for (const [width, enlarged] of [[1440, false], [390, false], [320, true]] as co
         await expect.poll(() => requests.length).toBe(3);
         await expect(check).toBeDisabled();
         const outside = page.getByRole("button", { name: "Release the message from Ana", exact: true });
-        await outside.focus(); await expect(outside).toBeFocused();
+        await outside.focus(); await page.keyboard.press("Tab");
+        const outsideDestination = page.getByRole("button", { name: "Confirm the message from Ana is spam", exact: true });
+        await expect(outsideDestination).toBeFocused();
         releaseCheck();
         await expect(article.getByRole("alert")).toContainText("Fixture receipt still unavailable");
-        await expect(check).toBeEnabled(); await expect(outside).toBeFocused();
+        await expect(check).toBeEnabled(); await expect(outsideDestination).toBeFocused();
         await expect(subject).toHaveValue(attempt.subject); await expect(body).toHaveValue(attempt.body);
         expect(requests[2]).toBe(requests[0]);
         await page.screenshot({ path: info.outputPath("reply-outside-focus-preserved.png"), fullPage: true });
@@ -243,6 +246,7 @@ for (const [width, enlarged] of [[1440, false], [390, false], [320, true]] as co
       await page.screenshot({ path: info.outputPath("held-unconfirmed.png"), fullPage: true });
       await Promise.all([page.waitForEvent("load"), page.keyboard.press("Enter")]);
       await expect.poll(() => documents).toBe(2);
+      await expect(page.getByRole("note")).toContainText("fictional bakery records");
       await expect(release).toBeEnabled(); await expect(spam).toBeEnabled();
       await expect(reload).toHaveCount(0); await expect(article.getByRole("alert")).toHaveCount(0);
       // Reload obtains the unchanged fictional fixture, not a manufactured SQL decision receipt.
