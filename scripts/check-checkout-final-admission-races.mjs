@@ -159,6 +159,9 @@ try {
     }
   }
   const baseline = await run("catalog-before-probes", catalogSql);
+  const migrationRole = await run("migration-owner", `select proowner::regrole::text from pg_proc where oid='${signature}'::regprocedure`);
+  if (!migrationRole) throw new Error("Original migration owner unavailable");
+  retain("migration-owner.json", JSON.stringify({ role: migrationRole }, null, 2));
   for (const [label, mutation, packet, expected] of [
     ["forward-existing-signature", "", forward, "checkout_admission_unsupported_baseline"],
     ["inverse-custom-acl", `create role ca_checkout_probe;grant execute on function ${signature} to ca_checkout_probe;`, inverse, "checkout_admission_acl_drift"],
@@ -168,7 +171,7 @@ try {
     ["inverse-body", `update pg_proc set prosrc='begin return true;end' where oid='${signature}'::regprocedure;`, inverse, "checkout_admission_catalog_drift"],
     ["inverse-overload", "create function public.assert_business_checkout_admission(text) returns boolean language sql as 'select true';", inverse, "checkout_admission_catalog_drift"],
   ]) {
-    const probe = processSql(label); probe.child.stdin.end(`begin;${mutation}select 'CHECKOUT_PROBE_PREPARED';\n\\i ${packet}\n`);
+    const probe = processSql(label); probe.child.stdin.end(`begin;${mutation}select 'CHECKOUT_PROBE_PREPARED';set local role ${literal(migrationRole)};\n\\i ${packet}\n`);
     const result = await probe.completed;
     if (result.code !== 3 || result.signal || result.error || result.timedOut || !result.stdout.includes("CHECKOUT_PROBE_PREPARED") || !result.stderr.includes(expected)) throw new Error(`${label}: mutation and exact atomic refusal were not observed`);
     if (await run(`${label}-catalog-after`, catalogSql) !== baseline) throw new Error(`${label}: refused packet changed the catalog`);
@@ -176,10 +179,10 @@ try {
   }
   const history = `select 'payment|'||p.id||'|'||md5(to_jsonb(p)::text) from public.business_payments p where p.workspace_id in(${fixtureWorkspaces.map(literal).join(",")}) union all select 'event|'||e.id||'|'||md5(to_jsonb(e)::text) from public.business_payment_events e join public.business_payments p on p.id=e.payment_id where p.workspace_id in(${fixtureWorkspaces.map(literal).join(",")}) order by 1`;
   const retained = await run("history-before-inverse", history);
-  await run("legitimate-inverse", `\\i ${inverse}`);
+  await run("legitimate-inverse", `set role ${literal(migrationRole)};\n\\i ${inverse}`);
   if (await run("gate-removed", `select to_regprocedure('${signature}') is null`) !== "t") throw new Error("Legitimate inverse retained the new gate");
   if (await run("history-after-inverse", history) !== retained) throw new Error("Legitimate inverse changed retained accepted payment/history bytes");
-  await run("legitimate-reapply", `\\i ${forward}`);
+  await run("legitimate-reapply", `set role ${literal(migrationRole)};\n\\i ${forward}`);
   if (await run("catalog-after-reapply", catalogSql) !== baseline) throw new Error("Reapply changed original historical functions or the current gate contract");
   if (await run("history-after-reapply", history) !== retained) throw new Error("Reapply changed retained accepted payment/history bytes");
   const ledgerAfter = JSON.parse(await run("ledger-after-reapply", "select coalesce(jsonb_agg(version::text order by version::text),'[]'::jsonb) from supabase_migrations.schema_migrations"));
