@@ -7,7 +7,7 @@ import { WorkspaceRequestContext } from "@/experience/workspace/WorkspaceRequest
 import type { SystemView } from "@/experience/systems/model";
 
 const workspaceId = crypto.randomUUID(), systemId = crypto.randomUUID();
-const system: SystemView = { id: systemId, name: "Team intake", kind: "app", lifecycle: "draft", health: { state: "unknown", summary: "No checks yet." },
+const system: SystemView = { id: systemId, name: "Team intake", detail: "Internal intake app", kind: "app", lifecycle: "draft", health: { state: "unknown", summary: "No checks yet." },
   surface: { kind: "work", workId: "intake", productId: "unknown" }, connections: [], versions: [], possibilities: [
     { id: "first", title: "Shorter intake", summary: "Remove one question.", status: "ready", affects: [systemId] },
     { id: "second", title: "Referral intake", summary: "Add a referral question.", status: "ready", affects: [systemId] },
