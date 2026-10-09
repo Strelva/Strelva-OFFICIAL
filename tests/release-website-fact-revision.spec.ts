@@ -1,11 +1,20 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type TestInfo } from "@playwright/test";
+
+function fixtureOrigin(info: TestInfo): string {
+  const baseURL = info.project.use.baseURL;
+  if (!baseURL) throw new Error("This fixture needs an explicit loopback baseURL.");
+  const url = new URL(baseURL);
+  if (url.protocol !== "http:" || !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) || url.username || url.password || url.pathname !== "/" || url.search || url.hash) throw new Error("This fixture needs a credential-free HTTP loopback origin.");
+  return url.origin;
+}
 
 for (const [width, enlarged] of [[1440, false], [390, false], [320, true]] as const) {
   test(`approved website facts can be revised with keyboard recovery at ${width}px${enlarged ? " with enlarged text" : ""}`, async ({ page }, info) => {
     const outsideRequests: string[] = [];
+    const ownedOrigin = fixtureOrigin(info);
     await page.route("**/*", route => {
       const url = new URL(route.request().url());
-      if (["localhost", "127.0.0.1"].includes(url.hostname)) return route.continue();
+      if (url.origin === ownedOrigin) return route.continue();
       outsideRequests.push(url.origin); return route.abort();
     });
     await page.setViewportSize({ width, height: 900 });
@@ -48,9 +57,10 @@ for (const [width, enlarged] of [[1440, false], [390, false], [320, true]] as co
     test.use({ hasTouch: width < 768 });
     test(`contact removal preserves keyboard recovery, errors and read-only limits${enlarged ? " with enlarged text" : ""}`, async ({ page }, info) => {
       const outsideRequests: string[] = [];
+      const ownedOrigin = fixtureOrigin(info);
       await page.route("**/*", route => {
         const url = new URL(route.request().url());
-        if (["localhost", "127.0.0.1"].includes(url.hostname)) return route.continue();
+        if (url.origin === ownedOrigin) return route.continue();
         outsideRequests.push(url.origin); return route.abort();
       });
       await page.setViewportSize({ width, height: 900 });
