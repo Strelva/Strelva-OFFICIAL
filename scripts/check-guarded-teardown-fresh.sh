@@ -24,7 +24,7 @@ done < <(printf '%s\n' "$repo_root"/supabase/migrations/20*.sql | sort)
 psql "${psql_args[@]}" --file="$repo_root/tests/guarded-tenant-teardown-schema.sql"
 printf 'PASS final guarded teardown against %s ordered actual forward migrations.\n' "$count"
 if [[ "${STRELVA_RUNTIME_GENERATION_SQL_PROOF:-0}" == 1 ]]; then
- for fixture in runtime-data-google-grant-generation.sql runtime-data-google-receipt-intent.sql runtime-data-tenant-connection-generation.sql; do
+ for fixture in runtime-data-google-grant-generation.sql runtime-data-google-receipt-intent.sql runtime-data-google-provider-retention.sql runtime-data-tenant-connection-generation.sql; do
   psql "${psql_args[@]}" --file="$repo_root/tests/$fixture"
  done
  source "$repo_root/tests/support/runtime-data-tenant-generation-races.sh"

@@ -1,6 +1,6 @@
 {
-  "source": "06010ce4 (composed forward inventory; execution qualification pending)",
-  "forwardCount": 337,
+  "source": "8aa78202 (composed forward inventory; complete qualification pending)",
+  "forwardCount": 338,
   "workspaceBoundary": "20260905190000_release_one_workspaces.sql",
   "focusedLegacyExceptions": {
     "20260920060000_content_version_request_id.sql": "Requires legacy content_versions, omitted from the purpose-built workspace fixture; real upgrade/fresh full-schema rehearsal owns it.",
@@ -329,6 +329,7 @@
     "20261021100400_google_make_real_flag.sql",
     "20261021100500_google_grant_generation.sql",
     "20261021100600_google_receipt_intent.sql",
+    "20261021100700_google_provider_payload_retention.sql",
     "20261021100800_tenant_connection_generation.sql",
     "20261021110000_enterprise_units.sql",
     "20261021111000_enterprise_standards.sql",

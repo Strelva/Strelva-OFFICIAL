@@ -1716,6 +1716,13 @@
           "rollbackStatus": "Prepared guarded or forward-only inverse; native inverse/reapply and populated refusal qualification pending"
         },
         {
+          "file": "20261021100700_google_provider_payload_retention.sql",
+          "sha256": "535e46d96ff2c08dd887e8505cd2f8795ee7adbdc4844705ed545f79efcd1020",
+          "rollback": "rollback-20261021100700_google_provider_payload_retention.sql",
+          "rollbackSha256": "433f6bb050fad8798844131b084a9527bfe0b08689ba5260d5d338043f4c7b2f",
+          "rollbackStatus": "Prepared inverse refuses populated receipt history; native refusal/reapply and operating retention recovery remain qualification gates"
+        },
+        {
           "file": "20261021100800_tenant_connection_generation.sql",
           "sha256": "86ca37051ffa99bd00c877d00f9f1ffd205dafe35abc595cd661ef942dc0d0ae",
           "rollback": "rollback-20261021100800_tenant_connection_generation.sql",
