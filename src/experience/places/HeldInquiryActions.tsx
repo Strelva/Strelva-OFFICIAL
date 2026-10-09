@@ -87,22 +87,22 @@ export function HeldInquiryActions({ workspaceId, rowId, name, mode }: { workspa
 
   const saving = outcome.kind === "saving";
   return (
-    <div ref={sectionRef} className="mt-3 flex flex-wrap items-center gap-2">
+    <div ref={sectionRef} className="mt-3 flex min-w-0 flex-wrap items-center gap-2">
       {mode === "held" ? (
         <>
-          <Button size="sm" disabled={saving || unconfirmed} onClick={() => void decide("release")} aria-label={`Release the message from ${name}`}>
+          <Button className="max-w-full whitespace-normal break-words" size="sm" disabled={saving || unconfirmed} onClick={() => void decide("release")} aria-label={`Release the message from ${name}`}>
             {saving && outcome.decision === "release" ? "Releasing…" : "Not spam, release it"}
           </Button>
-          <Button size="sm" variant="secondary" disabled={saving || unconfirmed} onClick={() => void decide("confirm_spam")} aria-label={`Confirm the message from ${name} is spam`}>
+          <Button className="max-w-full whitespace-normal break-words" size="sm" variant="secondary" disabled={saving || unconfirmed} onClick={() => void decide("confirm_spam")} aria-label={`Confirm the message from ${name} is spam`}>
             {saving && outcome.decision === "confirm_spam" ? "Saving…" : "It's spam"}
           </Button>
         </>
       ) : (
-        <Button size="sm" variant="secondary" disabled={saving || unconfirmed} onClick={() => void decide("hold")} aria-label={`Move the message from ${name} back to held`}>
+        <Button className="max-w-full whitespace-normal break-words" size="sm" variant="secondary" disabled={saving || unconfirmed} onClick={() => void decide("hold")} aria-label={`Move the message from ${name} back to held`}>
           {saving ? "Moving…" : "Move back to held"}
         </Button>
       )}
-      {unconfirmed ? <Button ref={reloadRef} size="sm" variant="secondary" onClick={() => window.location.reload()}>Reload inquiries</Button> : null}
+      {unconfirmed ? <Button className="max-w-full whitespace-normal break-words" ref={reloadRef} size="sm" variant="secondary" onClick={() => window.location.reload()}>Reload inquiries</Button> : null}
       {outcome.kind === "error" ? <p role="alert" className="text-sm text-critical">{outcome.message}</p> : null}
     </div>
   );

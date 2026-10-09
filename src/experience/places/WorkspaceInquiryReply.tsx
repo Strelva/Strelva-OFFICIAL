@@ -54,7 +54,7 @@ export function WorkspaceInquiryReply({ workspaceId, rowId, name, email, booking
     else if (!open && wasOpen.current) openerRef.current?.focus();
     wasOpen.current = open;
   }, [open]);
-  if (!open) return <Button ref={openerRef} size="md" variant="secondary" onClick={() => setOpen(true)}>Reply to {name}</Button>;
+  if (!open) return <Button className="max-w-full whitespace-normal break-words" ref={openerRef} size="md" variant="secondary" onClick={() => setOpen(true)}>Reply to {name}</Button>;
   async function send() {
     if (inFlight.current || settled.current || (!attempt.current && (!subject.trim() || !body.trim()))) return;
     inFlight.current = true;
@@ -87,16 +87,16 @@ export function WorkspaceInquiryReply({ workspaceId, rowId, name, email, booking
     finally { inFlight.current = false; setSaving(false); }
   }
   return (
-    <div ref={sectionRef} className="mt-4 grid gap-4">
+    <div ref={sectionRef} className="mt-4 grid min-w-0 gap-4">
       <p className="text-sm break-all">To {email}</p>
-      <TextInput ref={subjectRef} label="Subject" value={subject} onChange={(event) => { if (!inFlight.current && !attempt.current) setSubject(event.target.value); }} maxLength={200} disabled={saving || requestId !== null} />
-      <TextArea label={`Your reply to ${name}`} value={body} onChange={(event) => { if (!inFlight.current && !attempt.current) setBody(event.target.value); }} maxLength={5000} disabled={saving || requestId !== null} />
+      <TextInput className="min-w-0" ref={subjectRef} label="Subject" value={subject} onChange={(event) => { if (!inFlight.current && !attempt.current) setSubject(event.target.value); }} maxLength={200} disabled={saving || requestId !== null} />
+      <TextArea className="min-w-0" label={`Your reply to ${name}`} value={body} onChange={(event) => { if (!inFlight.current && !attempt.current) setBody(event.target.value); }} maxLength={5000} disabled={saving || requestId !== null} />
       {bookingOffers ? <InquiryBookingOfferComposer workspaceId={workspaceId} rowId={rowId} disabled={saving || requestId !== null} append={text => { if (inFlight.current || attempt.current) return false; const next = body ? `${body}\n\n${text}` : text; if (next.length > 5000) return false; setBody(next); return true; }} /> : null}
       <p className="text-xs text-gray-muted">{member ? "You can send an ordinary reply for inquiries assigned or routed to you. Prices, dates and promises need the owner’s approval. A sent reply cannot be undone." : "Sending approves this exact message, including any price, date or promise. A sent reply cannot be undone."}</p>
       {outcome ? <p ref={outcomeRef} tabIndex={-1} role="status" className="text-sm">{REPLY_OUTCOME[outcome.status]}</p> : (
         <div className="flex flex-wrap gap-3">
-          <Button ref={checkRef} loading={saving} disabled={saving || (!requestId && (!subject.trim() || !body.trim()))} onClick={() => void send()}>{requestId ? "Check this reply" : member ? "Send reply" : "Approve and send reply"}</Button>
-          {!requestId ? <Button variant="ghost" disabled={saving} onClick={() => { if (!inFlight.current && !attempt.current) setOpen(false); }}>Close draft</Button> : null}
+          <Button className="max-w-full whitespace-normal break-words" ref={checkRef} loading={saving} disabled={saving || (!requestId && (!subject.trim() || !body.trim()))} onClick={() => void send()}>{requestId ? "Check this reply" : member ? "Send reply" : "Approve and send reply"}</Button>
+          {!requestId ? <Button className="max-w-full whitespace-normal break-words" variant="ghost" disabled={saving} onClick={() => { if (!inFlight.current && !attempt.current) setOpen(false); }}>Close draft</Button> : null}
         </div>
       )}
       {error ? <p role="alert" className="text-sm text-critical">{error}</p> : null}

@@ -17,24 +17,24 @@ function sourceLabel(source: string): string {
 
 function LeadCard({ lead, workspaceId, tenantId, bookingProposals, replies, bookingOffers }: { lead: LeadView; workspaceId: string; tenantId: string | null; bookingProposals?: boolean; replies?: boolean; bookingOffers?: boolean }) {
   return (
-    <Card padding="md">
+    <Card padding="md" className="min-w-0">
       <article aria-labelledby={`lead-${lead.id}`}>
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 id={`lead-${lead.id}`} className="truncate text-[15px] font-medium">{lead.name}</h3>
             <p className="mt-1 text-xs text-gray-muted"><time dateTime={lead.createdAt}>{whenLabel(lead.createdAt, true)}</time></p>
           </div>
-          {lead.source ? <span className="shrink-0 rounded-md border border-gray-border px-2 py-0.5 text-xs text-gray-muted">{sourceLabel(lead.source)}</span> : null}
+          {lead.source ? <span className="min-w-0 max-w-full break-words rounded-md border border-gray-border px-2 py-0.5 text-xs text-gray-muted">{sourceLabel(lead.source)}</span> : null}
         </div>
-        {lead.message ? <p className="mt-3 whitespace-pre-line text-sm leading-6">{lead.message}</p> : null}
+        {lead.message ? <p className="mt-3 whitespace-pre-line break-words text-sm leading-6">{lead.message}</p> : null}
         {lead.fields.length ? (
           <dl className="mt-3 grid gap-1 text-sm">
-            {lead.fields.map(([key, value]) => <div key={key} className="flex gap-2"><dt className="text-gray-muted">{sourceLabel(key)}:</dt><dd className="min-w-0 break-words">{value}</dd></div>)}
+            {lead.fields.map(([key, value]) => <div key={key} className="flex flex-wrap gap-2"><dt className="min-w-0 max-w-full break-words text-gray-muted">{sourceLabel(key)}:</dt><dd className="min-w-0 break-words">{value}</dd></div>)}
           </dl>
         ) : null}
         {replies && lead.reply && Object.hasOwn(REPLY_OUTCOME, lead.reply.status) ? <p role="status" className="mt-4 text-sm">{REPLY_OUTCOME[lead.reply.status]}{lead.reply.providerMessageId ? <span className="mt-1 block break-all text-xs text-gray-muted">Provider receipt: {lead.reply.providerMessageId}</span> : null}</p> : lead.email && replies && lead.rowId && lead.replyPermission === "none" ? <p className="mt-4 text-sm text-gray-muted">The owner or the assigned team member can reply to this inquiry.</p> : lead.email && replies && lead.rowId ? <WorkspaceInquiryReply workspaceId={workspaceId} rowId={lead.rowId} name={lead.name} email={lead.email} bookingOffers={bookingOffers && lead.replyPermission !== "member"} member={lead.replyPermission === "member"} /> : lead.email ? (
           <p className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-            <a className="inline-flex min-h-[40px] items-center rounded-lg bg-warm-black px-3 font-medium text-warm-white" href={`mailto:${encodeURIComponent(lead.email).replace(/%40/g, "@")}`}>Reply by email</a>
+            <a className="inline-flex max-w-full min-h-[40px] items-center rounded-lg bg-warm-black px-3 text-center font-medium text-warm-white" href={`mailto:${encodeURIComponent(lead.email).replace(/%40/g, "@")}`}>Reply by email</a>
             <span className="break-all text-gray-muted">{lead.email}</span>
           </p>
         ) : null}
@@ -59,9 +59,9 @@ function reasonLabel(reason: string | null): string {
 
 function HeldCard({ item, workspaceId }: { item: HeldView; workspaceId: string }) {
   return (
-    <Card padding="md">
+    <Card padding="md" className="min-w-0">
       <article aria-labelledby={`held-${item.rowId}`}>
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 id={`held-${item.rowId}`} className="truncate text-[15px] font-medium">{item.name}</h3>
             <p className="mt-1 text-xs text-gray-muted"><time dateTime={item.createdAt}>{whenLabel(item.createdAt, true)}</time> · {reasonLabel(item.reason)}</p>
