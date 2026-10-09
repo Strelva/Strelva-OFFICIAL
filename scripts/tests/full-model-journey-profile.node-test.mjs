@@ -148,3 +148,35 @@ test('native inquiry publication admission is explicit while both dark variants 
     'BOOKING_PROVIDER_PROOF', 'NEWSLETTER_SENDER_RELEASE', 'AGENT_PAYMENTS'])
     assert.equal(native.env[`STRELVA_${suffix}`], '0', suffix);
 });
+
+test('runtime and proof root files change the source pin without a new commit', () => {
+  const root = mkdtempSync(join(tmpdir(), 'strelva-root-source-test-'));
+  const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe' });
+  try {
+    git('init', '-q');
+    for (const file of ['instrumentation.ts', 'postcss.config.mjs', 'vitest.config.ts', 'vitest.setup.ts', 'sentry.server.config.ts', 'sentry.edge.config.ts', 'sentry.client.config.ts', 'playwright.provider.config.ts', 'eslint.config.mjs'])
+      writeFileSync(join(root, file), 'runtime or proof before');
+    git('add', '.');
+    git('-c', 'user.name=Local proof', '-c', 'user.email=proof@example.test', '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'fixture');
+    const before = sourceInventory(root);
+    writeFileSync(join(root, 'instrumentation.ts'), 'changed workspace registration');
+    const changed = sourceInventory(root);
+    assert.equal(changed.head, before.head); assert.equal(changed.tree, before.tree);
+    assert.notDeepEqual(changed, before, 'unchanged HEAD/tree cannot hide changed registration');
+    for (const file of ['instrumentation.ts', 'postcss.config.mjs', 'vitest.config.ts', 'vitest.setup.ts', 'sentry.server.config.ts', 'sentry.edge.config.ts', 'sentry.client.config.ts', 'playwright.provider.config.ts', 'eslint.config.mjs'])
+      assert.ok(before.sourceFiles.find(item => item.file === file)?.sha256, `${file} executes runtime or proof code`);
+    rmSync(join(root, 'instrumentation.ts'));
+    assert.equal(sourceInventory(root).sourceFiles.find(item => item.file === 'instrumentation.ts').sha256, null);
+    const deleted = sourceInventory(root);
+    for (const file of ['instrumentation-client.ts', 'middleware.ts', 'proxy.ts', 'tailwind.config.ts'])
+      writeFileSync(join(root, file), 'new untracked runtime entrypoint');
+    const added = sourceInventory(root);
+    assert.equal(added.head, before.head); assert.equal(added.tree, before.tree);
+    assert.notDeepEqual(added, deleted, 'untracked root entrypoints must not disappear from the proof');
+    for (const file of ['instrumentation-client.ts', 'middleware.ts', 'proxy.ts', 'tailwind.config.ts'])
+      assert.ok(added.sourceFiles.find(item => item.file === file)?.sha256);
+    for (const file of ['.env', '.env.local', 'private-proof.env', 'instrumentation-notes.md', 'unrelated.config.mjs'])
+      writeFileSync(join(root, file), 'excluded private or unrelated fixture');
+    assert.deepEqual(sourceInventory(root), added, 'environment and unrelated files remain outside source evidence');
+  } finally { rmSync(root, { recursive: true }); }
+});
