@@ -1,0 +1,50 @@
+{
+  "status": "source_preparation_only",
+  "frozenUnion": "77fc4ea49f61aecc901f92062d8646bd125f21ee",
+  "capabilityRepair": "080ab594a18bb18ec0f7db6fc85f73b8eda39189",
+  "entries": [
+    {
+      "path": "src/platform/capabilities/inventory-contracts.ts",
+      "sourceRef": "080ab594a18bb18ec0f7db6fc85f73b8eda39189",
+      "beforeGitBlob": "75bb614353331f1e79ca6782110587de5e05abb8",
+      "afterSha256": "41f1f0f29911182b5dac287856d83d9ee5e176cf5b458a99566b57fcf80f464c"
+    },
+    {
+      "path": "src/experience/workspace/contracts.ts",
+      "sourceRef": "77fc4ea49f61aecc901f92062d8646bd125f21ee",
+      "beforeGitBlob": "cc269f00f5e6d49487a95853488cc5666fc0c9ce",
+      "afterSha256": "4067cc5adb5c23c9aafd4770e93ddeb35ba8affbe1faeca98dddc26389c9dcdf"
+    },
+    {
+      "path": "src/app/api/workspace/route.ts",
+      "sourceRef": "77fc4ea49f61aecc901f92062d8646bd125f21ee",
+      "beforeGitBlob": "fe8286775e3ab9941e3b0a4088d343a22f7e68bc",
+      "afterSha256": "f96b6f2ac9624c664266ac347929cda38cc57211dca88aa5fbbaa6cef3238bf1"
+    },
+    {
+      "path": "src/app/api/workspace/ask/route.ts",
+      "sourceRef": "77fc4ea49f61aecc901f92062d8646bd125f21ee",
+      "beforeGitBlob": "699523d303dbf554e637213577bcab440b410e99",
+      "afterSha256": "4c6fd6bd7d0bb1455844bc87732a9c9c8e2657c277902f45bf47decae4927062"
+    },
+    {
+      "path": "src/platform/agent-channel/protected-tools.ts",
+      "sourceRef": "77fc4ea49f61aecc901f92062d8646bd125f21ee",
+      "beforeGitBlob": "7a3a6aa37b8c19d67da0901b43d33786233ff447",
+      "afterSha256": "91129c8488ed4dda6c4ec5af62b151626bf254737ee0b10f4cc47424b0c56e74"
+    },
+    {
+      "path": "src/app/api/mcp/public/route.ts",
+      "sourceRef": "77fc4ea49f61aecc901f92062d8646bd125f21ee",
+      "beforeGitBlob": "246562e6d6e9eb03b0631d5778983d2b9c85f627",
+      "afterSha256": "b678ca928fa33e1e11f3af207129056df3d5bf59998b2248a3ee9a8de24cde91"
+    },
+    {
+      "path": "src/server/capability-consumer-availability.ts",
+      "sourceRef": null,
+      "beforeGitBlob": null,
+      "afterSha256": "fb313fa3a1b3d83a9cd1cf91331121b086ddbceef82a19b62cfdaad0cabe0a11"
+    }
+  ],
+  "patchSha256": "0c97355f2f86e5267e7bb20492d1b0657d78c8aa428b5b269b6b8c41d04d9e64"
+}

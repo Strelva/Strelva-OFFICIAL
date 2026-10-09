@@ -1,4 +1,10 @@
-# E03 consumer adoption proposals — held
+# E03 consumer adoption proposals — source preparation
+
+Root authorized exact consumer source preparation against frozen union
+`77fc4ea49f61aecc901f92062d8646bd125f21ee` after the PR625 validator repair.
+The [frozen delta handoff](./capability-consumer-frozen-77fc4ea.md) and its patch
+supersede the illustrative interface sketches below. No consumer changes are
+applied. Root coordinates the actual branch/base before application.
 
 Not applied. Architecture union owns the workspace route, contracts and rendered
 surfaces until freeze. These proposals preserve existing gates and authority.
