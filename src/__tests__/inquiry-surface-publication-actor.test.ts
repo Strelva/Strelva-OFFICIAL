@@ -44,7 +44,7 @@ it("the actual surface queues and resolves publication as the authenticated owne
     return { changed: false, reason: authorization.allowed ? "native_publication_not_executed_in_unit" : authorization.reason };
   });
   const result = await executeInquirySurface({ context: { tenantId, businessId, config, repository },
-    action: { kind: "publish", requestId: work.id }, expectedRevision: 1, actorId: owner });
+    action: { kind: "publish", requestId: work.id, actorId: owner }, expectedRevision: 1, actorId: owner });
   expect(mocks.resolve).toHaveBeenCalledWith(tenantId, event!.id, "approved", owner);
   expect(mocks.authority).toHaveBeenCalledWith("authorize_inquiry_publication_actor", {
     p_tenant_id: tenantId, p_actor_id: owner, p_claim_id: String(event!.metadata!.publicationClaimId), p_event_id: event!.id,
