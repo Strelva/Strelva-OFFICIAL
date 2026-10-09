@@ -150,7 +150,7 @@ for (const [width, enlarged] of [[1440, false], [390, false], [320, true]] as co
       f.failCurrentRead(false); await page.keyboard.press("Enter");
       await expect(reload).toHaveCount(0); await expect(draft).toBeEnabled(); await expect(draft).toHaveValue(draftText);
       await expect(fact.getByRole("button", { name: "Save correction", exact: true })).toBeEnabled();
-      await expect(f.parent).toContainText("their earlier publication receipt does not describe the current routing"); await expect(page.locator("#rebuild-domain-heading")).toHaveCount(0);
+      await expect(f.parent).toContainText("their earlier publication receipt does not describe the current routing"); await expect(f.parent.getByRole("heading", { name: "Saved preview and publication history", exact: true })).toBeVisible(); await expect(f.parent).toContainText("Earlier publication receipt retained. The previous website is restored."); await expect(f.parent).not.toContainText("This revision has been published."); await expect(page.locator("#rebuild-domain-heading")).toHaveCount(0);
       await geometry(page, f.parent, width); await page.screenshot({ path: info.outputPath("undo-reconciled-draft.png"), fullPage: true }); await scope(info, f.blocked, f.writes, 2);
     });
   }
