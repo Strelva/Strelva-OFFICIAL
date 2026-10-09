@@ -218,6 +218,12 @@ test("customer grants one managed website draft, agency prepares it, and custome
     agencyPage.setDefaultTimeout(25_000);
     await agencyPage.setViewportSize({ width: 390, height: 844 });
     await agencyPage.goto(`/workspace?workspaceId=${agencyId}`, { waitUntil: "domcontentloaded" });
+    // The released agency Home opens Clients; assigned drafts live in Queue.
+    if (process.env.STRELVA_SYSTEMS_RELEASE === "1") {
+      const queue = agencyPage.getByRole("tab", { name: "Queue", exact: true });
+      await queue.click();
+      await expect(queue).toHaveAttribute("aria-selected", "true");
+    }
     // The heading names Possibilities only when STRELVA_SYSTEMS_RELEASE is on for the app under test.
     await expect(agencyPage.getByRole("heading", { name: process.env.STRELVA_SYSTEMS_RELEASE === "1" ? "Website possibilities for clients" : "Assigned website drafts", exact: true })).toBeVisible();
     await expect(agencyPage.getByRole("link", { name: "Open website", exact: true })).toBeVisible();
@@ -236,6 +242,11 @@ test("customer grants one managed website draft, agency prepares it, and custome
     await customerPage.screenshot({ path: testInfo.outputPath("customer-website-grant-desktop.png"), fullPage: true });
 
     await agencyPage.goto(`/workspace?workspaceId=${agencyId}`, { waitUntil: "domcontentloaded" });
+    if (process.env.STRELVA_SYSTEMS_RELEASE === "1") {
+      const queue = agencyPage.getByRole("tab", { name: "Queue", exact: true });
+      await queue.click();
+      await expect(queue).toHaveAttribute("aria-selected", "true");
+    }
     await agencyPage.getByRole("link", { name: "Open website", exact: true }).click();
     await expect(agencyPage.getByRole("heading", { name: "Prepare a website update", exact: true })).toBeVisible();
     const preparedHeadline = `Prepared by the named agency ${randomUUID().slice(0, 8)}`;

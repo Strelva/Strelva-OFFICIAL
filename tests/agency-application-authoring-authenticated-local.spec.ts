@@ -243,6 +243,12 @@ test("a named agency operator revises one assigned application and returns it fo
     agencyPage.setDefaultTimeout(20_000);
     await agencyPage.setViewportSize({ width: 390, height: 844 });
     await agencyPage.goto(`/workspace?workspaceId=${agencyId}`, { waitUntil: "domcontentloaded" });
+    // The released agency Home opens Clients; assigned drafts live in Queue.
+    if (process.env.STRELVA_SYSTEMS_RELEASE === "1") {
+      const queue = agencyPage.getByRole("tab", { name: "Queue", exact: true });
+      await queue.click();
+      await expect(queue).toHaveAttribute("aria-selected", "true");
+    }
     // Systems wording only when STRELVA_SYSTEMS_RELEASE is on for the app under test.
     await expect(agencyPage.getByRole("heading", { name: process.env.STRELVA_SYSTEMS_RELEASE === "1" ? "Internal-tool drafts for clients" : "Assigned application drafts", exact: true })).toBeVisible();
     await agencyPage.getByRole("link", { name: "Open draft", exact: true }).click();
