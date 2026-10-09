@@ -1780,9 +1780,9 @@
         },
         {
           "file": "20261022130000_tenant_newsletter_teardown_hold.sql",
-          "sha256": "bf0c96fe9643fe221e0e21e362d7d2f1d480d0e96b60ec1db082c6947ad5703b",
+          "sha256": "dd88c6683e0b8c5a5c906afd918307ab26e4ebdee30e15119077a8f34d928696",
           "rollback": "rollback-20261022130000_tenant_newsletter_teardown_hold.sql",
-          "rollbackSha256": "cfbe93a6a9639c677d322bc31b9fa1aa4e318131cd208581483a15180c92ce5f",
+          "rollbackSha256": "b3302fe9cb4ae6071ba87eb19f83606b79498c9199f6ea02c817b948a0f83f1b",
           "rollbackStatus": "Prepared exact authority/body/ACL baseline and successor drift guards; native refusal and inverse/reapply qualification pending"
         }
       ]
