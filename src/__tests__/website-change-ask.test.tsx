@@ -65,3 +65,14 @@ it("allows correction after an initial route validation refusal with a fresh key
   const first = JSON.parse(String(request.mock.calls[0]?.[1]?.body)), next = JSON.parse(String(request.mock.calls[1]?.[1]?.body));
   expect(next.request).toBe("Corrected words"); expect(next.idempotencyKey).not.toBe(first.idempotencyKey); expect(filed).toHaveBeenCalledWith(requestId);
 });
+
+it("cannot discard an attempt by closing before the sending render commits", async () => {
+  let resolve!: (response: Response) => void;
+  const request = vi.fn((_url: RequestInfo | URL, _init?: RequestInit) => new Promise<Response>(done => { resolve = done; }));
+  const { container, closed } = mount(request); write(container, "Change the opening hours.");
+  const close = Array.from(container.querySelectorAll("button")).find(item => item.textContent === "Close")!;
+  act(() => { container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); close.click(); });
+  expect(closed).not.toHaveBeenCalled(); expect(request).toHaveBeenCalledOnce();
+  await act(async () => resolve(Response.json({ error: "Validation refused." }, { status: 400 })));
+  act(() => close.click()); expect(closed).toHaveBeenCalledOnce();
+});

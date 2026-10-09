@@ -81,7 +81,7 @@ export function WebsiteChangeAsk({ workspaceId, systemId, siteName, onFiled, onC
         disabled={sending || unconfirmed} onChange={event => { if (!inFlight.current && !attempt.current) setWords(event.target.value); }} placeholder="New office hours in the footer, starting Monday." />
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" size="sm" disabled={sending || (!unconfirmed && words.trim().length < 3)}>{sending ? (unconfirmed ? "Checking…" : "Filing…") : unconfirmed ? "Check this request" : "File the request"}</Button>
-        <Button type="button" size="sm" variant="ghost" disabled={sending || unconfirmed} onClick={onClose}>Close</Button>
+        <Button type="button" size="sm" variant="ghost" disabled={sending || unconfirmed} onClick={() => { if (!inFlight.current && !attempt.current) onClose(); }}>Close</Button>
       </div>
       {notice ? <p role={notice.tone} className="text-sm">{notice.text}</p> : null}
     </form>
