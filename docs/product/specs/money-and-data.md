@@ -1,10 +1,16 @@
 # Money and the client's data
 
+> **Changed by ADR 0013 / decision 2.** The business or its agency is the payer, chosen
+> per business. Owner-only payment email (§3.7), payer identity and permissions (§4–5), and
+> operator conversion/export/exit as client service (§2, §3.19, §4) are superseded
+> requirements with engineering follow-up. Platform billing support remains logged platform
+> work; it does not grant client-service powers.
+
 Status: implementation prepared locally through wave 6 round 5 on
 `w6/agency-operator` (2026-10-10 migration series). Nothing in this work
 applies production migrations, changes Stripe, sends live email or flips a
 production flag. Code and local tests establish implementation; production
-conversion, provider delivery and seven days of parity remain rollout proof.
+conversion, agency delivery and seven days of parity remain rollout proof.
 
 | Launch requirement | Implemented path | Local evidence / remaining proof |
 | --- | --- | --- |
@@ -21,7 +27,7 @@ conversion, provider delivery and seven days of parity remain rollout proof.
 
 The report integration requires both `STRELVA_WORKSPACE_RELEASE=1` and the
 new `STRELVA_BUSINESS_OUTCOME_REPORTS=1`; the latter is off by default. It
-respects the existing global/customer email gates and every linked site's
+respects the existing global/business email gates and every linked site's
 email override. Flags off retain the existing report path. An armed grouping
 or receipt outage never falls back around the durable delivery reservation.
 Rollback retains private monthly delivery receipts, and reapply refuses
@@ -98,7 +104,7 @@ sites stay up and every lead is kept while it's sorted out.
 
 **gldf leaves with everything.** Great Lakes Dried Fruits is grandfathered,
 runs a store with rewards, takes leads, and holds a Google connection. A year
-from now the owner emails "we're moving to another provider, send me our
+from now the owner emails "we're moving to another agency, send me our
 stuff." The operator starts the export. The owner gets a link by email to one
 download: the business record, the website content and assets, every lead
 ever received (not just the last 90 days), every order, every rewards member
@@ -115,7 +121,9 @@ it is counted or linked, and nothing is claimed that the data can't join.
 
 - **Business** owns the money relationship and the data. Billing hangs off the
   business workspace, not a site or a System. One business can pay for many
-  Systems and Versions (Twin Trees). The payer is the **owner** role.
+  Systems and Versions (Twin Trees). The **payer is chosen per business**:
+  the business pays directly, or its agency pays and resells at its own price.
+  Payer and owner are separate; payment grants no operating authority.
 - **Systems** produce records (leads, orders, bookings, members). Those
   records belong to the business and are stored in Postgres keyed so they
   survive renames, rebuilds and conversion. A System pausing never deletes
@@ -127,9 +135,11 @@ it is counted or linked, and nothing is claimed that the data can't join.
 - **Running** carries the data promises: "Every inquiry is kept", "Every
   inquiry is answered within a day". The outcome loop is how Running proves
   them.
-- **Needs you** carries only money decisions that are the owner's: a failed
-  payment, a payer change, an exit. Strelva handled carries receipts:
-  "Strelva sent your export", "Strelva recorded your payment".
+- **Needs you** carries decisions for the authorized person: money goes to
+  the selected payer; owner approval of a payer change and exit remains
+  explicit. Strelva handled (label open, D-label) carries actor-named receipts:
+  "Acme Marketing sent your export" with "Runs on Strelva", or
+  "Strelva recorded your payment" when the platform acted.
 - **Strelva operator** does conversions, billing setup and exports for owners
   who never sign in. The operator is `admin` on the workspace, never `owner`.
 
@@ -218,7 +228,8 @@ it is counted or linked, and nothing is claimed that the data can't join.
     `/api/v1/leads/[tenant]` (additive). The starter form in
     `custom-repo-starter/` sends them first; client repos adopt them only on
     their next change.
-23. Every inquiry records the time of its first reply, by owner or Strelva,
+23. Every inquiry records the time and actor of its first reply, by owner, agency
+    or platform,
     in Postgres.
 24. Bookings link to a lead where one exists: native bookings already do
     (`public_website_bookings.inquiry_id`); legacy `bookings` and Calendly
@@ -239,10 +250,16 @@ not the same as comped: `subscription.ts` treats a grandfathered tenant as
 
 **Who can do what**
 
+**Changed by ADR 0013 / decision 2:** money actions and payment notices must
+follow the chosen business or agency payer. The owner-only payment matrix and
+recipient binding below are historical implementation; engineering must
+reconcile payer permissions, transitions and delivery. Export/exit requests
+made as client service must use the ordinary agency path, not platform powers.
+
 | Action | Owner | Member | Strelva operator |
 | --- | --- | --- | --- |
 | See billing state and amount | Yes | No | Yes |
-| Pay, update card (Stripe portal) | Yes, by emailed link or signed in | No | No |
+| Pay, update card (Stripe portal) | When business is payer, by emailed link or signed in | No | No |
 | Set or change billing state | No | No | Yes, with receipt; money changes need Jacob's yes |
 | Propose payer change | Yes (`workspace_payer_transitions`) | No | No |
 | Request export | Yes, in app or by email | No | Starts it for the owner |
@@ -279,8 +296,9 @@ not the same as comped: `subscription.ts` treats a grandfathered tenant as
 `job_economics.payer_id` reference `users(id)`. An owner who never signed in
 has no user row, so a converted client can't hold an allowance or a job until
 someone signs in. Billing state therefore must not depend on a payer user. It
-names the payer by the business record's owner recipient; the user link is
-added if and when they sign in.
+must identify the selected business or agency payer without requiring an
+owner user row. The earlier owner-recipient binding is superseded by decision 2;
+the organization-payer mapping remains an engineering follow-up.
 
 **Recommended billing home.** Activate the dormant `accounts` tables and add
 `accounts.workspace_id` (unique), `billing_type`, `billing_sources jsonb` and a

@@ -4,7 +4,7 @@
 and a business workspace where connected sites are enabled.
 
 The current screen requires a confirmed-email business owner or admin. Connecting
-through ordinary agency provider access depends on [NOT BUILT — tracked in #255].
+through ordinary agency access depends on [NOT BUILT — tracked in #255].
 
 1. On the business Home, select **Bring it into Strelva** under **Already have a
    website?**, or **Connect it** under **Have another website?**.

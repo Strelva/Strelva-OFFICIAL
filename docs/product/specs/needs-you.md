@@ -1,5 +1,13 @@
 # Needs you and Strelva handled
 
+> **Changed by ADR 0013 / decisions 1–2.** Agency work names the serving agency and
+> carries "Runs on Strelva"; automatic platform work names Strelva. The platform sets fixed
+> safety rules; any agency uses the ordinary agency path for client review and service.
+> Operator-set agency defaults/escalation, client chasing and the converted-admin fallback
+> below are older implementation, needing engineering follow-up (§3.3/12/16, §4, §6–7). Do
+> not use platform authority for client service. "Strelva handled" stays label open
+> (D-label).
+
 Status: draft spec, 2026-10-06; working default per the product model. Built
 and proven **locally** on branch `build/needs-you` (2026-10-06), behind
 `STRELVA_NEEDS_YOU_RELEASE` (off). Nothing is in production and client email
@@ -18,7 +26,7 @@ stays gated.
   replay (`scripts/needs-you-parity.ts`); the `change_verify_failed` and
   `sendUpdateLiveEmail` fixes.
 - **Built locally on `w2/decisions-wiring` (2026-10-06), same flag:**
-  adapters for website documents (approve, launch), provider delivery,
+  adapters for website documents (approve, launch), agency delivery,
   standing responsibilities, finite responsibilities, agency draft grants,
   app and custom-app releases, work plan outputs, money (allowance cap, job
   budget, payer change) and Make real and Version releases, each resolving
@@ -85,16 +93,17 @@ acts.
 The Mooney Firm, on an ordinary week. The details are illustrative; which of
 these the firm has connected today is not checked.
 
-- **Monday, 9:02.** A client leaves a five-star Google review. Strelva drafts
+- **Monday, 9:02.** An end customer leaves a five-star Google review. Acme Marketing drafts
   a reply in the firm's voice. The firm's review replies are set to "post
   after 12 hours unless I stop it". No email goes out for this. The reply
-  posts Monday night and shows in **Strelva handled**: "Strelva replied to
-  Dana's review."
-- **Monday, 14:10.** The owner emails Strelva that Friday hours change to 9–3.
-  An operator enters it in the business record as an owner-stated fact.
-  Strelva updates attymooney.com and the Google Business hours. No question is
+  posts Monday night and shows in **Strelva handled**: "Acme Marketing replied to
+  Dana's review", with "Runs on Strelva". If automatic platform behavior did
+  the work, the receipt instead names Strelva.
+- **Monday, 14:10.** The owner emails Acme Marketing that Friday hours change to 9–3.
+  An agency team member enters it in the business record as an owner-stated fact.
+  Acme Marketing updates attymooney.com and the Google Business hours. No question is
   asked, because the owner said it. Two receipts appear, each with Undo.
-- **Tuesday, 07:00.** One email: "Strelva needs 2 decisions." First, a reply
+- **Tuesday, 07:00.** One email: "Acme Marketing needs 2 decisions", with "Runs on Strelva". First, a reply
   to a new inquiry that quotes a consult price. Quoting a price is always the
   owner's call. Second, a consult-booking page that is ready to go live on the
   site. Each has **Approve** and **Not yet**. The owner taps Approve on the
@@ -103,7 +112,7 @@ these the firm has connected today is not checked.
 - **Friday, 07:00.** A reminder covers the booking page only. On day 14 it
   lapses. Nothing goes live. The operator queue shows it as the owner's call,
   unanswered.
-- **The monthly report** lists what Strelva handled, with links that undo
+- **The monthly report** lists the actor-named receipts from Strelva handled, with links that undo
   what can still be undone.
 
 The owner never signed in. Every decision that was theirs reached them, and
@@ -115,19 +124,21 @@ nothing that wasn't theirs did.
   belong to the owner, across every **System**, **Request** and **Running**
   item. Each item names the System it touches ("attymooney.com") and what the
   owner is deciding.
-- **Strelva handled** is the receipt view. Each entry is something Strelva
-  did on a System, said in a sentence with Strelva as the subject.
-- **The policy** is set per business, per System, per kind of change. Strelva
-  (as the agency) sets it. The owner can make it stricter. Fixed rules in code
+- **Strelva handled** is the receipt view; **label open (D-label)**, kept
+  behind one label constant. Each entry names whoever acted on the System.
+  An agency uses its display name and "Runs on Strelva" credit; Strelva names
+  the actor only for platform behavior or as its own agency's display name.
+- **The policy** is set per business, per System, per kind of change. The serving
+  agency sets it within the platform's fixed rules. The owner can make it stricter. Fixed rules in code
   hold no matter what either of them sets.
 - **Connections** never grant authority (ADR 0011 rule 2). An *acts*
-  Connection to Google means Strelva can post. The policy decides whether it
-  may post without asking.
+  Connection to Google describes the System's ability to post. Separate
+  authority and policy determine whether it may post, and whether to ask.
 - **Make real** (a Possibility) and **releasing a Version** are changes like
   any other. Each part goes through the policy. If any part routes to the
   owner, the whole Make real waits for the owner.
 - A **Running** item is itself a standing approval. When the owner approves
-  "Strelva keeps your Google hours matching your business record", each later
+  "Your Google hours match your business record", each later
   run is handled and reported, not asked again. This is the pattern
   `standing_responsibilities` already enforces in Postgres: one approved
   policy admits many jobs.
@@ -145,11 +156,12 @@ nothing that wasn't theirs did.
    returns the route and the rule that produced it.
 2. **Fixed rules come first.** Some routes are fixed and no setting moves them
    (section 4). The evaluator applies them before any business setting.
-3. **Strelva sets the defaults; the owner can only make them stricter.**
+3. **The serving agency sets defaults within fixed platform rules; the owner
+   can only make them stricter.**
    Allowed: `handle` → `handle_after_notice` → `strelva_reviews` →
    `owner_decides`. An owner can move a kind to the right on one System or on
-   all of them. An owner can move it back left only as far as Strelva's
-   default.
+   all of them. An owner can move it back left only as far as the agency's
+   default within the fixed platform rules.
 4. **Origin counts.** A change the owner asked for, and whose content is
    exactly what they asked for, is handled and reported. "Change Friday hours
    to 9–3" is an example. If Strelva had to interpret the request, the result
@@ -181,17 +193,17 @@ nothing that wasn't theirs did.
    a business's pending changes form one `business_facts` item
    (`fact.inferred`, `owner_decides`, admins never decide).
    `confirm_business_facts` applies it only for the owner's session or a
-   signed link to the trusted owner address (rule 8). A recipient a provider
+   signed link to the trusted owner address (rule 8). A recipient an agency
    wrote is itself pending and never approves. Delivery and the link claim
    resolve that same trusted owner (`resolve_business_owner_recipient`), and the item
-   is never emailed to an address only a provider wrote. The owner approves
+   is never emailed to an address only an agency wrote. The owner approves
    only where every value is shown in full (the signed-link confirm page and
    the Needs you card, from `SourceAdapter.review` bound to the item's
    revision); the 1,000-character item detail is whole lines plus a count,
    never a cut value, and a pending recipient change leads it. The hourly
    chase also finds businesses with pending facts and no tenant or bookings.
    The migration rebuilds the confirmed copy
-   from the owner's own history, so an earlier provider overwrite or deletion
+   from the owner's own history, so an earlier agency overwrite or deletion
    stays pending. Confirmed contact facts reach a native website as after the
    owner's own save: signed in, the owner's contact review is prepared at once;
    by link, Strelva's review queue gets it and the decision reads
@@ -222,7 +234,7 @@ nothing that wasn't theirs did.
    (`owner_decision_link_bindings`, checked in `claim_owner_decision`). With
    no trusted address nothing is sent; the item is recorded as not sent
    (`no_trusted_owner_recipient`) and the operator queue shows it.
-   - **Urgent kinds** go at once, one email per item. Urgent means a customer
+   - **Urgent kinds** go at once, one email per item. Urgent means an end customer
      is waiting: an inquiry reply, a review reply in `approve` mode.
    - **Everything else** goes in one morning email per business that has
      open items, at 07:00 in the business's timezone.
@@ -259,12 +271,12 @@ nothing that wasn't theirs did.
     today's `escalateEventToOwner`, generalized. An operator can never decide
     an `owner_decides` item.
 
-    An active platform operator or member of the business's provider agency
+    An active platform operator or member of the business's agency
     cannot use a direct admin seat to decide an owner item, even if the item
     permits ordinary admins. A verified owner who is also an operator still
     decides through their owner session. The additive
     `20261017120000_owner_decision_operator_refusal` restores this refusal after
-    neutral provider predicates, preserving recipient trust and owner-link
+    neutral agency predicates, preserving recipient trust and owner-link
     execution effects. Native SQL tests cover both refusal branches, ordinary
     admins, revoked operators and the real-owner exception. This is prepared
     integration code; production execution remains separate.
@@ -274,7 +286,9 @@ nothing that wasn't theirs did.
     email listed, plus anything newer. If Needs you is empty, the section is
     gone.
 14. **Strelva handled is one receipt feed.** Each receipt has the System, a
-    sentence ("Strelva updated your Friday hours on Google"), the time, what
+    sentence naming the actor ("Acme Marketing updated your Friday hours on
+    Google", with "Runs on Strelva", or "Strelva updated your Friday hours
+    on Google" for automatic platform behavior), the time, what
     changed, outside-write evidence (provider accepted, read-back verified or
     not), and an undo state.
     - Undo states: `undo` (one tap), `undo_needs_review` (undo makes a
@@ -290,7 +304,7 @@ nothing that wasn't theirs did.
       the owner.
     - Undoing an owner-approved change, or a change some later change
       depends on, becomes `undo_needs_review`.
-16. **Policy changes leave receipts.** Strelva's default, the owner's
+16. **Policy changes leave receipts.** The agency's default, the owner's
     stricter setting, an earned-trust promotion and an inquiry `promote` each
     write a receipt with the old and new route. Only routes in force when the
     change was proposed apply to it.
@@ -299,7 +313,7 @@ nothing that wasn't theirs did.
 
 ### Change kinds and their routes
 
-"Default" is Strelva's starting setting for a managed business. "Floor" is
+"Default" is the serving agency's starting setting for a managed business. "Floor" is
 the least strict route allowed. Only Jacob can change a floor, in code.
 
 | Change kind | Example | Default | Floor |
@@ -307,7 +321,7 @@ the least strict route allowed. Only Jacob can change a floor, in code.
 | `fact.owner_stated` | Owner gave new hours; push to site and Google | handle | handle |
 | `fact.inferred` | Strelva read a price off an old page | owner_decides | owner_decides |
 | `copy.routine` | Fix a typo, refresh event text on a low-risk section | strelva_reviews | handle |
-| `copy.marketing` | New hero or services copy Strelva wrote | strelva_reviews | strelva_reviews |
+| `copy.marketing` | New hero or services copy the agency wrote | strelva_reviews | strelva_reviews |
 | `structure` | Theme, navigation, footer, new page | owner_decides (as a Request) | owner_decides |
 | `google.post` / `google.photo` | Google Business post or photo | strelva_reviews | handle_after_notice |
 | `review.reply` | Reply to a 4–5 star review | handle_after_notice (12 h) | handle_after_notice |
@@ -321,7 +335,7 @@ the least strict route allowed. Only Jacob can change a floor, in code.
 | `running.approve` | Approve or widen a standing responsibility | owner_decides | owner_decides |
 | `request.scope` | Agree a Request's scope and deadline, accept a result | owner_decides | owner_decides |
 | `access.grant` | Connect Google, grant an agency draft access, invite | owner_decides (sign-in) | owner_decides |
-| `money` | Accept a job, allowance cap, payer change | owner_decides (sign-in) | owner_decides |
+| `money` | Accept a job, allowance cap, payer change | Historical owner_decides (sign-in); payer routing needs decision 2 follow-up | owner_decides |
 | `exit` | Leave, export | owner only (sign-in), owner-started | owner_decides |
 | `health.fix` | Restart, re-verify, retry a failed check | handle | handle |
 | `health.owner_action` | Reconnect Google, fix DNS at the registrar | owner action (not a decision) | — |
@@ -340,7 +354,7 @@ per-tenant setting (section 9).
 - `withdrawn`: Strelva or an operator pulled it.
 - `superseded`: a newer proposal replaced it, and any link for it refuses.
 - `failed` leaves the source item pending, as `resolveEventAction` already
-  does. The owner sees "Strelva couldn't finish this. We're on it." The item
+  does. The owner sees "{actor display name} couldn't finish this. We're on it." The item
   moves to the operator queue.
 - Accepted-but-unverified is never retried (AGENTS.md "Outside writes").
 
@@ -355,10 +369,10 @@ an unanswered one.
 | Actor | Can |
 | --- | --- |
 | Owner | Approve or decline any `owner_decides` item; make any route stricter; undo any `undo` receipt |
-| Admin member | Decide items whose lifecycle already allows owner or admin (website approve, provider delivery, service commitments, standing approve). Never the owner-only kinds below |
+| Admin member | Decide items whose lifecycle already allows owner or admin (website approve, agency delivery, service commitments, standing approve). Never the owner-only kinds below |
 | Member | See Needs you; decide nothing unless the lifecycle names them (finite responsibility creator, inquiry sponsor) |
-| Agency (Strelva today) | Set defaults; decide `strelva_reviews` items; escalate; never decide `owner_decides` |
-| Strelva operator | Same as agency; also sees every business's open owner items, read-only |
+| Agency (including Strelva's, with no extra powers) | Set defaults; decide `strelva_reviews` items; escalate; never decide `owner_decides` |
+| Platform operator | Logged platform support, incidents and release only; never client service or agency authority |
 
 **Owner-only kinds** are the ones the database already restricts to role
 `owner`:
@@ -501,7 +515,7 @@ policy, the item, delivery and expiry.
 | Finite responsibility approve | `work-execution/engine.ts` | `running.approve` / `request.scope` | owner_decides (today: creator) |
 | Standing responsibility approve, admit | `standing.ts` | `running.approve` | owner_decides once, then handle per run |
 | Operational assignment offer | `operations/assignments.ts` | `access.grant` | owner (sign-in) |
-| Provider delivery decide | `offerings/provider-delivery.ts` | `request.scope` | owner_decides |
+| Agency delivery decide | `offerings/provider-delivery.ts` | `request.scope` | owner_decides |
 | Service delivery agree, accept | `service-requests` | `request.scope` | owner_decides |
 | Website approve, launch, undo | `rebuild-service.ts`, website RPCs | `system.go_live` / `system.change_live` | owner_decides |
 | Agency website or app draft grant | `agency-website-draft.ts`, `agency-draft-access.ts` | `access.grant` | owner (sign-in) |
@@ -551,7 +565,7 @@ yes to email.
 | No trusted owner address | Operator: "Not sent: no trusted owner address" | An address an operator adds waits; the owner signs in to set it |
 | Link expired or item changed | "This changed since we emailed you" / "This link expired", with Open | Owner opens the latest in the workspace or the next morning email |
 | Owner no longer owner | "This link isn't for this account" | Nothing acts |
-| Resolve fails at the provider | "Strelva couldn't finish this. We're on it." | Item stays pending (source rule); operator queue P1/P2 |
+| Resolve fails at the provider | "{actor display name} couldn't finish this. We're on it." | Item stays pending (source rule); operator queue P1/P2 |
 | Provider accepted, read-back failed | Receipt says "Done, not yet confirmed" | `verify.failed` to operator; never retried |
 | Scanner prefetches link | Nothing | GET never mutates |
 | Make real partly lands | Item-by-item result | Landed parts get receipts; the rest stays open |
@@ -559,7 +573,7 @@ yes to email.
 **Undo, honestly, by kind**
 
 - Website content (tenant): today undo drafts a revert that needs review
-  (`undo_last_change`, version restore to draft). This spec makes undo of a
+  (`undo_last_change`, History restore to draft). This spec makes undo of a
   Strelva-handled change one tap, under the rule in behavior 15.
 - Website v2 launch: undo saves an earlier revision as a new candidate that
   needs owner approval. It stays `undo_needs_review`.

@@ -15,7 +15,7 @@ This button requests a limited snapshot. Its parsed contract includes supported
 saved results, application releases and records, onboarding cases, economics
 receipts and public website booking grants/receipts. It excludes managed-site
 content, application source/artifacts, calendar connection data, inquiry/follow-up
-and offering/provider records, and credentials. Uploads are references, not
+and offering/agency records, and credentials. Uploads are references, not
 embedded files. The SQL snapshot has a 2 MB limit before booking enrichment.
 
 Known blocker: the latest website-document SQL adds fields that the current
@@ -30,9 +30,9 @@ or website backup.
 
 ## Agency request at 1.0
 
-1. Request the client's export through your provider seat. The export goes to
+1. Request the client's export through your agency seat. The export goes to
    the owner; your agency gets a receipt. [NOT BUILT — tracked in #295]
-2. When your provider relationship ends, take the handoff export of your own
+2. When your agency relationship ends, take the handoff export of your own
    Package definitions, without client data. [NOT BUILT — tracked in #295]
 
 Exporting does not stop service, cancel billing, delete work or transfer ownership.

@@ -8,7 +8,7 @@
    role, and creates an invitation. Share the private link; this action does not
    send email. The person accepts using the invited, confirmed email.
 2. Open that person's **Client assignments** and choose their clients. Only
-   clients with an active provider seat appear. Use **Assign several people or
+   clients with an active agency seat appear. Use **Assign several people or
    clients** to add or remove up to 200 assignments in one transaction.
 3. Team lists each person's assigned clients. Remove a client assignment when
    their work ends. **Remove staff** asks for confirmation and ends all their
@@ -17,8 +17,8 @@
 
 Owners and admins can change Member/Admin agency roles. Owner memberships and
 your own membership are protected in this surface. Agency roles do not select
-different permissions per client: assigned staff use the existing provider-seat
-operator role. Direct customer membership and non-agency work grants retain
+different permissions per client: assigned staff use the existing agency-seat
+operating role. Direct business membership and non-agency work grants retain
 their own authority. Do not grant business-owner access to staff as a workaround.
 
 This is locally tested implementation on `a1/agency-team`, behind the workspace

@@ -1,5 +1,13 @@
 # Strelva Reborn
 
+> **Changed by ADR 0013 / decisions 1–2.** The operator conversion/admin membership (§3),
+> client-service `/admin` queue (§5), agency access via that membership, and client
+> onboarding/invitations (§6) below are older implementation. Engineering must reconcile
+> them with the ordinary agency path: Strelva's agency has no extra powers, and platform
+> operators never serve or convert clients. Payer is chosen per business (business or
+> agency), separate from owner. Actor-named receipts carry "Runs on Strelva" for agency
+> work; "Strelva handled" stays label open (D-label).
+
 Created: 2026-10-02
 Changed: 2026-10-07. Reborn is now the one build to `1.0.0`, not a ladder of `0.x` releases.
 Status: building. Nothing in this release is deployed.
@@ -15,7 +23,7 @@ by area, with a spec for each. [Strelva 1.0.0](./strelva-1.0.0.md) is the
 feature list. This page is the build: what's done, what's left, in what order,
 and what needs Jacob's yes.
 
-The Sept 30 release (internal name `strelvav2`, version `0.2.0`) put the
+The Sept 30 release (internal name `strelvav2`, release `0.2.0`) put the
 workspace machinery in production: memberships, grants, saved work, approvals,
 exits, exports, allowances. It moved no client. The
 [strelvav2 page](./strelvav2.md) is now history.
@@ -30,7 +38,7 @@ Connections, Possibilities, Versions, Make real) is in scope, not deferred.
 | Release | What it is | When |
 | --- | --- | --- |
 | `0.2.1` | Every client lead also kept in Postgres; all 9 client repos checked | Now, alone, on Jacob's yes. Leads expire from Redis every day ([PR #213](https://github.com/Strelva/Strelva-OFFICIAL/pull/213)) |
-| `1.0.0` | Everything below and in [Strelva 1.0.0](./strelva-1.0.0.md) | When every line is true in production and Jacob says Strelva would stand behind it for any new customer |
+| `1.0.0` | Everything below and in [Strelva 1.0.0](./strelva-1.0.0.md) | When every line is true in production and Jacob says Strelva would stand behind it for any new agency or business |
 
 Building together does not mean deploying everything at once. Production steps
 still go one at a time behind their own flags and Jacob's yes: migrations,
@@ -290,7 +298,7 @@ Proof: per-client conversion receipt; storefront responses unchanged.
 
 **Who runs a conversion (decided Oct 2).** A named Strelva operator: a
 verified user with an active `super_admins` row. They become the workspace's
-`created_by` and an `admin` member, not `owner`; owner carries payer, exit,
+`created_by` and an `admin` member, not `owner`; owner carries exit,
 launch and publish authority that belongs to the client once invited in
 section 6. No client user, invite or email is involved. The receipt records
 billing type and multi-site accounts for review only; Stripe and allowances
@@ -518,13 +526,13 @@ runs beside it from step 2.
 
 ## Preview and Stable
 
-Strelva has two channels. Customers use **Strelva**, the Stable channel,
+Strelva has two channels. Businesses and agencies use **Strelva**, the Stable channel,
 which is what `main` and production run. Jacob and selected testers use
 **Strelva Preview**, built from Reborn work before it ships. Nightly is when
 Preview gets built, not a separate channel.
 
 All Reborn work lands on the `reborn` branch through pull requests. `main`
-stays Stable; each Reborn version merges into `main` when it is cut. A step that
+stays Stable; each Reborn release merges into `main` when it is cut. A step that
 must not wait for the rest (like `0.2.1`) is built from `main` directly.
 
 - **Nightly build.** [`preview-nightly.yml`](../../.github/workflows/preview-nightly.yml)
@@ -582,8 +590,14 @@ Every production step also passes the
 
 ## Not in Strelva Reborn
 
-New pricing or plan tiers. Partner agencies (Strelva is the only agency in
-this release). Home Finder. Enterprise customers. Self-serve website building
+**Changed by ADR 0012 and ADR 0013 / decision 2:** the agency exclusion
+below is an older scope record. Agencies, including Strelva's, are in 1.0.0
+on equal terms. ADR 0012 also supersedes the older ladder exclusions; see the
+October 7 scope in [Strelva 1.0.0](./strelva-1.0.0.md). Engineering readiness
+remains separate from selected scope.
+
+Earlier exclusions: new pricing or plan tiers. Partner agencies (Strelva is the only agency in
+this release). Home Finder. Enterprise businesses. Self-serve website building
 for owners. `/api/v2`. No `/api/v1` change except additive.
 (Possibilities, Make real and Versions moved into Reborn on October 6.)
 

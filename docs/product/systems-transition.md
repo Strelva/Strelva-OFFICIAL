@@ -1,11 +1,20 @@
 # Systems transition map
 
+> **Changed by ADR 0013 / decisions 1–2 and 4–8.** This dated inventory retains
+> storage/API names. Provider now means an outside system; Agency means a person or agency
+> serving a business. Receipts name whoever acted, with agency display name and "Runs on
+> Strelva" credit. "Strelva handled" stays label open (D-label). Client service must use
+> ordinary agency authority; reconcile any operator/admin conversion or delivery paths
+> before treating them as the selected model. Past restorable states are History; research
+> responses are Proposals; a stored credential is an account connection; text before work
+> exists is an ask.
+
 Created: 2026-10-04
-Kind: transition inventory. It maps today's code onto the selected customer
+Kind: transition inventory. It maps today's code onto the selected on-screen
 model. It is not an ADR, a release plan or production evidence.
 Base: branch `reborn-business-record` at `276bb09a`.
 
-**Every piece of Strelva today lands in one of four customer nouns, or
+**Every piece of Strelva today lands in one of four on-screen nouns, or
 underneath them.** A business has **Systems** (the website, the booking
 page, the intake form, the staff app). Each System has **Connections** (it
 reads the business record, appears on the website, acts through Google).
@@ -55,7 +64,7 @@ Each row gives:
   - `release/revision` is the temporal history axis (`RULE_CONTEXT_VERSION_IDENTITY`
     keeps it separate from Versions).
   - `supporting` means records, grants, operations, receipts or money, which
-    stay underneath and are never a customer noun.
+    stay underneath and are never a on-screen noun.
   - `health` is the operational health and pause state that
     `RULE_SYSTEM_PAUSE_HEALTH` keeps separate from Draft, Live and Paused.
 - **Risk:** risk to the live clients on the tenant model if the change is
@@ -79,11 +88,11 @@ this branch.
 | System | `saved_product_work` (`id`, `workspace_id`, `product_id`, `resource_kind`, `source_work_id`) in `supabase/migrations/20260905190000_release_one_workspaces.sql`; `tenants.stable_id` for live sites | No row says "this is a System". Identity is per product: `website_work_id`, `work_id` and tenant slug. No shared lifecycle. |
 | Lifecycle | `InquiryCapabilityStatus = draft \| live_unverified \| live \| paused \| failed` (`src/products/inquiries/contracts.ts`) is the closest match to Draft/Live/Paused with health beside it | Each product has its own states: application `draft/installed/retired`, custom app `draft/released/retired`, website `building/review_ready/approved/published/failed`, schedule `active/paused`. |
 | Connection (System to System or resource) | `work-context` source grants (`read` or `use_in_work`, pinned to the source revision, stale on change) in `src/platform/work-context/service.ts`; `public_website_booking_grants` (a booking appearing on a website); `InquiryConnectionView.canSee/canDo` (`src/products/inquiries/connections.ts`) | No typed kind (`read/act/appear/share/depend/trigger`) and no propagation policy. |
-| Connection (external account, the old `PRIM_CONNECTION`) | Redis `connections:{tenant}:{provider}` (`src/lib/connections.ts`, `google-token.ts`); `workspace_calendar_connections`; `domain_claims`; `integration-registry.ts` status `connected/needs_reauth/sync_failed/not_configured/unknown` | Tenant Google tokens live only in Redis. Workspace and tenant connections are separate stores. |
+| Account connection (stored outside credentials, the old `PRIM_CONNECTION`) | Redis `connections:{tenant}:{provider}` (`src/lib/connections.ts`, `google-token.ts`); `workspace_calendar_connections`; `domain_claims`; `integration-registry.ts` status `connected/needs_reauth/sync_failed/not_configured/unknown` | Tenant Google tokens live only in Redis. Workspace and tenant connections are separate stores. |
 | Possibility | Website rebuild (`src/products/websites/rebuild-*.ts`, `RebuildExperience.tsx` "Before and after", "Approve this preview"); inquiry rehearsal (`REHEARSAL_CHECK_IDS`, state `rehearsing`); tracker experiments (`src/products/tracker/experiment.ts`, evidence `simulated/operator_reported/measured`); work-plan proposed apps ("Review a proposed app before anything is created") | Every one is single-System and product-specific. None pins a baseline across Systems. A proposed app plan is a suggestion, not something you can open and use, so it falls short of `PRIM_POSSIBILITY`. |
 | Make real | Website launch states `launch_started/launch_prepared/launch_confirmed/launch_failed`; `inquiry_publication_claims` (`claimed/accepted/verification_failed/failed`); governed-work `proposals → decisions → execution_attempts → outcomes`; `execute_work_plan_output` atomic receipt; standing responsibility `admit` | No grouped, multi-effect activation. Each product publishes on its own. |
 | Version (contextual) | None in code. The closest lineage mechanism is inquiry patterns: `PatternInstallationStatus = installed \| update_available \| conflicted` (`src/products/inquiries/contracts.ts`, `inquiry-pattern-updates.ts`). That is a shared origin offering an upgrade that can conflict with local changes. Offering `definition_version` is the other hint. | Must be built. Twin Trees is the real same-business case. Agency origin to two clients is the cross-business case. |
-| release/revision | `application_releases.version`, `custom_application_releases.version`, `website_documents.revision` + `website_document_heads.approved_revision`, `content_versions`, `site_snapshots`, `business_record_revisions`, offering `definition_version` (semver) | Already consistent in spirit: immutable published rows plus a head pointer. They keep the name "version" in storage, but the customer word becomes **History** or **Releases**, never Version. |
+| release/revision | `application_releases.version`, `custom_application_releases.version`, `website_documents.revision` + `website_document_heads.approved_revision`, `content_versions`, `site_snapshots`, `business_record_revisions`, offering `definition_version` (semver) | Already consistent in spirit: immutable published rows plus a head pointer. They keep the name "version" in storage, but the on-screen word becomes **History** for past restorable states; app releases are **release**, never Version. |
 
 ## Inventory: `src/platform`
 
@@ -92,14 +101,14 @@ this branch.
 | workspaces | `src/platform/workspaces/` (`workspaces`, `workspace_memberships`, `saved_product_work`, delegations, handoffs, invitations, `workspace_operations`) | supporting (the Business root); `saved_product_work` is the **System identity seed** | System registry references `saved_product_work.id` rather than copying payloads. `source_work_id` is lineage between work items, not Version lineage; do not reuse it for Versions. | Low. Workspace-only; no live client has a workspace (Reborn page, Oct 2). | B |
 | business-record | `src/platform/business-record/`, `20261002120000_business_record.sql` | supporting (the business context every System reads) | Becomes the source of `read` Connections. "Website reads hours" is a Connection from the website System to the record, not a copy. | Medium. Conversion writes facts from live tenants; unapplied in production. | B (connection), — (record) |
 | business-record `tenant_workspace_links` | same migration | supporting; anchor for the **managed-website System** of each converted client | Pick this as the one workspace-to-tenant link and have offering bindings and hosted reservations read through it (see "Missing or colliding concepts"). | High if a second link disagrees: wrong site shown for a business. | B, G (ADR) |
-| offerings | `src/platform/offerings/definitions.ts` (`private_staff_requests`, `customer_inquiry_intake`, `managed_website_changes`, all `1.0.0`), `offering_installations` (`draft/active/retired`) | supporting (commercial packaging + install record); customer noun **retired** | An installation creates or attaches a System. Its `definition_id@definition_version` is the System's origin, which is the hook for Version lineage. Stop showing "Installed offerings" and "Retired offerings". | Low. Workspace-only. | B (install → System), D (origin), E (UI) |
+| offerings | `src/platform/offerings/definitions.ts` (`private_staff_requests`, `customer_inquiry_intake`, `managed_website_changes`, all `1.0.0`), `offering_installations` (`draft/active/retired`) | supporting (commercial packaging + install record); on-screen noun **retired** | An installation creates or attaches a System. Its `definition_id@definition_version` is the System's origin, which is the hook for Version lineage. Stop showing "Installed offerings" and "Retired offerings". | Low. Workspace-only. | B (install → System), D (origin), E (UI) |
 | offerings `offering_website_bindings` | `20260915060000_offering_websites.sql` | Connection (business ↔ managed site), duplicate of the tenant link | Fold into `tenant_workspace_links` or make it a typed Connection that references the link. | Same as above. | B |
-| offerings agency drafts | `agency-website-draft*.ts`, `agency_managed_website_draft_{grants,revisions,preparations}`; `agency-draft-access.ts` | supporting (grant) + **Possibility** prepared by a provider for one System | An agency draft is a candidate change to the client's System, so it is a Possibility on that System. The grant stays a grant. It is **not** a contextual Version (see below). | Medium. Writes through to client website drafts. | C, D (reject mapping), — (grants) |
-| offerings provider delivery | `provider-delivery*.ts`, `offering_provider_deliveries` | supporting / missing concept (provider commitment) | Keep. Surfaces as "who operates this System". | Low. | G (vocabulary) |
-| capabilities | `src/platform/capabilities/` (registry, `version`, qualification) | supporting (executable action contracts) | Make-real steps call qualified capabilities by exact version. No customer noun. | None. | C (consumer) |
+| offerings agency drafts | `agency-website-draft*.ts`, `agency_managed_website_draft_{grants,revisions,preparations}`; `agency-draft-access.ts` | supporting (grant) + **Possibility** prepared by an agency for one System | An agency draft is a candidate change to the client's System, so it is a Possibility on that System. The grant stays a grant. It is **not** a contextual Version (see below). | Medium. Writes through to client website drafts. | C, D (reject mapping), — (grants) |
+| offerings agency delivery | `provider-delivery*.ts`, `offering_provider_deliveries` | supporting / missing concept (agency commitment) | Keep. Surfaces as "who operates this System". | Low. | G (vocabulary) |
+| capabilities | `src/platform/capabilities/` (registry, `version`, qualification) | supporting (executable action contracts) | Make-real steps call qualified capabilities by exact version. No on-screen noun. | None. | C (consumer) |
 | products | `src/platform/products/catalog.ts`, `executables.ts` (`websites`, `onboarding`, `applications`, `scheduling`, `investigations`, `operations`) | supporting; `executables` becomes the list of **System kinds** Strelva can make | The kind is an implementation category, not identity (`PRIM_SYSTEM`). Catalog products like `ai_visibility` and `homefinder` are not Systems. | None. | B |
 | work-context | `src/platform/work-context/` (source grants pinned to revision, facts `current/stale/conflicting`) | **Connection** (`read`/`depend` with freshness); closest existing contract to `RULE_SYSTEM_CONNECTION_CONTRACT` | Generalize from work-to-work grants to System-to-System connections; keep revision pinning and stale detection. | None. | B |
-| work-participation | `src/platform/work-participation/` (grants, contributions, `operational_assignments`) | supporting (grants); "share" Connection kind for people | `share` is access. Keep assignment as the provider path. | Low. | — |
+| work-participation | `src/platform/work-participation/` (grants, contributions, `operational_assignments`) | supporting (grants); "share" Connection kind for people | `share` is access. Keep assignment as the agency path. | Low. | — |
 | agent-access | `src/platform/agent-access/` (scoped tokens per work) | supporting (grant); a `share` Connection to an outside AI | Token scope becomes "this System, read/propose". | Low. | — |
 | work-execution | `engine.ts` (responsibility DAG, `paused`, `needs_attention`), `standing.ts` (`proposed/active/paused/revoked`) | supporting + **missing concept** (Responsibility, "What Strelva keeps running") + health/pause | Standing work attaches to a System. Pause of a System pauses its standing work and keeps receipts. | Low. Workspace-only. | F (pause), G (noun) |
 | work-economics | `src/platform/work-economics/` (jobs, allowances, payer transitions, Stripe sync) | supporting (money) | Make real preflights budgets here (`COMP_MULTI_SYSTEM_ACTIVATION` step 2). No change to Stripe. | High if touched: live Stripe. Do not touch. | C (read only) |
@@ -118,7 +127,7 @@ this branch.
 | --- | --- | --- | --- | --- | --- |
 | websites | `src/products/websites/` (44 files): `document-store.ts` (v2 documents), `rebuild-*.ts`, `site-health.ts`, `deployment.ts`, `domain-verification.ts`; `WebsiteLifecycle = draft/preview_ready/approved/launch_pending/published/failed`; rebuild `building/review_ready/approved/published/failed`; launch history `launch_*`. Publishing provisions a hosted **tenant row** (`provisionHostedWebsiteTenant`, `reserve_website_hosted_tenant`). | **System** (website). Rebuild is a **Possibility**; approve + publish is **Make real**; `website_documents.revision` is release/revision; `website_document_health` is health | Website System ID = the website `saved_product_work.id` for native sites, and the tenant `stable_id` (through the link) for live custom-repo sites. A published native site has both: a work row *and* a hosted tenant. The registry must treat them as one System, not two. When a converted client's site moves from custom repo to v2 document, it must keep the same System ID. That is the identity test in `PRIM_SYSTEM`. | High. Publishing and domains reach live hosts. Rebuild is behind `STRELVA_WEBSITE_REBUILD_RELEASE`. | B, C, F |
 | managed-presence | `src/products/managed-presence/legacy.ts` (`resolveLegacyManagedPresence`) | adapter for the managed-website System; **retire** after migration | Becomes the read adapter that turns a tenant into a website System card (name, domain, live link, status). | High: it is how existing clients appear. | B, E |
-| inquiries | `src/products/inquiries/` (37 files): `InquiryCapabilityStatus`, request states `shaped … rehearsing … live_unverified`, change receipts with undo, `connections.ts`, `inquiry_workspaces` keyed by `tenant_id` + `business_id`, Redis-authoritative tenant leads, `STRELVA_INQUIRIES_RELEASE` | **System** (customer inquiries / lead intake). Rehearsal is Possibility isolation. Publication claim is Make real. `connections.ts` is the first Connections panel. | Its status already splits lifecycle from verification. Reuse that shape for every System (F). Inquiry form appearing on a website is an `appear` Connection. Pattern updates (`installed/update_available/conflicted`) are the model for D's upgrade candidates. | High. Leads for live clients are Redis-only and expire (Reborn section 0). Do not change ingestion. | B, C, E, F |
+| inquiries | `src/products/inquiries/` (37 files): `InquiryCapabilityStatus`, request states `shaped … rehearsing … live_unverified`, change receipts with undo, `connections.ts`, `inquiry_workspaces` keyed by `tenant_id` + `business_id`, Redis-authoritative tenant leads, `STRELVA_INQUIRIES_RELEASE` | **System** (end-customer inquiries / lead intake). Rehearsal is Possibility isolation. Publication claim is Make real. `connections.ts` is the first Connections panel. | Its status already splits lifecycle from verification. Reuse that shape for every System (F). Inquiry form appearing on a website is an `appear` Connection. Pattern updates (`installed/update_available/conflicted`) are the model for D's upgrade candidates. | High. Leads for live clients are Redis-only and expire (Reborn section 0). Do not change ingestion. | B, C, E, F |
 | scheduling | `src/products/scheduling/` (schedules with `active/paused`, `public_website_booking_grants`, `public_website_bookings`, calendar connections `outlook/google`) | **System** (bookings). Booking on a website is an `appear` Connection. Calendar is an external Connection. Pause is lifecycle. | Pause keeps existing reservations and stops new ones (`RULE_SYSTEM_PAUSE_HEALTH` validation). Tenant booking (`src/lib/booking.ts`, Redis config) stays legacy until Reborn section 2. | Medium. The tenant widget is live for wellness clients. | F, B |
 | applications | `src/products/applications/` (`application_states` `draft/installed/retired`, `application_releases`, grants) | **System** (internal app) + release/revision | `installed` maps to Live and `retired` to archived. `candidate_versions` is a single-System Possibility seed. | Low. | B, C |
 | custom-applications | `src/products/custom-applications/` (`custom_application_states` `draft/released/retired`, releases, reviews, budgets) | **System** (internal app built from code) + release/revision | Same as applications. The release candidate is the Possibility, and "Review and release" is Make real. | Low. | B, C |
@@ -131,20 +140,20 @@ this branch.
 | ai-visibility, website-audit, assessment | `src/products/{ai-visibility,website-audit,assessment}/` | issued output (public result), Possibility trigger | An audit of a site is evidence that opens a rebuild Possibility. It is not itself a System. | None. | C |
 | domain-monitor | `src/products/domain-monitor/` + `src/lib/domain-monitor*.ts` | health | Feeds website System health. | Low (read only). | F |
 | home-finder | `src/products/home-finder/` | external product Connection; out of Reborn | None now. | None. | — |
-| product-learning | `src/products/product-learning/` (`STRELVA_PRODUCT_LEARNING_RELEASE`; options `integration/workflow_removal/new_service/no_build`) | supporting (internal learning). Its options are internal Possibilities for Strelva itself. | Not customer-facing. Keep it off customer vocabulary. | None. | — |
+| product-learning | `src/products/product-learning/` (`STRELVA_PRODUCT_LEARNING_RELEASE`; options `integration/workflow_removal/new_service/no_build`) | supporting (internal learning). Its research responses are internal Proposals for Strelva itself; only working alternatives that can be opened, used and compared are Possibilities. | Not business-facing. Keep it off on-screen vocabulary. | None. | — |
 
 ## Inventory: `src/experience` and workspace routes
 
 | Module / route | Evidence | Lands as | What has to change | Risk | Lane |
 | --- | --- | --- | --- | --- | --- |
-| app-frame places | `src/experience/app-frame/workspace-places.ts`, `StrelvaSidebar.tsx`: Home, Customers, Requests, Running; "Website and apps", "All apps and files"; `apps/work/products` all titled "Apps" | Home + Systems list | "Website and apps" becomes the business's Systems by name, with the website pinned first. "Running" keeps its own place because Responsibility does not fit. Customers stays a records place, not a System. | Low. Workspace-only. | E |
+| app-frame places | `src/experience/app-frame/workspace-places.ts`, `StrelvaSidebar.tsx`: Home, Customers, Requests, Running; "Website and apps", "All apps and files"; `apps/work/products` all titled "Apps" | Home + Systems list | "Website and apps" becomes the business's Systems by name, with the website pinned first. "Running" keeps its own place because Responsibility does not fit. The current places are Home, Needs you, Requests, Running and Systems, plus Business details, People & access and Help. The retired Customers URL still resolves; contacts live in the business record. | Low. Workspace-only. | E |
 | workspace | `src/experience/workspace/` (65 files): `BusinessHome`, `AgencyHome`, `OfferingDirectory`, `OfferingInstallation`, `WorkspaceTemplateLibrary`, `TrackerExperimentForm`, `WorkspaceOngoing`, `WorkspaceRequests` | System home (Home), System view (opened work), retire offering shelf | `?view=` work views become one System view whose main area is the thing. Connections, Possibilities and Versions are contextual panels (`DESIGN_SYSTEMS_PRODUCT_MODEL.presentation`). | Low. | E |
 | websites | `src/experience/websites/` (`WebsiteExperience`, `RebuildExperience`, `WebsiteConnections`, "Revision history") | System view (website), Possibility (rebuild), Connections panel | Rebuild becomes "a Possibility for your website". "Revision history" stays as history. | Medium (the rebuild flag). | E, C |
 | inquiries | `src/experience/inquiries/` (steps New, Shape, Work, Plan, Preview, Rehearsal, Receipt; "Recorded connections for this Business") | System view (inquiries) | The "Capability" and "Version" labels in `views.tsx` move to System and History. | Low. | E |
-| agency-website | `src/experience/agency-website/` ("Prepare a website update", "Saved preview") | Possibility prepared by a provider | Present as a Possibility on the client's website System. | Medium. | E, C |
+| agency-website | `src/experience/agency-website/` ("Prepare a website update", "Saved preview") | Possibility prepared by an agency | Present as a Possibility on the client's website System. | Medium. | E, C |
 | applications, custom-applications | `src/experience/{applications,custom-applications}/` ("Build candidate", "Release candidate", "Live release") | System view + release | "Release candidate" becomes a Possibility, or stays release language for builders *(decision for E/G)*. | Low. | E |
 | scheduling | `src/experience/scheduling/` ("Calendar connections") | Connections panel (external) | Show as a Connection on the booking System. | Low. | E |
-| operations | `src/experience/operations/` ("Keep something running", "Restore an earlier live version", "Allow this exact source version for seven days") | Responsibility (missing noun), history, Connection grants | "Restore an earlier live version" is release language; keep it. | Low. | E, G |
+| operations | `src/experience/operations/` ("Keep something running", "Restore an earlier live version", "Allow this exact source version for seven days") | Responsibility (missing noun), history, Connection grants | "Restore an earlier live version" becomes "Restore from History"; source-revision grants keep their internal revision reference. | Low. | E, G |
 | delivery | `src/experience/delivery/` (preview fixtures only; `WorkspaceLayout` imports the workspace's own `BusinessHome`, not this one) | deleted October 6, 2026 with `/preview/strelva/{agency,client,start}` | None. | None. | E |
 | customers | `src/experience/customers/` (Home Finder) | out of scope | None. | None. | — |
 | product, conversation | `ProductShell`, `stream.ts` | public assessment shell; chat plumbing | None. | None. | — |
@@ -173,7 +182,7 @@ Which nine are the paying clients is not settled. The
 | Governed work + AI governance | `src/lib/ai-governance.ts`; `proposals/decisions/execution_attempts/outcomes`; Redis event lifecycle | supporting (approvals, receipts); Make real reuses it | A Make real effect that touches content or Google still goes through `ai-governance.ts` and approval (AGENTS.md "Outside writes"). | High. | C (consumer) |
 | Leads | `src/lib/leads.ts` (Redis `leads:{t}`, `lead:{t}:{id}`, 90-day TTL) | records of the inquiries System (supporting) | Reborn section 0 dual-writes these to Postgres before anything else. | **Highest**. Data is being lost today. | — (Reborn) |
 | Booking | `src/lib/booking.ts`, `storage/booking-store.ts` (PG `bookings` + Redis config) | records + config of the booking System | Pause is not available on the tenant widget. F's pause applies to workspace scheduling only until Reborn section 2. | Medium. | F (scope note) |
-| Google OAuth, connections | `src/lib/{google-token,google-resources,oauth-state,connections}.ts` (Redis `connections:{t}:{provider}`, only copy), `integration-registry.ts` | external **Connection** (`PRIM_CONNECTION`) | Customer Connections read these through an adapter. The move to Postgres is Reborn section 2/4, through `crypto/secrets.ts`, without re-consent. | High. Losing a token forces re-consent. | B (adapter) |
+| Google OAuth, connections | `src/lib/{google-token,google-resources,oauth-state,connections}.ts` (Redis `connections:{t}:{provider}`, only copy), `integration-registry.ts` | **account connection** (`PRIM_CONNECTION`) | System account connections read these through an adapter. The move to Postgres is Reborn section 2/4, through `crypto/secrets.ts`, without re-consent. | High. Losing a token forces re-consent. | B (adapter) |
 | Domains | `src/lib/domains.ts` (`domain_claims` `pending/verified/misconfigured/conflict/error`), `domain-monitor*.ts` | external Connection (domain) + health | The domain is a Connection of the website System. Its status is health. | High (DNS is Jacob's yes). | B, F |
 | Scan | `src/lib/scan.ts`, `scan-store.ts` (Redis `reb:scan:*`) | health / evidence | Feeds website health and opens rebuild Possibilities. One scanner only. | Low. | F |
 | Orders, rewards, newsletter | `src/lib/orders.ts`, `rewards/*`, `newsletter.ts` | records of a store System *(inference: gldf's store is one System with these as records)* | Reborn section 4 decides workspace home vs `/dashboard`. | Medium (gldf runs a store). | — |
@@ -240,7 +249,9 @@ transition. **Risk:** medium. The tools write live content through approval.
 | missing concept: Requested work | `service_requests`, `service_request_commands`, `offering_provider_deliveries` |
 | Version (contextual) | none yet |
 
-## Customer vocabulary today
+<a id="customer-vocabulary-today"></a>
+
+## On-screen vocabulary in the dated inventory
 
 These strings come from a scan of `src/experience`, `src/app`,
 `src/platform` and `src/products`:
@@ -253,20 +264,21 @@ These strings come from a scan of `src/experience`, `src/app`,
 | "Installed offerings", "Retired offerings", "Back to offerings", "Retire this offering" | `workspace/OfferingDirectory.tsx`, `WorkspaceAllowanceSummary.tsx` | Retire. Show the Systems the offering created. |
 | "All products" | `workspace/WorkspaceLayout.tsx` | Retire. |
 | "Capability", "No inquiry capability is live here yet." | `inquiries/views.tsx` | System + lifecycle ("No inquiry form is live yet."). |
-| "Version", "Rehearse this version first", "Inspect version and scope" | `inquiries/views.tsx` | History / release. "Rehearse" belongs to a Possibility. |
+| "Version", "Rehearse this version first", "Inspect version and scope" | `inquiries/views.tsx` | History for past states; "Rehearse this Possibility" for a working candidate. Internal Capability Version remains underneath. |
 | "Tracker version", "Refresh latest version" | `workspace/WorkspaceExperimentResult.tsx` | History. |
 | "Restore an earlier live version" | `operations/BoundedWorkExperience.tsx` | History (keep the meaning; avoid the word Version). |
 | "Connections", "Recorded connections for this Business" | `inquiries/views.tsx` | Connections. This one already fits. |
 | "Connect existing work", "Connected work" | `workspace/OfferingInstallation.tsx`, `BusinessHome.tsx` | Connections. |
 | "Approve this preview", "Before and after" | `websites/WebsiteExperience.tsx`, `RebuildExperience.tsx` | Possibility + Make real. |
 | "Recording a comparison keeps it experimental" | `workspace/TrackerExperimentForm.tsx` | Possibility evidence. |
-| "Running", "What Strelva keeps running", "Keep something running" | `workspace-places.ts`, `operations/ResponsibilityExperience.tsx` | Keep. This is the missing Responsibility noun. |
+| "Running", "What Strelva keeps running", "Keep something running" | `workspace-places.ts`, `operations/ResponsibilityExperience.tsx` | Running stays on screen; Responsibility is the internal maintained condition. The sentence says what is kept true and names the actor where needed. |
 
 The collision to resolve: the
 [product ontology](../architecture/product-ontology.md) defines **Version**
 as "restorable historical state". The selected model makes Version mean a
 contextual adaptation. One of them has to change in the ontology (lane G).
-Every customer-facing "version" string above means history.
+Every historical-state "version" string above must become **History** on screen.
+The quoted strings are inventory evidence, not approved future copy.
 
 ## Worked examples
 
@@ -285,7 +297,7 @@ registry then shows:
   `revalidationHealth`, `domain_claims` and scan.
 - **Store** (System, Live) *(inference: orders and rewards as its
   records)*.
-- **Customer inquiries** (System, Live). Its records are the leads, which
+- **Inquiries** (System, Live). Its records are the leads, which
   stay Redis-authoritative until Reborn section 2.
 
 Its Connections:
@@ -351,7 +363,7 @@ says otherwise.
 `/agency-websites/[bindingId]` let an agency prepare one change to one
 client's live site, under a grant, for the client to review. That is a
 candidate alternative to an existing System's current state: a
-**Possibility**, prepared by a provider.
+**Possibility**, prepared by an agency.
 
 The agency Version case is different. The agency's own reusable website
 setup (a "method") is an origin. Client A's site and client B's site are
@@ -407,7 +419,7 @@ What has to land first, and what stays on the tenant model.
    local fixture. Then agency origin → two businesses. Do not reuse
    `version` columns. They are the release axis.
 8. **G: vocabulary and ADR.** This covers retiring "offering", "app" and
-   "product" as customer nouns, the ontology Version collision, and naming
+   "product" as on-screen nouns, the ontology Version collision, and naming
    Responsibility and Requested work.
 
 **Stays behind the legacy tenant model until each client is converted and
@@ -441,22 +453,23 @@ Systems for those clients are read-only views until then.
 3. **Records and the Customers place.** Contacts, inquiries, bookings and
    orders belong to the business and are read by many Systems. The model
    puts the business record at the root ("Business supplies shared
-   context"), so this is covered as context. However, the customer-facing
-   Customers place has no noun in the four. *(inference: fine as a place,
-   not a primitive.)*
+   context"), so this is covered as context. However, the business-facing
+   Customers place was retired; its old URL resolves to Home
+   (`workspace-places.ts`, inspected on the October 9 base). No new place
+   is introduced for contacts.
 4. **Issued outputs.** An issued proposal, a sent report or an audit
    result is immutable and not a System. `RULE_SYSTEM_OUTPUT_IDENTITY`
-   covers the rule. There is no customer noun yet, and documents have no
+   covers the rule. There is no on-screen noun yet, and documents have no
    issued-snapshot storage.
-5. **Provider: who operates the System.** Today this is seats, delegations,
-   assignments and provider delivery. The managed default means most
-   clients never touch Systems themselves. "Operated by Strelva" has to be
-   visible on every System, and it is neither a Connection nor a Version.
+5. **Agency: who operates the System.** Today this is seats, delegations,
+   assignments and agency delivery. The managed default means most
+   clients never touch Systems themselves. "Operated by {agency display name}" and "Runs on Strelva" identify
+   agency service on a System, and it is neither a Connection nor a Version.
    *(inference: an attribute of the System plus grants, not a fifth noun.)*
 6. **The temporal release axis.** Releases and revisions are everywhere in
-   storage, and customers do see "history" and "restore". The model keeps
-   them separate from Versions, but gives them no customer word. History is
-   the obvious one.
+   storage, and owners do see "history" and "restore". The model keeps
+   them separate from Versions, and decision 4 names past restorable states **History**. App releases
+   use **release**.
 7. **Origin, for agency methods.** Version lineage needs a name for the
    shared source that Versions descend from. Today that is offering
    definitions and the proposed Method. Lane D must name it without
@@ -475,7 +488,7 @@ Systems for those clients are read-only views until then.
 - **D:** no `version` column in existing tables means a contextual Version.
 - **F:** use `InquiryCapabilityStatus` as the template for separating
   lifecycle from verification.
-- **E and G:** retire "offering", "product" and "app" as customer nouns.
+- **E and G:** retire "offering", "product" and "app" as on-screen nouns.
   Keep "Running" and "Requests" as places until G names their concepts.
 - **G:** fix the ontology's Version definition.
 
