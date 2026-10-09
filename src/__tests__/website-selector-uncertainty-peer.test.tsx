@@ -2,6 +2,7 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import type { WebsiteCapabilityOptions } from "@/products/websites/contracts";
 import { WebsiteExperience } from "@/experience/websites/WebsiteExperience";
 import { RebuildExperience } from "@/experience/websites/RebuildExperience";
 import { parseRebuildView } from "@/experience/websites/rebuild-transport";
@@ -186,4 +187,165 @@ it.each(['rebuild', 'legacy'] as const)('unlocks %s form editing when a current 
  expect(button('Reload current state')).toBeUndefined();
  const formsAction = button('Choose forms') ?? button('Update website preview');
  expect(formsAction).toBeDefined(); expect(formsAction!.disabled).toBe(false);
+});
+
+it.each(['rebuild', 'legacy'] as const)('peer freezes %s exact submitted selection during same-batch field change', async kind => {
+ let respond!: (value: Response) => void; let submitted = '';
+ vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
+  if (init?.method === 'POST') { submitted = String(init.body); return new Promise<Response>(yes => { respond = yes; }); }
+  if (String(url).endsWith('/connections')) return Response.json(options);
+  return Response.json(legacyRecord());
+ }));
+ await (kind === 'legacy' ? mountLegacy() : mount()); await choose();
+ const selected = node.querySelectorAll('select')[1]!;
+ await act(async () => { button('Update website preview')!.click(); selected.value = 'orders'; selected.dispatchEvent(new Event('change', { bubbles: true })); });
+ expect(JSON.parse(submitted).selection.inquiryCapabilityId).toBe('catering');
+ await act(async () => respond(Response.json({ error: 'Unknown' }, { status: 503 })));
+ expect(node.querySelectorAll('select')[1]!.value).toBe('catering');
+ expect(button('Reload current state')).toBeDefined();
+});
+it('peer retains managed forms uncertainty across canPublish loss and regain', async () => {
+ let respond!: (value: Response) => void;
+ vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
+  if (init?.method === 'POST') return new Promise<Response>(yes => { respond = yes; });
+  if (String(url).endsWith('/connections')) return Response.json(options);
+  if (String(url).includes('/history?')) return Response.json({ revisions: [] });
+  if (String(url).endsWith('/website-authority')) return Response.json({});
+  return Response.json(envelope());
+ }));
+ const render = (canPublish: boolean) => createElement(RebuildExperience, { workspaceId, initialRecord: parseRebuildView(envelope()), managed: true, canPublish });
+ node = document.createElement('div'); document.body.append(node); root = createRoot(node);
+ await act(async () => root.render(render(true))); await choose();
+ await act(async () => button('Update website preview')!.click());
+ await act(async () => root.render(render(false)));
+ await act(async () => root.render(render(true)));
+ await act(async () => respond(Response.json({ error: 'Unknown' }, { status: 503 })));
+ expect(button('Reload current state')).toBeDefined();
+ expect(button('Publish approved website')!.disabled).toBe(true);
+ expect(node.textContent).not.toContain('This exact preview is approved.');
+});
+
+it.each(['rebuild', 'legacy'] as const)('peer refuses %s stale complete connection acknowledgement', async kind => {
+ const transport = vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
+  if (init?.method === 'POST') return Response.json(kind === 'legacy' ? legacyRecord() : envelope());
+  if (String(url).endsWith('/connections')) return Response.json(options);
+  return Response.json(legacyRecord());
+ }); vi.stubGlobal('fetch', transport);
+ await (kind === 'legacy' ? mountLegacy() : mount()); await choose();
+ await act(async () => button('Update website preview')!.click());
+ expect(button('Reload current state')).toBeDefined();
+ expect(button(kind === 'legacy' ? 'Prepare launch' : 'Publish approved website')!.disabled).toBe(true);
+ expect(node.textContent).not.toContain('forms saved'); expect(node.textContent).not.toContain('forms updated');
+});
+
+it.each(['rebuild', 'legacy'] as const)('peer refuses %s different selected forms in an advancing connection receipt', async kind => {
+ const next = kind === 'legacy' ? legacyRecord(2,false) : envelope(2,false);
+ if ('website' in next) next.website.publishedCapabilitySelection.inquiryCapabilityId = 'orders';
+ else next.rebuild.publishedCapabilitySelection.inquiryCapabilityId = 'orders';
+ const transport = vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
+  if (init?.method === 'POST') return Response.json(next);
+  if (String(url).endsWith('/connections')) return Response.json(options);
+  return Response.json(legacyRecord());
+ }); vi.stubGlobal('fetch', transport);
+ await (kind === 'legacy' ? mountLegacy() : mount()); await choose();
+ await act(async () => button('Update website preview')!.click());
+ expect(button('Reload current state')).toBeDefined();
+ expect(node.textContent).not.toContain('forms saved'); expect(node.textContent).not.toContain('forms updated');
+});
+it.each(['rebuild', 'legacy'] as const)('guards %s source and booking fields synchronously alongside the submitted inquiry', async kind => {
+ const firstCalendar = '66666666-6666-4666-8666-666666666666', secondCalendar = '77777777-7777-4777-8777-777777777777';
+ const extended: WebsiteCapabilityOptions = structuredClone(options); extended.tenants[0]!.booking = [firstCalendar,secondCalendar].map((grantId,index) => ({ grantId, capabilityId: 'booking', version: 1, name: `Calendar ${index + 1}`, provider: 'google', range: { from: '2026-10-10T09:00:00Z', to: '2026-10-10T10:00:00Z' } }));
+ extended.tenants.push({ tenantId: 'other-bakery', siteName: 'Other bakery', inquiry: [], booking: [] });
+ let respond!: (value: Response) => void; let body = '';
+ vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
+  if (init?.method === 'POST') { body = String(init.body); return new Promise<Response>(yes => { respond = yes; }); }
+  if (String(url).endsWith('/connections')) return Response.json(extended);
+  return Response.json(legacyRecord());
+ }));
+ await (kind === 'legacy' ? mountLegacy() : mount()); await choose();
+ const selects = node.querySelectorAll('select'); const calendar = selects[2]!;
+ await act(async () => { calendar.value = firstCalendar; calendar.dispatchEvent(new Event('change', { bubbles: true })); });
+ await act(async () => {
+  button('Update website preview')!.click();
+  selects[0]!.value = 'other-bakery'; selects[0]!.dispatchEvent(new Event('change', { bubbles: true }));
+  calendar.value = secondCalendar; calendar.dispatchEvent(new Event('change', { bubbles: true }));
+ });
+ await act(async () => respond(Response.json({ error: 'Unknown' }, { status: 503 })));
+ expect(JSON.parse(body).selection).toEqual({ tenantId: 'fictional-bakery', inquiryCapabilityId: 'catering', bookingGrantId: firstCalendar });
+ expect(node.querySelectorAll('select')[0]!.value).toBe('fictional-bakery'); expect(node.querySelectorAll('select')[2]!.value).toBe(firstCalendar);
+});
+it.each(['rebuild', 'legacy'] as const)('accepts %s exact null disconnect and rejects a receipt that retains forms', async kind => {
+ let retain = true;
+ vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
+  if (init?.method === 'POST') {
+   const next = kind === 'legacy' ? legacyRecord(2,false) : envelope(2,false);
+   if (!retain) { if ('website' in next) delete (next.website as { publishedCapabilitySelection?: unknown }).publishedCapabilitySelection; else delete (next.rebuild as { publishedCapabilitySelection?: unknown }).publishedCapabilitySelection; }
+   expect(JSON.parse(String(init.body)).selection).toBeNull(); return Response.json(next);
+  }
+  if (String(url).endsWith('/connections')) return Response.json(options);
+  if (String(url).includes('/history?')) return Response.json({ revisions: [] });
+  return Response.json(kind === 'legacy' ? legacyRecord() : envelope());
+ }));
+ await (kind === 'legacy' ? mountLegacy() : mount()); await act(async () => button('Remove forms from this draft')!.click());
+ expect(button('Reload current state')).toBeDefined();
+ await act(async () => button('Reload current state')!.click()); retain = false;
+ await act(async () => button('Remove forms from this draft')!.click());
+ expect(button('Reload current state')).toBeUndefined(); expect(node.textContent).not.toContain('is approved.'); expect(node.textContent).toContain(kind === 'legacy' ? 'Website forms updated' : 'Visitor forms saved');
+});
+it.each([false,true])('retains pending managed selection after permission loss and valid acknowledgement without stealing outside focus (moved=%s)', async moved => {
+ let respond!: (value: Response) => void;
+ vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
+  if (init?.method === 'POST') return new Promise<Response>(yes => { respond = yes; });
+  if (String(url).endsWith('/connections')) return Response.json(options);
+  if (String(url).includes('/history?')) return Response.json({ revisions: [] });
+  return Response.json(envelope());
+ }));
+ const render = (canPublish: boolean) => createElement(RebuildExperience, { workspaceId, initialRecord: parseRebuildView(envelope()), managed: true, canPublish });
+ node = document.createElement('div'); document.body.append(node); root = createRoot(node);
+ await act(async () => root.render(render(true))); await choose(); button('Update website preview')!.focus(); await act(async () => button('Update website preview')!.click());
+ const outside = document.createElement('button'); outside.textContent = 'Other System'; document.body.append(outside); if (moved) outside.focus();
+ await act(async () => root.render(render(false)));
+ const section = node.querySelector('[aria-label="Website visitor forms"]')!; expect(section.parentElement!.hidden).toBe(true); expect(node.querySelectorAll('select')[1]!.value).toBe('catering');
+ await act(async () => root.render(render(true))); await act(async () => respond(Response.json(envelope(2,false))));
+ expect(button('Reload current state')).toBeDefined(); expect(node.querySelectorAll('select')[1]!.value).toBe('catering');
+ expect(document.activeElement).toBe(moved ? outside : button('Reload current state'));
+ await act(async () => button('Reload current state')!.click()); expect(button('Choose forms')!.disabled).toBe(false);
+});
+it.each(['rebuild', 'legacy'] as const)('ignores late selector replies from an unmounted %s owner after workspace switch', async kind => {
+ let respond!: (value: Response) => void;
+ const foreign = '55555555-5555-4555-8555-555555555555';
+ vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockImplementation(async (url, init) => {
+  if (init?.method === 'POST') return new Promise<Response>(yes => { respond = yes; });
+  if (String(url).endsWith('/connections')) return Response.json(options);
+  return Response.json({ ...legacyRecord(), workspaceId: String(url).includes(foreign) ? foreign : workspaceId });
+ }));
+ await (kind === 'legacy' ? mountLegacy() : mount()); await choose(); await act(async () => button('Update website preview')!.click());
+ await act(async () => root.render(kind === 'legacy' ? createElement(WebsiteExperience, { workspaceId: foreign, workId }) : createElement(RebuildExperience, { workspaceId: foreign, initialRecord: { ...parseRebuildView(envelope()), workspaceId: foreign } })));
+ await act(async () => respond(Response.json({ error: 'Unknown old work' }, { status: 503 })));
+ expect(button('Reload current state')).toBeUndefined(); expect(node.textContent).not.toContain('could not be confirmed'); expect(button('Choose forms')!.disabled).toBe(false);
+});
+
+it('peer rejects legacy receipt with an unrelated advancing rebuild envelope', async () => {
+ const legacy = legacyRecord(); const next = { ...legacy, rebuild: envelope(2,false).rebuild };
+ vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockImplementation(async (url, init) => Response.json(init?.method === 'POST' ? next : String(url).endsWith('/connections') ? options : legacyRecord())));
+ await mountLegacy(); await choose(); await act(async () => button('Update website preview')!.click());
+ expect(button('Reload current state')).toBeDefined(); expect(button('Prepare launch')!.disabled).toBe(true);
+});
+it('peer rejects legacy advancing receipt that still serves the previous candidate revision', async () => {
+ const next = legacyRecord(2,false); next.website.candidate = legacyRecord().website.candidate;
+ vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockImplementation(async (url, init) => Response.json(init?.method === 'POST' ? next : String(url).endsWith('/connections') ? options : legacyRecord())));
+ await mountLegacy(); await choose(); await act(async () => button('Update website preview')!.click());
+ expect(button('Reload current state')).toBeDefined(); expect(node.textContent).not.toContain('forms updated');
+});
+it.each(['mixed-envelope','stale-document','current-document','deduplicated-document'] as const)('binds rebuild acknowledgement to its current document separately from work revision (%s)', async mode => {
+ const before = envelope(3,true); before.rebuild.candidate.revision = 1;
+ if (mode === 'deduplicated-document') { before.rebuild.publishedCapabilitySelection.inquiryCapabilityId = 'catering'; before.rebuild.candidate.document.capabilities!.inquiry!.capabilityId = 'catering'; before.rebuild.candidate.contentHash = siteDocumentHash(before.rebuild.candidate.document); }
+ const next = envelope(4,false); next.rebuild.candidate.revision = mode === 'stale-document' || mode === 'deduplicated-document' ? 1 : 2;
+ if (mode === 'deduplicated-document') { next.rebuild.candidate.document = structuredClone(before.rebuild.candidate.document); next.rebuild.candidate.contentHash = before.rebuild.candidate.contentHash; }
+ const body = mode === 'mixed-envelope' ? { ...next, website: legacyRecord(4,false).website } : next;
+ vi.stubGlobal('fetch', vi.fn<typeof fetch>().mockImplementation(async (_url, init) => Response.json(init?.method === 'POST' ? body : options)));
+ node = document.createElement('div'); document.body.append(node); root = createRoot(node);
+ await act(async () => root.render(createElement(RebuildExperience, { workspaceId, initialRecord: parseRebuildView(before) }))); await choose(); await act(async () => button('Update website preview')!.click());
+ if (mode === 'current-document' || mode === 'deduplicated-document') { expect(button('Reload current state')).toBeUndefined(); expect(node.textContent).toContain('Visitor forms saved'); }
+ else { expect(button('Reload current state')).toBeDefined(); expect(node.textContent).not.toContain('Visitor forms saved'); }
 });

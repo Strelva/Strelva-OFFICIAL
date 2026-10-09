@@ -1348,3 +1348,16 @@ Transport checks the full messages and exact actions; it does not infer safety
 from a generic409 or an “unchanged” substring. Actual service controls verify no
 candidate commit and retained approval, while component controls retain the
 correction and permit direct retry. Unknown row/authority403/409 stays locked.
+
+Visitor-form controls synchronously preserve all three captured field choices.
+An acknowledgement must advance the work revision by the existing service's one
+revision, clear approval, and return a current candidate with exactly the requested
+selection (including null removal) from the exact owning version before adoption.
+V1 candidate revision advances with the work; V2 document revision cannot go
+backward and retains its prior exact hash when content deduplication reuses the
+same document revision. V2 document revision need not equal work revision. Mixed
+version envelopes and stale candidates remain unknown. Same/old revisions
+and different selections remain unconfirmed. A managed pending/unknown editor
+retains its inputs while publication permission changes, staying hidden and
+read-only without that permission. Late producer uncertainty can notify only its
+still-mounted exact owning view; old-work/unmounted callbacks are ignored.

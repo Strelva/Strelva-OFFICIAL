@@ -16,3 +16,11 @@ it("selector peer actual service keeps the memory-port commit when acknowledgeme
  await expect(h.service.connectCapabilities(actor, approved.workId, { expectedRevision: approved.rebuild.revision, selection: null })).rejects.toBeInstanceOf(WorkspaceConflictError);
  expect(candidate).toHaveBeenCalledTimes(1); expect(vi.mocked(fetch)).not.toHaveBeenCalled(); vi.unstubAllGlobals();
 });
+it('actual V2 forms acknowledgment preserves a deduplicated document independently of its advancing work revision and clears approval', async () => {
+ vi.stubGlobal('fetch', vi.fn(async () => { throw Error('Outside transport forbidden in this probe'); }));
+ const h = harness(); const reviewed = await h.create(); const approved = await h.service.approve(actor, reviewed.workId, selection(reviewed));
+ const next = await h.service.connectCapabilities(actor, approved.workId, { expectedRevision: approved.rebuild.revision, selection: null });
+ expect(next.rebuild.revision).toBe(approved.rebuild.revision + 1); expect(next.rebuild.candidate!.revision).toBe(approved.rebuild.candidate!.revision); expect(next.rebuild.candidate!.contentHash).toBe(approved.rebuild.candidate!.contentHash);
+ expect(next.rebuild.revision).not.toBe(next.rebuild.candidate!.revision); expect(next.rebuild.approvedCandidateRevision).toBeNull(); expect(next.rebuild.publishedCapabilitySelection).toBeUndefined();
+ expect(vi.mocked(fetch)).not.toHaveBeenCalled(); vi.unstubAllGlobals();
+});

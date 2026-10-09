@@ -18,13 +18,16 @@ export function WebsiteConnections({ record, disabled, onSaved, onBusyChange, he
   onUnconfirmed?: (recovery: FocusRecovery | null) => void;
   readOnly?: boolean;
 }) {
-  return <WebsiteConnectionSelector workspaceId={record.workspaceId} workId={record.workId} revision={record.website.revision} selected={record.website.publishedCapabilitySelection ?? null} disabled={disabled} headingRef={headingRef} onFocusRecovery={onFocusRecovery} onBusyChange={onBusyChange} onUnconfirmed={onUnconfirmed} readOnly={readOnly} onSaved={value => onSaved(parseWebsiteRecord(value, record.workspaceId))} />;
+  return <WebsiteConnectionSelector workspaceId={record.workspaceId} workId={record.workId} revision={record.website.revision} version={1} candidateRevision={record.website.candidate?.revision} selected={record.website.publishedCapabilitySelection ?? null} disabled={disabled} headingRef={headingRef} onFocusRecovery={onFocusRecovery} onBusyChange={onBusyChange} onUnconfirmed={onUnconfirmed} readOnly={readOnly} onSaved={value => onSaved(parseWebsiteRecord(value, record.workspaceId))} />;
 }
 
-export function WebsiteConnectionSelector({ workspaceId, workId, revision, selected, disabled, onSaved, onBusyChange, hosted = false, hasForms = false, headingRef, onFocusRecovery, onUnconfirmed, readOnly = false }: {
+export function WebsiteConnectionSelector({ workspaceId, workId, revision, selected, disabled, onSaved, onBusyChange, hosted = false, hasForms = false, headingRef, onFocusRecovery, onUnconfirmed, readOnly = false, version = 1, candidateRevision, candidateContentHash }: {
   workspaceId: string;
   workId: string;
   revision: number;
+  version?: 1 | 2;
+  candidateRevision?: number;
+  candidateContentHash?: string;
   selected: WebsiteCapabilitySelection | null;
   disabled: boolean;
   hosted?: boolean;
@@ -51,9 +54,16 @@ export function WebsiteConnectionSelector({ workspaceId, workId, revision, selec
   const sourceRef = useRef<HTMLSelectElement>(null);
   const chooseRef = useRef<HTMLButtonElement>(null);
   const inFlight = useRef(false);
+  const pendingWrite = useRef(false);
   const focusRecovery = useRef<FocusRecovery | null>(null);
   const mounted = useRef(true);
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; focusRecovery.current?.cancel(); }; }, []);
+  const unconfirmedOwner = useRef(onUnconfirmed);
+  unconfirmedOwner.current = onUnconfirmed;
+  useEffect(() => { mounted.current = true; return () => {
+    mounted.current = false;
+    if (pendingWrite.current && unconfirmedOwner.current) { unconfirmedOwner.current(focusRecovery.current); focusRecovery.current = null; }
+    else focusRecovery.current?.cancel();
+  }; }, []);
   const endpoint = `/api/websites/${encodeURIComponent(workId)}/connections`;
   const tenant = options?.tenants.find(item => item.tenantId === tenantId);
   const locked = disabled || readOnly || busy || needsReload;
@@ -85,14 +95,24 @@ export function WebsiteConnectionSelector({ workspaceId, workId, revision, selec
     focusRecovery.current?.cancel();
     focusRecovery.current = beginFocusRecovery(sectionRef.current);
     const started = { ...scope.current };
+    pendingWrite.current = true;
     setBusy(true); setError(""); onBusyChange?.(true);
     let acknowledged = false;
     try {
       const next = await request({ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expectedRevision: revision, selection }) });
       acknowledged = true;
       if ((next as { workId?: unknown })?.workId !== workId || (next as { workspaceId?: unknown })?.workspaceId !== workspaceId) throw new WebsiteExperienceError("The response belongs to a different website. Reload your saved work.", 200);
+      type SavedSelection = { version?: unknown; revision?: unknown; approvedCandidateRevision?: unknown; publishedCapabilitySelection?: WebsiteCapabilitySelection; status?: unknown; candidate?: { revision?: unknown; contentHash?: unknown } };
+      const content = next as { website?: SavedSelection; rebuild?: SavedSelection };
+      const saved = version === 2 ? content.rebuild : content.website;
+      const accepted = saved?.publishedCapabilitySelection;
+      const matchesSelection = selection ? accepted?.tenantId === selection.tenantId && accepted.inquiryCapabilityId === selection.inquiryCapabilityId && accepted.bookingGrantId === selection.bookingGrantId : accepted == null;
+      const matchesCandidate = version === 1 ? saved?.candidate?.revision === revision + 1 : typeof saved?.candidate?.revision === "number" && typeof candidateRevision === "number" && saved.candidate.revision >= candidateRevision && (saved.candidate.revision > candidateRevision || typeof candidateContentHash === "string" && saved.candidate.contentHash === candidateContentHash);
+      if ((version === 2 ? content.website : content.rebuild) !== undefined || !saved || saved.version !== version || saved.revision !== revision + 1 || saved.approvedCandidateRevision !== null || !matchesCandidate || saved.status !== (version === 2 ? "review_ready" : "preview_ready") || !matchesSelection) throw new Error("The visitor form acknowledgment could not be confirmed.");
+      if (!mounted.current) throw new Error("Access changed while saving visitor forms.");
       if (mounted.current && scope.current.workspaceId === started.workspaceId && scope.current.workId === started.workId) {
         if (scope.current.permissionRevision !== started.permissionRevision) throw new Error("Access changed while saving visitor forms.");
+        pendingWrite.current = false;
         onSaved(next);
         // The parent owns recovery when a new revision remounts this selector.
         if (onFocusRecovery && focusRecovery.current) {
@@ -102,22 +122,22 @@ export function WebsiteConnectionSelector({ workspaceId, workId, revision, selec
         setOptions(null);
       }
     } catch (cause) {
-      if (mounted.current && scope.current.workspaceId === started.workspaceId && scope.current.workId === started.workId) {
-        const refused = !acknowledged && cause instanceof WebsiteExperienceError && (
+      if (scope.current.workspaceId === started.workspaceId && scope.current.workId === started.workId) {
+        const refused = mounted.current && !acknowledged && cause instanceof WebsiteExperienceError && (
           cause.status === 400 && cause.message === "Check the website connection selection." ||
           cause.status === 401 && cause.message === "Sign in to change website connections."
         );
         if (refused) setError(cause.message);
         else {
-          unresolved.current = true; setNeedsReload(true);
+          unresolved.current = true; if (mounted.current) setNeedsReload(true);
           const reason = cause instanceof WebsiteExperienceError && [200,403,409].includes(cause.status ?? 0) ? `${cause.message} ` : "";
-          setError(`${reason}The visitor form change could not be confirmed. Reload the current saved website before continuing.`);
+          if (mounted.current) setError(`${reason}The visitor form change could not be confirmed. Reload the current saved website before continuing.`);
           onUnconfirmed?.(focusRecovery.current);
           focusRecovery.current = null;
         }
       }
     }
-    finally { inFlight.current = false; if (mounted.current) setBusy(false); onBusyChange?.(false); }
+    finally { pendingWrite.current = false; inFlight.current = false; if (mounted.current) setBusy(false); onBusyChange?.(false); }
   }
 
   return <section ref={sectionRef} className={styles.requestCard} aria-label="Website visitor forms" aria-busy={busy || undefined}>
@@ -126,10 +146,10 @@ export function WebsiteConnectionSelector({ workspaceId, workId, revision, selec
     {selected ? <p className="text-sm">{selected.inquiryCapabilityId ? "Inquiry form selected. " : ""}{selected.bookingGrantId ? "Booking calendar selected." : ""}</p> : <p className="text-sm text-gray-muted">{hasForms ? "Native visitor forms are present in this preview." : "No forms selected."}</p>}
     {error ? <p role="alert" className="text-sm text-critical">{error}</p> : null}
     {!options ? <div className={styles.actions}><Button ref={chooseRef} type="button" variant="secondary" disabled={locked} loading={busy} onClick={() => void load()}>{error ? "Try loading forms again" : "Choose forms"}</Button></div> : options.tenants.length === 0 ? <p role="status" className="text-sm text-gray-muted">No published forms are available from websites connected to this business.</p> : <>
-      <SelectInput ref={sourceRef} label="Connected website" value={tenantId} disabled={locked} options={[{ value: "", label: "Choose a website" }, ...options.tenants.map(item => ({ value: item.tenantId, label: item.siteName }))]} onChange={event => { setTenantId(event.target.value); setInquiryId(""); setBookingId(""); }} />
+      <SelectInput ref={sourceRef} label="Connected website" value={tenantId} disabled={locked} options={[{ value: "", label: "Choose a website" }, ...options.tenants.map(item => ({ value: item.tenantId, label: item.siteName }))]} onChange={event => { if (disabled || readOnly || inFlight.current || unresolved.current) return; setTenantId(event.target.value); setInquiryId(""); setBookingId(""); }} />
       {tenant ? <div className={styles.formGrid}>
-        <SelectInput label="Inquiry form" value={inquiryId} disabled={locked} options={[{ value: "", label: "Do not add an inquiry form" }, ...tenant.inquiry.map(item => ({ value: item.capabilityId, label: item.name }))]} onChange={event => setInquiryId(event.target.value)} />
-        <SelectInput label="Booking calendar" value={bookingId} disabled={locked} options={[{ value: "", label: "Do not add a booking calendar" }, ...tenant.booking.map(item => ({ value: item.grantId, label: `${item.name} · ${item.provider === "outlook" ? "Outlook" : "Google"}` }))]} onChange={event => setBookingId(event.target.value)} />
+        <SelectInput label="Inquiry form" value={inquiryId} disabled={locked} options={[{ value: "", label: "Do not add an inquiry form" }, ...tenant.inquiry.map(item => ({ value: item.capabilityId, label: item.name }))]} onChange={event => { if (!disabled && !readOnly && !inFlight.current && !unresolved.current) setInquiryId(event.target.value); }} />
+        <SelectInput label="Booking calendar" value={bookingId} disabled={locked} options={[{ value: "", label: "Do not add a booking calendar" }, ...tenant.booking.map(item => ({ value: item.grantId, label: `${item.name} · ${item.provider === "outlook" ? "Outlook" : "Google"}` }))]} onChange={event => { if (!disabled && !readOnly && !inFlight.current && !unresolved.current) setBookingId(event.target.value); }} />
       </div> : null}
       <div className={styles.actions}><Button type="button" disabled={locked || !tenant || (!inquiryId && !bookingId)} loading={busy} onClick={() => void save({ tenantId, ...(inquiryId ? { inquiryCapabilityId: inquiryId } : {}), ...(bookingId ? { bookingGrantId: bookingId } : {}) })}>Update website preview</Button></div>
     </>}
