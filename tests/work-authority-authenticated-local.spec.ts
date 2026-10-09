@@ -1,9 +1,32 @@
 import { createClient } from "@supabase/supabase-js";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { localEnvironment, signedInContext } from "./support/local-auth";
 
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires an isolated local Supabase stack.");
 test.setTimeout(120_000);
+
+async function readyAuthority(page: Page, workId: string, navigate: () => Promise<unknown>) {
+  // Both native reads start together. Register before navigation/reload; each
+  // exact work response must finish successfully inside the unchanged case.
+  const reads = ["/api/work-context", "/api/work-participation"].map(path => page.waitForResponse(response => {
+    const url = new URL(response.url());
+    return response.request().method() === "GET" && url.pathname === path && url.searchParams.get("workId") === workId && !url.searchParams.has("view");
+  }, { timeout: 20_000 }));
+  const [responses] = await Promise.all([Promise.all(reads), navigate()]);
+  for (const response of responses) {
+    expect(response.status(), await response.text()).toBe(200);
+    expect(response.headers()["content-type"]).toContain("application/json");
+    expect((await response.json()).version).toBe(1);
+  }
+  return responses[1]!.json();
+}
+function participationMutation(page: Page, workId: string, kind: "contribute" | "review" | "revoke") {
+  return page.waitForResponse(response => {
+    if (response.request().method() !== "POST" || new URL(response.url()).pathname !== "/api/work-participation") return false;
+    const body = response.request().postDataJSON();
+    return body.workId === workId && body.command?.kind === kind;
+  }, { timeout: 20_000 });
+}
 
 test("verified outside contribution survives review and loses access on revocation", async ({ browser }, testInfo) => {
   const env = localEnvironment();
@@ -25,26 +48,45 @@ test("verified outside contribution survives review and loses access on revocati
     expect((await guest.context.request.get(`/api/documents?workId=${document.workId}`)).status()).toBe(403);
     const guestPage = await guest.context.newPage();
     await guestPage.setViewportSize({ width: 390, height: 844 });
-    await guestPage.goto(`/workspace/contribute/${document.workId}`);
+    const guestAccess = await readyAuthority(guestPage, document.workId, () => guestPage.goto(`/workspace/contribute/${document.workId}`));
+    expect(guestAccess).toMatchObject({ currentActorEmail: guest.email, canManage: false });
     await expect(guestPage.getByRole("heading", { name: "Local contribution procedure", exact: true })).toBeVisible();
     await expect(guestPage.getByText("The business opens at nine.", { exact: true })).toBeVisible();
     await guestPage.getByLabel("What changed?", { exact: true }).fill("Opening procedure clarified");
     await guestPage.getByLabel("Your proposal", { exact: true }).fill("Unlock the front door at nine, then check the incoming requests.");
-    await guestPage.getByRole("button", { name: "Submit for review", exact: true }).click();
+    const [submitted] = await Promise.all([
+      participationMutation(guestPage, document.workId, "contribute"),
+      guestPage.getByRole("button", { name: "Submit for review", exact: true }).click(),
+    ]);
+    expect(submitted.status(), await submitted.text()).toBe(200);
+    expect(submitted.request().postDataJSON()).toMatchObject({ workId: document.workId, command: { kind: "contribute", grantId: grant.id, baseWorkRevision: "0" } });
+    expect((await submitted.json()).contributions).toEqual(expect.arrayContaining([expect.objectContaining({ grantId: grant.id, actorEmail: guest.email, summary: "Opening procedure clarified", content: "Unlock the front door at nine, then check the incoming requests.", status: "pending" })]));
     await expect(guestPage.getByRole("status")).toContainText("Contribution sent for review.");
-    await guestPage.reload();
+    const persistedContribution = await readyAuthority(guestPage, document.workId, () => guestPage.reload());
+    expect(persistedContribution.contributions).toEqual(expect.arrayContaining([expect.objectContaining({ grantId: grant.id, summary: "Opening procedure clarified", status: "pending" })]));
     await expect(guestPage.getByText("Opening procedure clarified", { exact: true })).toBeVisible();
     expect(await guestPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await guestPage.screenshot({ path: testInfo.outputPath("contribution-mobile.png"), fullPage: true });
     const ownerPage = await owner.context.newPage();
-    await ownerPage.goto(`/workspace/contribute/${document.workId}`);
+    const ownerAccess = await readyAuthority(ownerPage, document.workId, () => ownerPage.goto(`/workspace/contribute/${document.workId}`));
+    expect(ownerAccess).toMatchObject({ currentActorEmail: owner.email, canManage: true });
     await ownerPage.getByLabel("Review reason", { exact: true }).fill("Matches the agreed opening sequence");
-    await ownerPage.getByRole("button", { name: "Accept proposal", exact: true }).click();
+    const [reviewed] = await Promise.all([
+      participationMutation(ownerPage, document.workId, "review"),
+      ownerPage.getByRole("button", { name: "Accept proposal", exact: true }).click(),
+    ]);
+    expect(reviewed.status(), await reviewed.text()).toBe(200);
+    expect((await reviewed.json()).contributions).toEqual(expect.arrayContaining([expect.objectContaining({ grantId: grant.id, status: "accepted", reviewedBy: owner.userId })]));
     await expect(ownerPage.getByRole("status")).toContainText("Review saved. The original work has not been changed.");
     await ownerPage.screenshot({ path: testInfo.outputPath("contribution-desktop.png"), fullPage: true });
     const unchanged = await owner.context.request.get(`/api/documents?workId=${document.workId}`);
     expect((await unchanged.json()).document.text).toBe("The business opens at nine.");
-    await ownerPage.getByRole("button", { name: "Revoke access", exact: true }).click();
+    const [revoked] = await Promise.all([
+      participationMutation(ownerPage, document.workId, "revoke"),
+      ownerPage.getByRole("button", { name: "Revoke access", exact: true }).click(),
+    ]);
+    expect(revoked.status(), await revoked.text()).toBe(200);
+    expect((await revoked.json()).grants).toEqual(expect.arrayContaining([expect.objectContaining({ id: grant.id, status: "revoked" })]));
     await expect(ownerPage.getByRole("status")).toContainText("Work access updated.");
     await guestPage.reload();
     await expect(guestPage.getByRole("heading", { name: "This work is not available to your account." })).toBeVisible();
