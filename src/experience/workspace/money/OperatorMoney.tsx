@@ -14,7 +14,7 @@ function number(value: FormDataEntryValue | null) { const raw = String(value ?? 
 function sameReviewedPayout(current: ReviewedPayout, reviewed: ReviewedPayout) {
   // Recipient's current profile may change after acceptance. Recorded
   // authorization and immutable payout/source facts remain historical identity.
-  return current.id === reviewed.id && current.sourceAccountId === reviewed.sourceAccountId && current.sourceTransaction === reviewed.sourceTransaction && current.recipientAccountId === reviewed.recipientAccountId && current.amountCents === reviewed.amountCents && current.currency === reviewed.currency && current.agreementVersion === reviewed.agreementVersion && current.authorizationProfileVersion === reviewed.authorizationProfileVersion;
+  return current.id === reviewed.id && current.sourceAccountId === reviewed.sourceAccountId && current.sourceTransaction === reviewed.sourceTransaction && current.recipientAccountId === reviewed.recipientAccountId && current.amountCents === reviewed.amountCents && current.currency === reviewed.currency && current.agreementVersion === reviewed.agreementVersion && current.authorizationProfileVersion === reviewed.authorizationProfileVersion && current.authorizedBy === reviewed.authorizedBy;
 }
 function utc(value: FormDataEntryValue | null) { const raw = String(value ?? ""); if (!raw || Number.isNaN(Date.parse(raw))) throw Error("Choose an explicit valid agreement date."); return new Date(raw).toISOString(); }
 export function OperatorMoney(props: { graph: GovernedOperatorGraph; actorId: string; profileVersion: string | null; executionEnabled: boolean; request?: typeof fetch }) { return <ScopedOperatorMoney key={`${props.graph.workspaceId}:${props.actorId}`} {...props} />; }
@@ -29,13 +29,14 @@ function ScopedOperatorMoney({ graph: initial, actorId, profileVersion, executio
     try {
       const response = await request(`/api/admin/money-configuration?${new URLSearchParams({ workspaceId: initial.workspaceId })}`, { credentials: "same-origin", cache: "no-store", signal: controller.signal });
       const value: unknown = await response.json().catch(() => null); if (!response.ok) throw Error(message(value)); const parsed = governedOperatorGraphSchema.parse(value); if (parsed.workspaceId !== initial.workspaceId) throw Error("Money records belong to another workspace.");
-      if (controller.signal.aborted || !alive.current) return; setGraph(parsed);
+      if (controller.signal.aborted || !alive.current) return;
       const pending = attempt.current;
       if (pending?.kind === "payout") {
         const row = parsed.payouts.find(item => item.id === pending.command.payoutId);
         if (!row || !sameReviewedPayout(row, pending.reviewed)) throw Error("The reviewed payout facts changed. Keep this uncertain operation for reconciliation.");
         if (row.transferId) { attempt.current = null; setNotice("The accepted payout receipt is recorded. No new payout was requested."); }
       }
+      setGraph(parsed);
       // A configuration replay must still return the original actual operator
       // acknowledgment; a row's existence alone cannot prove who recorded it.
       setPhase("ready"); focus(origin);

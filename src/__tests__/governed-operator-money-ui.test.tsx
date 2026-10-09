@@ -46,11 +46,28 @@ describe("recorded operator money", () => {
     expect(node.textContent).toContain("Recorded for old-profile"); expect(node.textContent).toContain("Current recipient profile: new-profile"); expect(node.textContent).not.toContain("Send this approved payout");
   });
   it("never confirms malformed transfer IDs or changed immutable payout readback", async () => {
-    for (const changed of [{ transferId: "not-a-transfer" }, { amountCents: 1701 }, { currency: "usd" }, { sourceTransaction: "ch_Foreign" }, { recipientAccountId: "acct_Foreign" }, { agreementVersion: "foreign-agreement" }, { authorizationProfileVersion: "foreign-profile" }]) {
+    for (const changed of [{ transferId: "not-a-transfer" }, { amountCents: 1701 }, { currency: "usd" }, { sourceAccountId: "acct_ForeignSource" }, { sourceTransaction: "ch_Foreign" }, { recipientAccountId: "acct_Foreign" }, { agreementVersion: "foreign-agreement" }, { authorizationProfileVersion: "foreign-profile" }, { authorizedBy: other }]) {
       const request = vi.fn<typeof fetch>().mockResolvedValueOnce(reply({ error: "Lost payout response" }, 500)).mockResolvedValueOnce(reply({ ...graph, payouts: [{ ...graph.payouts[0]!, transferId: "tr_FictionalAccepted", ...changed }] }));
       const { node } = await mount(request, "explicit-profile", true); await click(node, "Send this approved payout"); await click(node, "Reload current money records");
       expect(node.textContent).not.toContain("The accepted payout receipt is recorded"); expect(node.querySelector("[role=alert]")).not.toBeNull();
+      expect(node.textContent).not.toContain("Accepted transfer receipt:"); expect(node.textContent).not.toContain("tr_FictionalAccepted");
+      expect(node.textContent).toContain("ch_FictionalSource"); expect(node.textContent).toContain("acct_FictionalRecipient"); expect(node.textContent).toContain("Explicit written agreement"); expect(node.textContent).toContain("Recorded for explicit-profile");
+      expect(node.textContent).toContain("The previous operation is uncertain"); expect(node.textContent).not.toContain("Retry the exact payout");
     }
+  });
+  it("refuses a substituted recorded approver without adopting its accepted receipt", async () => {
+    const request = vi.fn<typeof fetch>().mockResolvedValueOnce(reply({ error: "Lost payout response" }, 500)).mockResolvedValueOnce(reply({ ...graph, payouts: [{ ...graph.payouts[0]!, authorizedBy: other, transferId: "tr_ForeignReceipt" }] }));
+    const { node } = await mount(request, "explicit-profile", true); await click(node, "Send this approved payout"); await click(node, "Reload current money records");
+    expect(node.querySelector("[role=alert]")?.textContent).toContain("reviewed payout facts changed"); expect(node.textContent).not.toContain("Accepted transfer receipt:"); expect(node.textContent).not.toContain("tr_ForeignReceipt"); expect(node.textContent).not.toContain("The accepted payout receipt is recorded"); expect(node.textContent).toContain("The previous operation is uncertain");
+  });
+  it("recovers the recorded historical approver even when a different current operator requested the payout", async () => {
+    const reviewed = { ...graph, payouts: [{ ...graph.payouts[0]!, authorizedBy: other }] };
+    const request = vi.fn<typeof fetch>().mockResolvedValueOnce(reply({ error: "Lost payout response" }, 500)).mockResolvedValueOnce(reply({ ...reviewed, payouts: [{ ...reviewed.payouts[0]!, transferId: "tr_FictionalAccepted" }] }));
+    const node = document.createElement("div"); document.body.append(node); const root = createRoot(node); roots.push(root);
+    await act(async () => root.render(createElement(OperatorMoney, { graph: reviewed, actorId, profileVersion: "explicit-profile", executionEnabled: true, request })));
+    await click(node, "Send this approved payout"); await click(node, "Reload current money records");
+    expect(node.textContent).toContain("The accepted payout receipt is recorded"); expect(node.textContent).toContain("Accepted transfer receipt: tr_FictionalAccepted"); expect(node.querySelector("[role=alert]")).toBeNull();
+    expect(request.mock.calls.filter(call => call[1]?.method === "POST")).toHaveLength(1);
   });
   it("preserves accepted historical readback when the mutable recipient profile changes later", async () => {
     const request = vi.fn<typeof fetch>().mockResolvedValueOnce(reply({ error: "Lost payout response" }, 500)).mockResolvedValueOnce(reply({ ...graph, payouts: [{ ...graph.payouts[0]!, transferId: "tr_FictionalAccepted", profileVersion: "recipient-later-profile", recipientProfileVersion: "recipient-later-profile" }] }));
