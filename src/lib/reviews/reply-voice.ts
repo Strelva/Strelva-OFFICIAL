@@ -6,12 +6,12 @@
  *   • guidance  — one plain paragraph: "how we sound"
  *   • templates — an example reply per review type, the AI mirrors the voice of
  *
- * Stored as one JSON blob in Redis (`reb:reply-voice:{tenant}`, same pattern as
- * the operator CRM / leads — internal per-tenant metadata, no DB migration).
- * Degrades to a safe default (mode "approve", no templates) without Redis.
+ * Stored under the selected tenant_settings authority; the frozen Redis key
+ * (`reb:reply-voice:{tenant}`) remains a best-effort cache after durable cutover.
+ * The Redis-authoritative path keeps its safe default without Redis.
  */
 
-import { mirrorRecord, readSetting } from "../client-records";
+import { mirrorRecord, readSetting, durableRecordAuthority, writeDurableRecord } from "../client-records";
 import { getRedis } from "@/platform/infra/redis";
 // The policy bridge (src/platform/needs-you/tenant-settings.ts) through the
 // port src/lib declares (Strelva Reborn section 7).
@@ -54,8 +54,8 @@ function key(tenantId: string): string {
  * The voice, with its mode from `decision_policies` (`review.reply`) when the
  * tenant is linked to a business, the release is on and the setting has
  * moved there (src/platform/needs-you/tenant-settings.ts). "off" (draft
- * nothing) is not a route and stays with the Redis blob, as do the guidance
- * and templates.
+ * nothing) is not a route and stays with the selected settings blob, as do
+ * the guidance and templates.
  */
 export async function getReplyVoice(tenantId: string, options: BridgeOptions = {}): Promise<ReplyVoice> {
   const voice = await readSetting(tenantId, "reply_voice", () => readRedisVoice(tenantId), defaultReplyVoice());
@@ -98,7 +98,8 @@ export interface ReplyVoiceWriter {
 /**
  * With a writer, an "approve" or "auto" mode is written to decision_policies
  * first when the tenant is linked (a refusal throws and nothing is saved).
- * The Redis blob is always written. The returned mode is the one in force.
+ * The selected setting authority is written next. Qualified durable saves
+ * refresh Redis only afterward. The returned mode is the one in force.
  */
 export async function saveReplyVoice(
   tenantId: string,
@@ -109,6 +110,7 @@ export async function saveReplyVoice(
   const requested: ReplyMode =
     input.mode === "off" || input.mode === "auto" || input.mode === "approve" ? input.mode : "approve";
   let inForce: ReplyMode = requested;
+  const durable = await durableRecordAuthority("tenant_settings");
   if (writer && requested !== "off") {
     const policy = await workspacePorts().tenantPolicy();
     const result = await policy.writeTenantPolicySetting({
@@ -118,15 +120,15 @@ export async function saveReplyVoice(
     }, options);
     if (result.stored === "decision_policies") inForce = policy.replyModeFromRoute(result.route);
   }
-  const saved = await saveRedisVoice(tenantId, { ...input, mode: requested });
+  const saved = await saveStoredVoice(tenantId, { ...input, mode: requested }, durable);
   return { ...saved, mode: inForce };
 }
 
-async function saveRedisVoice(
+async function saveStoredVoice(
   tenantId: string,
   input: { mode?: ReplyMode; guidance?: string; templates?: { key?: string; example?: string }[] },
+  durable: boolean,
 ): Promise<ReplyVoice> {
-  const redis = getRedis();
   const mode: ReplyMode =
     input.mode === "off" || input.mode === "auto" || input.mode === "approve" ? input.mode : "approve";
   const guidance = (input.guidance ?? "").trim().slice(0, MAX_GUIDANCE);
@@ -140,6 +142,13 @@ async function saveRedisVoice(
     templates.push({ key: k, example });
   }
   const voice: ReplyVoice = { mode, guidance, templates, updatedAt: new Date().toISOString() };
+  if (durable) {
+    const status = await writeDurableRecord("tenant_settings", tenantId, "reply_voice", { value: voice }, voice.updatedAt ?? undefined);
+    if (status === "kept") throw new Error("Reply voice update was superseded by a newer change.");
+    try { const redis = getRedis(); if (redis) await redis.set(key(tenantId), voice); } catch { /* Durable voice already saved; Redis is a cache. */ }
+    return voice;
+  }
+  const redis = getRedis();
   if (redis) {
     await redis.set(key(tenantId), voice);
     await mirrorRecord("tenant_settings", tenantId, "reply_voice", { value: voice });

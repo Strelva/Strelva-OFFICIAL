@@ -1,4 +1,4 @@
-import { mirrorRecord, removeRecord, readSetting } from "./client-records";
+import { mirrorRecord, removeRecord, readSetting, durableRecordAuthority, writeDurableRecord, removeDurableRecord } from "./client-records";
 import { getRedis } from "@/platform/infra/redis";
 
 /**
@@ -60,16 +60,27 @@ async function getRedisGoal(tenant: string): Promise<Goal | null> {
 }
 
 export async function setGoal(tenant: string, metric: GoalMetric, target: number): Promise<Goal | null> {
-  const redis = getRedis();
-  if (!redis) return null;
   if (!GOAL_METRICS.includes(metric) || !Number.isFinite(target) || target <= 0) return null;
   const goal: Goal = { metric, target: Math.round(target), createdAt: new Date().toISOString() };
+  if (await durableRecordAuthority("tenant_settings")) {
+    const status = await writeDurableRecord("tenant_settings", tenant, "goal", { value: goal }, goal.createdAt);
+    if (status === "kept") throw new Error("Goal update was superseded by a newer change.");
+    try { const redis = getRedis(); if (redis) await redis.set(goalKey(tenant), JSON.stringify(goal)); } catch { /* Durable goal already saved; Redis is a cache. */ }
+    return goal;
+  }
+  const redis = getRedis();
+  if (!redis) return null;
   await redis.set(goalKey(tenant), JSON.stringify(goal));
   await mirrorRecord("tenant_settings", tenant, "goal", { value: goal });
   return goal;
 }
 
 export async function clearGoal(tenant: string): Promise<void> {
+  if (await durableRecordAuthority("tenant_settings")) {
+    await removeDurableRecord("tenant_settings", tenant, "goal");
+    try { const redis = getRedis(); if (redis) await redis.del(goalKey(tenant)); } catch { /* Durable removal already saved; Redis is a cache. */ }
+    return;
+  }
   const redis = getRedis();
   if (!redis) return;
   await redis.del(goalKey(tenant));

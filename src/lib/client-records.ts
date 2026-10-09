@@ -46,7 +46,7 @@ export async function writeDurableRecord(store: ClientRecordStoreName, tenant: s
 }
 export async function removeDurableRecord(store: ClientRecordStoreName, tenant: string, recordId: string): Promise<void> {
   const result = await (await workspacePorts().clientRecords()).writeClientRecord(store, tenant, { recordId, remove: true }, "dual_write");
-  if (["failed", "skipped"].includes(result.status)) throw new Error(`client_records_remove_failed:${result.reason ?? result.status}`);
+  if (["failed", "skipped", "kept"].includes(result.status)) throw new Error(`client_records_remove_failed:${result.reason ?? result.status}`);
 }
 
 export async function mutateDurableConnection(tenant:string,provider:string,expected:unknown,payload:unknown,capturedAt:string):Promise<string> {
