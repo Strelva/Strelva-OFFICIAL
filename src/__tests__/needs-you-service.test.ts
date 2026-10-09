@@ -397,7 +397,16 @@ describe("booking request clock ownership", () => {
   });
   it("does not email booking asks while owner notices are off", async () => {
     vi.stubEnv("STRELVA_BOOKING_OWNER_NOTICE", "0");
-    const { svc } = await setup(); expect((await svc.chase()).urgent).toBe(0); expect(sendEmail).not.toHaveBeenCalled();
+    const { row, resolve, svc } = await setup();
+    expect((await svc.chase()).urgent).toBe(0);
+    expect(mem.items.get(row.id)?.deliveries).toEqual([
+      expect.objectContaining({ kind: "urgent", status: "suppressed", reason: "booking_owner_notice_disabled" }),
+    ]);
+    expect(mem.items.get(row.id)?.state).toBe("open");
+    await svc.chase();
+    expect(mem.items.get(row.id)?.deliveries).toHaveLength(1);
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(resolve).not.toHaveBeenCalled();
   });
 });
 

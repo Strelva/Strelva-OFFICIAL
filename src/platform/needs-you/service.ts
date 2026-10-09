@@ -476,7 +476,13 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
           const fresh = await reconcile(readCtx, row);
           if (fresh === "gone" || fresh === "changed") continue;
         }
-        if (row.sourceLifecycle === "booking_request" && !bookingOwnerNoticeEnabled()) continue;
+        if (row.sourceLifecycle === "booking_request" && !bookingOwnerNoticeEnabled()) {
+          if (row.urgent && row.deliveryState === "not_sent") {
+            await deps.store.recordDelivery(workspaceId, row.id, "urgent", "suppressed", null, null, "booking_owner_notice_disabled");
+            summary.ownerNotTold += 1;
+          }
+          continue;
+        }
         if (deps.canDeliver && !(await deps.canDeliver(row))) { summary.ownerNotTold += 1; continue; }
         if (row.urgent && row.deliveryState === "not_sent"
           && (row.sourceLifecycle !== "booking_request" || !deps.bookingUrgentAllowed || await deps.bookingUrgentAllowed(workspaceId))) {
