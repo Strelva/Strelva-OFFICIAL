@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page, type Route, type TestInfo } from "@playwright/test";
+import { assertReadableText } from "./support/assert-readable-text";
 import { formsRecord, formOptions, workId, workspaceId } from "./support/website-forms-browser-fixture";
 
 function loopback(info: TestInfo) {
@@ -7,6 +8,12 @@ function loopback(info: TestInfo) {
   const url = new URL(base);
   if (url.protocol !== "http:" || !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) || url.username || url.password || url.pathname !== "/" || url.search || url.hash) throw new Error("A credential-free HTTP loopback origin is required.");
   return url.origin;
+}
+
+async function readableForms(page: Page, forms: Locator, info: TestInfo, state: string) {
+  await assertReadableText(forms.getByRole("heading", { name: "Visitor forms", exact: true }), info, `${state}-forms-heading`);
+  await assertReadableText(forms.getByText("Inquiry form selected.", { exact: true }), info, `${state}-selected-summary`);
+  await assertReadableText(page.getByText("Fictional website forms interface · no Auth or publication proof", { exact: true }), info, `${state}-fixture-disclosure`);
 }
 
 async function fixture(page: Page, info: TestInfo, version: 1 | 2, width: number, enlarged = false, managed = false) {
@@ -39,6 +46,7 @@ async function fixture(page: Page, info: TestInfo, version: 1 | 2, width: number
   if (enlarged) await page.addStyleTag({ content: "html { font-size: 200% !important; }" });
   const forms = page.getByRole("region", { name: "Website visitor forms", exact: true, includeHidden: true });
   await expect(forms).toBeVisible();
+  await readableForms(page, forms, info, "initial");
   await forms.getByRole("button", { name: "Choose forms", exact: true }).click();
   const source = forms.getByLabel("Connected website", { exact: true });
   await expect(source).toHaveValue("fictional-bakery");
@@ -76,6 +84,7 @@ test("managed v2 publication permission loss hides pending forms and requires sa
   await outside.focus(); await f.complete("valid");
   const reload = page.getByRole("button", { name: "Reload current state", exact: true });
   await expect(reload).toBeVisible(); await expect(outside).toBeFocused();
+  await readableForms(page, f.forms, info, "unknown-permission");
   await expect(f.update).toBeDisabled();
   await expect(page.getByRole("button", { name: "Publish approved website", exact: true })).toBeDisabled();
   const previousReads = f.reads.length;
@@ -86,6 +95,7 @@ test("managed v2 publication permission loss hides pending forms and requires sa
   await f.forms.getByRole("button", { name: "Choose forms", exact: true }).click();
   await expect(f.inquiry).toHaveValue("catering");
   await expect(page.getByRole("button", { name: "Publish approved website", exact: true })).toHaveCount(0);
+  await readableForms(page, f.forms, info, "reconciled-permission");
   await page.screenshot({ path: info.outputPath("managed-permission-reconciled.png"), fullPage: true });
   await scope(info, f.blocked, f.posts);
 });
@@ -124,6 +134,7 @@ for (const version of [1, 2] as const) for (const [width, enlarged] of [[1440, f
       await expect.poll(() => f.posts.length).toBe(1);
       expect(JSON.parse(f.posts[0]!)).toEqual({ expectedRevision: 1, selection: { tenantId: "fictional-bakery", inquiryCapabilityId: "catering" } });
       for (const control of await f.forms.locator("select, button").all()) await expect(control).toBeDisabled();
+      await readableForms(page, f.forms, info, "pending");
       for (const name of ["Approve this preview", "Prepare launch", "Publish approved website"]) {
         const action = page.getByRole("button", { name, exact: true });
         if (await action.count()) await expect(action).toBeDisabled();
@@ -141,11 +152,13 @@ for (const version of [1, 2] as const) for (const [width, enlarged] of [[1440, f
       if (await publish.count()) await expect(publish).toBeDisabled();
       await geometry(page, f.forms, width);
       if (width < 768) { const box = await reload.boundingBox(); expect(box!.height).toBeGreaterThanOrEqual(44); expect(box!.width).toBeGreaterThanOrEqual(44); }
+      await readableForms(page, f.forms, info, "unknown");
       await page.screenshot({ path: info.outputPath("unconfirmed-forms.png"), fullPage: true });
       f.failRead(true); await reload.focus(); await page.keyboard.press("Enter");
       await expect(page.getByRole("alert").filter({ hasText: "The current saved website could not be loaded" }).first()).toBeVisible();
       await expect(reload).toBeFocused(); await expect(f.update).toBeDisabled(); await expect(f.inquiry).toHaveValue("catering");
       expect(f.posts).toHaveLength(1);
+      await readableForms(page, f.forms, info, "failed-current-read");
       f.failRead(false); await page.keyboard.press("Enter");
       await expect(reload).toHaveCount(0);
       await expect(page.getByRole("heading", { name: version === 2 ? "Ready for your review" : "Fictional bakery", exact: true }).first()).toBeFocused();
@@ -156,6 +169,7 @@ for (const version of [1, 2] as const) for (const [width, enlarged] of [[1440, f
       await f.forms.getByRole("button", { name: "Choose forms", exact: true }).click();
       await expect(f.inquiry).toHaveValue("catering");
       await geometry(page, f.forms, width);
+      await readableForms(page, f.forms, info, "reconciled");
       await page.screenshot({ path: info.outputPath("reconciled-forms.png"), fullPage: true });
       await scope(info, f.blocked, f.posts);
     });
@@ -172,6 +186,7 @@ for (const version of [1, 2] as const) {
     await f.complete("valid");
     const reload = page.getByRole("button", { name: "Reload current state", exact: true });
     await expect(reload).toBeVisible(); await expect(outside).toBeFocused(); await expect(f.update).toBeDisabled();
+    await readableForms(page, f.forms, info, "unknown-editing-access");
     await reload.click(); await expect(reload).toHaveCount(0);
     await expect(f.forms.getByRole("button", { name: "Choose forms", exact: true })).toBeEnabled();
     await scope(info, f.blocked, f.posts);
@@ -185,6 +200,7 @@ for (const version of [1, 2] as const) {
     await expect(f.forms.getByRole("button", { name: "Choose forms", exact: true })).toBeEnabled();
     await expect(outsideFocus ? outside : f.forms.getByRole("heading", { name: "Visitor forms", exact: true })).toBeFocused();
     await expect(page.getByRole("button", { name: "Reload current state", exact: true })).toHaveCount(0);
+    await readableForms(page, f.forms, info, "acknowledged");
     await scope(info, f.blocked, f.posts);
   });
 }

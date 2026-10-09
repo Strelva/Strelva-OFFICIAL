@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page, type Route, type TestInfo } from "@playwright/test";
+import { assertReadableText } from "./support/assert-readable-text";
 import type { WebsiteBrief } from "../src/products/websites/contracts";
 import { legacyBrief, legacyBrowserRecord, legacyWorkspaceId, legacyWorkId } from "./support/legacy-website-browser-fixture";
 
@@ -15,6 +16,13 @@ function loopback(info: TestInfo) {
   const url = new URL(base);
   if (url.protocol !== "http:" || !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) || url.username || url.password || url.pathname !== "/" || url.search || url.hash) throw new Error("A credential-free HTTP loopback origin is required.");
   return url.origin;
+}
+
+async function readableBrief(page: Page, region: Locator, info: TestInfo, state: string) {
+  await assertReadableText(region.getByRole("heading", { level: 1 }), info, `${state}-website-heading`);
+  await assertReadableText(region.getByRole("textbox", { name: "Business name", exact: true }), info, `${state}-entered-business`);
+  await assertReadableText(region.getByText("Describe the business in your own words. This stays attached to the saved work.", { exact: true }), info, `${state}-brief-description`);
+  await assertReadableText(page.getByText("Fictional website recovery · no Auth, generation or publication proof", { exact: true }), info, `${state}-fixture-disclosure`);
 }
 
 async function fixture(page: Page, info: TestInfo, mode: "create" | "saved", width: number, enlarged: boolean) {
@@ -40,6 +48,7 @@ async function fixture(page: Page, info: TestInfo, mode: "create" | "saved", wid
   if (enlarged) await page.addStyleTag({ content: "html { font-size: 200% !important; }" });
   const region = page.getByRole("region", { name: "Website setup", exact: true });
   await expect(region.getByRole("textbox", { name: "Business name", exact: true })).toBeEnabled();
+  await readableBrief(page, region, info, "initial");
   return { region, posts, reads, blocked,
     failRead(value: boolean) { failRead = value; },
     async complete(index: number, outcome: "lost" | "artifact_failed" | "launch_failed") {
@@ -108,6 +117,7 @@ for (const [width, enlarged] of [[1440, false], [390, false], [320, true]] as co
     await expect(width === 390 ? outside : recovery).toBeFocused();
     await expect(generate).toBeDisabled(); await frozenBrief(page, f.region);
     await geometry(page, f.region, width);
+    await readableBrief(page, f.region, info, "unknown-frozen");
     await page.screenshot({ path: info.outputPath("frozen-brief.png"), fullPage: true });
     if (mode === "create") {
       await recovery.focus(); await page.keyboard.press("Enter");
@@ -127,6 +137,7 @@ for (const [width, enlarged] of [[1440, false], [390, false], [320, true]] as co
       await expect(f.region.getByRole("alert")).toContainText("The current saved website could not be loaded");
       await expect(recovery).toBeFocused(); await expect(generate).toBeDisabled(); await frozenBrief(page, f.region);
       expect(f.posts).toHaveLength(1);
+      await readableBrief(page, f.region, info, "failed-current-read");
       f.failRead(false); await recovery.focus(); await page.keyboard.press("Enter");
       await expect(recovery).toHaveCount(0); expect(f.reads).toHaveLength(previousReads + 2);
       await expect(f.region.getByRole("heading", { name: submitted.businessName, exact: true })).toBeFocused();
@@ -134,6 +145,7 @@ for (const [width, enlarged] of [[1440, false], [390, false], [320, true]] as co
       await expect(f.region.getByRole("button", { name: "Prepare launch", exact: true })).toHaveCount(0);
       expect(f.posts).toHaveLength(1);
     }
+    await readableBrief(page, f.region, info, "reconciled");
     await geometry(page, f.region, width); await page.screenshot({ path: info.outputPath("recovered-brief.png"), fullPage: true });
     expect(f.blocked).toEqual([]);
     await info.attach("fictional-ui-scope", { body: JSON.stringify({ width, enlarged, mode, observedHttpPosts: f.posts.length, nativeAuthQualified: false, providerGenerationCountQualified: false, publicationQualified: false }), contentType: "application/json" });
@@ -154,6 +166,7 @@ test.describe("persisted launch failure", () => {
     await expect(f.region.getByRole("button", { name: "Retry launch preparation", exact: true })).toBeEnabled();
     await expect(f.region.getByRole("status").filter({ hasText: "Launch preparation is pending" })).toHaveCount(0);
     await expect(f.region.getByRole("heading", { name: legacyBrief.businessName, exact: true })).toBeFocused();
+    await readableBrief(page, f.region, info, "retained-launch-failure");
     await geometry(page, f.region, 390); await page.screenshot({ path: info.outputPath("saved-launch-failure.png"), fullPage: true });
     expect(f.posts).toHaveLength(1); expect(f.blocked).toEqual([]);
     await info.attach("fictional-ui-scope", { body: JSON.stringify({ observedHttpPosts: 1, nativeAuthQualified: false, providerGenerationCountQualified: false, publicationQualified: false }), contentType: "application/json" });
