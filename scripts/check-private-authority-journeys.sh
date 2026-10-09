@@ -16,7 +16,7 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 [[ "$bundler" == webpack || "$bundler" == turbopack ]] || { echo 'Choose webpack or turbopack.' >&2; exit 2; }
-base_env=("PATH=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin" "HOME=$HOME" "USER=${USER:-}" "LOGNAME=${LOGNAME:-}" "TMPDIR=${TMPDIR:-/tmp}" "LC_ALL=C")
+base_env=("PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" "HOME=$HOME" "USER=${USER:-}" "LOGNAME=${LOGNAME:-}" "TMPDIR=${TMPDIR:-/tmp}" "LC_ALL=C")
 manifest="$root/scripts/full-model-journey-profile.mjs"
 if [[ "$list" == 1 ]]; then env -i "${base_env[@]}" node scripts/private-authority-journey-window.mjs manifest; exit; fi
 # New isolated window preflight; never dispatch the primary windows here.
