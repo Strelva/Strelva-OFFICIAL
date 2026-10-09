@@ -39,3 +39,15 @@ it("keeps provider failure echo out of permanent receipt history",async()=>{
  const result=await postReviewReply({workspaceId:"workspace",bindingId:"binding",location:{locationId:"location"},receipts:store,client} as unknown as ListingContext,{reviewId:"review",text:"Owner authored",authority:input.authority});
  expect(result.status).toBe("failed");expect(JSON.stringify(store.all())).not.toContain("private Google provider");
 });
+
+it("settles an unsent undo when its snapshot expires during the final authority check",async()=>{
+ vi.useFakeTimers();vi.setSystemTime(new Date("2026-10-08T00:00:00Z"));
+ const store=createMemoryReceiptStore();const deadline=new Date(Date.now()+1000).toISOString();
+ const original=(await store.record({...input,providerPayloadExpiresAt:deadline})).receipt;
+ await store.settle(original.id,"workspace",{status:"posted",undo:{kind:"patch_snapshot",updateMask:["hours"],snapshot:{hours:"Google prior"}}});
+ let checks=0;const authorizeProvider=vi.fn(async()=>{if(++checks===2) vi.advanceTimersByTime(1000);});
+ const client={patchLocation:vi.fn()};
+ const result=await undoListingChange({workspaceId:"workspace",bindingId:"binding",location:{locationId:"location"},receipts:store,client,authorizeProvider} as unknown as ListingContext,{receiptId:original.id,authority:{kind:"operator_undo",actor:"operator"}});
+ expect(result).toMatchObject({status:"failed",receipt:{status:"failed",undo:null,error:"The saved Google snapshot expired before the write. Nothing was sent."}});
+ expect(client.patchLocation).not.toHaveBeenCalled();expect(store.all().filter(row=>row.status==="posting")).toHaveLength(0);
+});

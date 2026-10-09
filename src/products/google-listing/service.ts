@@ -189,7 +189,12 @@ async function governedWrite<T>(ctx: ListingContext, plan: WritePlan<T>): Promis
     });
     return { status: "failed", receipt: settled, accessPending: false, message: MESSAGES.provider };
   }
-  if(snapshotExpired()) return refused("snapshot_expired");
+  if (snapshotExpired()) {
+    const settled = await ctx.receipts.settle(receipt.id, ctx.workspaceId, {
+      status: "failed", error: "The saved Google snapshot expired before the write. Nothing was sent.", undo: null,
+    });
+    return { status: "failed", receipt: settled, accessPending: false, message: MESSAGES.snapshot_expired };
+  }
   let written: GoogleResult<T>;
   try { written = await plan.write(); }
   catch {
