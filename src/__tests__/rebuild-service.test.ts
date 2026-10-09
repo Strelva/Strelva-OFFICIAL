@@ -625,3 +625,32 @@ describe("website System: publish onto a linked site, routing after a rename, op
     expect(h.domainChange).not.toHaveBeenCalled();
   });
 });
+
+
+describe("continued email cue complete current job",()=>{
+ it.each(["\n","\r\n"])("keeps LF/CRLF cue binding coherent through edit/removal/recomposition %j",async(separator)=>{
+  const description=["We do not offer delivery","Email:","orders@example.test","Do not email retired@example.test","Call (716) 555-0199","We bake bread."].join(separator);
+  const h=harness();let record=await h.create({...brief,description});
+  expect(record.rebuild.status).toBe("review_ready");
+  const contact=Object.entries(record.rebuild.candidate!.document.facts).find(([,fact])=>fact.kind==="contact"&&fact.text==="orders@example.test");expect(contact).toBeDefined();
+  for(const id of unresolvedSiteFacts(record.rebuild.candidate!.document))record=await h.service.resolveFact(actor,record.workId,id,{...selection(record),action:"confirm"});
+  record=await h.launch(record);const published=clone(h.publications.get(record.rebuild.tenantId!)!);
+  const id=contact![0];expect(descriptionContactBindings(currentDescriptionBusinessFacts({...brief,description},record.rebuild.candidate!.document)).filter(binding=>binding.contactId===id)).toHaveLength(1);
+  const edited=await h.service.resolveFact(actor,record.workId,id,{...selection(record),action:"edit",text:"pickup@example.test"});
+  const current=currentDescriptionBusinessFacts({...brief,description},edited.rebuild.candidate!.document);
+  expect(descriptionContactBindings(current).filter(binding=>binding.contactId===id)).toHaveLength(1);
+  const recomposed=await composeRebuildSite(current,writeSourceContent(current));
+  for(const doc of [edited.rebuild.candidate!.document,recomposed]){
+   const claims=Object.values(doc.facts).filter(fact=>fact.kind==="claim").map(fact=>fact.text).join(" ");expect(claims).toContain("pickup@example.test");expect(claims).not.toContain("orders@example.test");expect(claims).toContain("Do not email retired@example.test");
+   for(const path of ["/","/contact"]){const html=renderSiteDocumentHtml(doc,path,{preview:true});expect(html).toContain('href="mailto:pickup@example.test"');expect(html).not.toContain("orders@example.test");expect(html).toContain('href="tel:7165550199"');expect(html).not.toContain('href="mailto:retired@example.test"');}
+  }
+  const removed=await h.service.resolveFact(actor,record.workId,id,{...selection(edited),action:"remove"});
+  expect(Object.values(removed.rebuild.candidate!.document.facts).every(fact=>fact.text.trim().length>0)).toBe(true);
+  expect(Object.values(removed.rebuild.candidate!.document.nodes).every(node=>node.factIds.every(id=>removed.rebuild.candidate!.document.facts[id]))).toBe(true);
+  const [claimId,claim]=Object.entries(removed.rebuild.candidate!.document.facts).find(([,fact])=>fact.kind==="claim"&&fact.text.includes("We bake bread."))!;
+  const ordinary=await h.service.resolveFact(actor,record.workId,claimId,{...selection(removed),action:"edit",text:claim.text.replace("We bake bread.","We bake pastries.")});
+  const final=currentDescriptionBusinessFacts({...brief,description},ordinary.rebuild.candidate!.document);expect(final.contact).not.toContain(id);expect(descriptionContactBindings(final)).toHaveLength(1);
+  for(const doc of [ordinary.rebuild.candidate!.document,await composeRebuildSite(final,writeSourceContent(final))])for(const path of ["/","/contact"]){const html=renderSiteDocumentHtml(doc,path,{preview:true});expect(html).not.toContain("pickup@example.test");expect(html).not.toContain("orders@example.test");expect(html).toContain('href="tel:7165550199"');expect(html).not.toContain('href="mailto:retired@example.test"');}
+  expect(ordinary.rebuild.input).toEqual(record.rebuild.input);expect(h.publications.get(record.rebuild.tenantId!)!).toEqual(published);expect(ordinary.rebuild.approvedCandidateRevision).toBeNull();
+ });
+});

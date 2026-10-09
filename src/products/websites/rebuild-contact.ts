@@ -21,7 +21,12 @@ export function descriptionContactSpans(description: string): Array<{ text: stri
     if (rebuildContactLink(text) && !contacts.some(contact => contact.start === start)) contacts.push({ text, start, end: start + text.length });
   };
   const offered = (index: number, length: number, context?: RegExp) => {
-    const prefix = description.slice(Math.max(0, index - 120), index).split(/[.!?;]\s+|\n/).at(-1)!;
+    const parts = description.slice(Math.max(0, index - 120), index).split(/[.!?;]\s+|\n/);
+    let prefix = parts.at(-1)!;
+    // A literal email cue may put its destination on the next line. Retain
+    // only that immediately preceding cue and its own negative/history scope.
+    const previous = parts.at(-2) ?? "";
+    if (context && !prefix.trim() && /\b(?:email|e-mail|mail|contact|reach|write)(?:\s+(?:us|me|our|office|at|on|team|business)){0,4}\s*:?\s*$/i.test(previous)) prefix = previous;
     const suffix = description.slice(index + length, index + length + 60);
     if (/\b(?:do not|don't|never|not|no longer|retired|former|previous|old|discontinued|obsolete)\b/i.test(prefix)) return false;
     if (/^\s*(?:is|was|has been)?\s*(?:retired|discontinued|obsolete|no longer)/i.test(suffix)) return false;

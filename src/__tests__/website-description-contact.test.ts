@@ -139,3 +139,34 @@ describe("supplied contact details in a new website description", () => {
     expect(result.document.capabilities).toBeUndefined();
   });
 });
+
+describe("continued literal contact cues",()=>{
+ it.each([
+  ["Email:\norders@example.test",["orders@example.test"]],
+  ["Email:\r\norders@example.test",["orders@example.test"]],
+  ["Do not email:\nretired@example.test",[]],
+  ["Previous email:\nretired@example.test",[]],
+  ["Call:\n(716) 555-0100",["(716) 555-0100"]],
+  ["Call:\r\n(716) 555-0100",["(716) 555-0100"]],
+  ["Do not call:\n(716) 555-0100",[]],
+  ["Previous phone:\n(716) 555-0100",[]],
+ ])("retains a positive literal cue and refuses its negative/history context %s",(description,expected)=>{
+  const facts=extractBusinessFacts({businessName:"Fictional Bread",description});
+  expect(facts.contact.map(id=>facts.facts[id]!.text)).toEqual(expected);
+  expect(descriptionContactBindings(facts)).toHaveLength(expected.length);
+ });
+});
+
+
+describe("continued email cue scope",()=>{
+ it.each([
+  "Email:\nOrders for Saturday:\norders@example.test",
+  "Email:\n\norders@example.test",
+  "Email:\nmailto:orders@example.test",
+  "No longer email:\norders@example.test",
+  "Email:\norders@example.test is retired",
+  "Unrelated:\norders@example.test",
+ ])("does not borrow an unrelated cue or activate a historical/invalid destination %s",description=>{
+  const facts=extractBusinessFacts({businessName:"Fictional Bread",description});expect(facts.contact).toEqual([]);expect(descriptionContactBindings(facts)).toEqual([]);
+ });
+});

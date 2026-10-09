@@ -234,7 +234,13 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
         const claim = document.facts[id]!; const before = claim.text; let next = before;
         for (const span of bindings.filter(binding => binding.contactId === factId && binding.claimId === id).sort((a,b) => b.start - a.start)) next = next.slice(0,span.start) + text + next.slice(span.end);
         next = next.trim();
-        if (next !== before) { claimChanges.push({ id, before, after: next }); claim.text = next; claim.highRisk = isHighRiskWebsiteClaim(next); }
+        if (next !== before) {
+          claimChanges.push({ id, before, after: next });
+          // Removing a destination-only span also removes its now-empty
+          // current claim; empty facts cannot survive schema validation.
+          if (!next && input.action === "remove") delete document.facts[id];
+          else { claim.text = next; claim.highRisk = isHighRiskWebsiteClaim(next); }
+        }
       }
     };
     const rewriteClaimCopy = (value: string, factIds?: string[], max?: number) => {
@@ -248,6 +254,7 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     if (input.action === "remove") {
       delete document.facts[factId];
       updateDescriptionClaims("");
+      const removedIds = new Set([factId,...claimChanges.filter(claim => !claim.after).map(claim => claim.id)]);
       const removeCopy = (value: string, factIds?: string[], max?: number) => {
         if (contactLink) return rewriteClaimCopy(value,factIds,max).split("\n\n").map(paragraph => paragraph === fact.text ? "" : paragraph).join("\n\n").trim();
         if (fact.text.startsWith(value) && value.length >= 30) return "";
@@ -260,8 +267,8 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
         if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).flatMap(([key,child]) => { const next = key === "href" && contactLink ? contactHref(child) ? undefined : child : rewrite(child,factIds); return next === undefined ? [] : [[key,next]]; }));
         return value;
       };
-      for (const [id,node] of Object.entries(document.nodes)) if (node.factIds.includes(factId)) {
-        const factIds = node.factIds.filter(value => value !== factId);
+      for (const [id,node] of Object.entries(document.nodes)) if (node.factIds.some(value => removedIds.has(value))) {
+        const factIds = node.factIds.filter(value => !removedIds.has(value));
         const verification = factIds.length ? node.verification : { supported:true,confidence:1,needsReview:false };
         const updated = catalogNodeSchema.safeParse({ ...node,props:rewrite(node.props,node.factIds),factIds,verification });
         // Some required typed fields (for example a link's href) cannot remain

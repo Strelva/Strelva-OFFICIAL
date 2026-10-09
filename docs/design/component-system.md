@@ -115,6 +115,9 @@ display separators; equivalent offered formats share one destination fact.
 A contact correction projects the same-kind safe destination and its exact
 positively offered spans in originating current description claims and copy.
 Ordered claim context survives chunk boundaries; contact tokens remain whole.
+An explicit email cue may place its destination on the immediately next line,
+retaining the cue's own negative/history scope. Removing a destination-only
+current claim also removes that empty claim and its node evidence references.
 Historical/negated mentions, unrelated facts, input/provenance and published
 versions remain intact. Recomposition uses corrected current claims. Editing
 or removing an ordinary claim that would change a currently bound contact
