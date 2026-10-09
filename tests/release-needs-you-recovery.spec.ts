@@ -28,7 +28,8 @@ async function fixture(page: Page, info: TestInfo, view: "home" | "needs-you", w
       return route.fulfill({ status: 503, json: { error: "Unrelated fictional read unavailable." } });
     }
     if (url.pathname.startsWith("/api/")) { blocked.push(`GET ${url.pathname}`); return route.abort(); }
-    if (url.pathname.startsWith("/_next/") || url.pathname === "/favicon.ico" || url.pathname === "/preview/strelva/needs-you-recovery") return route.continue();
+    const workspaceImage = ["/images/workspace/dusk.webp", "/images/workspace/ink-moss.webp"].includes(url.pathname) && url.search === "";
+    if (url.pathname.startsWith("/_next/") || workspaceImage || url.pathname === "/favicon.ico" || url.pathname === "/preview/strelva/needs-you-recovery") return route.continue();
     blocked.push(`GET ${url.pathname}`); return route.abort();
   });
   await page.setViewportSize({ width, height: 900 });

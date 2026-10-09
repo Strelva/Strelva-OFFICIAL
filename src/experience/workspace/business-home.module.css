@@ -1165,6 +1165,14 @@ button.row:hover {
   }
 }
 
+@media (pointer: coarse) {
+  .quietPill,
+  .decisionLink {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .reveal,
   .decision,

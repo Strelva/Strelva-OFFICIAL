@@ -1534,9 +1534,27 @@ The fictional recovery browser fixture keeps its original customer viewport,
 enlarged text, coarse-pointer and complete recovery assertions. Chromium147
 full-page capture beyond the viewport clears touch emulation and paints fine
 pointer CSS. The owned capture helper fits document height at the same width
-only for the full-page image, refuses changed critical geometry/text paint or
-unbounded height feedback, and restores the exact viewport, focus and scroll
-even on capture failure. Each phase retains the exact capture mode and device
+only for the full-page image. The real fixture places its disclosure above an
+AppFrame whose default height is 100dvh, so naive expansion grows the document by
+the disclosure height forever. Capture pins the existing `--app-frame-height`
+contract to the observed original frame height, verifies exact frame/main and
+review-control geometry and text paint, then attempts every owned restoration
+of the original property value, priority and presence, viewport, focus and scroll
+before any equality assertions. A rejected resize or property mismatch cannot
+prevent remaining restoration attempts. Capture and cleanup failures stay
+retained in order, with the first failure as cause; any failed restoration or
+remaining mismatch refuses qualification. Finite actual reveal animations finish before measurement;
+zero-size hidden nodes retain their empty rectangles rather than receiving
+window scroll offsets. Other responsive height/paint/focus changes and remaining
+height feedback still refuse capture. Each phase retains the exact capture mode and device
 metadata. Expanded capture height grants no customer-device qualification.
 Closed local synthetic controls and focused source tests are preparation; the
 unchanged complete45-case HTTP/UI job must pass on the composed source.
+
+The native Not yet pill and Open decision link retain their normal desktop
+geometry and use 44px minima for coarse pointers. The recovery fixture permits
+only the two exact same-origin background assets named in its owned CSS, in
+addition to its existing closed read/static routes; foreign traffic and writes
+still fail. Bounded actual HTTP diagnostics completed the Deck recovery job and
+all four Home recovery phases, with Home's terminal asset-allowlist refusal
+retained. The final combined successor still requires the unchanged full 45 run.
