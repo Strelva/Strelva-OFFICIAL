@@ -9,11 +9,11 @@ import { beginFocusRecovery, type FocusRecovery } from "./focus-recovery";
 import type { RebuildView } from "./rebuild-transport";
 
 /** Prepare authority for one hostname before the operator changes its domain. */
-interface DomainRequestProps { workId: string; workspaceId?: string; request?: typeof fetch; readOnly?: boolean; disabled?: boolean; canPrepare?: () => boolean }
+interface DomainRequestProps { workId: string; workspaceId?: string; request?: typeof fetch; readOnly?: boolean; disabled?: boolean; canPrepare?: () => boolean; onBlockedChange?: (blocked: boolean) => void }
 export function WebsiteDomainRequest(props: DomainRequestProps) {
   return <DomainRequestSession key={`${props.workspaceId ?? "work"}:${props.workId}`} {...props} />;
 }
-function DomainRequestSession({ workId, workspaceId, request = fetch, readOnly = false, disabled = false, canPrepare }: DomainRequestProps) {
+function DomainRequestSession({ workId, workspaceId, request = fetch, readOnly = false, disabled = false, canPrepare, onBlockedChange }: DomainRequestProps) {
   const [domain, setDomain] = useState("");
   const [busy, setBusy] = useState(false);
   const [unknown, setUnknown] = useState(false);
@@ -41,7 +41,7 @@ function DomainRequestSession({ workId, workspaceId, request = fetch, readOnly =
     const command = check ? attempt.current : { workId, workspaceId, requestId: requestId.current, domain: domain.trim(), hostname: normalizeTenantDomain(domain.trim())?.replace(/:\d+$/, "") ?? domain.trim().toLowerCase() };
     if (!command) return;
     const wasUnknown = unknown, started = permission.current.revision;
-    attempt.current = command; inFlight.current = true;
+    attempt.current = command; inFlight.current = true; onBlockedChange?.(true);
     focus.current?.cancel(); focus.current = beginFocusRecovery(scopeRef.current);
     setBusy(true); setNotice(null);
     try {
@@ -59,12 +59,12 @@ function DomainRequestSession({ workId, workspaceId, request = fetch, readOnly =
       const next = receipt(check ? body.request : body, command);
       if (!mounted.current) return;
       if (permission.current.revision !== started) throw new Error("Your access changed while this domain request was being checked.");
-      setSaved(next); setUnknown(false);
+      setSaved(next); setUnknown(false); onBlockedChange?.(false);
       setNotice({ error: false, text: next.decisionId ? "Saved domain request found. The owner has already decided this request." : !next.current || Date.parse(next.expiresAt) <= Date.now() ? "Saved domain request found. This request is no longer current." : "Domain request saved for the owner. Domain setup waits for their approval." });
     } catch (cause) {
       if (!mounted.current) return;
       const refused = cause instanceof Error && "refused" in cause;
-      if (!refused) setUnknown(true);
+      if (!refused) setUnknown(true); else onBlockedChange?.(false);
       setNotice({ error: true, text: `${cause instanceof Error ? cause.message : "The domain request could not be confirmed."}${refused ? "" : " Check this exact saved request before preparing another."}` });
     } finally { inFlight.current = false; if (mounted.current) setBusy(false); }
   }
