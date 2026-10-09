@@ -5,7 +5,7 @@ import { WebsiteExperience } from "./WebsiteExperience";
 
 /** Browser proof supplies fictional responses before mounting this default HTTP consumer. */
 export function LegacyWebsiteRecoveryFixture({ saved }: { saved: boolean }) {
-  return <main data-dashboard className="min-h-screen bg-surface-base">
+  return <main data-dashboard className="min-h-screen bg-surface-base text-warm-black">
     <header className="flex flex-wrap gap-4 border-b border-gray-border p-6 text-sm">
       <p>Fictional website recovery · no Auth, generation or publication proof</p>
       <Button className="max-w-full whitespace-normal" variant="secondary">Outside website control</Button>

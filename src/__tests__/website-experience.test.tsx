@@ -141,7 +141,9 @@ describe("WebsiteExperience", () => {
     const button = [...container.querySelectorAll("button")].find((item) => item.textContent?.includes("Generate a new preview"));
     expect(button).toBeTruthy();
     await act(async () => button?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-    expect(container.textContent).toContain("Reload the latest version before trying again.");
+    expect(container.textContent).toContain("The website change could not be confirmed. Check the current saved website before continuing.");
+    expect([...container.querySelectorAll("button")].some((item) => item.textContent === "Reload current state")).toBe(true);
+    expect(description!.readOnly).toBe(true);
     expect([...container.querySelectorAll<HTMLTextAreaElement>("textarea")].some((field) => field.value.includes("Add evening appointments"))).toBe(true);
     act(() => root.unmount()); container.remove();
   });

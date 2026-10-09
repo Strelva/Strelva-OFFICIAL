@@ -1394,3 +1394,9 @@ The domain preparation also reports synchronous pending/unknown admission to the
 
 
 The first combined39 recovery cases passed35 and retained39 valid traces; four enlarged320px routing cases failed reflow. Actual DOM measurement found the monthly-report month field extending to404px and the preview-error reload control to342px. The owned report field now shrinks within a full-width mobile group; preview error content wraps. Full rerun remains required; native inputs, report fetching, preview hash checks and routing authority are unchanged.
+
+### Website recovery text and card foreground
+
+The legacy website request card sets its semantic foreground (`--warm-black`) together with its semantic surface. Visitor-form headings and selected-state summaries remain readable across host/theme and permission/error states; disabling owned controls does not dim non-control content. Fictional website recovery wrappers bind the same foreground so their no-Auth/no-publication labels remain visible. Tokens and global theme values are unchanged.
+
+Legacy unknown mutations show one plain-language result and recovery instruction: existing work reloads saved state; initial creation checks the same captured request. The entered-details reminder appears once. Browser exception jargon stays out of the customer notice; definitive initial sign-in refusal, changed-access context and actual saved artifact/launch failure distinctions remain intact. This copy change does not alter classification, immutable attempts, focus, authority or retry behavior. Source/retained paint supports the defect; rendered post-correction contrast remains a separate check.

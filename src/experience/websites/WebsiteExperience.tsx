@@ -287,7 +287,8 @@ function WebsiteSession({
         creationAttempt.current = null; setError(reason);
       } else {
         unresolved.current = true; setNeedsReload(true);
-        setError(`${reason} Check the current saved website before continuing.`);
+        const access = permission.current.revision !== started ? "Your access changed. " : cause instanceof WebsiteExperienceError && cause.status === 401 ? `${reason} ` : "";
+        setError(record ? `${access}The website change could not be confirmed. Check the current saved website before continuing.` : `${access}Your website request could not be confirmed. Check this same request before starting another.`);
       }
     } finally {
       inFlight.current = false;
@@ -348,7 +349,7 @@ function WebsiteSession({
       setNotice("Saved status refreshed.");
     } catch {
       if (!mountedRef.current || permission.current.revision !== started) return;
-      setError("The current saved website could not be loaded. Your inputs are retained. Reload again to check what was saved.");
+      setError("The current saved website could not be loaded. Reload again to check what was saved.");
     } finally {
       inFlight.current = false;
       if (mountedRef.current) setBusy(false);
@@ -375,7 +376,7 @@ function WebsiteSession({
       </header>
 
       {readOnly ? <div className={styles.status}><ShieldCheck size={16} aria-hidden="true" /><span>You can review this website, but this access level cannot change it.</span></div> : null}
-      {error ? <div className={styles.alert} role="alert">{error}<p className="mt-2 text-xs">{needsReload ? "Your entered details remain available. Check the current saved website before continuing." : "Your entered details and saved work remain available."}</p>{needsReload && record ? <Button ref={reloadRef} type="button" variant="secondary" loading={busy} disabled={busy} onClick={() => void reload()}>Reload current state</Button> : needsReload && creationAttempt.current ? <Button ref={reloadRef} type="button" variant="secondary" loading={busy} disabled={busy || readOnly} onClick={() => void createPreview(true)}>Check this website request</Button> : null}</div> : null}
+      {error ? <div className={styles.alert} role="alert">{error}<p className="mt-2 text-xs">{needsReload ? "Your entered details are kept here." : "Your entered details and saved work remain available."}</p>{needsReload && record ? <Button ref={reloadRef} type="button" variant="secondary" loading={busy} disabled={busy} onClick={() => void reload()}>Reload current state</Button> : needsReload && creationAttempt.current ? <Button ref={reloadRef} type="button" variant="secondary" loading={busy} disabled={busy || readOnly} onClick={() => void createPreview(true)}>Check this website request</Button> : null}</div> : null}
       {notice ? <p className={styles.notice} role="status">{notice}</p> : null}
 
       {workId && loadFailed && !record ? (
@@ -389,7 +390,7 @@ function WebsiteSession({
         <>
           <div className={styles.status} data-tone={website?.status === "failed" ? "attention" : undefined}>
             {needsReload ? <CircleAlert size={16} aria-hidden="true" /> : <StatusIcon website={website!} />}
-            <span>{needsReload ? "Check the current saved website before reviewing its approval or launch state." : <><strong>{statusLabel(website!)}</strong> · {statusMessage(website!)}</>}</span>
+            <span>{needsReload ? "Approval and launch status are unconfirmed." : <><strong>{statusLabel(website!)}</strong> · {statusMessage(website!)}</>}</span>
           </div>
 
           <div className={styles.requestCard}>
