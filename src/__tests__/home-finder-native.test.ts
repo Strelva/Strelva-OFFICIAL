@@ -54,6 +54,10 @@ describe("Home Finder native licensed transport", () => {
     await expect(readHomeFinderBindings(actor, workspaceId, db)).rejects.toThrow("scope");
     await expect(installHomeFinder(actor, { workspaceId, agencyId: binding.agencyId, commandId: id, name: "Home Finder", externalInstallationId: binding.externalInstallationId, brokerageName: binding.brokerageName, approvedOrigin: binding.approvedOrigin, sourceName: binding.sourceName, licenseReference: "fixture", licenseExpiresAt: binding.licenseExpiresAt }, { rpc: vi.fn().mockResolvedValue({ error: null, data: { ...binding, id: requestId } }) })).rejects.toThrow("receipt");
   });
+  it("refuses an installation receipt with changed agency, license or display identity", async () => {
+    const install = { workspaceId, agencyId: binding.agencyId, commandId: id, name: "Home Finder", externalInstallationId: binding.externalInstallationId, brokerageName: binding.brokerageName, approvedOrigin: binding.approvedOrigin, sourceName: binding.sourceName, licenseReference: binding.licenseReference, licenseExpiresAt: binding.licenseExpiresAt };
+    for (const drift of [{ agencyId: requestId }, { licenseReference: "other" }, { licenseExpiresAt: "2027-01-01T00:00:00Z" }, { approvedOrigin: "https://other.example.test" }, { brokerageName: "Other Brokerage" }, { sourceName: "Other Feed" }]) await expect(installHomeFinder(actor, install, { rpc: vi.fn().mockResolvedValue({ error: null, data: { ...binding, ...drift } }) })).rejects.toThrow("receipt");
+  });
   it("unknown effect is durably recorded after a timeout, with no PII in RPC arguments", async () => {
     const rpc = vi.fn().mockImplementation(async (name: string) => ({ error: null, data: name === "begin_home_finder_intake" ? { status: "started", reference: null } : name === "refresh_home_finder_probe" || name === "finish_home_finder_intake" ? null : binding }));
     const adapter = runtime(vi.fn().mockRejectedValue(new Error("transport uncertain")));
@@ -78,9 +82,20 @@ describe("Home Finder native licensed transport", () => {
 describe("license and display configuration renewal", () => {
   const update = { workspaceId, bindingId: id, commandId: requestId, expectedRevision: 1, expectedChange: 4, brokerageName: binding.brokerageName, approvedOrigin: binding.approvedOrigin, licenseReference: "renewed-fixture", licenseExpiresAt: "2026-12-01T00:00:00Z", sourceName: binding.sourceName };
   it("uses current actor and both native revisions, demanding a paused unqualified receipt", async () => {
-    const rpc = vi.fn().mockResolvedValue({ error: null, data: { ...binding, revision: 2, lifecycle: "paused", qualifiedAt: null, readiness: null, runtimeAllowed: false } });
+    const rpc = vi.fn().mockResolvedValue({ error: null, data: { ...binding, revision: 2, lifecycle: "paused", qualifiedAt: null, readiness: null, runtimeAllowed: false, licenseReference: update.licenseReference, licenseExpiresAt: "2026-12-01T00:00:00.000Z" } });
     expect((await configureHomeFinder(actor, update, { rpc })).revision).toBe(2);
     expect(rpc).toHaveBeenCalledWith("configure_home_finder", expect.objectContaining({ p_user_id: actor.userId, p_verified_email: actor.verifiedEmail, p_input: update, p_digest: expect.stringMatching(/^[a-f0-9]{64}$/) }));
+  });
+  it("refuses a renewal receipt that did not persist the requested license or display scope", async () => {
+    const persisted = { ...binding, revision: 2, lifecycle: "paused", qualifiedAt: null, readiness: null, runtimeAllowed: false, licenseReference: update.licenseReference, licenseExpiresAt: update.licenseExpiresAt };
+    for (const drift of [{ licenseReference: "old-license" }, { licenseExpiresAt: binding.licenseExpiresAt }, { approvedOrigin: "https://foreign.example.test" }, { brokerageName: "Other Brokerage" }, { sourceName: "Other Feed" }]) {
+      await expect(configureHomeFinder(actor, update, { rpc: vi.fn().mockResolvedValue({ error: null, data: { ...persisted, ...drift } }) })).rejects.toThrow("receipt");
+    }
+  });
+  it("requires renewal to clear readiness and retain active draft or paused state", async () => {
+    const persisted = { ...binding, revision: 2, lifecycle: "paused", qualifiedAt: null, readiness: null, runtimeAllowed: false, licenseReference: update.licenseReference, licenseExpiresAt: update.licenseExpiresAt };
+    for (const drift of [{ readiness }, { lifecycle: "live" }, { status: "revoked" }]) await expect(configureHomeFinder(actor, update, { rpc: vi.fn().mockResolvedValue({ error: null, data: { ...persisted, ...drift } }) })).rejects.toThrow("receipt");
+    for (const lifecycle of ["draft", "paused"]) expect((await configureHomeFinder(actor, update, { rpc: vi.fn().mockResolvedValue({ error: null, data: { ...persisted, lifecycle, licenseExpiresAt: "2026-12-01T00:00:00.000Z" } }) })).lifecycle).toBe(lifecycle);
   });
   it("rejects foreign identity, stale generations, claimed qualification and installation identity changes", async () => {
     for (const result of [{ ...binding, workspaceId: requestId }, { ...binding, revision: 1 }, { ...binding, revision: 2, qualifiedAt: null, runtimeAllowed: true }]) await expect(configureHomeFinder(actor, update, { rpc: vi.fn().mockResolvedValue({ error: null, data: result }) })).rejects.toThrow("receipt");

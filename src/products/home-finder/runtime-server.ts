@@ -38,7 +38,9 @@ export async function readHomeFinderBindings(actor: WorkspaceActor, workspaceId:
 export async function installHomeFinder(actor: WorkspaceActor, raw: HomeFinderInstall, db = enterpriseDb()) {
   const input = homeFinderInstallSchema.parse(raw);
   const binding = homeFinderBindingSchema.parse(await enterpriseCall(db, "install_home_finder", { ...enterpriseActor(actor), p_input: input, p_digest: sha256(canonicalJson(input)) }));
-  if (binding.workspaceId !== input.workspaceId || binding.id !== input.commandId || binding.externalInstallationId !== input.externalInstallationId) throw new WorkspaceStoreError("The installation receipt could not be confirmed.");
+  if (binding.workspaceId !== input.workspaceId || binding.id !== input.commandId || binding.externalInstallationId !== input.externalInstallationId
+    || binding.agencyId !== input.agencyId || binding.brokerageName !== input.brokerageName || binding.approvedOrigin !== input.approvedOrigin
+    || binding.sourceName !== input.sourceName || binding.licenseReference !== input.licenseReference || Date.parse(binding.licenseExpiresAt) !== Date.parse(input.licenseExpiresAt)) throw new WorkspaceStoreError("The installation receipt could not be confirmed.");
   return binding;
 }
 async function owned(actor: WorkspaceActor, workspaceId: string, bindingId: string, db: EnterpriseDb) {
@@ -108,6 +110,8 @@ export async function readHomeFinderSystemObservations(actor: WorkspaceActor, wo
 export async function configureHomeFinder(actor: WorkspaceActor, raw: HomeFinderConfigure, db = enterpriseDb()) {
   const input = homeFinderConfigureSchema.parse(raw);
   const result = homeFinderBindingSchema.parse(await enterpriseCall(db, "configure_home_finder", { ...enterpriseActor(actor), p_input: input, p_digest: sha256(canonicalJson(input)) }));
-  if (result.workspaceId !== input.workspaceId || result.id !== input.bindingId || result.revision !== input.expectedRevision + 1 || result.runtimeAllowed || result.qualifiedAt !== null) throw new WorkspaceStoreError("The configuration receipt could not be confirmed. Reload current state.");
+  if (result.workspaceId !== input.workspaceId || result.id !== input.bindingId || result.revision !== input.expectedRevision + 1 || result.runtimeAllowed || result.qualifiedAt !== null || result.readiness !== null || result.status !== "active" || result.lifecycle === "live"
+    || result.brokerageName !== input.brokerageName || result.approvedOrigin !== input.approvedOrigin || result.sourceName !== input.sourceName
+    || result.licenseReference !== input.licenseReference || Date.parse(result.licenseExpiresAt) !== Date.parse(input.licenseExpiresAt)) throw new WorkspaceStoreError("The configuration receipt could not be confirmed. Reload current state.");
   return result;
 }
