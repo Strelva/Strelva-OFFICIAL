@@ -1761,7 +1761,7 @@
           "file": "20261021140000_native_google_lifecycle.sql",
           "sha256": "7d4c76cb8c8f579c19ab9d5ab262db747d868bd5a70274fceef2fdb0066a26b9",
           "rollback": "rollback-20261021140000_native_google_lifecycle.sql",
-          "rollbackSha256": "5bcf9780306f92aa1baeb8c57fbcc0857cc36c7025e5570e40ef78ea4e959832",
+          "rollbackSha256": "d8b273241725a8dc2bcc174c92bdf575bb4e14ee374bc4dc95438c66b191a5cb",
           "rollbackStatus": "Prepared source-drift and populated-state guarded inverse; native inverse/reapply, concurrency and populated refusal qualification pending"
         },
         {

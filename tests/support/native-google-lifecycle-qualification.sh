@@ -63,7 +63,7 @@ select 'journal-security '||encode(sha256(convert_to(jsonb_build_object('owner',
  from pg_class c where c.oid=to_regclass('public.native_google_lifecycle_prior_functions');
 select 'journal-policy '||p.polname||' '||encode(sha256(convert_to(to_jsonb(p)::text,'UTF8')),'hex')
  from pg_policy p where p.polrelid=to_regclass('public.native_google_lifecycle_prior_functions') order by p.polname;
-select 'journal-column-acl '||a.attname||' '||coalesce(a.attacl::text,'NULL')
+select 'journal-column '||a.attname||' '||encode(sha256(convert_to((to_jsonb(a)-'attrelid')::text,'UTF8')),'hex')
  from pg_attribute a where a.attrelid=to_regclass('public.native_google_lifecycle_prior_functions')
  and a.attnum>0 and not a.attisdropped order by a.attnum;
 create function pg_temp.native_qualification_rows() returns setof text language plpgsql as $$
@@ -119,6 +119,13 @@ late_marker="marker text := '  perform pg_advisory_xact_lock(hashtextextended(v_
 assert f.count(late_marker)==1
 write('forward-late-marker-refusal',f.replace(late_marker,"marker text := 'missing_marker perform pg_advisory_xact_lock(hashtextextended(v_workspace::text || '",1))
 write('inverse-extra-acl',injected(i,'grant execute on function '+target+' to authenticated;'))
+for name,sql in {
+ 'inverse-journal-extra-column': 'alter table public.native_google_lifecycle_prior_functions add column unexpected text;',
+ 'inverse-journal-nullability': 'alter table public.native_google_lifecycle_prior_functions alter column prior_properties drop not null;',
+ 'inverse-journal-default': "alter table public.native_google_lifecycle_prior_functions alter column prior_properties set default '{}'::jsonb;",
+ 'inverse-journal-column-type': 'alter table public.native_google_lifecycle_prior_functions alter column applied_properties type json using applied_properties::json;',
+}.items(): write(name,injected(i,sql))
+
 write('inverse-owner-acl',injected(i,"do $qualification$ begin execute 'revoke execute on function "+target+" from '||quote_ident(pg_get_userbyid((select relowner from pg_class where oid='public.workspace_account_bindings'::regclass))); end $qualification$;"))
 for name,sql in {
  'inverse-journal-owner': 'alter table public.native_google_lifecycle_prior_functions owner to authenticated;',
@@ -165,6 +172,9 @@ write('inverse-populated',injected(i,populate))
 PY
  local label
  # All inverse refusal scenarios exercise the actual current inverse guards.
+ for label in inverse-journal-extra-column inverse-journal-nullability inverse-journal-default inverse-journal-column-type; do
+  native_qualification_refuse "$label" "$qualification_dir/$label.sql" native_google_rollback_journal_shape_drift
+ done
  for label in inverse-journal-owner inverse-journal-rls inverse-journal-force-rls inverse-journal-policy inverse-journal-table-acl inverse-journal-column-acl; do
   native_qualification_refuse "$label" "$qualification_dir/$label.sql" native_google_rollback_journal_authority_drift
  done

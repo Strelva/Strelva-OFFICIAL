@@ -17,6 +17,17 @@ do $$ declare prior record; properties jsonb; restored_source text; applied_defi
   or exists(select 1 from pg_attribute where attrelid='public.native_google_lifecycle_prior_functions'::regclass
    and attnum>0 and not attisdropped and attacl is not null)
   then raise exception 'native_google_rollback_journal_authority_drift'; end if;
+ if exists(
+  with expected(position,name,type_name,required) as (values
+   (1,'signature','text',true),(2,'definition','text',true),(3,'prior_definition_hash','text',true),
+   (4,'prior_source_hash','text',true),(5,'prior_properties','jsonb',true),
+   (6,'applied_hash','text',false),(7,'applied_properties','jsonb',false)),
+  actual as (select attnum,attname,atttypid,attnotnull,atthasdef,attidentity,attgenerated,atttypmod
+   from pg_attribute where attrelid='public.native_google_lifecycle_prior_functions'::regclass and attnum>0 and not attisdropped)
+  select 1 from expected e full join actual a on a.attnum=e.position
+   where a.attnum is null or e.position is null or a.attname<>e.name or a.atttypid<>e.type_name::regtype
+    or a.attnotnull<>e.required or a.atthasdef or a.attidentity<>'' or a.attgenerated<>'' or a.atttypmod<>-1)
+  then raise exception 'native_google_rollback_journal_shape_drift'; end if;
  if exists(select 1 from public.native_google_disconnect_receipts) or exists(select 1 from public.native_google_oauth_attempts) then raise exception 'native_google_rollback_populated_review_required'; end if;
  if (select count(*) from public.native_google_lifecycle_prior_functions)<>2
   or not exists(select 1 from public.native_google_lifecycle_prior_functions where signature='public.upsert_workspace_google_location(uuid,text,text,text)')
