@@ -7,7 +7,7 @@ import { getRedis } from "@/platform/infra/redis";
 import { websiteRebuildReleaseEnabledForTenant, websiteRebuildReleaseMayBeOn } from "./rebuild-release";
 import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type SavedWork, type WorkspaceActor } from "@/platform/workspaces/types";
-import { actingProviderRefusal } from "@/platform/workspaces/acting-provider";
+import { actingAgencyRefusal } from "@/platform/workspaces/acting-provider";
 import { siteDocumentHash, siteDocumentSchema, unresolvedSiteFacts, type SiteDocument } from "./site-document";
 import { websiteLaunchReceiptSchema, type WebsiteLaunchReceipt } from "./contracts";
 import { bindToCurrentTenant } from "./hosted-routing";
@@ -89,7 +89,7 @@ export function createWebsiteDocumentStore(db?: WebsiteDocumentRpc, ownerLink?: 
     const result = await client.rpc(name,args);
     if (result.error) {
       // An agency launching or attaching a domain: not staffed, not verified for publishing, or no owner mandate.
-      const refusal = actingProviderRefusal(result.error.message);
+      const refusal = actingAgencyRefusal(result.error.message);
       if (refusal) throw new WorkspaceAccessError(refusal);
       if (result.error.message.includes("workspace_access_denied") || result.error.message.includes("website_tenant_access_denied") || result.error.message.includes("website_tenant_not_linked") || result.error.message.includes("agency_managed_website_draft_denied")) throw new WorkspaceAccessError();
       if (result.error.message.includes("website_domain_owner_approval_required")) throw new WorkspaceConflictError("The owner hasn't approved this domain yet. Strelva can prepare the records; the owner decides.");

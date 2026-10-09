@@ -204,8 +204,8 @@ export async function defaultTenantReplyDeps(): Promise<TenantReplyDeps> {
       const client = getSupabase();
       const user = client ? (await client.from("users").select("email").eq("id", userId).maybeSingle()).data : null;
       if (!user?.email) throw new Error("acting_provider_not_staffed");
-      const { assertActingProvider } = await import("@/platform/workspaces/acting-provider");
-      const actingAgency = await assertActingProvider({ userId, verifiedEmail: user.email }, workspaceId, { effect: "google", kind: "google_location", ref: locationId });
+      const { assertActingAgency } = await import("@/platform/workspaces/acting-provider");
+      const actingAgency = await assertActingAgency({ userId, verifiedEmail: user.email }, workspaceId, { effect: "google", kind: "google_location", ref: locationId });
       if (agencyId && actingAgency !== agencyId) throw new Error("acting_provider_not_staffed");
     },
   };

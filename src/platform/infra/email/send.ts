@@ -8,7 +8,7 @@ import {
   prospectEmailsEnabled,
 } from "@/platform/infra/email/enabled";
 import { getClientEmailOverride } from "@/platform/infra/email/client-override";
-import { providerEmailSendAllowed, senderDomain, type EmailProvider } from "@/platform/infra/email/provider-gate";
+import { agencyEmailSendAllowed, senderDomain, type EmailAgency } from "@/platform/infra/email/provider-gate";
 import { renderEmailHtml, renderEmailText, type EmailOptions } from "@/platform/infra/email/layout";
 
 /** The four people Strelva can address. These are relationship roles, not
@@ -31,7 +31,7 @@ export type SendEmailInput = RenderedEmail & {
    * client's mail). The send then also needs that agency's seat, its email
    * verification and the business's mandate for the sending domain
    * (provider-gate.ts). Absent ⇒ behavior is unchanged. */
-  provider?: EmailProvider;
+  provider?: EmailAgency;
   /** Business scope for owner presentation; never an authority grant. */
   workspaceId?: string;
   fromName?: string;
@@ -81,7 +81,7 @@ function fromAddressFor(input: Pick<SendEmailInput, "fromAddress">): string {
 async function audienceEnabled(input: SendEmailInput, strictClientGate = false): Promise<boolean> {
   if (!(await audiencePolicyEnabled(input, strictClientGate))) return false;
   // The audience allows it; an agency's send also needs its own effect gate.
-  return !input.provider || providerEmailSendAllowed(input.provider, senderDomain(fromAddressFor(input)));
+  return !input.provider || agencyEmailSendAllowed(input.provider, senderDomain(fromAddressFor(input)));
 }
 
 async function audiencePolicyEnabled(input: SendEmailInput, strictClientGate: boolean): Promise<boolean> {
@@ -159,7 +159,7 @@ export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendE
         }
       : {}),
   };
-  if (input.provider && !(await providerEmailSendAllowed(input.provider, senderDomain(fromAddress)))) {
+  if (input.provider && !(await agencyEmailSendAllowed(input.provider, senderDomain(fromAddress)))) {
     return { status: "suppressed", reason: "provider_not_cleared" };
   }
   const result = input.idempotencyKey
@@ -189,7 +189,7 @@ export interface SendBatchInput {
   audience: EmailAudience;
   tenantId?: string;
   /** As SendEmailInput.provider; checked against fromAddress's domain. */
-  provider?: EmailProvider;
+  provider?: EmailAgency;
   /** Business scope for owner presentation; never an authority grant. */
   workspaceId?: string;
   fromName: string;
@@ -213,7 +213,7 @@ export async function batchEmailSuppression(input: Pick<SendBatchInput, "audienc
   const rendered = { subject: "", to: [], html: "", text: "" };
   if (input.requireClientGate && !(await audienceEnabled({ ...rendered, audience: "client", tenantId: input.tenantId }, true))) return "not sent: gated";
   if (!(await audienceEnabled({ ...rendered, audience: input.audience, tenantId: input.tenantId }))) return "not sent: gated";
-  if (input.provider && !(await providerEmailSendAllowed(input.provider, senderDomain(fromAddressFor(input))))) return "not sent: provider not cleared";
+  if (input.provider && !(await agencyEmailSendAllowed(input.provider, senderDomain(fromAddressFor(input))))) return "not sent: provider not cleared";
   if (!process.env.RESEND_API_KEY) return "not sent: unconfigured";
   return null;
 }
@@ -244,7 +244,7 @@ export async function sendBatchWithReceipt(input: SendBatchInput): Promise<SendB
     text: message.text,
     ...(message.headers ? { headers: message.headers } : {}),
   }));
-  if (input.provider && !(await providerEmailSendAllowed(input.provider, domain))) {
+  if (input.provider && !(await agencyEmailSendAllowed(input.provider, domain))) {
     return { status: "suppressed", reason: "not sent: provider not cleared" };
   }
   const result = input.idempotencyKey
