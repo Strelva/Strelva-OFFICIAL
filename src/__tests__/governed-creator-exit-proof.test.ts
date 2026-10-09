@@ -28,6 +28,7 @@ describe('creator exit native evidence admission', () => {
     for (const changed of [{ qualified: false }, { scope: 'count-only' }, { database: 'unowned' }, { databaseOwner: '' }, { databaseSettingsEqual: false }, { databaseSettingsSha256: 'unknown' }, { cloneSchemaSha256: 'c'.repeat(64) }, { parentQualification: 'relative.json' }, { fullReleaseQualified: true }]) expect(() => qualifiedCreatorClone({ ...qualification, ...changed }, qualification.database)).toThrow();
   });
   it('matches the existing Python sorted compact ASCII owner/static-settings contract', () => {
+    expect(ownerSettingsCanonical({ value: String.fromCharCode(127) })).toBe('{"value":"\\u007f"}');
     expect(ownerSettingsCanonical({ z: 'Málaga', a: { b: 2, a: 1 } })).toBe('{"a":{"a":1,"b":2},"z":"M\\u00e1laga"}');
     const state = { systemIdentifier: '701', database: { oid: 5, datname: 'parent', datdba: 10, datconnlimit: -1 }, ownerName: 'postgres', settings: [{ databaseOid: 5, roleOid: 0, roleName: null, config: ['search_path=public'] }] };
     const clone = { ...state, database: { ...state.database, oid: 99, datname: 'clone' }, settings: [{ ...state.settings[0]!, databaseOid: 99 }] };

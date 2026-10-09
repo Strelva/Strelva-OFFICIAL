@@ -10,7 +10,7 @@ export function exactForwardLedger(inventory, installed) {
 /** Same sorted-key compact ASCII JSON used by capture-db-owner-settings.py. */
 export function ownerSettingsCanonical(value) {
   const sorted = item => Array.isArray(item) ? item.map(sorted) : item && typeof item === 'object' ? Object.fromEntries(Object.keys(item).sort().map(key => [key, sorted(item[key])])) : item;
-  return JSON.stringify(sorted(value)).replace(/[^\x00-\x7f]/g, char => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`);
+  return JSON.stringify(sorted(value)).replace(/[^\x00-\x7e]/g, char => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`);
 }
 export function normalizedOwnerSettings(state) {
   const { oid, datname, ...database } = state.database;
