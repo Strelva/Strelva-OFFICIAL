@@ -520,8 +520,8 @@ _Avoid_: delivery receipt, provider receipt, guaranteed delivery
 
 ## Open naming questions
 
-- **On-screen labels:** Jacob approves exact labels. “Strelva handled” remains
-  open when another agency acted; the actor in each action remains explicit.
+- **On-screen labels:** Jacob approves exact labels. “What changed” is decided;
+  the rest stay open.
 - **Capability and System kind:** whether every System kind corresponds to one
   Capability or composes several remains open. They are internal words, not
   competing on-screen nouns.
