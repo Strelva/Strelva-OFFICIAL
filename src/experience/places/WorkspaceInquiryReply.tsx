@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { TextArea, TextInput } from "@/components/ui/TextInput";
 import { InquiryBookingOfferComposer } from "./InquiryBookingOfferComposer";
@@ -25,7 +25,15 @@ export function WorkspaceInquiryReply({ workspaceId, rowId, name, email, booking
   const [saving, setSaving] = useState(false);
   const [outcome, setOutcome] = useState<WorkspaceReplyOutcome | null>(null);
   const [error, setError] = useState<string | null>(null);
-  if (!open) return <Button size="md" variant="secondary" onClick={() => setOpen(true)}>Reply to {name}</Button>;
+  const openerRef = useRef<HTMLButtonElement>(null);
+  const subjectRef = useRef<HTMLInputElement>(null);
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (open && !wasOpen.current) subjectRef.current?.focus();
+    else if (!open && wasOpen.current) openerRef.current?.focus();
+    wasOpen.current = open;
+  }, [open]);
+  if (!open) return <Button ref={openerRef} size="md" variant="secondary" onClick={() => setOpen(true)}>Reply to {name}</Button>;
   async function send() {
     const id = requestId ?? crypto.randomUUID();
     setRequestId(id); setSaving(true); setError(null);
@@ -46,7 +54,7 @@ export function WorkspaceInquiryReply({ workspaceId, rowId, name, email, booking
   return (
     <div className="mt-4 grid gap-4">
       <p className="text-sm break-all">To {email}</p>
-      <TextInput label="Subject" value={subject} onChange={(event) => setSubject(event.target.value)} maxLength={200} disabled={saving || requestId !== null} />
+      <TextInput ref={subjectRef} label="Subject" value={subject} onChange={(event) => setSubject(event.target.value)} maxLength={200} disabled={saving || requestId !== null} />
       <TextArea label={`Your reply to ${name}`} value={body} onChange={(event) => setBody(event.target.value)} maxLength={5000} disabled={saving || requestId !== null} />
       {bookingOffers ? <InquiryBookingOfferComposer workspaceId={workspaceId} rowId={rowId} disabled={saving || requestId !== null} append={text => { const next = body ? `${body}\n\n${text}` : text; if (next.length > 5000) return false; setBody(next); return true; }} /> : null}
       <p className="text-xs text-gray-muted">{member ? "You can send an ordinary reply for inquiries assigned or routed to you. Prices, dates and promises need the owner’s approval. A sent reply cannot be undone." : "Sending approves this exact message, including any price, date or promise. A sent reply cannot be undone."}</p>

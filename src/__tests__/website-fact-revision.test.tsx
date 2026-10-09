@@ -183,15 +183,16 @@ describe("ordinary website fact revision", () => {
     expect(container.querySelector("textarea")).toBeNull(); expect(document.activeElement).toBe(container.querySelector("#rebuild-decisions-heading"));
     expect(onSaved).toHaveBeenCalledExactlyOnceWith(next.workId); expect(container.querySelector('[role="alert"]')).toBeNull();
   });
-  it("returns focus to the mounted contact action after removal rejection without an open draft", async () => {
+  it("preserves deliberate focus movement after removal rejection without an open draft", async () => {
     const record = approved(); record.candidate!.facts.bread!.kind = "contact"; record.candidate!.facts.bread!.text = "orders@example.test";
     let reject!: (error: Error) => void;
     const mutate = vi.fn(() => new Promise<RebuildView>((_,fail) => { reject = fail; }));
     await mount(record,mutate); container.querySelector("details")!.open = true;
     const remove = button("Remove contact"); remove.focus(); await act(async () => remove.click());
-    container.querySelector<HTMLAnchorElement>("a")!.focus(); expect(document.activeElement).not.toBe(remove);
+    const destination = container.querySelector<HTMLAnchorElement>("a")!;
+    destination.focus(); expect(document.activeElement).not.toBe(remove);
     await act(async () => reject(new Error("This website changed. Reopen its current preview.")));
-    expect(button("Remove contact").disabled).toBe(false); expect(document.activeElement).toBe(button("Remove contact"));
+    expect(button("Remove contact").disabled).toBe(false); expect(document.activeElement).toBe(destination);
     expect(container.textContent).toContain("This exact preview is approved."); expect(container.querySelector('[role="alert"]')?.textContent).toContain("This website changed");
   });
   it.each(["edit","remove"] as const)("sends exact ordinary candidate identity for %s through HTTP and preserves a conflict", async action => {

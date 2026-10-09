@@ -11,6 +11,7 @@ import {
   type WebsiteExperienceTransport,
 } from "./contracts";
 import styles from "./website-experience.module.css";
+import type { FocusRecovery } from "./focus-recovery";
 import { WebsiteConnections } from "./WebsiteConnections";
 import { RebuildExperience } from "./RebuildExperience";
 
@@ -193,12 +194,20 @@ function WebsiteSession({
   onSaved,
   transport = serverWebsiteTransport,
 }: WebsiteExperienceProps) {
+  const connectionHeadingRef = useRef<HTMLHeadingElement>(null);
+  const connectionFocus = useRef<FocusRecovery | null>(null);
+  useEffect(() => () => connectionFocus.current?.cancel(), []);
   const [record, setRecord] = useState<WebsiteRecord | null>(null);
   const [fields, setFields] = useState<BriefFields>(() => ({ ...EMPTY_BRIEF, description: initialRequest }));
   const [loading, setLoading] = useState(Boolean(workId));
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (busy || !connectionFocus.current) return;
+    connectionFocus.current.recover(connectionHeadingRef.current);
+    connectionFocus.current = null;
+  }, [record, busy]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const requestId = useRef(createWebsiteRequestId()).current;
@@ -362,7 +371,7 @@ function WebsiteSession({
             {dirty && !readOnly ? <p className={styles.notice}>Save this wording as a new preview before approving it. The current saved revision stays unchanged.</p> : null}
           </div>
 
-          <WebsiteConnections key={`${record.workId}:${record.website.revision}`} record={record} disabled={readOnly || busy || dirty} onBusyChange={setBusy} onSaved={(next) => { setRecord(next); setNotice("Website forms updated. Review and approve the new preview."); onSaved?.(next.workId); }} />
+          <WebsiteConnections headingRef={connectionHeadingRef} onFocusRecovery={recovery => { connectionFocus.current?.cancel(); connectionFocus.current = recovery; }} key={`${record.workId}:${record.website.revision}`} record={record} disabled={readOnly || busy || dirty} onBusyChange={setBusy} onSaved={(next) => { setRecord(next); setNotice("Website forms updated. Review and approve the new preview."); onSaved?.(next.workId); }} />
 
           {website!.candidate ? (
             <section className={styles.previewSection} aria-labelledby="website-preview-heading">

@@ -557,3 +557,18 @@
 @media (prefers-reduced-motion: reduce) {
   .card { transition: none; }
 }
+
+/* Match the owned control foundation for real touch hit boxes. */
+@media (pointer: coarse) {
+  .page button,
+  .back,
+  .linkAction,
+  .segmented button,
+  .lineage button,
+  .fold > summary {
+    min-inline-size: 2.75rem;
+    min-block-size: 2.75rem;
+  }
+
+  .fold > summary { padding-block: 12px; }
+}
