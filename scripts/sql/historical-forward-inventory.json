@@ -1,6 +1,6 @@
 {
-  "source": "6c372",
-  "forwardCount": 330,
+  "source": "a7c6b715 (composed forward inventory; execution qualification pending)",
+  "forwardCount": 335,
   "workspaceBoundary": "20260905190000_release_one_workspaces.sql",
   "focusedLegacyExceptions": {
     "20260920060000_content_version_request_id.sql": "Requires legacy content_versions, omitted from the purpose-built workspace fixture; real upgrade/fresh full-schema rehearsal owns it.",
@@ -327,6 +327,9 @@
     "20261021100200_google_receipt_key_read.sql",
     "20261021100300_investigation_history_export.sql",
     "20261021100400_google_make_real_flag.sql",
+    "20261021100500_google_grant_generation.sql",
+    "20261021100600_google_receipt_intent.sql",
+    "20261021100800_tenant_connection_generation.sql",
     "20261021110000_enterprise_units.sql",
     "20261021111000_enterprise_standards.sql",
     "20261021112000_home_finder_native.sql",
@@ -337,6 +340,8 @@
     "20261021131000_agent_oauth_connection_context.sql",
     "20261021131100_agent_oauth_renewable.sql",
     "20261021131200_agent_website_tools.sql",
+    "20261021132000_money_effect_admission.sql",
+    "20261021132100_agent_payment_exit_admission.sql",
     "20261022090000_guarded_tenant_teardown.sql"
   ]
 }

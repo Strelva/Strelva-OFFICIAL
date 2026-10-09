@@ -6,6 +6,7 @@ cd "$repo_root"
 # no production credentials, provider writes or accounting permission are implied.
 bash scripts/check-agent-channel-sql.sh \
   tests/agent-payment-attempt-schema.sql \
+  tests/money-effect-admission-schema.sql \
   tests/custom-sandbox-runtime-schema.sql \
   tests/sandbox-build-evidence-schema.sql \
   tests/agent-oauth-connection-schema.sql \
