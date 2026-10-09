@@ -6,6 +6,7 @@ language plpgsql immutable set search_path=public,pg_temp as $$
 declare path text;
 begin
  if jsonb_typeof(p_paths) is distinct from 'array' or jsonb_array_length(p_paths)>100 then raise exception 'system_version_input_invalid'; end if;
+ if exists(select 1 from jsonb_array_elements(p_paths) as entries(value) where jsonb_typeof(entries.value) is distinct from 'string') then raise exception 'system_version_input_invalid'; end if;
  for path in select jsonb_array_elements_text(p_paths) loop
   if path !~ '^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$' or length(path)>300 or string_to_array(path,'.') && array['__proto__','prototype','constructor'] or p_definition #> string_to_array(path,'.') is null then raise exception 'system_version_input_invalid'; end if;
  end loop;

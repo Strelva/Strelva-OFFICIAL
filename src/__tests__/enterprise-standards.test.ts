@@ -42,6 +42,12 @@ describe("pushed standards keep local ownership", () => {
     for (const paths of [["missing"], ["*"], ["__proto__"], Array(101).fill("hours")]) expect(() => validateLockedPaths(definition, paths)).toThrow();
     expect(validateLockedPaths(definition, ["brand.name", "brand.name"])).toEqual(["brand.name"]);
   });
+  it("refuses null and non-string lock entries at the actual service boundary", () => {
+    const numericNamedDefinition = { title: "Locked", "17": "Numeric key", true: "Boolean key" };
+    for (const paths of [[null], [17], [true], ["title", null]]) {
+      expect(() => Reflect.apply(validateLockedPaths, undefined, [numericNamedDefinition, paths])).toThrow();
+    }
+  });
   it("a foreign actor cannot edit the location or publish the source", async () => {
     const { versions, version } = await fixture(["brand.name"]);
     const outsider: VersionActor = { userId: "outsider", memberships: [] };
