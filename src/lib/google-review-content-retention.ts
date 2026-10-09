@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { getSupabase } from "@/platform/infra/db/client";
 import { getRedis } from "@/platform/infra/redis";
-import { projectGoogleReview, projectGoogleReviewEvent } from "@/platform/google-review-content";
+import { projectGoogleReview, projectGoogleReviewEvent } from "@/platform/infra/google-review-content";
 import { updateEvent } from "./events";
 import type { ReviewItem, UnifiedEvent } from "./types";
 

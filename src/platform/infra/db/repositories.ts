@@ -1,4 +1,4 @@
-import { projectGoogleReviewEvent } from "@/platform/google-review-content";
+import { projectGoogleReviewEvent } from "@/platform/infra/google-review-content";
 /**
  * Typed Postgres repositories — the Supabase side of the migration.
  *

@@ -1,4 +1,4 @@
-import { googleReviewContentLive } from "@/platform/google-review-content";
+import { googleReviewContentLive } from "@/platform/infra/google-review-content";
 import { workspacePorts } from "../workspace-ports";
 /**
  * The "auto-post" half of done-for-you review replies.

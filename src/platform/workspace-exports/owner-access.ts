@@ -1,4 +1,4 @@
-import { assertGoogleReviewArchiveCurrent } from "@/platform/google-review-content";
+import { assertGoogleReviewArchiveCurrent } from "@/platform/infra/google-review-content";
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import type { WorkspaceActor } from "@/platform/workspaces";

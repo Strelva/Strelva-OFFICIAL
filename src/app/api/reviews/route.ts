@@ -1,5 +1,5 @@
 import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
-import { customerImportedReview } from "@/platform/google-review-content";
+import { customerImportedReview } from "@/platform/infra/google-review-content";
 import { NextResponse } from "next/server";
 import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";

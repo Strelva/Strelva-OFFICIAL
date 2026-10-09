@@ -1,4 +1,4 @@
-import { projectGoogleReviewEvent } from "@/platform/google-review-content";
+import { projectGoogleReviewEvent } from "@/platform/infra/google-review-content";
 /**
  * UnifiedEvent data layer - Redis-backed event queue for dashboard.
  * Uses sorted sets with timestamp scores for efficient time-range queries.

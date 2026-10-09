@@ -1,4 +1,4 @@
-import { googleReviewContent } from "@/platform/google-review-content";
+import { googleReviewContent } from "@/platform/infra/google-review-content";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UnifiedEvent } from "@/lib/types";
 

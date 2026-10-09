@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { googleReviewContent, googleReviewArchiveDeadline, GOOGLE_REVIEW_CACHE_MS } from "@/platform/google-review-content";
+import { googleReviewContent, googleReviewArchiveDeadline, GOOGLE_REVIEW_CACHE_MS } from "@/platform/infra/google-review-content";
 import { readWorkspaceExportBuild, type V3Rpc } from "@/platform/workspace-exports/v3";
 import { readOwnerExportBody } from "@/platform/workspace-exports/owner-access";
 const fetched = Date.parse("2026-09-01T00:00:00Z");

@@ -1,4 +1,4 @@
-import { projectGoogleReviewExport, assertGoogleReviewArchiveCurrent } from "@/platform/google-review-content";
+import { projectGoogleReviewExport, assertGoogleReviewArchiveCurrent } from "@/platform/infra/google-review-content";
 /**
  * Workspace export schema 3 (money-and-data spec, part c).
  *

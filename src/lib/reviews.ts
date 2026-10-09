@@ -1,5 +1,5 @@
 import { reconcileLegacyReviewImports } from "./review-import-provenance";
-import { projectGoogleReview } from "@/platform/google-review-content";
+import { projectGoogleReview } from "@/platform/infra/google-review-content";
 import { promises as fs } from "fs";
 import path from "path";
 import type { ReviewItem } from "./types";

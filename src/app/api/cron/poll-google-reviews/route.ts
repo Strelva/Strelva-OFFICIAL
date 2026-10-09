@@ -1,4 +1,4 @@
-import { googleReviewContent } from "@/platform/google-review-content";
+import { googleReviewContent } from "@/platform/infra/google-review-content";
 import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 /**
  * Google Reviews Polling Cron

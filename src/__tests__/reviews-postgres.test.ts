@@ -1,4 +1,4 @@
-import { googleReviewContent } from "@/platform/google-review-content";
+import { googleReviewContent } from "@/platform/infra/google-review-content";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const supa = vi.hoisted(() => ({

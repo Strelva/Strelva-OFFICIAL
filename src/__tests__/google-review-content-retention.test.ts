@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { googleReviewContent, googleReviewContentLive, projectGoogleReview, projectGoogleReviewEvent, projectGoogleReviewExport, GOOGLE_REVIEW_CACHE_MS } from "@/platform/google-review-content";
+import { googleReviewContent, googleReviewContentLive, projectGoogleReview, projectGoogleReviewEvent, projectGoogleReviewExport, GOOGLE_REVIEW_CACHE_MS } from "@/platform/infra/google-review-content";
 const now = Date.parse("2026-10-08T12:00:00Z");
 const lease = googleReviewContent(new Date(now));
 describe("Google API review cache", () => {

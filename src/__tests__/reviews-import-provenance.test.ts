@@ -15,7 +15,7 @@ function builder(): unknown {
 }
 import { POST } from "@/app/api/reviews/route";
 import { getReviews } from "@/lib/reviews";
-import { projectGoogleReviewExport, googleReviewContent, projectGoogleReview } from "@/platform/google-review-content";
+import { projectGoogleReviewExport, googleReviewContent, projectGoogleReview } from "@/platform/infra/google-review-content";
 beforeEach(() => { state.rows = []; state.insert = null; state.permission.mockResolvedValue(null); vi.stubEnv("DATA_SOURCE", "postgres"); });
 it("actual authenticated Google-labelled customer import survives persistence, read and export without accepting client API identity/provenance", async () => {
   const response = await POST(new Request("http://localhost/api/reviews", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ source: "google", author: "Customer supplied author", rating: 5, text: "Customer supplied review", date: "2026-10-08", externalId: "forged-api-id", providerContent: googleReviewContent(new Date("2099-01-01")) }) }));
