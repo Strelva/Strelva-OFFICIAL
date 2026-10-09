@@ -7,6 +7,7 @@ import { BusinessHome } from "@/experience/workspace/BusinessHome";
 import { NeedsYouSection, StrelvaHandledSection } from "@/experience/workspace/NeedsYouSection";
 import type { NeedsYouState } from "@/experience/workspace/useNeedsYou";
 import type { HandledReceipt, OwnerDecision } from "@/platform/needs-you/contracts";
+import { handledFromStore } from "@/platform/needs-you/handled";
 import type { WorkspaceSnapshot } from "@/experience/workspace/contracts";
 
 const noop = () => undefined;
@@ -98,14 +99,17 @@ describe("recorded actors on Home", () => {
     expect(html).not.toContain("Acme Marketing");
   });
 
-  it("renders agency receipts and keeps a missing actor neutral, including Undo", () => {
+  it.each(["Strelva Agency", "Acme Agency", "Strelva creative Agency"])("renders %s once and keeps missing actors neutral, including Undo", displayName => {
+    const row = { store: "business_record_revisions", id: "14", at: "2026-10-06T14:10:00Z", changes: ["fact:hours"], undo: "undo" };
     const html = handled(ready({ handled: [
-      { ...receipts[0]!, actor: { kind: "agency", displayName: "Acme Marketing" } },
-      { ...receipts[0]!, id: "record:15", actor: undefined },
+      handledFromStore({ ...row, actor: { kind: "agency", displayName } })!,
+      handledFromStore({ ...row, id: "15" })!,
     ] }));
-    expect(html).toContain("Acme Marketing updated your hours");
+    expect(html).toContain(`${displayName} updated your hours`);
+    expect(html).toContain(`aria-label="Undo: ${displayName} updated your hours in your business record"`);
     expect(html).toContain("Runs on Strelva");
     expect(html).toContain('aria-label="Undo: Updated your hours in your business record"');
+    expect(html).not.toContain("Agency Agency");
     expect(html).not.toContain("Strelva updated");
   });
 

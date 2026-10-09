@@ -3,7 +3,7 @@
 import { useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { ArrowRight, Check, Circle, FileText, LayoutGrid, LoaderCircle, Plus, ShieldCheck, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { actorCopy, actorPresentation } from "@/platform/presentation/actor";
+import { actorPresentation } from "@/platform/presentation/actor";
 import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
 import { StrelvaShell, pinnedApps, pinnedSystems, pinnedWebsites, type StrelvaSection } from "@/experience/app-frame/StrelvaShell";
 import { SystemList } from "@/experience/systems/SystemList";
@@ -201,7 +201,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   }
 
   const attentionRows = home.attention.map(({ work, reason }) => <li key={work.id}><button type="button" aria-label={`Open ${work.title}`} className={styles.row} onClick={() => onOpen(work.id)}><span><strong>{work.title}</strong><small>{reason}</small></span><ArrowRight size={16} aria-hidden="true" /></button></li>);
-  const receiptList = <ul className={styles.list} aria-label="This week’s changes">{receipts.slice(0, 7).map(receipt => <li key={receipt.id}><span className={styles.row}><span><strong>{actorCopy(receipt.sentence, receipt.actor)}</strong>{actorPresentation(receipt.actor).credit ? <small>{actorPresentation(receipt.actor).credit}</small> : null}<small>{new Date(receipt.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {receipt.undo}</small></span></span></li>)}</ul>;
+  const receiptList = <ul className={styles.list} aria-label="This week’s changes">{receipts.slice(0, 7).map(receipt => <li key={receipt.id}><span className={styles.row}><span><strong>{receipt.sentence}</strong>{actorPresentation(receipt.actor).credit ? <small>{actorPresentation(receipt.actor).credit}</small> : null}<small>{new Date(receipt.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {receipt.undo}</small></span></span></li>)}</ul>;
 
   // ---- Strelva is working (ink-moss): what is moving now, then what Strelva handled.
   const lead = making[0];

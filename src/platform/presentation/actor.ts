@@ -31,9 +31,13 @@ export function actorSentence(actor: unknown, action: string, neutral?: string):
   return name ? `${name} ${action}` : neutral ?? `${action.charAt(0).toUpperCase()}${action.slice(1)}`;
 }
 
-/** Only authored actor copy is adapted. Never replace Strelva inside quoted customer words. */
+/** Adapt authored platform-placeholder copy once, never an already named actor. */
 export function actorCopy(text: string, actor: unknown): string {
-  if (!text.startsWith("Strelva ")) return text;
+  const { name } = actorPresentation(actor);
+  if (name && name !== "Strelva" && text.startsWith(`${name} `)) return text;
+  // Authored actions start with a lower-case verb. "Strelva Agency …" is a
+  // recorded name, even if the caller has no actor metadata.
+  if (!/^Strelva [a-z]/.test(text)) return text;
   const action = text.slice("Strelva ".length);
   const neutral = action.startsWith("is ") ? `${action.slice(3, 4).toUpperCase()}${action.slice(4)}`
     : action.startsWith("needs ") ? `Needs ${action.slice(6)}` : undefined;

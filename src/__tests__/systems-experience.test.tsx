@@ -167,7 +167,7 @@ describe("stored Make real on the System views", () => {
     const { systems } = readBusinessSystems({ snapshot: snapshot([], projection({ ...mooney,
       activations: [{ id: "a1", possibilityId: "p1", title: "A rebuilt attymooney.com", status: "needs_attention", headline: "Partly live", partlyLive: true, done: 3, total: 5, affects: [SITE, INBOX], lines: [] }],
       history: [
-        { id: "r1", systemId: SITE, sentence: "Strelva started running it", at: "2026-10-01T12:00:00Z" },
+        { id: "r1", systemId: SITE, sentence: "Started running it", at: "2026-10-01T12:00:00Z" },
         { id: "r2", systemId: SITE, sentence: "Website content changed", at: "2026-10-03T12:00:00Z" },
       ],
       handled: [{ id: "h1", systemId: SITE, sentence: "Strelva: Publish the rebuilt attymooney.com", at: "2026-10-05T12:00:00Z", undo: "Undo from History" }],
@@ -177,7 +177,7 @@ describe("stored Make real on the System views", () => {
     expect(site.activations).toEqual([expect.objectContaining({ id: "a1", headline: "Partly live" })]);
     expect(systems.find(item => item.id === INBOX)!.activations).toHaveLength(1);
     expect(systems.find(item => item.id === INTAKE_SYSTEM)!.activations).toBeUndefined();
-    expect(site.history!.map(row => row.sentence)).toEqual(["Strelva: Publish the rebuilt attymooney.com", "Website content changed", "Strelva started running it"]);
+    expect(site.history!.map(row => row.sentence)).toEqual(["Strelva: Publish the rebuilt attymooney.com", "Website content changed", "Started running it"]);
     expect(site.possibilities[0]!.staleReason).toBe("attymooney.com changed since this was built.");
   });
 });
@@ -270,7 +270,7 @@ describe("Make real and the System page", () => {
         { label: "Publish the booking page", state: "Done", detail: null },
         { label: "Add the booking link on Google", state: "Waiting", detail: "Google hasn't approved Strelva's access yet." },
       ] }],
-      history: [{ id: "h1", sentence: "Strelva started running it", at: "2026-10-01T12:00:00Z" }],
+      history: [{ id: "h1", sentence: "Started running it", at: "2026-10-01T12:00:00Z" }],
     } });
     expect(html).toContain("Making it live");
     expect(html).toContain("Partly live");

@@ -1,5 +1,5 @@
 "use client";
-import { actorCopy, actorPresentation } from "@/platform/presentation/actor";
+import { actorPresentation } from "@/platform/presentation/actor";
 import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
 import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 
@@ -183,7 +183,7 @@ function HistoryPanel({ system }: { system: SystemView }) {
     return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   };
   return <Panel id={`${system.id}-history`} title="History" count={0} intro="The last changes, newest first.">
-    <ul className={styles.panelList}>{rows.map(row => <li key={row.id}><span>{actorCopy(row.sentence, row.actor)}</span>{actorPresentation(row.actor).credit ? <small>{actorPresentation(row.actor).credit}</small> : null}<small><time dateTime={row.at}>{when(row.at)}</time></small></li>)}</ul>
+    <ul className={styles.panelList}>{rows.map(row => <li key={row.id}><span>{row.sentence}</span>{actorPresentation(row.actor).credit ? <small>{actorPresentation(row.actor).credit}</small> : null}<small><time dateTime={row.at}>{when(row.at)}</time></small></li>)}</ul>
   </Panel>;
 }
 

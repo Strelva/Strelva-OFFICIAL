@@ -10,13 +10,20 @@ describe("recorded actor presentation", () => {
   it.each([
     [{ kind: "platform" }, "Strelva", null],
     [{ kind: "agency", displayName: "Acme Marketing" }, "Acme Marketing", "Runs on Strelva"],
+    [{ kind: "agency", displayName: "Strelva Agency" }, "Strelva Agency", "Runs on Strelva"],
+    [{ kind: "agency", displayName: "Strelva creative Agency" }, "Strelva creative Agency", "Runs on Strelva"],
     [{ kind: "agency", displayName: "Strelva" }, "Strelva", "Runs on Strelva"],
     [{ kind: "person", displayName: "Sheri" }, "Sheri", null],
     [{ kind: "operator", displayName: "Jacob" }, "Jacob (platform support)", null],
     [{ kind: "operator" }, "Platform operator (support)", null],
   ])("presents %j without changing who acted", (actor, name, credit) => {
     expect(actorPresentation(actor)).toEqual({ name, credit });
-    expect(actorSentence(actor, "updated your hours")).toBe(`${name} updated your hours`);
+    const sentence = actorSentence(actor, "updated your hours");
+    expect(sentence).toBe(`${name} updated your hours`);
+    expect(actorCopy(sentence, actor)).toBe(sentence);
+    const adapted = actorCopy("Strelva updated your hours", actor);
+    expect(adapted).toBe(sentence);
+    expect(actorCopy(adapted, actor)).toBe(sentence);
   });
 
   it.each([undefined, null, "strelva", { kind: "agency", displayName: "  " }, { kind: "person", userId: "person-id" }, { kind: "agent" }])("keeps missing/invalid attribution neutral: %j", actor => {
@@ -24,6 +31,11 @@ describe("recorded actor presentation", () => {
     expect(actorPresentation(actor)).toEqual({ name: null, credit: null });
     expect(actorSentence(actor, "updated your hours")).toBe("Updated your hours");
     expect(actorCopy("Strelva updated your hours", actor)).toBe("Updated your hours");
+    expect(actorCopy(actorSentence(actor, "updated your hours"), actor)).toBe("Updated your hours");
+  });
+
+  it("does not corrupt an attributed agency sentence when metadata is missing", () => {
+    expect(actorCopy("Strelva Agency updated your hours", null)).toBe("Strelva Agency updated your hours");
   });
 
   it("preserves quoted words and mentions of the platform inside an action", () => {

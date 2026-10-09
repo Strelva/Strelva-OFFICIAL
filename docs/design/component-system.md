@@ -949,7 +949,9 @@ session, physical device, screen reader and native assistant use remain open.
 NeedsYouSection, BusinessHome receipt feeds and System History use
 `platform/presentation/actor.ts`. Recorded agencies show their display name and
 “Runs on Strelva”; people show their recorded display name; platform operators
-show support attribution. Missing actor data uses neutral copy. Agency shell
+show support attribution. Receipt sentences are attributed once in their source
+projection and rendered unchanged, including Undo labels. Missing actor data uses
+neutral copy. Agency shell
 branding never supplies a receipt actor. `STRELVA_HANDLED_LABEL` retains the
 current place name pending D-label. Existing tokens and components are unchanged.
 Local behavior and verification are recorded in the actor-lane handoff; this is
