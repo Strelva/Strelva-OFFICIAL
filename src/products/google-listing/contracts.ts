@@ -47,6 +47,8 @@ export type UndoDescriptor =
 export type Readback = "matched" | "differs" | "failed" | "held_by_google";
 
 export interface ListingReceipt {
+  /** Immutable original write identity; absent on unqualified legacy receipts. */
+  intentDigest?: string | null;
   id: string;
   workspaceId: string;
   bindingId: string | null;

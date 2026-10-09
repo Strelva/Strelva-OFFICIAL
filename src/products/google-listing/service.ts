@@ -1,3 +1,4 @@
+import { canonicalJson } from "@/platform/business-record/tenant-import";
 import { createHash } from "node:crypto";
 import type { FactValues } from "@/platform/business-record/contracts";
 import type { SystemLifecycle } from "@/platform/systems/contracts";
@@ -148,11 +149,20 @@ async function governedWrite<T>(ctx: ListingContext, plan: WritePlan<T>): Promis
     undoesReceiptId: plan.undoesReceiptId ?? null, idempotencyKey,
   };
   let { receipt, replayed } = await ctx.receipts.record(receiptInput);
+  const originalIntent = (value: Pick<ListingReceipt,"workspaceId"|"bindingId"|"locationId"|"action"|"targetRef"|"authority"|"before"|"after"|"undoesReceiptId">) => canonicalJson({
+    workspaceId:value.workspaceId,bindingId:value.bindingId,locationId:value.locationId,action:value.action,
+    targetRef:value.targetRef,authority:value.authority,before:value.before,after:value.after,undoesReceiptId:value.undoesReceiptId,
+  });
+  if (replayed && receipt.status === "failed" && originalIntent(receipt) !== originalIntent(receiptInput)) return refused("snapshot_unavailable");
+  const rootIntentDigest = receipt.intentDigest;
+  if (plan.retryFailed && replayed && receipt.status === "failed" && !rootIntentDigest) throw new Error("Google retry receipt intent is unqualified.");
+
   // Only a durable, definitive refusal permits another dispatch. Each retry
   // follows the previous failed receipt, so later attempts find any accepted
   // or uncertain retry even when the event marker was lost. Bound the walk.
   for (let retry = 0; plan.retryFailed && replayed && receipt.status === "failed" && retry < 20; retry += 1) {
     ({ receipt, replayed } = await ctx.receipts.record({ ...receiptInput, idempotencyKey: `${idempotencyKey}:retry:${receipt.id}` }));
+    if (!rootIntentDigest || receipt.intentDigest !== rootIntentDigest) throw new Error("Google retry receipt identity changed.");
   }
   if (replayed && receipt.status !== "posting") {
     // Already decided. Never a second write.

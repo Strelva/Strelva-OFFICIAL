@@ -6,6 +6,7 @@ import { canonicalJson } from "@/platform/business-record/tenant-import";
 import { readBusinessRecord } from "@/platform/business-record/service";
 import { tenantPublishingPorts } from "@/platform/infra/tenant-publishing";
 import type { GoogleMakeRealPorts } from "@/platform/make-real/google-adapter";
+import { readGoogleMakeRealReceipt } from "./make-real-receipts";
 import type { ListingReceipt } from "./contracts";
 import { googleTargetAllowed, undoWorkspaceGoogleChange, tenantListingContext } from "./workspace";
 import { readListingControl } from "./controls";
@@ -22,9 +23,12 @@ export const googleMakeRealPorts:GoogleMakeRealPorts={
   const event=await (await tenantPublishingPorts()).getEventRaw(request.eventId);
   if(!event || event.tenantId!==request.tenantId || event.metadata?.kind!=="workspace_google_listing_draft" || event.metadata.workspaceId!==businessId || event.metadata.locationId!==request.locationId || googleMakeRealDraftDigest(event.metadata)!==request.draftDigest)throw new Error("The exact approved Google draft changed or is unavailable.");
   const db=getSupabase();if(!db)throw new Error("Google receipt storage is unavailable.");
-  const {data,error}=await (db as unknown as {rpc(name:string,args:Record<string,unknown>):PromiseLike<{data:unknown;error:unknown}>}).rpc("read_google_listing_receipt_by_key",{p_workspace_id:businessId,p_idempotency_key:`google-draft:${request.eventId}`});
-  if(error)throw new Error("Google receipt could not be read.");
-  const receipt=data as unknown as ListingReceipt|null;
+  const receipt=await readGoogleMakeRealReceipt(`google-draft:${request.eventId}`,async key=>{
+   const {data,error}=await (db as unknown as {rpc(name:string,args:Record<string,unknown>):PromiseLike<{data:unknown;error:unknown}>}).rpc("read_google_listing_receipt_by_key",{p_workspace_id:businessId,p_idempotency_key:key});
+   if(error)throw new Error("Google receipt could not be read.");
+   return data as ListingReceipt|null;
+  });
+  if(receipt && (receipt.workspaceId!==businessId || receipt.bindingId!==binding.id || receipt.locationId!==request.locationId))throw new Error("Google receipt target changed.");
   const control=await readListingControl(businessId,request.locationId);
   const ready=!control.paused&&!control.accessPending&&event.status==="pending";
   return {ready,resolved:event.status==="approved",reason:control.paused?"The Google listing is paused.":control.accessPending?"Google project approval or business access is pending.":event.status!=="pending"?"The Google draft is already resolved.":undefined,receipt:receipt?{id:receipt.id,status:receipt.status,readback:receipt.readback,undo:Boolean(receipt.undo)}:null};
@@ -33,7 +37,7 @@ export const googleMakeRealPorts:GoogleMakeRealPorts={
   await googleMakeRealPorts.inspect(actor,businessId,request);
   // The existing claimed approval executor owns governance, current authority,
   // provider pacing, record/Version pins, receipts and unknown-effect recovery.
-  return (await tenantPublishingPorts()).resolveEventAction(request.tenantId,request.eventId,"approved",`owner-link:${actor.verifiedEmail}`);
+  return (await tenantPublishingPorts()).resolveEventAction(request.tenantId,request.eventId,"approved",actor.userId);
  },
  async verify(actor,businessId,request,receiptId){
   await googleMakeRealPorts.inspect(actor,businessId,request);

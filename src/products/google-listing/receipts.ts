@@ -1,4 +1,5 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { canonicalJson } from "@/platform/business-record/tenant-import";
 import { getSupabase } from "@/platform/infra/db/client";
 import type { ListingAction, ListingAuthority, ListingReceipt, Readback, ReceiptStatus, UndoDescriptor } from "./contracts";
 
@@ -21,6 +22,12 @@ export interface RecordReceiptInput {
   undo?: UndoDescriptor | null;
   undoesReceiptId?: string | null;
   idempotencyKey: string;
+}
+
+export function googleReceiptIntentDigest(input: RecordReceiptInput): string {
+  return createHash("sha256").update(canonicalJson({ workspaceId:input.workspaceId, bindingId:input.bindingId,
+    locationId:input.locationId, action:input.action, targetRef:input.targetRef, authority:input.authority,
+    before:input.before, after:input.after, undoesReceiptId:input.undoesReceiptId ?? null })).digest("hex");
 }
 
 export interface SettleReceiptInput {
@@ -74,7 +81,7 @@ export function createMemoryReceiptStore(now: () => string = () => new Date().to
       if (input.undoesReceiptId && rows.get(input.undoesReceiptId)?.workspaceId !== input.workspaceId) throw new ListingReceiptError("google_receipt_not_found");
       const at = now();
       const receipt: ListingReceipt = {
-        id: randomUUID(), workspaceId: input.workspaceId, bindingId: input.bindingId, locationId: input.locationId, action: input.action,
+        intentDigest: googleReceiptIntentDigest(input), id: randomUUID(), workspaceId: input.workspaceId, bindingId: input.bindingId, locationId: input.locationId, action: input.action,
         targetRef: input.targetRef, status: "posting", authority: input.authority, before: input.before, after: input.after,
         readback: null, providerRef: null, undo: input.undo ?? null, undoesReceiptId: input.undoesReceiptId ?? null,
         undoneByReceiptId: null, idempotencyKey: input.idempotencyKey, error: null, createdAt: at, updatedAt: at, completedAt: null,
@@ -123,7 +130,7 @@ export function createSupabaseReceiptStore(db: Db | null = getSupabase() as unkn
   return {
     async record(input) {
       const data = await call("record_google_listing_receipt", { p_input: {
-        workspaceId: input.workspaceId, bindingId: input.bindingId, locationId: input.locationId, action: input.action,
+        intentDigest: googleReceiptIntentDigest(input), workspaceId: input.workspaceId, bindingId: input.bindingId, locationId: input.locationId, action: input.action,
         targetRef: input.targetRef, authority: input.authority, before: input.before, after: input.after,
         undo: input.undo ?? null, undoesReceiptId: input.undoesReceiptId ?? null, idempotencyKey: input.idempotencyKey,
       } });
