@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import { closeSync, constants, existsSync, fstatSync, lstatSync, openSync, readFileSync, readdirSync, readSync, realpathSync } from 'node:fs';
+import { basename, dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readOwnedJourneyFile } from './journey-evidence-files.mjs';
 
@@ -263,17 +263,59 @@ export function parseLocalStackEnv(text) {
 const quote = value => `'${String(value).replaceAll("'", "'\\''")}'`;
 export const shellEnvironment = env => Object.entries(env).map(([key, value]) => `export ${key}=${quote(value)}`).join('\n');
 
-// Root app edges and configs can execute code without changing HEAD/tree.
-// This finite list excludes environment/private files and unrelated documents.
+// Every cached Git entry is covered independently of its directory/extension.
+// This finite list only admits additional *untracked* execution/proof inputs;
+// ignored environment, dependencies and generated output remain separate.
 const rootProofSource = /^(?:(?:instrumentation(?:-client)?|middleware|proxy)\.(?:[cm]?js|ts)|(?:next|playwright(?:\.provider)?|postcss|tailwind|vitest|eslint|sentry\.(?:server|edge|client))\.config\.(?:[cm]?js|ts)|vitest\.setup\.(?:[cm]?js|ts))$/;
+const untrackedProofSource = /^(src\/|scripts\/|tests\/|supabase\/|custom-repo-starter\/|public\/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|tsconfig\.json$|vercel\.json$|release-manifest\.json$)/;
+
+// Hash binary bytes from the admitted descriptor, never a symbolic-link target.
+// The private evidence reader has a different UTF-8/private-directory contract.
+function sourceDigest(root, file) {
+  const path = join(root, file);
+  if (!file || file.split('/').some(part => part === '..') || !path.startsWith(root + sep)) throw new Error('Owned source path required.');
+  let parent = root;
+  for (const part of file.split('/').slice(0, -1)) {
+    parent = join(parent, part);
+    let stat; try { stat = lstatSync(parent); } catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+    if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error('Owned regular source ancestor required.');
+  }
+  let stat; try { stat = lstatSync(path); } catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || realpathSync(path) !== path) throw new Error('Owned regular source file required; symbolic or linked inputs are refused.');
+  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const opened = fstatSync(fd);
+    if (!opened.isFile() || opened.nlink !== 1 || opened.dev !== stat.dev || opened.ino !== stat.ino || realpathSync(path) !== path) throw new Error('Source descriptor changed before hashing.');
+    const hash = createHash('sha256'), buffer = Buffer.alloc(Math.min(65536, opened.size + 1));
+    let bytes = 0;
+    while (bytes <= opened.size) {
+      const size = readSync(fd, buffer, 0, Math.min(buffer.length, opened.size + 1 - bytes), null);
+      if (!size) break;
+      hash.update(buffer.subarray(0, size)); bytes += size;
+    }
+    const after = fstatSync(fd);
+    const current = lstatSync(path);
+    if (bytes !== opened.size || after.size !== opened.size || after.mtimeMs !== opened.mtimeMs || after.ctimeMs !== opened.ctimeMs
+      || current.dev !== opened.dev || current.ino !== opened.ino || current.size !== opened.size || current.mtimeMs !== opened.mtimeMs
+      || current.ctimeMs !== opened.ctimeMs || realpathSync(path) !== path) throw new Error('Source file changed while hashing.');
+    return hash.digest('hex');
+  } finally { closeSync(fd); }
+}
 
 export function sourceInventory(root) {
+  root = realpathSync(root);
   const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
-  const files = [...new Set(git('ls-files', '-z', '--cached', '--others', '--exclude-standard').split('\0'))]
-    .filter(file => /^(src\/|scripts\/|tests\/|supabase\/|package\.json$|pnpm-lock\.yaml$|tsconfig\.json$)/.test(file) || rootProofSource.test(file)).sort();
-  const sourceFiles = files.map(file => ({ file, sha256: existsSync(join(root, file))
-    ? createHash('sha256').update(readFileSync(join(root, file))).digest('hex') : null }));
-  return { head: git('rev-parse', 'HEAD'), tree: git('rev-parse', 'HEAD^{tree}'), sourceFiles, fullReleaseQualified: false };
+  if (realpathSync(git('rev-parse', '--show-toplevel')) !== root) throw new Error('Complete Git source inventory requires the checkout root.');
+  const tracked = git('ls-files', '--stage', '-z').split('\0').filter(Boolean).map(entry => {
+    const tab = entry.indexOf('\t'), [mode, , stage] = entry.slice(0, tab).split(' ');
+    if (tab < 0 || stage !== '0' || !['100644', '100755'].includes(mode)) throw new Error('Unsupported Git source entry: symbolic links, gitlinks and unresolved stages are refused.');
+    return entry.slice(tab + 1);
+  });
+  const untracked = git('ls-files', '-z', '--others', '--exclude-standard').split('\0').filter(file => untrackedProofSource.test(file) || rootProofSource.test(file));
+  const files = [...new Set([...tracked, ...untracked])].sort();
+  const sourceFiles = files.map(file => ({ file, sha256: sourceDigest(root, file) }));
+  return { inventoryVersion: 2, coverage: { tracked: 'all-git-index-regular-files', untracked: 'authored-runtime-and-proof-roots', ignoredInputsQualified: false },
+    head: git('rev-parse', 'HEAD'), tree: git('rev-parse', 'HEAD^{tree}'), sourceFiles, fullReleaseQualified: false };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -286,7 +328,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     else if (action === 'preflight') { preflight(profile, resolve(input || '.')); console.log('Closed profile preflight passed; no release qualification is implied.'); }
     else if (action === 'validate') console.log(JSON.stringify(validateReport(JSON.parse(readOwnedJourneyFile(dirname(resolve(input)),resolve(input))), profile), null, 2));
     else if (action === 'stack-env') console.log(shellEnvironment(parseLocalStackEnv(readFileSync(input, 'utf8'))));
-    else if (action === 'source') console.log(JSON.stringify(sourceInventory(resolve(input || '.')), null, 2));
+    else if (action === 'source') {
+      const inventory = sourceInventory(resolve(input || '.'));
+      if (inventory.sourceFiles.some(file => file.sha256 === null)) throw new Error('Missing tracked or admitted source file; initial source admission refused.');
+      console.log(JSON.stringify(inventory, null, 2));
+    }
     else if (action === 'schema') console.log(JSON.stringify(readdirSync(input).filter(file => /^\d{14}_.*\.sql$/.test(file)).sort()
       .map(file => ({ file, sha256: createHash('sha256').update(readFileSync(join(input, file))).digest('hex') }))));
     else throw new Error('Unknown profile action.');

@@ -644,6 +644,39 @@ Isolated worktrees can set `STRELVA_BUILD_CACHE=off` with `pnpm exec next build 
 
 ## Private full-model artifact retention
 
+Source inventory version 2 hashes the working bytes of **every regular cached
+Git file**, without a directory or extension allowlist. This includes the
+website starter TypeScript renderer, copied `.mjs` renderer/capability runtime,
+visitor components, public assets and workspace/release/deployment configuration.
+Documentation and historical tracked artifacts are also covered; their inclusion
+does not claim that a native journey executed them. New tracked input locations
+need no inventory allowlist change. NUL-separated Git paths retain whitespace,
+and binary assets are hashed as bytes, without printing their contents.
+
+Additional nonignored untracked inputs are limited to `src`, `scripts`, `tests`,
+`supabase`, `custom-repo-starter`, `public`, package/lock/workspace/TypeScript/
+release/deployment files and the existing root runtime/proof entrypoints.
+Ignored environment files, `node_modules`, compiler output and other local files
+are excluded. This is no dependency, generated-output or transitive-import
+attestation: an ignored/copied output, external package target, other repository
+or external acceptance owner still needs its own exact receipt. The source
+inventory covers the starter bytes that artifact generation reads/copies; it
+does not certify that the resulting exported repository matches them.
+
+The source reader refuses symbolic-link leaves/ancestors, hardlinked or
+nonregular files, Git links/submodules and unresolved index entries rather than
+following outside targets. It checks the opened descriptor and rejects a file
+that changes during hashing. Missing tracked paths remain visible as `null` in
+end-state capture; the initial CLI source admission refuses them. Version 2
+records its coverage explicitly and always keeps `fullReleaseQualified: false`.
+Earlier finite versionless inventories cannot be expanded retrospectively from
+later hashes, even when HEAD/tree match: their original failures and uncovered
+runtime inputs remain unqualified. A new proof requires fresh version-2 source
+before/end snapshots and all original journey/status/integrity requirements.
+
+Source-only regression command (no dependency installation or services):
+`node --test scripts/tests/journey-source-inventory.node-test.mjs scripts/tests/full-model-journey-profile.node-test.mjs`.
+
 `check-full-model-journeys.sh` keeps each run in its fresh private directory and
 each primary variant's raw Playwright artifacts under `artifacts-<variant>`.
 Before either supplementary window starts, `retention-<variant>` retains the
