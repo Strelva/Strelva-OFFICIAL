@@ -65,7 +65,7 @@ test("a real owner reviews and makes native inquiry/app changes live, proves rec
       const system = await store.createSystem(actor, businessId, { name, kind, purpose: "Native local publication journey" }, randomUUID());
       const revision = await store.recordRevision(actor, { businessId, systemId: system.id }, system.changeNumber,
         { implementation: await content.put(businessId, body), summary: "Original native baseline" }, randomUUID());
-      return { businessId, systemId: system.id, revisionId: revision.revision.id };
+      return { businessId, systemId: system.id, revisionId: revision.revision.id, number: revision.revision.number };
     }
 
     async function prepare(input: PossibilityInput) {
