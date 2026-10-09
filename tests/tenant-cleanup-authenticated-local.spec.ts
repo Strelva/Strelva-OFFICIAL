@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Request } from "@playwright/test";
 import { adminClient, cleanup, forgetTenantCache, makeOperator, noHorizontalOverflow, person } from "./support/journeys";
 import { localEnvironment } from "./support/local-auth";
 
@@ -59,11 +59,37 @@ for (const width of [1440, 390]) {
       await expect(page.getByRole("link", { name: "Open cleanup recovery", exact: true })).toHaveAttribute("href", `/admin/tenant-cleanup/${tenantId}`);
       // Reload the deleted tenant's original editor URL. The server now routes
       // to a standalone recovery page backed by the actual authenticated GET.
-      const reloadRead = page.waitForResponse(value => new URL(value.url()).pathname === endpoint && value.request().method() === "GET");
-      await page.reload();
-      await expect(page).toHaveURL(new RegExp(`/admin/tenant-cleanup/${tenantId}$`));
+      // A streamed Next redirect may return the original editor document
+      // before its recovery destination loads. The retained cold recovery
+      // document took 7.2s; URL arrival alone also precedes its receipt read.
+      // Join the exact redirect and authenticated GET in one finite phase,
+      // within the original case budget, so teardown cannot obscure failure.
+      const recoveryUrl = new RegExp(`/admin/tenant-cleanup/${tenantId}$`);
+      let recoveryRequest: Request | undefined;
+      const captureRecoveryRead = (request: Request) => {
+        if (new URL(request.url()).pathname === endpoint && request.method() === "GET") recoveryRequest = request;
+      };
+      // Capture actual newly dispatched requests synchronously. Strict-mode
+      // remounts may abort an earlier read, so bind to the current physical
+      // request; an older pending response with the same URL cannot satisfy it.
+      page.on("request", captureRecoveryRead);
+      const reloadRead = await (async () => {
+        try {
+          const [, response] = await Promise.all([
+            page.waitForURL(recoveryUrl, { timeout: 20_000 }),
+            page.waitForResponse(value => value.request() === recoveryRequest, { timeout: 20_000 }),
+            page.reload(),
+          ]);
+          return response;
+        } finally {
+          page.off("request", captureRecoveryRead);
+        }
+      })();
+      await expect(page).toHaveURL(recoveryUrl);
       await expect(page.getByRole("heading", { name: "Tenant cleanup", exact: true })).toBeVisible();
-      expect((await reloadRead).status()).toBe(200);
+      expect(reloadRead.status(), await reloadRead.text()).toBe(200);
+      expect(reloadRead.headers()["cache-control"]).toBe("private, no-store");
+      expect((await reloadRead.json()).cleanup).toMatchObject({ id: pending.cleanup.id, tenantId, revision: after.cleanup.revision, databaseDeleted: true, providerComplete: false, complete: false, slugReusable: false });
       await expect(page.getByText(pending.cleanup.id, { exact: true })).toBeVisible();
       const recoveredRetry = page.getByRole("button", { name: "Retry pending cleanup", exact: true });
       await expect(recoveredRetry).toBeDisabled();

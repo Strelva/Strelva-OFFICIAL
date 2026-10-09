@@ -1,3 +1,4 @@
+import { nativeBookingJourney } from "./support/native-booking-journey";
 import { randomUUID } from "node:crypto";
 import { configuredPackageReviewer } from "./support/configured-package-reviewer";
 import { ordinaryAgencyMaker, ordinaryCustomerBusiness } from "./support/ordinary-agency-maker";
@@ -62,28 +63,40 @@ test("native scheduling keeps one reservation identity through cancel, reschedul
   const admin = createClient(env.url, env.service, { auth: { persistSession: false, autoRefreshToken: false } });
   const owner = await signedInContext(browser, admin, "scheduling-lifecycle-owner");
   try {
-    const snapshotResponse = await owner.context.request.get("/api/workspace");
-    expect(snapshotResponse.status()).toBe(200);
-    const { workspaceId } = await snapshotResponse.json();
-    let schedule = await post(owner.context.request, "/api/bounded-work", { action: "create", productId: "scheduling", workspaceId, input: { title: "Private availability", availability: [{ start: "2026-10-01T09:00:00Z", end: "2026-10-01T17:00:00Z" }] } }, 201);
-    const reopened = await owner.context.request.get(`/api/bounded-work?productId=scheduling&workId=${schedule.id}`);
-    expect((await reopened.json()).payload.reservations).toEqual([]);
-    schedule = await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "scheduling", workId: schedule.id, command: { kind: "reserve", expectedRevision: 0, requestId: "visit-1", title: "Site visit", start: "2026-10-01T10:00:00Z", end: "2026-10-01T11:00:00Z" } });
-    schedule = await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "scheduling", workId: schedule.id, command: { kind: "cancel", expectedRevision: 1, requestId: "visit-1" } });
-    expect(schedule.payload.reservations[0]).toMatchObject({ requestId: "visit-1", status: "cancelled" });
-    const cancelRetry = await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "scheduling", workId: schedule.id, command: { kind: "cancel", expectedRevision: 1, requestId: "visit-1" } });
-    expect(cancelRetry.payload.reservations).toHaveLength(1);
-    schedule = await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "scheduling", workId: schedule.id, command: { kind: "reserve", expectedRevision: 2, requestId: "visit-2", title: "Follow-up", start: "2026-10-01T11:00:00Z", end: "2026-10-01T12:00:00Z" } });
-    schedule = await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "scheduling", workId: schedule.id, command: { kind: "reschedule", expectedRevision: 3, requestId: "visit-2", start: "2026-10-01T12:00:00Z", end: "2026-10-01T13:00:00Z" } });
-    const rescheduleRetry = await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "scheduling", workId: schedule.id, command: { kind: "reschedule", expectedRevision: 3, requestId: "visit-2", start: "2026-10-01T12:00:00Z", end: "2026-10-01T13:00:00Z" } });
-    expect(rescheduleRetry.payload.reservations).toEqual(schedule.payload.reservations);
-    await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "scheduling", workId: schedule.id, command: { kind: "reserve", expectedRevision: 4, requestId: "visit-3", title: "Conflict", start: "2026-10-01T13:00:00Z", end: "2026-10-01T14:00:00Z" } });
-    await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "scheduling", workId: schedule.id, command: { kind: "reschedule", expectedRevision: 5, requestId: "visit-2", start: "2026-10-01T13:30:00Z", end: "2026-10-01T14:30:00Z" } }, 409);
-    const final = await owner.context.request.get(`/api/bounded-work?productId=scheduling&workId=${schedule.id}`);
-    expect((await final.json()).payload.reservations).toEqual(expect.arrayContaining([
-      expect.objectContaining({ requestId: "visit-1", status: "cancelled" }),
-      expect.objectContaining({ requestId: "visit-2", status: "reserved", start: "2026-10-01T12:00:00Z", end: "2026-10-01T13:00:00Z" }),
-      expect.objectContaining({ requestId: "visit-3", status: "reserved" }),
+    const workspaceId = await ordinaryCustomerBusiness(owner, "Native scheduling lifecycle business");
+    const bookings = await nativeBookingJourney(owner, admin, workspaceId);
+    expect(await bookings.read()).toEqual([]);
+    const first = await bookings.reserve("visit-0001", 10, "Site visit");
+    await bookings.approve(first.id);
+    const firstToken = await bookings.managementToken(first.id);
+    await bookings.manage(firstToken, "cancel");
+    const cancelledHistory = await bookings.history(first.id);
+    await bookings.manage(firstToken, "cancel");
+    expect(await bookings.history(first.id)).toEqual(cancelledHistory);
+    const second = await bookings.reserve("visit-0002", 11, "Follow-up");
+    await bookings.approve(second.id);
+    const token = await bookings.managementToken(second.id);
+    await bookings.manage(token, "reschedule", bookings.at(12));
+    const moved = await bookings.read();
+    const movedHistory = await bookings.history(second.id);
+    expect(movedHistory.filter((entry: { reason: string }) => entry.reason === "Customer rescheduled")).toHaveLength(1);
+    await bookings.manage(token, "reschedule", bookings.at(12));
+    expect(await bookings.read()).toEqual(moved);
+    expect(await bookings.history(second.id)).toEqual(movedHistory);
+    // Request-mode moves require a fresh owner decision for the new time.
+    await bookings.approve(second.id);
+    const third = await bookings.reserve("visit-0003", 13, "Conflict");
+    const beforeConflict = await bookings.read();
+    const beforeConflictHistory = await bookings.history(second.id);
+    await bookings.manage(token, "reschedule", bookings.at(13, 30), "conflict");
+    expect(await bookings.read()).toEqual(beforeConflict);
+    expect(await bookings.history(second.id)).toEqual(beforeConflictHistory);
+    const final = await bookings.read();
+    expect(final).toHaveLength(3);
+    expect(final).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: first.id, legacyId: "manual-visit-0001", status: "cancelled" }),
+      expect.objectContaining({ id: second.id, legacyId: "manual-visit-0002", status: "confirmed", start: bookings.at(12), end: bookings.at(13) }),
+      expect.objectContaining({ id: third.id, legacyId: "manual-visit-0003", status: "requested" }),
     ]));
   } finally { await owner.context.close(); }
 });
@@ -97,10 +110,14 @@ test("scheduling, generated applications and two-source investigation persist wi
   try {
     const workspaceId = await ordinaryCustomerBusiness(owner, "Native horizontal operations business");
     maker = await ordinaryAgencyMaker(browser, admin, owner, workspaceId);
-    let schedule = await post(owner.context.request, "/api/bounded-work", { action: "create", productId: "scheduling", workspaceId, input: { title: "Private availability", availability: [{ start: "2026-10-01T09:00:00Z", end: "2026-10-01T17:00:00Z" }] } }, 201);
-    schedule = await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "scheduling", workId: schedule.id, command: { kind: "reserve", expectedRevision: 0, requestId: "visit-1", title: "Site visit", start: "2026-10-01T10:00:00Z", end: "2026-10-01T11:00:00Z" } });
-    expect(schedule.payload.reservations[0].status).toBe("reserved");
-    await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "scheduling", workId: schedule.id, command: { kind: "reserve", expectedRevision: 1, requestId: "visit-2", title: "Conflicting visit", start: "2026-10-01T10:30:00Z", end: "2026-10-01T11:30:00Z" } }, 409);
+    const bookings = await nativeBookingJourney(owner, admin, workspaceId);
+    const visit = await bookings.reserve("combined-visit-0001", 10, "Site visit");
+    await bookings.approve(visit.id);
+    const beforeConflict = await bookings.read();
+    await bookings.conflict(10, 30);
+    expect(await bookings.read()).toEqual(beforeConflict);
+    expect(beforeConflict).toHaveLength(1);
+    expect(beforeConflict[0]).toMatchObject({ id: visit.id, status: "confirmed", start: bookings.at(10), end: bookings.at(11) });
     let app = await post(maker.context.request, "/api/bounded-work", { action: "create", productId: "applications", workspaceId, input: { title: "Project portal", fields: [{ id: "name", label: "Project", type: "text", required: true }], components: [{ kind: "form", fields: ["name"] }, { kind: "list", fields: ["name"] }] } }, 201);
     await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: app.id, command: { kind: "install", expectedRevision: 0 } }, 409);
     app = await post(maker.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: app.id, command: { kind: "rehearse", expectedRevision: 0 } });
