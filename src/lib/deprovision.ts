@@ -13,6 +13,7 @@
  * server-side (confirmSlug === id in the request body).
  */
 
+import { z } from "zod";
 import { RESERVED_SUBDOMAINS } from "@/lib/tenant-host";
 import { leadAuthorityIsPostgres } from "./lead-reads";
 import { getSupabase } from "@/platform/infra/db/client";
@@ -21,7 +22,7 @@ import type { TenantConfig } from "@/lib/types";
 import { clearTenantDomainClaims } from "@/lib/domains";
 import { deleteVercelProject, isVercelConfigured } from "@/lib/vercel";
 import { authoritativePatterns } from "@/lib/tenant-rename";
-import { getAccountForTenant, unlinkTenant } from "@/lib/accounts";
+import { unlinkTenant } from "@/lib/accounts";
 
 // Real tenants that must never be torn down by accident. A backstop only —
 // the live "has paid" guard is the primary defense (this set drifts stale).
@@ -76,6 +77,9 @@ export const TENANT_TABLES_RETAINED_AS_RECEIPTS = [
   "agency_managed_website_draft_grants", "agency_managed_website_draft_preparations",
   "agency_managed_website_draft_revisions", "outside_write_receipts", "report_snapshots",
 ] as const;
+// This receipt outlives tenant deletion and fences slug reuse until cleanup.
+// It is read through service-role RPCs, never counted by a direct table sweep.
+export const TENANT_CLEANUP_RECEIPT_TABLES = ["tenant_deprovision_cleanup"] as const;
 
 // Tables keyed on the tenant's stable_id are not swept by slug either; the
 // `tenants` delete settles them through their foreign keys:
@@ -103,6 +107,23 @@ export interface DeprovisionResult {
   executed: boolean;
   pgRowTotal: number;
   summary: Record<string, StoreAction[]>;
+  databaseDeleted?: boolean;
+  cleanup?: CleanupReceipt;
+}
+
+const cleanupSchema = z.object({
+  id: z.string().uuid(), tenantId: z.string(), databaseDeleted: z.literal(true),
+  redisComplete: z.boolean(), providerComplete: z.boolean(), complete: z.boolean(),
+}).passthrough();
+export type CleanupReceipt = z.infer<typeof cleanupSchema>;
+
+/** An outstanding native receipt remains available after the tenant is gone. */
+export async function readDeprovisionCleanup(tenantId: string): Promise<CleanupReceipt | null> {
+  const call = rpc();
+  if (!call) throw new Error("tenant_cleanup_database_unavailable");
+  const result = await call("tenant_cleanup_receipt", { p_slug: tenantId });
+  if (result.error) throw new Error("tenant_cleanup_receipt_unavailable");
+  return result.data === null ? null : cleanupSchema.parse(result.data);
 }
 
 // The Supabase client is strongly typed to literal table names; a generic sweep
@@ -135,13 +156,17 @@ function rpc(): TeardownRpc | null {
 }
 
 /** Workspace website rows that hold this tenant (service-role SQL; the tables revoke direct reads). */
-async function workspaceWebsiteBlockers(tenantId: string): Promise<{ publications: number; reservations: number }> {
+async function workspaceWebsiteBlockers(tenantId: string): Promise<{ publications: number; reservations: number; bookingGrants: number; bookings: number }> {
   const call = rpc();
-  if (!call) return { publications: 0, reservations: 0 };
-  const { data, error } = await call("tenant_teardown_blockers", { p_tenant_id: tenantId });
+  if (!call) throw new Error("tenant_teardown_blockers_unavailable");
+  const { data, error } = await call("tenant_cleanup_teardown_blockers", { p_tenant_id: tenantId });
   if (error) throw new Error(`tenant_teardown_blockers: ${error.message}`);
-  const row = (Array.isArray(data) ? data[0] : data) as { publications?: number | string; reservations?: number | string } | undefined;
-  return { publications: Number(row?.publications ?? 0), reservations: Number(row?.reservations ?? 0) };
+  const count = z.union([z.number(), z.string().regex(/^\d+$/)]).pipe(z.coerce.number().int().nonnegative());
+  const row = z.object({ publications: count, reservations: count, booking_grants: count, bookings: count })
+    .safeParse(Array.isArray(data) ? data[0] : data);
+  if (!row.success) throw new Error("tenant_teardown_blockers_unavailable");
+  return { publications: row.data.publications, reservations: row.data.reservations,
+    bookingGrants: row.data.booking_grants, bookings: row.data.bookings };
 }
 
 /** Pause every stored System adopted from this tenant (pause_tenant_systems). */
@@ -158,7 +183,7 @@ export async function pauseStoredSystems(tenantId: string): Promise<{ ok: true; 
 }
 
 /** Delete every tenant-scoped row and the tenant in one transaction. */
-async function deleteTenantRowsAtomically(tenantId: string, force: boolean): Promise<{ counts: Record<string, number>; paused: number }> {
+async function deleteTenantRowsAtomically(tenantId: string, force: boolean): Promise<{ counts: Record<string, number>; paused: number; cleanup: CleanupReceipt }> {
   const call = rpc();
   if (!call) throw new Error("tenant_teardown_database_unavailable");
   const { data, error } = await call("deprovision_tenant_guarded", {
@@ -167,15 +192,15 @@ async function deleteTenantRowsAtomically(tenantId: string, force: boolean): Pro
     p_retain_receipts: process.env.STRELVA_TENANT_RECEIPT_RETENTION === "1",
   });
   if (error) throw new Error(`deprovision_tenant_rows: ${error.message}`);
-  const result = data as { counts?: Record<string, unknown>; paused?: number } | null;
+  const result = data as { counts?: Record<string, unknown>; paused?: number; cleanup?: unknown } | null;
   if (!result?.counts || !Number.isFinite(result.paused)) throw new Error("tenant_teardown_invalid_receipt");
-  return { counts: Object.fromEntries(Object.entries(result.counts).map(([table, n]) => [table, Number(n)])), paused: result.paused! };
+  return { counts: Object.fromEntries(Object.entries(result.counts).map(([table, n]) => [table, Number(n)])), paused: result.paused!, cleanup: cleanupSchema.parse(result.cleanup) };
 }
 
 /** Per-tenant Redis key patterns, with the tenant id pinned to its KNOWN
  *  position. A bare "id appears anywhere" match would delete OTHER tenants' keys
  *  for an unlucky id. Wildcards are SCANned; exact keys checked with EXISTS. */
-export function tenantRedisPatterns(tenantId: string, ownerEmail?: string): string[] {
+export function tenantRedisPatterns(tenantId: string, _ownerEmail?: string): string[] {
   // Client data that Redis holds as the only copy (leads, orders, threads,
   // connections with encrypted secrets, booking config, rewards, settings,
   // spam held for review) is the same registry a rename moves, so the two
@@ -213,7 +238,8 @@ export function tenantRedisPatterns(tenantId: string, ownerEmail?: string): stri
     // tenant-scoped and is filtered in findTenantRedisKeys before deletion.
     `reb:inquiry-reply-target:*`,
   ];
-  if (ownerEmail) p.push(`reb:invites:${ownerEmail.toLowerCase()}`);
+  // Invites are email-keyed/shared; ownership is rechecked before removal.
+  p.push("reb:invites:*");
   return [...new Set(p)];
 }
 
@@ -221,7 +247,7 @@ export function tenantRedisPatterns(tenantId: string, ownerEmail?: string): stri
  *  them; a blob is only taken when it still says it belongs to this tenant. */
 export async function findTenantEventBlobKeys(tenantId: string): Promise<string[]> {
   const redis = getRedis();
-  if (!redis) return [];
+  if (!redis) throw new Error("tenant_cleanup_redis_unavailable");
   const ids = ((await redis.zrange<string[]>(`events:${tenantId}`, 0, -1)) ?? []).map(String);
   const found: string[] = [];
   for (const id of ids) {
@@ -233,7 +259,7 @@ export async function findTenantEventBlobKeys(tenantId: string): Promise<string[
 
 export async function findTenantRedisKeys(patterns: string[], tenantId?: string): Promise<string[]> {
   const redis = getRedis();
-  if (!redis) return [];
+  if (!redis) throw new Error("tenant_cleanup_redis_unavailable");
   const found = new Set<string>();
   for (const pattern of patterns) {
     if (!pattern.includes("*")) {
@@ -245,13 +271,15 @@ export async function findTenantRedisKeys(patterns: string[], tenantId?: string)
       const [next, keys] = await redis.scan(cursor, { match: pattern, count: 500 });
       cursor = String(next);
       for (const k of keys) {
-        if (pattern === "reb:inquiry-reply-target:*" && tenantId) {
+        if ((pattern === "reb:inquiry-reply-target:*" || pattern === "reb:invites:*") && tenantId) {
           const raw = await redis.get<unknown>(k);
           let value: unknown = raw;
           if (typeof raw === "string") {
             try { value = JSON.parse(raw); } catch { value = null; }
           }
-          if (!value || typeof value !== "object" || (value as { tenantId?: unknown }).tenantId !== tenantId) continue;
+          if (!value || typeof value !== "object" || (pattern === "reb:invites:*"
+            ? (value as { tenant?: unknown }).tenant !== tenantId
+            : (value as { tenantId?: unknown }).tenantId !== tenantId)) continue;
         }
         found.add(k);
       }
@@ -271,6 +299,8 @@ export interface DeprovisionOptions {
   force?: boolean;
   /** Leave the {tenantId}-site Vercel project in place. */
   keepVercel?: boolean;
+  /** Retry only this persisted cleanup; never delete a newly created tenant. */
+  cleanupReceiptId?: string;
 }
 
 /**
@@ -284,12 +314,20 @@ export interface DeprovisionOptions {
  * the Redis connection from the existing lib singletons — no new clients needed.
  */
 export async function runDeprovision(opts: DeprovisionOptions): Promise<DeprovisionResult> {
-  const { tenantId, tenant, dryRun = true, force = false, keepVercel = false } = opts;
+  const { tenantId, tenant, dryRun = true, force = false } = opts;
   const executed = !dryRun;
   const summary: Record<string, StoreAction[]> = { postgres: [], redis: [], vercel: [] };
 
   if (!isValidDeprovisionTenantId(tenantId)) {
     return { ok: false, refusalReason: "invalid_tenant_id", refusalDetail: "Invalid tenant id.", tenantId, executed: false, pgRowTotal: 0, summary };
+  }
+
+  if (opts.cleanupReceiptId) {
+    if (!executed) throw new Error("tenant_cleanup_retry_requires_execution");
+    const cleanup = await readDeprovisionCleanup(tenantId);
+    if (!cleanup || cleanup.id !== opts.cleanupReceiptId) throw new Error("tenant_cleanup_receipt_changed");
+    if (cleanup.complete) return { ok: true, tenantId, executed: false, databaseDeleted: true, pgRowTotal: 0, summary, cleanup };
+    return finishCleanup(opts, cleanup, 0, summary);
   }
 
   // Guard 1: hardcoded denylist.
@@ -328,11 +366,11 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
   // tenant. Refuse before anything is deleted; --force cannot override it
   // because the restricting foreign keys would roll the purge back anyway.
   const blockers = await workspaceWebsiteBlockers(tenantId);
-  if (blockers.publications + blockers.reservations > 0) {
+  if (blockers.publications + blockers.reservations + blockers.bookingGrants + blockers.bookings > 0) {
     return {
       ok: false,
       refusalReason: "workspace_website",
-      refusalDetail: `"${tenantId}" is held by a workspace website (publications=${blockers.publications}, reservations=${blockers.reservations}). Release it through the business workspace first. Nothing was deleted.`,
+      refusalDetail: `"${tenantId}" is held by workspace-owned records (publications=${blockers.publications}, reservations=${blockers.reservations}, booking grants=${blockers.bookingGrants}, bookings=${blockers.bookings}). Release it through the business workspace first. Nothing was deleted.`,
       tenantId,
       executed: false,
       pgRowTotal: 0,
@@ -376,70 +414,110 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
     summary.postgres!.push({ target: table, found: n, deleted: executed && ((removed[table] ?? 0) > 0 || cascaded) });
   }
 
-  // Redis: per-tenant keys (pinned patterns) + global cache busts.
-  const redis = getRedis();
-  const tenantKeys = [
-    ...(await findTenantEventBlobKeys(tenantId)),
-    ...(await findTenantRedisKeys(tenantRedisPatterns(tenantId, tenant?.ownerEmail ?? undefined), tenantId)),
-  ];
-  // The multi-site account blob is shared with other sites: take this site out
-  // of it (and its line item) rather than deleting it.
-  const account = await getAccountForTenant(tenantId).catch(() => null);
-  if (account) {
-    if (executed) await unlinkTenant(account.id, tenantId);
-    summary.redis!.push({ target: `account:${account.id}`, found: 1, deleted: executed, detail: "site removed from the account grouping" });
-  }
-  for (let i = 0; executed && redis && i < tenantKeys.length; i += 500) await redis.del(...tenantKeys.slice(i, i + 500));
-  for (const k of tenantKeys) summary.redis!.push({ target: k, found: 1, deleted: executed });
+  if (executed && receipt) return finishCleanup(opts, receipt.cleanup, pgTotal, summary);
+  return discoverCleanup(opts, pgTotal, summary);
+}
 
-  // Domain claims live in one shared map — clear just this tenant's entries.
-  if (tenant) {
-    const claimed = await clearTenantDomainClaims(tenant, executed);
-    for (const d of claimed) {
-      summary.redis!.push({ target: `domain-claim ${d}`, found: 1, deleted: executed });
+/** Dry-run discovery makes no deletion or availability claim. */
+async function discoverCleanup(opts: DeprovisionOptions, pgRowTotal: number, summary: Record<string, StoreAction[]>): Promise<DeprovisionResult> {
+  let ok = true;
+  try {
+    const keys = [...await findTenantEventBlobKeys(opts.tenantId), ...await findTenantRedisKeys(tenantRedisPatterns(opts.tenantId), opts.tenantId)];
+    for (const key of keys) summary.redis!.push({ target: key, found: 1, deleted: false });
+    for (const domain of await clearTenantDomainClaims({ id: opts.tenantId }, false)) summary.redis!.push({ target: `domain-claim ${domain}`, found: 1, deleted: false });
+  } catch {
+    ok = false;
+    summary.redis!.push({ target: "discovery", found: "unknown", deleted: false, detail: "Redis discovery unavailable; no empty-store claim." });
+  }
+  for (const key of GLOBAL_CACHE_KEYS) summary.redis!.push({ target: key, found: "cache", deleted: false, detail: "would invalidate (dry run)" });
+  summary.vercel!.push({ target: `${opts.tenantId}-site`, found: "unknown", deleted: false, detail: "not deleted (dry run)" });
+  return { ok, tenantId: opts.tenantId, executed: false, pgRowTotal, summary };
+}
+
+/** Shared Redis objects are edited atomically and retain every other tenant. */
+export const REMOVE_OWNED_KEY = `
+  local raw = redis.call('GET', KEYS[1])
+  if not raw then return 0 end
+  local value = cjson.decode(raw)
+  if type(value) == 'table' and value[ARGV[2]] == ARGV[1] then return redis.call('DEL', KEYS[1]) end
+  return 0
+`;
+
+async function finishCleanup(opts: DeprovisionOptions, receipt: CleanupReceipt, pgRowTotal: number, summary: Record<string, StoreAction[]>): Promise<DeprovisionResult> {
+  const { tenantId, keepVercel = false } = opts;
+  let redisComplete = receipt.redisComplete;
+  let providerComplete = receipt.providerComplete;
+  const previousActions = z.array(z.object({ target: z.string() }).passthrough()).safeParse(
+    receipt.summary && typeof receipt.summary === "object" ? (receipt.summary as Record<string, unknown>).redis : []);
+  const accountIds = new Set(previousActions.success ? previousActions.data
+    .filter(action => action.target.startsWith("account:")).map(action => action.target.slice(8)) : []);
+  // Retain retry identities even if discovery fails or Redis is absent on this
+  // attempt. Otherwise an earlier removed reverse index would lose its target.
+  for (const id of accountIds) summary.redis!.push({ target: `account:${id}`, found: 1, deleted: redisComplete,
+    detail: redisComplete ? "shared grouping cleanup confirmed by the prior receipt" : "shared grouping cleanup pending" });
+  if (!redisComplete) {
+    const redis = getRedis();
+    if (!redis) summary.redis!.push({ target: "tenant cleanup", found: "unknown", deleted: false, detail: "Redis unavailable; cleanup pending." });
+    else try {
+      const keys = [...await findTenantEventBlobKeys(tenantId), ...await findTenantRedisKeys(tenantRedisPatterns(tenantId), tenantId)];
+      // Keep the canonical account lock and client-record mirror hooks. Save
+      // its identity before unlinkTenant can remove the reverse index: a
+      // partial write or process interruption must still be retryable.
+      const accountId = await redis.get<string>(`account-of:${tenantId}`);
+      if (accountId !== null && typeof accountId !== "string") throw new Error("tenant_cleanup_grouping_invalid");
+      if (accountId) accountIds.add(accountId);
+      if (accountIds.size) {
+        for (const id of accountIds) if (!summary.redis!.some(action => action.target === `account:${id}`)) {
+          summary.redis!.push({ target: `account:${id}`, found: 1, deleted: false, detail: "shared grouping cleanup pending" });
+        }
+        const checkpointCall = rpc();
+        if (!checkpointCall) throw new Error("tenant_cleanup_grouping_checkpoint_failed");
+        const checkpoint = await checkpointCall("finish_tenant_deprovision_cleanup", { p_tenant_id: tenantId, p_receipt_id: receipt.id,
+          p_redis_complete: false, p_provider_complete: providerComplete, p_summary: summary });
+        if (checkpoint.error) throw new Error("tenant_cleanup_grouping_checkpoint_failed");
+        const recorded = cleanupSchema.parse(checkpoint.data);
+        if (recorded.id !== receipt.id || recorded.tenantId !== tenantId) throw new Error("tenant_cleanup_grouping_checkpoint_failed");
+        for (const id of accountIds) {
+          const changed = await unlinkTenant(id, tenantId, { readRedisForCleanup: true });
+          const readback = await redis.get<{ tenantIds?: unknown }>(`account:${id}`);
+          if (!changed || !Array.isArray(readback?.tenantIds) || readback.tenantIds.includes(tenantId)) throw new Error("tenant_cleanup_grouping_unconfirmed");
+          const action = summary.redis!.find(item => item.target === `account:${id}`)!;
+          action.deleted = true; action.detail = "site removed from the shared grouping; account and subscription retained";
+        }
+      }
+      for (const key of keys) {
+        const field = key.startsWith("reb:invites:") ? "tenant"
+          : key.startsWith("event:") || key.startsWith("reb:inquiry-reply-target:") ? "tenantId" : null;
+        const removed = field ? await redis.eval<number>(REMOVE_OWNED_KEY, [key], [tenantId, field]) : await redis.del(key);
+        if (typeof removed !== "number") throw new Error("tenant_cleanup_delete_unconfirmed");
+        summary.redis!.push({ target: key, found: 1, deleted: removed > 0, ...(removed > 0 ? {} : { detail: "already absent or owned by another tenant" }) });
+      }
+      for (const domain of await clearTenantDomainClaims({ id: tenantId })) summary.redis!.push({ target: `domain-claim ${domain}`, found: 1, deleted: true });
+      const invalidated = await redis.del(...GLOBAL_CACHE_KEYS);
+      if (typeof invalidated !== "number") throw new Error("tenant_cleanup_cache_unconfirmed");
+      for (const key of GLOBAL_CACHE_KEYS) summary.redis!.push({ target: key, found: "cache", deleted: true, detail: "global cache invalidated" });
+      redisComplete = true;
+    } catch {
+      summary.redis!.push({ target: "tenant cleanup", found: "unknown", deleted: false, detail: "Redis cleanup failed; completed actions are retained and cleanup can be retried." });
     }
   }
-  if (executed && redis) await redis.del(...GLOBAL_CACHE_KEYS);
-  for (const k of GLOBAL_CACHE_KEYS) {
-    summary.redis!.push({
-      target: k,
-      found: "cache",
-      deleted: executed,
-      detail: "global cache invalidated",
-    });
+  if (!providerComplete) {
+    const target = `${tenantId}-site`;
+    if (keepVercel || !isVercelConfigured()) summary.vercel!.push({ target, found: "unknown", deleted: false,
+      detail: keepVercel ? "retained by request; complete purge and slug reuse remain blocked" : "Provider unavailable; absence is unverified and cleanup remains pending" });
+    else try {
+      const removed = await deleteVercelProject(target);
+      providerComplete = removed.ok;
+      summary.vercel!.push({ target, found: "unknown", deleted: removed.ok, detail: removed.ok ? "deleted (or confirmed absent)" : "Provider refused deletion; cleanup pending." });
+    } catch {
+      summary.vercel!.push({ target, found: "unknown", deleted: false, detail: "Provider deletion unconfirmed; cleanup pending." });
+    }
   }
-
-  // Vercel: the {tenantId}-site project (env + domains go with it).
-  if (keepVercel) {
-    summary.vercel!.push({
-      target: `${tenantId}-site`,
-      found: "?",
-      deleted: false,
-      detail: "skipped (keepVercel)",
-    });
-  } else if (!isVercelConfigured()) {
-    summary.vercel!.push({
-      target: `${tenantId}-site`,
-      found: "?",
-      deleted: false,
-      detail: "VERCEL_API_TOKEN not set — onboarding likely never created it",
-    });
-  } else if (executed) {
-    const r = await deleteVercelProject(`${tenantId}-site`);
-    summary.vercel!.push({
-      target: `${tenantId}-site`,
-      found: "?",
-      deleted: r.ok,
-      detail: r.ok ? "deleted (or already absent)" : r.error,
-    });
-  } else {
-    summary.vercel!.push({
-      target: `${tenantId}-site`,
-      found: "?",
-      deleted: false,
-      detail: "would delete (dry run)",
-    });
-  }
-
-  return { ok: true, tenantId, executed, pgRowTotal: pgTotal, summary };
+  const call = rpc();
+  if (!call) throw new Error("tenant_cleanup_receipt_unavailable_after_database_removal");
+  const saved = await call("finish_tenant_deprovision_cleanup", { p_tenant_id: tenantId, p_receipt_id: receipt.id,
+    p_redis_complete: redisComplete, p_provider_complete: providerComplete, p_summary: summary });
+  if (saved.error) throw new Error("tenant_cleanup_receipt_unavailable_after_database_removal");
+  const cleanup = cleanupSchema.parse(saved.data);
+  return { ok: cleanup.complete, tenantId, executed: true, databaseDeleted: true, pgRowTotal, summary, cleanup };
 }

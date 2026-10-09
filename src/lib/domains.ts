@@ -184,29 +184,36 @@ async function deleteRedisClaim(domain: string): Promise<void> {
  * Postgres `domain_claims` rows are removed separately by the caller.
  */
 export async function clearTenantDomainClaims(
-  tenant: TenantConfig,
+  tenant: Pick<TenantConfig, "id">,
   apply = true
 ): Promise<string[]> {
   const redis = getRedis();
-  if (!redis) return [];
-  try {
-    const claims = await getRedisClaims();
-    const cleared: string[] = [];
-    for (const { domain } of domainsFromTenant(tenant)) {
-      const key = claimKey(domain);
-      if (key in claims) {
-        cleared.push(domain);
-        if (apply) delete claims[key];
-      }
-    }
-    if (apply && cleared.length) {
-      await redis.set(CLAIMS_REDIS_KEY, claims);
-      invalidateDomainMapCache();
-    }
-    return cleared;
-  } catch {
-    return [];
+  if (!redis) throw new Error("tenant_domain_cleanup_unavailable");
+  if (!apply) {
+    // This destructive caller cannot use getRedisClaims' display fallback:
+    // a failed read is not evidence that the shared map was empty.
+    const claims = await redis.get<Record<string, DomainClaim>>(CLAIMS_REDIS_KEY);
+    return Object.entries(claims ?? {}).filter(([, claim]) => claim.tenantId === tenant.id).map(([domain]) => domain);
   }
+  // Compare ownership and change the shared map in one Redis operation. A
+  // stale tenant config cannot remove another site's claim or lose its write.
+  const cleared = await redis.eval<string[]>(`
+    local raw = redis.call('GET', KEYS[1])
+    if not raw then return {} end
+    local claims = cjson.decode(raw)
+    local removed = {}
+    for domain, claim in pairs(claims) do
+      if type(claim) == 'table' and claim.tenantId == ARGV[1] then
+        claims[domain] = nil
+        table.insert(removed, domain)
+      end
+    end
+    if #removed > 0 then redis.call('SET', KEYS[1], cjson.encode(claims)) end
+    return removed
+  `, [CLAIMS_REDIS_KEY], [tenant.id]);
+  if (!Array.isArray(cleared)) throw new Error("tenant_domain_cleanup_unconfirmed");
+  invalidateDomainMapCache();
+  return cleared;
 }
 
 async function addDomainToVercel(domain: string, reconcileBeforeWrite = false, beforeWrite?: () => Promise<void>): Promise<Partial<DomainClaim>> {

@@ -28,6 +28,7 @@
  *   --force         Override the real-client guards (denylist + has-paid).
  *   --keep-vercel   Leave the {tenantId}-site Vercel project in place.
  *   --json          Emit a machine-readable summary instead of the human report.
+ *   --retry-cleanup=<receiptId> Resume only the outstanding external/cache cleanup.
  */
 
 import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
@@ -41,6 +42,7 @@ interface Flags {
   force: boolean;
   keepVercel: boolean;
   json: boolean;
+  cleanupReceiptId?: string;
 }
 
 function parseFlags(): { tenantId: string | undefined; flags: Flags } {
@@ -53,6 +55,7 @@ function parseFlags(): { tenantId: string | undefined; flags: Flags } {
       force: args.includes("--force"),
       keepVercel: args.includes("--keep-vercel"),
       json: args.includes("--json"),
+      cleanupReceiptId: args.find((arg) => arg.startsWith("--retry-cleanup="))?.slice("--retry-cleanup=".length),
     },
   };
 }
@@ -114,15 +117,17 @@ async function main() {
     dryRun: !flags.confirm,
     force: flags.force,
     keepVercel: flags.keepVercel,
+    cleanupReceiptId: flags.cleanupReceiptId,
   });
 
-  if (!result.ok) {
+  if (!result.ok && result.refusalReason) {
     console.error(`REFUSED: ${result.refusalDetail ?? result.refusalReason}\n`);
     process.exit(2);
   }
 
   if (flags.json) {
-    console.log(JSON.stringify({ tenantId, dbHost, executed: result.executed, pgRowTotal: result.pgRowTotal, summary: result.summary }, null, 2));
+    console.log(JSON.stringify({ ...result, dbHost }, null, 2));
+    if (!result.ok) process.exitCode = 3;
     return;
   }
 
@@ -138,6 +143,10 @@ async function main() {
   }
   console.log(`  ${verb} ${result.pgRowTotal} Postgres row(s) across ${result.summary.postgres?.length ?? 0} table(s).`);
   console.log(banner);
+  if (!result.ok) {
+    console.error(`Database removal committed; cleanup is incomplete. Slug reuse is blocked. Retry with --confirm --retry-cleanup=${result.cleanup?.id}`);
+    process.exitCode = 3;
+  }
   if (!result.executed) {
     console.log("DRY RUN — nothing was deleted. Re-run with --confirm to execute.\n");
   } else {

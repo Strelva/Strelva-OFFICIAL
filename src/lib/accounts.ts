@@ -352,9 +352,11 @@ export async function linkTenantToAccount(accountId: string, tenantId: string): 
   });
 }
 
-export async function unlinkTenant(accountId: string, tenantId: string): Promise<Account | null> {
+export async function unlinkTenant(accountId: string, tenantId: string, options: { readRedisForCleanup?: boolean } = {}): Promise<Account | null> {
   return withAccountLock(accountId, async () => {
-    const account = await getAccount(accountId);
+    // Teardown has already removed the tenant from Postgres. Its shared
+    // grouping still needs the actual Redis object under the same account lock.
+    const account = options.readRedisForCleanup ? await getRedisAccount(accountId) : await getAccount(accountId);
     if (!account) return null;
     const redis = getRedis();
     if (redis) {
