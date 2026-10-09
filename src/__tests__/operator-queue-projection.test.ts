@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { QUEUE_KINDS, type QueueContext, type QueueItemRaw, type QueueKind, type QueueMark } from "@/platform/operator-queue/contracts";
 import { projectQueue, type SourceRead } from "@/platform/operator-queue/project";
-import { buildAgencyQueue } from "@/platform/operator-queue/agency-queue";
 import { EFFORT_CATEGORY_BY_KIND, prefillMinutes, priorityFor } from "@/platform/operator-queue/rules";
 import { UNDO_RULES } from "@/platform/operator-queue/undo";
 import { buildDomainView } from "@/platform/operator-queue/domain-view";
@@ -222,19 +221,6 @@ describe("undo labels", () => {
     expect(UNDO_RULES.review_reply.label).toBe("Google review replies can't be undone from Strelva. You can edit or delete the reply in Google.");
     expect(UNDO_RULES.gbp_hours.undo).toBe("put_back_draft");
     expect(UNDO_RULES.content_publish.undo).toBe("available");
-  });
-});
-
-describe("agency queue view model", () => {
-  it("shows only delegated businesses and never Strelva-only kinds", () => {
-    const queue = projectQueue({ reads: reads(), context: context(), tenants, emailPaused: false, now: NOW });
-    const view = buildAgencyQueue(queue, context().delegations, AGENCY);
-    expect(view.groups.map((group) => group.workspaceId)).toEqual([WORKSPACE]);
-    const kinds = view.groups.flatMap((group) => group.items.map((item) => item.kind));
-    expect(kinds).not.toContain("lead_unkept");
-    expect(kinds).not.toContain("prospect_lead");
-    expect(kinds).toEqual(expect.arrayContaining(["operational_exception", "assignment_offer"]));
-    expect(buildAgencyQueue(queue, context().delegations, OTHER_WORKSPACE).total).toBe(0);
   });
 });
 

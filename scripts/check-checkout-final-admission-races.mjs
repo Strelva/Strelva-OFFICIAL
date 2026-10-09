@@ -95,10 +95,10 @@ try {
   // Catalog-source check and exact installed forward identity bind this rehearsal.
   await run("source-contract", `\\i ${root}/scripts/sql/checkout-final-admission-contract.sql`);
   const expectedLedger = inventory.forwardFiles.map(file => /^([0-9]+)_/.exec(file)?.[1]).sort();
-  if (inventory.forwardCount !== 345 || expectedLedger.length !== 345 || expectedLedger.some(version => !version) || new Set(expectedLedger).size !== 345) throw new Error("Source inventory must contain the exact unique 345 forward versions");
+  if (inventory.forwardCount !== 346 || expectedLedger.length !== 346 || expectedLedger.some(version => !version) || new Set(expectedLedger).size !== 346) throw new Error("Source inventory must contain the exact unique 346 forward versions");
   installedLedger = JSON.parse(await run("exact-forward-ledger", "select coalesce(jsonb_agg(version::text order by version::text),'[]'::jsonb) from supabase_migrations.schema_migrations"));
   retain("installed-forward-ledger.json", JSON.stringify({ expected: expectedLedger, installed: installedLedger }, null, 2));
-  if (JSON.stringify(installedLedger) !== JSON.stringify(expectedLedger)) throw new Error("Requires the exact sorted qualified 345-migration identity; a same-count substituted ledger is refused.");
+  if (JSON.stringify(installedLedger) !== JSON.stringify(expectedLedger)) throw new Error("Requires the exact sorted qualified 346-migration identity; a same-count substituted ledger is refused.");
   for (const kind of cases) {
     const f = await fixture(kind), label = kind.replaceAll(" ", "-"), app = `checkout-wait-${randomUUID()}`;
     fixtureWorkspaces.push(f.business, f.agency);
