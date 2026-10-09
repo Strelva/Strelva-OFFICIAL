@@ -201,35 +201,74 @@ test("independently owned businesses install and update definitions without copy
     expect(installed.payload.release.spec.fields[0].label).toBe("Problem");
     expect(installed.payload.records).toEqual([{ id: "customer-record", values: { problem: "Customer business record" } }]);
     expect(JSON.stringify(installed)).not.toContain("Private source business record");
-    installed = await releaseVersion(customer.context.request, target);
+    // Review the pending native Version B before its single owner approval.
+    // The application keeps A live until that exact Version decision releases B.
+    const ownerPage = await customer.context.newPage();
+    async function readOwnerSystem() {
+      const ownerWorkRead = ownerPage.waitForResponse(response => {
+        const url = new URL(response.url());
+        return response.request().method() === "GET"
+          && url.origin === new URL(env.app).origin
+          && url.pathname === "/api/bounded-work"
+          && url.searchParams.get("productId") === "applications"
+          && url.searchParams.get("workId") === target.workId;
+      }, { timeout: 5_000 });
+      const [ownerWork] = await Promise.all([
+        ownerWorkRead,
+        ownerPage.goto(`/workspace?workspaceId=${customerSpace}&view=system&system=${target.systemId}`),
+      ]);
+      expect(ownerWork.status(), "The owner's exact application browser read must succeed before checking its controls.").toBe(200);
+      return ownerWork.json();
+    }
+    const ownerBeforeB = await readOwnerSystem();
+    expect(ownerBeforeB.payload.release).toEqual(installed.payload.release);
+    expect(ownerBeforeB.payload.records).toEqual(installed.payload.records);
+    const pendingVersion = ownerPage.getByLabel("Version possibilities", { exact: true });
+    await expect(pendingVersion.getByText("Compare the release and alternative", { exact: true })).toBeVisible();
+    await pendingVersion.getByText("Compare the release and alternative", { exact: true }).click({ timeout: 5_000 });
+    await expect(pendingVersion.getByLabel("Current release preview", { exact: true })).toContainText("Repair requests");
+    await expect(pendingVersion.getByLabel("Current release preview", { exact: true })).toContainText("Problem");
+    await expect(pendingVersion.getByLabel("Prepared alternative preview", { exact: true })).toContainText("Harbor repairs");
+    await expect(pendingVersion.getByLabel("Prepared alternative preview", { exact: true })).toContainText("Repair detail");
+    await expect(pendingVersion.getByRole("button", { name: "Make real", exact: true })).toBeEnabled();
+    expect(await read(customer.context.request, target.workId)).toEqual(installed);
+    const [ownerBResponse] = await Promise.all([
+      ownerPage.waitForResponse(response => {
+        const url = new URL(response.url());
+        return response.request().method() === "POST"
+          && url.origin === new URL(env.app).origin
+          && url.pathname === "/api/workspace/needs-you";
+      }, { timeout: 5_000 }),
+      pendingVersion.getByRole("button", { name: "Make real", exact: true }).click({ timeout: 5_000 }),
+    ]);
+    expect(ownerBResponse.request().postDataJSON()).toEqual({ workspaceId: customerSpace,
+      itemId: pendingB.id, revision: pendingB.revisionHash, decision: "approve" });
+    expect(ownerBResponse.status(), await ownerBResponse.text()).toBe(200);
+    const ownerBDecision = await ownerBResponse.json();
+    expect(ownerBDecision.status).toBe("done");
+    expect(ownerBDecision.item).toMatchObject({ id: pendingB.id, revisionHash: pendingB.revisionHash,
+      workspaceId: customerSpace, systemId: target.systemId, sourceLifecycle: "version_release",
+      sourceId: target.versionId, state: "approved", outcome: "done" });
+    expect(ownerBDecision.item.receiptRef).toMatch(new RegExp(`^version_release:${target.versionId}:`));
+    approvedDecisions.set(target.versionId, { id: pendingB.id, revisionHash: pendingB.revisionHash });
+    installed = await read(customer.context.request, target.workId);
     expect(installed.payload.release.version).toBe(2);
     expect(installed.payload.release.spec.title).toBe("Harbor repairs");
     expect(installed.payload.release.spec.fields[0].label).toBe("Repair detail");
     expect(installed.payload.records).toEqual([{ id: "customer-record", values: { problem: "Customer business record" } }]);
-    // Customer manager controls in the actual System application surface.
-    const ownerPage = await customer.context.newPage();
-    // Diagnose the owner's actual browser read before checking its controls.
-    // A pending read fails within the existing five-second assertion window.
-    const ownerWorkRead = ownerPage.waitForResponse(response => {
-      const url = new URL(response.url());
-      return response.request().method() === "GET"
-        && url.origin === new URL(env.app).origin
-        && url.pathname === "/api/bounded-work"
-        && url.searchParams.get("productId") === "applications"
-        && url.searchParams.get("workId") === target.workId;
-    }, { timeout: 5_000 });
-    const [ownerWork] = await Promise.all([
-      ownerWorkRead,
-      ownerPage.goto(`/workspace?workspaceId=${customerSpace}&view=system&system=${target.systemId}`),
-    ]);
-    expect(ownerWork.status(), "The owner's exact application browser read must succeed before Review and Sharing render.").toBe(200);
+    expect(installed.payload.candidate.spec).toEqual(installed.payload.release.spec);
+    // A live B has no pending application change to approve a second time.
+    const ownerAfterB = await readOwnerSystem();
+    expect(ownerAfterB.payload.release).toEqual(installed.payload.release);
+    expect(ownerAfterB.payload.records).toEqual(installed.payload.records);
+    await expect(ownerPage.getByText("Version 2 is the version people use now.", { exact: true })).toBeVisible();
     await expect(ownerPage.getByRole("tab", { name: "Review", exact: true })).toBeVisible();
     await expect(ownerPage.getByRole("tab", { name: "Sharing", exact: true })).toBeVisible();
     await expect(ownerPage.getByRole("tab", { name: "Edit", exact: true })).toHaveCount(0);
     await ownerPage.getByRole("tab", { name: "Review", exact: true }).click();
     const ownerApplication = ownerPage.getByRole("tab", { name: "Review", exact: true }).locator("xpath=ancestor::section[1]");
-    await ownerApplication.getByText("Review changes", { exact: true }).click();
-    await expect(ownerApplication.getByRole("button", { name: "Publish", exact: true })).toBeVisible();
+    await expect(ownerApplication.getByText("Review changes", { exact: true })).toHaveCount(0);
+    await expect(ownerApplication.getByRole("button", { name: "Publish", exact: true })).toHaveCount(0);
     await expect(ownerApplication.getByText("Edit proposed app", { exact: true })).toHaveCount(0);
     await expect(ownerApplication.getByRole("button", { name: /^(Check proposed change|Run checks again|Check source version)$/ })).toHaveCount(0);
     await expect(ownerApplication.getByText("Source design and updates", { exact: true })).toHaveCount(0);

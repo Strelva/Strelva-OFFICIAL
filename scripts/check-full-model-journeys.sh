@@ -136,10 +136,10 @@ for variant in "${variants[@]}"; do
     run_clean bash -c 'set -a; source "$1"; set +a; shift; exec "$@"' bash "$work/package-reviewer-test.env" \
       env STRELVA_PRIVATE_SOURCE_NATIVE_PROOFS=1 STRELVA_PRIVATE_SOURCE_PROOF_DIR="$work" \
       PLAYWRIGHT_JSON_OUTPUT_FILE="$work/results-$variant.json" pnpm exec playwright test "${specs[@]}" \
-      --workers=1 --retries=0 --reporter=line,json --output="test-results/full-model-$variant" > "$work/browser-$variant.log" 2>&1 || status=$?
+      --workers=1 --retries=0 --reporter=line,json --output="$work/artifacts-$variant" > "$work/browser-$variant.log" 2>&1 || status=$?
   else
     run_clean env PLAYWRIGHT_JSON_OUTPUT_FILE="$work/results-$variant.json" pnpm exec playwright test "${specs[@]}" \
-      --workers=1 --retries=0 --reporter=line,json --output="test-results/full-model-$variant" > "$work/browser-$variant.log" 2>&1 || status=$?
+      --workers=1 --retries=0 --reporter=line,json --output="$work/artifacts-$variant" > "$work/browser-$variant.log" 2>&1 || status=$?
   fi
   node "$manifest" validate "$profile" "$work/results-$variant.json" ${variant_arg[@]+"${variant_arg[@]}"} > "$work/receipt-$variant.json" || status=1
   # Independent closed recovery evidence never changes a failed native status.
