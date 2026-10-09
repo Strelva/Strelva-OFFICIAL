@@ -91,7 +91,7 @@ run_clean() {
 }
 node "$manifest" source "$profile" "$root" > "$work/source.json"
 node "$manifest" schema "$profile" "$root/supabase/migrations" > "$work/schema.json"
-printf "export PLAYWRIGHT_BASE_URL='%s'\nexport NEXT_PUBLIC_APP_URL='%s'\nexport PLAYWRIGHT_DIST_DIR='.next-full-model-journeys'\nexport APPROVE_LINK_SECRET='%s'\nexport CRON_SECRET='%s'\nexport SECRETS_ENC_KEY='%s'\nexport PUBLIC_CONTINUATION_SECRET='%s'\n" \
+printf "export PLAYWRIGHT_BASE_URL='%s'\nexport NEXT_PUBLIC_APP_URL='%s'\nexport PLAYWRIGHT_DIST_DIR='.next-full-model-journeys'\nexport STRELVA_BUILD_CACHE='off'\nexport APPROVE_LINK_SECRET='%s'\nexport CRON_SECRET='%s'\nexport SECRETS_ENC_KEY='%s'\nexport PUBLIC_CONTINUATION_SECRET='%s'\n" \
   "$origin" "$origin" "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" > "$work/local.env"
 bundler_args=(); [[ "$bundler" != webpack ]] || bundler_args=(--webpack)
 variants=(additive-off)
