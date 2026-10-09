@@ -85,7 +85,7 @@ it.each(['create','revise'] as const)('peer preserves %s captured brief across s
  await change(container.querySelector('textarea')!,'Exact captured correction');
  const draft=container.querySelector('textarea')!;
  await act(async()=>{button(action==='create'?'Generate a private preview':'Generate a new preview').click();Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value')!.set!.call(draft,'Drifted displayed correction');draft.dispatchEvent(new Event('input',{bubbles:true}));});
- expect(bodies).toHaveLength(1);expect(JSON.parse(bodies[0]).brief.description).toBe('Exact captured correction');expect(saved!.website.brief.description).toBe('Exact captured correction');
+ expect(bodies).toHaveLength(1);expect(JSON.parse(bodies[0]!).brief.description).toBe('Exact captured correction');expect(saved!.website.brief.description).toBe('Exact captured correction');
  expect(container.querySelector('textarea')!.value).toBe('Exact captured correction');expect(container.querySelector('textarea')!.readOnly).toBe(true);
 });
 it.each(['create','revise'] as const)('peer refuses %s draft editing after unknown is already frozen',async(action)=>{
