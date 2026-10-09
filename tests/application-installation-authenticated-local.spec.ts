@@ -104,6 +104,7 @@ test("independently owned businesses install and update definitions without copy
       expect(native.data.kind).toBe("internal_app");
       return { ...installed, workId: native.data.workId as string };
     }
+    const approvedDecisions=new Map<string,{id:string;revisionHash:string}>();
     async function releaseVersion(request:APIRequestContext,version:{workspaceId:string;systemId:string;versionId:string;workId:string}){
       const response=await request.get(`/api/workspace/versions?workspaceId=${version.workspaceId}&systemId=${version.systemId}`);
       expect(response.status(),await response.text()).toBe(200);
@@ -114,6 +115,7 @@ test("independently owned businesses install and update definitions without copy
       expect(needs.status(),await needs.text()).toBe(200);
       const item=(await needs.json()).items.find((item:{id:string})=>item.id===prepared.receipt.decisionId);
       expect(item).toBeTruthy();
+      approvedDecisions.set(version.versionId,{id:item.id,revisionHash:item.revisionHash});
       const done=await post(request,"/api/workspace/needs-you",{workspaceId:version.workspaceId,itemId:item.id,revision:item.revisionHash,decision:"approve"});
       expect(done.status).toBe("done");
       return read(request,version.workId);
@@ -166,8 +168,31 @@ test("independently owned businesses install and update definitions without copy
     definition = { ...definition, fields: [{ id: "problem", label: "Repair detail", type: "text", required: true }] };
     const second = await publishSource();
     current = await view();
-    await post(customer.context.request, "/api/workspace/versions", { action: "adopt", workspaceId: customerSpace,
+    const providerPrepared=await post(builder.context.request, "/api/workspace/versions", { action: "adopt", workspaceId: customerSpace,
       systemId: target.systemId, versionId: target.versionId, rowRevision: current.rowRevision, revision: second.source.number });
+    expect(providerPrepared.outcome).toBe("prepared");
+    expect(providerPrepared.receipt).toBeTruthy();
+    expect(providerPrepared.receipt.workspaceId).toBe(customerSpace);
+    expect(providerPrepared.receipt.versionId).toBe(target.versionId);
+    const pendingNeeds=await customer.context.request.get("/api/workspace/needs-you?workspaceId="+customerSpace);
+    expect(pendingNeeds.status(),await pendingNeeds.text()).toBe(200);
+    const pendingB=(await pendingNeeds.json()).items.find((item:{id:string})=>item.id===providerPrepared.receipt.decisionId);
+    expect(pendingB.sourceLifecycle).toBe("version_release");expect(pendingB.sourceId).toBe(target.versionId);
+    const oldA=approvedDecisions.get(target.versionId)!;
+    expect(pendingB.id).not.toBe(oldA.id);
+    expect(pendingB.revisionHash).not.toBe(oldA.revisionHash);
+    const beforeOldDecision=await read(customer.context.request,target.workId);
+    const replayA=await customer.context.request.post("/api/workspace/needs-you",{headers:{origin:localEnvironment().app},
+      data:{workspaceId:customerSpace,itemId:oldA.id,revision:oldA.revisionHash,decision:"approve"}});
+    expect([200,409]).toContain(replayA.status());
+    const replayResult=await replayA.json();
+    expect(["done","already_handled"]).toContain(replayResult.status);
+    expect(await read(customer.context.request,target.workId)).toEqual(beforeOldDecision);
+    await info.attach("maker-prepared-B-owner-release-boundary",{contentType:"application/json",body:Buffer.from(JSON.stringify({
+      sameWorkId:target.workId,sourceRevision:second.source.number,providerPrepared,
+      pendingOwnerDecision:{id:pendingB.id,revisionHash:pendingB.revisionHash},
+      previousADecision:oldA,oldDecisionReplayStatus:replayResult.status,runtimeUnchangedBeforeOwnerBApproval:true,
+      productionQualification:false},null,2))});
     current=await view();
     expect(current.workingDefinition.title).toBe("Harbor repairs");
     expect(current.workingDefinition.fields[0].label).toBe("Repair detail");
@@ -180,6 +205,7 @@ test("independently owned businesses install and update definitions without copy
     expect(installed.payload.release.version).toBe(2);
     expect(installed.payload.release.spec.title).toBe("Harbor repairs");
     expect(installed.payload.release.spec.fields[0].label).toBe("Repair detail");
+    expect(installed.payload.records).toEqual([{ id: "customer-record", values: { problem: "Customer business record" } }]);
     // Customer manager controls in the actual System application surface.
     const ownerPage = await customer.context.newPage();
     await ownerPage.goto(`/workspace?workspaceId=${customerSpace}&view=system&system=${target.systemId}`);
