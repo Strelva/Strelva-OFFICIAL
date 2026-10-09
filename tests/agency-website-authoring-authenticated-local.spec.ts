@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { expect, test, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type BrowserContext, type Page, type Request } from "@playwright/test";
 import { localEnvironment, signedInContext } from "./support/local-auth";
 import { ordinaryAgencyMaker, ordinaryCustomerBusiness } from "./support/ordinary-agency-maker";
 
@@ -107,6 +107,10 @@ test("customer grants one managed website draft, agency prepares it, and custome
       stable_id: tenantStableId,
       site_name: "Website draft customer",
       template: "wellness",
+      // This exact job prepares/publishes native wellness content sections.
+      // Classify that existing fixture explicitly; the database otherwise
+      // defaults to custom_repo and its preview requires an external repo.
+      delivery_model: "platform_template",
       owner_name: "Website owner",
       owner_email: owner.email,
       active: true,
@@ -262,10 +266,36 @@ test("customer grants one managed website draft, agency prepares it, and custome
     customerWebsitePage = await owner.context.newPage();
     customerWebsitePage.setDefaultTimeout(25_000);
     await customerWebsitePage.setViewportSize({ width: 1280, height: 900 });
-    await customerWebsitePage.goto(customerEditorHref, { waitUntil: "domcontentloaded" });
-    await expect(customerWebsitePage.getByRole("button", { name: "Edit site", exact: true })).toBeVisible();
-    await customerWebsitePage.getByRole("button", { name: "Edit site", exact: true }).click();
-    await expect(customerWebsitePage.getByLabel("Headline", { exact: true }).first()).toHaveValue(preparedHeadline);
+    const editor = customerWebsitePage;
+    let heroRead: Request | undefined;
+    const captureHeroRead = (request: Request) => {
+      const url = new URL(request.url());
+      if (url.origin === env.app && url.pathname === `/client/${tenantId}/api/content/hero` && url.searchParams.get("draft") === "true" && request.method() === "GET") heroRead = request;
+    };
+    editor.on("request", captureHeroRead);
+    try {
+      // The inspector loads the real saved draft after Edit site. Bind the
+      // response to its newly dispatched physical Request; an older pending
+      // response at this URL cannot satisfy the actual customer review.
+      const [draftRead] = await Promise.all([
+        editor.waitForResponse(response => response.request() === heroRead, { timeout: 20_000 }),
+        (async () => {
+          await editor.goto(customerEditorHref, { waitUntil: "domcontentloaded" });
+          await expect(editor.getByRole("button", { name: "Edit site", exact: true })).toBeVisible();
+          await editor.getByRole("button", { name: "Edit site", exact: true }).click();
+        })(),
+      ]);
+      expect(draftRead.status(), await draftRead.text()).toBe(200);
+      expect(await draftRead.json()).toMatchObject({ ...hero, headline: preparedHeadline });
+    } finally {
+      editor.off("request", captureHeroRead);
+    }
+    await expect(editor.getByLabel("Headline", { exact: true }).first()).toHaveValue(preparedHeadline);
+    const previewAddress = new URL(await editor.locator('iframe[title="Editable preview"]').getAttribute("src") ?? "", env.app);
+    expect(previewAddress.origin).toBe(env.app);
+    expect(previewAddress.searchParams.get("tenant")).toBe(tenantId);
+    expect(previewAddress.searchParams.get("preview")).toBe("true");
+    await expect(editor.frameLocator('iframe[title="Editable preview"]').getByRole("heading", { name: preparedHeadline, exact: true })).toBeVisible();
     await customerWebsitePage.screenshot({ path: testInfo.outputPath("customer-website-review-desktop.png"), fullPage: true });
     const publish = customerWebsitePage.getByRole("button", { name: /^(Publish live|Save changes)$/ }).last();
     await expect(publish).toBeEnabled();
