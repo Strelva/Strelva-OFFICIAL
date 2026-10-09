@@ -74,3 +74,6 @@ export { prepareBundleWebsiteSection } from "./bundle";
 export { rehearseBundleWebsiteSection } from "./bundle";
 
 export {prepareBundleWebsiteUpdate} from "./bundle-lifecycle";
+
+export * from "./legacy-archive";
+export * from "./legacy-archive-store";

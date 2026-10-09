@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { websiteCapabilitySelectionSchema } from "@/products/websites/contracts";
-import { rebuildSkippedPathSchema, websiteRebuildSchema } from "@/products/websites/client";
+import { legacyArchiveSummarySchema as legacyArchiveSummaryViewSchema, rebuildSkippedPathSchema, websiteRebuildSchema } from "@/products/websites/client";
 
 const factSchema = z.object({ text: z.string(), kind: z.string(), highRisk: z.boolean(), origin: z.string(), sources: z.array(z.object({ sourceId: z.string(), quote: z.string() })), verification: z.object({ supported: z.boolean(), confidence: z.number() }).optional() });
 const auditCheckSchema = z.object({ name: z.string(), status: z.string(), score: z.number(), message: z.string() });
 const auditSnapshotSchema = z.object({ categories: z.array(z.object({ name: z.string(), slug: z.string(), score: z.number(), checks: z.array(auditCheckSchema) })) });
 export const rebuildAuditSchema = z.object({ scope: z.literal("html"), before: auditSnapshotSchema, after: auditSnapshotSchema, checkedAt: z.string(), unavailable: z.array(z.string()) });
+export { legacyArchiveSummarySchema as legacyArchiveSummaryViewSchema } from "@/products/websites/client";
 export const rebuildViewSchema = z.object({
   workId: z.string(), workspaceId: z.string(), tenantId: z.string().nullable().default(null), revision: z.number(), title: z.string(),
   status: z.enum(["building", "review", "approved", "published", "failed"]),
@@ -18,10 +19,15 @@ export const rebuildViewSchema = z.object({
   domain: z.object({ hostname: z.string(), status: z.string(), checkedAt: z.string().nullable(), error: z.string().optional(), records: z.array(z.object({ type: z.string(), name: z.string(), value: z.string() })) }).nullable(),
   error: z.string().nullable(),
   audit: rebuildAuditSchema.nullable().default(null),
+  legacyArchives: z.array(legacyArchiveSummaryViewSchema).max(50).default([]),
+  legacyArchivesNextCursor: z.string().regex(/^[a-f0-9]{64}$/).nullable().default(null),
+  legacyArchivesUnavailable: z.boolean().default(false),
   documentRevisions: z.array(z.object({ revision: z.number(), contentHash: z.string(), createdAt: z.string(), published: z.boolean() })).default([]),
   history: z.array(z.object({ revision: z.number(), kind: z.string(), at: z.string() })).default([]),
 });
-export type RebuildView = z.infer<typeof rebuildViewSchema>;
+type CompleteRebuildView = z.infer<typeof rebuildViewSchema>;
+type ArchiveViewFields = "legacyArchives" | "legacyArchivesNextCursor" | "legacyArchivesUnavailable";
+export type RebuildView = Omit<CompleteRebuildView, ArchiveViewFields> & Partial<Pick<CompleteRebuildView, ArchiveViewFields>>;
 export interface RebuildTransport {
   read(workspaceId: string, workId: string, signal?: AbortSignal): Promise<RebuildView>;
   start(input: { workspaceId: string; requestId: string; url?: string; description?: string; businessName?: string }): Promise<RebuildView>;
@@ -60,15 +66,21 @@ export function parseRebuildView(value: unknown): RebuildView {
   const item = record.rebuild;
   return rebuildViewSchema.parse({ workId: record.workId, workspaceId: record.workspaceId, agencyPublishPermission: record.agencyPublishPermission, tenantId: item.tenantId, revision: item.revision, title: item.title, status: item.status === "review_ready" ? "review" : item.status, stages: Array.from(new Map(item.stages.map(stage => [stage.stage, stage])).values()), skippedPaths: item.skippedPaths, candidate: item.candidate ? { revision: item.candidate.revision, contentHash: item.candidate.contentHash, previewHref: item.candidate.previewHref, pageCount: item.candidate.document.pages.length, hasForms: Boolean(item.candidate.document.capabilities?.inquiry || item.candidate.document.capabilities?.booking), facts: item.candidate.document.facts, unmappedPages: item.pageMapping.filter(page => !page.carriedOver).map(page => page.sourceUrl) } : null, capabilitySelection: "publishedCapabilitySelection" in item ? item.publishedCapabilitySelection : null, approved: Boolean(item.candidate && item.approvedCandidateRevision === item.candidate.revision), publishedUrl: item.launch.receipt?.status === "published" ? item.launch.receipt.providerUrl : null, readBack: item.launch.readBack?.status ?? null, domain: null, error: item.lastError, audit: "audit" in item ? item.audit : null, history: item.history });
 }
+export function archivedHistoryView(history: unknown, record: Pick<RebuildView,"workspaceId" | "workId">) {
+  try {
+    const envelope = z.object({ workspaceId: z.string().uuid(), workId: z.string().uuid(), legacyArchives: z.array(legacyArchiveSummaryViewSchema).max(50), legacyArchivesNextCursor: z.string().regex(/^[a-f0-9]{64}$/).nullable(), legacyArchivesUnavailable: z.boolean() }).parse(history);
+    if (envelope.workspaceId !== record.workspaceId || envelope.workId !== record.workId || envelope.legacyArchives.some(archive => archive.workspaceId !== record.workspaceId)) throw new Error("Archive scope mismatch");
+    return { legacyArchives: envelope.legacyArchives, legacyArchivesNextCursor: envelope.legacyArchivesNextCursor, legacyArchivesUnavailable: envelope.legacyArchivesUnavailable };
+  } catch { return { legacyArchives: [], legacyArchivesNextCursor: null, legacyArchivesUnavailable: true }; }
+}
 async function withDomain(record: RebuildView): Promise<RebuildView> {
-  if (!record.candidate) return record;
   const read = async (route: string) => {
     const response = await fetch(`/api/websites/${encodeURIComponent(record.workId)}/${route}?${new URLSearchParams({ workspaceId: record.workspaceId })}`, { cache: "no-store", credentials: "same-origin" });
     if (!response.ok) return null;
     return response.json();
   };
-  const [domain, history] = await Promise.all([record.publishedUrl ? read("domain").catch(() => null) : null, read("history").catch(() => null)]);
-  return { ...record, domain: domain ? rebuildViewSchema.shape.domain.parse(domain.domain ?? null) : record.domain, documentRevisions: history ? rebuildViewSchema.shape.documentRevisions.parse(history.revisions) : record.documentRevisions };
+  const [domain, history] = await Promise.all([record.candidate && record.publishedUrl ? read("domain").catch(() => null) : null, read("history").catch(() => null)]);
+  return { ...record, ...archivedHistoryView(history,record), domain: domain ? rebuildViewSchema.shape.domain.parse(domain.domain ?? null) : record.domain, documentRevisions: history ? rebuildViewSchema.shape.documentRevisions.parse(history.revisions) : record.documentRevisions };
 }
 export const serverRebuildTransport: RebuildTransport = {
   async read(workspaceId, workId, signal) { return withDomain(await request(`/api/websites/${encodeURIComponent(workId)}/rebuild?${new URLSearchParams({ workspaceId })}`, { signal })); },

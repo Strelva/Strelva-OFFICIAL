@@ -78,3 +78,5 @@ export { siteEditingFor, CONTENT_READING_REPOS, type SiteEditing } from "./site-
 
 export { websiteDomainRequestSchema, websiteCutoverUndoReceiptSchema, type WebsiteDomainRequest, type WebsiteCutoverUndoReceipt } from "./recovery-contracts";
 export { parseWebsiteReportView, type WebsiteReportView } from "./report-view";
+
+export { legacyArchiveSummarySchema, type LegacyArchiveSummary } from "./legacy-archive-contracts";

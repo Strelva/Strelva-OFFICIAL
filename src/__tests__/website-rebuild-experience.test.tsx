@@ -123,9 +123,10 @@ describe("website rebuild review", () => {
     expect(button("Publish approved website").disabled).toBe(true);
     expect(button("Choose forms").disabled).toBe(true);
   });
-  it("retains v1 creation while rebuild release is off", async () => {
+  it("stops new creation while rebuild release is off and opens native intake when enabled", async () => {
     await mount(createElement(WebsiteExperience, { workspaceId: fixtureRebuild().workspaceId }));
-    expect(container.textContent).toContain("Business name");
+    expect(container.textContent).toContain("Website creation is unavailable");
+    expect(container.textContent).not.toContain("Business name");
     expect(container.textContent).not.toContain("Your current website");
     await act(async () => root!.render(createElement(WebsiteExperience, { workspaceId: fixtureRebuild().workspaceId, rebuildEnabled: true })));
     expect(container.textContent).toContain("Your current website");

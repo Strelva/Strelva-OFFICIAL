@@ -13,6 +13,7 @@ import { WebsiteRebuildSharing } from "./WebsiteRebuildSharing";
 import type { WebsiteCutoverUndoReceipt } from "@/products/websites/client";
 import { WebsiteCutoverUndo, WebsiteDomainRequest } from "./WebsiteRecoveryControls";
 import { SITES_PATH_ORIGIN } from "@/platform/infra/brand";
+import { WebsiteArchivedVersions } from "./WebsiteArchivedVersions";
 import styles from "./rebuild-experience.module.css";
 
 export interface RebuildExperienceProps {
@@ -340,6 +341,7 @@ function ScopedRebuildExperience({ workspaceId, workId, readOnly = false, manage
         <p className={styles.meta}>Your preview stays private. Publishing requires an owner&apos;s approval.</p>
       </form> : <p className={styles.notice}>No website preview is waiting for review. Choose an agency with an active provider seat to request website work.</p>
       : <>
+        <WebsiteArchivedVersions record={record} />
         <ol className={styles.progress} aria-label="Website build progress" aria-live="polite">
           {record.stages.map(stage => <li key={stage.stage} data-status={stage.status}><span className={styles.stageIcon}>{stage.status === "completed" ? <Check size={16} aria-label="Completed" /> : stage.status === "running" ? <Loader2 size={16} className="motion-safe:animate-spin" aria-label="Running" /> : stage.status === "failed" ? <CircleAlert size={16} aria-label="Failed" /> : <span aria-label="Pending">○</span>}</span><div><strong>{stage.stage.replace(/_/g, " ")}</strong><p>{stage.message ?? stage.status}</p></div></li>)}
         </ol>
