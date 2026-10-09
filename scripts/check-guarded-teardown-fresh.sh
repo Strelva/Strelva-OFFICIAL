@@ -18,11 +18,21 @@ psql "${psql_args[@]}" --file="$repo_root/scripts/sql/local-supabase-shim.sql" >
 count=0
 while IFS= read -r migration;do
  printf 'Fresh teardown predecessor: %s\n' "$(basename "$migration")"
+ if [[ "${STRELVA_GOOGLE_REVIEW_RETENTION_SQL_PROOF:-0}" == 1 && "$(basename "$migration")" == 20261021100900_google_review_content_retention.sql ]]; then
+  psql "${psql_args[@]}" --file="$repo_root/tests/google-review-content-retention-upgrade-before.sql"
+ fi
  psql "${psql_args[@]}" --file="$migration" >/dev/null
+ if [[ "${STRELVA_GOOGLE_REVIEW_RETENTION_SQL_PROOF:-0}" == 1 && "$(basename "$migration")" == 20261021100900_google_review_content_retention.sql ]]; then
+  psql "${psql_args[@]}" --file="$repo_root/tests/google-review-content-retention-upgrade-after.sql"
+ fi
  count=$((count+1))
 done < <(printf '%s\n' "$repo_root"/supabase/migrations/20*.sql | sort)
 psql "${psql_args[@]}" --file="$repo_root/tests/guarded-tenant-teardown-schema.sql"
 printf 'PASS final guarded teardown against %s ordered actual forward migrations.\n' "$count"
+if [[ "${STRELVA_GOOGLE_REVIEW_RETENTION_SQL_PROOF:-0}" == 1 ]]; then
+ psql "${psql_args[@]}" --file="$repo_root/tests/google-review-content-retention-schema.sql"
+ printf 'PASS populated review retention upgrade and native archive expiry/purge.\n'
+fi
 if [[ "${STRELVA_RUNTIME_GENERATION_SQL_PROOF:-0}" == 1 ]]; then
  for fixture in runtime-data-google-grant-generation.sql runtime-data-google-receipt-intent.sql runtime-data-google-provider-retention.sql runtime-data-tenant-connection-generation.sql; do
   psql "${psql_args[@]}" --file="$repo_root/tests/$fixture"

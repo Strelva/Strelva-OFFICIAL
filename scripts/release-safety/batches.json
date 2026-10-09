@@ -1730,6 +1730,13 @@
           "rollbackStatus": "Prepared guarded or forward-only inverse; native inverse/reapply and populated refusal qualification pending"
         },
         {
+          "file": "20261021100900_google_review_content_retention.sql",
+          "sha256": "6d05b1f2e2c71463372b7fb5e55702a81b385eff96e5a2d5e0f050cb47c7076a",
+          "rollback": "rollback-20261021100900_google_review_content_retention.sql",
+          "rollbackSha256": "239e9e85e6af3f5c55b62dabb0087a1e065c40d941fd39278b09b3a458990253",
+          "rollbackStatus": "Forward-only; discarded provider cache cannot be restored; native refusal and populated retention/archives qualification pending"
+        },
+        {
           "file": "20261021101000_google_make_real_service_authority.sql",
           "sha256": "5e5c50f53eb1381b462924374f565d379a5b7325de56e3ab6ab790fe323a7d20",
           "rollback": "rollback-20261021101000_google_make_real_service_authority.sql",

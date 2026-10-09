@@ -31,6 +31,7 @@ SQL
    if [[ "$case_name" == recipient ]];then
     printf "%s\n" "update public.business_owner_recipient_trust set email='replacement@example.test' where workspace_id='e8211010-0000-4000-8000-000000000010';"
    elif [[ "$case_name" == member ]];then
+    printf '%s\n' "select public.set_agency_client_staff('e8211010-0000-4000-8000-000000000001','gs-admission-operator@strelva.example.test','e8211010-0000-4000-8000-000000000020','e8211010-0000-4000-8000-000000000010','e8211010-0000-4000-8000-000000000001',false);"
     printf "%s\n" "delete from public.workspace_memberships where workspace_id='e8211010-0000-4000-8000-000000000010' and user_id='e8211010-0000-4000-8000-000000000001';"
    fi
    cat <<'SQL'
@@ -72,6 +73,7 @@ SQL
    psql "${psql_args[@]}" -q -c "update public.business_owner_recipient_trust set email='gs-admission-tenant-owner@example.test' where workspace_id='e8211010-0000-4000-8000-000000000010'"
   elif [[ "$case_name" == member ]];then
    psql "${psql_args[@]}" -q -c "insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values('e8211010-0000-4000-8000-000000000010','e8211010-0000-4000-8000-000000000001','admin','e8211010-0000-4000-8000-000000000001')"
+   psql "${psql_args[@]}" -q -c "select public.set_agency_client_staff('e8211010-0000-4000-8000-000000000001','gs-admission-operator@strelva.example.test','e8211010-0000-4000-8000-000000000020','e8211010-0000-4000-8000-000000000010','e8211010-0000-4000-8000-000000000001',true)"
   else
    psql "${psql_args[@]}" -q -c "update public.gs_authority_fixture set session='$original_session'"
   fi
