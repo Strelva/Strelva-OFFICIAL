@@ -47,13 +47,20 @@ export class WebsiteUnconfirmedError extends Error {
 /** Cross-field lifecycle checks used for mutation acknowledgement and recovery reads. */
 export function currentWebsiteRecord(next: WebsiteRecord, workspaceId: string, workId?: string): WebsiteRecord {
   const website = next.website, candidate = website.candidate;
-  const invalid = next.workspaceId !== workspaceId || Boolean(workId && next.workId !== workId)
+  const launch = website.launch;
+  const approved = Boolean(candidate && website.approvedCandidateRevision === candidate.revision);
+  const emptyLaunch = launch.status === "not_requested" && launch.candidateRevision === null && launch.receipt === null && launch.failure === null;
+  const selectedLaunch = Boolean(candidate && launch.candidateRevision === candidate.revision);
+  const phase = website.status === "draft" ? candidate === null && website.approvedCandidateRevision === null && emptyLaunch && website.lastError === null
+    : website.status === "preview_ready" ? Boolean(candidate) && website.approvedCandidateRevision === null && emptyLaunch && website.lastError === null
+    : website.status === "approved" ? approved && emptyLaunch && website.lastError === null
+    : website.status === "launch_pending" ? approved && selectedLaunch && launch.status === "pending" && (!launch.receipt || launch.receipt.status === "pending") && launch.failure === null && website.lastError === null
+    : website.status === "published" ? approved && selectedLaunch && launch.status === "published" && launch.receipt?.status === "published" && launch.failure === null && website.lastError === null
+    : website.lastError?.stage === "artifact" ? candidate === null && website.approvedCandidateRevision === null && emptyLaunch
+    : website.lastError?.stage === "launch" && approved && selectedLaunch && launch.status === "failed" && launch.receipt === null && Boolean(launch.failure);
+  const invalid = !phase || next.workspaceId !== workspaceId || Boolean(workId && next.workId !== workId)
     || Boolean(candidate && candidate.revision > website.revision)
-    || Boolean(website.approvedCandidateRevision !== null && website.approvedCandidateRevision !== candidate?.revision)
-    || Boolean(["approved", "launch_pending", "published"].includes(website.status) && (!candidate || website.approvedCandidateRevision !== candidate.revision))
-    || Boolean(website.status === "preview_ready" && (!candidate || website.approvedCandidateRevision !== null))
-    || Boolean(website.launch.receipt && (!candidate || website.launch.receipt.candidateRevision !== candidate.revision || website.launch.receipt.artifactHash !== candidate.contentHash || website.launch.candidateRevision !== candidate.revision))
-    || Boolean(website.status === "published" && website.launch.receipt?.status !== "published");
+    || Boolean(launch.receipt && (!candidate || launch.receipt.candidateRevision !== candidate.revision || launch.receipt.artifactHash !== candidate.contentHash));
   if (invalid) throw new WebsiteUnconfirmedError();
   return next;
 }
@@ -66,7 +73,7 @@ export function websiteMutationAcknowledgement(next: WebsiteRecord, action: Webs
   const expectedBrief = input.brief;
   const sameBrief = !expectedBrief || [...new Set([...Object.keys(expectedBrief), ...Object.keys(website.brief)])].every(key => expectedBrief[key as keyof WebsiteBrief] === website.brief[key as keyof WebsiteBrief]);
   let valid = sameBrief;
-  if (action === "create") valid &&= website.revision >= 1;
+  if (action === "create") valid &&= website.revision >= 1 || website.status === "draft" && website.revision === 0;
   if (action === "revise") valid &&= website.revision === input.expectedRevision! + 1 && website.approvedCandidateRevision === null && website.launch.status === "not_requested" && (website.status === "preview_ready" && candidate?.revision === website.revision || website.status === "failed" && website.lastError?.stage === "artifact" && candidate === null);
   if (action === "approve") valid &&= website.revision === input.expectedRevision! + 1 && website.status === "approved" && candidate?.revision === input.candidateRevision && candidate.contentHash === input.candidateContentHash && website.approvedCandidateRevision === input.candidateRevision;
   if (action === "prepareLaunch") valid &&= website.revision >= input.expectedRevision! && website.revision <= input.expectedRevision! + 2 && candidate?.revision === input.candidateRevision && candidate.contentHash === input.candidateContentHash && website.approvedCandidateRevision === input.candidateRevision && website.launch.candidateRevision === input.candidateRevision && (["launch_pending", "published"].includes(website.status) || website.status === "failed" && website.lastError?.stage === "launch");

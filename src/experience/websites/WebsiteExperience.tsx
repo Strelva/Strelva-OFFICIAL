@@ -103,7 +103,7 @@ function statusLabel(website: Website): string {
 
 function statusMessage(website: Website): string {
   if (isLocalExportReady(website)) return "Your approved website is ready to download. It has not been published.";
-  if (website.status === "draft") return "Your website draft is saved while the next preview is being prepared.";
+  if (website.status === "draft") return "Your website draft is saved. Generate a private preview when ready.";
   if (website.status === "preview_ready") return `Preview version ${website.candidate?.revision ?? "current"} is ready for your review.`;
   if (website.status === "approved") return `Preview version ${website.approvedCandidateRevision ?? "current"} is approved. Prepare launch when you are ready.`;
   if (website.status === "launch_pending") return "Launch preparation is still pending. Check the saved status before trying again.";
@@ -300,7 +300,7 @@ function WebsiteSession({
     if (!input) return;
     if (!check && (inFlight.current || unresolved.current || readOnly)) return;
     creationAttempt.current = input;
-    await run("Preview generation", () => transport.create(input), next => `Private website preview generated as version ${next.website.candidate?.revision ?? next.website.revision}.`, next => websiteMutationAcknowledgement(next, "create", input), check);
+    await run("Preview generation", () => transport.create(input), next => next.website.status === "draft" ? "Your website draft is saved. Generate a private preview when ready." : `Private website preview generated as version ${next.website.candidate?.revision ?? next.website.revision}.`, next => websiteMutationAcknowledgement(next, "create", input), check);
   }
 
   async function createOrRevise() {
