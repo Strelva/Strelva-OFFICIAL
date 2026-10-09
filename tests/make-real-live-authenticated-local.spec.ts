@@ -177,17 +177,39 @@ test("a real owner reviews and makes native inquiry/app changes live, proves rec
     await inquiryAction({ kind: "edit", requestId, input: { source: "manual", path: "form.title", after: "Reviewed native inquiry form" } });
     await inquiryAction({ kind: "rehearse", requestId });
     expect(inquiry.rehearsal?.passed).toBe(true);
+    // This converted fixture has no installed inquiry offering. Its HTTP
+    // route therefore selects the tenant stable ID, while Systems and Booking
+    // use the canonically linked customer workspace. Keep those identities distinct.
+    const inquiryBusinessId = inquiry.snapshot.business.id;
+    const nativeTenant = await admin.from("tenants").select("stable_id").eq("id", tenantId).single();
+    expect(nativeTenant.error).toBeNull();
+    expect(nativeTenant.data).not.toBeNull();
+    const tenantStableId = nativeTenant.data!.stable_id!;
+    expect(tenantStableId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    const installedInquiries = await admin.rpc("read_inquiry_workspace_exit", { p_tenant_stable_id: tenantStableId });
+    expect(installedInquiries.error).toBeNull();
+    expect(installedInquiries.data).toEqual([]);
+    const canonicalLink = await admin.from("tenant_workspace_links").select("workspace_id")
+      .eq("tenant_stable_id", tenantStableId).single();
+    expect(canonicalLink.error).toBeNull();
+    expect(canonicalLink.data?.workspace_id).toBe(businessId);
+    expect(inquiryBusinessId).toBe(tenantStableId);
+    expect(inquiryBusinessId).not.toBe(businessId);
     // Persist an actual engine approval with CAS; the HTTP publish action
     // would already publish, bypassing the Make Real path under test.
     const inquiryRepository = getInquiryRepository();
-    const snapshot = await inquiryRepository.getSnapshot(tenantId, businessId);
+    // The wrong customer workspace ID must still fail the exact native store lookup.
+    expect(await inquiryRepository.getSnapshot(tenantId, businessId)).toBeNull();
+    const snapshot = await inquiryRepository.getSnapshot(tenantId, inquiryBusinessId);
     expect(snapshot).not.toBeNull();
-    const engine = new InquiryEngine({ businessId, state: snapshot!.state });
+    expect(snapshot!.businessId).toBe(inquiryBusinessId);
+    expect(snapshot!.revision).toBe(inquiry.snapshot.revision);
+    const engine = new InquiryEngine({ businessId: inquiryBusinessId, state: snapshot!.state });
     const approved = engine.approvePublish(requestId, { actorId: owner.userId });
-    const saved = await inquiryRepository.compareAndSwap({ tenantId, businessId, expectedRevision: snapshot!.revision,
+    const saved = await inquiryRepository.compareAndSwap({ tenantId, businessId: inquiryBusinessId, expectedRevision: snapshot!.revision,
       state: engine.snapshot(), actorId: owner.userId });
     expect(saved.changed).toBe(true);
-    const inquiryRequest = inquiryFormRequestSchema.parse({ tenantId, businessId, requestId,
+    const inquiryRequest = inquiryFormRequestSchema.parse({ tenantId, businessId: inquiryBusinessId, requestId,
       capabilityId: approved.capabilityId, changeId: approved.activeChangeId, version: approved.draft!.version });
 
     const appBaseline = await baseline("Native application publication", { workId: app.id, releaseVersion: 1 });
@@ -323,13 +345,16 @@ test("a real owner reviews and makes native inquiry/app changes live, proves rec
       inquiry = await readInquiry();
       await inquiryAction({ kind: "edit", requestId, input: { source: "manual", path: "form.title", after: "Native form awaiting booking verification" } });
       await inquiryAction({ kind: "rehearse", requestId });
-      const partialSnapshot = await inquiryRepository.getSnapshot(tenantId, businessId);
+      expect(inquiry.snapshot.business.id).toBe(inquiryBusinessId);
+      const partialSnapshot = await inquiryRepository.getSnapshot(tenantId, inquiryBusinessId);
       expect(partialSnapshot).not.toBeNull();
-      const partialEngine = new InquiryEngine({ businessId, state: stateForReceive(partialSnapshot!) });
+      expect(partialSnapshot!.businessId).toBe(inquiryBusinessId);
+      expect(partialSnapshot!.revision).toBe(inquiry.snapshot.revision);
+      const partialEngine = new InquiryEngine({ businessId: inquiryBusinessId, state: stateForReceive(partialSnapshot!) });
       const partialApproved = partialEngine.approvePublish(requestId, { actorId: owner.userId });
-      expect((await inquiryRepository.compareAndSwap({ tenantId, businessId, expectedRevision: partialSnapshot!.revision,
+      expect((await inquiryRepository.compareAndSwap({ tenantId, businessId: inquiryBusinessId, expectedRevision: partialSnapshot!.revision,
         state: partialEngine.snapshot(), actorId: owner.userId })).changed).toBe(true);
-      const partialInquiryRequest = inquiryFormRequestSchema.parse({ tenantId, businessId, requestId,
+      const partialInquiryRequest = inquiryFormRequestSchema.parse({ tenantId, businessId: inquiryBusinessId, requestId,
         capabilityId: partialApproved.capabilityId, changeId: partialApproved.activeChangeId, version: partialApproved.draft!.version });
       expect(partialInquiryRequest.version).toBe(inquiryRequest.version + 1);
       const currentAppSystem = await live.current(appBaseline), currentInquirySystem = await live.current(inquiryBaseline);
@@ -397,7 +422,7 @@ test("a real owner reviews and makes native inquiry/app changes live, proves rec
         expect(result.error).toBeNull(); return result.data;
       };
       const undoClaims = await claims(); expect(undoClaims).toHaveLength(1);
-      expect(undoClaims![0]).toMatchObject({ tenant_id: tenantId, business_id: businessId, request_id: requestId,
+      expect(undoClaims![0]).toMatchObject({ tenant_id: tenantId, business_id: inquiryBusinessId, request_id: requestId,
         capability_id: approved.capabilityId, change_id: partialApproved.activeChangeId, action: "undo", version: partialInquiryRequest.version + 1,
         idempotency_key: compensationKey, status: "accepted", actor_id: owner.userId, acceptance_id: expect.any(String) });
       const repeated = activationSchema.parse((await post(operator.context.request, "/api/admin/make-real", { action: "rollback", workspaceId: businessId, activationId: partial.id, confirm: true })).activation);
