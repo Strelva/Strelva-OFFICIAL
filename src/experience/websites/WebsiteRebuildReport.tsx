@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { TextInput } from "@/components/ui/TextInput";
-import { parseWebsiteReportView, type WebsiteReportView } from "@/products/websites/report-view";
+import { parseWebsiteReportView, type WebsiteReportView } from "@/products/websites/client";
 import { beginFocusRecovery } from "./focus-recovery";
 const reportUnavailable = "The monthly report could not be opened. Try loading it again.";
 export function WebsiteRebuildReport({ workId, fixture = false }: { workId: string; fixture?: boolean }) {

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { websiteDomainRequestSchema, type WebsiteDomainRequest } from "@/products/websites/recovery-contracts";
-export { websiteDomainRequestSchema, type WebsiteDomainRequest } from "@/products/websites/recovery-contracts";
+import { websiteDomainRequestSchema, type WebsiteDomainRequest } from "./website-domain-contracts";
+export { websiteDomainRequestSchema, type WebsiteDomainRequest } from "./website-domain-contracts";
 import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import type { SendEmailResult } from "@/platform/infra/email/send";

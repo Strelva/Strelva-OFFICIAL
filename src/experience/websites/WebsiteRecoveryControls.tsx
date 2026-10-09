@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { TextInput } from "@/components/ui/TextInput";
-import { normalizeTenantDomain } from "@/lib/tenant-urls";
-import { websiteDomainRequestSchema, websiteCutoverUndoReceiptSchema, type WebsiteDomainRequest as DomainReceipt, type WebsiteCutoverUndoReceipt } from "@/products/websites/recovery-contracts";
+import { normalizeTenantDomain } from "@/platform/infra/domain-normalization";
+import { websiteDomainRequestSchema, websiteCutoverUndoReceiptSchema, type WebsiteDomainRequest as DomainReceipt, type WebsiteCutoverUndoReceipt } from "@/products/websites/client";
 import { beginFocusRecovery, type FocusRecovery } from "./focus-recovery";
 import type { RebuildView } from "./rebuild-transport";
 

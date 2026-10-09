@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { z } from "zod";
-import { expectedConnectedSiteSystemId } from "@/products/connected-sites/acknowledgement";
+import { expectedConnectedSiteSystemId } from "@/products/connected-sites/client";
 import { Button } from "@/components/ui/Button";
 import { SelectInput, TextInput } from "@/components/ui/TextInput";
 import { PLATFORMS, type SitePlatform } from "@/products/connected-sites/contracts";

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
-import { exactBusinessPageUrl } from "@/products/connected-sites/acknowledgement";
+import { exactBusinessPageUrl } from "@/products/connected-sites/client";
 import { beginFocusRecovery, type FocusRecovery } from "@/experience/websites/focus-recovery";
 import { Button } from "@/components/ui/Button";
 import { SelectInput, TextInput } from "@/components/ui/TextInput";

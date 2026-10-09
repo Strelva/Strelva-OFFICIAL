@@ -2,14 +2,8 @@ import { APP_ROOT_DOMAIN, SITES_ROOT_DOMAIN, SITES_PATH_ORIGIN, CONTROL_PLANE_UR
 import type { TenantConfig } from "./types";
 import type { SiteConfig, TenantIdentity } from "./tenant/models";
 
-function withoutProtocol(domain: string): string {
-  return domain.trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-}
-
-export function normalizeTenantDomain(domain: string | undefined): string | null {
-  const normalized = domain ? withoutProtocol(domain).toLowerCase() : "";
-  return normalized || null;
-}
+import { normalizeTenantDomain } from "@/platform/infra/domain-normalization";
+export { normalizeTenantDomain } from "@/platform/infra/domain-normalization";
 
 function withoutWww(domain: string): string {
   return domain.replace(/^www\./, "");

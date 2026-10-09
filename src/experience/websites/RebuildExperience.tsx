@@ -10,7 +10,7 @@ import { beginFocusRecovery, type FocusRecovery } from "./focus-recovery";
 import { WebsiteConnectionSelector } from "./WebsiteConnections";
 import { WebsiteRebuildReport } from "./WebsiteRebuildReport";
 import { WebsiteRebuildSharing } from "./WebsiteRebuildSharing";
-import type { WebsiteCutoverUndoReceipt } from "@/products/websites/recovery-contracts";
+import type { WebsiteCutoverUndoReceipt } from "@/products/websites/client";
 import { WebsiteCutoverUndo, WebsiteDomainRequest } from "./WebsiteRecoveryControls";
 import { SITES_PATH_ORIGIN } from "@/platform/infra/brand";
 import styles from "./rebuild-experience.module.css";
