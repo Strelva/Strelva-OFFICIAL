@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { localEnvironment, signedInContext } from "./support/local-auth";
 import { ordinaryAgencyMaker, ordinaryCustomerBusiness } from "./support/ordinary-agency-maker";
+import { privateSourceNativeReceipt, runPrivateSourceNativeProof, runPrivateSourceInverseDriftProof } from "./support/private-source-native-proof";
 import { configuredPackageReviewer } from "./support/configured-package-reviewer";
 
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local Supabase Auth and database.");
@@ -65,6 +66,24 @@ test("independently owned businesses install and update definitions without copy
     }
     const first = await publishSource();
     for(const businessId of [sourceSpace,customerSpace])await post(builder.context.request,"/api/workspace/version-sources",{action:"share",workspaceId:maker.agencyId,systemId:source.systemId,businessId,shared:true});
+    // Optional root-owned native window, inside this same real Auth identity.
+    if(process.env.STRELVA_PRIVATE_SOURCE_NATIVE_PROOFS==="1"){
+      for(const mode of ["withdrawal","expiry"] as const){
+        const raceCommandId=randomUUID();
+        const raceGrant=await post(customer.context.request,"/api/workspace/version-sources",{action:"grant_install",workspaceId:customerSpace,
+          agencyWorkspaceId:maker.agencyId,revisionId:first.source.revisionId,commandId:raceCommandId,
+          expiresAt:new Date(Date.now()+(mode==="expiry"?20_000:3_600_000)).toISOString()});
+        const path=await privateSourceNativeReceipt(admin,{source:first.source,sourceUserId:builder.userId,sourceEmail:builder.email,
+          businessId:customerSpace,makerUserId:builder.userId,makerEmail:builder.email,grantId:raceGrant.grantId,
+          commandId:raceCommandId,name:"Native race repair definition",mode});
+        const proof=runPrivateSourceNativeProof(path,mode);
+        await info.attach(`private-source-${mode}-native-proof`,{contentType:"application/x-ndjson",body:Buffer.from(proof)});
+        // Withdrawal race ends with share withdrawn; restore through real HTTP authority.
+        await post(builder.context.request,"/api/workspace/version-sources",{action:"share",workspaceId:maker.agencyId,
+          systemId:source.systemId,businessId:customerSpace,shared:true});
+      }
+      await info.attach("private-source-inverse-drift-native-proof",{contentType:"application/x-ndjson",body:Buffer.from(runPrivateSourceInverseDriftProof())});
+    }
     async function install(request: APIRequestContext, workspaceId: string) {
       const installed = await post(request, "/api/workspace/version-sources", { action: "install", workspaceId, source: first.source,
         name: "Repair requests", commandId: randomUUID() }, 201);

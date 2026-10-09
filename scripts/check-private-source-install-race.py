@@ -50,7 +50,7 @@ def run_race(name, held, attempted, refusal=None, finish_held="", before_release
     first = subprocess.Popen(base, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
     second = None
     try:
-        first.stdin.write("begin;set local statement_timeout='12s';select pg_backend_pid();"+held+"select 'LOCKED';\n")
+        first.stdin.write("begin;set local statement_timeout='35s';select pg_backend_pid();"+held+"select 'LOCKED';\n")
         first.stdin.flush()
         pid = None
         while True:
@@ -63,7 +63,7 @@ def run_race(name, held, attempted, refusal=None, finish_held="", before_release
                 raise RuntimeError(first.stderr.read())
         if pid is None:
             raise AssertionError('Missing blocker identity.')
-        second = subprocess.Popen([*base, '-c', "set application_name="+literal(app)+";set statement_timeout='12s';begin;"+attempted+'commit;'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        second = subprocess.Popen([*base, '-c', "set application_name="+literal(app)+";set statement_timeout='35s';begin;"+attempted+'commit;'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         deadline = time.monotonic()+8
         observed = None
         while time.monotonic()<deadline:
@@ -80,10 +80,10 @@ def run_race(name, held, attempted, refusal=None, finish_held="", before_release
         if before_release:
             before_release()
         first.stdin.write(finish_held+'commit;\n');first.stdin.close()
-        first.wait(timeout=15)
+        first.wait(timeout=40)
         if first.returncode:
             raise RuntimeError(first.stderr.read())
-        output, error=second.communicate(timeout=15)
+        output, error=second.communicate(timeout=40)
         if refusal:
             if second.returncode==0 or refusal not in error:
                 raise AssertionError(name+': expected current-authority refusal: '+error)
@@ -92,7 +92,7 @@ def run_race(name, held, attempted, refusal=None, finish_held="", before_release
         if 'deadlock detected' in error:
             raise AssertionError(name+': deadlock, not serialization.')
         print(json.dumps({'case':name,'observedBlocker':pid,'waiter':observed['pid'],'wait':observed['wait'],
-                          'result':'refused after withdrawal' if refusal else 'serialized after install'}))
+                          'result':'authority refusal' if refusal else 'serialized after install'}))
     finally:
         if first.poll() is None:
             first.terminate();first.wait(timeout=5)
@@ -106,10 +106,14 @@ actual=json.loads(execute(preflight))
 if actual!={'grantMatches':True}:
     raise SystemExit('Exact current marked grant/destination/command/source-revision/definition/actor linkage is required.')
 if os.environ.get('STRELVA_PRIVATE_SOURCE_RACE') == 'expiry':
-    # Root supplies a fresh legitimate owner-issued grant expiring within 7s;
+    # Root supplies a fresh legitimate owner-issued 20-second grant;
     # all command/qualification/actor provenance checks above still apply.
+    remaining=float(execute('select extract(epoch from expires_at-clock_timestamp()) from public.system_package_install_grants where id='+literal(f['grantId'])+'::uuid;'))
+    if not 12<=remaining<=20:
+        raise SystemExit('Expiry proof requires 12–20 seconds of actual remaining grant lifetime after adapter setup.')
+    print(json.dumps({'case':'bounded expiry setup margin','remainingSeconds':remaining,'minimumSeconds':12}))
     def wait_expiry():
-        deadline=time.monotonic()+8
+        deadline=time.monotonic()+25
         while time.monotonic()<deadline:
             expired=execute('select expires_at<=clock_timestamp() from public.system_package_install_grants where id='+literal(f['grantId'])+'::uuid;')
             if expired=='t':

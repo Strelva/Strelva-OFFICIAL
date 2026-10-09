@@ -126,7 +126,8 @@ for variant in "${variants[@]}"; do
   status=0
   if [[ "$profile" == full-native ]]; then
     run_clean bash -c 'set -a; source "$1"; set +a; shift; exec "$@"' bash "$work/package-reviewer-test.env" \
-      env PLAYWRIGHT_JSON_OUTPUT_FILE="$work/results-$variant.json" pnpm exec playwright test "${specs[@]}" \
+      env STRELVA_PRIVATE_SOURCE_NATIVE_PROOFS=1 STRELVA_PRIVATE_SOURCE_PROOF_DIR="$work" \
+      PLAYWRIGHT_JSON_OUTPUT_FILE="$work/results-$variant.json" pnpm exec playwright test "${specs[@]}" \
       --workers=1 --retries=0 --reporter=line,json --output="test-results/full-model-$variant" > "$work/browser-$variant.log" 2>&1 || status=$?
   else
     run_clean env PLAYWRIGHT_JSON_OUTPUT_FILE="$work/results-$variant.json" pnpm exec playwright test "${specs[@]}" \
