@@ -193,7 +193,15 @@ export function syntheticJourneyParityTenantIds(): string[] {
       'verifiedActor',u.verified_at is not null,
       'agencyOwner',exists(select 1 from public.workspace_memberships m where m.workspace_id=a.agency_workspace_id and m.user_id=a.added_by and m.role='owner'),
       'actorEmail',u.email,'agencyName',agency.name,'agencyKind',agency.kind,'businessName',business.name,'businessKind',business.kind,
-      'sourceKind',a.source_kind,'sourceUrl',a.source_url,'productId',s.product_id,'resourceKind',s.resource_kind) end) order by t.id),'[]'::json)
+      'sourceKind',a.source_kind,'sourceUrl',a.source_url,
+      'prospectFixtureMatches',exists(select 1 from public.prospects p
+        join public.workspace_memberships recipient on recipient.workspace_id=a.customer_workspace_id and recipient.role='owner'
+        join public.users recipient_user on recipient_user.id=recipient.user_id and recipient_user.verified_at is not null
+        where p.id=a.prospect_id and p.agency_workspace_id=a.agency_workspace_id and p.source='audit'
+          and p.result_id='workflow-'||p.id::text and p.name='Dana Ruiz' and p.business='Elmwood Bakery'
+          and p.score=58 and p.grade='C' and p.url is null and p.email=recipient_user.email
+          and recipient_user.email ~ '^local-workflow-owner-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}@example[.]test$'),
+      'productId',s.product_id,'resourceKind',s.resource_kind) end) order by t.id),'[]'::json)
     from public.tenants t left join public.website_hosted_tenant_reservations r on r.tenant_stable_id=t.stable_id and r.tenant_id=t.id
     left join public.saved_product_work s on s.id=r.website_work_id
     left join public.agency_client_additions a on a.customer_workspace_id=r.workspace_id

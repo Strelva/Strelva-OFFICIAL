@@ -1,3 +1,4 @@
+import { runWorkspaceInvestigation } from "../../src/products/investigations/server";
 import { createHash, randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -106,6 +107,5 @@ export async function seedStores(admin: SupabaseClient, tenantId: string) {
 export async function runAt(f: Awaited<ReturnType<typeof fixture>>, workId:string, revision:number, requestId:string, now:Date) {
   const user = await f.admin.auth.admin.getUserById(f.owner.userId);
   expect(user.error).toBeNull(); expect(user.data.user?.email_confirmed_at).toBeTruthy();
-  const { runWorkspaceInvestigation } = await import("../../src/products/investigations/server");
   return runWorkspaceInvestigation({userId:f.owner.userId,verifiedEmail:user.data.user!.email!.toLowerCase()},workId,{expectedRevision:revision,requestId},now);
 }

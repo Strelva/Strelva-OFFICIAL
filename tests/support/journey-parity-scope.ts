@@ -51,7 +51,8 @@ export interface ParityTenant {
     businessName: string;
     businessKind: string;
     sourceKind: string;
-    sourceUrl: string;
+    sourceUrl: string | null;
+    prospectFixtureMatches?: boolean;
     productId: string;
     resourceKind: string;
   };
@@ -68,7 +69,8 @@ export function assertKnownParityTenants(tenants: ParityTenant[]): string[] {
       || !/^local-workflow-agency-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}@example\.test$/.test(p.actorEmail)
       || p.agencyName !== "Northside Web Care" || p.agencyKind !== "agency"
       || p.businessName !== "Elmwood Bakery" || p.businessKind !== "customer"
-      || p.sourceKind !== "url" || p.sourceUrl !== "http://elmwood-source.example/"
+      || !((p.sourceKind === "url" && p.sourceUrl === "http://elmwood-source.example/")
+        || (p.sourceKind === "prospect" && p.sourceUrl === null && p.prospectFixtureMatches === true))
       || p.productId !== "websites" || p.resourceKind !== "website") {
       throw new Error(`Unexpected tenant in disposable journey parity setup: ${tenant.id}`);
     }

@@ -1,3 +1,4 @@
+import { ordinaryAgencyMaker, ordinaryCustomerBusiness } from "./support/ordinary-agency-maker";
 import { createClient } from "@supabase/supabase-js";
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { localEnvironment, signedInContext } from "./support/local-auth";
@@ -89,22 +90,29 @@ test("scheduling, generated applications and two-source investigation persist wi
   const env = localEnvironment();
   const admin = createClient(env.url, env.service, { auth: { persistSession: false, autoRefreshToken: false } });
   const owner = await signedInContext(browser, admin, "horizontal-owner");
+  let maker: Awaited<ReturnType<typeof ordinaryAgencyMaker>> | undefined;
   try {
-    const snapshotResponse = await owner.context.request.get("/api/workspace");
-    expect(snapshotResponse.status()).toBe(200);
-    const { workspaceId } = await snapshotResponse.json();
+    const workspaceId = await ordinaryCustomerBusiness(owner, "Native horizontal operations business");
+    maker = await ordinaryAgencyMaker(browser, admin, owner, workspaceId);
     let schedule = await post(owner.context.request, "/api/bounded-work", { action: "create", productId: "scheduling", workspaceId, input: { title: "Private availability", availability: [{ start: "2026-10-01T09:00:00Z", end: "2026-10-01T17:00:00Z" }] } }, 201);
     schedule = await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "scheduling", workId: schedule.id, command: { kind: "reserve", expectedRevision: 0, requestId: "visit-1", title: "Site visit", start: "2026-10-01T10:00:00Z", end: "2026-10-01T11:00:00Z" } });
     expect(schedule.payload.reservations[0].status).toBe("reserved");
     await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "scheduling", workId: schedule.id, command: { kind: "reserve", expectedRevision: 1, requestId: "visit-2", title: "Conflicting visit", start: "2026-10-01T10:30:00Z", end: "2026-10-01T11:30:00Z" } }, 409);
-    let app = await post(owner.context.request, "/api/bounded-work", { action: "create", productId: "applications", workspaceId, input: { title: "Project portal", fields: [{ id: "name", label: "Project", type: "text", required: true }], components: [{ kind: "form", fields: ["name"] }, { kind: "list", fields: ["name"] }] } }, 201);
+    let app = await post(maker.context.request, "/api/bounded-work", { action: "create", productId: "applications", workspaceId, input: { title: "Project portal", fields: [{ id: "name", label: "Project", type: "text", required: true }], components: [{ kind: "form", fields: ["name"] }, { kind: "list", fields: ["name"] }] } }, 201);
     await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: app.id, command: { kind: "install", expectedRevision: 0 } }, 409);
-    app = await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: app.id, command: { kind: "rehearse", expectedRevision: 0 } });
+    app = await post(maker.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: app.id, command: { kind: "rehearse", expectedRevision: 0 } });
     app = await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: app.id, command: { kind: "install", expectedRevision: app.payload.revision } });
     app = await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: app.id, command: { kind: "submit", expectedRevision: app.payload.revision, record: { id: "project-1", values: { name: "Kitchen renovation" } } } });
-    const installedCopy = await post(owner.context.request, "/api/bounded-work", { action: "from_source", productId: "applications", workspaceId, sourceWorkId: app.id }, 201);
+    // Reuse an agency-owned released definition; customer records remain private.
+    let reusable = await post(maker.context.request, "/api/bounded-work", { action: "create", productId: "applications", workspaceId: maker.agencyId, input: { title: "Reusable project portal", fields: [{ id: "name", label: "Project", type: "text", required: true }], components: [{ kind: "form", fields: ["name"] }, { kind: "list", fields: ["name"] }] } }, 201);
+    reusable = await post(maker.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: reusable.id, command: { kind: "rehearse", expectedRevision: reusable.payload.revision } });
+    reusable = await post(maker.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: reusable.id, command: { kind: "install", expectedRevision: reusable.payload.revision } });
+    reusable = await post(maker.context.request, "/api/bounded-work", { action: "command", productId: "applications", workId: reusable.id, command: { kind: "submit", expectedRevision: reusable.payload.revision, record: { id: "agency-private", values: { name: "Private agency project" } } } });
+    await post(owner.context.request, "/api/bounded-work", { action: "from_source", productId: "applications", workspaceId, sourceWorkId: reusable.id }, 403);
+    const installedCopy = await post(maker.context.request, "/api/bounded-work", { action: "from_source", productId: "applications", workspaceId, sourceWorkId: reusable.id }, 201);
     expect(installedCopy.payload.records).toEqual([]);
-    expect(installedCopy.payload.installation.sourceWorkId).toBe(app.id);
+    expect(installedCopy.payload.installation.sourceWorkId).toBe(reusable.id);
+    expect(JSON.stringify(installedCopy)).not.toContain("Private agency project");
     const left = await post(owner.context.request, "/api/documents", { action: "create", workspaceId, input: { title: "Published hours", text: "Open at nine" } });
     const right = await post(owner.context.request, "/api/documents", { action: "create", workspaceId, input: { title: "Staff hours", text: "Open at ten" } });
     let investigation = await post(owner.context.request, "/api/bounded-work", { action: "create", productId: "investigations", workspaceId, input: { title: "Keep hours consistent", intervalMinutes: 60, sources: [{ workId: left.workId }, { workId: right.workId }] } }, 201);
@@ -113,5 +121,5 @@ test("scheduling, generated applications and two-source investigation persist wi
     const reopened = await owner.context.request.get(`/api/bounded-work?productId=investigations&workId=${investigation.id}`);
     expect((await reopened.json()).payload.runs).toHaveLength(1);
     await post(owner.context.request, "/api/bounded-work", { action: "run", productId: "investigations", workId: investigation.id, command: { expectedRevision: 1, requestId: "too-early" } }, 409);
-  } finally { await owner.context.close(); }
+  } finally { await maker?.context.close(); await owner.context.close(); }
 });

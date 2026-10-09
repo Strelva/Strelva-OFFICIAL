@@ -25,3 +25,12 @@ describe("owned synthetic journey parity scope", () => {
     expect(() => assertKnownParityTenants([{ ...native, native: { ...native.native!, ...change } }])).toThrow("Unexpected tenant");
   });
 });
+
+
+it("admits the full-profile prospect only with the exact linked producer proof", () => {
+  const prospect: ParityTenant = { ...native, native: { ...native.native!, sourceKind: "prospect", sourceUrl: null, prospectFixtureMatches: true } };
+  expect(assertKnownParityTenants([prospect])).toEqual([native.stableId]);
+  for (const change of [{ prospectFixtureMatches: false }, { prospectFixtureMatches: undefined }, { sourceUrl: "https://customer.example.com" }, { agencyOwner: false }, { actorMatches: false }, { verifiedActor: false }, { tenantStableId: "unrelated" }]) {
+    expect(() => assertKnownParityTenants([{ ...prospect, native: { ...prospect.native!, ...change } }])).toThrow("Unexpected tenant");
+  }
+});
