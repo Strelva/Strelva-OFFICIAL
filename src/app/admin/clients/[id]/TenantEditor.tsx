@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useId } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Toggle } from "@/components/ui/Toggle";
 import { getToggleableRegistry } from "@/lib/features/registry";
 import { Field } from "@/app/admin/ui";
@@ -661,6 +662,7 @@ export function TenantEditor({ tenant }: { tenant: EditableTenant }) {
             placeholder={tenant.id}
             className="w-full rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm font-mono text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-critical0/50"
           />
+          {deprovisionCleanupId && <Link href={`/admin/tenant-cleanup/${tenant.id}`} className="block text-sm text-accent-text underline focus-visible:outline-2 focus-visible:outline-offset-2">Open cleanup recovery</Link>}
           {deprovisionError && (
             <p className="text-xs text-critical leading-snug">{deprovisionError}</p>
           )}

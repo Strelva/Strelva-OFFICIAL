@@ -1,6 +1,6 @@
 import { authorizeAdminOperatorRead } from "@/platform/operator-read-audit/admission";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { isSuperAdmin } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { getClickCounts, getActivity, listDrafts, getDailyMetrics } from "@/lib/storage";
@@ -100,7 +100,7 @@ export default async function ClientDetailPage({
 
   const { id } = await params;
   const tenant = await getTenantConfig(id);
-  if (!tenant) notFound();
+  if (!tenant) redirect(`/admin/tenant-cleanup/${encodeURIComponent(id)}`);
 
   const noRisk: AtRiskSignal = {
     tenantId: id,

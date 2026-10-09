@@ -1106,3 +1106,17 @@ These are implemented private contracts. Scoped tests/lint/typechecking establis
 only their respective behavior; native SQL, rendered desktop/mobile states and
 actual licensed provider journeys require separate proof. No new foundation,
 material or composition direction was adopted.
+
+
+### Prepared operator tenant-cleanup recovery (October 8, 2026)
+
+`src/app/admin/tenant-cleanup/[id]/CleanupRecovery.tsx` composes the owned
+`Button` and `TextInput` primitives inside the existing admin theme. It reads the
+current native receipt through the super-admin GET and retries only its exact id
+with typed slug confirmation. Loading, unavailable, missing, pending and complete
+states remain distinct; complete receipts retain the retired-slug statement and
+have no retry control. Unknown/rejected writes require a fresh receipt read.
+The client editor links to recovery after a pending result; a missing tenant at
+its original editor URL routes to the standalone page. No component primitive API
+or accepted visual direction changes. Focused transport/authority checks pass;
+actual Auth desktop/mobile reload/retry/screenshots are prepared, not observed.

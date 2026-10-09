@@ -11,7 +11,12 @@ Use the coordinator's existing disposable database with the complete actual
 forward schema, guarded teardown and cleanup receipt CAS already applied. This
 fixture creates fictional tenants and leaves their retained receipts in that
 disposable database. It neither creates a schema nor substitutes missing tables.
-The adapter is limited to real service-role cleanup/client-record RPCs. A missing
+The adapter is limited to real service-role cleanup/client-record RPCs. Its strict
+connection parser allows exactly one `-h`, `-U`, `-d` and optional valid `-p`.
+Duplicates, long aliases, URI/service values, arbitrary flags and ambiguous socket
+paths are refused. The argv is reconstructed from those fields and all PG/PSQL
+environment overrides are removed. Socket directories must resolve inside owned
+/tmp with the current user's UID. A missing
 function, denied privilege or SQL error remains an error; direct table fallback
 throws. Its `psql` transport accepts JSON argv with an explicit local host and DB.
 
@@ -64,11 +69,15 @@ authenticated GET recovers the durable receipt after tenant deletion; ordinary
 people remain denied and slug reuse remains refused. Screenshots and native
 receipt attachments are captured during execution.
 
-The editor requires a tenant row on page load. This fixture does not claim a fresh
-page load reconstructs the pending editor after the tenant is gone. Durable
-recovery currently belongs to the authenticated receipt API; a standalone
-operator recovery surface remains unproven. No fabricated response or route
-fulfillment replaces the cleanup request.
+The standalone `/admin/tenant-cleanup/<slug>` page requires current super-admin
+authority and no tenant row. It loads the actual receipt API, displays distinct
+loading/unavailable/missing/pending/complete states, confirms the typed slug and
+retries only the recovered exact id. The client editor links to it after partial
+removal; reloading the old deleted-tenant editor URL routes to it. The updated
+actual Auth fixture reloads that URL, verifies native GET recovery, performs a
+new exact-receipt retry, observes revision progress and pending provider state,
+and checks an ordinary signed-in person cannot enter the recovery page. Browser
+execution remains unperformed; this is implemented recovery with prepared proof.
 
 ## Prepared evidence and next action
 
@@ -77,3 +86,12 @@ gate off (one skip); Playwright listed both desktop/mobile cases without startin
 a browser or server. No native DB, Redis server, Auth, browser, build, provider,
 production or dependency operation ran while preparing these fixtures. Root must
 execute both on one composed source and retain original errors and receipts.
+
+
+Successor source verification: strict adapter regressions reject duplicated/long
+host switches, URI/service and extra command/file flags, and remove libpq overrides.
+Focused receipt-client tests reject cross-scope/stale/inconsistent/missing retry
+receipts and preserve denied/unavailable outcomes. Page authority tests require
+current super-admin before mounting recovery. `21st` catalog search/review is
+unavailable locally (`command not found`); no dependency was installed. Existing
+owned primitives and tokens were reused. Native/UI execution remains root-owned.

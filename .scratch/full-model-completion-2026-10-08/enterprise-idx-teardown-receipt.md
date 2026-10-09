@@ -99,3 +99,39 @@ on both runner and server. Preparation evidence: scoped lint and diff checks pas
 two UI cases. No native DB/Redis/Auth/browser/build/provider/production commands in
 this fixture-preparation turn. Root owns composed typecheck and execution; retain
 all failures, native receipts and existing provider/full-model gates.
+
+
+Recovery/adapter successor: independent coordinator review found that 9e2d02f8's
+initial local-host adapter guard accepted a duplicate later host or --host switch.
+That source is not safe alone. The successor parses only singular -h/-U/-d and
+optional valid -p pairs, rejects all other flags and unsafe values, reconstructs
+argv, removes libpq/psql environment overrides and checks actual socket directory
+canonical /tmp ownership before execution. Focused regressions preserve duplicate,
+long host, URI/service, command/file flag and PGHOSTADDR/PGSERVICE rejection.
+
+Standalone `/admin/tenant-cleanup/<slug>` is now implemented with current
+super-admin auth, actual existing receipt GET and exact-id retry, shared native
+receipt parsing, explicit loading/unknown/absence/pending/complete states and
+owned Button/TextInput primitives. Missing tenant at original editor URL routes
+there; pending editor links there. Typed confirmation remains required; denied,
+stale/inconsistent or unavailable responses cannot authorize another retry before
+reload. Client async responses are tied to current page generation. Updated
+actual Auth desktop/mobile journey reloads the deleted editor URL, observes the
+standalone page/native GET, re-confirms and retries the same receipt, reads native
+revision progress and verifies ordinary UI/API denial and slug retirement.
+
+The earlier fresh recovery UI gap is now implemented locally; actual browser
+proof remains pending. 21st CLI was unavailable (command not found), so no install
+or generated design; inspected owned components were reused. React checklist
+applied to direct imports, effect cancellation/current-response ownership,
+accessible states/labels/focus and no added provider/dependency. Exact source and
+focused proof are supplied in the coordinator handoff; no native/Redis/Auth/browser,
+Docker/build/typecheck/provider/production operations ran in this successor.
+
+Successor verification: eleven focused files, 82 passed and four explicitly gated
+native cases skipped; scoped lint and diff checks pass. Updated Playwright lists
+the two desktop/mobile reload/recovery cases without browser/server startup.
+Native full-schema two-worker execution and actual Auth reload UI remain pending
+in coordinator resource windows. The next integration must include 9e2d02f8 and
+this successor before any native adapter execution. Retain all existing unknown
+provider/mirror repair evidence and the prior accidental native failure record.

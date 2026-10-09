@@ -55,20 +55,47 @@ for (const width of [1440, 390]) {
       expect(after.cleanup.revision).toBeGreaterThan(pending.cleanup.revision);
       expect(after).toMatchObject({ ok: false, databaseDeleted: true, cleanup: { providerComplete: false, complete: false } });
       await expect(retry).toBeVisible();
-      // A lost tab/response is recovered by the real authenticated receipt API.
-      // The deleted tenant's editor is not claimed to survive a page reload.
+      await expect(page.getByRole("link", { name: "Open cleanup recovery", exact: true })).toHaveAttribute("href", `/admin/tenant-cleanup/${tenantId}`);
+      // Reload the deleted tenant's original editor URL. The server now routes
+      // to a standalone recovery page backed by the actual authenticated GET.
+      const reloadRead = page.waitForResponse(value => new URL(value.url()).pathname === endpoint && value.request().method() === "GET");
+      await page.reload();
+      await expect(page).toHaveURL(new RegExp(`/admin/tenant-cleanup/${tenantId}$`));
+      await expect(page.getByRole("heading", { name: "Tenant cleanup", exact: true })).toBeVisible();
+      expect((await reloadRead).status()).toBe(200);
+      await expect(page.getByText(pending.cleanup.id, { exact: true })).toBeVisible();
+      const recoveredRetry = page.getByRole("button", { name: "Retry pending cleanup", exact: true });
+      await expect(recoveredRetry).toBeDisabled();
+      await page.getByLabel(`Type ${tenantId} to confirm cleanup retry`, { exact: true }).fill(tenantId);
+      await expect(recoveredRetry).toBeEnabled();
+      const recoveredPost = page.waitForResponse(value => new URL(value.url()).pathname === endpoint && value.request().method() === "POST");
+      await recoveredRetry.focus(); await expect(recoveredRetry).toBeFocused(); await recoveredRetry.click();
+      const recoveryResponse = await recoveredPost;
+      expect(recoveryResponse.request().postDataJSON()).toEqual({ action: "retry-cleanup", confirmSlug: tenantId, cleanupReceiptId: pending.cleanup.id });
+      expect(recoveryResponse.status(), await recoveryResponse.text()).toBe(202);
+      const afterReload = await recoveryResponse.json();
+      expect(afterReload.cleanup.revision).toBeGreaterThan(after.cleanup.revision);
+      expect(afterReload.cleanup).toMatchObject({ id: pending.cleanup.id, providerComplete: false, complete: false });
+      await expect(page.getByText("Cleanup is still pending. The receipt has been saved; retry when the remaining stores are available.", { exact: true })).toBeVisible();
+      await noHorizontalOverflow(page);
+      await page.screenshot({ path: testInfo.outputPath(`tenant-cleanup-reloaded-${width}.png`), fullPage: true });
+      const deniedPage = await stranger.context.newPage();
+      await deniedPage.goto(`/admin/tenant-cleanup/${tenantId}`);
+      await expect(deniedPage).not.toHaveURL(new RegExp(`/admin/tenant-cleanup/${tenantId}$`));
+      await expect(deniedPage.getByRole("heading", { name: "Tenant cleanup", exact: true })).toHaveCount(0);
+      await deniedPage.close();
       const recovered = await operator.context.request.get(endpoint);
       expect(recovered.status(), await recovered.text()).toBe(200);
       expect(recovered.headers()["cache-control"]).toBe("private, no-store");
-      expect((await recovered.json()).cleanup).toMatchObject({ id: pending.cleanup.id, revision: after.cleanup.revision, complete: false });
+      expect((await recovered.json()).cleanup).toMatchObject({ id: pending.cleanup.id, revision: afterReload.cleanup.revision, complete: false });
       const native = await admin.rpc("tenant_cleanup_receipt", { p_slug: tenantId });
       expect(native.error).toBeNull();
-      expect(native.data).toMatchObject({ id: pending.cleanup.id, revision: after.cleanup.revision, providerComplete: false, complete: false });
+      expect(native.data).toMatchObject({ id: pending.cleanup.id, revision: afterReload.cleanup.revision, providerComplete: false, complete: false });
       expect((await stranger.context.request.get(endpoint)).status()).toBe(403);
       expect((await stranger.context.request.post(endpoint, { headers: { origin: env.app }, data: { action: "retry-cleanup", confirmSlug: tenantId, cleanupReceiptId: pending.cleanup.id } })).status()).toBe(403);
       const insert = await admin.from("tenants").insert({ id: tenantId, site_name: "Unsafe reuse fictional" });
       expect(insert.error?.message).toContain("tenant_slug_retired");
-      await testInfo.attach("native-pending-cleanup", { body: JSON.stringify({ pending: pending.cleanup, after: after.cleanup, recovered: native.data }, null, 2), contentType: "application/json" });
+      await testInfo.attach("native-pending-cleanup", { body: JSON.stringify({ pending: pending.cleanup, after: after.cleanup, afterReload: afterReload.cleanup, recovered: native.data }, null, 2), contentType: "application/json" });
     } finally {
       // Leave the native receipt/fence in this disposable stack. Never clear
       // retained history or weaken authority just to make fixture teardown green.

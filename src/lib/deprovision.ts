@@ -1,3 +1,5 @@
+import { cleanupSchema, type CleanupReceipt } from "./deprovision-cleanup-receipt";
+export type { CleanupReceipt } from "./deprovision-cleanup-receipt";
 /**
  * Core tenant deprovision logic — shared between the admin API route
  * (src/app/api/admin/tenants/[id]/deprovision/route.ts) and the CLI script
@@ -110,12 +112,6 @@ export interface DeprovisionResult {
   databaseDeleted?: boolean;
   cleanup?: CleanupReceipt;
 }
-
-const cleanupSchema = z.object({
-  id: z.string().uuid(), tenantId: z.string(), revision: z.number().int().nonnegative(), databaseDeleted: z.literal(true),
-  redisComplete: z.boolean(), providerComplete: z.boolean(), complete: z.boolean(),
-}).passthrough();
-export type CleanupReceipt = z.infer<typeof cleanupSchema>;
 
 /** An outstanding native receipt remains available after the tenant is gone. */
 export async function readDeprovisionCleanup(tenantId: string): Promise<CleanupReceipt | null> {
