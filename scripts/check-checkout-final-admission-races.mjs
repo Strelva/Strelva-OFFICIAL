@@ -118,7 +118,7 @@ try {
     const holder = processSql(`${label}-holder`);
     let worker;
     try {
-      holder.child.stdin.write(`begin;${lock}select 'CHECKOUT_LOCK_HELD|'||jsonb_build_object('pid',pg_backend_pid(),'transaction',pg_current_xact_id()::text);\n`);
+      holder.child.stdin.write(`begin;${lock}select 'CHECKOUT_LOCK_HELD|'||jsonb_build_object('pid',pg_backend_pid(),'transaction',pg_current_xact_id()::text)::text;\n`);
     await waitUntil(() => holder.output().includes("CHECKOUT_LOCK_HELD|"), `${kind}: holder did not acquire the expected lock`);
     const holding = JSON.parse(holder.output().split("\n").find(line => line.startsWith("CHECKOUT_LOCK_HELD|")).slice("CHECKOUT_LOCK_HELD|".length));
     if (!Number.isInteger(holding.pid) || holding.pid <= 0 || !/^[0-9]+$/.test(holding.transaction)) throw new Error("Holder backend identity was invalid");
