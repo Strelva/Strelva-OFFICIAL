@@ -9,7 +9,10 @@ begin
  if p_provider is null or p_provider !~ '^[a-z][a-z0-9_]{0,79}$'
  or p_expected_payload is null or jsonb_typeof(p_expected_payload)<>'object'
  or p_payload is null or jsonb_typeof(p_payload)<>'object' or p_captured_at is null then raise exception 'client_record_invalid'; end if;
- select stable_id into v_stable from public.tenants where id=p_tenant_id;
+ -- Match teardown's lifecycle lock order; KEY SHARE pins both slug and
+ -- stable identity through the nested historical writer's second lookup.
+ perform pg_advisory_xact_lock(hashtextextended('hosted-tenant:'||p_tenant_id,7416));
+ select stable_id into v_stable from public.tenants where id=p_tenant_id for key share;
  if v_stable is null then raise exception 'client_record_unknown_tenant'; end if;
  perform pg_advisory_xact_lock(hashtextextended(v_stable::text||':provider_connections:'||p_provider,9106));
  select * into v_row from public.tenant_client_records where tenant_stable_id=v_stable and store='provider_connections' and record_id=p_provider for update;
