@@ -1,4 +1,10 @@
-# Strelva — managed business-presence control plane
+# Strelva — Reborn 1.0
+
+**Next-release source: [`reborn-1.0`](https://github.com/Strelva/Strelva-OFFICIAL/tree/reborn-1.0).**
+All reviewed Reborn work converges here before promotion to `main`. This is a
+prepared release candidate; publication does not approve production rollout.
+[Consolidation and proof boundaries](docs/operations/reborn-consolidation-2026-10-09.md)
+owns included source and remaining qualification.
 
 Strelva is transitioning toward a common conversational experience for Users,
 Paid Users, Clients, and Enterprise accounts. The description below covers the

@@ -73,9 +73,25 @@ is not fresh combined application/Auth/native qualification. Action-time actor
 snapshots, the bounded200-row attribution read, managed-target rights, native
 application cases, provider operation and full release retain their existing limits.
 
+## Authorized publication and cleanup
+
+After combined verification, Jacob authorized publishing the union as
+`reborn-1.0`, deleting incorporated inactive branches and closing superseded
+pull requests. This canonical name replaces `integrate/reborn-1.0` for new work.
+The original consolidation limits above describe that earlier phase; this later
+authorization permits publication and bounded cleanup, not promotion to `main`.
+
+The nightly workflow in this source now defaults to `reborn-1.0`. Its scheduled
+definition on `main` still reads `reborn`, so the legacy remote remains a
+compatibility reference until that routing update reaches `main`. Active security
+repairs, dirty/occupied worktrees, held proposals and unique source are preserved.
+Exact expected-SHA inventories, deletion receipts and PR dispositions live in
+workspace `.scratch/domain-language-2026-10-09/`. Deleted branch tips remain
+reachable from the canonical reviewed source; no worktree directories are removed.
+
 ## Next action
 
-Advance the common Reborn branch only after combined source verification. Leave
+Use `reborn-1.0` as the common next-release branch. Leave
 `main` and the other integration owner's private checkout/canonical model untouched.
 Give that owner the exact combined source and retained failure receipts for final
 native/Auth/managed-target qualification before promotion or rollout.

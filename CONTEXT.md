@@ -1,5 +1,16 @@
 # Strelva interface and Managed Websites context
 
+## October 9 Reborn 1.0 publication
+
+Jacob authorized publishing the reviewed union as canonical `reborn-1.0`,
+deleting safely incorporated inactive branches and closing superseded pull
+requests. `reborn-1.0` is the next-release source before `main`; the earlier
+`integrate/reborn-1.0` name is superseded. Active, dirty, held and uniquely
+unmerged work stays isolated. The legacy remote `reborn` remains for the
+nightly workflow on `main`, which still defaults to that name; remove this
+compatibility reference after the routing change reaches `main`. Neither
+publication nor cleanup authorizes a `main` merge or production rollout.
+
 ## October 9 reviewed Reborn consolidation
 
 Jacob authorized consolidating all reviewed Reborn work before moving to `main`.
