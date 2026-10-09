@@ -96,3 +96,10 @@ it('hands a flagged decision uncertainty to the reload action instead of its obs
   button('Confirm').focus(); await act(async () => button('Confirm').click());
   expect(button('Confirm').disabled).toBe(true); expect(document.activeElement).toBe(button('Reload current state'));
 });
+it('retains the current revision and unknown lock when a standalone saved-state read goes backward', async () => {
+  const value = { ...record(), revision: 5 };
+  const transport = { read: async () => ({ ...value, revision: 4, title: 'STALE SAVED STATE' }), mutate: async () => { throw new RebuildUnconfirmedError(); }, start: async () => value };
+  await unknown(value, transport); await act(async () => button('Reload current state').click());
+  expect(node.textContent).not.toContain('STALE SAVED STATE');
+  expect(button('Reload current state')).toBeDefined(); expect(button('Publish approved website').disabled).toBe(true);
+});

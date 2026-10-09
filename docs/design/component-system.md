@@ -1403,6 +1403,25 @@ write/read per pending operation, and read-only users can still read saved state
 Focused service/transport/component tests prove these local boundaries. This is
 not browser, genuine Auth, delivery, provider or production proof.
 
+The local `website-attempt` owner now admits and settles native/legacy review,
+domain preparation and routing undo. It retains captured commands, updates
+permission epochs before interaction, and keeps the synchronous write/unknown
+fences independent of React commits. Same-work role changes retain the owner;
+workspace/work changes keep the existing scoped reset. Native intake now freezes
+its submitted URL or description/name/request ID after a lost acknowledgement
+and offers **Check this website request** using that exact idempotent POST with
+current access. Only an initial route401 or accepted owning result releases it.
+
+Accepted mutation acknowledgement no longer awaits History/domain enrichment.
+The current candidate and cleared approval appear immediately; supplemental
+state is marked unavailable until an explicit **Reload saved History** or
+**Reload domain status** GET. Malformed, denied or foreign History remains
+unavailable without locking or replaying the accepted correction. History checks
+its workspace/work envelope and shapes; domain checks its response shape under
+the existing scoped route (the domain response has no identity envelope).
+[Website stream evidence](../architecture/deepening-2026-10-09/02-website-settlement.md)
+records local service-backed regressions and fictional browser limits.
+
 `WebsiteConnectionSelector` reports unknown visitor-form writes to each owning
 website view, including successful envelopes that fail that owner's parser.
 Only the exact route-proven selection400 and sign-in401 messages retain direct
