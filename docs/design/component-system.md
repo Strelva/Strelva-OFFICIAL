@@ -59,6 +59,27 @@ grant/revoke. Native runtime/authority/upgrade assertions run in disposable SQL.
 These receipts establish prepared implementation, not production rollout, approved
 review policy, provider delivery or customer adoption.
 
+## Recorded money terms, October 9, prepared local source
+
+`CollectionTerms` composes the owned Button, Card, TextInput and SelectInput with
+semantic quote/history lists. A current business owner chooses an already
+recorded price and explicit period; the exact amount/currency and UTC instants
+are visible before acceptance. Agency charging approval and a payment mandate
+remain separate. No price or recurring interval is inferred.
+
+Missing customer configuration, no approved prices and read-only/exit state
+remove acceptance controls. During an uncertain response, the draft and exact
+command remain frozen until current readback; any permitted retry reuses that
+same command. A matching historical receipt recovers a lost response without
+another POST. Current authority is rechecked by the server. Workspace changes
+abort old observations; error focus preserves navigation when the user moved.
+The browser imports a pure shared DTO/schema owner, without database/provider
+modules. Twenty-two focused component/contract tests passed locally, alongside
+scoped lint and bounded types. A genuine signed-in one-case Auth/UI/PostgreSQL
+journey is prepared and listed, but has not executed. Desktop/mobile rendered
+proof, current catalog/native proof and provider/commercial qualification remain
+unproven; this entry records source behavior rather than final interface approval.
+
 ## Start with tokens and atoms
 
 ### Systems mutation recovery, October 8, local
