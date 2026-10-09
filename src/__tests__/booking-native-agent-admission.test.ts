@@ -19,7 +19,8 @@ it("admits the exact live unlinked native calendar without unrelated tenant pari
 });
 it("retains legacy tenant cutover and every global/write rollback gate", async () => {
  await expect(requireAgentBookings("legacy-site")).rejects.toThrow("Agent bookings are not enabled");
- for (const [flag, value] of [["STRELVA_BOOKING_AGENTS", "0"], ["DUAL_WRITE_PG", "0"], ["STRELVA_BOOKING_STORE_WRITE", "0"]]) {
+ const gates: Array<[string, string]> = [["STRELVA_BOOKING_AGENTS", "0"], ["DUAL_WRITE_PG", "0"], ["STRELVA_BOOKING_STORE_WRITE", "0"]];
+ for (const [flag, value] of gates) {
   vi.stubEnv(flag, value); store.context.mockClear(); await expect(requireAgentBookings(scope)).rejects.toThrow("not enabled"); expect(store.context).not.toHaveBeenCalled(); vi.stubEnv(flag, "1");
  }
 });

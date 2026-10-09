@@ -17,7 +17,9 @@ it("refuses an unapproved fallback before any primary request", async () => {
 });
 it("uses the same admitted server model set for the actual generation call", async () => {
  await defaultGenerate(input); expect(calls.generate).toHaveBeenCalledOnce();
- expect(calls.generate.mock.calls[0][2].models.map((model: { label: string }) => model.label)).toEqual(input.approvedModelLabels);
+ const dispatch = calls.generate.mock.calls[0];
+ if (!dispatch) throw new Error("Actual model dispatch was not recorded.");
+ expect(dispatch[2].models.map((model: { label: string }) => model.label)).toEqual(input.approvedModelLabels);
 });
 it("request restriction cannot configure arbitrary providers or exceed the bounded fallback set", () => {
  const request = { workspaceId: "11111111-1111-4111-8111-111111111111", userGoal: "A private plan", planningEconomics: { jobId: "22222222-2222-4222-8222-222222222222", executionKey: "one", maximumCents: 100, approvedModelLabels: input.approvedModelLabels } };

@@ -54,7 +54,9 @@ test("actual provider browser consent, native renewal and owner revocation", asy
   const read = () => localSql<Array<{ id: string; scopes: string[]; userId: string; used: boolean; rotations: number }>>(`select coalesce(jsonb_agg(jsonb_build_object('id',c.id,'scopes',c.scopes,'userId',c.user_id,'used',c.last_used_at is not null,'rotations',(select count(*) from public.assistant_refresh_tokens r where r.connection_id=c.id and consumed_at is not null))),'[]') from public.assistant_connections c where c.workspace_id=:'v1'::uuid and c.client_id=:'v2';`, scope.workspaceId, scope.clientId);
   // The actual provider must call/renew; this harness never exchanges fixture tokens.
   await expect.poll(() => read().some(c => c.used && c.rotations > 0), { timeout: 60_000 }).toBe(true);
-  const [connection] = read(); expect(read()).toHaveLength(1); expect(connection.userId).toBe(scope.ownerUserId); expect([...connection.scopes].sort()).toEqual([...scope.scopes].sort());
+  const connections = read(); expect(connections).toHaveLength(1); const connection = connections[0];
+  if (!connection) throw new Error("Actual provider connection was not recorded.");
+  expect(connection.userId).toBe(scope.ownerUserId); expect([...connection.scopes].sort()).toEqual([...scope.scopes].sort());
   claim.recordRequest(connection.id);
   await page.goto(`/connect?workspaceId=${scope.workspaceId}`);
   await page.getByRole("button", { name: `Disconnect ${scope.clientName}`, exact: true }).click();
