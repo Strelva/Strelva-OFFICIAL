@@ -330,7 +330,10 @@ response; its draft becomes read-only and **Check this request** explicitly send
 that same attempt. Only the exact saved request in a validated response completes
 it. Receipt actions have no retry key and remain locked after an unconfirmed
 result until the user reloads and reads the receipts. State belongs to the exact
-business/System identity. `ConnectSiteExperience`, `ServerVisibility` publication
+business/System identity. `ConnectSiteExperience` likewise admits one synchronous
+connect/verification flight, freezes an unknown write until actual reload, and
+does not replay a write without a backend key. Its state belongs to the current
+business. `ConnectSiteExperience`, `ServerVisibility` publication
 and Business details' generic save failure report uncertainty and ask the user
 to inspect the current saved state before retrying. Explicit release holds,
 read-only checks and permission refusals keep their own messages. No automatic

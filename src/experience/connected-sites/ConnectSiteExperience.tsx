@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
+import { z } from "zod";
 import { Button } from "@/components/ui/Button";
 import { SelectInput, TextInput } from "@/components/ui/TextInput";
 import { PLATFORMS, type SitePlatform } from "@/products/connected-sites/contracts";
@@ -22,6 +23,11 @@ const PLATFORM_LABEL: Partial<Record<SitePlatform, string>> = {
 };
 const PLATFORM_OPTIONS = PLATFORMS.filter(value => PLATFORM_LABEL[value]).map(value => ({ value, label: PLATFORM_LABEL[value]! }));
 const UNCONFIRMED_CONNECTION = "We couldn't confirm the connection's current state. Reload the page to check before trying again.";
+const connectedResponse = z.object({ site: z.object({
+  id: z.string().uuid(), siteHost: z.string().min(1), siteUrl: z.string().url(), status: z.enum(["active", "revoked"]),
+  verifiedAt: z.string().nullable(), systemId: z.string().uuid(), snippet: z.object({ script: z.string(), meta: z.string().nullable() }),
+}) });
+const errorResponse = z.object({ error: z.string() });
 
 /**
  * A new business brings the website it already has (website System spec,
@@ -29,7 +35,11 @@ const UNCONFIRMED_CONNECTION = "We couldn't confirm the connection's current sta
  * the live page to confirm the site is theirs → the website opens as a
  * System. Strelva never edits the pages. Every call is rechecked on the server.
  */
-export function ConnectSiteExperience({ workspaceId, canManage, initialSites, appBase = "" }: { workspaceId: string; canManage: boolean; initialSites: ConnectableSite[]; appBase?: string }) {
+export function ConnectSiteExperience(props: { workspaceId: string; canManage: boolean; initialSites: ConnectableSite[]; appBase?: string }) {
+  return <ConnectSiteExperienceContent key={props.workspaceId} {...props} />;
+}
+
+function ConnectSiteExperienceContent({ workspaceId, canManage, initialSites, appBase = "" }: Parameters<typeof ConnectSiteExperience>[0]) {
   const request = useWorkspaceRequest();
   const [site, setSite] = useState<ConnectableSite | null>(() => initialSites.find(item => item.status === "active") ?? null);
   const [sites, setSites] = useState(initialSites.filter(item => item.status === "active"));
@@ -37,35 +47,48 @@ export function ConnectSiteExperience({ workspaceId, canManage, initialSites, ap
   const [platform, setPlatform] = useState<SitePlatform>("unknown");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const inFlight = useRef(false);
+  const needsReload = useRef(false);
+  const [unconfirmed, setUnconfirmed] = useState(false);
   const systemPage = (systemId: string) => `${appBase}/workspace?${new URLSearchParams({ view: "system", system: systemId, workspaceId })}`;
+
+  function uncertain(message?: string) {
+    needsReload.current = true; setUnconfirmed(true);
+    setError([message, UNCONFIRMED_CONNECTION].filter(Boolean).join(" "));
+  }
 
   async function post(body: Record<string, unknown>): Promise<ConnectableSite | null> {
     const response = await request("/api/workspace/connected-sites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, ...body }) });
-    const result = await response.json().catch(() => null) as { site?: ConnectableSite; error?: string } | null;
-    if (!response.ok || !result?.site) {
-      const held = response.status === 503 && result?.error === "Connected sites are not enabled. Nothing changed.";
-      setError(!held && (response.ok || response.status >= 500 || !result?.error)
-        ? [result?.error, UNCONFIRMED_CONNECTION].filter(Boolean).join(" ") : result?.error || UNCONFIRMED_CONNECTION);
+    const raw: unknown = await response.json().catch(() => null);
+    const parsed = connectedResponse.safeParse(raw), error = errorResponse.safeParse(raw);
+    const result = parsed.success ? parsed.data : null;
+    const message = error.success ? error.data.error : undefined;
+    if (!response.ok || !result || (body.action === "verify" && result.site.id !== body.siteId)) {
+      const held = response.status === 503 && message === "Connected sites are not enabled. Nothing changed.";
+      // The store can report a malformed saved row as 400 after SQL commits.
+      // Unconfirmed writes have no replay key: inspect fresh state on reload.
+      if (!held && (response.ok || response.status === 400 || response.status >= 500 || !message)) uncertain(message);
+      else setError(message || UNCONFIRMED_CONNECTION);
       return null;
     }
-    setSites(items => [...items.filter(item => item.id !== result.site!.id), result.site!]);
+    setSites(items => [...items.filter(item => item.id !== result.site.id), result.site]);
     return result.site;
   }
   async function connect(event: FormEvent) {
     event.preventDefault();
-    if (!canManage || busy) return;
+    if (!canManage || inFlight.current || needsReload.current) return;
     if (!url.trim()) { setError("Enter your site's address, like yourbusiness.com."); return; }
-    setBusy(true); setError("");
+    inFlight.current = true; setBusy(true); setError("");
     try { const next = await post({ action: "connect", siteUrl: url.trim(), platform }); if (next) setSite(next); }
-    catch { setError(UNCONFIRMED_CONNECTION); }
-    finally { setBusy(false); }
+    catch { uncertain(); }
+    finally { inFlight.current = false; setBusy(false); }
   }
   async function verify() {
-    if (!site || !canManage || busy) return;
-    setBusy(true); setError("");
+    if (!site || !canManage || inFlight.current || needsReload.current) return;
+    inFlight.current = true; setBusy(true); setError("");
     try { const next = await post({ action: "verify", siteId: site.id }); if (next) setSite(next); }
-    catch { setError(UNCONFIRMED_CONNECTION); }
-    finally { setBusy(false); }
+    catch { uncertain(); }
+    finally { inFlight.current = false; setBusy(false); }
   }
 
   return <div className="mx-auto grid w-full max-w-2xl gap-6 px-4 py-10 md:px-8">
@@ -74,13 +97,13 @@ export function ConnectSiteExperience({ workspaceId, canManage, initialSites, ap
       <p className="text-sm text-gray-muted">Keep your site where it is: Wix, Squarespace, WordPress or anything else. Strelva fills in your confirmed details, takes its inquiries and counts visits. It never edits your pages.</p>
     </header>
     {sites.length ? <div className="grid gap-3">
-      <SelectInput label="Connected website" value={site?.id ?? ""} options={[{ value: "", label: "Connect another website" }, ...sites.map(item => ({ value: item.id, label: item.siteHost }))]} onChange={event => { setSite(sites.find(item => item.id === event.target.value) ?? null); setError(""); }} disabled={busy} />
-      {site && canManage ? <Button type="button" variant="ghost" className="justify-self-start" disabled={busy} onClick={() => { setSite(null); setError(""); }}>Connect another website</Button> : null}
+      <SelectInput label="Connected website" value={site?.id ?? ""} options={[{ value: "", label: "Connect another website" }, ...sites.map(item => ({ value: item.id, label: item.siteHost }))]} onChange={event => { if (!inFlight.current && !needsReload.current) { setSite(sites.find(item => item.id === event.target.value) ?? null); setError(""); } }} disabled={busy || unconfirmed} />
+      {site && canManage ? <Button type="button" variant="ghost" className="justify-self-start" disabled={busy || unconfirmed} onClick={() => { if (!inFlight.current && !needsReload.current) { setSite(null); setError(""); } }}>Connect another website</Button> : null}
     </div> : null}
     {!site ? canManage ? <form className="grid gap-4" onSubmit={connect} noValidate aria-label="Connect your website">
-      <TextInput label="Your site's address" type="url" inputMode="url" autoComplete="url" placeholder="yourbusiness.com" value={url} disabled={busy} spellCheck={false} autoCapitalize="none" onChange={event => { setUrl(event.target.value); setError(""); }} />
-      <SelectInput label="Built with" value={platform} options={PLATFORM_OPTIONS} disabled={busy} onChange={event => setPlatform(event.target.value as SitePlatform)} />
-      <Button type="submit" loading={busy} className="justify-self-start">Get my two lines</Button>
+      <TextInput label="Your site's address" type="url" inputMode="url" autoComplete="url" placeholder="yourbusiness.com" value={url} readOnly={busy || unconfirmed} spellCheck={false} autoCapitalize="none" onChange={event => { if (!inFlight.current && !needsReload.current) { setUrl(event.target.value); setError(""); } }} />
+      <SelectInput label="Built with" value={platform} options={PLATFORM_OPTIONS} disabled={busy || unconfirmed} onChange={event => { if (!inFlight.current && !needsReload.current) setPlatform(event.target.value as SitePlatform); }} />
+      <Button type="submit" loading={busy} disabled={unconfirmed} className="justify-self-start">Get my two lines</Button>
     </form> : <p className="text-sm text-gray-muted">An owner or admin of this business connects its website.</p>
     : site.verifiedAt ? <section className="grid gap-3" aria-labelledby="connected-done">
       <h2 id="connected-done" className="text-base font-medium">{site.siteHost} is connected</h2>
@@ -92,7 +115,7 @@ export function ConnectSiteExperience({ workspaceId, canManage, initialSites, ap
       <p className="text-sm text-gray-muted">Paste them into your site&rsquo;s header code (most builders call it &ldquo;custom code&rdquo;), on every page. Someone else runs your site? Send them these lines; they&rsquo;re safe to share.</p>
       <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-gray-bg p-3 text-xs" aria-label="Lines to add to your site">{[site.snippet.meta, site.snippet.script].filter(Boolean).join("\n")}</pre>
       <p className="text-sm text-gray-muted">Publish the site, then check. Strelva reads the live page to confirm it&rsquo;s yours. Nothing is collected until then.</p>
-      {canManage ? <Button type="button" loading={busy} className="justify-self-start" onClick={() => void verify()}>Check my site</Button> : null}
+      {canManage ? <Button type="button" loading={busy} disabled={unconfirmed} className="justify-self-start" onClick={() => void verify()}>Check my site</Button> : null}
     </section>}
     {error ? <p role="alert" className="text-sm text-terra">{error}</p> : null}
   </div>;

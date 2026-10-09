@@ -121,6 +121,9 @@ describe("Business details", () => {
     expect(page).toContain("Nothing was saved");
     const invalid = html(createElement(WorkspaceBusinessDetails, { workspaceId: WS, action, result: "invalid", field: "phone", state: { kind: "ready", data: { record: record("owner"), operator: false, sites: [], denied: [] } } }));
     expect(invalid).toContain("7 to 15 digits");
+    const unreadableSave = html(createElement(WorkspaceBusinessDetails, { workspaceId: WS, result: "failed", state: { kind: "error" } }));
+    expect(unreadableSave).toContain("couldn&#x27;t confirm whether the save completed");
+    expect(unreadableSave).not.toContain("Nothing changed");
   });
 });
 
