@@ -1777,6 +1777,13 @@
           "rollback": "rollback-20261022123000_private_definition_versions.sql",
           "rollbackSha256": "082aebf140e7d604fede2870525facab7b99de8d4fb87a966023334f1ac4b60d",
           "rollbackStatus": "Owner-issued/migrator-owner baseline preflight refuses unsupported ACL atomically; all13 successor body/ACL guards and exact predecessor ACL restoration; native qualification pending"
+        },
+        {
+          "file": "20261022130000_tenant_newsletter_teardown_hold.sql",
+          "sha256": "9d43cda986d818eebf532556271e1408bb121962e6341cb8c0e2e349f4687e3c",
+          "rollback": "rollback-20261022130000_tenant_newsletter_teardown_hold.sql",
+          "rollbackSha256": "29382e84df33e10f2c62a6b2cc60fb9131efedfbd81f739336e1ad0329d869bf",
+          "rollbackStatus": "Prepared exact authority/body/ACL baseline and successor drift guards; native refusal and inverse/reapply qualification pending"
         }
       ]
     }

@@ -1,6 +1,6 @@
 {
-  "source": "cbfc7a72 plus frozen private definition Versions packet (native qualification pending)",
-  "forwardCount": 341,
+  "source": "Prepared full-model342 inventory; private permission successor and newsletter native qualification pending",
+  "forwardCount": 342,
   "workspaceBoundary": "20260905190000_release_one_workspaces.sql",
   "focusedLegacyExceptions": {
     "20260920060000_content_version_request_id.sql": "Requires legacy content_versions, omitted from the purpose-built workspace fixture; real upgrade/fresh full-schema rehearsal owns it.",
@@ -348,6 +348,7 @@
     "20261022090000_guarded_tenant_teardown.sql",
     "20261022090100_tenant_cleanup_receipts.sql",
     "20261022120000_agency_created_application_authority.sql",
-    "20261022123000_private_definition_versions.sql"
+    "20261022123000_private_definition_versions.sql",
+    "20261022130000_tenant_newsletter_teardown_hold.sql"
   ]
 }

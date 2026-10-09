@@ -18,6 +18,9 @@ psql "${psql_args[@]}" --file="$repo_root/scripts/sql/local-supabase-shim.sql" >
 count=0
 while IFS= read -r migration;do
  printf 'Fresh teardown predecessor: %s\n' "$(basename "$migration")"
+ if [[ "$(basename "$migration")" == 20261022130000_tenant_newsletter_teardown_hold.sql ]]; then
+  node "$repo_root/scripts/tenant-newsletter-baseline-proof.mjs" | psql "${psql_args[@]}"
+ fi
  if [[ "${STRELVA_GOOGLE_REVIEW_RETENTION_SQL_PROOF:-0}" == 1 && "$(basename "$migration")" == 20261021100900_google_review_content_retention.sql ]]; then
   psql "${psql_args[@]}" --file="$repo_root/tests/google-review-content-retention-upgrade-before.sql"
  fi
@@ -48,6 +51,7 @@ PYURL
 done < <(printf '%s\n' "$repo_root"/supabase/migrations/20*.sql | sort)
 psql "${psql_args[@]}" --file="$repo_root/tests/guarded-tenant-teardown-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/scripts/sql/tenant-teardown-evidence-owners.sql"
+psql "${psql_args[@]}" --file="$repo_root/scripts/sql/tenant-newsletter-teardown-hold.sql"
 printf 'PASS final guarded teardown against %s ordered actual forward migrations.\n' "$count"
 if [[ "${STRELVA_GOOGLE_REVIEW_RETENTION_SQL_PROOF:-0}" == 1 ]]; then
  psql "${psql_args[@]}" --file="$repo_root/tests/google-review-content-retention-schema.sql"
@@ -93,11 +97,14 @@ fi
 
 if [[ "${STRELVA_PRIVATE_DEFINITION_SQL_PROOF:-0}" == 1 ]]; then
  psql "${psql_args[@]}" --file="$repo_root/scripts/sql/private-definition-versions-contract.sql"
+ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261022130000_tenant_newsletter_teardown_hold.sql"
  psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261022123000_private_definition_versions.sql"
  pg_dump --host="$cluster_socket" --port="$cluster_port" --username="$(id -un)" --dbname=postgres --schema-only --schema=public | python3 -c 'import sys; sys.stdout.writelines(line for line in sys.stdin if not line.startswith((r"\restrict ",r"\unrestrict ")))' > "$cluster_root/private-definition-restored.sql"
  cmp "$cluster_root/private-definition-before.sql" "$cluster_root/private-definition-restored.sql"
  psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022123000_private_definition_versions.sql"
  psql "${psql_args[@]}" --file="$repo_root/scripts/sql/private-definition-versions-contract.sql"
+ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022130000_tenant_newsletter_teardown_hold.sql"
+ psql "${psql_args[@]}" --file="$repo_root/scripts/sql/tenant-newsletter-teardown-hold.sql"
  pnpm exec tsx scripts/generate-database-types.ts --host "$cluster_socket" --port "$cluster_port" --out "$repo_root/.scratch/full-model-completion-2026-10-08/private-definition-database.types.ts"
  printf 'PASS private definition forward/inverse/reapply, exact public schema ACL equality and READ ONLY contracts.\n'
 fi
