@@ -444,3 +444,156 @@ permission, SQL, provider/Auth or `/api/v1` contract changed. No custom-client o
 agency permission runner is required by the href deletion. Full lint's merged
 source result plus all changed-file checks are retained. Clean build remains held
 for the coordinator's next resource window.
+
+
+Registration wording correction: the first new entry described “guarded populated
+inverse and reapply pass”, which overstated the proof. Root review corrected it:
+conditioned PostgreSQL 18 **empty-schema** inverse/reapply restores exact
+definitions and ACL; **populated inverse refuses**, preserving rows and forward
+fingerprints. Only the new entry's rollbackStatus is corrected; every historical
+entry and SQL hash/byte remains unchanged. Offline inventory/JSON/diff checks
+pass after this metadata correction; the 40-test suite is not rerun for wording.
+
+
+## Candidate source and proof handoff
+
+Recovery commit: `77fc4ea49f61aecc901f92062d8646bd125f21ee`; coordinator registration:
+`95424f72fa836bed1a32566aa48021c8cce7f903`; separate inquiry deletion:
+`201c19874be9be5f3ea65128e06a00826607a781`. The final metadata/evidence commit
+records corrected inverse wording and final source counts. All exact input heads
+are listed above and remain ancestors; complete peer handoffs/inventory entries
+and the projection synchronization caveat are retained. This worktree alone was
+changed. No App/OpenedWork/SystemPage runtime source changed after the recovery
+freeze. The [complete changed-file manifest](07-union-changed-files.txt) uses starting
+base `6ddc03f4d0f854997ff3f54481d5066625bf62fe`; its reads stream was already included.
+
+Independent final bounded source review found no concrete blocker in inquiry
+identity/retention/Unavailable or held inventory registration. Both frozen SQL
+hashes were independently verified. Review is source evidence, not a new suite or
+migration application. Root's SQL companion repaired-source upgrade pass is
+separate from this unrepaired candidate's required-runner failures. Do not project
+that pass onto this source. Its exact helper release/review is a subsequent
+integration action, outside this candidate's source authorization.
+
+Exact local commands (environment cleared for app/browser/SQL/build):
+
+```sh
+env -i PATH="$PATH" HOME="$HOME" TMPDIR="$TMPDIR" STRELVA_LOCAL_TEST_WORKERS=4 \
+  pnpm exec vitest run $(cat docs/architecture/deepening-2026-10-09/07-union-test-files.txt)
+pnpm exec vitest run src/__tests__/architecture-union-document.test.tsx \
+  src/__tests__/architecture-union-entrances.test.tsx src/__tests__/workspace-refresh.test.tsx
+pnpm exec vitest run src/__tests__/offering-installations.test.ts \
+  src/__tests__/workspace-offerings-ui.test.tsx
+pnpm exec vitest run src/__tests__/release-safety-tools.test.ts
+pnpm typecheck
+pnpm check:boundaries
+pnpm check:ontology
+pnpm lint
+# Full lint was run on merged source; every later changed TS/TSX file was checked again.
+git diff --check
+
+env -i PATH="/opt/homebrew/opt/postgresql@18/bin:$PATH" HOME="$HOME" TMPDIR="$TMPDIR" \
+  bash scripts/check-lifetime-system-kind.sh
+env -i PATH="/opt/homebrew/opt/postgresql@18/bin:$PATH" HOME="$HOME" TMPDIR="$TMPDIR" \
+  pnpm check:workspace-sql
+env -i PATH="/opt/homebrew/opt/postgresql@18/bin:$PATH" HOME="$HOME" TMPDIR="$TMPDIR" \
+  pnpm check:workspace-upgrade
+```
+
+For browser replay, copy each corresponding `tests/fixtures/*-page.tsx` into its
+disposable `src/app/preview/strelva/` proof route: `opened-work-proof`,
+`architecture-union-proof`, `architecture-union-inquiry-proof`. Start only the
+fictional clean-environment app:
+
+```sh
+env -i PATH="$PATH" HOME="$HOME" TMPDIR="$TMPDIR" STRELVA_UI_PREVIEW=1 \
+  NEXT_TELEMETRY_DISABLED=1 pnpm exec next dev --hostname 127.0.0.1 --port 3437
+env -i PATH="$PATH" HOME="$HOME" TMPDIR="$TMPDIR" STRELVA_UI_PREVIEW=1 \
+  PLAYWRIGHT_BASE_URL=http://127.0.0.1:3437 PLAYWRIGHT_CHANNEL=chrome \
+  pnpm exec playwright test tests/opened-work-composition.spec.ts \
+  tests/release-workspace-navigation.spec.ts tests/architecture-union.spec.ts \
+  tests/architecture-union-inquiry.spec.ts
+```
+
+Actual runs were serialized as 31 peer, 10 union and 2 inquiry cases; 43 unique cases
+pass with zero skips. Two union cases were later rerun for inspected warning
+screenshots, not counted again. Stop the devserver, remove all disposable route
+copies and regenerate route types before source-only checks/build. An initial
+teardown typecheck's generated imports failed; its retained log and final passing
+regeneration are separate. Existing shared primitive/tokens were used throughout.
+
+
+Raw local evidence is retained at `/tmp/strelva-architecture-union-20261009/`
+(outside tracked source). Primary proof files:
+
+- Initial/final recovery: `refresh-deferred-initial.log`, `union-gates-final.log`.
+- Broad initial/final: `units-initial.log`, `units-final.log` (83-file manifest).
+- Browser: `browser-peer-final.log`, `browser-touch-final.log`,
+  `inquiry-browser-final.log`; retained final warning/installation images in
+  `browser-artifacts/retry-v1-320.png`, `retry-v2-390.png`,
+  `inquiry-desktop.png`, `inquiry-mobile.png`.
+- SQL: `kind-sql.log`, `workspace-sql.log`, `workspace-upgrade.log`.
+- Final checks: `typecheck-final.log`, `boundaries-final.log`, `ontology-final.log`,
+  merged `lint.log` plus `lint-correction-final.log`, `inquiry-lint-final.log` and
+  `lint-visual-capture-final.log`.
+- Adjacent/registration: `inquiry-initial.log`, `inquiry-final.log`,
+  `release-inventory-initial.log`, `release-inventory-wording.log`,
+  `release-tools-initial.log`, `release-tools-final.log`.
+
+Source-only candidate is ready for root review with the serialized clean build
+receipt below. Canonical integration and production remain held. Exact next
+action: root reviews draft #623's final head and independently reviews the SQL
+companion helper's separate source; integrate only released exact heads, preserving
+this packet entry, all peer records and the projection synchronization caveat.
+Then rerun required runners on the combined reviewed helper source. Production
+requires separately qualified historical kinds, hosted ACL/Auth, PostgreSQL 17/
+managed feasibility, live preflight and explicit migration/rollout authorization.
+The exact-resource inquiry resolver remains future prepared work, not part of
+this source. No further App/OpenedWork/SystemPage source edit is planned.
+
+## Final clean build and resource release
+
+The coordinator explicitly released the serialized build window. The single run
+completed **exit 0** on committed source `201c19874be9be5f3ea65128e06a00826607a781`
+plus the reserved final docs/manifest, corrected registration wording and screenshot
+capture. Compilation, TypeScript and all 260 generated static pages completed.
+Exact changed-file hashes are retained in `build-source.json`; the final commit
+changes only evidence/docs/metadata and preserves every tested runtime byte.
+
+```sh
+env -i PATH="$PATH" HOME="$HOME" TMPDIR="$TMPDIR" NEXT_TELEMETRY_DISABLED=1 pnpm build
+```
+
+Existing frozen-lockfile dependencies were used. The environment contains only
+PATH, HOME, TMPDIR and the telemetry-disable flag; repository env files are only
+`.env.example` and `.env.production.example`. Disposable routes/bridge/devserver
+were removed before the build, and no build or native process remains. No fake
+provider variables or real credentials were supplied. The local manifest precheck
+initially misclassified `.env.production.example`; its shell continued to this
+single authorized build. Corrected read-only validation and `build-precheck.txt`
+retain that setup failure; no second build was started.
+
+Retained warnings are two dynamic-filesystem tracing warnings in
+`src/lib/google-review-content-retention.ts`, Sentry `disableLogger` deprecation
+and Node `module.register` deprecation. No bundle-size/performance, provider/Auth
+or production qualification follows. `build.log` and `build.exit` retain the
+complete output and exit receipt. The broad slot was explicitly released to root
+and foundation after teardown, with F01 Redis then O01 Lua next. No further broad
+or native run was started here. The companion's later workspace retry failure
+at missing `public.build_payments` in its minimal-parent cleanup fixture remains
+separate source evidence; neither required runner is green on this candidate.
+
+
+Measured source deltas (Git numstat; tests/docs/proof tooling counted separately):
+
+| Baseline | Runtime TS/TSX +/− | New migration SQL +/− | Tests +/− | Docs +/− | Proof tooling +/− |
+| --- | --- | --- | --- | --- | --- |
+| Bound starting base `6ddc03f4` (reads already present) | 511/461 | 94/0 | 2120/64 | 2761/94 | 183/0 |
+| Architecture source base `e9511b044` (all six streams) | 582/540 | 94/0 | 2355/67 | 3061/2 | 183/0 |
+
+Runtime grows by 50 lines against the bound base, or 42 across all six; no shrink,
+bundle, latency or economic benefit is claimed. The bounded retry adds 3 net runtime
+lines and the inquiry deletion removes 3; no meaningful guard was removed.
+Runtime SQL is only the 94 prepared forward/inverse lines; existing migration bytes
+are unchanged. Test counts include fictional browser fixtures and SQL assertions;
+proof tooling includes local runners, preflight SQL and held release metadata.

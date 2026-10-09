@@ -72,6 +72,7 @@ for (const width of [1440, 390, 320]) for (const version of [1, 2]) {
     expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(true);
     expect(await retry.evaluate(node => { const bounds = node.getBoundingClientRect(); return bounds.width >= 44 && bounds.height >= 44; })).toBe(true);
     await warningFits();
+    await page.screenshot({ path: testInfo.outputPath("union-retry-warning.png"), fullPage: false });
     await unchanged();
     await retry.focus();
     await expect(retry).toBeFocused();

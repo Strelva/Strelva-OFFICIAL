@@ -196,17 +196,35 @@ live preflight and migration application remain separate release obligations.
 No agency-workflow/provider authority expansion or shared database action was
 performed.
 
-## Exact next action
+## Candidate freeze and exact next action
 
-Complete the final combined manifest, checks and desktop/mobile replay, then
-record actual failures/skips and runtime/SQL/test/doc counts in the union handoff.
-After the original union proof passes, the separately authorized bounded inquiry
-repair may remove its fabricated resource-UUID href and prove the existing
-Unavailable installation UI; an exact authorized resource-to-tenant mapping
-remains future work. Publish/register the draft union PR against `reborn-1.0`
-and hand the exact candidate head to the coordinator for independent review.
-Canonical integration remains held; local source readiness is distinct from
-production readiness.
+The recovery correction is frozen at
+`77fc4ea49f61aecc901f92062d8646bd125f21ee`, ordinary-published for separately
+held foundation preparation. Registration `95424f72fa836bed1a32566aa48021c8cce7f903`
+adds one proposed lifetime-kind packet entry with frozen hashes; later metadata
+correctly says empty-schema inverse/reapply restores definitions/ACL while
+populated inverse refuses and preserves rows/forward fingerprints. Offline
+inventory and 40 release-safety tests pass; all historical entries stay unchanged.
+
+The separately authorized inquiry deletion is frozen at
+`201c19874be9be5f3ea65128e06a00826607a781`: only fabricated href construction is
+removed, with the existing Unavailable fallback and resource/installation/history
+retained. Two initial emission/UI regressions fail, then 23 tests and two actual
+installation browser cases pass. No exact mapping, grants or UUID-to-tenant alias
+is introduced. An actor-authorized resource/tenant/business mapping remains future
+prepared work. Final changed-file checks pass; the single clean-environment build
+passes exit 0 with retained tracing/deprecation warnings and the broad slot released.
+See the [union handoff](07-architecture-union.md)
+and [changed-file manifest](07-union-changed-files.txt) for final evidence/counts.
+
+Draft [#623](https://github.com/Strelva/Strelva-OFFICIAL/pull/623) targets
+`reborn-1.0`. Root must independently review its final candidate head and the SQL
+companion's separately repaired harness before canonical integration. The companion's
+passing conditioned PG18 upgrade is separate evidence; this candidate's required
+runners retain their observed failures until a reviewed helper release is combined.
+No PG17, hosted ACL/Auth, historical-kind, live preflight or migration application
+qualification follows. Canonical integration remains held. F01 must preserve the
+new held release inventory entry during later convergence.
 
 Canonical `PRODUCT_MODEL.md` and shared strategic state remain with their existing
 integration owner. Return bounded evidence deltas without creating a competing
