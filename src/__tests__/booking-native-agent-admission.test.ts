@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const store = vi.hoisted(() => ({ context: vi.fn(), db: vi.fn() }));
 vi.mock("@/platform/bookings/store", async original => ({ ...await original<typeof import("@/platform/bookings/store")>(), readBookingContext: store.context, bookingStoreDb: store.db }));
 import { requireAgentBookings, requestAgentBooking } from "@/platform/bookings/native";
+import { readAgentBookingAvailability } from "@/platform/agent-channel/public-tools";
 import { resetBookingFlagCache } from "@/platform/bookings/flags";
 const ws = "11111111-1111-4111-8111-111111111111";
 const scope = `workspace:${ws}`;
@@ -32,4 +33,22 @@ it("refuses linked paused foreign or malformed native contexts", async () => {
 it("reaches the still-disabled customer confirmation gate without a booking effect", async () => {
  await expect(requestAgentBooking(scope, { origin: "agent", serviceId: "service", start: "2026-11-03T15:00:00Z", requestId: "request_123", agent: { name: "Assistant" }, customer: { name: "Dana", email: "dana@example.test" } })).rejects.toThrow("Customer confirmation is not available");
  expect(store.context).toHaveBeenCalledTimes(1); expect(store.db).not.toHaveBeenCalled();
+});
+const directoryFor = (bookingScope: string) => ({ list: async () => [{ business: "native", name: "Native", industry: null, website: null }], scope: async () => bookingScope });
+it("reports the native confirmation hold rather than unrelated tenant parity", async () => {
+ store.context.mockResolvedValue({ ...context, services: [{ id: "service", active: true }] });
+ await expect(readAgentBookingAvailability(directoryFor(scope), "Native")).resolves.toEqual({ status: "no", detail: "Customer confirmation is not available for this business." });
+ expect(store.db).not.toHaveBeenCalled();
+});
+it("keeps legacy availability behind cutover and native availability behind rollback gates", async () => {
+ await expect(readAgentBookingAvailability(directoryFor("legacy-site"), "Native")).resolves.toMatchObject({ status: "no", detail: "Strelva agent booking is not enabled for this business." });
+ for (const flag of ["STRELVA_BOOKING_AGENTS", "STRELVA_BOOKING_STORE_WRITE", "DUAL_WRITE_PG"]) {
+  vi.stubEnv(flag, "0"); store.context.mockClear();
+  await expect(readAgentBookingAvailability(directoryFor(scope), "Native")).resolves.toMatchObject({ status: "no", detail: "Strelva agent booking is not enabled for this business." });
+  expect(store.context).not.toHaveBeenCalled(); vi.stubEnv(flag, "1");
+ }
+});
+it("keeps an unreadable native calendar unknown instead of claiming availability", async () => {
+ store.context.mockRejectedValue(new Error("store unavailable"));
+ await expect(readAgentBookingAvailability(directoryFor(scope), "Native")).resolves.toMatchObject({ status: "unknown" });
 });

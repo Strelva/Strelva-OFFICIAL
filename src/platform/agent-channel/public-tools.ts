@@ -14,7 +14,6 @@ import { bookingScopeFor } from "@/platform/bookings/booking-scope";
 import { agentConfirmationAvailable, agentReceipt, nativeBookingByToken, nativeServices, nativeSlots, requestAgentBooking, requireAgentBookings, statusAccessLive, tokenHash } from "@/platform/bookings/native";
 import { servicePolicy } from "@/platform/bookings/service-policy";
 import { bookingStoreDb, readBookingContext } from "@/platform/bookings/store";
-import { bookingAgentsEnabled, bookingReadSource } from "@/platform/bookings/flags";
 import { recordAgentBusinessDiscoveries } from "@/platform/bookings/agent-proof";
 import { deliverBookingUpdates } from "@/platform/bookings/updates";
 import { agentCallLimited, agentHoldCall, agentIdentityLimitsEnabled, isDisposableEmail, type AgentCall } from "./limits";
@@ -127,11 +126,16 @@ export async function readAgentBookingAvailability(directory: BusinessDirectory,
   if (matches.length > 1) return { status: "unknown", detail: "More than one Strelva business matched this name or website." };
   const entry = matches[0]!;
   try {
-    if (!bookingAgentsEnabled() || await bookingReadSource() !== "postgres") {
-      return { status: "no", detail: "Strelva agent booking is not enabled for this business." };
-    }
     const scope = await directory.scope(entry.business);
     if (!scope) return { status: "no", detail: "This business has no active booking connection in Strelva." };
+    try {
+      await requireAgentBookings(scope);
+    } catch (error) {
+      if (error instanceof PublicBookingError && error.message === "Agent bookings are not enabled.") {
+        return { status: "no", detail: "Strelva agent booking is not enabled for this business." };
+      }
+      throw error;
+    }
     const ctx = await readBookingContext(scope);
     if (!ctx?.workspaceId || ctx.paused || !ctx.services.some(s => s.active && servicePolicy(ctx, s.id).bookable)) {
       return { status: "no", detail: "This business has no active bookable service in Strelva." };
