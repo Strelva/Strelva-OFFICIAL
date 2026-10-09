@@ -12047,6 +12047,64 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      tenant_cleanup_teardown_blockers: {
+        Args: {
+          p_tenant_id: string
+        }
+        Returns: { publications: number; reservations: number; booking_grants: number; bookings: number }[]
+      }
+      tenant_cleanup_receipt: {
+        Args: {
+          p_slug: string
+        }
+        Returns: Json
+      }
+      finish_tenant_deprovision_cleanup: {
+        Args: {
+          p_tenant_id: string
+          p_receipt_id: string
+          p_redis_complete: boolean
+          p_provider_complete: boolean
+          p_summary: Json
+          p_expected_revision: number
+        }
+        Returns: Json
+      }
+      lock_agency_created_application: {
+        Args: {
+          p_workspace_id: string
+          p_user_id: string
+          p_verified_email: string
+          p_work_id: string
+        }
+        Returns: boolean
+      }
+      read_agency_created_application: {
+        Args: {
+          p_workspace_id: string
+          p_user_id: string
+          p_verified_email: string
+          p_work_id: string
+        }
+        Returns: Json
+      }
+      agency_created_application_work_ids: {
+        Args: {
+          p_workspace_id: string
+          p_user_id: string
+          p_verified_email: string
+        }
+        Returns: string[]
+      }
+      agency_can_author_created_application: {
+        Args: {
+          p_workspace_id: string
+          p_user_id: string
+          p_verified_email: string
+          p_work_id: string
+        }
+        Returns: boolean
+      }
       rotate_tenant_track_signing_key: {
         Args: {
           p_public_key: string | null
