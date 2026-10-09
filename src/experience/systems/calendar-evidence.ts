@@ -1,5 +1,5 @@
-import { listWorkspaceCalendarConnections } from "@/products/scheduling/calendar/repository";
-import type { CalendarConnection } from "@/products/scheduling/calendar/contracts";
+import { listWorkspaceCalendarConnections } from "@/products/scheduling/server";
+import type { CalendarConnection } from "@/products/scheduling/contracts";
 import type { BusinessSystems } from "@/platform/systems/from-existing";
 import type { ConnectionState } from "@/platform/systems/contracts";
 import type { Observation } from "@/platform/system-health";
