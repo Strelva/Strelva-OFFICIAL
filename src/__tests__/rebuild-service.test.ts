@@ -141,6 +141,19 @@ describe("website rebuild service lifecycle and durable recovery", () => {
     expect(renderSiteDocumentHtml(published.document,"/contact")).toContain(`href="${oldHref}"`);
     expect(h.documents.manage).toHaveBeenLastCalledWith(actor,{ workspaceId, workId: record.workId });
   });
+  it("keeps contact correction coherent for a retained document extracted before line grouping", async () => {
+    const description = "We bake bread\nEmail orders@example.test.";
+    const h = harness();
+    // Model an already retained pre-fix document; immutable intake still keeps
+    // the owner's lines while the old extractor combined its claim chunks.
+    h.pipeline.mockImplementationOnce((input,options) => runWebsiteRebuild("description" in input ? { ...input,description:input.description.replace(/\s+/g," ") } : input,options));
+    const record = await h.create({ ...brief, description });
+    const [factId] = Object.entries(record.rebuild.candidate!.document.facts).find(([,fact]) => fact.kind === "contact")!;
+    const edited = await h.service.resolveFact(actor,record.workId,factId,{ ...selection(record), action:"edit", text:"pickup@example.test" });
+    const html = renderSiteDocumentHtml(edited.rebuild.candidate!.document,"/",{ preview:true });
+    expect(html).toContain("Email pickup@example.test."); expect(html).not.toContain("orders@example.test");
+    expect(edited.rebuild.input).toEqual(record.rebuild.input);
+  });
   it("preserves separate input line context through publication, contact correction and recomposition", async () => {
     const description = "We do not offer delivery\nEmail orders@example.test or call 716-555-0100.";
     const h = harness(); let record = await h.create({ ...brief, description });

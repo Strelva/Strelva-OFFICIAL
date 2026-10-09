@@ -218,7 +218,14 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     if (!fact) throw new WorkspaceConflictError("This fact is no longer in the current document.");
     const contactLink = fact.kind === "contact" ? rebuildContactLink(fact.text) : null;
     const contactHref = (value: unknown) => contactLink && (value === contactLink.href || value === `${contactLink.href.split(":")[0]}:${fact.text}`);
-    const descriptionFacts = "description" in loaded.rebuild.input ? extractBusinessFacts(loaded.rebuild.input) : null;
+    let descriptionFacts = "description" in loaded.rebuild.input ? extractBusinessFacts(loaded.rebuild.input) : null;
+    if (descriptionFacts && "description" in loaded.rebuild.input) {
+      // Existing documents retain their original claim IDs across corrections.
+      // An ID unique to the previous flat layout proves that retained layout;
+      // use it without rewriting intake or manufacturing new contact evidence.
+      const flat = extractBusinessFacts({ ...loaded.rebuild.input,description:loaded.rebuild.input.description.replace(/\s+/g," ") });
+      if (flat.claims.some(id => id !== flat.nameFactId && !descriptionFacts!.claims.includes(id) && document.facts[id])) descriptionFacts = flat;
+    }
     const currentDescription = descriptionFacts ? { ...descriptionFacts, facts: document.facts } : null;
     const bindings = currentDescription ? descriptionContactBindings(currentDescription) : [];
     if (currentDescription && fact.kind === "claim" && ["edit","remove"].includes(input.action)) {
