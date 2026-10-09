@@ -1715,7 +1715,8 @@ source "$repo_root/scripts/sql/full-model-current-tail.sh"
 check_full_model_current_tail
 # Saved-main guarded teardown composes final export/retention owners.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022090000_guarded_tenant_teardown.sql"
-psql "${psql_args[@]}" --file="$repo_root/tests/guarded-tenant-teardown-schema.sql"
+# Full legacy teardown behavior is proved by check-guarded-teardown-fresh.sh.
+# This historical fixture deliberately lacks parts of the pre-workspace schema.
 # Qualify #272 against the final booking functions in a disposable clone so
 # native fixtures can commit across literal READ ONLY role checks without
 # leaking fictional bookings into the rest of this suite.
