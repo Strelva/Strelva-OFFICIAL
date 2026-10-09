@@ -15,6 +15,14 @@ function corrected() {
 }
 describe("retained native child lifecycle", () => {
   afterEach(() => vi.useRealTimers());
+  it("tracks actual schema dump closure through the same owned-child lifecycle while keeping psql the default", async () => {
+    const dump = child(), sql = child(), spawn = vi.fn().mockReturnValueOnce(dump).mockReturnValueOnce(sql), retain = vi.fn();
+    const ownedDump = startRetainedNativeChild("schema", { spawn, command: "pg_dump", args: ["--schema-only"], env: {}, retain });
+    const ownedSql = startRetainedNativeChild("sql", { spawn, args: ["-X"], env: {}, retain });
+    expect(spawn.mock.calls[0]!.slice(0, 2)).toEqual(["pg_dump", ["--schema-only"]]); expect(spawn.mock.calls[1]!.slice(0, 2)).toEqual(["psql", ["-X"]]);
+    dump.stdout.emit("data", "create table native(id uuid);\n"); dump.emit("exit", 0, null); expect(ownedDump.done()).toBe(false); dump.emit("close", 0, null); sql.emit("close", 0, null);
+    expect(ownedDump.output()).toBe("create table native(id uuid);\n"); expect(await ownedDump.completed).toMatchObject({ closed: true, code: 0 }); await ownedSql.completed;
+  });
   it("retains final diagnostics after exit and settles only on close", async () => {
     vi.useFakeTimers(); const owned = corrected(); let settled = false; const result = owned.completed.then(value => { settled = true; return value; }, error => { settled = true; return error; });
     owned.process.stdout.emit("data", "initial\n"); owned.process.emit("exit", 3, null); await Promise.resolve(); expect(settled).toBe(false); expect(owned.done()).toBe(false);

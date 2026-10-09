@@ -6,7 +6,8 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFile
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startRetainedNativeChild } from './lib/retained-native-child.mjs';
-import { exactCreatorWait, exactForwardLedger, qualifiedCreatorClone } from './lib/governed-creator-exit-proof.mjs';
+import { assertBaseline } from './full-model-stack-qualification.mjs';
+import { exactCreatorWait, exactForwardLedger, qualifiedCreatorClone, validateParentQualification, ownerSettingsCanonical, normalizedOwnerSettings, canonicalSchemaDump } from './lib/governed-creator-exit-proof.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const [db, evidence, qualificationPath] = process.argv.slice(2);
 const url = new URL(db || 'http://invalid'), database = decodeURIComponent(url.pathname.slice(1));
@@ -23,11 +24,14 @@ if (!stat.isDirectory() || stat.isSymbolicLink() || stat.uid !== process.getuid(
 const qualificationBytes = privateFile(qualificationPath || '');
 const qualification = qualifiedCreatorClone(JSON.parse(qualificationBytes), database);
 const parentQualificationBytes = privateFile(qualification.parentQualification);
+const parentQualification = JSON.parse(parentQualificationBytes), parentOwnerSettingsBytes = privateFile(qualification.parentOwnerSettingsEvidence), parentOwnerSettings = JSON.parse(parentOwnerSettingsBytes);
+const baselinePath = join(parentQualification.current?.binding?.stack ?? '', 'full-model-bootstrap-baseline.json'), baselineBytes = privateFile(baselinePath), baseline = JSON.parse(baselineBytes);
+if (assertBaseline(baseline, parentQualification.current).baselineSha256 !== parentQualification.baselineSha256) throw Error('Parent bootstrap baseline digest mismatch.');
 mkdirSync(evidence, { mode: 0o700 });
 const hash = value => createHash('sha256').update(value).digest('hex');
 const outputs = [];
 const retain = (name, value) => { writeFileSync(join(evidence, name), value, { mode: 0o600 }); if (!outputs.includes(name)) outputs.push(name); };
-retain('clone-qualification.json', qualificationBytes); retain('parent-qualification.json', parentQualificationBytes);
+retain('clone-qualification.json', qualificationBytes); retain('parent-qualification.json', parentQualificationBytes); retain('parent-owner-settings.json', parentOwnerSettingsBytes); retain('parent-bootstrap-baseline.json', baselineBytes);
 const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('PG')));
 if (process.env.STRELVA_GOVERNED_CREATOR_EXIT_PASSWORD) env.PGPASSWORD = process.env.STRELVA_GOVERNED_CREATOR_EXIT_PASSWORD;
 delete env.STRELVA_GOVERNED_CREATOR_EXIT_PASSWORD;
@@ -36,13 +40,32 @@ const literal = value => `'${String(value).replaceAll("'", "''")}'`;
 const identifier = value => `"${String(value).replaceAll('"', '""')}"`;
 const inventory = JSON.parse(readFileSync(join(root, 'scripts/sql/historical-forward-inventory.json'), 'utf8'));
 const fixtureFiles = ['setup', 'holder', 'worker', 'observe'].map(kind => `tests/support/governed-creator-exit-race-${kind}.sql`);
-const sourceFiles = ['scripts/check-governed-creator-exit-races.mjs', 'scripts/lib/governed-creator-exit-proof.mjs', 'scripts/lib/retained-native-child.mjs', 'scripts/sql/governed-money-operations-contract.sql', 'scripts/sql/historical-forward-inventory.json', 'scripts/release-safety/batches.json', 'supabase/migrations/rollback-20261022172000_governed_money_operations.sql', ...fixtureFiles, ...inventory.forwardFiles.map(file => `supabase/migrations/${file}`)];
-const snapshot = () => ({ files: Object.fromEntries(sourceFiles.map(path => [path, hash(readFileSync(join(root, path)))])), qualification: hash(privateFile(qualificationPath)), parentQualification: hash(privateFile(qualification.parentQualification)) });
+const sourceFiles = ['scripts/check-governed-creator-exit-races.mjs', 'scripts/lib/governed-creator-exit-proof.mjs', 'scripts/lib/retained-native-child.mjs', 'scripts/sql/governed-creator-clone-state.sql', 'scripts/full-model-stack-qualification.mjs', 'scripts/check-workspace-target.mjs', 'scripts/full-model-journey-profile.mjs', 'scripts/sql/governed-money-operations-contract.sql', 'scripts/sql/historical-forward-inventory.json', 'scripts/release-safety/batches.json', 'supabase/migrations/rollback-20261022172000_governed_money_operations.sql', ...fixtureFiles, ...inventory.forwardFiles.map(file => `supabase/migrations/${file}`)];
+const snapshot = () => ({ files: Object.fromEntries(sourceFiles.map(path => [path, hash(readFileSync(join(root, path)))])), qualification: hash(privateFile(qualificationPath)), parentQualification: hash(privateFile(qualification.parentQualification)), parentOwnerSettings: hash(privateFile(qualification.parentOwnerSettingsEvidence)), parentBootstrapBaseline: hash(privateFile(baselinePath)) });
 const sourceBefore = snapshot(); retain('source-before.json', JSON.stringify(sourceBefore, null, 2));
+const parentCurrent = validateParentQualification(parentQualification, inventory, sourceBefore.files, qualification);
+if (parentOwnerSettings.format !== 1 || parentOwnerSettings.fullReleaseQualified !== false || parentOwnerSettings.databaseUrlSha256 !== parentCurrent.binding.databaseUrlSha256 || parentOwnerSettings.ownerSettingsSha256 !== hash(ownerSettingsCanonical(parentOwnerSettings.state)) || parentOwnerSettings.state.systemIdentifier !== parentCurrent.databaseIdentity.systemIdentifier || String(parentOwnerSettings.state.database.oid) !== parentCurrent.databaseIdentity.databaseOid || parentOwnerSettings.state.database.datname !== parentCurrent.databaseIdentity.database) throw Error('Parent raw owner/settings sidecar is not bound to the qualified parent database.');
 const children = new Set();
-function processSql(name) { const child = startRetainedNativeChild(name, { spawn, args, env, retain }); children.add(child); return child; }
+function processSql(name, command = 'psql', processArgs = args) { const child = startRetainedNativeChild(name, { spawn, args: processArgs, env, retain, command }); children.add(child); return child; }
 function successful(result) { return result.closed && result.code === 0 && !result.signal && !result.error && !result.timedOut; }
 async function run(name, sql) { const child = processSql(name); child.child.stdin.end(`${sql}\n`); const result = await child.completed; if (!successful(result)) throw Error(`${name}: native SQL failed; retained exact process/log identifies code, signal and error.`); return result.stdout; }
+async function nativeCapture(name, command, commandArgs) {
+  const child = processSql(name, command, commandArgs); child.child.stdin.end(); const result = await child.completed;
+  if (!successful(result)) throw Error(`${name}: native capture failed; retained raw process diagnostics.`);
+  return child.output(); // exact untrimmed dump bytes, including final newline
+}
+const rolesSql = "select jsonb_build_object('roles',(select jsonb_agg(jsonb_build_object('name',rolname,'super',rolsuper,'inherit',rolinherit,'createRole',rolcreaterole,'createDb',rolcreatedb,'login',rolcanlogin,'replication',rolreplication,'bypassRls',rolbypassrls,'config',rolconfig) order by rolname) from pg_roles),'membership',(select coalesce(jsonb_agg(jsonb_build_object('role',r.rolname,'member',m.rolname,'grantor',g.rolname,'admin',a.admin_option,'inherit',a.inherit_option,'set',a.set_option) order by r.rolname,m.rolname,g.rolname),'[]'::jsonb) from pg_auth_members a join pg_roles r on r.oid=a.roleid join pg_roles m on m.oid=a.member join pg_roles g on g.oid=a.grantor))";
+async function captureClone(phase) {
+  const state = JSON.parse(await run(`${phase}-owner-static-settings`, readFileSync(join(root, 'scripts/sql/governed-creator-clone-state.sql'), 'utf8')));
+  const roles = JSON.parse(await run(`${phase}-roles`, rolesSql));
+  const dumpVersion = (await nativeCapture(`${phase}-dump-version`, 'pg_dump', ['--version'])).trim();
+  const schema = canonicalSchemaDump(await nativeCapture(`${phase}-schema`, 'pg_dump', ['--dbname', db, '--schema-only']));
+  const ledger = JSON.parse(await run(`${phase}-full-ledger`, "select coalesce(jsonb_agg(to_jsonb(m) order by version),'[]'::jsonb) from supabase_migrations.schema_migrations m"));
+  const metadata = { state, ownerSettingsSha256: hash(ownerSettingsCanonical(state)), normalizedOwnerSettingsSha256: hash(ownerSettingsCanonical(normalizedOwnerSettings(state))), rolesSha256: hash(JSON.stringify(roles)), catalogSha256: hash(schema), dumpVersion, ledger };
+  retain(`${phase}-actual-clone.json`, JSON.stringify(metadata, null, 2)); retain(`${phase}-canonical-schema.sql`, schema); retain(`${phase}-roles.json`, JSON.stringify(roles, null, 2));
+  if (state.database.datname !== database || state.ownerName !== qualification.databaseOwner || state.systemIdentifier !== parentCurrent.databaseIdentity.systemIdentifier || metadata.ownerSettingsSha256 !== qualification.ownerSettingsSha256 || metadata.normalizedOwnerSettingsSha256 !== qualification.databaseSettingsSha256 || metadata.normalizedOwnerSettingsSha256 !== hash(ownerSettingsCanonical(normalizedOwnerSettings(parentOwnerSettings.state))) || metadata.catalogSha256 !== parentCurrent.catalogSha256 || metadata.catalogSha256 !== qualification.cloneSchemaSha256 || metadata.rolesSha256 !== parentCurrent.rolesSha256 || dumpVersion !== parentCurrent.dumpVersion || JSON.stringify(ledger) !== JSON.stringify(parentCurrent.ledger)) throw Error(`${phase}: actual database schema/roles/owner/static-settings/ledger differ from qualified parent or clone evidence.`);
+  return metadata;
+}
 async function closeChildren(owned = [...children]) {
   for (const child of owned) if (!child.done()) child.terminate();
   const results = await Promise.allSettled(owned.map(child => child.completed));
@@ -54,8 +77,9 @@ const signature = 'public.register_governed_creator_listing(uuid,text,jsonb)';
 const catalogSql = "select p.oid::regprocedure::text||'|'||md5(pg_get_functiondef(p.oid))||'|'||p.proowner||'|'||coalesce(p.proacl::text,'') from pg_proc p where p.pronamespace='public'::regnamespace order by 1";
 const ledgerSql = "select coalesce(jsonb_agg(version::text order by version::text),'[]'::jsonb) from supabase_migrations.schema_migrations";
 const historySql = "select 'agreement|'||id||'|'||md5(to_jsonb(a)::text) from public.money_agreements a where beneficiary_workspace_id='d1720000-0000-4000-8000-000000000020' union all select 'exit|'||id||'|'||md5(to_jsonb(e)::text) from public.workspace_exit_requests e where workspace_id='d1720000-0000-4000-8000-000000000020' order by 1";
-let status = 'failed', error, installedLedger, owner, sequence = 0;
+let status = 'failed', error, installedLedger, owner, cloneBefore, cloneAfter, sequence = 0;
 try {
+  cloneBefore = await captureClone('before');
   const databaseFacts = JSON.parse(await run('database-binding', "select jsonb_build_object('database',current_database(),'owner',pg_get_userbyid(datdba)) from pg_database where datname=current_database()"));
   if (databaseFacts.database !== database || databaseFacts.owner !== qualification.databaseOwner) throw Error('Actual database identity/owner differs from qualified clone.');
   retain('database-binding.json', JSON.stringify(databaseFacts, null, 2));
@@ -128,14 +152,20 @@ try {
   if (await run('catalog-after-reapply', catalogSql) !== baseline || await run('history-after-reapply', historySql) !== retainedHistory) throw Error('Reapply changed catalog or retained history.');
   const ledgerAfter = JSON.parse(await run('ledger-after-reapply', ledgerSql));
   if (JSON.stringify(ledgerAfter) !== JSON.stringify(installedLedger)) throw Error('Inverse/reapply changed ledger identity.');
+  cloneAfter = await captureClone('end');
+  if (JSON.stringify(cloneAfter) !== JSON.stringify(cloneBefore)) throw Error('Actual clone metadata/schema/roles/ledger changed across execution.');
   status = 'passed';
 } catch (failure) { error = failure instanceof Error ? failure.message : String(failure); process.exitCode = 1; }
 finally {
   try {
+    await closeChildren();
+    if (cloneBefore && !cloneAfter) {
+      try { cloneAfter = await captureClone('end'); } catch (captureFailure) { status = 'failed'; error ||= String(captureFailure); process.exitCode = 1; }
+    }
     await closeChildren(); const sourceAfter = snapshot(); retain('source-end.json', JSON.stringify(sourceAfter, null, 2));
     const sourceUnchanged = JSON.stringify(sourceBefore) === JSON.stringify(sourceAfter);
     if (!sourceUnchanged) { status = 'failed'; error ||= 'Source/qualification evidence changed during execution.'; process.exitCode = 1; }
-    retain('receipt.json', JSON.stringify({ status, error, allOwnedChildrenClosed: true, sourceUnchanged, installedLedger, canonicalOwner: owner, nativeProviderQualified: false, fullStackQualifiedByHarness: false, cleanupOwner: 'root coordinator-owned disposable clone; no fixture deletion', sourceBefore, sourceAfter, artifacts: Object.fromEntries(outputs.map(name => [name, hash(readFileSync(join(evidence, name)))])) }, null, 2));
+    retain('receipt.json', JSON.stringify({ status, error, allOwnedChildrenClosed: true, sourceUnchanged, installedLedger, canonicalOwner: owner, cloneBefore, cloneAfter, actualCloneEndVerified: !!cloneAfter, nativeProviderQualified: false, fullStackQualifiedByHarness: false, cleanupOwner: 'root coordinator-owned disposable clone; no fixture deletion', sourceBefore, sourceAfter, artifacts: Object.fromEntries(outputs.map(name => [name, hash(readFileSync(join(evidence, name)))])) }, null, 2));
   } catch (cleanupFailure) { process.exitCode = 1; retain('cleanup-closure-failure.json', JSON.stringify({ status: 'failed', error, cleanupError: String(cleanupFailure), allOwnedChildrenClosed: false }, null, 2)); }
   if (process.exitCode) console.error('Creator exit qualification failed; retained private logs preserve the exact failure.');
 }

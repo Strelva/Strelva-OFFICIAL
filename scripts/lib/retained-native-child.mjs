@@ -1,7 +1,7 @@
 /** Only the owning harness supplies spawn/retention. No process starts on import.
  * EXIT is not closure: final stdout/stderr can arrive before CLOSE. */
-export function startRetainedNativeChild(name, { spawn, args, env, retain, timeoutMs = 15000, graceMs = 500, closeLimitMs = 2000 }) {
-  const child = spawn("psql", args, { stdio: ["pipe", "pipe", "pipe"], env });
+export function startRetainedNativeChild(name, { spawn, args, env, retain, command = "psql", timeoutMs = 15000, graceMs = 500, closeLimitMs = 2000 }) {
+  const child = spawn(command, args, { stdio: ["pipe", "pipe", "pipe"], env });
   let stdout = "", stderr = "", closed = false, childError = null, timedOut = false, terminationRequested = false;
   let escalation, closeLimit;
   const log = () => retain(`${name}.log`, `${stdout}\n${stderr}`);
