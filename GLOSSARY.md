@@ -1,356 +1,521 @@
 # Strelva glossary
 
-Terms the workspace code, docs and UI copy use for businesses, the Systems they
-run, the people who work on them, and the work and records underneath.
+This is the single authority for words in product copy, docs and the internal
+model. The [product ontology](./docs/architecture/product-ontology.md) owns
+structure and governance rules; both CONTEXT.md files point here for language.
+These definitions apply Jacob's decisions of October 9, 2026.
 
-This file adds to two existing authorities and never overrides them:
+## On screen
 
-- [Product ontology](./docs/architecture/product-ontology.md) (normative):
-  Tenant, Site Property, Actor, Platform Membership, Customer Inquiry, Record,
-  Capability, Capability Version, Agent Capability, Change, Work,
-  Responsibility, Rehearsal, Receipt, Draft, Version, and more.
-- [CONTEXT.md](./CONTEXT.md) "Language": Business, Offering, Installation,
-  Assignment, Work, Provider commitment, Contribution reward.
+Words a person sees. The concepts are defined here; exact product labels remain
+Jacob's call (label open). Internal distinctions stay in the Underneath layer.
 
-Design notes behind the newer entries live in
-[docs/architecture/deepening-2026-10-05/](./docs/architecture/deepening-2026-10-05/).
-Terms marked _(ADR 0011, proposed)_ follow company ADR 0011, which is not yet
-accepted.
+The named actor is whoever did the work. An agency uses its display name with
+“Runs on Strelva” credit. Strelva is the actor only for platform action or when
+Strelva's own agency acted under its agency display name.
 
-## Businesses and what they run
+### Systems and their state
+
+**System** _(label open)_:
+Something a business made in Strelva that works, such as a website, proposal,
+booking page, intake flow or internal app. Its identity survives changes to
+its content, data, logic and screens. Draft, Live and Paused express intent;
+Health is separate.
+_Avoid_: product, project, installation, module, app (as the general noun)
+
+**Connection** _(label open)_:
+What a System reads, acts on, appears in, shares with, depends on or is triggered
+by: business facts, another System, a person, an outside account or a domain.
+An account connection is one kind. A Connection never grants authority by itself.
+_Avoid_: integration (as the general on-screen noun), permission
+
+**Possibility** _(label open)_:
+A working alternative to one or several Systems that a person can open, use
+and compare. A suggestion alone is not a Possibility. Make real turns it on.
+_Avoid_: idea, recommendation, research proposal, experiment (as synonyms)
+
+**Make real** _(label open)_:
+Turn a Possibility on under the same authority and approvals as any other change.
+The result says what happened, including when only part of it became real.
+_Avoid_: activate everything, automatic approval, guaranteed success
+
+**Version** _(label open)_:
+The same System adapted to another context, such as a location, client or
+segment, with lineage to its source. Across businesses, each Version is that
+business's own System with its own data, accounts and grants.
+_Avoid_: History, release, revision, copy, fork (as synonyms)
+
+**History** _(label open)_:
+Past states of a System, including states a person can restore.
+_Avoid_: Version, release, revision (as the on-screen noun)
+
+**Health** _(label open)_:
+How a System is doing now, separate from whether the business intends it to
+be Draft, Live or Paused.
+_Avoid_: lifecycle, Live (as proof of health), guaranteed uptime
+
+### Requests and what keeps running
+
+**Request / Requests** _(label open)_:
+Asked-for work with an end: Asked → Needs you → In progress → Ready for your
+review → Done. A Request sent to an agency is not an accepted job until scope
+and deadline are agreed.
+_Avoid_: Work (as a business-screen noun), start request, ticket, obligation
+
+**Running** _(label open)_:
+What is kept true over time under stated limits, named by the condition being
+maintained rather than the machinery that maintains it.
+_Avoid_: Work, Ongoing, Responsibility, Assignment (as business-screen nouns)
+
+**Needs you** _(label open)_:
+Decisions, information or approvals that need the person's attention before
+work can continue.
+_Avoid_: failures (as a synonym), agent queue, operator inbox
+
+**Strelva handled** _(label open)_:
+The place showing completed actions and their results. Each action names whoever
+did the work, including an agency's display name when the agency acted. The
+place label remains open because actions may be performed by other agencies.
+_Avoid_: Strelva did it (when another actor did), anonymous agency work
+
+**Ask Strelva** _(label open)_:
+Where a person says what they want to happen. Their words are an ask before
+work exists; an ask alone grants no permission to run, share or publish anything.
+_Avoid_: Start, start request, prompt (as the on-screen noun)
+
+### People and businesses
+
+**Business / Your business**:
+The organization whose work and records remain separate from other businesses.
+The owner sees “your business” or its name; the agency sees a client.
+_Avoid_: customer (for the business), tenant, account
+
+**Client**:
+A business an agency makes and runs Systems for. Agencies see “your clients”
+and “Client email.” Delegation determines which clients an agency can see.
+_Avoid_: customer (for the business), tenant, account
+
+**End customer**:
+A member of the public the business serves: “their customers” or “end customers.”
+_Avoid_: customer (for the business or agency), Platform Member, Studio Member
+
+**Agency**:
+Anyone who makes and runs Systems for clients. Strelva's own agency is one of
+them with no extra powers. An agency sees only clients that delegated to it and
+may be chosen as payer for a business.
+_Avoid_: provider (for people), partner, reseller, white-labeler (as synonyms)
+
+**Owner**:
+The business's owner role: decides, launches, exits and invites.
+_Avoid_: payer (as a synonym), agency (as a synonym), account holder
+
+**Inquiry**:
+One end customer's request to a business, with its handling status and assignee.
+Customer Inquiry is the full term.
+_Avoid_: lead (the stored copy), submission, prospect, record
+
+### Finding your way
+
+**Section**:
+A workspace destination: Home, Needs you, Requests, Running or Systems, with
+Business details, People & access and Help in the business menu. Account is
+personal account context; Ask Strelva is the ask entrance. A System opens by
+its own name.
+_Avoid_: Work, Ongoing, Settings, Explore, Start (as current place names)
+
+## Underneath
+
+Internal model words. These are not nouns for business screens.
+
+### Businesses and what they run
 
 **Workspace kind**:
-Whose workspace it is: one person's own (personal), an agency's, or a
-business's.
-_Avoid_: client workspace, tenant, account, customer workspace
+Whose workspace it is: one person's own (personal), an agency's or a business's.
+_Avoid_: tenant, account, customer workspace
 
 **Business workspace**:
-The workspace of one business. Its records stay separate from every other
-business.
-_Avoid_: customer workspace, client, tenant, site
+The workspace of one business, with records separate from every other business.
+_Avoid_: customer workspace, tenant, site
 
-**System** _(ADR 0011, proposed)_:
-A thing a business has made in Strelva and keeps using, such as its website,
-a schedule or a private application. It keeps its identity while its content
-and behaviour change.
-_Avoid_: product, project, installation, app (as the general noun)
+**Business record**:
+The shared facts, contacts, requests, bookings and content belonging to a business.
+_Avoid_: CRM, knowledge graph, tenant config
 
 **System kind**:
-A type of System that Strelva knows how to make and run, such as a website, a
-schedule or a document. A System has exactly one kind for its whole life.
+A type of System, such as a website, schedule or document. A System has one kind
+for its whole life.
 _Avoid_: product, executable, horizontal, native product, tool
-Overlaps the ontology's Capability; see the open questions below.
+
+**Capability**:
+A reusable, governed ability to create, inspect or operate a kind of business
+work. Systems are built from capabilities.
+_Avoid_: System (as a synonym), module, executable, feature
+
+**Capability Version**:
+A fixed definition of a Capability's inputs, outputs, rules and supported actions.
+_Avoid_: Version (without Capability), History, release
+
+**Agent Capability**:
+A governed tool or action an agent may attempt.
+_Avoid_: permission, guaranteed ability, autonomous authority
+
+**Offering**:
+An outcome packaged for a business under stated limits, delivered through one
+or more capabilities. Packaging for a System, not the primary on-screen noun.
+_Avoid_: item, shelf item, System (as a synonym)
+
+**Installation**:
+An offering configured for one business with its selected definition and
+connected resources. It grants no new authority and proves no agency commitment.
+_Avoid_: System (as a synonym), permission, service acceptance
 
 **Entrance**:
-The way an Agent Capability gets started: from a reviewed work plan, from ongoing
-delegated work, on a schedule, or by a person acting directly.
-_Avoid_: trigger, channel, surface, source
+How an Agent Capability starts: reviewed work, delegated ongoing work, a
+schedule or a person acting directly.
+_Avoid_: channel, surface, source (as synonyms)
 
-## People and permission
+### People and permission
 
 **Membership**:
-A person's direct place in a workspace, which always carries a workspace role.
+A person's direct place in a workspace, carrying a workspace role.
 _Avoid_: access, seat, join
 
 **Workspace role**:
-The rank a member holds in a workspace: owner, admin or member.
+The rank a member holds: owner, admin or member.
 _Avoid_: viewer, editor (legacy tenant roles), seat, permission level
 
 **Workspace permission**:
-One named thing a workspace role allows across the whole workspace, such as
-creating work or managing the calendar connection. It lasts as long as the
-membership and has no budget or expiry.
-_Avoid_: capability, ability, authority, standing, allowance, scope, flag
+A named action a workspace role allows for the duration of membership.
+_Avoid_: capability, authority, allowance, scope, flag
 
 **Delegated read**:
-Read-only sight of a business workspace that the business grants to an
-agency. It carries no role and lets nobody operate anything.
-_Avoid_: shared access, agency access, read access, Assignment
+Read-only sight of a business workspace granted to an agency. It carries no
+role and lets nobody operate anything.
+_Avoid_: shared access, agency access, Assignment
 
-**Acting provider**:
-The agency a person acts for on a business: the agency holds an active
-provider seat, the person belongs to it and is staffed on the business. For
-an outside effect (publish, Google, email, payments) the agency must also be
-verified for that effect and hold a Client-resource mandate for the resource.
-Every agency is checked the same way, Strelva's included.
-_Avoid_: operator, Strelva staff (as a provider), super admin
+**Acting agency**:
+The agency a person represents in delegated client work. Every agency has the
+same standing, Strelva's included.
+_Avoid_: acting provider, operator, Strelva staff (as an agency role), super admin
 
 **Client-resource mandate**:
-A business's grant letting one agency do one effect to one named resource: a
-website System, a domain, a Google location, a sending domain or a payment
-account. The owner grants and ends it; ending the seat ends it.
-_Avoid_: permission, scope, OAuth grant, verification
+A business's grant allowing one agency to perform a named effect on one named
+resource. The owner grants and ends it.
+_Avoid_: account connection, agency verification, unrestricted permission
 
 **Work access**:
-How the viewer relates to one piece of work: owned (in their personal
-workspace), member, delegated read, addressed (an incoming handoff), or
-public.
-_Avoid_: access (without the qualifier), ownership, sharing
+How a viewer relates to internal work: owned, member, delegated read, addressed
+by an incoming handoff or public.
+_Avoid_: access (without a qualifier), ownership, sharing
 
 **Tenant membership**:
 A person's place on a legacy managed-website tenant, ranked viewer, editor,
-admin or owner. It is separate from workspace membership, even for the same
-business.
+admin or owner. Separate from workspace membership.
 _Avoid_: workspace membership, business membership
 
 **Strelva staff**:
-A person at Strelva who can open any tenant. In a workspace they hold nothing
-special and act only through membership or an Assignment.
+People employed by Strelva. Employment alone does not grant agency authority
+over client work.
 _Avoid_: super admin (in workspace contexts), god mode, operator override
 
 **Verified actor**:
-A signed-in person whose email address is confirmed. Only a verified actor can
-read or change workspace work.
-_Avoid_: user, session user, current user
+A signed-in person with a confirmed email address.
+_Avoid_: current user, session user (as synonyms)
 
-## Workspace state
+**Assignment**:
+Explicit, limited permission for a person or agent to operate named work within
+agreed limits and time. It does not transfer business ownership.
+_Avoid_: Responsibility, membership, unlimited delegation
+
+### Agencies and the platform
+
+These terms follow ADR 0012's neutral platform decision. Agency is defined in
+On screen.
+
+**Strelva agency**:
+Strelva's own agency, with the same standing and powers as every other agency.
+_Avoid_: Strelva staff, house agency, operator, platform (as synonyms)
+
+**Platform operator**:
+Strelva staff acting for the platform in support, incidents or release. Its
+actions are logged. It never sells to or serves a client; client work follows
+the ordinary agency path.
+_Avoid_: Strelva agency, super admin, operator override
+
+**Payer**:
+Who pays Strelva for one business: the business itself or its agency, chosen
+for that business.
+_Avoid_: owner (as a synonym), billing owner, account holder
+
+**Creator**:
+Anyone who builds something other businesses can install: an agency, an
+independent builder or Strelva.
+_Avoid_: developer, partner, vendor (as synonyms)
+
+**Agency verification**:
+The per-agency check for outside effects such as publishing, Google writes,
+sending email and taking payment. It does not replace a business's authority.
+_Avoid_: approval, partner status, onboarding
+
+**Agency commitment**:
+Work an agency has agreed to take care of. Asking an agency is not its acceptance.
+_Avoid_: provider commitment, Request (as proof of acceptance)
+
+**Method**:
+An agency's reusable way to set up and run offerings for clients, without
+business data, secrets or grants.
+_Avoid_: playbook, snapshot, template, recipe (as synonyms)
+
+**Contribution reward**:
+An explicitly awarded benefit for helping develop an offering, such as usage
+or subscription credit. It is not equity or access to client information.
+_Avoid_: royalty (unless agreed), ownership, permission
+
+### Workspace state
 
 **Workspace release**:
-The switch that decides whether workspace Systems exist in an environment at
-all. When it is closed, no workspace work is offered or accepted.
-_Avoid_: feature flag, beta, rollout
+Whether workspace Systems are available in an environment.
+_Avoid_: System Version, service acceptance
+
+**Release**:
+An application release, such as 1.0.0.
+_Avoid_: Version, History
 
 **Stopped workspace**:
-A workspace whose exit has completed. Its records stay readable and nothing
-new starts in it.
-_Avoid_: exited workspace, closed, deleted, archived, frozen
+A workspace whose exit has completed, with readable records and no new work.
+_Avoid_: deleted, archived, frozen
 
 **Unconfirmed exit**:
-The state where Strelva could not check whether a workspace has stopped, so
-changes pause until it can.
-_Avoid_: unknown, error state, stopped
+A workspace whose stopped state could not be confirmed.
+_Avoid_: stopped, deleted, confirmed exit
 
 **Read-only reason**:
-The single most important reason a person cannot change the open workspace:
-delegated read, stopped, unconfirmed exit, or role.
-_Avoid_: disabled reason, lock, error
+The principal reason a person cannot change the open workspace: delegated
+read, stopped, unconfirmed exit or role.
+_Avoid_: error, lock (without a reason)
 
 **Workspace write**:
-A request that changes workspace work. It must come directly from Strelva,
-never from another site acting with the person's sign-in.
-_Avoid_: mutation, POST
+An authorized change to workspace work.
+_Avoid_: Request (as a synonym), automatic permission
 
-## Work and records
+### Work and records
+
+**Work**:
+The internal durable thread from a person's intent to an answer, Change,
+Capability or Responsibility. On screen, finite work is Requests; maintained
+conditions are Running.
+_Avoid_: Work (as a business-screen noun), permission
+
+**Responsibility**:
+An ongoing condition kept true under stated limits. It states permitted actions,
+limits, escalation and required approvals; Assignment is permission to operate.
+_Avoid_: Assignment, retainer, maintenance, unlimited service
+
+**Receipt**:
+Durable evidence of an action: who acted, what happened, why, its target,
+outcome and any supported inverse. Acceptance and read-back are distinct facts.
+_Avoid_: guaranteed success, anonymous agency work
 
 **Workspace record**:
-One thing a System kind keeps on behalf of a workspace, such as a website
-draft, a schedule, a document or an onboarding case. It belongs to exactly one
-workspace and one record kind, and changes one revision at a time.
-_Avoid_: saved work, product work, bounded work, saved product work, resource, item
+A typed thing a System kind keeps for one workspace, such as a website draft,
+schedule, document or onboarding case, with one record kind and successive revisions.
+_Avoid_: saved work, product work, resource, item (as synonyms)
 
 **Record kind**:
-What a workspace record is: the System kind that owns it plus the kind of
-thing within it, such as "tracker / tracker" or "onboarding / case".
-_Avoid_: resource kind, product id (alone), type
+The owning System kind and the kind of thing it keeps, such as a tracker row
+or onboarding case.
+_Avoid_: resource kind, product id (alone), type (alone)
 
 **Owning kind**:
-The one System kind allowed to create and change records of a given record
-kind. Other kinds may read those records but never change them.
+The one System kind allowed to create and change a record kind.
 _Avoid_: owning product, writer, source product
 
 **Companion state**:
-State a System kind keeps beside its workspace records under its own rules,
-such as application releases, custom-application grants and budgets.
-_Avoid_: side table, durable state, sidecar
+State a System kind keeps alongside workspace records under its own rules.
+_Avoid_: side table, sidecar, workspace record (as a synonym)
 
 **Revision**:
-The count of accepted changes to one workspace record. A change names the
-revision it started from.
-_Avoid_: Version (a restorable state, see the ontology), CAS, sequence
+The count of accepted changes to one workspace record.
+_Avoid_: Version, History, release
 
 **Revision conflict**:
-The refusal of a change because another change was accepted after the one it
-started from. The person reloads and tries again; nothing is merged.
-_Avoid_: stale write, race, concurrent edit error
+A change refused because another change was accepted after its starting revision.
+_Avoid_: merged change, accepted change, generic error
 
 **Revision entry**:
-The append-only note of who made a revision, what kind of change it was, and
-when.
-_Avoid_: history row, audit entry, change log
+An append-only note of who made a revision, what changed and when.
+_Avoid_: Receipt, Audit (as synonyms)
 
-## Starting work
+### Starting work
 
-**Start request**:
-The words a person writes to say what they want Strelva to make happen,
-before any work exists. It is request data only and never permission to run,
-share or publish anything.
-_Avoid_: pending request, intent, prompt, continuation, start context, draft (Draft is unpublished state)
+**Ask**:
+The words a person writes about what they want before work exists. An ask is
+request data, never permission to run, share or publish anything.
+_Avoid_: start request, pending Request, prompt, continuation, draft
 
-**Start route**:
-A destination a start request can be aimed at, such as a document, a work
-plan, onboarding or Help.
-_Avoid_: route (alone), view, product id
+**Ask route**:
+A destination an ask is aimed at, such as a document, plan, onboarding or Help.
+_Avoid_: start route, route (alone), product id
 
-**Routed request**:
-A start request the person has aimed at one start route, waiting for that
-System kind to open new work with it.
-_Avoid_: continuation, start context, horizontal request, plan start request
+**Routed ask**:
+An ask aimed at one destination, waiting for new work to begin from it.
+_Avoid_: routed request, continuation, start context
 
-**Spent request**:
-A routed request whose System kind has saved work from it. From then on the
-work carries the words and the start request is gone.
-_Avoid_: consumed intent, used draft
+**Spent ask**:
+An ask from which work has been saved; the work now carries those words.
+_Avoid_: spent request, consumed intent, used draft
 
-**Cleared request**:
-A start request the person explicitly emptied. It stays empty and never comes
-back from an older copy.
-_Avoid_: reset, discarded draft
+**Cleared ask**:
+An ask the person explicitly emptied, which stays empty.
+_Avoid_: cleared request, discarded draft, reset (without a subject)
 
 **Service request**:
-A start request sent to a human provider through Help. It is not an accepted
-job until scope and deadline are agreed.
-_Avoid_: job, ticket, provider commitment (until accepted)
+A Request sent to an agency. It is not an accepted job until scope and deadline
+are agreed.
+_Avoid_: start request, human provider, job (until accepted), agency commitment
 
-## Finding your way
+### Finding your way
 
 **Workspace location**:
-Where a person is inside one workspace: the workspace, the section or opened
-work, and any detail within it. It is a navigation hint; it never grants
-access.
-_Avoid_: view, route, page, state, URL
-
-**Section**:
-One of the fixed destinations every workspace has: Home, Work, Ongoing, People
-& access, Settings, Help, Explore, and Start.
-_Avoid_: view, tab, page, area
+Where a person is within a workspace: a section, opened work and its detail.
+A location never grants access.
+_Avoid_: state, permission, route (as synonyms)
 
 **Opened work**:
-A single piece of work shown in the tool that fits its kind, or new work being
-made in that tool.
-_Avoid_: selected work, horizontal view, product view
+One piece of internal work shown in the tool for its kind, or new work being made.
+_Avoid_: horizontal view, product view
 
 **Location detail**:
-The part of a workspace location that only makes sense inside one section or
-opened work, such as a standing, an assignment, an inquiry record, a tracker
-row or an offering.
-_Avoid_: embedded route params, sub-view, sub-route
+The part of a location meaningful within one section or opened work.
+_Avoid_: section (as a synonym), sub-route
 
 **Return target**:
-A workspace location that is safe to carry through sign-in and reopen
-afterwards. Anything that cannot be read back exactly is refused, not
-repaired.
-_Avoid_: next, redirect, continue URL
+A workspace location that can be reopened after sign-in.
+_Avoid_: permission, access grant
 
-## Inquiries
-
-**Inquiry**:
-One customer's request to a business, received through a published inquiry
-form or booking page, together with its handling status and assignee.
-_Avoid_: lead (the storage record), submission (the delivery payload), record
-The ontology's Customer Inquiry; "inquiry" is the short form.
+### Inquiries and research
 
 **Lead**:
-The stored copy of the customer's own words and contact details. It is the
-authority for customer fields and never holds handling decisions.
-_Avoid_: inquiry, contact, CRM record
+The stored copy of an end customer's own words and contact details, separate
+from handling decisions. Internal inquiry storage, never Strelva's sales record.
+_Avoid_: Inquiry, prospect, contact, CRM record (as synonyms)
+
+**Prospect**:
+An agency or business considering Strelva. A prospect record is Strelva's own
+pre-relationship sales record.
+_Avoid_: lead, Delivery Lead, end customer
+
+**Proposal**:
+One proposed response to a research Opportunity. It is not yet a working
+alternative or authorization to implement one. A proposal System offered by a
+business is a separate use of the ordinary word.
+_Avoid_: Possibility (for research), supported Capability, permission
 
 **Inquiry intake**:
-A business's Capability of the inquiry kind: its form, routing, follow-up and
-Responsibility. Its identity survives every new Capability Version.
+A business's inquiry Capability: its form, routing, follow-up and Responsibility.
+Its identity survives new Capability Versions.
 _Avoid_: offering, installation, form (alone)
 
 **Live intent**:
-The owner meant this Capability Version of an inquiry intake to be on the website,
-whether or not the read-back has confirmed it yet.
-_Avoid_: live (alone), verified, published
+The owner's intention that a Capability Version be on the website, separate
+from confirmation that it is there.
+_Avoid_: verified, published, healthy
 
 **Current inquiry**:
-An inquiry that is still open, whose inquiry intake has live intent, and whose
-captured Capability Version is the live one. Only a current inquiry can receive
-governed messages.
-_Avoid_: fresh, valid, active
+An open inquiry whose intake has live intent and whose captured Capability
+Version is the live one.
+_Avoid_: fresh, valid, active (without a qualifier)
 
 **Inquiry workspace**:
-The versioned store of one business's inquiry intakes, Capability Versions,
-Receipts and record changes. It is not the business workspace and holds no customer
-fields.
-_Avoid_: workspace (alone), snapshot, state
+The inquiry domain's versioned store of intakes, Capability Versions, Receipts
+and record changes. Separate from the business workspace and end-customer fields.
+_Avoid_: workspace (alone), snapshot, business workspace
 
 **Record change**:
-A published, undoable change to an inquiry's status or assignee. It is the
-authority for handling decisions.
-_Avoid_: overlay, bulk update, patch
+A published, undoable change to inquiry handling status or assignee.
+_Avoid_: Lead, submission, overlay
 
 **Intake outcome**:
-The single answer a visitor-facing entry point gets for one submission:
-accepted, duplicate, pending, stopped, changed, missing, invalid, or
-unavailable.
-_Avoid_: capture result, evidence status
+The answer an inquiry entry gives for a submission: accepted, duplicate,
+pending, stopped, changed, missing, invalid or unavailable.
+_Avoid_: evidence status, message outcome
 
-## Inquiry messages
+**Customer agent**:
+An AI acting for an end customer, such as an assistant making a reservation.
+It is not Strelva's agent and holds no business authority.
+_Avoid_: bot, AI customer, business agent
+
+### Outside systems and inquiry messages
+
+**Provider**:
+An outside system, such as Google, Resend, Stripe or a calendar. People and
+agencies serving a business are agencies.
+_Avoid_: agency, human provider, service provider (for people)
+
+**Account connection**:
+A stored login or credential binding to an outside system, with its connection
+state. One kind of Connection; it never grants authority by itself.
+_Avoid_: Connection (as if all Connections were accounts), mandate, Assignment
 
 **Inquiry message**:
-One email Strelva sends about one inquiry for one purpose. There is at most
-one per inquiry and purpose.
-_Avoid_: delivery, notification, action, send
+An email about one inquiry for one purpose.
+_Avoid_: action, notification, send attempt (as synonyms)
 
 **Message purpose**:
-Why an inquiry message exists: reply to the customer, follow-up to the
-customer, or staff notice.
-_Avoid_: action, owner notification (it goes to staff, not the owner)
+Why an inquiry message exists: reply to the end customer, follow-up to the
+end customer or staff notice.
+_Avoid_: action, owner notification (for a staff notice)
 
 **Message review**:
-The exact rendered inquiry message, held for the responsibility sponsor's
-approval.
-_Avoid_: approval event, change request, draft
+The exact rendered inquiry message held for the Responsibility sponsor's approval.
+_Avoid_: approval event, change request, Draft (as synonyms)
 
 **Approval**:
-The sponsor's explicit yes to one message review. A standing approval is a
-responsibility rule that allows a purpose without a review.
-_Avoid_: authorization, resolve, pre-authorization
+The sponsor's explicit yes to a message review. Standing approval is a
+Responsibility rule permitting a purpose without an individual review.
+_Avoid_: unlimited authorization, resolve
 
 **Send attempt**:
-One claimed try to hand an inquiry message to the email provider.
-_Avoid_: delivery, execution, claim, retry
+One try to hand an inquiry message to an email provider.
+_Avoid_: delivery, acceptance, retry (as synonyms)
 
 **Accepted**:
-The provider took the message and gave it an id. From then on the message
-counts as sent, and Strelva never offers another attempt.
-_Avoid_: delivered, success, sent, verified
+The provider took the message. Acceptance is the completion boundary for sending.
+_Avoid_: delivered, verified, guaranteed receipt
 
 **Rejected**:
-The message was refused before the provider took it. Only a rejected message
-can have another attempt.
-_Avoid_: failed, bounced, suppressed
+The message was refused before the provider took it.
+_Avoid_: bounced, suppressed, unknown outcome
 
 **Unknown outcome**:
-An attempt may have reached the provider, but Strelva never heard back. It is
-treated as possibly accepted.
-_Avoid_: failed, timeout, error
+An attempt may have reached the provider but no answer was received. Possibly accepted.
+_Avoid_: rejected, failed, safe to retry
 
 **Unconfirmed**:
-Accepted, but no provider report has arrived and read-back has not confirmed
-anything yet.
-_Avoid_: accepted_unverified, pending verification
+Accepted, without a provider report or read-back confirming the later result.
+_Avoid_: rejected, unsent, delivered
 
 **Provider report**:
-Later evidence about an accepted message, from a webhook or a read-back:
-delivered (the recipient's server took it), deferred (delayed, provider still
-trying), bounced (refused for good), suppressed (the provider would not send
-to that address), failed or complained. Every report leaves the message
-accepted.
-_Avoid_: outcome, verification, webhook status
+Later evidence about an accepted message: delivered, deferred, bounced,
+suppressed, failed or complained. It does not undo acceptance.
+_Avoid_: send outcome, Approval, guaranteed delivery
 
 **Reconciliation**:
-A person or job checks what happened to an unknown outcome or a stuck
-receipt, then records the finding. It never sends.
-_Avoid_: retry, recovery, repair
+Checking what happened to an unknown outcome or a stuck Receipt and recording
+the finding. It is not another send.
+_Avoid_: retry, recovery, repair (as synonyms)
 
 **Message receipt**:
-The durable record in the business workspace that Strelva sent this exact
-message on this approval.
-_Avoid_: delivery receipt, responsibility receipt, provider receipt
+The durable record that the exact message was sent under the stated approval,
+including who acted.
+_Avoid_: delivery receipt, provider receipt, guaranteed delivery
 
 ## Open naming questions
 
-- **Capability vs System kind.** The ontology's Capability is "a reusable,
-  governed ability to create, inspect, or operate a kind of business work".
-  ADR 0011 (proposed) calls the things a business runs Systems. Until ADR 0011
-  is accepted, code keeps Capability, and System and System kind stay proposed.
-- **Work.** The ontology defines Work as "the durable thread from a person's
-  intent to an answer"; CONTEXT.md defines it as "a finite request, action or
-  result". Both predate this glossary.
-- **Assignment vs Responsibility.** CONTEXT.md's Assignment and the ontology's
-  Responsibility both describe explicit, limited permission to operate work.
-- **Application records.** Rows inside a custom application are called
-  application records in code; they are not workspace records.
+- **On-screen labels:** Jacob approves exact labels. “Strelva handled” remains
+  open when another agency acted; the actor in each action remains explicit.
+- **Capability and System kind:** whether every System kind corresponds to one
+  Capability or composes several remains open. They are internal words, not
+  competing on-screen nouns.
+- **Application records:** the name for records inside a custom application,
+  distinct from workspace records, remains open.

@@ -179,88 +179,12 @@ authority and production restrictions remain unchanged.
 
 ## Language
 
-Workspace terms beyond these live in [GLOSSARY.md](./GLOSSARY.md).
-
-**System:** Something a business made in Strelva that works, such as a
-website, proposal, booking page, intake flow or internal app. Its identity
-survives changes to how it is built. Draft, Live or Paused; health is separate.
-_Avoid_: app, product, module, project (as the customer noun)
-
-**Connection:** What a System reads, acts on, appears in, shares with, depends
-on or is triggered by: another System, business facts, a person, an outside
-account, a domain. An account binding is one kind; a Connection never grants
-authority by itself.
-_Avoid_: integration (for the customer noun)
-
-**Possibility:** A working alternative to one or several Systems that a person
-can open, use and compare. A suggestion alone is not a Possibility. **Make
-real** turns it on.
-_Avoid_: idea, recommendation, experiment (for the customer noun)
-
-**Version:** A System adapted to a different context (market, segment, agency
-client, location) with lineage to its source. Not an edit or a deploy.
-_Avoid_: release, revision, copy, fork
-
-**Business:** The customer organization whose work and records must remain
-separate from other businesses. A business is not a website tenant, payer or
-agency merely because the same person can access them.
-_Avoid_: tenant (legacy storage name only), account, client (for the record)
-
-**Business record:** The one shared set of facts, contacts, requests, bookings
-and content that belongs to a business and that every capability reads.
-_Avoid_: CRM, knowledge graph, tenant config
-
-**Capability:** Something Strelva's software can do on a business record, such
-as answering requests, taking bookings or publishing a website. Businesses
-don't buy capabilities directly; Systems are built from them.
-_Avoid_: module, product, executable, feature, app (for first-party capabilities)
-
-**Offering:** An outcome a business turns on, named the way the business would
-say it ("Never miss a new client"), delivered by one or more capabilities
-under stated limits. Human help is the exception path inside it, not the
-offering itself. Since October 4, packaging for a System, not the primary
-customer noun.
-_Avoid_: item, shelf item, package, product, service
-
-**Responsibility:** A condition an offering keeps true over time under stated
-limits, such as every inquiry answered within five minutes. It is the unit
-Strelva prices and is accountable for.
-_Avoid_: retainer, maintenance, service level
-
-**Receipt:** The record that an outside change was made and then read back from
-the outside system, with what changed and how to undo it.
-_Avoid_: proof, log, evidence (for a single change)
-
-**Provider:** Whoever serves a business beyond the software: nobody
-(self-serve), an agency, or Strelva's own agency.
-_Avoid_: operator (that's Strelva staff in the console), vendor
-
-**Method:** An agency's reusable way of setting up and running offerings for
-its clients. A method carries no customer data, secrets or grants.
-_Avoid_: playbook, snapshot, template, recipe
-
-**Customer agent:** An AI acting for a member of the public, such as Google
-calling to book or ChatGPT making a reservation. It is not Strelva's agent and
-holds no business authority.
-_Avoid_: bot, AI customer
-
-**Installation:** An offering configured for one business, with its selected
-version and connected resources. Internal binding under a System or Version;
-not a customer noun. Installation does not grant new authority or
-prove that a human provider accepted service.
-
-**Assignment:** A person's or agent's explicit permission to operate specified
-work within agreed limits and time. It does not transfer customer ownership.
-
-**Work:** A finite request, action or result. Work can belong to an installation
-or remain independently useful.
-
-**Provider commitment:** The work a provider has actually agreed to take care of.
-Requesting a provider is not its acceptance.
-
-**Contribution reward:** An explicitly awarded benefit for helping develop an
-offering. It may begin as usage or subscription credit; it is not company equity
-or permission to access client information.
+[GLOSSARY.md](./GLOSSARY.md) is the single word authority. Its **On screen**
+layer governs business-screen nouns and actions; exact labels are Jacob-approved
+and open labels remain marked there. **Underneath** owns internal definitions.
+The [product ontology](./docs/architecture/product-ontology.md) owns structure
+and governance rules. Actor and audience naming follows the glossary and
+company ADR 0013; copy names whoever acted.
 
 ## Evidence state
 
