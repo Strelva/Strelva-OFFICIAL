@@ -112,7 +112,7 @@ export interface DeprovisionResult {
 }
 
 const cleanupSchema = z.object({
-  id: z.string().uuid(), tenantId: z.string(), databaseDeleted: z.literal(true),
+  id: z.string().uuid(), tenantId: z.string(), revision: z.number().int().nonnegative(), databaseDeleted: z.literal(true),
   redisComplete: z.boolean(), providerComplete: z.boolean(), complete: z.boolean(),
 }).passthrough();
 export type CleanupReceipt = z.infer<typeof cleanupSchema>;
@@ -473,10 +473,11 @@ async function finishCleanup(opts: DeprovisionOptions, receipt: CleanupReceipt, 
         const checkpointCall = rpc();
         if (!checkpointCall) throw new Error("tenant_cleanup_grouping_checkpoint_failed");
         const checkpoint = await checkpointCall("finish_tenant_deprovision_cleanup", { p_tenant_id: tenantId, p_receipt_id: receipt.id,
-          p_redis_complete: false, p_provider_complete: providerComplete, p_summary: summary });
+          p_redis_complete: false, p_provider_complete: providerComplete, p_summary: summary, p_expected_revision: receipt.revision });
         if (checkpoint.error) throw new Error("tenant_cleanup_grouping_checkpoint_failed");
         const recorded = cleanupSchema.parse(checkpoint.data);
         if (recorded.id !== receipt.id || recorded.tenantId !== tenantId) throw new Error("tenant_cleanup_grouping_checkpoint_failed");
+        receipt = recorded;
         for (const id of accountIds) {
           const changed = await unlinkTenant(id, tenantId, { readRedisForCleanup: true });
           const readback = await redis.get<{ tenantIds?: unknown }>(`account:${id}`);
@@ -516,8 +517,9 @@ async function finishCleanup(opts: DeprovisionOptions, receipt: CleanupReceipt, 
   const call = rpc();
   if (!call) throw new Error("tenant_cleanup_receipt_unavailable_after_database_removal");
   const saved = await call("finish_tenant_deprovision_cleanup", { p_tenant_id: tenantId, p_receipt_id: receipt.id,
-    p_redis_complete: redisComplete, p_provider_complete: providerComplete, p_summary: summary });
-  if (saved.error) throw new Error("tenant_cleanup_receipt_unavailable_after_database_removal");
+    p_redis_complete: redisComplete, p_provider_complete: providerComplete, p_summary: summary, p_expected_revision: receipt.revision });
+  if (saved.error) throw new Error(saved.error.message.includes("tenant_cleanup_revision_conflict")
+    ? "tenant_cleanup_revision_conflict_reload_receipt" : "tenant_cleanup_receipt_unavailable_after_database_removal");
   const cleanup = cleanupSchema.parse(saved.data);
   return { ok: cleanup.complete, tenantId, executed: true, databaseDeleted: true, pgRowTotal, summary, cleanup };
 }

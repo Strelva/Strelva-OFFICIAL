@@ -30,9 +30,9 @@ vi.mock("@/platform/infra/db/client", () => ({
       if (name === "assert_tenant_inquiry_export") return db.teardownError ? { data: null, error: db.teardownError } : { data: null, error: null };
       if (name === "deprovision_tenant_guarded") return db.teardownError || db.pauseError
         ? { data: null, error: db.teardownError ?? db.pauseError }
-        : { data: { counts: { memberships: 1, tenants: 1 }, paused: 2, cleanup: { id: "27410000-0000-4000-8000-000000000001", tenantId: args.p_tenant_id,
+        : { data: { counts: { memberships: 1, tenants: 1 }, paused: 2, cleanup: { id: "27410000-0000-4000-8000-000000000001", tenantId: args.p_tenant_id, revision: 0,
           databaseDeleted: true, redisComplete: false, providerComplete: false, complete: false } }, error: null };
-      if (name === "finish_tenant_deprovision_cleanup") return { data: { id: args.p_receipt_id, tenantId: args.p_tenant_id, databaseDeleted: true,
+      if (name === "finish_tenant_deprovision_cleanup") return { data: { id: args.p_receipt_id, tenantId: args.p_tenant_id, revision: Number(args.p_expected_revision)+1, databaseDeleted: true,
         redisComplete: args.p_redis_complete, providerComplete: args.p_provider_complete, complete: args.p_redis_complete && args.p_provider_complete }, error: null };
       if (name === "pause_tenant_systems") return db.pauseError ? { data: null, error: db.pauseError } : { data: 2, error: null };
       return { data: null, error: { message: `unexpected rpc ${name}` } };

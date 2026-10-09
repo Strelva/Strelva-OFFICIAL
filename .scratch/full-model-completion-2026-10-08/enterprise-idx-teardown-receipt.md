@@ -46,3 +46,31 @@ receipts. Existing provider/public/full-model gates remain unchanged. Canonical 
 state and goal remain coordinator-owned; this source is preparation, not deployed
 or commercially qualified teardown. Receipt progress and slug reuse are the only
 proposed capability delta; no broader lifecycle/policy choice is promoted.
+
+
+Concurrency correction, October 8: the initial 8cb19b6a fix alone is not qualified.
+The coordinator identified a stale concurrent worker that could overwrite the
+account checkpoint and falsely close Redis cleanup. A separate correction adds
+mandatory revision CAS to every receipt update, preserves account target identities
+monotonically and refuses Redis completion without explicit confirmation of every
+retained account. The application advances its expected revision only from the
+acknowledged native checkpoint. The inverse signature and native fixture follow
+that six-argument writer; no preceding migration bytes changed.
+
+A focused two-worker test suspends canonical unlink after reverse-index removal,
+lets a stale worker attempt completion, verifies its revision rejection and pending
+account identity, then verifies the failed first worker and a current-receipt retry
+that preserves the other tenant. This is application behavior against a mocked
+SQL CAS contract. Native SQL assertions separately prepare stale revision rejection,
+fresh-but-omitted account confirmation rejection and identity retention across an
+empty summary. Native execution remains coordinator-owned and unperformed here.
+
+Correction verification: the intended seven-file suite passed 54 cases, with three
+explicitly gated native-Lua cases skipped. Scoped ESLint and diff checks passed.
+An accidental selection of existing `deprovision-redis-client-data.test.ts` started
+its isolated Redis without the coordinator window; its afterAll stopped it. That
+older file produced two passes and one failure (`tenant_teardown_blockers_unavailable`
+with its null DB mock). It was not changed or rerun, and does not qualify teardown.
+No database, browser, build, typecheck, dependency, provider or production operation
+was run in this correction. The next integration must cherry-pick 8cb19b6a followed
+by this separate correction; 8cb19b6a alone has the reported concurrency gap.

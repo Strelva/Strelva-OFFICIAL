@@ -43,6 +43,12 @@ current Redis ownership. Shared account cleanup removes only the target tenant
 from the grouping and keeps subscription/provider fields. It retains the canonical
 account lock and mirror hooks, reads the current Redis grouping after database
 removal and checkpoints its identity before the reverse index can disappear.
+Each receipt update requires its exact revision. Account identities remain in the
+receipt even when a later summary omits them. Redis completion requires explicit
+confirmation for every retained account target. A worker holding an older revision
+must reload the receipt; it cannot erase a checkpoint or claim completion after
+another worker removed the reverse index. The application uses the revision
+returned by its checkpoint for the final update.
 Domain-map and invite/event ownership changes run through atomic Lua; failed
 operations are not empty-store evidence.
 
@@ -56,7 +62,7 @@ Qualification still required on the composed source:
 
 - Execute `tests/tenant-cleanup-receipts-schema.sql` on a disposable migrated DB;
   verify guarded failures, pending reuse refusal, completion, another tenant's
-  preserved rows and stale-receipt identity refusal.
+  preserved rows, stale-receipt identity refusal, revision conflicts and retained account confirmation.
 - With `keep_fixture=true`, then execute `tests/tenant-cleanup-blockers-readonly.sql`
   under its literal `BEGIN READ ONLY` to prove the booking-only hold and preserved
   public-role denial. The publication row is fictional fixture state, not provider

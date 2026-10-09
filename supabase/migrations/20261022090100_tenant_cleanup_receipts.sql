@@ -6,6 +6,7 @@ create table public.tenant_deprovision_cleanup (
   tenant_id text primary key,
   receipt_id uuid not null unique default gen_random_uuid(),
   tenant_stable_id uuid,
+  revision bigint not null default 0 check(revision>=0),
   database_receipt jsonb not null,
   redis_complete boolean not null default false,
   provider_complete boolean not null default false,
@@ -35,7 +36,7 @@ grant execute on function public.tenant_cleanup_teardown_blockers(text) to servi
 
 create function public.tenant_cleanup_receipt(p_slug text) returns jsonb
 language sql stable security definer set search_path=public,pg_temp as $$
- select jsonb_build_object('id',receipt_id,'tenantId',tenant_id,'databaseDeleted',true,
+ select jsonb_build_object('id',receipt_id,'tenantId',tenant_id,'revision',revision,'databaseDeleted',true,
    'redisComplete',redis_complete,'providerComplete',provider_complete,
    'complete',redis_complete and provider_complete,'slugReusable',false,'summary',summary,
    'databaseReceipt',database_receipt)
@@ -70,14 +71,36 @@ begin
 end $$;
 
 create function public.finish_tenant_deprovision_cleanup(
- p_tenant_id text,p_receipt_id uuid,p_redis_complete boolean,p_provider_complete boolean,p_summary jsonb
+ p_tenant_id text,p_receipt_id uuid,p_redis_complete boolean,p_provider_complete boolean,p_summary jsonb,p_expected_revision bigint
 ) returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
+declare v_receipt public.tenant_deprovision_cleanup%rowtype; v_accounts jsonb;
 begin
- if p_redis_complete is null or p_provider_complete is null or jsonb_typeof(p_summary) is distinct from 'object'
+ if p_redis_complete is null or p_provider_complete is null or jsonb_typeof(p_summary) is distinct from 'object' or p_expected_revision is null
    then raise exception 'tenant_cleanup_invalid'; end if;
  perform pg_advisory_xact_lock(hashtextextended('hosted-tenant:'||p_tenant_id,7416));
  if exists(select 1 from public.tenants where id=p_tenant_id) then raise exception 'tenant_cleanup_identity_conflict'; end if;
+ select * into v_receipt from public.tenant_deprovision_cleanup
+ where tenant_id=p_tenant_id and receipt_id=p_receipt_id for update;
+ if not found then raise exception 'tenant_cleanup_receipt_changed'; end if;
+ if v_receipt.revision<>p_expected_revision then raise exception 'tenant_cleanup_revision_conflict'; end if;
+ if jsonb_typeof(coalesce(p_summary->'redis','[]'::jsonb))<>'array' then raise exception 'tenant_cleanup_invalid'; end if;
+ -- Account identities are monotonic. A later worker must explicitly confirm
+ -- every retained target before it can mark Redis complete; a stale summary
+ -- cannot silently drop the identity after its reverse index was removed.
+ select coalesce(jsonb_agg(action),'[]'::jsonb) into v_accounts
+ from jsonb_array_elements(coalesce(v_receipt.summary->'redis','[]'::jsonb)) action
+ where action->>'target' like 'account:%';
+ if p_redis_complete and exists(
+   select 1 from jsonb_array_elements(v_accounts) old_action
+   where not exists(select 1 from jsonb_array_elements(coalesce(p_summary->'redis','[]'::jsonb)) new_action
+     where new_action->>'target'=old_action->>'target' and new_action->'deleted'='true'::jsonb)
+ ) then raise exception 'tenant_cleanup_pending_account'; end if;
+ p_summary:=jsonb_set(p_summary,'{redis}',coalesce(p_summary->'redis','[]'::jsonb)||
+   coalesce((select jsonb_agg(old_action) from jsonb_array_elements(v_accounts) old_action
+     where not exists(select 1 from jsonb_array_elements(coalesce(p_summary->'redis','[]'::jsonb)) new_action
+       where new_action->>'target'=old_action->>'target')),'[]'::jsonb),true);
  update public.tenant_deprovision_cleanup set
+ revision=revision+1,
  redis_complete=redis_complete or p_redis_complete,provider_complete=provider_complete or p_provider_complete,
  summary=p_summary,updated_at=clock_timestamp()
  where tenant_id=p_tenant_id and receipt_id=p_receipt_id;
@@ -100,9 +123,9 @@ create trigger tenant_cleanup_reuse_guard before insert or update of id on publi
  for each row execute function public.tenant_cleanup_reuse_guard();
 revoke all on function public.tenant_cleanup_receipt(text),
  public.deprovision_tenant_guarded(text,boolean,boolean,boolean),
- public.finish_tenant_deprovision_cleanup(text,uuid,boolean,boolean,jsonb),
+ public.finish_tenant_deprovision_cleanup(text,uuid,boolean,boolean,jsonb,bigint),
  public.tenant_cleanup_reuse_guard() from public,anon,authenticated;
 grant execute on function public.tenant_cleanup_receipt(text),
  public.deprovision_tenant_guarded(text,boolean,boolean,boolean),
- public.finish_tenant_deprovision_cleanup(text,uuid,boolean,boolean,jsonb) to service_role;
+ public.finish_tenant_deprovision_cleanup(text,uuid,boolean,boolean,jsonb,bigint) to service_role;
 commit;

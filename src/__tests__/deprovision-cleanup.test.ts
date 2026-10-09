@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
-  redisAvailable: true, configured: true, guardFails: false, saveFails: false,
-  receipt: { id: "27410000-0000-4000-8000-000000000010", tenantId: "fictional-cleanup", databaseDeleted: true,
+  staleGuard: null as null | Record<string, unknown>, redisAvailable: true, configured: true, guardFails: false, saveFails: false,
+  receipt: { id: "27410000-0000-4000-8000-000000000010", tenantId: "fictional-cleanup", revision: 0, databaseDeleted: true,
     redisComplete: false, providerComplete: false, complete: false },
-  summary: { redis: [] as Array<{ target: string }> },
+  summary: { redis: [] as Array<{ target: string; deleted?: boolean }> },
   calls: [] as string[], keys: new Set<string>(),
   bookingGrants: 0, bookings: 0, malformedBlocker: false,
 }));
@@ -30,13 +30,20 @@ vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({
     if (name === "tenant_cleanup_receipt") return { data: { ...state.receipt, summary: state.summary }, error: null };
     if (name === "deprovision_tenant_guarded") return state.guardFails
       ? { data: null, error: { message: "tenant_teardown_blocked_by_workspace_owned_records" } }
-      : { data: { counts: { tenants: 1 }, paused: 2, cleanup: { ...state.receipt } }, error: null };
+      : { data: { counts: { tenants: 1 }, paused: 2, cleanup: state.staleGuard ?? { ...state.receipt } }, error: null };
     if (name === "finish_tenant_deprovision_cleanup") {
+      if (args.p_expected_revision !== state.receipt.revision) return { data: null, error: { message: "tenant_cleanup_revision_conflict" } };
       if (state.saveFails) return { data: null, error: { message: "storage unavailable" } };
+      const incoming = structuredClone(args.p_summary as typeof state.summary);
+      const previous = state.summary.redis.filter(action => action.target.startsWith("account:"));
+      if (args.p_redis_complete === true && previous.some(old => !incoming.redis?.some(action => action.target === old.target && action.deleted === true)))
+        return { data: null, error: { message: "tenant_cleanup_pending_account" } };
+      incoming.redis = [...(incoming.redis ?? []), ...previous.filter(old => !incoming.redis?.some(action => action.target === old.target))];
+      state.receipt.revision++;
       state.receipt.redisComplete ||= args.p_redis_complete === true;
       state.receipt.providerComplete ||= args.p_provider_complete === true;
       state.receipt.complete = state.receipt.redisComplete && state.receipt.providerComplete;
-      state.summary = structuredClone(args.p_summary as typeof state.summary);
+      state.summary = incoming;
       return { data: { ...state.receipt, summary: state.summary }, error: null };
     }
     throw new Error(`Unexpected RPC ${name}`);
@@ -47,11 +54,11 @@ const run = () => runDeprovision({ tenantId: state.receipt.tenantId, tenant: nul
 
 beforeEach(() => {
   vi.resetAllMocks(); vi.stubEnv("STRELVA_LEADS_AUTHORITY", "redis"); vi.stubEnv("STRELVA_TENANT_RECEIPT_RETENTION", "0");
-  state.redisAvailable = true; state.configured = true; state.guardFails = false; state.saveFails = false;
+  state.staleGuard = null; state.redisAvailable = true; state.configured = true; state.guardFails = false; state.saveFails = false;
   state.calls = []; state.keys = new Set(["connections:fictional-cleanup:google", "connections:other-site:google"]);
   state.bookingGrants = 0; state.bookings = 0; state.malformedBlocker = false;
   state.summary = { redis: [] };
-  Object.assign(state.receipt, { redisComplete: false, providerComplete: false, complete: false });
+  Object.assign(state.receipt, { revision: 0, redisComplete: false, providerComplete: false, complete: false });
 });
 afterEach(() => vi.unstubAllEnvs());
 describe("truthful committed database removal and retryable cleanup", () => {
@@ -129,6 +136,38 @@ describe("truthful committed database removal and retryable cleanup", () => {
     state.malformedBlocker = true;
     await expect(runDeprovision({ tenantId: state.receipt.tenantId, tenant: null, dryRun: true })).rejects.toThrow("blockers_unavailable");
     expect(redis.del).not.toHaveBeenCalled(); expect(provider.deleteVercelProject).not.toHaveBeenCalled();
+  });
+  it("rejects a concurrent stale worker after the account checkpoint and retains the failed unlink target", async () => {
+    const index = "account-of:fictional-cleanup";
+    state.keys.add(index);
+    let enter!: () => void; let release!: () => void;
+    const entered = new Promise<void>(resolve => { enter = resolve; });
+    const paused = new Promise<void>(resolve => { release = resolve; });
+    const stale = { ...state.receipt };
+    let tenantIds = ["fictional-cleanup", "other-site"];
+    redis.get.mockImplementation(async key => key === index ? state.keys.has(index) ? "shared" : null : key === "account:shared" ? { tenantIds } : null);
+    accounts.unlinkTenant.mockImplementationOnce(async () => {
+      state.keys.delete(index); enter(); await paused;
+      throw new Error("account persistence refused");
+    }).mockImplementationOnce(async () => { tenantIds = ["other-site"]; return { tenantIds }; });
+    const workerA = run();
+    await entered;
+    // A second worker captured revision zero before A checkpointed revision one.
+    // The guarded RPC mock returns that immutable snapshot, while finish reads
+    // the current shared receipt and enforces the database CAS contract.
+    state.staleGuard = stale;
+    const workerB = run();
+
+    await expect(workerB).rejects.toThrow("revision_conflict");
+    expect(state.summary.redis).toContainEqual(expect.objectContaining({ target: "account:shared" }));
+    expect(state.receipt.redisComplete).toBe(false);
+    release();
+    expect(await workerA).toMatchObject({ ok: false, cleanup: { complete: false } });
+    expect(state.summary.redis).toContainEqual(expect.objectContaining({ target: "account:shared" }));
+    expect(tenantIds).toEqual(["fictional-cleanup", "other-site"]);
+    const retry = await runDeprovision({ tenantId: state.receipt.tenantId, tenant: null, dryRun: false, cleanupReceiptId: state.receipt.id });
+    expect(retry.ok).toBe(true);
+    expect(tenantIds).toEqual(["other-site"]);
   });
   it("checkpoints the account identity before unlinking so a failed write can retry after the reverse index vanished", async () => {
     const index = "account-of:fictional-cleanup";

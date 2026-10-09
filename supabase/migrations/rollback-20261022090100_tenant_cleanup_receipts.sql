@@ -7,7 +7,7 @@ do $$ begin
 end $$;
 drop trigger tenant_cleanup_reuse_guard on public.tenants;
 drop function public.tenant_cleanup_reuse_guard();
-drop function public.finish_tenant_deprovision_cleanup(text,uuid,boolean,boolean,jsonb);
+drop function public.finish_tenant_deprovision_cleanup(text,uuid,boolean,boolean,jsonb,bigint);
 drop function public.deprovision_tenant_guarded(text,boolean,boolean,boolean);
 drop function public.tenant_cleanup_receipt(text);
 drop function public.tenant_cleanup_teardown_blockers(text);
