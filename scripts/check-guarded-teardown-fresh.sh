@@ -56,3 +56,12 @@ if [[ "${STRELVA_CLEANUP_AGENCY_SQL_PROOF:-0}" == 1 ]]; then
  psql "${psql_args[@]}" --file="$repo_root/scripts/sql/agency-created-application-authority-contract.sql"
  printf 'PASS cleanup receipt CAS, booking-only READ ONLY and agency reader contracts.\n'
 fi
+if [[ "${STRELVA_TENANT_CLEANUP_NATIVE_PROOF:-0}" == 1 ]]; then
+ cleanup_connection=$(python3 - "$cluster_socket" "$cluster_port" "$(id -un)" <<'PY'
+import json,sys
+print(json.dumps(['-h',sys.argv[1],'-p',sys.argv[2],'-U',sys.argv[3],'-d','postgres']))
+PY
+ )
+ STRELVA_TENANT_CLEANUP_PSQL="$cleanup_connection" pnpm exec vitest run src/__tests__/deprovision-concurrent-native.test.ts --maxWorkers=2
+ printf 'PASS actual two-worker PostgreSQL and Redis cleanup recovery.\n'
+fi
