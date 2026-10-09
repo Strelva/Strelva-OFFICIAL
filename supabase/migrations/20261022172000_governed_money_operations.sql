@@ -149,7 +149,7 @@ begin
  select started_at into started from public.split_transfer_attempts where payout_id=payout.id;
  if remaining is distinct from payout.amount_cents or split.source_account_id<>'platform' or split.source_charge_id is distinct from p_charge or split.currency is distinct from p_currency or split.agreement_version is distinct from payout.agreement_version then raise exception 'payout_accrual_changed';end if;
  if started is null or started<clock_timestamp()-interval '23 hours' then raise exception 'payout_attempt_requires_reconciliation';end if;
- if p_available is null or p_available<0 or (select coalesce(sum(amount_cents),0) from public.split_payouts where source_account_id='platform' and source_transaction=p_charge)>p_available then raise exception 'payout_source_balance_changed';end if;
+ if p_available is null or p_available<0 or (select coalesce(sum(public.split_reserved_net(split_id)),0) from public.split_payouts where source_account_id='platform' and source_transaction=p_charge)>p_available then raise exception 'payout_source_balance_changed';end if;
  return to_jsonb(payout);
 end $$;
 
@@ -163,7 +163,7 @@ begin
  ('public.read_governed_money_preparation(uuid,uuid,text)','069ebd4ec0274185bf97814ea64f6523','s',array['p_workspace_id','p_user_id','p_verified_email']::text[]),
  ('public.prepare_governed_collection_terms(uuid,text,jsonb)','d76caf2ab026b72931ce6af8570b7d36','v',array['p_user_id','p_verified_email','p_command']::text[]),
  ('public.register_governed_creator_listing(uuid,text,jsonb)','3971564a6293d3f7aba4c51a37d3b5c2','v',array['p_user_id','p_verified_email','p_command']::text[]),
- ('public.assert_governed_payout_dispatch(uuid,uuid,text,text,text,text,bigint,text,bigint)','7040fc98259767dea0a2b4a82a4a634a','v',array['p_payout_id','p_user_id','p_verified_email','p_profile_version','p_recipient','p_charge','p_amount','p_currency','p_available']::text[])) v(signature,source_hash,volatility,arg_names) loop
+ ('public.assert_governed_payout_dispatch(uuid,uuid,text,text,text,text,bigint,text,bigint)','b8fb6dd56365665db132b300ce564d70','v',array['p_payout_id','p_user_id','p_verified_email','p_profile_version','p_recipient','p_charge','p_amount','p_currency','p_available']::text[])) v(signature,source_hash,volatility,arg_names) loop
   if (select count(*) from pg_proc where pronamespace='public'::regnamespace and proname=split_part(split_part(expected.signature,'.',2),'(',1))<>1 then raise exception 'governed_money_catalog_drift';end if;
   select f.*,l.lanname into p from pg_proc f join pg_language l on l.oid=f.prolang where f.oid=to_regprocedure(expected.signature);
   if p.oid is null or p.proowner<>migrator or p.pronamespace<>'public'::regnamespace or p.lanname<>'plpgsql' or p.prokind<>'f' or p.prorettype<>'jsonb'::regtype or p.proretset or p.proisstrict or not p.prosecdef or p.proleakproof or p.provolatile::text<>expected.volatility or p.proparallel<>'u' or p.proconfig is distinct from array['search_path=public, pg_temp']::text[] or p.provariadic<>0 or p.prosupport<>0 or p.procost<>100 or p.prorows<>0 or p.pronargdefaults<>0 or p.proargdefaults is not null or p.proargmodes is not null or p.proallargtypes is not null or p.proargnames is distinct from expected.arg_names or p.pronargs<>cardinality(expected.arg_names) or md5(p.prosrc)<>expected.source_hash then raise exception 'governed_money_catalog_drift';end if;

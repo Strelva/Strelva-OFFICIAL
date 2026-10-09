@@ -24,4 +24,11 @@ describe("governed money source packet", () => {
     expect(owner.indexOf("public.accept_platform_collection_terms")).toBeLessThan(owner.indexOf("public.freeze_platform_collection_period"));
     expect(owner).toContain("m.role='owner' for share of m,w");
   });
+  it("counts existing restored recovery reservations using the declared net-capacity contract", () => {
+    const dispatch = forward.slice(forward.indexOf("create function public.assert_governed_payout_dispatch"), forward.indexOf("do $$declare f regprocedure"));
+    expect(dispatch).toContain("coalesce(sum(public.split_reserved_net(split_id)),0)");
+    expect(dispatch.indexOf("coalesce(sum(public.split_reserved_net(split_id)),0)")).toBeGreaterThan(dispatch.indexOf("8814"));
+    const recovery = readFileSync("supabase/migrations/20261020090013_recovery_payouts.sql", "utf8");
+    expect(recovery).toContain("split_recovery_payouts"); expect(recovery).toContain("split_recovery_reversal_receipts");
+  });
 });
