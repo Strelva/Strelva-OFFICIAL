@@ -4,7 +4,7 @@ import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { listWorkspaces } from "@/platform/workspaces";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 import { BusinessRecordConflictError, undoBusinessRecordRevision } from "@/platform/business-record";
-import { needsYouReleaseEnabled } from "@/platform/needs-you/server";
+import { needsYouReleaseEnabled } from "@/experience/workspace/needs-you-server";
 
 export const dynamic = "force-dynamic";
 

@@ -67,7 +67,7 @@ export function journeyProfile(name, masterOff = false) {
   Object.assign(env, {
     STRELVA_WORKSPACE_RELEASE: masterOff ? '0' : '1', STRELVA_LOCAL_AUTH_PROOF: '1',
     STRELVA_FULL_MODEL_PROFILE: name, STRELVA_FULL_MODEL_MASTER_OFF: masterOff ? '1' : '0',
-    STRELVA_APPLICATION_USE_JOURNEY: '1', STRELVA_CLIENT_RECORDS_READ: '',
+    STRELVA_APPLICATION_USE_JOURNEY: '1', STRELVA_MAKE_REAL_LIVE_JOURNEY: '0', STRELVA_CLIENT_RECORDS_READ: '',
     STRELVA_BOOKING_STORE_READ: 'legacy', STRELVA_LEADS_READ: 'legacy', STRELVA_LEADS_AUTHORITY: 'legacy',
     CONTENT_SOURCE: 'postgres', TENANTS_SOURCE: 'postgres', DATA_SOURCE: 'postgres',
     EMAIL_SENDING_ENABLED: 'false', CUSTOMER_EMAIL_ENABLED: 'false', OPERATOR_EMAILS_ENABLED: 'false',
@@ -84,7 +84,7 @@ export function journeyProfile(name, masterOff = false) {
       'BUSINESS_BILLING', 'BUSINESS_RECORD_READS', 'BUSINESS_PAGES', 'CUSTOMERS_RELEASE',
       'CLIENT_RECORDS_DUAL_WRITE', 'EXPORT_SCHEMA_3', 'EXPORT_RECOVERY', 'EXIT_HANDOFF',
       'BUSINESS_OUTCOME_REPORTS', 'INQUIRY_OUTCOMES']) env[`STRELVA_${suffix}`] = '1';
-    Object.assign(env, { STRELVA_BOOKING_STORE_READ: 'postgres', STRELVA_LEADS_READ: 'postgres',
+    Object.assign(env, { STRELVA_MAKE_REAL_LIVE_JOURNEY: '1', STRELVA_BOOKING_STORE_READ: 'postgres', STRELVA_LEADS_READ: 'postgres',
       STRELVA_LEADS_AUTHORITY: 'postgres', STRELVA_CLIENT_RECORDS_READ: 'spam_held,inquiry_timeline,inquiry_reply,inquiry_delivery,booking_config,account_grouping,orders,provider_connections,provider_metadata,reward_members,reward_transactions,threads,tenant_settings' });
   }
   return { name, masterOff, env, specs: name === 'full-native' ? nativeSpecs : name === 'full-provider' ? providerSpecs : [
