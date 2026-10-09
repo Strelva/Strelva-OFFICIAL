@@ -326,14 +326,14 @@ describe("plan approvals keyed by workspace", () => {
 
 // The live service ----------------------------------------------------------------
 
-function service(input: { p: Possibility; live: ReturnType<typeof createInMemoryLiveSystems>; adapters: EffectAdapter[]; activations?: ActivationRepository; clock?: { now: number }; recordService?: Parameters<typeof createLiveMakeRealService>[0]["recordService"] }) {
+function service(input: { p: Possibility; live: ReturnType<typeof createInMemoryLiveSystems>; adapters: EffectAdapter[]; activations?: ActivationRepository; clock?: { now: number }; recordService?: Parameters<typeof createLiveMakeRealService>[0]["recordService"]; adapterFactory?: Parameters<typeof createLiveMakeRealService>[0]["adapters"] }) {
   const possibilities = createInMemoryPossibilityRepository();
   const activations = input.activations ?? createInMemoryActivationRepository();
   const approvals = createInMemoryApprovalRecords();
   const clock = input.clock ?? { now: Date.parse(AT) };
   const svc = createLiveMakeRealService({
     possibilities: () => possibilities, activations: () => activations, live: () => input.live.port,
-    adapters: () => input.adapters, approvals, clock: () => new Date(clock.now).toISOString(),
+    adapters: input.adapterFactory ?? (() => input.adapters), approvals, clock: () => new Date(clock.now).toISOString(),
     ...(input.recordService ? { recordService: input.recordService } : {}),
   });
   return { svc, possibilities, activations, approvals, clock };
@@ -466,7 +466,8 @@ describe("live Make real service", () => {
     const clock = { now: Date.parse(AT) };
     const log: string[] = [];
     const recordService = vi.fn(async (_session: unknown, action: string, subject: string) => { log.push(`${action} ${subject}`); });
-    const { svc, possibilities, approvals } = service({ p, live, adapters: [createHostedWebsiteAdapter(hosted.ports, ctx())], activations: crashing, clock, recordService });
+    const adapterFactory=vi.fn(()=>[createHostedWebsiteAdapter(hosted.ports, ctx())]);
+    const { svc, possibilities, approvals } = service({ p, live, adapters: [], activations: crashing, clock, recordService, adapterFactory });
     await possibilities.create(p);
     approvals.record({ id: "a1", businessId: BIZ, subject: planApprovalSubject(p), status: "approved", decidedBy: "owner_link" });
     await expect(svc.startApproved({ actor: OWNER, workspaceId: BIZ, possibilityId: p.id, approvalId: "a1" })).rejects.toThrow("worker killed");
@@ -484,6 +485,7 @@ describe("live Make real service", () => {
     const resumed = await svc.resumeDue([{ workspaceId: BIZ, activationId, actor: SYSTEM, service: session }]);
     expect(resumed.results[0]).toMatchObject({ status: "made_real" });
     expect(log.at(-1)).toBe(`resume activation:${activationId}`);
+    expect(adapterFactory).toHaveBeenLastCalledWith(SYSTEM,BIZ,{session,approvalId:"a1",possibilityId:p.id,activationId});
     expect(hosted.state.launches).toBe(1);
     const done = (await memory.get(BIZ, activationId))!;
     // Approver of record: the owner who started it, with the same approval.

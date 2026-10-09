@@ -10,6 +10,7 @@ export interface GoogleMakeRealState {
  receipt: { id:string; status:string; readback:string|null; undo:boolean } | null;
 }
 export interface GoogleMakeRealPorts {
+ forService?(context: import("./live").LiveMakeRealServiceContext): GoogleMakeRealPorts;
  inspect(actor:WorkspaceActor,businessId:string,request:GoogleMakeRealRequest):Promise<GoogleMakeRealState>;
  approve(actor:WorkspaceActor,businessId:string,request:GoogleMakeRealRequest):Promise<{changed:boolean;reason?:string}>;
  verify(actor:WorkspaceActor,businessId:string,request:GoogleMakeRealRequest,receiptId:string|null):Promise<{ok:boolean;detail:string}>;

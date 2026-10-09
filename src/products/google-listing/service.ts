@@ -52,6 +52,7 @@ export interface ListingContext {
   /** Throws unless the person behind an operator_* authority is the
    * business's acting provider for Google on this location (seat, staff row,
    * verification, the owner's mandate). Without it those authorities are refused. */
+  authorizeService?: () => Promise<void>;
   authorizeProvider?: () => Promise<void>;
 }
 
@@ -142,6 +143,7 @@ async function governedWrite<T>(ctx: ListingContext, plan: WritePlan<T>): Promis
   if (undoKinds !== Boolean(plan.undoesReceiptId)) return refused("authority");
   const byProvider = parsed.data.kind === "operator_instruction" || parsed.data.kind === "operator_undo";
   const providerCleared = async () => {
+    if (ctx.authorizeService) { try { await ctx.authorizeService(); } catch { return false; } }
     if (!byProvider) return true;
     if (!ctx.authorizeProvider) return false;
     try { await ctx.authorizeProvider(); return true; } catch { return false; }

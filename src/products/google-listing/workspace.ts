@@ -145,6 +145,10 @@ export async function executeGoogleListingEvent(input: { tenantId: string; event
     const original = ctx.client;
     ctx.client = {...original,patchLocation:async (...args) => {await recheck();return original.patchLocation(...args);},updateReply:async (...args)=>{await recheck();return original.updateReply(...args);}};
   }
+  if (input.actorId.startsWith("make-real-service:")) ctx.authorizeService = async () => {
+    const current = await deps.authorize(input);
+    if (!current.allowed) throw new Error("Google service authority ended before dispatch.");
+  };
   ctx.onWriteAccepted = async () => (await deps.events()).markExecutionExternalAccepted(input.event.id);
   ctx.onWriteUnconfirmed = async () => (await deps.events()).markExecutionExternalUnconfirmed(input.event.id);
   let accepted = false;

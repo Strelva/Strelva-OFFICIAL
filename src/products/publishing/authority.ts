@@ -44,7 +44,14 @@ export async function authorizePublishingEvent(input: { tenantId: string; event:
   if (target?.workspaceId !== workspaceId.data) return deny("publishing_scope_changed");
   let actor: WorkspaceActor | null = null;
   let viewer: ReleaseViewer;
-  if (input.actorId.startsWith("owner-link:")) {
+  if (input.actorId.startsWith("make-real-service:")) {
+    if (input.event.metadata?.kind !== "workspace_google_listing_draft") return deny("publishing_approval_required");
+    try {
+      const service = await (await import("@/products/google-listing/make-real-service-authority")).authorizeGoogleServiceEvent(input);
+      actor = { userId: service.userId, verifiedEmail: service.verifiedEmail };
+    } catch { return deny("publishing_service_authority_ended"); }
+    viewer = { operator: false, tester: false };
+  } else if (input.actorId.startsWith("owner-link:")) {
     const recipient = input.actorId.slice("owner-link:".length).trim().toLowerCase();
     const owner = nativeWorkspace ? await deps.workspaceOwner?.(nativeWorkspace).catch(() => null) : await deps.owner(workspaceId.data).catch(() => null);
     if (!owner || owner.email.trim().toLowerCase() !== recipient) return deny("publishing_owner_changed");

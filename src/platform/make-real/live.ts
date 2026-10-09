@@ -27,11 +27,18 @@ import { STRELVA_SYSTEM_LABEL, type ServiceAction, type ServiceSession } from "@
  *   activation goes to the operator queue (listOperationalExceptions).
  */
 
+export interface LiveMakeRealServiceContext {
+  session: ServiceSession;
+  approvalId: string | null;
+  possibilityId: string;
+  activationId?: string;
+}
+
 export interface LiveMakeRealDeps {
   possibilities(actor: WorkspaceActor): PossibilityRepository;
   activations(actor: WorkspaceActor): ActivationRepository;
   live(actor: WorkspaceActor): LiveSystemsPort;
-  adapters(actor: WorkspaceActor, workspaceId: string): EffectAdapter[];
+  adapters(actor: WorkspaceActor, workspaceId: string, service?: LiveMakeRealServiceContext): EffectAdapter[];
   approvals: ApprovalRecordsPort;
   checks?: OperatingChecksPort;
   clock?: () => string;
@@ -93,14 +100,15 @@ export function createLiveOperatingChecks(runners: Record<string, (activation: A
 }
 
 export function createLiveMakeRealService(deps: LiveMakeRealDeps) {
-  function makeRealFor(actor: WorkspaceActor, workspaceId: string, possibilityId: string, approvalId: string | null): MakeReal {
+  function makeRealFor(actor: WorkspaceActor, workspaceId: string, possibilityId: string, approvalId: string | null, session?: ServiceSession, activationId?: string): MakeReal {
+    if (session && (session.workspaceId !== workspaceId || session.actor.userId !== actor.userId || session.actor.verifiedEmail !== actor.verifiedEmail || !["make_real_link", "make_real_resume"].includes(session.purpose))) throw new WorkspaceAccessError();
     const possibilities = deps.possibilities(actor);
     return createMakeReal({
       possibilities,
       activations: deps.activations(actor),
       live: deps.live(actor),
       authority: createApprovalAuthority({ approvals: deps.approvals, possibilities, possibilityId, approvalId }),
-      adapters: deps.adapters(actor, workspaceId),
+      adapters: session ? deps.adapters(actor, workspaceId, { session, approvalId, possibilityId, ...(activationId ? { activationId } : {}) }) : deps.adapters(actor, workspaceId),
       checks: deps.checks ?? createLiveOperatingChecks(),
       approvals: deps.approvals,
       requirePlanApproval: true,
@@ -109,17 +117,17 @@ export function createLiveMakeRealService(deps: LiveMakeRealDeps) {
     });
   }
 
-  async function forActivation(actor: WorkspaceActor, workspaceId: string, activationId: string) {
+  async function forActivation(actor: WorkspaceActor, workspaceId: string, activationId: string, session?: ServiceSession) {
     const activation = await deps.activations(actor).get(workspaceId, activationId);
     if (!activation) throw new WorkspaceAccessError();
     const approvalId = activation.approvals[0]?.approvalId ?? null;
-    return { activation, makeReal: makeRealFor(actor, workspaceId, activation.possibilityId, approvalId) };
+    return { activation, makeReal: makeRealFor(actor, workspaceId, activation.possibilityId, approvalId, session, activationId) };
   }
 
   return {
     /** Approval starts the durable activation and runs a first pass. */
-    async startApproved(input: { actor: WorkspaceActor; workspaceId: string; possibilityId: string; approvalId: string }): Promise<Activation> {
-      const makeReal = makeRealFor(input.actor, input.workspaceId, input.possibilityId, input.approvalId);
+    async startApproved(input: { actor: WorkspaceActor; workspaceId: string; possibilityId: string; approvalId: string; service?: ServiceSession }): Promise<Activation> {
+      const makeReal = makeRealFor(input.actor, input.workspaceId, input.possibilityId, input.approvalId, input.service);
       const started = await makeReal.start(input.actor, input.workspaceId, input.possibilityId, { planApprovalId: input.approvalId });
       return makeReal.run(input.actor, input.workspaceId, started.id);
     },
@@ -127,16 +135,16 @@ export function createLiveMakeRealService(deps: LiveMakeRealDeps) {
       return (await forActivation(actor, workspaceId, activationId)).activation;
     },
     /** Operator: resume after fixing the cause. No new owner approval while the plan is unchanged. */
-    async resume(actor: WorkspaceActor, workspaceId: string, activationId: string, note?: string): Promise<Activation> {
-      const { makeReal } = await forActivation(actor, workspaceId, activationId);
+    async resume(actor: WorkspaceActor, workspaceId: string, activationId: string, note?: string, service?: ServiceSession): Promise<Activation> {
+      const { makeReal } = await forActivation(actor, workspaceId, activationId, service);
       return makeReal.resume(actor, workspaceId, activationId, note);
     },
-    async reconcile(actor: WorkspaceActor, workspaceId: string, activationId: string, input: { stepId: string; resolution: "completed" | "not_applied"; evidence: string; providerRef?: string; note?: string }): Promise<Activation> {
-      const { makeReal } = await forActivation(actor, workspaceId, activationId);
+    async reconcile(actor: WorkspaceActor, workspaceId: string, activationId: string, input: { stepId: string; resolution: "completed" | "not_applied"; evidence: string; providerRef?: string; note?: string }, service?: ServiceSession): Promise<Activation> {
+      const { makeReal } = await forActivation(actor, workspaceId, activationId, service);
       return makeReal.reconcile(actor, workspaceId, activationId, input);
     },
-    async rollback(actor: WorkspaceActor, workspaceId: string, activationId: string, note?: string): Promise<Activation> {
-      const { makeReal } = await forActivation(actor, workspaceId, activationId);
+    async rollback(actor: WorkspaceActor, workspaceId: string, activationId: string, note?: string, service?: ServiceSession): Promise<Activation> {
+      const { makeReal } = await forActivation(actor, workspaceId, activationId, service);
       return makeReal.rollback(actor, workspaceId, activationId, note);
     },
     /**
@@ -152,7 +160,7 @@ export function createLiveMakeRealService(deps: LiveMakeRealDeps) {
         if (Date.now() - started >= deadlineMs) break;
         try {
           if (item.service && (item.service.purpose !== "make_real_resume" || item.service.workspaceId !== item.workspaceId)) throw new WorkspaceAccessError();
-          const { activation, makeReal } = await forActivation(item.actor, item.workspaceId, item.activationId);
+          const { activation, makeReal } = await forActivation(item.actor, item.workspaceId, item.activationId, item.service);
           if (activation.status !== "in_progress") { results.push({ activationId: item.activationId, status: activation.status }); continue; }
           const reconciling = activation.steps.some((s) => s.status === "running");
           const by = item.service ? STRELVA_SYSTEM_LABEL : "Strelva";
@@ -212,7 +220,7 @@ export function liveReadyPlan(p: Possibility, names: ReadonlyMap<string, string>
 /** Start an approved live plan and say what landed, for the Needs you outcome. */
 export async function startLiveApproved(
   service: Pick<LiveMakeRealService, "startApproved">,
-  input: { actor: WorkspaceActor; workspaceId: string; possibilityId: string; approvalId: string; title: string },
+  input: { actor: WorkspaceActor; workspaceId: string; possibilityId: string; approvalId: string; title: string; service?: ServiceSession },
 ): Promise<MakeRealRunResult> {
   // A refusal throws; the Needs you source records it as a failed outcome.
   const activation = await service.startApproved(input);

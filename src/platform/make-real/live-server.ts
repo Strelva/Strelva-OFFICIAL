@@ -49,7 +49,7 @@ export async function anyMakeRealChannelEnabled(workspaceId: string): Promise<bo
   return false;
 }
 
-export function liveChannelAdapters(actor: WorkspaceActor, workspaceId: string, google: GoogleMakeRealPorts) {
+export function liveChannelAdapters(actor: WorkspaceActor, workspaceId: string, google: GoogleMakeRealPorts, service?: import("./live").LiveMakeRealServiceContext) {
   const ctx: LiveChannelContext = { actor, enabled: (channel) => makeRealChannelEnabled(workspaceId, channel) };
   return [
     createHostedWebsiteAdapter({
@@ -86,7 +86,7 @@ export function liveChannelAdapters(actor: WorkspaceActor, workspaceId: string, 
       publish: async (a, workId, raw) => (await import("@/products/applications/server")).publishApplication(a, workId, raw),
       rollback: async (a, workId, raw) => (await import("@/products/applications/server")).rollbackApplication(a, workId, raw),
     }, ctx),
-    createGoogleListingAdapter(google, ctx),
+    createGoogleListingAdapter(service && google.forService ? google.forService(service) : google, ctx),
   ];
 }
 
@@ -95,7 +95,7 @@ export function createServerLiveMakeReal(google: GoogleMakeRealPorts) {
     possibilities: (actor) => createSupabasePossibilityRepository(actor),
     activations: (actor) => createSupabaseActivationRepository(actor),
     live: (actor) => createSystemStoreLiveSystems({ store: createSupabaseSystemStore(), content: createSupabaseRevisionContent(actor), actor }),
-    adapters: (actor, workspaceId) => liveChannelAdapters(actor, workspaceId, google),
+    adapters: (actor, workspaceId, service) => liveChannelAdapters(actor, workspaceId, google, service),
     approvals: createNeedsYouApprovalRecords({ read: (workspaceId, itemId) => PostgresNeedsYouStore.read(workspaceId, itemId) }),
     recordService: recordServiceAction,
   });
@@ -202,6 +202,6 @@ export async function readLiveReadyPlans(workspaceId: string): Promise<ReadyPlan
 }
 
 /** Start an approved live plan (the item id is the plan approval). */
-export function startLiveMakeReal(google: GoogleMakeRealPorts, input: { actor: WorkspaceActor; workspaceId: string; possibilityId: string; approvalId: string; title: string }) {
+export function startLiveMakeReal(google: GoogleMakeRealPorts, input: { actor: WorkspaceActor; workspaceId: string; possibilityId: string; approvalId: string; title: string; service?: ServiceSession }) {
   return startLiveApproved(createServerLiveMakeReal(google), input);
 }

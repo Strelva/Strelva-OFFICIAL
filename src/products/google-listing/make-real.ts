@@ -1,22 +1,26 @@
-import { createHash } from "node:crypto";
+import { googleMakeRealDraftDigest } from "./make-real-draft";
+export { googleMakeRealDraftDigest } from "./make-real-draft";
 import { readPublishingSnapshot } from "@/products/publishing/server";
 import { publishingWorkspaceId } from "@/platform/infra/publishing-scope";
 import { getSupabase } from "@/platform/infra/db/client";
-import { canonicalJson } from "@/platform/business-record/tenant-import";
 import { readBusinessRecord } from "@/platform/business-record/service";
 import { tenantPublishingPorts } from "@/platform/infra/tenant-publishing";
 import type { GoogleMakeRealPorts } from "@/platform/make-real/google-adapter";
 import { readGoogleMakeRealReceipt } from "./make-real-receipts";
 import type { ListingReceipt } from "./contracts";
 import { googleTargetAllowed, undoWorkspaceGoogleChange, tenantListingContext } from "./workspace";
+import { checkGoogleMakeRealService, googleServiceActor } from "./make-real-service-authority";
+import type { LiveMakeRealServiceContext } from "@/platform/make-real/live";
+import { undoListingChange } from "./service";
 import { readListingControl } from "./controls";
-/** Hash content and source/authority pins; execution markers are mutable receipts. */
-export function googleMakeRealDraftDigest(metadata: Record<string, unknown>): string {
- return createHash("sha256").update(canonicalJson({workspaceId:metadata.workspaceId,locationId:metadata.locationId,draft:metadata.draft,recordRevision:metadata.recordRevision??null,version:metadata.version??null,maintenance:metadata.maintenance??null})).digest("hex");
-}
-export const googleMakeRealPorts:GoogleMakeRealPorts={
+function createGoogleMakeRealPorts(service?:LiveMakeRealServiceContext):GoogleMakeRealPorts {
+ const ports:GoogleMakeRealPorts={
+ forService:context=>createGoogleMakeRealPorts(context),
  async inspect(actor,businessId,request){
-  if((await readBusinessRecord(actor,businessId)).access!=="owner" || !(await googleTargetAllowed(actor,businessId,request.tenantId)))throw new Error("Current Google owner authority is required.");
+  if (service) {
+   const checked=await checkGoogleMakeRealService({workspaceId:businessId,actorId:googleServiceActor(service),request,context:service});
+   if(checked.userId!==actor.userId || checked.verifiedEmail.toLowerCase()!==actor.verifiedEmail.toLowerCase())throw new Error("Google service identity changed.");
+  } else if((await readBusinessRecord(actor,businessId)).access!=="owner" || !(await googleTargetAllowed(actor,businessId,request.tenantId)))throw new Error("Current Google owner authority is required.");
   const snapshot=await readPublishingSnapshot(actor,businessId);
   const binding=snapshot.bindings.find(binding=>binding.status==="connected" && (binding.originTenantId===request.tenantId || (!binding.originTenantId && publishingWorkspaceId(request.tenantId)===businessId)) && binding.locations.some(location=>location.locationId===request.locationId));
   if(!binding)throw new Error("The selected Google grant was revoked or the location moved.");
@@ -34,13 +38,13 @@ export const googleMakeRealPorts:GoogleMakeRealPorts={
   return {ready,resolved:event.status==="approved",reason:control.paused?"The Google listing is paused.":control.accessPending?"Google project approval or business access is pending.":event.status!=="pending"?"The Google draft is already resolved.":undefined,receipt:receipt?{id:receipt.id,status:receipt.status,readback:receipt.readback,undo:Boolean(receipt.undo)}:null};
  },
  async approve(actor,businessId,request){
-  await googleMakeRealPorts.inspect(actor,businessId,request);
+  await ports.inspect(actor,businessId,request);
   // The existing claimed approval executor owns governance, current authority,
   // provider pacing, record/Version pins, receipts and unknown-effect recovery.
-  return (await tenantPublishingPorts()).resolveEventAction(request.tenantId,request.eventId,"approved",actor.userId);
+  return (await tenantPublishingPorts()).resolveEventAction(request.tenantId,request.eventId,"approved",service?googleServiceActor(service):actor.userId);
  },
  async verify(actor,businessId,request,receiptId){
-  await googleMakeRealPorts.inspect(actor,businessId,request);
+  await ports.inspect(actor,businessId,request);
   const event=await (await tenantPublishingPorts()).getEventRaw(request.eventId);
   const draft=event?.metadata?.draft as {action:string;post?:{summary:string};hours?:unknown;record?:unknown;reviewId?:string;text?:string}|undefined;
   if(!draft)throw new Error("The Google draft is unavailable.");
@@ -62,5 +66,20 @@ export const googleMakeRealPorts:GoogleMakeRealPorts={
   }
   return {ok:matched,detail:matched?"Google currently matches the approved draft.":"Google current readback does not confirm the approved draft."};
  },
- undo:(actor,businessId,request,receiptId)=>undoWorkspaceGoogleChange(actor,{workspaceId:businessId,tenantId:request.tenantId,locationId:request.locationId,receiptId}),
-};
+ async undo(actor,businessId,request,receiptId){
+  if(!service)return undoWorkspaceGoogleChange(actor,{workspaceId:businessId,tenantId:request.tenantId,locationId:request.locationId,receiptId});
+  const state=await ports.inspect(actor,businessId,request);
+  if(state.receipt?.id!==receiptId)throw new Error("Google undo receipt changed.");
+  const actorId=googleServiceActor(service);
+  const recheck=async()=>{await checkGoogleMakeRealService({workspaceId:businessId,actorId,request,context:service,mode:"undo"});};
+  await recheck();
+  const ctx=await tenantListingContext(request.tenantId,businessId,request.locationId);
+  const original=await ctx.receipts.get(receiptId,businessId);
+  if(!original || original.authority.kind!=="owner_approval" || original.authority.approvalRef!==request.eventId)throw new Error("Google undo instruction changed.");
+  ctx.authorizeService=recheck;
+  return undoListingChange(ctx,{receiptId,authority:{kind:"owner_undo",actor:actorId},retryFailed:true});
+ },
+ };
+ return ports;
+}
+export const googleMakeRealPorts=createGoogleMakeRealPorts();

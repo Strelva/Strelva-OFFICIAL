@@ -82,7 +82,7 @@ export interface MakeRealSourcePorts {
   livePlans?(workspaceId: string): Promise<ReadyPlan[]>;
   policies(actor: WorkspaceActor, workspaceId: string): Promise<PolicySetting[]>;
   /** Make real's own resolver, started with the owner's plan approval. Null: the plan is no longer this business's. */
-  start(actor: WorkspaceActor, workspaceId: string, possibilityId: string, approvalId: string): Promise<MakeRealRunResult | null>;
+  start(actor: WorkspaceActor, workspaceId: string, possibilityId: string, approvalId: string, service?: ServiceSession): Promise<MakeRealRunResult | null>;
   /**
    * Logs Strelva (system)'s one run under a `make_real_link` session before
    * Make real starts (record_strelva_service_action). Without it, a link
@@ -186,7 +186,7 @@ export function makeRealAdapter(ports: MakeRealSourcePorts): SourceAdapter {
       }
       let result: MakeRealRunResult | null;
       try {
-        result = await ports.start(actor, ctx.workspaceId, source.possibilityId, item.id);
+        result = service ? await ports.start(actor, ctx.workspaceId, source.possibilityId, item.id, service) : await ports.start(actor, ctx.workspaceId, source.possibilityId, item.id);
       } catch (error) {
         return { outcome: "failed", reason: `make_real_refused: ${error instanceof Error ? error.message : "unknown"}`.slice(0, 500) };
       }

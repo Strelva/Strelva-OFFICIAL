@@ -87,12 +87,12 @@ function makeRealSource(store: NeedsYouStore, google: GoogleMakeRealPorts | unde
     policies: (actor, workspaceId) => store.policies(actor, workspaceId),
     // The one logged run for an owner with no account (owner-entry decision 6).
     recordLinkRun: (session, subject, detail) => recordServiceAction(session, "run", subject, detail),
-    async start(actor, workspaceId, possibilityId, approvalId) {
+    async start(actor, workspaceId, possibilityId, approvalId, service) {
       const live = (await liveReadyPlans(workspaceId)).find((plan) => plan.possibilityId === possibilityId);
       if (live) {
         const { startLiveMakeReal } = await import("@/platform/make-real/live-server");
         if (!google) throw new Error("Google Make real composition is unavailable.");
-        return startLiveMakeReal(google, { actor, workspaceId, possibilityId, approvalId, title: live.title });
+        return startLiveMakeReal(google, { actor, workspaceId, possibilityId, approvalId, title: live.title, ...(service ? { service } : {}) });
       }
       const result = await makeRealForWorkspace(await liveDeps(actor, workspaceId), possibilityId, { canActivate: true }, {
         planApproval: { approvalId, approvals: needsYouMakeRealApprovals((ws, id) => store.read(ws, id)) },

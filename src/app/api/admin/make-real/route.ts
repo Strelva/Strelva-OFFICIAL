@@ -62,9 +62,9 @@ export async function POST(request: Request) {
       const { recordServiceAction } = await import("@/platform/needs-you/service-actor");
       await recordServiceAction(service, input.action, `activation:${input.activationId}`, note);
     }
-    const activation = input.action === "resume" ? await liveMakeReal.resume(actor, input.workspaceId, input.activationId, note)
-      : input.action === "rollback" ? await liveMakeReal.rollback(actor, input.workspaceId, input.activationId, note)
-        : await liveMakeReal.reconcile(actor, input.workspaceId, input.activationId, { stepId: input.stepId, resolution: input.resolution, evidence: input.evidence, ...(input.providerRef ? { providerRef: input.providerRef } : {}), note });
+    const activation = input.action === "resume" ? await liveMakeReal.resume(actor, input.workspaceId, input.activationId, note, service ?? undefined)
+      : input.action === "rollback" ? await liveMakeReal.rollback(actor, input.workspaceId, input.activationId, note, service ?? undefined)
+        : await liveMakeReal.reconcile(actor, input.workspaceId, input.activationId, { stepId: input.stepId, resolution: input.resolution, evidence: input.evidence, ...(input.providerRef ? { providerRef: input.providerRef } : {}), note }, service ?? undefined);
     return NextResponse.json({ activation, view: describeActivation(activation) }, { headers: noStore });
   } catch (error) {
     return failure(error);

@@ -51,3 +51,11 @@ it("settles an unsent undo when its snapshot expires during the final authority 
  expect(result).toMatchObject({status:"failed",receipt:{status:"failed",undo:null,error:"The saved Google snapshot expired before the write. Nothing was sent."}});
  expect(client.patchLocation).not.toHaveBeenCalled();expect(store.all().filter(row=>row.status==="posting")).toHaveLength(0);
 });
+
+it("rechecks service authority before dispatch and settles an unsent revoked approval",async()=>{
+ const store=createMemoryReceiptStore();let checks=0;
+ const authorizeService=vi.fn(async()=>{if(++checks===2)throw new Error("owner instruction revoked");});
+ const client={getReview:vi.fn(async()=>({ok:true,data:{reviewId:"review",starRating:"FIVE"}})),updateReply:vi.fn()};
+ const result=await postReviewReply({workspaceId:"workspace",bindingId:"binding",location:{locationId:"location"},receipts:store,client,authorizeService} as unknown as ListingContext,{reviewId:"review",text:"Owner authored",authority:input.authority});
+ expect(result).toMatchObject({status:"failed",receipt:{status:"failed",undo:null}});expect(client.updateReply).not.toHaveBeenCalled();expect(authorizeService).toHaveBeenCalledTimes(2);
+});
