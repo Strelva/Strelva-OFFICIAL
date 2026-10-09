@@ -77,7 +77,7 @@ export function NoSiteCard({ body }: { body: string }) {
 
 export function SiteHeading({ id, name, multiple }: { id: string; name: string; multiple: boolean }) {
   return multiple
-    ? <h2 id={id} className="mb-3 text-lg font-medium">{name}</h2>
+    ? <h2 id={id} className="mb-3 min-w-0 break-words text-lg font-medium">{name}</h2>
     : <h2 id={id} className="sr-only">{name}</h2>;
 }
 

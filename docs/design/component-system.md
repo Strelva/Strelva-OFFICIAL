@@ -1296,3 +1296,5 @@ publication; independent read-only block checks keep the uncertainty visible.
 Successful connection/verification recovers a removed initiating control to the
 mounted instruction/connected heading, with the same outside-focus safeguard.
 The heading is programmatically focusable and does not add a Tab stop.
+
+The owned `SiteHeading` wraps uninterrupted site names within its available width. Actual inquiry DOM measurements at 320px with 200% root text located a 373px text range inside a 256px heading, extending document width to 405px. Wrapping changes presentation only; complete corrected browser acceptance remains required.
