@@ -16,6 +16,10 @@ const parent = dirname(evidence), stat = lstatSync(parent);
 if (!stat.isDirectory() || stat.isSymbolicLink() || stat.uid !== process.getuid() || (stat.mode & 0o777) !== 0o700 || realpathSync(parent) !== parent) throw new Error("Evidence parent must be canonical, private and owned by this user.");
 mkdirSync(evidence, { mode: 0o700 });
 const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("PG")));
+// A reviewed owned clone may require its private local credential. Keep it out
+// of URL/argv and discard ambient libpq overrides before mapping this one secret.
+if (process.env.STRELVA_CHECKOUT_RACE_PASSWORD) env.PGPASSWORD = process.env.STRELVA_CHECKOUT_RACE_PASSWORD;
+delete env.STRELVA_CHECKOUT_RACE_PASSWORD;
 const args = [db, "-X", "-qAt", "-v", "ON_ERROR_STOP=1"];
 const literal = value => `'${String(value).replaceAll("'", "''")}'`;
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
