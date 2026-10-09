@@ -23,7 +23,7 @@ type Investigation = z.infer<typeof investigationSchema>;
 type InvestigationSource = z.infer<typeof investigationSourceSchema>;
 type Spec = z.infer<typeof applicationSpecSchema>;
 type Saved = { id: string; payload: Application | Schedule | Investigation };
-type Props = { initialRequest?: string; workspaceId: string; workId?: string; productId: Product; readOnly?: boolean; canManage?: boolean; draftEditOnly?: boolean; workspaceStopped?: boolean; calendarRecoveryAllowed?: boolean; sources: WorkspaceWork[]; onSaved: (id: string) => void };
+type Props = { initialRequest?: string; workspaceId: string; workId?: string; productId: Product; readOnly?: boolean; canManage?: boolean; canEdit?: boolean; draftEditOnly?: boolean; workspaceStopped?: boolean; calendarRecoveryAllowed?: boolean; sources: WorkspaceWork[]; onSaved: (id: string) => void };
 type Command = (command: Record<string, unknown>, action?: "command" | "run") => Promise<boolean>;
 const labels = { applications: "Internal tool", scheduling: "Reservations", investigations: "Website monitoring" };
 const control = "block w-full rounded-xl border border-gray-border bg-surface px-3 py-2 text-sm min-h-11";
@@ -86,7 +86,7 @@ export function BoundedWorkExperience(props: Props) {
   const onSaved = props.workId ? props.onSaved : (id: string) => { intent.spend(props.productId); props.onSaved(id); };
   return <Session key={`${props.workspaceId}:${props.workId ?? "new"}:${props.productId}`} {...props} onSaved={onSaved} initialRequest={props.initialRequest || (!props.workId ? intentRequestFor(intent, props.productId) : undefined)} />;
 }
-function Session({ initialRequest, workspaceId, workId, productId, readOnly = false, draftEditOnly = false, canManage = !readOnly || draftEditOnly, workspaceStopped = false, calendarRecoveryAllowed = false, sources, onSaved }: Props) {
+function Session({ initialRequest, workspaceId, workId, productId, readOnly = false, draftEditOnly = false, canManage = !readOnly || draftEditOnly, canEdit = draftEditOnly, workspaceStopped = false, calendarRecoveryAllowed = false, sources, onSaved }: Props) {
   const request = useWorkspaceRequest();
   const [saved, setSaved] = useState<Saved | null>(null);
   const [busy, setBusy] = useState(false);
@@ -141,9 +141,9 @@ function Session({ initialRequest, workspaceId, workId, productId, readOnly = fa
     {error ? <div role="alert" className="space-y-2 text-sm text-critical"><p>{error}</p>{workId ? <Button variant="secondary" disabled={busy} onClick={() => setReload(value => value + 1)}>Reload current work</Button> : null}</div> : null}
     {notice ? <p role="status" className="text-sm">{notice}</p> : null}
     {handingOff && saved ? <p role="status" className="text-sm text-gray-muted">Saved. Opening your work before the next change. <a className="underline underline-offset-4" href={`?workspaceId=${encodeURIComponent(workspaceId)}&view=${productId}&work=${encodeURIComponent(saved.id)}`}>Open saved work</a></p> : workId && !saved ? <p role="status">{busy ? "Loading your work…" : "No result is available to display."}</p> : saved ? <>
-      {productId === "applications" ? <ApplicationResult value={saved.payload as Application} workId={saved.id} canManage={canManage} draftEditOnly={draftEditOnly} disabled={disabled} command={command} /> : productId === "scheduling" ? <ScheduleResult value={saved.payload as Schedule} canManage={canManage} disabled={disabled} calendarRecoveryAllowed={calendarRecoveryAllowed} command={command} workspaceId={workspaceId} workId={saved.id} onChanged={() => setReload(value => value + 1)} /> : <InvestigationResult value={saved.payload as Investigation} disabled={disabled} command={command} sources={sources} workspaceId={workspaceId} />}
+      {productId === "applications" ? <ApplicationResult value={saved.payload as Application} workId={saved.id} canManage={canManage} canEdit={canEdit} draftEditOnly={draftEditOnly} disabled={disabled} command={command} /> : productId === "scheduling" ? <ScheduleResult value={saved.payload as Schedule} canManage={canManage} disabled={disabled} calendarRecoveryAllowed={calendarRecoveryAllowed} command={command} workspaceId={workspaceId} workId={saved.id} onChanged={() => setReload(value => value + 1)} /> : <InvestigationResult value={saved.payload as Investigation} disabled={disabled} command={command} sources={sources} workspaceId={workspaceId} />}
       <details className={group}><summary className="cursor-pointer text-sm">History and responsibility</summary><p className="text-sm text-gray-muted">Revision {saved.payload.revision}. Created {time(saved.payload.createdAt)}.</p>{productId === "applications" ? <p className="break-all text-sm">Maintenance owner: {(saved.payload as Application).spec.maintenanceOwner}</p> : null}<ol className="space-y-2 text-sm">{saved.payload.history.slice().reverse().map(item => <li key={item.revision}>{item.kind.replaceAll("_", " ")} · {time(item.at)}<span className="block break-all text-gray-muted">Recorded actor: {item.actorId}</span></li>)}</ol></details>
-    </> : !readOnly && canManage ? <>{productId === "applications" ? <CopyApplication sources={sources} disabled={disabled} copy={sourceWorkId => write({ action: "from_source", workspaceId, sourceWorkId })} /> : null}<Create productId={productId} sources={sources} disabled={disabled} create={input => write({ action: "create", workspaceId, input })} /></> : null}
+    </> : !readOnly && canManage && (productId !== "applications" || canEdit) ? <>{productId === "applications" ? <CopyApplication sources={sources} disabled={disabled} copy={sourceWorkId => write({ action: "from_source", workspaceId, sourceWorkId })} /> : null}<Create productId={productId} sources={sources} disabled={disabled} create={input => write({ action: "create", workspaceId, input })} /></> : !readOnly && canManage && productId === "applications" ? <p className="text-sm text-gray-muted">Ask your provider to create or copy an internal tool.</p> : null}
   </section>;
 }
 
@@ -305,7 +305,7 @@ function recordImpact(value: Application, candidateVersion: number): string {
   return check.passed ? "Passed. Record compatibility check passed for this proposal. Publishing checks the latest records again and does not delete them." : "Failed. One or more existing records do not fit this proposal.";
 }
 
-function ApplicationReview({ value, command, disabled, canPublish = true }: { value: Application; command: Command; disabled: boolean; canPublish?: boolean }) {
+function ApplicationReview({ value, command, disabled, canPublish = true, canEdit = false }: { value: Application; command: Command; disabled: boolean; canPublish?: boolean; canEdit?: boolean }) {
   const id = useId();
   const liveRelease = value.status === "retired" ? null : value.release ?? null;
   const proposed = value.candidate?.spec ?? value.spec;
@@ -323,16 +323,16 @@ function ApplicationReview({ value, command, disabled, canPublish = true }: { va
       <section aria-labelledby={`${id}-records`} className="space-y-2"><h3 id={`${id}-records`} className="font-medium">Existing records</h3><p className="text-sm text-gray-muted">{recordImpact(value, proposedVersion)}</p></section>
       {rehearsal ? <section aria-labelledby={`${id}-checks`} className="space-y-2"><h3 id={`${id}-checks`} className="font-medium">Checks for proposed version {proposedVersion}</h3><ul className="space-y-1 text-sm">{rehearsal.checks.map(check => <li key={check.name}>{check.passed ? "Passed" : "Failed"}: {check.name}</li>)}</ul></section> : null}
       <div className="flex flex-wrap gap-3">
-        {!checksPassed ? <Button variant="secondary" disabled={disabled} onClick={() => void command({ kind: "rehearse", expectedDesignRevision: value.candidate?.designRevision ?? value.designRevision ?? 0 })}>{rehearsal ? "Run checks again" : "Check proposed change"}</Button> : null}
+        {canEdit && !checksPassed ? <Button variant="secondary" disabled={disabled} onClick={() => void command({ kind: "rehearse", expectedDesignRevision: value.candidate?.designRevision ?? value.designRevision ?? 0 })}>{rehearsal ? "Run checks again" : "Check proposed change"}</Button> : null}
         {canPublish ? <Button disabled={disabled || !checksPassed} onClick={() => void command({ kind: "publish", expectedCandidateRevision: value.candidate?.designRevision ?? value.designRevision ?? 0, expectedReleaseVersion: liveRelease?.version ?? null })}>Publish</Button> : null}
       </div>
-      {!checksPassed ? <p className="text-sm text-gray-muted">{canPublish ? "Publish is available after every check passes." : "The customer can publish after every check passes."}</p> : null}
+      {!checksPassed ? <p className="text-sm text-gray-muted">{canPublish ? canEdit ? "Publish is available after every check passes." : "Ask your provider to run the checks before you publish." : "The customer can publish after every check passes."}</p> : null}
       {!canPublish && checksPassed ? <p className="text-sm text-gray-muted">Checks passed. Return this draft to the customer for review and publication.</p> : null}
     </div>
   </details>;
 }
 
-function ApplicationResult({ value, workId, canManage, draftEditOnly = false, command, disabled }: { value: Application; workId: string; canManage: boolean; draftEditOnly?: boolean; command: Command; disabled: boolean }) {
+function ApplicationResult({ value, workId, canManage, canEdit, draftEditOnly = false, command, disabled }: { value: Application; workId: string; canManage: boolean; canEdit: boolean; draftEditOnly?: boolean; command: Command; disabled: boolean }) {
   const [section, setSection] = useState(draftEditOnly ? "edit" : "use");
   const [values, setValues] = useState<Record<string, string | number | boolean>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -363,7 +363,7 @@ function ApplicationResult({ value, workId, canManage, draftEditOnly = false, co
     <div className="flex flex-wrap items-center justify-between gap-3">
       <Tabs aria-label="Application workspace" value={section} onChange={setSection} items={[
         { value: "use", label: liveRelease ? "Use" : "Preview", id: `${id}-use-tab`, panelId: `${id}-use-panel` },
-        ...(canManage ? [{ value: "edit", label: "Edit", id: `${id}-edit-tab`, panelId: `${id}-edit-panel` }] : []),
+        ...(canManage ? [{ value: "edit", label: canEdit ? "Edit" : "Review", id: `${id}-edit-tab`, panelId: `${id}-edit-panel` }] : []),
         ...(canManage && !draftEditOnly ? [{ value: "sharing", label: "Sharing", id: `${id}-sharing-tab`, panelId: `${id}-sharing-panel` }] : []),
       ]} />
       {canManage && !liveRelease && section === "use" ? <Button variant="secondary" onClick={() => setSection("edit")}>Review and publish</Button> : null}
@@ -382,11 +382,11 @@ function ApplicationResult({ value, workId, canManage, draftEditOnly = false, co
     </section> : <ApplicationDraftPreview spec={value.candidate?.spec || value.spec} />}
     </TabsPanel>
     {canManage ? <TabsPanel id={`${id}-edit-panel`} tabId={`${id}-edit-tab`} active={section === "edit" && canManage}>
-    <ApplicationReview value={value} command={command} disabled={disabled} canPublish={!draftEditOnly} />
-    {!draftEditOnly && value.installation ? <SourceUpdate key={value.installation.sourceVersion} value={value} command={command} disabled={disabled} /> : null}
-    <EditApplicationSpec key={value.specVersion} value={value} command={command} disabled={disabled} />
+    <ApplicationReview value={value} command={command} disabled={disabled} canPublish={!draftEditOnly} canEdit={canEdit} />
+    {canEdit && !draftEditOnly && value.installation ? <SourceUpdate key={value.installation.sourceVersion} value={value} command={command} disabled={disabled} /> : null}
+    {canEdit ? <EditApplicationSpec key={value.specVersion} value={value} command={command} disabled={disabled} /> : null}
     {!draftEditOnly && (value.releases?.length ?? 0) > 1 && liveRelease ? <details className={group}><summary className="cursor-pointer text-sm">Restore an earlier live version</summary><p className="text-sm text-gray-muted">This changes the version people use now. Existing records and their attribution remain in place.</p><label className="text-sm">Released version<select className={control} value={priorRelease} disabled={disabled} onChange={event => setPriorRelease(event.target.value)}><option value="">Choose a released version</option>{value.releases?.filter(release => release.version !== liveRelease.version).map(release => <option key={release.version} value={release.version}>Version {release.version}: {release.spec.title}</option>)}</select></label><Button variant="secondary" disabled={disabled || !priorRelease} onClick={() => void command({ kind: "rollback_release", expectedDesignRevision: value.candidate?.designRevision ?? value.designRevision ?? 0, expectedReleaseVersion: liveRelease.version, version: Number(priorRelease) })}>Restore released version</Button></details> : null}
-    {!draftEditOnly && value.versions.length > 1 ? <details className={group}><summary className="cursor-pointer text-sm">Use an earlier version as a proposed change</summary><p className="text-sm text-gray-muted">This prepares an earlier version for review. It does not change the live app until you check and publish it. Existing records remain.</p><label className="text-sm">Earlier version<select className={control} value={priorVersion} disabled={disabled} onChange={event => setPriorVersion(event.target.value)}><option value="">Choose a version</option>{value.versions.filter(version => version.version !== value.specVersion).map(version => <option key={version.version} value={version.version}>Version {version.version}: {version.spec.title}</option>)}</select></label><Button variant="secondary" disabled={disabled || !priorVersion} onClick={() => void command({ kind: "rollback", version: Number(priorVersion) })}>Use version as proposed change</Button></details> : null}
+    {canEdit && !draftEditOnly && value.versions.length > 1 ? <details className={group}><summary className="cursor-pointer text-sm">Use an earlier version as a proposed change</summary><p className="text-sm text-gray-muted">This prepares an earlier version for review. It does not change the live app until you check and publish it. Existing records remain.</p><label className="text-sm">Earlier version<select className={control} value={priorVersion} disabled={disabled} onChange={event => setPriorVersion(event.target.value)}><option value="">Choose a version</option>{value.versions.filter(version => version.version !== value.specVersion).map(version => <option key={version.version} value={version.version}>Version {version.version}: {version.spec.title}</option>)}</select></label><Button variant="secondary" disabled={disabled || !priorVersion} onClick={() => void command({ kind: "rollback", version: Number(priorVersion) })}>Use version as proposed change</Button></details> : null}
     </TabsPanel> : null}
     {canManage && !draftEditOnly ? <TabsPanel id={`${id}-sharing-panel`} tabId={`${id}-sharing-tab`} active={section === "sharing"}>
       <ApplicationAccessControls workId={workId} status={value.status} hasRelease={Boolean(value.release)} canManage={canManage} disabled={disabled} />

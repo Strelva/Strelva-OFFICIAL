@@ -51,7 +51,7 @@ export function AgencyApplicationDraftExperience({ workId }: { workId: string })
       {busy ? <p role="status">Checking the current draft permission…</p> : null}
       {error ? <div role="alert" className="mb-5 space-y-2 text-sm text-critical"><p>{error}</p><Button variant="secondary" onClick={() => { setBusy(true); setError(""); setReload(value => value + 1); }}>Reload permission</Button></div> : null}
       {!busy && !error && !active ? <p role="status" className="mb-5 max-w-2xl rounded-xl border border-gray-border p-4 text-sm text-gray-muted">The customer has not granted draft editing for this application, or the grant has expired or been revoked. You can inspect the assigned work when its delivery is active, but you cannot save a draft revision.</p> : null}
-      {!busy ? <BoundedWorkExperience workspaceId="assigned" workId={workId} productId="applications" readOnly={!active} draftEditOnly={active} sources={[]} onSaved={() => undefined} /> : null}
+      {!busy ? <BoundedWorkExperience workspaceId="assigned" workId={workId} productId="applications" readOnly={!active} draftEditOnly={active} canEdit={active} sources={[]} onSaved={() => undefined} /> : null}
     </div>
   </main>;
 }

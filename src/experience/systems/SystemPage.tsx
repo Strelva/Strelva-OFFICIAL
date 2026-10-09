@@ -46,6 +46,8 @@ export interface SystemPageProps {
   versionReadOnly?: boolean;
   /** Runtime use can remain available to members who cannot manage the System. */
   useReadOnly?: boolean;
+  /** Current maker authority; release management alone does not grant design or rehearsal. */
+  canEditApplications?: boolean;
   rebuildEnabled?: boolean;
   managed?: boolean;
   /** Managed website tooling is available only to a Strelva operator. */
@@ -203,7 +205,7 @@ export function websiteSandbox(src: string): string {
   }
 }
 
-function SystemSurface({ system, workspaceId, readOnly, useReadOnly = readOnly, rebuildEnabled, managed, agency, sources, localPreview, workspaceStopped, calendarRecoveryAllowed, inquiryAdapter, inquiryInbox }: SystemPageProps & { system: SystemView }) {
+function SystemSurface({ system, workspaceId, readOnly, versionReadOnly, useReadOnly = readOnly, canEditApplications = false, rebuildEnabled, managed, agency, sources, localPreview, workspaceStopped, calendarRecoveryAllowed, inquiryAdapter, inquiryInbox }: SystemPageProps & { system: SystemView }) {
   const noop = () => undefined;
   if (system.surface.kind === "inquiries") {
     if (inquiryInbox) return <WorkspaceInquirySystem key={workspaceId} workspaceId={workspaceId} />;
@@ -216,7 +218,9 @@ function SystemSurface({ system, workspaceId, readOnly, useReadOnly = readOnly, 
   if (system.surface.kind !== "work") return null;
   const { workId, productId } = system.surface;
   if (productId === "home_finder") return <div className="p-6"><h2 className="text-sm font-semibold">HomeFinder</h2><p className="mt-2 text-sm text-gray-muted">Open the licensed search settings and installation evidence for this business.</p><a className={styles.linkAction} href={`/workspace/home-finder?${new URLSearchParams({ workspaceId })}`}>Open HomeFinder<ArrowUpRight size={16} aria-hidden="true" /></a></div>;
-  if (productId === "applications" || productId === "scheduling") return <BoundedWorkExperience key={workId} workspaceId={workspaceId} workId={workId} productId={productId} sources={[...sources]} readOnly={useReadOnly} canManage={!readOnly} workspaceStopped={workspaceStopped} calendarRecoveryAllowed={calendarRecoveryAllowed} onSaved={noop} />;
+  const creatorDraft = productId === "applications" && sources.some(source => source.id === workId && source.creatorDraft === true);
+  const draftEditOnly = creatorDraft && !workspaceStopped && versionReadOnly === false;
+  if (productId === "applications" || productId === "scheduling") return <BoundedWorkExperience key={workId} workspaceId={workspaceId} workId={workId} productId={productId} sources={[...sources]} readOnly={draftEditOnly ? false : useReadOnly} canManage={draftEditOnly || !readOnly} canEdit={draftEditOnly || (canEditApplications && !readOnly)} draftEditOnly={draftEditOnly} workspaceStopped={workspaceStopped} calendarRecoveryAllowed={calendarRecoveryAllowed} onSaved={noop} />;
   if (productId === "custom-applications") return <CustomApplicationManageExperience key={workId} workId={workId} readOnly={readOnly} />;
   if (productId === "documents" && !localPreview) return <DocumentExperience key={workId} workspaceId={workspaceId} workId={workId} readOnly={readOnly} onSaved={noop} sources={[...sources]} />;
   if (productId === "tracker" && !localPreview) return <TrackerExperience key={workId} workspaceId={workspaceId} workId={workId} readOnly={readOnly} onSaved={noop} />;
