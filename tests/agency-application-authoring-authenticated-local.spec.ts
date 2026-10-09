@@ -313,6 +313,14 @@ test("a named agency operator revises one assigned application and returns it fo
     await expect(agencyPage.getByRole("button", { name: "Publish", exact: true })).toHaveCount(0);
 
     await customerPage.bringToFront();
+    // Reopen the actual saved request after publication/operator navigation.
+    // Its delivery selection is local to the Help form and must be restored
+    // before confirming the completed receipt, regardless of dev tab refreshes.
+    await customerPage.goto(`/workspace?workspaceId=${businessId}&view=help`, { waitUntil: "domcontentloaded" });
+    await expect(customerPage.getByRole("heading", { name: "What do you need?", exact: true })).toBeVisible();
+    await customerPage.getByRole("button", { name: /Prepare the exact permit request application/ }).click();
+    await expect(customerPage.locator(`#delivery-controls-${serviceRequest.request.id}`)).toBeVisible();
+    await customerPage.getByRole("button", { name: "Review delivery options", exact: true }).click();
     await customerPage.getByRole("textbox", { name: "Customer review", exact: true }).fill("Verified the agency receipt and published the returned draft.");
     await customerPage.getByRole("button", { name: "Confirm completed delivery", exact: true }).click();
     await expect(customerPage.getByText("The completed delivery is confirmed and linked to this request.", { exact: true })).toBeVisible();
