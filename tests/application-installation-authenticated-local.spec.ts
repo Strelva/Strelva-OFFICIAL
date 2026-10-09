@@ -217,24 +217,47 @@ test("independently owned businesses install and update definitions without copy
       // then ended with both Strict Mode requests pending. Bound arrival and the
       // actual response separately; keep the original 180-second whole-job cap.
       const observed = observeBrowserRead(ownerPage, request => request.method() === "GET" && isOwnerWorkUrl(request.url()), { arrivalMs: 10_000, responseMs: 10_000 });
+      // The Version sidebar reads independently of the application. The retained
+      // failure had this exact read pending after the application returned 200.
+      const versionObserved = observeBrowserRead(ownerPage, request => {
+        const url = new URL(request.url());
+        return request.method() === "GET" && url.origin === new URL(env.app).origin
+          && url.pathname === "/api/workspace/versions"
+          && url.searchParams.get("workspaceId") === customerSpace
+          && url.searchParams.get("systemId") === target.systemId;
+      }, { arrivalMs: 10_000, responseMs: 10_000 });
       let actualRead: Awaited<typeof observed.promise>;
+      let actualVersionRead: Awaited<typeof versionObserved.promise>;
       try {
-        [actualRead] = await Promise.all([
+        [actualRead, actualVersionRead] = await Promise.all([
           observed.promise,
+          versionObserved.promise,
           ownerPage.goto(`/workspace?workspaceId=${customerSpace}&view=system&system=${target.systemId}`),
         ]);
-      } finally { observed.cancel(); }
+      } finally { observed.cancel(); versionObserved.cancel(); }
       const ownerWork = actualRead.response;
+      const ownerVersion = actualVersionRead.response;
+      expect(ownerVersion.request()).toBe(actualVersionRead.request);
+      expect(ownerVersion.status(), "The owner's exact Version browser read must succeed before comparing its prepared alternative.").toBe(200);
+      const versionView = await ownerVersion.json();
+      expect(versionView).toMatchObject({ workspaceId: customerSpace, systemId: target.systemId, versionId: target.versionId });
       expect(ownerWork.request()).toBe(actualRead.request);
       expect(ownerWork.status(), "The owner's exact application browser read must succeed before checking its controls.").toBe(200);
       await info.attach(`owner-system-read-${randomUUID()}`, { contentType: "application/json", body: Buffer.from(JSON.stringify({
         exactWorkId: target.workId, status: ownerWork.status(), requestArrivalMs: actualRead.arrivalMs,
-        responseAfterArrivalMs: actualRead.responseMs, originalCaseBudgetMs: 180_000,
+        responseAfterArrivalMs: actualRead.responseMs,
+        exactVersionRead: { versionId: versionView.versionId, workspaceId: versionView.workspaceId, systemId: versionView.systemId,
+          rowRevision: versionView.rowRevision, status: ownerVersion.status(), requestArrivalMs: actualVersionRead.arrivalMs,
+          responseAfterArrivalMs: actualVersionRead.responseMs }, originalCaseBudgetMs: 180_000,
         productionQualification: false,
       })) });
-      return ownerWork.json();
+      return { work: await ownerWork.json(), version: versionView };
     }
-    const ownerBeforeB = await readOwnerSystem();
+    const { work: ownerBeforeB, version: ownerVersionBeforeB } = await readOwnerSystem();
+    expect(ownerVersionBeforeB).toMatchObject({ rowRevision: current.rowRevision, pendingRelease: {
+      rowRevision: current.rowRevision, decisionRevision: pendingB.revisionHash,
+      makeReal: { kind: "version_release", versionId: target.versionId },
+    } });
     expect(ownerBeforeB.payload.release).toEqual(installed.payload.release);
     expect(ownerBeforeB.payload.records).toEqual(installed.payload.records);
     const pendingVersion = ownerPage.getByLabel("Version possibilities", { exact: true });
@@ -272,7 +295,8 @@ test("independently owned businesses install and update definitions without copy
     expect(installed.payload.records).toEqual([{ id: "customer-record", values: { problem: "Customer business record" } }]);
     expect(installed.payload.candidate.spec).toEqual(installed.payload.release.spec);
     // A live B has no pending application change to approve a second time.
-    const ownerAfterB = await readOwnerSystem();
+    const { work: ownerAfterB, version: ownerVersionAfterB } = await readOwnerSystem();
+    expect(ownerVersionAfterB.pendingRelease).toBeNull();
     expect(ownerAfterB.payload.release).toEqual(installed.payload.release);
     expect(ownerAfterB.payload.records).toEqual(installed.payload.records);
     await expect(ownerPage.getByText("Version 2 is the version people use now.", { exact: true })).toBeVisible();
