@@ -161,7 +161,7 @@ async function workspaceWebsiteBlockers(tenantId: string): Promise<{ publication
   if (!call) throw new Error("tenant_teardown_blockers_unavailable");
   const { data, error } = await call("tenant_cleanup_teardown_blockers", { p_tenant_id: tenantId });
   if (error) throw new Error(`tenant_teardown_blockers: ${error.message}`);
-  const count = z.union([z.number(), z.string().regex(/^\d+$/)]).pipe(z.coerce.number().int().nonnegative());
+  const count = z.union([z.number(), z.string().regex(/^\d+$/)]).transform(value => Number(value)).pipe(z.number().int().nonnegative());
   const row = z.object({ publications: count, reservations: count, booking_grants: count, bookings: count })
     .safeParse(Array.isArray(data) ? data[0] : data);
   if (!row.success) throw new Error("tenant_teardown_blockers_unavailable");
@@ -489,7 +489,7 @@ async function finishCleanup(opts: DeprovisionOptions, receipt: CleanupReceipt, 
       for (const key of keys) {
         const field = key.startsWith("reb:invites:") ? "tenant"
           : key.startsWith("event:") || key.startsWith("reb:inquiry-reply-target:") ? "tenantId" : null;
-        const removed = field ? await redis.eval<number>(REMOVE_OWNED_KEY, [key], [tenantId, field]) : await redis.del(key);
+        const removed = field ? await redis.eval<[string, string], number>(REMOVE_OWNED_KEY, [key], [tenantId, field]) : await redis.del(key);
         if (typeof removed !== "number") throw new Error("tenant_cleanup_delete_unconfirmed");
         summary.redis!.push({ target: key, found: 1, deleted: removed > 0, ...(removed > 0 ? {} : { detail: "already absent or owned by another tenant" }) });
       }

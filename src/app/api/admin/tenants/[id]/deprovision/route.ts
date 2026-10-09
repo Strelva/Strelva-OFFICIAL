@@ -97,7 +97,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const result = await runDeprovision({
     tenantId: id,
-    tenant,
+    tenant: tenant ?? null,
     dryRun: false,
     force: false,
     keepVercel: false,
