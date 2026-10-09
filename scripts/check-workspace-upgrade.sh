@@ -515,6 +515,11 @@ check_full_model_current_tail
 source "$repo_root/tests/support/runtime-data-tenant-generation-races.sh"
 check_tenant_connection_generation_lifecycle
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022090000_guarded_tenant_teardown.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022090100_tenant_cleanup_receipts.sql"
+psql "${psql_args[@]}" --set=keep_fixture=true --file="$repo_root/tests/tenant-cleanup-receipts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-cleanup-blockers-readonly.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022120000_agency_created_application_authority.sql"
+psql "${psql_args[@]}" --file="$repo_root/scripts/sql/agency-created-application-authority-contract.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/guarded-tenant-teardown-schema.sql"
 
 # #251: final-schema support reads and contact repair require durable actor audit.

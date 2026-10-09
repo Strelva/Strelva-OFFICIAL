@@ -1717,6 +1717,11 @@ source "$repo_root/tests/support/runtime-data-tenant-generation-races.sh"
 check_tenant_connection_generation_lifecycle
 # Saved-main guarded teardown composes final export/retention owners.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022090000_guarded_tenant_teardown.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022090100_tenant_cleanup_receipts.sql"
+psql "${psql_args[@]}" --set=keep_fixture=true --file="$repo_root/tests/tenant-cleanup-receipts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-cleanup-blockers-readonly.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261022120000_agency_created_application_authority.sql"
+psql "${psql_args[@]}" --file="$repo_root/scripts/sql/agency-created-application-authority-contract.sql"
 # Full legacy teardown behavior is proved by check-guarded-teardown-fresh.sh.
 # This historical fixture deliberately lacks parts of the pre-workspace schema.
 # Qualify #272 against the final booking functions in a disposable clone so

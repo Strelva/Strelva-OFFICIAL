@@ -1,6 +1,6 @@
 {
-  "source": "a7c6b715 (composed forward inventory; execution qualification pending)",
-  "forwardCount": 335,
+  "source": "06010ce4 (composed forward inventory; execution qualification pending)",
+  "forwardCount": 337,
   "workspaceBoundary": "20260905190000_release_one_workspaces.sql",
   "focusedLegacyExceptions": {
     "20260920060000_content_version_request_id.sql": "Requires legacy content_versions, omitted from the purpose-built workspace fixture; real upgrade/fresh full-schema rehearsal owns it.",
@@ -342,6 +342,8 @@
     "20261021131200_agent_website_tools.sql",
     "20261021132000_money_effect_admission.sql",
     "20261021132100_agent_payment_exit_admission.sql",
-    "20261022090000_guarded_tenant_teardown.sql"
+    "20261022090000_guarded_tenant_teardown.sql",
+    "20261022090100_tenant_cleanup_receipts.sql",
+    "20261022120000_agency_created_application_authority.sql"
   ]
 }

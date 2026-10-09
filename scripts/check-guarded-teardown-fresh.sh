@@ -31,3 +31,9 @@ if [[ "${STRELVA_RUNTIME_GENERATION_SQL_PROOF:-0}" == 1 ]]; then
  check_tenant_connection_generation_lifecycle
  printf 'PASS native grant generation, original receipt intent and tenant rename/reuse races.\n'
 fi
+if [[ "${STRELVA_CLEANUP_AGENCY_SQL_PROOF:-0}" == 1 ]]; then
+ psql "${psql_args[@]}" --set=keep_fixture=true --file="$repo_root/tests/tenant-cleanup-receipts-schema.sql"
+ psql "${psql_args[@]}" --file="$repo_root/tests/tenant-cleanup-blockers-readonly.sql"
+ psql "${psql_args[@]}" --file="$repo_root/scripts/sql/agency-created-application-authority-contract.sql"
+ printf 'PASS cleanup receipt CAS, booking-only READ ONLY and agency reader contracts.\n'
+fi
