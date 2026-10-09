@@ -21206,6 +21206,17 @@ export type Database = {
         }
         Returns: boolean
       }
+      assert_business_checkout_admission: {
+        Args: {
+          p_accepted_email: string | null
+          p_account: string
+          p_actor_id: string | null
+          p_generation: number
+          p_payment_id: string
+          p_verified_email: string | null
+        }
+        Returns: boolean
+      }
       assert_current_provider_payer: {
         Args: {
           p_agency: string
