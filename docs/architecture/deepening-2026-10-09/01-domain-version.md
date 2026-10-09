@@ -208,8 +208,8 @@ retaining the two product failures. No product failure was removed or skipped.
   UI components/inventory were unchanged. This preview substitutes responses and
   does not execute the new server determination; caller tests prove that code.
 
-**Explicit limits/skips.** The 12 skipped tests are the optional PostgreSQL
-Version store contract without `STRELVA_VERSIONS_PSQL`. No local SQL runner,
+**Explicit limits/skips.** Twelve optional PostgreSQL tests (Version store plus
+agency Library/Review all) lacked `STRELVA_VERSIONS_PSQL`. No local SQL runner,
 authenticated browser/provider, hosted/native publication or production proof
 was run. SQL/security/migration bytes are untouched. No storage, permission or
 `/api/v1` contract changed, so SQL/custom-client checks were not triggered.
