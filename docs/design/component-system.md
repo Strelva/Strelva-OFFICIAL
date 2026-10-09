@@ -143,6 +143,13 @@ static/native render serialization proof belongs to
 `rebuild-service.test.ts`. Actual browser/native contact use remains a separate
 release check.
 
+Fictional `contacts`, `contacts-error` and `contacts-read-only` rebuild fixtures
+exercise the supported contact controls without provider, publication or message
+effects. `release-website-fact-revision.spec.ts` covers keyboard correction,
+removal, rejection, read-only controls and reflow at 1440px, 390px and 320px with
+enlarged text. The fixture transport does not update the rendered site document;
+these cases qualify controls only, never real preview revision or delivery.
+
 ### Website owner consent for agency publication, October 7, local
 
 `RebuildExperience` uses the owned Button and a labelled native checkbox for

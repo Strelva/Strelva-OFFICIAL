@@ -24,6 +24,18 @@ export const fixtureSiteDocument: SiteDocument = {
 };
 export const mooneyFixtureDocument = siteDocumentSchema.parse(mooneySource);
 export function fixtureRebuild(scenario = "review"): RebuildView {
+  if (["contacts", "contacts-error", "contacts-read-only"].includes(scenario)) {
+    const record = fixtureRebuild("review");
+    record.status = "approved";
+    record.approved = true;
+    record.stages = record.stages.map(stage => ({ ...stage, message: "Completed in this fictional contact-control fixture" }));
+    if (record.candidate) record.candidate.facts = {
+      phone: { text: "(716) 555-0100", kind: "contact", highRisk: false, origin: "owner_stated", sources: [], verification: { supported: true, confidence: 1 } },
+      email: { text: "orders@example.test", kind: "contact", highRisk: false, origin: "owner_stated", sources: [], verification: { supported: true, confidence: 1 } },
+      ordinary: { text: "Fictional contact-control review; no publication or message is sent.", kind: "claim", highRisk: false, origin: "owner_stated", sources: [], verification: { supported: true, confidence: 1 } },
+    };
+    return record;
+  }
   if (scenario === "skipped-pages") return { ...fixtureRebuild("review"), skippedPaths: [
     { url: "https://synthetic-business.example.test/private", reason: "robots" },
     { url: "https://synthetic-business.example.test/app", reason: "javascript_only" },
