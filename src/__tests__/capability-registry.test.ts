@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { CAPABILITY_KINDS, getCapability, listCapabilities, workspaceDiscoveryProducts, workspaceExecutables, type CapabilityKind } from "@/capability-registry";
-import { EXECUTABLE_CAPABILITY_DEFINITIONS } from "@/server/capabilities";
+import { CAPABILITY_KINDS, getCapability, listCapabilities, workspaceDiscoveryProducts, workspaceExecutables, capabilityStatusView, validateCapabilityStatusView, type CapabilityKind } from "@/capability-registry";
+import { executableCapabilityRegistry, EXECUTABLE_CAPABILITY_QUALIFICATIONS, EXECUTABLE_CAPABILITY_DEFINITIONS } from "@/server/capabilities";
 import { PRODUCT_CATALOG, listWorkspaceDiscoveryProducts, listWorkspaceExecutableProducts } from "@/platform/products";
 import { listOfferingDefinitions } from "@/platform/offerings/definitions";
 import { getAllCapabilities } from "@/lib/capabilities";
@@ -36,6 +36,8 @@ describe("capability registry", () => {
     expect(getCapability("agent_capability:website")).toMatchObject({ name: "Website Management" });
     expect(getCapability("workspace_executable:nope")).toBeNull();
     expect(getCapability("billing:website")).toBeNull();
+    expect(getCapability("toString:website")).toBeNull();
+    expect(getCapability("__proto__:website")).toBeNull();
   });
 
   it("each declaration file exists and is named in the capabilities README", () => {
@@ -51,4 +53,54 @@ describe("capability registry", () => {
     expect(workspaceExecutables()).toBe(listWorkspaceExecutableProducts());
     expect(workspaceDiscoveryProducts()).toEqual(listWorkspaceDiscoveryProducts());
   });
+
+  it("binds owner contracts and local witnesses to exact declarations and resolvable references", () => {
+    for (const entry of all) {
+      expect(entry.owner).toEqual({ reference: entry.declaredIn, model: CAPABILITY_KINDS[entry.kind].model });
+      expect(entry.contract.reference).toBe(entry.declaredIn);
+      for (const evidence of entry.qualification.evidence) {
+        expect(evidence.capabilityKey).toBe(entry.key);
+        expect(() => readFileSync(evidence.reference.split("#")[0]!, "utf8"), evidence.reference).not.toThrow();
+        if (evidence.mode === "local_test") {
+          const witness = EXECUTABLE_CAPABILITY_QUALIFICATIONS.find(item => `operation:${item.qualification.capabilityId}@${item.qualification.capabilityVersion}` === entry.key);
+          expect(witness?.qualification.evidence).toContainEqual(expect.objectContaining({ id: evidence.id, reference: evidence.reference, status: "passed", kind: "focused_test", environment: "local", checkedAt: evidence.checkedAt }));
+        }
+      }
+      const receiptReference = entry.qualification.receiptReference;
+      if (receiptReference) expect(() => readFileSync(receiptReference.split("#")[0]!, "utf8")).not.toThrow();
+      expect(entry.qualification.provenModes).not.toContain("production");
+      expect(Object.isFrozen(entry.qualification.evidence)).toBe(true);
+    }
+  });
+
+  it("validates generated status without promoting descriptions, fixtures or labels", () => {
+    const status = JSON.parse(JSON.stringify(capabilityStatusView()));
+    expect(validateCapabilityStatusView(status)).toBe(true);
+    for (const mode of ["local_native", "local_auth", "provider", "production"]) {
+      const changed = structuredClone(status);
+      changed.entries[0].qualification.provenModes.push(mode);
+      changed.entries[0].qualification.evidence[1].mode = mode;
+      expect(validateCapabilityStatusView(changed), mode).toBe(false);
+    }
+    const forged = structuredClone(status);
+    forged.entries[0].qualification.evidence[1].capabilityKey = "operation:create_application@2";
+    expect(validateCapabilityStatusView(forged)).toBe(false);
+    const mislabeled = structuredClone(status);
+    mislabeled.entries.find((entry: { kind: string }) => entry.kind === "product").productionReady = true;
+    expect(validateCapabilityStatusView(mislabeled)).toBe(false);
+    status.entries.pop();
+    expect(validateCapabilityStatusView(status)).toBe(false);
+  });
+
+  it("listing and status generation do not admit a descriptive or unqualified operation", () => {
+    const before = executableCapabilityRegistry.listDescriptors();
+    listCapabilities();
+    capabilityStatusView();
+    expect(executableCapabilityRegistry.listDescriptors()).toEqual(before);
+    expect(() => executableCapabilityRegistry.requireExact("homefinder", 1)).toThrow(/unknown_capability/);
+    expect(() => executableCapabilityRegistry.requireExact("create_application", 2)).toThrow(/version_unavailable/);
+    expect(() => executableCapabilityRegistry.requireExact("create_application", 1, "runner")).toThrow(/entrance_unavailable/);
+    expect(listCapabilities({ kind: "product" }).every(entry => entry.qualification.provenModes.join() === "source")).toBe(true);
+  });
+
 });

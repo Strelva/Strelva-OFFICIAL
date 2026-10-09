@@ -62,7 +62,7 @@ continuation (carry a public result into a workspace).
 
 One registry lists them all: `src/capability-registry.ts` (Strelva Reborn
 section 7, local). `listCapabilities()` returns every declared capability as
-`{ key, kind, id, name, description, declaredIn }`; `getCapability(key)`
+`{ key, kind, id, name, description, declaredIn, owner, contract, qualification, availability }`; `getCapability(key)`
 finds one. It reads the six declaration files below through adapters, so each
 capability is still declared once, in the file that owns its kind. It sits at
 the app edge because two kinds are tenant-model declarations in `src/lib` and
@@ -88,6 +88,14 @@ The six declaration files:
 | `src/platform/offerings/definitions.ts` | Installable offerings: `private_staff_requests`, `customer_inquiry_intake`, `managed_website_changes`. |
 | `src/lib/capabilities.ts` | Tenant agent capabilities (`website`, `blog`, `reviews`, `google_business`, …). |
 | `src/lib/features/registry.ts` | Tenant dashboard features and sets (`wellness`, `ecommerce`). Not billing. |
+
+Owner qualification and scoped availability now have a separate
+[server contract](./capability-qualification.md). The existing adapters emit
+owner/contract/evidence references; `capabilityStatusView()` generates a validated
+status view. Local test witnesses cannot become native/Auth/provider/production
+readiness labels. Availability returns available/unavailable/unknown with a
+reason and grants nothing. Consumer adoption is pending the architecture union
+freeze; the business summary table above remains a human-owned outcome view.
 
 `src/lib/site-capabilities.ts` is separate again: which sections and actions a
 tenant site supports, served to client repos at `/api/v1/site-capabilities`.
