@@ -58,10 +58,19 @@ test("an accepted member runs exact zero-cost work as themselves, then revocatio
       command: { kind: "approve", expectedRevision: responsibility.payload.revision },
     });
 
-    // A verified outsider is still ineligible because assignments do not create membership.
+    // Malformed agency offers are rejected before authority is considered.
     await post(owner.context.request, "/api/operational-assignments", {
       action: "offer", workId: responsibility.id,
       assignment: { assigneeEmail: outsider.email, assigneeKind: "agency", expiresAt: new Date(Date.now() + 86_400_000).toISOString(), idempotencyKey: "outsider-offer" },
+    }, 400);
+    const outsiderAgency = await post(outsider.context.request, "/api/workspace", {
+      action: "create_agency", name: "Unassigned outsider agency",
+    }, 201);
+    // A real agency identity without a seat/assignment grants no customer access.
+    await post(owner.context.request, "/api/operational-assignments", {
+      action: "offer", workId: responsibility.id,
+      assignment: { assigneeEmail: outsider.email, assigneeKind: "agency", agencyWorkspaceId: outsiderAgency.workspaceId,
+        expiresAt: new Date(Date.now() + 86_400_000).toISOString(), idempotencyKey: "outsider-agency-offer" },
     }, 403);
 
     const retryableOffer = {

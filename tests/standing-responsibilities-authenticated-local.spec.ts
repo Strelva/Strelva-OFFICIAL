@@ -197,7 +197,7 @@ test("an owner can discover, create, and reopen ongoing work in the workspace", 
     await page.getByLabel("Name", { exact: true }).fill("UI supplier check");
     await page.getByLabel("Result", { exact: true }).fill("Compare the supplier records whenever a check is needed.");
     await page.getByLabel("Saved check", { exact: true }).selectOption({ label: "Saved supplier check" });
-    await page.getByRole("button", { name: "Create ongoing work", exact: true }).click();
+    await page.getByRole("button", { name: "Start running it", exact: true }).click();
     await expect(page).toHaveURL(/standingId=/);
     await expect(page.getByRole("heading", { name: "UI supplier check", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Runs", exact: true })).toBeVisible();
