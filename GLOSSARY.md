@@ -72,11 +72,11 @@ Decisions, information or approvals that need the person's attention before
 work can continue.
 _Avoid_: failures (as a synonym), agent queue, operator inbox
 
-**Strelva handled** _(label open)_:
+**What changed**:
 The place showing completed actions and their results. Each action names whoever
-did the work, including an agency's display name when the agency acted. The
-place label remains open because actions may be performed by other agencies.
-_Avoid_: Strelva did it (when another actor did), anonymous agency work
+did the work, including an agency's display name when the agency acted.
+_Avoid_: Strelva handled (former label), Strelva did it (when another actor did),
+anonymous agency work
 
 **Ask Strelva** _(label open)_:
 Where a person says what they want to happen. Their words are an ask before
@@ -321,6 +321,7 @@ _Avoid_: Assignment, retainer, maintenance, unlimited service
 **Receipt**:
 Durable evidence of an action: who acted, what happened, why, its target,
 outcome and any supported inverse. Acceptance and read-back are distinct facts.
+It keeps the actor's name as it was when the action happened.
 _Avoid_: guaranteed success, anonymous agency work
 
 **Workspace record**:
