@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
       - name: Retain exact reviewed source
@@ -35,24 +35,26 @@ jobs:
           mkdir -p /tmp/strelva-source
           git archive --format=tar.gz --prefix=strelva-source/ HEAD > /tmp/strelva-source/source.tar.gz
           git rev-parse HEAD > /tmp/strelva-source/commit.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: reviewed-source-${{ github.run_id }}
           path: /tmp/strelva-source/
           retention-days: 1
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 10.34.5
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version-file: .node-version
           cache: pnpm
+      - run: pnpm check:qualification --stage toolchain
       - run: pnpm install --frozen-lockfile
+      - run: pnpm check:qualification --stage dependencies
       - name: Metadata, delivery, entry, and UI regressions
         run: |
           pnpm test:workspace-target
           pnpm exec vitest run src/__tests__/service-delivery-commitment.test.ts src/__tests__/service-requests.test.ts src/__tests__/workspace-start-launch.test.ts src/__tests__/business-entry.test.ts src/__tests__/business-entry-route.test.ts src/__tests__/delivery-client.test.ts src/__tests__/delivery-launch-ui.test.tsx src/__tests__/workspace-launch-return.test.ts
-      - uses: supabase/setup-cli@v3
+      - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3
         with:
           version: 2.117.0
       - name: Full ordered upgrade and delivery lifecycle
@@ -70,7 +72,7 @@ jobs:
           SCAFFOLD_DEV_UNGATED_ACCESS: '0'
       - name: Retain browser evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: launch-browser-${{ github.run_id }}
           path: |
@@ -94,18 +96,20 @@ jobs:
       OPERATOR_EMAILS_ENABLED: 'false'
       PROSPECT_EMAILS_ENABLED: 'false'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 10.34.5
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 22
+          node-version-file: .node-version
           cache: pnpm
+      - run: pnpm check:qualification --stage toolchain
       - run: pnpm install --frozen-lockfile
-      - uses: supabase/setup-cli@v3
+      - run: pnpm check:qualification --stage dependencies
+      - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3
         with:
           version: 2.117.0
       - name: Install browser
@@ -134,7 +138,7 @@ jobs:
           node scripts/check-launch-browser-results.mjs "$RUNNER_TEMP/launch-results.json"
       - name: Retain synthetic browser outcomes and screenshots, not credentials
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: authenticated-launch-${{ github.run_id }}
           path: |

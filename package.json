@@ -13,8 +13,8 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "check": "pnpm check:site-domains && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
-    "check:launch": "pnpm check:site-domains && pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke",
-    "check:release": "pnpm check:site-domains && pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && pnpm check:prod && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke",
+    "check:launch": "pnpm check:site-domains && pnpm lint && pnpm typecheck && pnpm test && pnpm check:supply-chain && pnpm build && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke",
+    "check:release": "pnpm check:site-domains && pnpm lint && pnpm typecheck && pnpm test && pnpm check:supply-chain && pnpm build && pnpm check:prod && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke",
     "smoke": "playwright test",
     "smoke:admin": "REB_DEV_UNGATED_ACCESS=1 playwright test tests/admin-operator.spec.ts",
     "smoke:dashboard": "REB_DEV_UNGATED_ACCESS=1 REB_DEV_TENANT=gldf playwright test tests/dashboard-owner.spec.ts",
@@ -49,7 +49,12 @@
     "reborn:progress": "node scripts/reborn-progress.mjs",
     "version:check": "node scripts/check-version-sync.mjs",
     "check:release-safety": "vitest run src/__tests__/release-safety-tools.test.ts src/__tests__/release-restore.test.ts src/__tests__/production-readiness-snapshot.test.ts && tsx scripts/check-release-safety.ts",
-    "check:release-safety:batch8": "tsx scripts/check-release-safety-batch8.ts"
+    "check:release-safety:batch8": "tsx scripts/check-release-safety-batch8.ts",
+    "check:qualification": "node scripts/check-qualification.mjs",
+    "test:qualification": "node --test scripts/tests/qualification.node-test.mjs",
+    "check:supply-chain": "node scripts/check-supply-chain.mjs",
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "test:supply-chain": "node --test scripts/tests/supply-chain.node-test.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.78",
@@ -135,15 +140,13 @@
       "@opentelemetry/instrumentation-mongoose@<0.67.0": "0.67.0",
       "@opentelemetry/instrumentation-tedious@<0.40.0": "0.40.0"
     },
-    "auditConfig": {
-      "ignoreGhsas": [
-        "GHSA-vfj7-8cjw-p6xm"
-      ]
-    },
     "allowBuilds": {
       "@sentry/cli": true,
       "esbuild": true,
       "unrs-resolver": true
     }
+  },
+  "engines": {
+    "node": ">=22 <23"
   }
 }

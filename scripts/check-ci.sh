@@ -7,6 +7,19 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$repo_root"
 
+# Enforce the same candidate profile before lint/build/SQL or fixture mutation.
+# PG18 is an explicit historical rehearsal, never a fallback for configured PG17.
+profile_name="${STRELVA_QUALIFICATION_PROFILE:-configured-pg17}"
+if qualification="$(node scripts/check-qualification.mjs --profile "$profile_name")"; then
+  :
+else
+  printf '%s\n' "$qualification"
+  exit 1
+fi
+printf '%s\n' "$qualification"
+postgres_bin_dir="$(printf '%s' "$qualification" | node -e 'let s="";process.stdin.on("data",c=>s+=c);process.stdin.on("end",()=>process.stdout.write(JSON.parse(s).observed.postgresBin))')"
+export PATH="$postgres_bin_dir:$PATH"
+
 # Match the hosted runner's empty-provider environment. These are explicit empty
 # exports rather than `unset`: Next.js may load an unset variable from `.env.local`,
 # while an existing empty value remains authoritative. This subprocess-only
@@ -65,26 +78,11 @@ pnpm check:boundaries
 echo "== ontology invariants =="
 pnpm check:ontology
 echo "== workspace ownership SQL =="
-postgres_bin_dir="/opt/homebrew/opt/postgresql@18/bin"
-if [[ ! -x "$postgres_bin_dir/initdb" ]]; then
-  postgres_bin_dir="$(pg_config --bindir 2>/dev/null || true)"
-fi
-if [[ -z "$postgres_bin_dir" || ! -x "$postgres_bin_dir/initdb" ]]; then
-  echo "PostgreSQL server binaries are unavailable (need initdb, pg_ctl, postgres, psql)." >&2
-  exit 1
-fi
-export PATH="$postgres_bin_dir:$PATH"
-for postgres_command in initdb pg_ctl postgres psql; do
-  if ! command -v "$postgres_command" >/dev/null 2>&1; then
-    echo "PostgreSQL server command is unavailable: $postgres_command" >&2
-    exit 1
-  fi
-done
 pnpm check:workspace-sql
 echo "== vitest with coverage gate =="
 pnpm test:coverage
 echo "== dependency audit =="
-pnpm audit --audit-level high
+pnpm check:supply-chain
 echo "== build =="
 pnpm build
 echo "== public smoke =="

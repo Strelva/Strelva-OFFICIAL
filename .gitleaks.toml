@@ -1,9 +1,8 @@
 title = "Strelva secret scanning"
 
-[allowlist]
-description = "Allow placeholders and documented env names."
-regexes = [
-  '''CRON_SECRET=''',
-  '''INTERNAL_API_SECRET=''',
-  '''STRIPE_SECRET_KEY='''
-]
+[extend]
+useDefault = true
+
+# Variable names and assignments are not exceptions. Test placeholders should
+# use short, clearly fictional values; any necessary exception must identify
+# an exact finding after review, never an entire secret-bearing key family.
