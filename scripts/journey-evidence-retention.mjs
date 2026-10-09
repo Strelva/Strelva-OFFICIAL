@@ -68,7 +68,14 @@ export function inventoryJourneyArtifacts({ work: input, artifactDir, proofFiles
   if (reportPath) {
     inspect(reportPath);
     try {
-      const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+      const path = ownedPath(reportPath);
+      if (!path) throw new Error('Refused report.');
+      const stat = lstatSync(path);
+      if (!stat.isFile() || stat.uid !== process.getuid?.() || !realpathSync(path).startsWith(work + sep)) throw new Error('Refused report.');
+      const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+      let raw;
+      try { raw = readFileSync(fd, 'utf8'); } finally { closeSync(fd); }
+      const report = JSON.parse(raw);
       const attachments = value => {
         if (Array.isArray(value)) { for (const item of value) attachments(item); }
         else if (value && typeof value === 'object') {

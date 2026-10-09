@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { test } from 'node:test';
@@ -41,7 +41,7 @@ test('unavailable validator and report-advertised missing trace refuse integrity
 test('symlink artifacts and symlink ancestor cannot inspect or chmod outside bytes', t => {
   const { work, output } = fixture(t), outside = mkdtempSync(join(tmpdir(), 'outside-retention.'));
   t.after(() => rmSync(outside, { recursive: true, force: true }));
-  const secret = join(outside, 'secret.txt'); writeFileSync(secret, 'fixture-secret', { mode: 0o644 });
+  const secret = join(outside, 'secret.txt'); writeFileSync(secret, 'fixture-secret', { mode: 0o644 }); chmodSync(secret, 0o644);
   const link = join(output, 'link'); symlinkSync(outside, link);
   const result = inventoryJourneyArtifacts({ work, proofFiles: [link, join(link, 'secret.txt')] });
   assert.equal(result.integrityValidated, false); assert.equal(statSync(secret).mode & 0o777, 0o644); assert.ok(!JSON.stringify(result).includes('fixture-secret'));
@@ -127,4 +127,16 @@ test('captured unqualified stack is retained but cannot qualify terminal evidenc
   const terminal = retainJourneyEnd({ work, output, sourceBefore: {}, captureSource: () => ({}), qualify: () => ({ qualified: false }), browser: { status: 0 } });
   assert.equal(terminal.stackState, 'unqualified'); assert.equal(terminal.retentionValidated, false);
   assert.deepEqual(JSON.parse(readFileSync(join(output, 'stack-after.json'))), { qualified: false });
+});
+
+test('a refused symlink report is never parsed for attachments', t => {
+  const { work, output } = fixture(t), outside = mkdtempSync(join(tmpdir(), 'outside-report.'));
+  t.after(() => rmSync(outside, { recursive: true, force: true }));
+  const outsideReport = join(outside, 'report.json'), forbiddenAttachment = join(output, 'proof-that-refused-report-was-parsed.txt');
+  writeFileSync(outsideReport, JSON.stringify({ attachments: [{ path: forbiddenAttachment }] }));
+  const reportPath = join(output, 'results.json'); symlinkSync(outsideReport, reportPath);
+  const inventory = inventoryJourneyArtifacts({ work, reportPath });
+  assert.equal(inventory.integrityValidated, false); assert.ok(inventory.issues.includes('unowned-or-symbolic-file'));
+  assert.ok(!inventory.files.some(item => item.path.includes('proof-that-refused-report')));
+  assert.ok(!JSON.stringify(inventory).includes(outsideReport));
 });
