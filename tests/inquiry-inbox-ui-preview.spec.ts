@@ -1,11 +1,70 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
 
 test.skip(process.env.STRELVA_UI_PREVIEW !== "1", "Requires isolated interface fixtures.");
 const path = "/preview/strelva/places?place=leads&held=1&reply=1";
 
-test("owner sees the exact recipient and message, then one truthful provider receipt", async ({ page }) => {
+// Real components, fictional records and intercepted mutation responses only.
+// Delivery, native authentication and SQL decisions need separate native proof.
+function fixtureOrigin(info: TestInfo): string {
+  const baseURL = info.project.use.baseURL;
+  if (!baseURL) throw new Error("This fixture needs an explicit loopback baseURL.");
+  const url = new URL(baseURL);
+  if (url.protocol !== "http:" || !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) || url.username || url.password || url.pathname !== "/" || url.search || url.hash) throw new Error("This fixture needs a credential-free HTTP loopback origin.");
+  return url.origin;
+}
+
+const scopes = new WeakMap<Page, { origin: string; blocked: string[] }>();
+test.use({ trace: "on", serviceWorkers: "block" });
+test.beforeEach(async ({ page }, info) => {
+  const scope = { origin: fixtureOrigin(info), blocked: [] as string[] };
+  scopes.set(page, scope);
+  await page.route("**/*", route => {
+    const url = new URL(route.request().url());
+    if (url.origin === scope.origin) return route.continue();
+    scope.blocked.push(url.origin);
+    return route.abort();
+  });
+});
+test.afterEach(async ({ page }, info) => {
+  const scope = scopes.get(page);
+  await info.attach("fictional-inquiry-ui-scope", {
+    body: JSON.stringify({ origin: scope?.origin, externalRequestsBlocked: scope?.blocked, viewport: page.viewportSize(), fictionalRecords: true, visibleFictionBanner: false, deliveryQualified: false, nativeAuthQualified: false, sqlDecisionQualified: false }),
+    contentType: "application/json",
+  });
+});
+
+async function actionBox(control: Locator, coarse: boolean) {
+  await expect(control).toBeVisible();
+  if (!coarse) return;
+  const box = await control.boundingBox();
+  expect(box, "Owned action has a physical touch box").not.toBeNull();
+  expect(box!.width).toBeGreaterThanOrEqual(44);
+  expect(box!.height).toBeGreaterThanOrEqual(44);
+}
+
+async function reflow(page: Page) {
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+}
+
+async function openFixture(page: Page, width: number, enlarged: boolean) {
+  await page.setViewportSize({ width, height: 900 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto(path);
+  await expect(page.getByRole("heading", { name: "Juniper Bakery", exact: true })).toBeVisible();
+  await expect(page.getByText("Strelva kept these out of your inbox. If one is a real person, release it. Nobody is emailed either way.", { exact: true })).toBeVisible();
+  if (enlarged) {
+    const original = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize));
+    await page.addStyleTag({ content: "html { font-size: 200% !important; }" });
+    expect(await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize))).toBe(original * 2);
+  }
+  expect(await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches)).toBe(true);
+  expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(width < 768);
+  await reflow(page);
+}
+
+test("owner sees the exact recipient and message, then one truthful provider receipt", async ({ page }, info) => {
   const requests: Record<string, unknown>[] = [];
-  await page.route("**/api/workspace/inquiries/reply", async route => {
+  await page.route(`${fixtureOrigin(info)}/api/workspace/inquiries/reply`, async route => {
     requests.push(route.request().postDataJSON());
     await route.fulfill({ json: { outcome: { status: "accepted", providerMessageId: "fixture-provider-1", acceptedAt: "2026-10-07T12:00:00Z", retryable: false } } });
   });
@@ -22,9 +81,9 @@ test("owner sees the exact recipient and message, then one truthful provider rec
   expect(requests[0]).not.toHaveProperty("to");
 });
 
-test("uncertain response retains the exact immutable draft and rechecks the same claim", async ({ page }) => {
+test("uncertain response retains the exact immutable draft and rechecks the same claim", async ({ page }, info) => {
   const requests: Record<string, unknown>[] = [];
-  await page.route("**/api/workspace/inquiries/reply", async route => {
+  await page.route(`${fixtureOrigin(info)}/api/workspace/inquiries/reply`, async route => {
     requests.push(route.request().postDataJSON());
     await route.fulfill(requests.length === 1 ? { status: 503, json: { error: "Receipt unavailable" } }
       : { json: { outcome: { status: "unknown", providerMessageId: null, acceptedAt: null, retryable: false } } });
@@ -41,8 +100,8 @@ test("uncertain response retains the exact immutable draft and rechecks the same
   expect(requests[1]).toEqual(requests[0]);
 });
 
-test("held review reports a refusal without removing evidence", async ({ page }) => {
-  await page.route("**/api/workspace/inquiries/held", route => route.fulfill({ status: 409, json: { error: "This message changed. Reload it." } }));
+test("held review reports a refusal without removing evidence", async ({ page }, info) => {
+  await page.route(`${fixtureOrigin(info)}/api/workspace/inquiries/held`, route => route.fulfill({ status: 409, json: { error: "This message changed. Reload it." } }));
   await page.goto(path);
   await page.getByRole("button", { name: "Release the message from Ana", exact: true }).click();
   await expect(page.getByRole("main").getByRole("alert")).toContainText("changed");
@@ -58,7 +117,7 @@ for (const state of ["empty", "permission", "error"] as const) {
   });
 }
 
-test("narrow inbox and keyboard reply stay inside the viewport", async ({ page }) => {
+test("narrow inbox and keyboard reply stay inside the viewport", async ({ page }, info) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(path);
   await page.getByRole("button", { name: "Reply to Priya S." }).focus();
@@ -66,5 +125,132 @@ test("narrow inbox and keyboard reply stay inside the viewport", async ({ page }
   await page.getByLabel("Your reply to Priya S.").fill("Please confirm the details.");
   await expect(page.getByLabel("Your reply to Priya S.")).toBeFocused();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: "output/w6-inquiry-reply-mobile.png", fullPage: true });
+  await page.screenshot({ path: info.outputPath("w6-inquiry-reply-mobile.png"), fullPage: true });
 });
+
+
+for (const [width, enlarged] of [[1440, false], [390, false], [320, true]] as const) {
+  test.describe(`fictional inquiry recovery at ${width}px${enlarged ? " with 200% text" : ""}`, () => {
+    test.use({ hasTouch: width < 768 });
+
+    test("keyboard reply keeps one exact attempt through lost and invalid receipts without stealing outside focus", async ({ page }, info) => {
+      const requests: string[] = [];
+      let releaseCheck = () => {};
+      const pendingCheck = new Promise<void>(resolve => { releaseCheck = resolve; });
+      await page.route(`${fixtureOrigin(info)}/api/workspace/inquiries/reply`, async route => {
+        expect(route.request().method()).toBe("POST");
+        requests.push(route.request().postData()!);
+        if (requests.length === 1) return route.abort("failed");
+        if (requests.length === 2) return route.fulfill({ json: { outcome: { status: "accepted" } } }); // Missing the existing acknowledgement fields.
+        if (requests.length === 3) {
+          await pendingCheck;
+          return route.fulfill({ status: 503, json: { error: "Fixture receipt still unavailable" } });
+        }
+        return route.fulfill({ json: { outcome: { status: "unknown", providerMessageId: null, acceptedAt: null, retryable: false } } });
+      });
+      try {
+        await openFixture(page, width, enlarged);
+        const article = page.getByRole("article", { name: "Priya S.", exact: true });
+        const opener = article.getByRole("button", { name: "Reply to Priya S.", exact: true });
+        await actionBox(opener, width < 768);
+        await opener.focus(); await page.keyboard.press("Enter");
+        const subject = article.getByLabel("Subject", { exact: true });
+        const body = article.getByLabel("Your reply to Priya S.", { exact: true });
+        await expect(subject).toBeFocused();
+        const words = "Can you confirm the pickup details? This is a fictional private draft.";
+        await subject.fill("Fictional pickup inquiry");
+        await page.keyboard.press("Tab"); await expect(body).toBeFocused();
+        await body.fill(words);
+        const send = article.getByRole("button", { name: "Approve and send reply", exact: true });
+        await actionBox(send, width < 768);
+        await actionBox(article.getByRole("button", { name: "Close draft", exact: true }), width < 768);
+        await page.keyboard.press("Tab"); await expect(send).toBeFocused();
+        await page.keyboard.press("Enter");
+        const check = article.getByRole("button", { name: "Check this reply", exact: true });
+        await expect(article.getByRole("alert")).toContainText("couldn't be confirmed");
+        await expect(check).toBeFocused();
+        await expect(subject).toBeDisabled(); await expect(body).toBeDisabled();
+        await expect(subject).toHaveValue("Fictional pickup inquiry"); await expect(body).toHaveValue(words);
+        await expect(article.getByRole("button", { name: "Close draft", exact: true })).toHaveCount(0);
+        expect(requests).toHaveLength(1);
+        const attempt = JSON.parse(requests[0]!);
+        expect(attempt).toMatchObject({ workspaceId: "5e000000-0000-4000-8000-000000000010", rowId: "5e000000-0000-4000-8000-0000000000d4", subject: "Fictional pickup inquiry", body: words });
+        expect(attempt.requestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+        expect(attempt).not.toHaveProperty("to");
+        await actionBox(check, width < 768); await reflow(page);
+        await page.screenshot({ path: info.outputPath("reply-lost-response.png"), fullPage: true });
+
+        await page.keyboard.press("Enter");
+        await expect.poll(() => requests.length).toBe(2);
+        await expect(check).toBeEnabled(); await expect(check).toBeFocused();
+        await expect(article.getByRole("status")).toHaveCount(0);
+        expect(requests[1]).toBe(requests[0]);
+        await reflow(page);
+        await page.screenshot({ path: info.outputPath("reply-invalid-ack.png"), fullPage: true });
+
+        await page.keyboard.press("Enter");
+        await expect.poll(() => requests.length).toBe(3);
+        await expect(check).toBeDisabled();
+        const outside = page.getByRole("button", { name: "Release the message from Ana", exact: true });
+        await outside.focus(); await expect(outside).toBeFocused();
+        releaseCheck();
+        await expect(article.getByRole("alert")).toContainText("Fixture receipt still unavailable");
+        await expect(check).toBeEnabled(); await expect(outside).toBeFocused();
+        await expect(subject).toHaveValue(attempt.subject); await expect(body).toHaveValue(attempt.body);
+        expect(requests[2]).toBe(requests[0]);
+        await page.screenshot({ path: info.outputPath("reply-outside-focus-preserved.png"), fullPage: true });
+
+        await check.focus(); await page.keyboard.press("Enter");
+        const receipt = article.getByRole("status");
+        await expect(receipt).toContainText("send couldn't be confirmed"); await expect(receipt).toBeFocused();
+        await expect(check).toHaveCount(0);
+        expect(requests).toHaveLength(4);
+        expect(requests.every(request => request === requests[0])).toBe(true);
+        await reflow(page);
+        await page.screenshot({ path: info.outputPath("reply-authoritative-unknown-receipt.png"), fullPage: true });
+      } finally { releaseCheck(); }
+    });
+
+    test("unknown held decision freezes actions and reloads fresh fictional inquiries without another mutation", async ({ page }, info) => {
+      const requests: string[] = [];
+      let documents = 0;
+      page.on("request", request => {
+        if (request.isNavigationRequest() && request.frame() === page.mainFrame() && new URL(request.url()).pathname === "/preview/strelva/places") documents += 1;
+      });
+      await page.route(`${fixtureOrigin(info)}/api/workspace/inquiries/held`, async route => {
+        expect(route.request().method()).toBe("POST");
+        requests.push(route.request().postData()!);
+        // Both lost transport and an incomplete successful acknowledgement remain unknown.
+        if (width === 390) return route.fulfill({ json: { status: "decided" } });
+        return route.abort("failed");
+      });
+      await openFixture(page, width, enlarged);
+      const article = page.getByRole("article", { name: "Ana", exact: true });
+      const release = article.getByRole("button", { name: "Release the message from Ana", exact: true });
+      const spam = article.getByRole("button", { name: "Confirm the message from Ana is spam", exact: true });
+      await actionBox(release, width < 768); await actionBox(spam, width < 768);
+      await release.focus(); await page.keyboard.press("Enter");
+      const reload = article.getByRole("button", { name: "Reload inquiries", exact: true });
+      await expect(article.getByRole("alert")).toContainText("decision couldn't be confirmed");
+      await expect(article.getByRole("alert")).not.toContainText("Nothing changed");
+      await expect(reload).toBeFocused();
+      await expect(release).toBeDisabled(); await expect(spam).toBeDisabled();
+      await expect(article.getByRole("status")).toHaveCount(0);
+      await expect(article.getByText("hi do u do gluten free", { exact: true })).toBeVisible();
+      expect(requests).toHaveLength(1);
+      expect(JSON.parse(requests[0]!)).toEqual({ workspaceId: "5e000000-0000-4000-8000-000000000010", rowId: "5e000000-0000-4000-8000-0000000000d2", decision: "release" });
+      await actionBox(reload, width < 768); await reflow(page);
+      await page.screenshot({ path: info.outputPath("held-unconfirmed.png"), fullPage: true });
+      await Promise.all([page.waitForEvent("load"), page.keyboard.press("Enter")]);
+      await expect.poll(() => documents).toBe(2);
+      await expect(release).toBeEnabled(); await expect(spam).toBeEnabled();
+      await expect(reload).toHaveCount(0); await expect(article.getByRole("alert")).toHaveCount(0);
+      // Reload obtains the unchanged fictional fixture, not a manufactured SQL decision receipt.
+      await expect(article.getByText("hi do u do gluten free", { exact: true })).toBeVisible();
+      expect(requests).toHaveLength(1);
+      if (enlarged) await page.addStyleTag({ content: "html { font-size: 200% !important; }" });
+      await reflow(page);
+      await page.screenshot({ path: info.outputPath("held-fresh-fictional-readback.png"), fullPage: true });
+    });
+  });
+}
