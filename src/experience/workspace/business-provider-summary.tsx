@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { OfferingCollection, OfferingInstallation } from "@/platform/offerings";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
-import type { PresentedProviderDelivery, WorkspaceOfferingState } from "./WorkspaceOfferings";
+import type { PresentedAgencyDelivery, WorkspaceOfferingState } from "./WorkspaceOfferings";
 import styles from "./workspace-offerings.module.css";
 
-export type BusinessProviderDeliveryState =
+export type BusinessAgencyDeliveryState =
   | { status: "loading" }
-  | { status: "ready"; deliveries: readonly PresentedProviderDelivery[] }
+  | { status: "ready"; deliveries: readonly PresentedAgencyDelivery[] }
   | { status: "error"; message: string };
 
 function errorMessage(value: unknown, fallback: string): string {
@@ -26,7 +26,7 @@ function definitionName(collection: OfferingCollection, installation: OfferingIn
   return collection.definitions.find((definition) => definition.id === installation.definitionId && definition.version === installation.definitionVersion)?.name ?? installation.definitionId;
 }
 
-export function useBusinessProviderDeliveries(state: WorkspaceOfferingState): BusinessProviderDeliveryState {
+export function useBusinessAgencyDeliveries(state: WorkspaceOfferingState): BusinessAgencyDeliveryState {
   const request = useWorkspaceRequest();
   const businessId = state.status === "ready" ? state.collection.businessId : null;
   const installationIds = state.status === "ready"
@@ -34,7 +34,7 @@ export function useBusinessProviderDeliveries(state: WorkspaceOfferingState): Bu
     : [];
   const installationKey = installationIds.join(",");
   const requestEpoch = useRef(0);
-  const [deliveryState, setDeliveryState] = useState<BusinessProviderDeliveryState>(
+  const [deliveryState, setDeliveryState] = useState<BusinessAgencyDeliveryState>(
     businessId && installationIds.length ? { status: "loading" } : { status: "ready", deliveries: [] },
   );
 
@@ -53,12 +53,12 @@ export function useBusinessProviderDeliveries(state: WorkspaceOfferingState): Bu
     try {
       const response = await request(`/api/offerings/provider-delivery?businessId=${encodeURIComponent(businessId)}`, { cache: "no-store", headers: { Accept: "application/json" } });
       const value: unknown = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(errorMessage(value, "Provider delivery status is unavailable."));
+      if (!response.ok) throw new Error(errorMessage(value, "Agency delivery status is unavailable."));
       if (epoch !== requestEpoch.current) return;
-      setDeliveryState({ status: "ready", deliveries: ((value as { deliveries?: PresentedProviderDelivery[] } | null)?.deliveries ?? []).filter((delivery) => requestedInstallationIds.includes(delivery.installationId)) });
+      setDeliveryState({ status: "ready", deliveries: ((value as { deliveries?: PresentedAgencyDelivery[] } | null)?.deliveries ?? []).filter((delivery) => requestedInstallationIds.includes(delivery.installationId)) });
     } catch (cause) {
       if (epoch !== requestEpoch.current) return;
-      setDeliveryState({ status: "error", message: cause instanceof Error ? cause.message : "Provider delivery status is unavailable." });
+      setDeliveryState({ status: "error", message: cause instanceof Error ? cause.message : "Agency delivery status is unavailable." });
     }
   }, [businessId, installationKey, request]);
 
@@ -66,15 +66,15 @@ export function useBusinessProviderDeliveries(state: WorkspaceOfferingState): Bu
   return deliveryState;
 }
 
-export function BusinessProviderStatus({
+export function BusinessAgencyStatus({
   state,
   deliveries,
   installations,
   collection,
   onOpen,
 }: {
-  state: BusinessProviderDeliveryState;
-  deliveries: readonly PresentedProviderDelivery[];
+  state: BusinessAgencyDeliveryState;
+  deliveries: readonly PresentedAgencyDelivery[];
   installations: readonly OfferingInstallation[];
   collection: OfferingCollection;
   onOpen: (id?: string) => void;
@@ -83,17 +83,24 @@ export function BusinessProviderStatus({
   if (!providerInstallations.length) return null;
   const deliveryByInstallation = new Map(deliveries.map((delivery) => [delivery.installationId, delivery]));
   return <section className={styles.providerSummary} aria-labelledby="home-provider-status">
-    <header><h3 id="home-provider-status">Provider requests</h3><span>Actual delivery status</span></header>
-    {state.status === "loading" ? <p role="status">Checking provider delivery status…</p> : state.status === "error" ? <div className={styles.providerUnavailable}>
-      <p role="alert">Provider delivery status is unavailable. Acceptance cannot be inferred from the offering record.</p>
-      <button type="button" onClick={() => onOpen()}>Open provider details</button>
+    <header><h3 id="home-provider-status">Agency requests</h3><span>Actual delivery status</span></header>
+    {state.status === "loading" ? <p role="status">Checking agency delivery status…</p> : state.status === "error" ? <div className={styles.providerUnavailable}>
+      <p role="alert">Agency delivery status is unavailable. Acceptance cannot be inferred from the offering record.</p>
+      <button type="button" onClick={() => onOpen()}>Open agency details</button>
     </div> : <ul>{providerInstallations.map((installation) => {
       const delivery = deliveryByInstallation.get(installation.id);
       return <li key={installation.id}>
-        <span><strong>{definitionName(collection, installation)}</strong>{delivery ? <small>{delivery.status === "requested" ? "Provider requested · waiting for acceptance" : delivery.status === "accepted" ? "Provider accepted" : "Provider delivery revoked"}</small> : <small>Provider requested. No delivery status has been returned yet.</small>}
-        {delivery ? <small>Customer decision: {delivery.customerDecision === "pending" ? "pending" : delivery.customerDecision === "confirmed" ? "confirmed" : "changes requested"}</small> : null}</span>
+        <span><strong>{definitionName(collection, installation)}</strong>{delivery ? <small>{delivery.status === "requested" ? "Agency requested · waiting for acceptance" : delivery.status === "accepted" ? "Agency accepted" : "Agency delivery revoked"}</small> : <small>Agency requested. No delivery status has been returned yet.</small>}
+        {delivery ? <small>Your decision: {delivery.customerDecision === "pending" ? "pending" : delivery.customerDecision === "confirmed" ? "confirmed" : "changes requested"}</small> : null}</span>
         <button type="button" onClick={() => onOpen(installation.id)}>Review</button>
       </li>;
     })}</ul>}
   </section>;
 }
+
+/** @deprecated Use BusinessAgencyDeliveryState. */
+export type BusinessProviderDeliveryState = BusinessAgencyDeliveryState;
+/** @deprecated Use useBusinessAgencyDeliveries. */
+export const useBusinessProviderDeliveries = useBusinessAgencyDeliveries;
+/** @deprecated Use BusinessAgencyStatus. */
+export const BusinessProviderStatus = BusinessAgencyStatus;

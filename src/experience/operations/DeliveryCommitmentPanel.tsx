@@ -99,7 +99,7 @@ export function DeliveryCommitmentPanel({ requestId }: { requestId: string }) {
       const saved = serviceRequestSchema.parse((body as { request?: unknown } | null)?.request);
       if (saved.id !== requestId || saved.businessId !== current.request.businessId) throw new Error("The delivery response could not be confirmed.");
       sessionStorage.removeItem(storageKey); setPending(null);
-      setNotice("Saved. Publication, billing, and provider access are unchanged.");
+      setNotice("Saved. Publication, billing, and agency access are unchanged.");
       await load();
     } catch (cause) {
       if (version === generation.current) setError(cause instanceof Error ? cause.message : "The outcome is uncertain. Retry the retained command.");
@@ -114,7 +114,7 @@ export function DeliveryCommitmentPanel({ requestId }: { requestId: string }) {
   const disabled = saving || Boolean(pending);
   const safeReviewUrl = commitment?.result && deliveryReviewUrlSchema.safeParse(commitment.result.reviewUrl).success ? commitment.result.reviewUrl : null;
   return <section className="space-y-6" aria-labelledby="delivery-title">
-    <header className="space-y-3"><Link href={`/workspace?workspaceId=${encodeURIComponent(item.businessId)}`}>Back to this business</Link><h1 id="delivery-title" className="font-display text-3xl">{item.outcome}</h1><p className="text-gray-muted">{commitment ? deliveryCommitmentStatus(commitment) : item.providerAcceptance.status === "accepted" ? "Accepted for review. Delivery has not started." : "Waiting for provider review. No delivery commitment has been accepted."}</p></header>
+    <header className="space-y-3"><Link href={`/workspace?workspaceId=${encodeURIComponent(item.businessId)}`}>Back to this business</Link><h1 id="delivery-title" className="font-display text-3xl">{item.outcome}</h1><p className="text-gray-muted">{commitment ? deliveryCommitmentStatus(commitment) : item.providerAcceptance.status === "accepted" ? "Accepted for review. Delivery has not started." : "Waiting for agency review. No delivery commitment has been accepted."}</p></header>
     <p>{item.request}</p>
     <p className="text-sm text-gray-muted">Scope: {item.scope.join(", ")} · Request revision {item.revision}</p>
     {error ? <p role="alert">{error}</p> : null}

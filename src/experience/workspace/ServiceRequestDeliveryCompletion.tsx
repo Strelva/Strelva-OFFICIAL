@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
-import type { AgencyApplicationDraftGrant, OfferingInstallation, ProviderDelivery } from "@/platform/offerings";
+import type { AgencyApplicationDraftGrant, OfferingInstallation, AgencyDelivery } from "@/platform/offerings";
 import type { ServiceRequest } from "@/platform/service-requests";
 import { AgencyWebsiteCustomerControls } from "@/experience/agency-website/AgencyWebsiteCustomerControls";
 import { sameAppHref } from "./workspace-discovery";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
 
-type DeliveryView = ProviderDelivery & { canManage?: boolean; canAccept?: boolean };
+type DeliveryView = AgencyDelivery & { canManage?: boolean; canAccept?: boolean };
 type DeliveryWork = { id: string; title: string };
 type AssignmentView = {
   id: string;
@@ -85,7 +85,7 @@ export function ServiceRequestDeliveryCompletion({ request, installation, respon
   const expectedResources = installation.nativeResources.map((resource) => resource.id);
   const scopeMatchesRequest = sameSet(currentRequest.scope, expectedScope);
   const selectedExactly = sameSet(selectedScope, expectedScope) && sameSet(selectedResources, expectedResources);
-  const providerKind = installation.responsibility.kind === "provider_requested" ? installation.responsibility.providerKind : null;
+  const agencyKind = installation.responsibility.kind === "provider_requested" ? installation.responsibility.providerKind : null;
   const agencyWorkspaceId = installation.responsibility.kind === "provider_requested" && installation.responsibility.providerKind === "agency"
     ? installation.responsibility.agencyWorkspaceId
     : undefined;
@@ -120,7 +120,7 @@ export function ServiceRequestDeliveryCompletion({ request, installation, respon
     try {
       const deliveryResponse = await transport(`/api/offerings/provider-delivery?businessId=${encodeURIComponent(currentRequest.businessId)}`, { cache: "no-store" });
       const deliveryBody = await deliveryResponse.json().catch(() => null) as { deliveries?: DeliveryView[] } | null;
-      if (!deliveryResponse.ok) throw new Error(messageBody(deliveryBody, "Provider delivery could not be loaded."));
+      if (!deliveryResponse.ok) throw new Error(messageBody(deliveryBody, "Agency delivery could not be loaded."));
       const found = (deliveryBody?.deliveries ?? []).find((item) => item.installationId === installation.id) ?? null;
       if (!current()) return;
       deliveryLoaded = true;
@@ -136,7 +136,7 @@ export function ServiceRequestDeliveryCompletion({ request, installation, respon
         }
         setAssignment({ ...assignmentBody.assignment, responsibility: assignmentBody.responsibility });
         setAssignmentState("ready");
-        if (applicationWorkId && providerKind === "agency") {
+        if (applicationWorkId && agencyKind === "agency") {
           const grantResponse = await transport(`/api/agency-application-draft-access?workId=${encodeURIComponent(applicationWorkId)}`, { cache: "no-store" });
           const grantBody = await grantResponse.json().catch(() => null) as { grant?: AgencyApplicationDraftGrant | null } | null;
           if (!current()) return;
@@ -150,16 +150,16 @@ export function ServiceRequestDeliveryCompletion({ request, installation, respon
           setDraftAccessState("ready");
         }
       }
-      if (current() && (!found || !(applicationWorkId && providerKind === "agency"))) setDraftAccessState("ready");
+      if (current() && (!found || !(applicationWorkId && agencyKind === "agency"))) setDraftAccessState("ready");
     } catch (cause) {
       if (current()) {
         if (!deliveryLoaded) setDeliveryState("error");
-        setError(cause instanceof Error ? cause.message : "Provider delivery could not be loaded.");
+        setError(cause instanceof Error ? cause.message : "Agency delivery could not be loaded.");
       }
     } finally {
       if (current()) setLoading(false);
     }
-  }, [applicationWorkId, currentRequest.businessId, installation.id, providerKind, transport]);
+  }, [applicationWorkId, currentRequest.businessId, installation.id, agencyKind, transport]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -175,7 +175,7 @@ export function ServiceRequestDeliveryCompletion({ request, installation, respon
   }
 
   async function createDelivery() {
-    if (!providerKind || providerKind === "named_third_party" || !selectedWorkId || !selectedExactly || !scopeMatchesRequest || !assigneeEmail.trim()) return;
+    if (!agencyKind || agencyKind === "named_third_party" || !selectedWorkId || !selectedExactly || !scopeMatchesRequest || !assigneeEmail.trim()) return;
     setLoading(true); setError(""); setNotice("");
     try {
       const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -184,8 +184,8 @@ export function ServiceRequestDeliveryCompletion({ request, installation, respon
         workId: selectedWorkId,
         assignment: {
           assigneeEmail: assigneeEmail.trim().toLowerCase(),
-          assigneeKind: providerKind,
-          ...(providerKind === "agency" ? { agencyWorkspaceId } : {}),
+          assigneeKind: agencyKind,
+          ...(agencyKind === "agency" ? { agencyWorkspaceId } : {}),
           expiresAt,
           idempotencyKey: requestKey("provider-assignment"),
         },
@@ -199,9 +199,9 @@ export function ServiceRequestDeliveryCompletion({ request, installation, respon
       }) as { delivery?: DeliveryView };
       setAssignment(assignmentValue);
       setDelivery(deliveryValue.delivery ?? null);
-      setNotice("The exact scope and resource are assigned to the named provider. Provider acceptance is still pending.");
+      setNotice("The exact scope and resource are assigned to the named agency. Agency acceptance is still pending.");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "The provider delivery could not be requested.");
+      setError(cause instanceof Error ? cause.message : "The agency delivery could not be requested.");
     } finally {
       setLoading(false);
     }
@@ -238,7 +238,7 @@ export function ServiceRequestDeliveryCompletion({ request, installation, respon
   }
 
   async function grantDraftEdit() {
-    if (!delivery || delivery.status !== "accepted" || providerKind !== "agency" || !applicationWorkId) return;
+    if (!delivery || delivery.status !== "accepted" || agencyKind !== "agency" || !applicationWorkId) return;
     setLoading(true); setError(""); setNotice("");
     try {
       const value = await post("/api/agency-application-draft-access", { action: "grant", deliveryId: delivery.id, workId: applicationWorkId }) as { grant?: AgencyApplicationDraftGrant };
@@ -272,7 +272,7 @@ export function ServiceRequestDeliveryCompletion({ request, installation, respon
     <div>
       <p className="text-[11px] uppercase tracking-[0.12em] text-gray-faint">Accepted request</p>
       <h3 id={`service-delivery-${currentRequest.id}`} className="mt-1 text-[15px] font-medium text-warm-black">Move this request into delivery</h3>
-      <p className="mt-1 text-sm leading-6 text-gray-muted">The provider response accepted review only. Choose the exact approved scope and native resource before creating a revocable work assignment.</p>
+      <p className="mt-1 text-sm leading-6 text-gray-muted">The agency response accepted review only. Choose the exact approved scope and native resource before creating a revocable work assignment.</p>
     </div>
     {!scopeMatchesRequest ? <p role="alert" className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-gray-muted">This request scope does not equal the offering’s accepted scope ({scopeSummary}). Save a revised request before delivery can be linked.</p> : null}
     {deliveryState === "loading" && !delivery ? <p role="status" className="text-sm text-gray-muted">Checking the current delivery state…</p> : null}
@@ -280,23 +280,23 @@ export function ServiceRequestDeliveryCompletion({ request, installation, respon
       <label className="grid gap-2 text-sm text-warm-black"><span>Approved exact work</span><select className="min-h-10 rounded-lg border border-gray-border bg-surface px-3" value={selectedWorkId} onChange={(event) => setSelectedWorkId(event.target.value)}><option value="">Choose approved work</option>{responsibilities.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
       <fieldset className="space-y-2"><legend className="text-sm font-medium text-warm-black">Exact accepted scope</legend>{expectedScope.map((value) => <label key={value} className="flex min-h-10 items-center gap-2 text-sm text-gray-muted"><input type="checkbox" checked={selectedScope.includes(value)} onChange={(event) => setSelectedScope((current) => event.target.checked ? [...current, value] : current.filter((item) => item !== value))} />{value}</label>)}</fieldset>
       <fieldset className="space-y-2"><legend className="text-sm font-medium text-warm-black">Exact native resource</legend>{installation.nativeResources.map((resource) => <label key={`${resource.kind}:${resource.id}`} className="flex min-h-10 items-center gap-2 text-sm text-gray-muted"><input type="checkbox" checked={selectedResources.includes(resource.id)} onChange={(event) => setSelectedResources((current) => event.target.checked ? [...current, resource.id] : current.filter((item) => item !== resource.id))} />{resource.kind} · {resource.id}</label>)}</fieldset>
-      <label className="grid gap-2 text-sm text-warm-black"><span>Named provider operator email</span><input className="min-h-10 rounded-lg border border-gray-border bg-surface px-3" type="email" value={assigneeEmail} onChange={(event) => setAssigneeEmail(event.target.value)} placeholder="verified operator email" /></label>
-      {providerKind === "agency" ? <p className="text-xs leading-5 text-gray-muted">This grants the named member of {installation.responsibility.kind === "provider_requested" ? installation.responsibility.providerName : "the agency"} access to this customer work only. It does not add customer workspace membership.</p> : null}
-      <Button type="button" disabled={loading || !selectedWork || !selectedExactly || !scopeMatchesRequest || !assigneeEmail.trim()} loading={loading} onClick={() => void createDelivery()}>Create exact provider assignment</Button>
+      <label className="grid gap-2 text-sm text-warm-black"><span>Named agency operator email</span><input className="min-h-10 rounded-lg border border-gray-border bg-surface px-3" type="email" value={assigneeEmail} onChange={(event) => setAssigneeEmail(event.target.value)} placeholder="verified operator email" /></label>
+      {agencyKind === "agency" ? <p className="text-xs leading-5 text-gray-muted">This grants the named member of {installation.responsibility.kind === "provider_requested" ? installation.responsibility.providerName : "the agency"} access to this work only. It does not add membership in your business workspace.</p> : null}
+      <Button type="button" disabled={loading || !selectedWork || !selectedExactly || !scopeMatchesRequest || !assigneeEmail.trim()} loading={loading} onClick={() => void createDelivery()}>Create exact agency assignment</Button>
     </> : null}
     {deliveryState === "ready" && delivery ? <div className="space-y-3 rounded-lg border border-gray-border bg-surface p-3 text-sm">
       <p className="text-gray-muted">Delivery status: <strong className="font-medium text-warm-black">{delivery.status}</strong>. Assignment: {assignment?.status ?? (assignmentState === "error" ? "unavailable" : "refreshing")}.</p>
-      <p className="text-gray-muted">The provider must accept the assignment and run the approved work. The native execution receipt remains attached to the assigned responsibility.</p>
-      <p className="text-xs leading-5 text-gray-muted">The assignment permits the named provider to work on this exact resource. Website preparation or application revision requires a separate customer grant. Publishing remains a customer decision.</p>
+      <p className="text-gray-muted">The agency must accept the assignment and run the approved work. The native execution receipt remains attached to the assigned responsibility.</p>
+      <p className="text-xs leading-5 text-gray-muted">The assignment permits the named agency to work on this exact resource. Website preparation or application revision requires separate permission from your business. Publishing remains your decision.</p>
       <a className="underline" href={`/workspace?workspaceId=${encodeURIComponent(currentRequest.businessId)}&view=operations&assignmentId=${encodeURIComponent(delivery.assignmentId)}`}>Open assigned work</a>
       {applicationWorkId && delivery.status === "accepted" ? <a className="block underline" href={`/workspace?workspaceId=${encodeURIComponent(currentRequest.businessId)}&work=${encodeURIComponent(applicationWorkId)}`}>Review application draft and publish when ready</a> : null}
-      {providerKind === "agency" && websiteBindingId && delivery.status === "accepted" && assignment?.status === "accepted" && assignmentState === "ready" ? <AgencyWebsiteCustomerControls deliveryId={delivery.id} bindingId={websiteBindingId} customerWebsiteHref={customerWebsiteHref} /> : null}
-      {providerKind === "agency" && applicationWorkId && delivery.status === "accepted" && assignment?.status === "accepted" && assignmentState === "ready" && draftAccessState === "ready" ? <div className="space-y-3 rounded-lg border border-gray-border p-3">
+      {agencyKind === "agency" && websiteBindingId && delivery.status === "accepted" && assignment?.status === "accepted" && assignmentState === "ready" ? <AgencyWebsiteCustomerControls deliveryId={delivery.id} bindingId={websiteBindingId} customerWebsiteHref={customerWebsiteHref} /> : null}
+      {agencyKind === "agency" && applicationWorkId && delivery.status === "accepted" && assignment?.status === "accepted" && assignmentState === "ready" && draftAccessState === "ready" ? <div className="space-y-3 rounded-lg border border-gray-border p-3">
         <h4 className="font-medium text-warm-black">Application draft editing</h4>
         <p className="text-xs leading-5 text-gray-muted">This permission names {assignment.assigneeEmail ? <strong className="font-medium text-warm-black">{assignment.assigneeEmail}</strong> : "the current agency operator"} and applies only to the installed application above. You can revoke it separately; it also closes when this assignment or delivery expires.</p>
         {draftGrantActive ? <><p className="text-sm text-warm-black">Draft editing is granted through {new Date(draftGrant!.expiresAt).toLocaleString()}.</p><div className="flex flex-wrap gap-2"><a className="underline" href={`/workspace?workspaceId=${encodeURIComponent(currentRequest.businessId)}&work=${encodeURIComponent(applicationWorkId)}`}>Review application draft</a><Button type="button" variant="secondary" disabled={loading} onClick={() => void revokeDraftEdit()}>Revoke draft editing</Button></div></> : <><p className="text-sm text-gray-muted">The agency can inspect and rehearse the assigned application. It cannot save a revision until you grant draft editing.</p><Button type="button" disabled={loading} loading={loading} onClick={() => void grantDraftEdit()}>Grant draft editing to named operator</Button></>}
       </div> : null}
-      {delivery.status === "accepted" && !currentRequest.deliveryId ? <p className="text-xs text-gray-muted">After the provider completes the work, review the receipt here and confirm it or request changes.</p> : null}
+      {delivery.status === "accepted" && !currentRequest.deliveryId ? <p className="text-xs text-gray-muted">After the agency completes the work, review the receipt here and confirm it or request changes.</p> : null}
       {delivery.status === "accepted" && completed && !currentRequest.deliveryId ? <div className="space-y-2"><label className="grid gap-2 text-sm text-warm-black"><span>Customer review</span><textarea className="min-h-20 rounded-lg border border-gray-border bg-surface px-3 py-2" value={decisionNote} onChange={(event) => setDecisionNote(event.target.value)} placeholder="What did you verify?" /></label><div className="flex flex-wrap gap-2"><Button type="button" disabled={loading || !decisionNote.trim()} loading={loading} onClick={() => void decide("confirmed")}>Confirm completed delivery</Button><Button type="button" variant="secondary" disabled={loading || !decisionNote.trim()} onClick={() => void decide("changes_requested")}>Request changes</Button></div></div> : null}
       {currentRequest.deliveryId ? <p role="status" className="text-xs text-accent">Linked delivery history is recorded on this request.</p> : null}
     </div> : null}

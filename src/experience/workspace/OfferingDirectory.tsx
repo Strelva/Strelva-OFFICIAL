@@ -6,7 +6,7 @@ import type { OfferingCollection, OfferingCommand, OfferingInstallation, Offerin
 import type { WorkspaceProduct, WorkspaceWork } from "./contracts";
 import { sameAppHref, type ManagedWorkSummary } from "./workspace-discovery";
 import { composeOfferingDiscovery, type OfferingDiscoveryEntry } from "./offering-discovery";
-import { BusinessProviderStatus, useBusinessProviderDeliveries, type BusinessProviderDeliveryState } from "./business-provider-summary";
+import { BusinessAgencyStatus, useBusinessAgencyDeliveries, type BusinessAgencyDeliveryState } from "./business-provider-summary";
 import styles from "./workspace-offerings.module.css";
 import { type WorkspaceOfferingState } from "./useWorkspaceOfferings";
 import { availabilityLabel, definitionFor } from "./offering-configuration";
@@ -246,7 +246,7 @@ export function WorkspaceOfferingDirectory({
 
   const currentByDefinition = new Map(state.collection.installations.filter((installation) => installation.status !== "retired").map((installation) => [installation.definitionId, installation]));
   return <section aria-labelledby="business-offerings-title">
-    <header className={styles.directoryHeader}><p className={styles.eyebrow}>{discoveryEntries ? "Explore" : "Ready-made systems"}</p><h2 id="business-offerings-title">{discoveryEntries ? "Useful outcomes for this business." : "What this business can use."}</h2><p>{discoveryEntries ? "Start work that is available here, or request setup when it needs a connected service or release decision." : "Set up a ready-made system around work the business already owns. Availability does not grant access or promise a provider."}</p></header>
+    <header className={styles.directoryHeader}><p className={styles.eyebrow}>{discoveryEntries ? "Explore" : "Ready-made systems"}</p><h2 id="business-offerings-title">{discoveryEntries ? "Useful outcomes for this business." : "What this business can use."}</h2><p>{discoveryEntries ? "Start work that is available here, or request setup when it needs a connected service or release decision." : "Set up a ready-made system around work the business already owns. Availability does not grant access or promise an agency."}</p></header>
     <WebsiteAssignments collection={state.collection} sites={managedSites} saving={state.saving} onCommand={onWebsiteCommand} />
     {discoveryEntries ? <DiscoveryRows entries={discoveryEntries} onOffering={(entry) => {
       if (entry.offering) onSelect(entry.installation?.id ?? entry.offering.id);
@@ -273,11 +273,11 @@ export function BusinessOfferingSummary({
   state: WorkspaceOfferingState;
   work: readonly WorkspaceWork[];
   onOpen: (id?: string) => void;
-  providerDeliveryState?: BusinessProviderDeliveryState;
+  providerDeliveryState?: BusinessAgencyDeliveryState;
   /** STRELVA_SYSTEMS_RELEASE. Off (the default): the pre-Systems "offerings" words on Home. */
   systemsReleased?: boolean;
 }) {
-  const fetchedProviderDeliveryState = useBusinessProviderDeliveries(state);
+  const fetchedProviderDeliveryState = useBusinessAgencyDeliveries(state);
   const panelTitle = systemsReleased ? "Set up for this business" : "Installed offerings";
   if (state.status === "unavailable") return null;
   if (state.status === "loading") return <section className={styles.homePanel} aria-labelledby="home-offerings"><header><Settings2 size={17} aria-hidden="true" /><h2 id="home-offerings">{panelTitle}</h2></header><p role="status">{systemsReleased ? "Loading…" : "Loading offerings…"}</p></section>;
@@ -288,6 +288,6 @@ export function BusinessOfferingSummary({
   return <section className={styles.homePanel} aria-labelledby="home-offerings">
     <header><Settings2 size={17} aria-hidden="true" /><h2 id="home-offerings">{systemsReleased ? "Ready-made systems" : "Business offerings"}</h2><span>{current.length}</span></header>
     {current.length ? <ul>{current.map((installation) => <li key={installation.id}><button type="button" onClick={() => onOpen(installation.id)}><span><strong>{definitionFor(state.collection, installation)?.name ?? installation.definitionId}</strong><small>{installation.status === "draft" ? "Draft setup · publication required" : installation.nativeResources.map((resource) => work.find((item) => item.id === resource.id)?.title ?? resource.kind.replaceAll("_", " ")).join(" · ") || "No connected work"}</small></span><ArrowRight size={14} aria-hidden="true" /></button></li>)}</ul> : <div className={styles.homeEmpty}><p>{systemsReleased ? "Nothing ready-made is set up for this business." : "No offerings are installed for this business."} Saved work remains available on its own.</p><button type="button" onClick={() => onOpen()}>{systemsReleased ? "Explore ready-made systems" : "Explore offerings"}</button></div>}
-    <BusinessProviderStatus state={providerState} deliveries={providerDeliveries} installations={current} collection={state.collection} onOpen={onOpen} />
+    <BusinessAgencyStatus state={providerState} deliveries={providerDeliveries} installations={current} collection={state.collection} onOpen={onOpen} />
   </section>;
 }
