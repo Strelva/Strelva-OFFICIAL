@@ -45,10 +45,43 @@ source guards, not newly exercised SQL proof. New route tests mock the Systems
 adapter and do not reproduce its synchronization racing with delegation
 failure. This is retained uncertainty, not an observed permission bypass.
 
+## Reviewed, awaiting convergence
+
+[Domain/Version PR #618](https://github.com/Strelva/Strelva-OFFICIAL/pull/618)
+is reviewed at `4543251842d0546258e392fdf368635b1deaf6c3` and remains isolated
+until the remaining streams converge. The coordinator reran its fifteen suites:
+**113 passed, 12 SQL-dependent skips**. Typecheck, boundaries, ontology, focused
+ESLint and diff whitespace pass. These totals overlap other streams' suites;
+do not add them as unique combined coverage.
+
+Independent source review found no blocker. One Version-owned determination
+now supplies working definition, latest release, release-needed verdict, next
+number and changed paths to projection, generic/native preparation and release.
+The first release describes its full definition; reordered object keys do not
+create preparation. Array order still matters. Native exact-revision reads and
+retained receipts precede the unchanged-work exit; release qualification,
+approval and locked-field guards remain. Supported release/restore and current
+SQL wrapper paths keep current/latest aligned. Runtime source adds seven lines
+while removing consumer-local decisions; no new module or dependency is added.
+
+Caller tests use fictional transports, including generic runtime eligibility
+that is deliberately substituted. They do not prove native eligibility, SQL,
+Auth, provider publication or production. The stream's fictional preview proof
+also substitutes responses; it does not execute the refactored server helper.
+
+The founder glossary requires lifetime System kind, while older contracts,
+stores, tests and SQL permit kind updates. No application update caller was
+found beyond stores/tests, but the service-role RPC still exists. Kind affects
+health and native eligibility, so renaming it a description does not reconcile
+the discrepancy. This PR changes neither meaning nor enforcement. A separate
+follow-up must select lifetime-kind enforcement or an explicit lifetime/mutable
+classification distinction before coordinated contract work. No migration or
+production authority follows from this record.
+
 ## Remaining streams and integration order
 
-- Domain and Version changes: finish the common change verdict; return the
-  traced System-kind ambiguity without silently reversing runtime meaning.
+- Domain and Version changes: reviewed and held at the head above; retain the
+  separate System-kind decision when integrating.
 - Website acceptance/recovery: retain submitted payloads and stable public
   props and workspace/work session keys; supplemental reads cannot undo an
   accepted mutation.
