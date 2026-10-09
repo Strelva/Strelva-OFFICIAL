@@ -1,3 +1,4 @@
+import { actorCopy } from "@/platform/presentation/actor";
 import { z } from "zod";
 import { callReleaseFlagsRpc, tenantReleaseFlagEnabled, workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 import { releaseFlagMayBeOn } from "@/platform/release-flags/resolve";
@@ -46,7 +47,7 @@ export function handledReport(receipt: CatalogReportReceipt): HandledReceipt {
       ? `Strelva couldn't send your ${label}. We're on it.`
       : `Strelva held your ${label}: ${(receipt.reason ?? "sending is paused").replace(/_/g, " ")}.`;
   return {
-    id: `catalog-report:${receipt.id}`, store: "catalog_report_receipts", systemId: null, sentence, at: receipt.at,
+    id: `catalog-report:${receipt.id}`, store: "catalog_report_receipts", systemId: null, sentence: actorCopy(sentence, null), at: receipt.at,
     changed: receipt.reason,
     evidence: receipt.status === "accepted" ? { providerAccepted: true, readBack: "not_checked" } : null,
     undo: { state: "not_undoable", reason: receipt.status === "accepted" ? "A sent report cannot be unsent." : "No report was sent, so there is nothing to undo." },

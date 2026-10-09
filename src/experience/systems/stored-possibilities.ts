@@ -1,3 +1,4 @@
+import { actorCopy, actorSentence } from "@/platform/presentation/actor";
 /**
  * Possibilities in Postgres for the Systems experience (systems-experience
  * spec behavior 15). Server only.
@@ -259,7 +260,7 @@ export function makeRealReceipts(rows: ReadonlyArray<{ possibility: Possibility;
     const systemId = p.changes[0]?.baseline.systemId ?? null;
     const withdrawn = [...p.history].reverse().find((h) => h.kind === "withdraw_idle");
     if (p.status === "withdrawn" && withdrawn && Date.parse(withdrawn.at) >= since) {
-      receipts.push({ id: `possibility:${p.id}:withdrawn`, systemId, sentence: `Strelva set aside "${p.title}" after 90 days without activity`, at: withdrawn.at, undo: "Ask Strelva to open it again" });
+      receipts.push({ ...(withdrawn.actorId === "strelva" ? { actor: { kind: "platform" as const } } : {}), id: `possibility:${p.id}:withdrawn`, systemId, sentence: actorSentence(withdrawn.actorId === "strelva" ? { kind: "platform" } : null, `set aside "${p.title}" after 90 days without activity`), at: withdrawn.at, undo: "Ask Strelva to open it again" });
     }
     if (!a) continue;
     for (const step of a.steps) {
@@ -270,10 +271,10 @@ export function makeRealReceipts(rows: ReadonlyArray<{ possibility: Possibility;
         : step.reversibility === "irreversible" ? "Can't be undone: it already happened outside Strelva"
           : "Undo from History";
       const confirmed = step.readBack?.status === "failed" ? " (not yet confirmed)" : "";
-      receipts.push({ id: `activation:${a.id}:${step.id}`, systemId, sentence: `Strelva: ${step.label}${confirmed}`, at, undo });
+      receipts.push({ id: `activation:${a.id}:${step.id}`, systemId, sentence: actorSentence(null, `${step.label}${confirmed}`), at, undo });
     }
     if ((a.status === "made_real" || a.status === "rolled_back") && Date.parse(a.updatedAt) >= since) {
-      receipts.push({ id: `activation:${a.id}`, systemId, sentence: a.status === "made_real" ? `Strelva made "${p.title}" live` : `Strelva undid "${p.title}"`, at: a.updatedAt, undo: a.status === "made_real" ? "Undo from History" : "Undone" });
+      receipts.push({ id: `activation:${a.id}`, systemId, sentence: a.status === "made_real" ? actorSentence(null, `made "${p.title}" live`) : actorSentence(null, `undid "${p.title}"`), at: a.updatedAt, undo: a.status === "made_real" ? "Undo from History" : "Undone" });
     }
   }
   return receipts.sort((x, y) => Date.parse(y.at) - Date.parse(x.at));
@@ -292,11 +293,11 @@ export function revisionHistory(systemId: string, revisions: readonly SystemRevi
   return [...revisions].sort((a, b) => b.number - a.number).slice(0, limit).map((r) => ({
     id: `revision:${r.id}`,
     systemId,
-    sentence: r.summary === "Adopted at conversion."
+    sentence: actorCopy(r.summary === "Adopted at conversion."
       ? "Strelva started running it"
       : r.implementation.kind === "make_real_content"
         ? `Made live: ${r.summary ?? "a change"}`
-        : `${IMPLEMENTATION_SENTENCE[r.implementation.kind] ?? r.summary ?? "Changed"}`,
+        : `${IMPLEMENTATION_SENTENCE[r.implementation.kind] ?? r.summary ?? "Changed"}`, null),
     at: r.createdAt,
     releaseRef: r.implementation.ref,
     implementationKind: r.implementation.kind,

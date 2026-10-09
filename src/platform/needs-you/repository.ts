@@ -3,6 +3,7 @@
  * call goes through a service-role function; the actor-facing ones recheck
  * the actor in SQL. This file shapes arguments and maps database errors.
  */
+import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
@@ -176,7 +177,7 @@ export const PostgresNeedsYouStore: NeedsYouStore = {
     p_workspace_id: input.workspaceId, ...actorArgs(actor), p_layer: input.layer, p_system_id: input.systemId, p_kind: input.kind,
     p_route: input.route, p_reason: input.reason, p_expected_version: input.expectedVersion,
   }, policyStateSchema, "The setting could not be saved."),
-  handled: (actor, workspaceId, since) => call("read_strelva_handled", { p_workspace_id: workspaceId, ...actorArgs(actor), p_since: since }, z.array(z.record(z.string(), z.unknown())), "Strelva handled could not be loaded."),
+  handled: (actor, workspaceId, since) => call("read_strelva_handled", { p_workspace_id: workspaceId, ...actorArgs(actor), p_since: since }, z.array(z.record(z.string(), z.unknown())), `${STRELVA_HANDLED_LABEL} could not be loaded.`),
 };
 
 /** Latest open published-schema item; SQL scopes the active site to this business. */

@@ -48,7 +48,7 @@ describe("catalog report release and receipts", () => {
   it("reads history using the verified workspace actor and preserves failures", async () => {
     expect(await readCatalogReportHandled(actor, workspaceId, at)).toEqual([handledReport(receipt)]);
     expect(rpc).toHaveBeenCalledWith("read_catalog_report_receipts", expect.objectContaining({ p_workspace_id: workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail }));
-    expect(handledReport({ ...receipt, status: "failed", reason: "provider_failed" }).sentence).toContain("couldn't send");
+    expect(handledReport({ ...receipt, status: "failed", reason: "provider_failed" }).sentence).toContain("Couldn't send");
     expect(handledReport({ ...receipt, status: "suppressed", reason: "email_paused" }).sentence).toContain("email paused");
     expect(handledReport(receipt).undo.state).toBe("not_undoable");
     expect(handledReport(receipt).evidence?.readBack).toBe("not_checked");

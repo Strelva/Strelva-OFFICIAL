@@ -276,7 +276,7 @@ describe("Make real and the System page", () => {
     expect(html).toContain("Partly live");
     expect(html).toContain("Waiting: Google hasn&#x27;t approved Strelva&#x27;s access yet.");
     expect(html).toContain("History");
-    expect(html).toContain("Strelva started running it");
+    expect(html).toContain("Started running it");
     expect(html).not.toMatch(/>Version[^s]/);
     const order = ["Making it live", ">Possibilities<", ">History<"].map((text) => html.indexOf(text));
     expect(order).toEqual([...order].sort((a, b) => a - b));

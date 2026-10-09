@@ -7,6 +7,7 @@
  * both and fails if they drift. Only Jacob changes a floor, in code.
  */
 import { z } from "zod";
+import { recordedActorSchema, type RecordedActor } from "@/platform/presentation/actor";
 
 export const CHANGE_KINDS = [
   "fact.owner_stated",
@@ -198,6 +199,10 @@ export const ownerDecisionSchema = z.object({
   decidedAt: isoSchema.nullable(),
   deliveryState: z.enum(DELIVERY_STATES),
   operatorNote: z.string().nullable(),
+  /** Requesting actor, when recorded by the source. Never inferred from branding. */
+  actor: recordedActorSchema.nullable().optional().catch(null),
+  /** Support reviewer, separate from the requesting actor. */
+  noteActor: recordedActorSchema.nullable().optional().catch(null),
   openedAt: isoSchema,
   expiresAt: isoSchema,
   reminded1At: isoSchema.nullable(),
@@ -260,11 +265,26 @@ export type UndoState =
   | { state: "not_undoable"; reason: string }
   | { state: "undone" };
 
+/** Browser and server share the receipt decoder so attribution survives transport. */
+export const handledReceiptSchema = z.object({
+  id: z.string(), store: z.string(), systemId: z.string().nullable(), sentence: z.string(), at: z.string(), changed: z.string().nullable(),
+  actor: recordedActorSchema.optional().catch(undefined),
+  evidence: z.object({ providerAccepted: z.boolean(), readBack: z.enum(["verified", "not_verified", "not_checked"]) }).nullable(),
+  undo: z.discriminatedUnion("state", [
+    z.object({ state: z.literal("undo") }),
+    z.object({ state: z.literal("undo_needs_review"), reason: z.string() }),
+    z.object({ state: z.literal("not_undoable"), reason: z.string() }),
+    z.object({ state: z.literal("undone") }),
+  ]),
+});
+
 export interface HandledReceipt {
   id: string;
   store: string;
   systemId: string | null;
-  /** Strelva is the subject: "Strelva updated your Friday hours on Google". */
+  /** Recorded executor, when the read model supplies it. Missing attribution stays neutral. */
+  actor?: RecordedActor;
+  /** Who acted and what changed, in plain words. */
   sentence: string;
   at: string;
   /** What changed, in plain words, when the store records it. */

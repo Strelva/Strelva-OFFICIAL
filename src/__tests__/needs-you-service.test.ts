@@ -320,7 +320,7 @@ describe("the chase", () => {
     const summary = await service().chase();
     expect(summary).toMatchObject({ digests: 1, ownerNotTold: 0 });
     expect(sendEmail).toHaveBeenCalledTimes(1);
-    expect(sendEmail.mock.calls[0]![0].options!.heading).toBe("Strelva needs 2 decisions");
+    expect(sendEmail.mock.calls[0]![0].options!.heading).toBe("2 decisions need you");
     expect([...mem.items.values()].every(i => i.deliveryState === "sent")).toBe(true);
   });
 

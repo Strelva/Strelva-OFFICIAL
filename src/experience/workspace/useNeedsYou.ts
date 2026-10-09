@@ -2,25 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
-import { ownerDecisionSchema, type Decision, type HandledReceipt, type OwnerDecision } from "@/platform/needs-you/contracts";
+import { handledReceiptSchema, ownerDecisionSchema, type Decision, type HandledReceipt, type OwnerDecision } from "@/platform/needs-you/contracts";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
 
-const undoSchema = z.discriminatedUnion("state", [
-  z.object({ state: z.literal("undo") }),
-  z.object({ state: z.literal("undo_needs_review"), reason: z.string() }),
-  z.object({ state: z.literal("not_undoable"), reason: z.string() }),
-  z.object({ state: z.literal("undone") }),
-]);
-const receiptSchema = z.object({
-  id: z.string(), store: z.string(), systemId: z.string().nullable(), sentence: z.string(), at: z.string(), changed: z.string().nullable(),
-  evidence: z.object({ providerAccepted: z.boolean(), readBack: z.enum(["verified", "not_verified", "not_checked"]) }).nullable(),
-  undo: undoSchema,
-});
 const responseSchema = z.object({
   role: z.enum(["owner", "admin", "member"]),
   items: z.array(ownerDecisionSchema),
   complete: z.boolean(),
-  handled: z.array(receiptSchema),
+  handled: z.array(handledReceiptSchema),
   handledAvailable: z.boolean(),
 });
 
@@ -34,11 +23,11 @@ export type ItemNotice = { tone: "done" | "info" | "error"; text: string };
 
 const DECIDE_COPY: Record<string, ItemNotice> = {
   done: { tone: "done", text: "Done." },
-  done_unverified: { tone: "done", text: "Done. Strelva is confirming it went through." },
+  done_unverified: { tone: "done", text: "Done. Confirmation is still pending." },
   already_handled: { tone: "info", text: "This was already handled." },
   changed: { tone: "info", text: "This changed. Showing the latest." },
   expired: { tone: "info", text: "This lapsed. Nothing changed." },
-  failed: { tone: "error", text: "Strelva couldn't finish this. We're on it." },
+  failed: { tone: "error", text: "Could not finish this." },
   forbidden: { tone: "error", text: "Only the owner can decide this." },
   not_owner: { tone: "error", text: "Only the owner can decide this." },
   not_found: { tone: "info", text: "This is no longer here." },

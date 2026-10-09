@@ -1,3 +1,4 @@
+import type { RecordedActor } from "@/platform/presentation/actor";
 import type { OwnerBrand } from "@/platform/infra/agency-brand";
 import type { ConnectionKind, ConnectionState, SystemLifecycle, SystemRef } from "@/platform/systems/contracts";
 import type { HealthStatus } from "@/platform/system-health/contracts";
@@ -236,6 +237,7 @@ export interface WorkspaceSystemActivation {
 }
 
 export interface WorkspaceSystemHistoryRow {
+  actor?: RecordedActor;
   id: string;
   systemId: string;
   /** "Strelva published the rebuilt site". Never called a Version. */
@@ -246,6 +248,7 @@ export interface WorkspaceSystemHistoryRow {
 }
 
 export interface WorkspaceSystemReceipt {
+  actor?: RecordedActor;
   id: string;
   systemId: string | null;
   sentence: string;

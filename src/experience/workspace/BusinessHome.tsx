@@ -3,6 +3,8 @@
 import { useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { ArrowRight, Check, Circle, FileText, LayoutGrid, LoaderCircle, Plus, ShieldCheck, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { actorCopy, actorPresentation } from "@/platform/presentation/actor";
+import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
 import { StrelvaShell, pinnedApps, pinnedSystems, pinnedWebsites, type StrelvaSection } from "@/experience/app-frame/StrelvaShell";
 import { SystemList } from "@/experience/systems/SystemList";
 import { SYSTEMS_LABEL, SYSTEMS_LIST_LABEL, type SystemView } from "@/experience/systems/model";
@@ -199,7 +201,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   }
 
   const attentionRows = home.attention.map(({ work, reason }) => <li key={work.id}><button type="button" aria-label={`Open ${work.title}`} className={styles.row} onClick={() => onOpen(work.id)}><span><strong>{work.title}</strong><small>{reason}</small></span><ArrowRight size={16} aria-hidden="true" /></button></li>);
-  const receiptList = <ul className={styles.list} aria-label="What Strelva did this week">{receipts.slice(0, 7).map(receipt => <li key={receipt.id}><span className={styles.row}><span><strong>{receipt.sentence}</strong><small>{new Date(receipt.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {receipt.undo}</small></span></span></li>)}</ul>;
+  const receiptList = <ul className={styles.list} aria-label="This week’s changes">{receipts.slice(0, 7).map(receipt => <li key={receipt.id}><span className={styles.row}><span><strong>{actorCopy(receipt.sentence, receipt.actor)}</strong>{actorPresentation(receipt.actor).credit ? <small>{actorPresentation(receipt.actor).credit}</small> : null}<small>{new Date(receipt.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {receipt.undo}</small></span></span></li>)}</ul>;
 
   // ---- Strelva is working (ink-moss): what is moving now, then what Strelva handled.
   const lead = making[0];
@@ -209,7 +211,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   const progressChecking = busy || deliveryPending;
   const anyWork = Boolean(lead || leadRequest);
   const working = <section className={`${styles.working} ${styles.reveal}`} style={{ "--i": 1 } as CSSProperties} aria-labelledby="home-progress">
-    <p className={styles.eyebrow} data-tone="aurora"><span className={styles.dot} aria-hidden="true" data-live={anyWork || undefined} />{anyWork ? "Strelva is working" : "Strelva"}</p>
+    <p className={styles.eyebrow} data-tone="aurora"><span className={styles.dot} aria-hidden="true" data-live={anyWork || undefined} />{anyWork ? "In progress" : "This week"}</p>
     <h2 id="home-progress" className={styles.srOnly}>In progress</h2>
     {lead ? <div className={styles.lead}>
       <h3>{lead.partlyLive ? `${lead.title}: Partly live` : lead.title}</h3>
@@ -240,8 +242,8 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
     {needsYouReleased ? <StrelvaHandledSection state={needsYou.state} pending={needsYou.pending} notices={needsYou.receiptNotices} onUndo={needsYou.undo}
       fallback={receipts.length ? receiptList : handled.length && !systemsReleased ? <ul className={styles.list}>{handled.map(row => requestRow(row))}</ul> : undefined} />
       : <section className={styles.handled} aria-labelledby="home-handled">
-        <header className={styles.handledHeader}><h2 id="home-handled">Strelva handled</h2>{systemsReleased ? <span>This week</span> : null}</header>
-        {systemsReleased ? (receipts.length ? receiptList : <p className={styles.muted}>Nothing this week. When Strelva changes something for you, it shows here with what changed and how to undo it.</p>)
+        <header className={styles.handledHeader}><h2 id="home-handled">{STRELVA_HANDLED_LABEL}</h2>{systemsReleased ? <span>This week</span> : null}</header>
+        {systemsReleased ? (receipts.length ? receiptList : <p className={styles.muted}>Nothing this week. When something changes for you, it shows here with what changed and how to undo it.</p>)
           : progressChecking ? <p role="status" className={styles.muted}>Checking what finished…</p> : handled.length ? <ul className={styles.list}>{handled.map(row => requestRow(row))}</ul> : <p className={styles.muted}>Nothing finished yet. When Strelva or your agency finishes something, it appears here with what changed.</p>}
         {customer && sites.length ? <a className={styles.textAction} href={`${appBase}/workspace/recaps?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Weekly and monthly recaps<ArrowRight size={16} aria-hidden="true" /></a> : null}
       </section>}

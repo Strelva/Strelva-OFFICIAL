@@ -158,7 +158,7 @@ describe("Make real on Home and the System page", () => {
 
   it("Strelva handled lists each live accepted effect and the settled summary, never an isolated one", () => {
     const receipts = makeRealReceipts([{ possibility: p, activation: activation({ status: "made_real" }) }], Date.parse(AT) - 1000);
-    expect(receipts.map((r) => r.sentence)).toEqual(["Strelva: Publish the rebuilt attymooney.com", 'Strelva made "A rebuilt attymooney.com" live']);
+    expect(receipts.map((r) => r.sentence)).toEqual(["Publish the rebuilt attymooney.com", 'Made "A rebuilt attymooney.com" live']);
     expect(receipts[0]!.undo).toBe("Undo from History");
     expect(makeRealReceipts([{ possibility: p, activation: activation({}) }], Date.parse(AT) + 1000)).toEqual([]);
     const withdrawn = { ...p, status: "withdrawn", history: [{ revision: 9, kind: "withdraw_idle", actorId: "strelva", at: AT }] } as unknown as Possibility;
@@ -171,7 +171,7 @@ describe("Make real on Home and the System page", () => {
       { id: "r2", businessId: BIZ, systemId: "s1", number: 2, implementation: { kind: "tenant_content", ref: "x@v_2" }, summary: "Website content changed.", createdAt: "2026-10-02T00:00:00.000Z", createdBy: ACTOR },
       { id: "r3", businessId: BIZ, systemId: "s1", number: 3, implementation: { kind: "make_real_content", ref: "sha256:a", contentHash: HASH }, summary: "the rebuilt attymooney.com", createdAt: "2026-10-03T00:00:00.000Z", createdBy: ACTOR },
     ]);
-    expect(rows.map((r) => r.sentence)).toEqual(["Made live: the rebuilt attymooney.com", "Website content changed", "Strelva started running it"]);
+    expect(rows.map((r) => r.sentence)).toEqual(["Made live: the rebuilt attymooney.com", "Website content changed", "Started running it"]);
     expect(rows.every((r) => !/version/i.test(r.sentence))).toBe(true);
   });
 });
