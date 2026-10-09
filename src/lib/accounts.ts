@@ -169,9 +169,9 @@ export async function getAllAccounts(): Promise<Account[]> {
   if (!durableGroupingReadsRequested()) return getRedisAccounts();
   // Stable tenant identity comes from the existing tenant registry. Redis's
   // global index and reverse keys are caches, not required for linked accounts.
-  let tenants: Awaited<ReturnType<typeof import("./tenants")["getAllTenants"]>>;
-  try { tenants = await (await import("./tenants")).getAllTenants(); }
-  catch { return getRedisAccounts(); }
+  // Missing registry authority cannot turn a selected durable store into a
+  // stale Redis list. Propagate the failure before any grouping is returned.
+  const tenants = await (await import("./tenants")).getAllTenants();
   const rows = await Promise.all(tenants.map(tenant => readRecords<Account>("account_grouping", tenant.id, async () => {
     const account = await getRedisAccountForTenant(tenant.id);
     return account ? [account] : [];

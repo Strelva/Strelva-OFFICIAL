@@ -8,6 +8,7 @@ vi.mock("@/platform/infra/redis", () => ({ getRedis: () => ({
 }) }));
 vi.mock("@/lib/tenants", () => ({ getAllTenants: vi.fn(async () => [{ id: "one" }, { id: "two" }]) }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => null }));
+import { getAllTenants } from "@/lib/tenants";
 import { getAccount, getAccountForTenant, getAllAccounts } from "@/lib/accounts";
 import { setClientRecordDb } from "@/platform/client-records/mirror";
 
@@ -42,6 +43,13 @@ describe("durable account grouping reads", () => {
     expect(state.redisReads).toEqual([]);
     state.fail = false; state.days = 6;
     await expect(getAccountForTenant("one")).rejects.toThrow("client_records_cutover_not_qualified");
+    expect(state.redisReads).toEqual([]);
+  });
+  it("propagates registry outage for selected durable whole-account reads without a Redis fallback", async () => {
+    vi.mocked(getAllTenants).mockRejectedValueOnce(new Error("tenant_registry_unavailable"))
+      .mockRejectedValueOnce(new Error("tenant_registry_unavailable"));
+    await expect(getAllAccounts()).rejects.toThrow("tenant_registry_unavailable");
+    await expect(getAccount("bundle")).rejects.toThrow("tenant_registry_unavailable");
     expect(state.redisReads).toEqual([]);
   });
   it("does not return a stale grouping payload that excludes the requested site", async () => {
