@@ -325,8 +325,12 @@ export async function agencyWorkflow(browser: Browser, testInfo: TestInfo, neutr
         const sitemap = await pathGet(new URL(`sitemap.xml`, localSite).toString());
         expect(sitemap.status()).toBe(200);
         expect(await sitemap.text()).toContain(localSite.toString());
-        const navigation = await publicPage.locator('a[href^="/"]').evaluateAll(links => links.map(link => link.getAttribute("href")));
-        expect(navigation.every(href => href?.startsWith(`/sites/${tenantId}/`))).toBe(true);
+        // Compiling the sitemap can refresh this same public document in dev.
+        // Web-first locators reacquire its context while checking every link;
+        // an empty/loading page must not satisfy route isolation vacuously.
+        await expect(publicPage.locator('meta[name="strelva-site-hash"]')).toHaveAttribute("content", record.rebuild.candidate!.contentHash);
+        await expect(publicPage.locator('a[href^="/"]')).not.toHaveCount(0);
+        await expect(publicPage.locator(`a[href^="/"]:not([href^="/sites/${tenantId}/"])`)).toHaveCount(0);
       }
       await expect(publicPage.locator('meta[name="strelva-site-hash"]')).toHaveAttribute("content", record.rebuild.candidate!.contentHash);
       await expect(publicPage.getByText("Elmwood Bakery").first()).toBeVisible();
