@@ -16,6 +16,7 @@ const CHECK_MESSAGE: Record<CheckStatus, string> = {
   edited: "The block on the live page was changed by hand. Replace it with the one above.",
   missing: "No Strelva block on the live page yet. Paste the one above, publish the site, then check again.",
 };
+const UNCONFIRMED_PAGE = "We couldn't confirm the public page's current state. Reload the page to check before trying again.";
 
 /**
  * What AI assistants can read about the business without running
@@ -37,7 +38,13 @@ export function ServerVisibility({ workspaceId, canManage, initial, suggestedHan
   async function post(body: Record<string, unknown>): Promise<Record<string, unknown> | null> {
     const response = await request("/api/workspace/connected-sites/visibility", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, ...body }) });
     const result = await response.json().catch(() => null) as Record<string, unknown> & { error?: string } | null;
-    if (!response.ok || !result) { setError(result?.error || "That didn't go through. Nothing changed."); return null; }
+    if (!response.ok || !result || (body.action === "page" ? !result.page : !result.check)) {
+      const held = response.status === 503 && (result?.error === "Connected sites are not enabled. Nothing changed." || result?.error === "Public business pages are not enabled. Nothing changed.");
+      setError(body.action === "page" && !held && (response.ok || response.status >= 500 || !result?.error)
+        ? [result?.error, UNCONFIRMED_PAGE].filter(Boolean).join(" ")
+        : result?.error || "This check couldn't be completed. Try again.");
+      return null;
+    }
     return result;
   }
   async function savePage(event: { preventDefault(): void }, published: boolean) {
@@ -45,7 +52,7 @@ export function ServerVisibility({ workspaceId, canManage, initial, suggestedHan
     if (!handle.trim()) { setError("Choose the page's address first."); return; }
     setBusy("page"); setError("");
     try { const result = await post({ action: "page", handle: handle.trim().toLowerCase(), published }); if (result?.page) setPage(result.page as VisibilityPage); }
-    catch { setError("We couldn't reach Strelva just now. Nothing changed."); }
+    catch { setError(UNCONFIRMED_PAGE); }
     finally { setBusy(null); }
   }
   async function runCheck() {

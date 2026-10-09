@@ -32,7 +32,7 @@ const OUTCOME: Record<DetailsSaveOutcome, { tone: "status" | "alert"; text: stri
   conflict: { tone: "alert", text: "Someone changed these details while you were editing. Nothing was saved. Here is the latest; make your change again." },
   invalid: { tone: "alert", text: "That wasn't saved." },
   denied: { tone: "alert", text: "Only the owner can change these details. Nothing was saved." },
-  failed: { tone: "alert", text: "That didn't save. Nothing changed. Try again in a minute." },
+  failed: { tone: "alert", text: "We couldn't confirm whether the save completed. Reload the page and review the latest details before saving again." },
 };
 
 const INVALID_HINT: Partial<Record<EditableDetail, string>> = {
@@ -83,7 +83,7 @@ export function WorkspaceBusinessDetails({ workspaceId, state, result, googleRes
     <WorkspacePlace workspaceId={workspaceId} eyebrow="Business" title="Business details"
       intro="Your business record: the facts Strelva keeps about your business, who gets its emails, and where the rest of your settings live."
       state={state} denied={data?.denied.map((site) => site.siteName)}
-      errorTitle="Business details couldn't load" errorBody="Nothing changed. Reload the page to try again.">
+      errorTitle="Business details couldn't load" errorBody={result === "failed" ? OUTCOME.failed.text : "Nothing changed. Reload the page to try again."}>
       {notice ? (
         <Card padding="md" className="mt-6" role={notice.tone}>
           <p className="text-sm leading-6">{notice.text}{result === "invalid" && field && INVALID_HINT[field] ? ` ${INVALID_HINT[field]}` : ""}</p>

@@ -21,6 +21,7 @@ const PLATFORM_LABEL: Partial<Record<SitePlatform, string>> = {
   shopify: "Shopify", framer: "Framer", godaddy: "GoDaddy", "google-sites": "Google Sites", square: "Square", duda: "Duda", carrd: "Carrd",
 };
 const PLATFORM_OPTIONS = PLATFORMS.filter(value => PLATFORM_LABEL[value]).map(value => ({ value, label: PLATFORM_LABEL[value]! }));
+const UNCONFIRMED_CONNECTION = "We couldn't confirm the connection's current state. Reload the page to check before trying again.";
 
 /**
  * A new business brings the website it already has (website System spec,
@@ -41,7 +42,12 @@ export function ConnectSiteExperience({ workspaceId, canManage, initialSites, ap
   async function post(body: Record<string, unknown>): Promise<ConnectableSite | null> {
     const response = await request("/api/workspace/connected-sites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, ...body }) });
     const result = await response.json().catch(() => null) as { site?: ConnectableSite; error?: string } | null;
-    if (!response.ok || !result?.site) { setError(result?.error || "That didn't go through. Nothing changed."); return null; }
+    if (!response.ok || !result?.site) {
+      const held = response.status === 503 && result?.error === "Connected sites are not enabled. Nothing changed.";
+      setError(!held && (response.ok || response.status >= 500 || !result?.error)
+        ? [result?.error, UNCONFIRMED_CONNECTION].filter(Boolean).join(" ") : result?.error || UNCONFIRMED_CONNECTION);
+      return null;
+    }
     setSites(items => [...items.filter(item => item.id !== result.site!.id), result.site!]);
     return result.site;
   }
@@ -51,14 +57,14 @@ export function ConnectSiteExperience({ workspaceId, canManage, initialSites, ap
     if (!url.trim()) { setError("Enter your site's address, like yourbusiness.com."); return; }
     setBusy(true); setError("");
     try { const next = await post({ action: "connect", siteUrl: url.trim(), platform }); if (next) setSite(next); }
-    catch { setError("We couldn't reach Strelva just now. Nothing changed."); }
+    catch { setError(UNCONFIRMED_CONNECTION); }
     finally { setBusy(false); }
   }
   async function verify() {
     if (!site || !canManage || busy) return;
     setBusy(true); setError("");
     try { const next = await post({ action: "verify", siteId: site.id }); if (next) setSite(next); }
-    catch { setError("We couldn't reach Strelva just now. Nothing changed."); }
+    catch { setError(UNCONFIRMED_CONNECTION); }
     finally { setBusy(false); }
   }
 

@@ -324,6 +324,19 @@ existing **Works with** disclosure. These are read-only contracts behind the
 Systems release, not new grants or provider writes. Focused projection and
 render tests cover the contracts; browser proof belongs in the stream handoff.
 
+October 9, website and connected-site failure recovery: `WebsiteChangeRequests`
+keeps one serialized filing attempt and idempotency key through an unknown
+response; its draft becomes read-only and **Check this request** explicitly sends
+that same attempt. Only the exact saved request in a validated response completes
+it. Receipt actions have no retry key and remain locked after an unconfirmed
+result until the user reloads and reads the receipts. State belongs to the exact
+business/System identity. `ConnectSiteExperience`, `ServerVisibility` publication
+and Business details' generic save failure report uncertainty and ask the user
+to inspect the current saved state before retrying. Explicit release holds,
+read-only checks and permission refusals keep their own messages. No automatic
+retry or provider authority is added. Focused component/route proof is separate
+from desktop/mobile rendering and complete native journeys.
+
 Keep completion scoped to named consumers. A repaired Button does not migrate all
 native buttons, and passing component tests does not prove an entire page journey.
 Record local checks with their revision and limitations in the existing

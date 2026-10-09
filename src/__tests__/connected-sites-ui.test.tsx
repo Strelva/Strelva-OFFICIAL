@@ -80,6 +80,23 @@ describe("bringing the website a business already has", () => {
     expect(field.value).toBe("second.example"); expect(node.querySelector('[role="alert"]')?.textContent).toContain("could not be verified");
     expect(node.querySelector('option[value="' + SITE + '"]')?.textContent).toBe("bakery.example");
   });
+  it.each(["lost reply", "server failure"])("retains the address and existing site after an uncertain %s without resubmitting", async (failure) => {
+    const request = vi.fn(async () => {
+      if (failure === "lost reply") throw new TypeError("Response lost after the write");
+      return new Response(JSON.stringify({ error: "The saved connection could not be read." }), { status: 500 });
+    });
+    const node = await mount(request as unknown as typeof fetch, { initialSites: [{ ...site, verifiedAt: "2026-10-08T01:00:00Z" }] });
+    await act(async () => { [...node.querySelectorAll("button")].find(item => item.textContent === "Connect another website")!.click(); });
+    const field = node.querySelector("input")!;
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, "second.example"); field.dispatchEvent(new Event("input", { bubbles: true })); });
+    await act(async () => node.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    expect(field.value).toBe("second.example");
+    expect(node.querySelector('option[value="' + SITE + '"]')?.textContent).toBe("bakery.example");
+    expect(node.querySelector('[role="alert"]')?.textContent).toContain("Reload the page to check before trying again.");
+    expect(node.querySelector('[role="alert"]')?.textContent).not.toContain("Nothing changed");
+    if (failure === "server failure") expect(node.querySelector('[role="alert"]')?.textContent).toContain("The saved connection could not be read.");
+    expect(request).toHaveBeenCalledTimes(1);
+  });
   it("tells a member an owner or admin connects the site", async () => {
     const node = await mount(vi.fn() as unknown as typeof fetch, { canManage: false });
     expect(node.textContent).toContain("An owner or admin of this business connects its website.");
