@@ -61,6 +61,24 @@ review policy, provider delivery or customer adoption.
 
 ## Start with tokens and atoms
 
+### Systems mutation recovery, October 8, local
+
+`SystemPage` validates Make real's live or isolated acknowledgment before showing
+its result. Only an explicitly isolated result says live Systems are unchanged.
+A lost, malformed or failed response locks further Make real actions and offers
+Reload this System to read what landed. Concurrent alternatives remain disabled
+while one request is pending. A live acknowledgment also offers that reload;
+the page does not promise automatic progress refresh.
+
+`SystemVersionManagement` removes stale draft controls while reloading after a
+write or uncertain acknowledgment. `SystemVersionImprovements` lets the exact
+Version's admitted manager prepare a native draft for review, while owner
+authority remains necessary to approve publication. Conflict choices respect
+the same read-only and pending state. These controls use the owned Button and
+field components. Focused local jsdom tests cover acknowledgment uncertainty,
+overlap, stale authority and admin preparation; rendered and actual Auth proof
+remain separate release checks.
+
 ### Website owner consent for agency publication, October 7, local
 
 `RebuildExperience` uses the owned Button and a labelled native checkbox for

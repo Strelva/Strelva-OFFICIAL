@@ -33,6 +33,20 @@ function requestFor(over: { getItem?: OwnerDecision; post?: () => Promise<Respon
   });
 }
 describe("Version Make real uses the one owner decision", () => {
+  it("allows an admin to prepare a native draft without owner publication authority", async () => {
+    const nativeView = { ...view, canMakeReal: false, nativeRuntime: { kind: "website_section" } };
+    const request = requestFor({ view: nativeView, post: async () => Response.json({ outcome: "prepared", rowRevision: 4, receipt: null }) });
+    const node = await render(request);
+    const prepare = button(node, "Prepare native draft for review");
+    expect(prepare.disabled).toBe(false);
+    await act(async () => prepare.click());
+    const writes = request.mock.calls.filter(([, init]) => init?.method === "POST");
+    expect(writes).toHaveLength(1); expect(writes[0]?.[0]).toBe("/api/workspace/versions/manage");
+    expect(JSON.parse(String(writes[0]?.[1]?.body)).action).toBe("prepare_release");
+    expect(node.textContent).not.toContain("Version release went live");
+    const readOnly = await render(requestFor({ view: nativeView }), true);
+    expect(button(readOnly, "Prepare native draft for review").disabled).toBe(true);
+  });
   it("compares the current/alternative and approves the existing Version item, without another release path", async () => {
     const request = requestFor(); const node = await render(request);
     expect(node.textContent).toContain("Compare the release and alternative");

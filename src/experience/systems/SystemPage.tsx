@@ -4,7 +4,8 @@ import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import { WorkspaceInquirySystem } from "@/experience/places/WorkspaceInquirySystem";
 import Link from "next/link";
 import { ContentWorkspace } from "@/experience/publishing/ContentWorkspace";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { z } from "zod";
 import { ArrowLeft, ArrowUpRight, MessageSquareText } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { InquiryServerWorkspaceExperience } from "@/experience/inquiries/InquiryServerExperience";
@@ -20,7 +21,6 @@ import type { WorkspaceWork } from "@/experience/workspace/contracts";
 import { possibilityScope } from "./from-workspace";
 import { HealthSignal, LifecyclePill, SYSTEM_ICONS } from "./SystemList";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
-import type { WorkspaceLiveMakeRealResult, WorkspaceMakeRealResult } from "@/experience/workspace/contracts";
 import {
   CONNECTION_KIND_LABEL, INCOMING_CONNECTION_LABEL, PAUSED_KEEPS, POSSIBILITY_STATUS_LABEL, SYSTEM_KIND_LABEL, makeRealSummary,
   type MakeRealOutcome, type SystemConnection, type SystemPossibility, type SystemView,
@@ -147,7 +147,7 @@ export function SystemPage(props: SystemPageProps) {
         {filesRequests && askingChange ? <WebsiteChangeAsk workspaceId={props.workspaceId} systemId={system.id} siteName={system.name} onFiled={() => setDetailVersion(version => version + 1)} onClose={() => setAskingChange(false)} /> : null}
         {system.kind === "website" && websiteDetail ? <WebsiteSystemPanels workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} onAsk={onAsk} onAskChange={filesRequests ? () => setAskingChange(true) : undefined} readOnly={readOnly} includeHistory={false} /> : null}
         {system.activations?.length ? <ActivationsPanel system={system} /> : null}
-        {system.possibilities.length || system.storedVersionId ? <PossibilitiesPanel versionReadOnly={props.versionReadOnly} system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={comparing && mode !== "current" ? comparing.id : null} onCompare={system.surface.kind === "website" ? compare : undefined} onAsk={onAsk} /> : null}
+        {system.possibilities.length || system.storedVersionId ? <PossibilitiesPanel systemHref={props.systemHref} versionReadOnly={props.versionReadOnly} system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={comparing && mode !== "current" ? comparing.id : null} onCompare={system.surface.kind === "website" ? compare : undefined} onAsk={onAsk} /> : null}
         {system.connections.length || system.offers?.length || siteHref || (websiteDetail?.status === "ready" && websiteDetail.detail.domains.length) ? <ConnectionsPanel system={system.kind === "website" && websiteDetail?.status === "ready" ? { ...system, connections: [...system.connections, ...websiteDomainConnections(websiteDetail.detail)] } : system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} siteHref={siteHref} /> : null}
         <PartsPanel system={system} />
         {system.versions.length ? <VersionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} /> : null}
@@ -284,25 +284,36 @@ function ConnectionsPanel({ system, systemHref, onOpenSystem, siteHref }: { syst
   </Panel>;
 }
 
+const makeRealResponseSchema = z.union([
+  z.object({ live: z.object({ live: z.literal(true), status: z.string(), headline: z.string(), activationId: z.string().nullable() }) }),
+  z.object({ result: z.object({ isolated: z.literal(true), status: z.enum(["in_progress", "needs_attention", "made_real", "rolled_back"]), headline: z.string(),
+    done: z.array(z.object({ label: z.string(), mode: z.string().nullable() })), waiting: z.array(z.object({ label: z.string(), reason: z.string() })),
+    unknown: z.array(z.string()), notStarted: z.array(z.string()), liveUnchanged: z.boolean(), notConnected: z.array(z.string()) }) }),
+]);
+
 async function requestMakeReal(request: typeof fetch, workspaceId: string, possibilityId: string): Promise<MakeRealOutcome> {
   try {
     const response = await request("/api/workspace/systems/make-real", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, possibilityId }),
     });
-    const body = await response.json().catch(() => null) as { result?: WorkspaceMakeRealResult; live?: WorkspaceLiveMakeRealResult; error?: string; permission?: string } | null;
-    if (response.ok && body?.live) return { kind: "live", headline: body.live.headline, started: Boolean(body.live.activationId) };
-    if (response.ok && body?.result) return { kind: "result", result: body.result };
-    if (response.status === 403) return { kind: "permission", message: body?.error || "Only an owner of this business can make a possibility real." };
-    return { kind: "error", message: `${body?.error || "Make real could not be confirmed."} Your live systems are unchanged.` };
+    const body: unknown = await response.json().catch(() => null);
+    const parsed = makeRealResponseSchema.safeParse(body);
+    if (response.ok && parsed.success) {
+      if ("live" in parsed.data) return { kind: "live", headline: parsed.data.live.headline, started: Boolean(parsed.data.live.activationId) };
+      return { kind: "result", result: parsed.data.result };
+    }
+    const error = z.object({ error: z.string() }).safeParse(body);
+    if (response.status === 403) return { kind: "permission", message: error.success ? error.data.error : "Only an owner of this business can make a possibility real." };
+    return { kind: "error", message: `${error.success ? error.data.error : "Make real could not be confirmed."} Reload this System to check what landed before trying another change.` };
   } catch {
-    return { kind: "error", message: "Make real could not be reached. Your live systems are unchanged." };
+    return { kind: "error", message: "The response to Make real was lost. It may have started. Reload this System to check what landed before trying another change." };
   }
 }
 
 function MakeRealState({ outcome, onAsk, title }: { outcome: MakeRealOutcome; onAsk: (request: string) => void; title: string }) {
   if (outcome.kind === "live") return <div role="status" className={styles.makeRealNotice} aria-label="Make real result">
     <h3>{outcome.headline}</h3>
-    <p>{outcome.started ? "Strelva is making it live now. Each step shows above as it lands; what lands stays." : "Nothing changed."}</p>
+    <p>{outcome.started ? "Strelva has started this change. Reload this System to see what landed and what still needs attention." : "Reload this System to check the current outcome before trying another change."}</p>
   </div>;
   if (outcome.kind !== "result") return <p role={outcome.kind === "error" ? "alert" : "status"} className={styles.makeRealNotice}>{outcome.message}</p>;
   const { result } = outcome;
@@ -318,22 +329,28 @@ function MakeRealState({ outcome, onAsk, title }: { outcome: MakeRealOutcome; on
   </div>;
 }
 
-function PossibilitiesPanel({ versionReadOnly, system, systems, workspaceId, readOnly, readOnlyReason, canMakeReal, makeRealReason, appBase, comparingId, onCompare, onAsk }: { versionReadOnly?: boolean; system: SystemView; systems: readonly SystemView[]; workspaceId: string; readOnly: boolean; readOnlyReason?: string; canMakeReal: boolean; makeRealReason?: string; appBase: string; comparingId: string | null; onCompare?: (possibility: SystemPossibility) => void; onAsk: (request: string) => void }) {
+function PossibilitiesPanel({ systemHref, versionReadOnly, system, systems, workspaceId, readOnly, readOnlyReason, canMakeReal, makeRealReason, appBase, comparingId, onCompare, onAsk }: { systemHref: (id: string) => string; versionReadOnly?: boolean; system: SystemView; systems: readonly SystemView[]; workspaceId: string; readOnly: boolean; readOnlyReason?: string; canMakeReal: boolean; makeRealReason?: string; appBase: string; comparingId: string | null; onCompare?: (possibility: SystemPossibility) => void; onAsk: (request: string) => void }) {
   const request = useWorkspaceRequest();
   const [outcome, setOutcome] = useState<{ id: string; outcome: MakeRealOutcome } | null>(null);
   const [running, setRunning] = useState<string | null>(null);
+  const inFlight = useRef(false);
+  const [needsReload, setNeedsReload] = useState(false);
   const [versionCount, setVersionCount] = useState(0);
   async function makeReal(possibility: SystemPossibility) {
+    if (inFlight.current || needsReload || !canMakeReal || readOnly || possibility.status !== "ready") return;
+    inFlight.current = true;
     setRunning(possibility.id);
     setOutcome(null);
     const next = await requestMakeReal(request, workspaceId, possibility.id);
     setOutcome({ id: possibility.id, outcome: next });
+    setNeedsReload(next.kind === "live" || next.kind === "error" || next.kind === "permission");
+    inFlight.current = false;
     setRunning(null);
   }
   return <Panel id={`${system.id}-possibilities`} title="Possibilities" count={system.possibilities.length + versionCount} intro="Alternatives you can open and compare before anything changes.">
     {system.possibilities.length ? <ul className={styles.panelList}>{system.possibilities.map(possibility => {
       const scope = possibilityScope(possibility, systems);
-      const blockedReason = !canMakeReal ? makeRealReason || "Only an owner of this business can make a possibility real." : possibility.status !== "ready" ? "Still being explored. It can be made real once it is ready." : undefined;
+      const blockedReason = readOnly || !canMakeReal ? makeRealReason || readOnlyReason || "Only an owner of this business can make a possibility real." : possibility.status !== "ready" ? "Still being explored. It can be made real once it is ready." : needsReload ? "Reload this System to check the current outcome before making another change." : running ? "Wait for the current Make real request to finish." : undefined;
       return <li key={possibility.id}>
         <span className={styles.possibilityHead}><strong>{possibility.title}</strong><span className={styles.lifecycle} data-lifecycle={possibility.status === "ready" ? "live" : "draft"}>{POSSIBILITY_STATUS_LABEL[possibility.status]}</span></span>
         <small>{possibility.summary}</small>
@@ -343,12 +360,13 @@ function PossibilitiesPanel({ versionReadOnly, system, systems, workspaceId, rea
         <span className={styles.possibilityActions}>
           {onCompare && possibility.previewSrc ? <Button size="sm" variant="secondary" aria-pressed={comparingId === possibility.id} onClick={() => onCompare(possibility)}>Compare</Button> : null}
           {possibility.openHref ? <a className={styles.linkAction} href={`${appBase}${possibility.openHref}`}>Open</a> : null}
-          <Button size="sm" disabled={Boolean(blockedReason) || running === possibility.id} title={blockedReason} onClick={() => void makeReal(possibility)}>{running === possibility.id ? "Making real…" : "Make real"}</Button>
+          <Button size="sm" disabled={Boolean(blockedReason)} loading={running === possibility.id} title={blockedReason} onClick={() => void makeReal(possibility)}>{running === possibility.id ? "Making real…" : "Make real"}</Button>
         </span>
-        {!canMakeReal ? <small>{blockedReason}</small> : null}
+        {readOnly || !canMakeReal ? <small>{blockedReason}</small> : null}
         {outcome?.id === possibility.id ? <MakeRealState outcome={outcome.outcome} onAsk={onAsk} title={possibility.title} /> : null}
       </li>;
     })}</ul> : system.storedVersionId ? null : <p className="mt-3">No alternatives are being explored. <button type="button" className="underline" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={() => onAsk(`What else could ${system.name} become? `)}>Ask what else it could become</button></p>}
+    {needsReload ? <a className={styles.linkAction} href={systemHref(system.id)}>Reload this System</a> : null}
     {system.storedVersionId ? <SystemVersionImprovements key={`${workspaceId}:${system.id}:${system.storedVersionId}`} workspaceId={workspaceId} systemId={system.id} versionId={system.storedVersionId} readOnly={versionReadOnly ?? readOnly} canMakeReal={canMakeReal} onCount={setVersionCount} /> : null}
   </Panel>;
 }

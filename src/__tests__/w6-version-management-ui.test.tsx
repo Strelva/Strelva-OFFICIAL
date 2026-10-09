@@ -17,6 +17,25 @@ async function render(request: typeof fetch, readOnly = false) {
 }
 function prepare(node: HTMLElement) { return [...node.querySelectorAll("button")].find(button => button.textContent === "Prepare this draft for release")!; }
 describe("Version draft management acknowledgment", () => {
+  it("does not expose a stale draft while recovering from an uncertain write", async () => {
+    let reads = 0;
+    let finish!: (response: Response) => void;
+    const request = vi.fn<typeof fetch>(async (_input, init) => {
+      if (init?.method === "POST") throw new Error("Reply lost");
+      if (++reads === 1) return Response.json(view);
+      return new Promise<Response>(resolve => { finish = resolve; });
+    });
+    const node = await render(request); await act(async () => prepare(node).click());
+    expect(prepare(node).disabled).toBe(true);
+    const reload = [...node.querySelectorAll("button")].find(button => button.textContent === "Reload the draft")!;
+    await act(async () => reload.click());
+    expect(node.textContent).toContain("Reading the Version’s draft");
+    expect(prepare(node)).toBeUndefined();
+    await act(async () => finish(Response.json({ ...view, rowRevision: 4, canManage: false })));
+    expect(prepare(node)).toBeUndefined();
+    expect(node.textContent).toContain("An owner or admin can change");
+    expect(request.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
+  });
   it("keeps loading, error and read-only states honest", async () => {
     const loading = await render(vi.fn(() => new Promise<Response>(() => undefined)));
     expect(loading.querySelector('[role="status"]')?.textContent).toContain("Reading the Version"); expect(prepare(loading)).toBeUndefined();
