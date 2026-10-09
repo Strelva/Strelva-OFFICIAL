@@ -415,3 +415,6 @@ export function accountMrrCents(account: Account): number {
   }
   return account.subscription?.amountCents ?? 0;
 }
+
+/** Pure legacy shape normalizer reused by operator source capture; no runtime read authority. */
+export { normalize as normalizeLegacyAccount };
