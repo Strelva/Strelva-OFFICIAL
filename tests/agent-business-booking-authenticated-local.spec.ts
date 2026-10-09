@@ -98,6 +98,17 @@ test("native public booking discovery, disabled admission, scanner preview and s
     const serviceId = randomUUID();
     const handle = `local-agent-${randomUUID().slice(0, 8)}`;
     seedNativePublicBooking(workspaceId, owner, serviceId);
+    // Public discovery uses the owner's confirmed copy, never raw/verified rows.
+    const pending = await owner.context.request.get(`/api/workspace/needs-you?workspaceId=${workspaceId}`);
+    expect(pending.status(), await pending.text()).toBe(200);
+    const confirmation = (await pending.json()).items.find((item: { sourceLifecycle: string; sourceId: string }) =>
+      item.sourceLifecycle === "business_facts" && item.sourceId === workspaceId);
+    expect(confirmation, "Seeded business/service details require an actual owner decision").toBeTruthy();
+    const confirmed = await moneyPost(owner.context.request, "/api/workspace/needs-you", {
+      workspaceId, itemId: confirmation.id, revision: confirmation.revisionHash, decision: "approve",
+    });
+    expect(confirmed.status).toBe("done");
+    expect(localSql(`select to_jsonb(count(*)) from public.business_record_confirmed where workspace_id=:'v1'::uuid and entity='service' and entity_id=:'v2'`, workspaceId, serviceId)).toBe(1);
     await moneyPost(owner.context.request, "/api/workspace/connected-sites/visibility", { action: "page", workspaceId, handle, published: true });
     const consent = await moneyPost(owner.context.request, "/api/workspace/agent-channel", { workspaceId, consented: true, reason: "Local fixture owner consent; delivery remains disabled" });
     expect(consent).toEqual({ consented: true });
