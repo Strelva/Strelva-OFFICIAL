@@ -13,7 +13,7 @@ import { contextForService, servicePolicy, validateBookingIntake } from "./servi
 import { pausedBookingMessage } from "./errors";
 import { getRedis } from "@/platform/infra/redis";
 import { alertOnce } from "@/platform/infra/monitoring";
-import { DEFAULT_BOOKING_CONFIG } from "@/lib/booking";
+import { DEFAULT_BOOKING_CONFIG } from "@/platform/infra/booking-config";
 import type { Booking, BookingConfig, DateOverride } from "@/lib/types";
 import {
   composeLegacyConfig,

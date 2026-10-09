@@ -1,22 +1,7 @@
+import { DEFAULT_BOOKING_CONFIG as canonicalDefaultBookingConfig } from "@/platform/infra/booking-config";
 import type { BookingConfig, DateOverride, Booking } from "./types";
 
-export const DEFAULT_BOOKING_CONFIG: BookingConfig = {
-  timezone: "America/New_York",
-  weeklySchedule: [
-    { day: 0, start: "09:00", end: "17:00", enabled: false },
-    { day: 1, start: "09:00", end: "17:00", enabled: false },
-    { day: 2, start: "12:00", end: "18:00", enabled: true },
-    { day: 3, start: "10:00", end: "16:00", enabled: true },
-    { day: 4, start: "12:00", end: "18:00", enabled: true },
-    { day: 5, start: "10:00", end: "16:00", enabled: true },
-    { day: 6, start: "09:00", end: "17:00", enabled: false },
-  ],
-  slotDuration: 60,
-  bufferTime: 15,
-  bookingLeadTime: 24,
-  maxAdvanceBooking: 60,
-  requirePayment: false,
-};
+export const DEFAULT_BOOKING_CONFIG: BookingConfig = canonicalDefaultBookingConfig;
 
 function timeToMinutes(time: string): number {
   // time is always a valid "HH:MM" string from schedule/override config.

@@ -1,4 +1,4 @@
-import type { PublicContinuation } from "@/lib/public-continuation";
+import type { PublicContinuation } from "@/platform/infra/public-continuation";
 
 // Recomposition input, never a conversion of an existing saved candidate.
 export function nativePublicWebsiteInput(brief: PublicContinuation, workspaceId: string, requestId: string) {
