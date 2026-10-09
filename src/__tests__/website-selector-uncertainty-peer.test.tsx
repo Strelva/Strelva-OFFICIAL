@@ -53,7 +53,7 @@ async function mountLegacy() { node = document.createElement("div"); document.bo
 it("adopts a validated connection receipt in the actual legacy parent and clears old launch approval", async () => {
  const transport = vi.fn<typeof fetch>().mockImplementation(async (url, init) => Response.json(String(url).includes("/connections") ? init?.method === "POST" ? legacyRecord(2, false) : options : legacyRecord())); vi.stubGlobal("fetch", transport);
  await mountLegacy(); await choose(); await act(async () => button("Update website preview")!.click());
- expect(button("Prepare launch")).toBeUndefined(); expect(node.textContent).toContain("Preview version 2 is ready for your review"); expect(node.textContent).toContain("Website forms updated. Review and approve the new preview.");
+ expect(button("Prepare launch")).toBeUndefined(); expect(node.textContent).toContain("Saved preview 2 is ready for your review"); expect(node.textContent).toContain("Website forms updated. Review and approve the new preview.");
 });
 it.each(["503", "malformed200"])("holds legacy approved actions behind current-state read after %s", async kind => {
  const transport = vi.fn<typeof fetch>().mockImplementation(async (url, init) => !String(url).includes("/connections") ? Response.json(legacyRecord()) : init?.method !== "POST" ? Response.json(options) : kind === "503" ? Response.json({ error: "Post-commit acknowledgement unavailable in fixture." }, { status: 503 }) : Response.json({ workId, workspaceId, website: { committedRevision: 2 } })); vi.stubGlobal("fetch", transport);
@@ -67,7 +67,7 @@ it("blocks legacy available-form refresh and exposes an actual current website r
  await mountLegacy(); await choose(); await act(async () => button("Update website preview")!.click()); await act(async () => button("Refresh available forms")!.click());
  const websiteReads = transport.mock.calls.filter(([url, init]) => !String(url).includes("/connections") && init?.method !== "POST");
  expect(websiteReads).toHaveLength(1); // initial read only
- expect(button("Prepare launch")!.disabled).toBe(true); expect(node.textContent).not.toContain("Preview version 1 is approved.");
+ expect(button("Prepare launch")!.disabled).toBe(true); expect(node.textContent).not.toContain("Saved preview 1 is approved.");
  expect(button("Check saved status")).toBeUndefined(); expect(button("Reload current state")).toBeDefined();
 });
 it.each(['rebuild', 'legacy'] as const)('performs one actual %s saved-state read after unknown, retains failed-read selection, and clears stale approval without replay', async kind => {

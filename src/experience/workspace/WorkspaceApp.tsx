@@ -48,7 +48,7 @@ import type { WorkspaceInquiryTarget, WorkspacePlanRenderer } from "./WorkspaceL
 import type { WorkspaceStartContinuation } from "./workspace-start";
 import { selectWorkspaceLocation, isHorizontalView, viewForWork, type HorizontalView, type WorkspaceView as View } from "./workspace-selection";
 import { workspaceExitBlocksChanges, workspaceExitIsStopped } from "./workspace-exit-ui";
-import { NO_OPEN_WORK, leaveWork, startContinuation, startRequest, type OpenWorkContext } from "./open-work";
+import { NO_OPEN_WORK, leaveWork, startContinuation, startAsk, type OpenWorkContext } from "./open-work";
 import type { PreviewRouteContext } from "./preview/route-context";
 
 type Notice = { kind: "success" | "error"; message: string } | null;
@@ -89,8 +89,8 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   const inquiryStartContext = startContinuation(open, "inquiries", "inquiries");
   const trackerStartContext = startContinuation(open, "tracker", "tracker");
   const documentStartContext = startContinuation(open, "document", "document");
-  const planStartRequest = startRequest(open, "plan");
-  const horizontalRequest = startRequest(open, view);
+  const planStartAsk = startAsk(open, "plan");
+  const horizontalRequest = startAsk(open, view);
   const [home, setHome] = useState(true);
   const [pendingRequest, setPendingRequest] = useState<string | null>(null);
   const [recovering, setRecovering] = useState(false);
@@ -492,7 +492,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
       : <><DocumentExperience key={`${snapshot.workspaceId}:${selectedWork?.productId === "documents" ? selectedWork.id : "new"}:${documentRequestText || "new"}`} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === "documents" ? selectedWork.id : undefined} readOnly={workspaceReadOnly} onSaved={handleDocumentSaved} initialRequestText={documentRequestText} sources={snapshot.work} />{selectedWork?.productId === "documents" ? <WorkAuthorityPanel key={selectedWork.id} workId={selectedWork.id} canManage={!workspaceReadOnly && (currentWorkspace?.role === "owner" || currentWorkspace?.role === "admin")} sources={snapshot.work} /> : null}</>
     : undefined;
   const planContent: WorkspacePlanRenderer | undefined = snapshot && view === "plan"
-    ? onRequest => <WorkPlanExperience systemsRelease={snapshot.releases?.systems === true} onRequest={onRequest} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === "work_plans" ? selectedWork.id : undefined} initialRequest={planStartRequest || undefined} sources={snapshot.work} readOnly={workspaceReadOnly} localPreview={snapshot.actor.localPreview} onSaved={handlePlanSaved} onOpenWork={openWorkFromPlan} />
+    ? onRequest => <WorkPlanExperience systemsRelease={snapshot.releases?.systems === true} onRequest={onRequest} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === "work_plans" ? selectedWork.id : undefined} initialRequest={planStartAsk || undefined} sources={snapshot.work} readOnly={workspaceReadOnly} localPreview={snapshot.actor.localPreview} onSaved={handlePlanSaved} onOpenWork={openWorkFromPlan} />
     : undefined;
 
   function clearPublicSaveQuery() {
@@ -678,7 +678,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
             <WebsiteAuditPage key={selectedWork.id} initialResult={selectedWork.assessment.payload} saved />
           ) : selectedWork?.assessment?.kind === "ai_visibility" ? (
             <>
-            <AiVisibilityAssessmentResult work={selectedWork} onRetry={workspaceReadOnly ? undefined : () => { setRetryWork(selectedWork); setOpen(current => ({ ...current, showAssessment: true, start: null })); }} accessLabel={delegatedRead ? "Read-only access granted by the customer" : workspaceExitBlocks ? "Changes are paused for this workspace" : "Access controlled by this workspace"} />
+            <AiVisibilityAssessmentResult work={selectedWork} onRetry={workspaceReadOnly ? undefined : () => { setRetryWork(selectedWork); setOpen(current => ({ ...current, showAssessment: true, start: null })); }} accessLabel={delegatedRead ? "Read-only access granted by the client" : workspaceExitBlocks ? "Changes are paused for this workspace" : "Access controlled by this workspace"} />
               {canShowWorkBudget ? <WorkBudgetPanel workspaceId={snapshot.workspaceId} workId={selectedWork.id} productId="ai_visibility" resourceKind={selectedWork.resourceKind} /> : null}
             </>
           ) : selectedWork?.productId === "research" && selectedWork.resourceKind === "experiment" ? (
@@ -756,8 +756,8 @@ function DelegatedEmpty() {
   return (
     <div className="mx-auto max-w-2xl">
       <LockKeyhole className="h-6 w-6 text-accent-text" strokeWidth={1.5} />
-      <h1 className="mt-5 font-display text-[36px] font-medium text-warm-black">Customer work shared read-only.</h1>
-      <p className="mt-3 max-w-xl text-[14px] leading-relaxed text-gray-muted">There is no work available in this shared view. Only the customer can create or change work here.</p>
+      <h1 className="mt-5 font-display text-[36px] font-medium text-warm-black">Client work shared read-only.</h1>
+      <p className="mt-3 max-w-xl text-[14px] leading-relaxed text-gray-muted">There is no work available in this shared view. Only the client can create or change work here.</p>
     </div>
   );
 }

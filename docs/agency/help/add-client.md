@@ -20,6 +20,6 @@ different things.
 
 There is no agency URL-add screen in this revision. Do not use `/admin/onboard`
 or tenant-conversion scripts as an agency instruction. An accepted assessment
-handoff gives the customer a copy; it does not make your agency its provider.
+handoff gives the business owner a copy; it does not establish an agency relationship.
 
 Next: [connect the site](./connect-site.md) or [check the rest of your book](./check-book.md).

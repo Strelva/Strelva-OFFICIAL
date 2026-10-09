@@ -197,7 +197,7 @@ test("owner can import, save, reload, edit with conflict feedback, paginate, and
   await expect(page.getByText(/Changed Name from.*Task 1.*Task one revised/)).toBeVisible();
 
   await writeExperiment(page);
-  await expect(page.getByText("Experiment recorded in My work. These are reported observations, not verified customer savings.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Experiment recorded in My work. These are reported observations, not verified business savings.", { exact: true })).toBeVisible();
   expect(fixture.experimentRecorded).toBe(true);
 
   await page.setViewportSize({ width: 390, height: 844 });

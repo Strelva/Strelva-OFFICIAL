@@ -299,7 +299,7 @@ test("independently owned businesses install and update definitions without copy
     expect(ownerVersionAfterB.pendingRelease).toBeNull();
     expect(ownerAfterB.payload.release).toEqual(installed.payload.release);
     expect(ownerAfterB.payload.records).toEqual(installed.payload.records);
-    await expect(ownerPage.getByText("Version 2 is the version people use now.", { exact: true })).toBeVisible();
+    await expect(ownerPage.getByText("Release 2 is what people use now.", { exact: true })).toBeVisible();
     await expect(ownerPage.getByRole("tab", { name: "Review", exact: true })).toBeVisible();
     await expect(ownerPage.getByRole("tab", { name: "Sharing", exact: true })).toBeVisible();
     await expect(ownerPage.getByRole("tab", { name: "Edit", exact: true })).toHaveCount(0);
@@ -308,18 +308,18 @@ test("independently owned businesses install and update definitions without copy
     await expect(ownerApplication.getByText("Review changes", { exact: true })).toHaveCount(0);
     await expect(ownerApplication.getByRole("button", { name: "Publish", exact: true })).toHaveCount(0);
     await expect(ownerApplication.getByText("Edit proposed app", { exact: true })).toHaveCount(0);
-    await expect(ownerApplication.getByRole("button", { name: /^(Check proposed change|Run checks again|Check source version)$/ })).toHaveCount(0);
+    await expect(ownerApplication.getByRole("button", { name: /^(Check proposed change|Run checks again|Check source release)$/ })).toHaveCount(0);
     await expect(ownerApplication.getByText("Source design and updates", { exact: true })).toHaveCount(0);
-    await ownerApplication.getByText("Restore an earlier live version", { exact: true }).click();
-    await expect(ownerApplication.getByRole("button", { name: "Restore released version", exact: true })).toBeVisible();
-    await expect(ownerApplication.getByRole("button", { name: "Restore released version", exact: true })).toBeDisabled();
+    await ownerApplication.getByText("Restore a release from History", { exact: true }).click();
+    await expect(ownerApplication.getByRole("button", { name: "Restore release from History", exact: true })).toBeVisible();
+    await expect(ownerApplication.getByRole("button", { name: "Restore release from History", exact: true })).toBeDisabled();
     // Publication ends implicit creator access; native Version authority remains separate.
     await makerPage.reload();
     await expect(makerPage.getByText("Working definition and local changes", { exact: true })).toBeVisible();
     await expect(makerPage.getByRole("tablist", { name: "Application workspace", exact: true })).toHaveCount(0);
     await expect(makerPage.getByRole("tab", { name: /^(Edit|Review|Sharing)$/ })).toHaveCount(0);
     await ownerPage.goto(`/workspace?workspaceId=${customerSpace}&view=applications`);
-    await expect(ownerPage.getByText("Ask your provider to create or copy an internal tool.", { exact: true })).toBeVisible();
+    await expect(ownerPage.getByText("Ask your agency to create or copy an internal tool.", { exact: true })).toBeVisible();
     await expect(ownerPage.getByRole("form", { name: "Application setup", exact: true })).toHaveCount(0);
     await expect(ownerPage.getByText("Start from an existing app", { exact: true })).toHaveCount(0);
 

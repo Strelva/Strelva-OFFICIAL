@@ -93,9 +93,9 @@ function item(input: { kind: ChangeKind; title: string; sourceId: string; revisi
   return {
     kind: input.kind,
     route: "owner_decides",
-    title: (first ? `Put ${input.title} live` : `Release the new version of ${input.title}`).slice(0, 200).trim(),
-    detail: first ? "It passed its checks. Nobody can use it until you approve." : "It passed its checks. The live version stays until you approve.",
-    approveEffect: first ? "It goes live for the people you give access to." : "The new version replaces the live one.",
+    title: (first ? `Put ${input.title} live` : `Approve the new release of ${input.title}`).slice(0, 200).trim(),
+    detail: first ? "It passed its checks. Nobody can use it until you approve." : "It passed its checks. The live release stays until you approve.",
+    approveEffect: first ? "It goes live for the people you give access to." : "The new release replaces the live one.",
     notYetEffect: "Nothing changes; it waits for you.",
     sourceLifecycle: "application_release",
     sourceId: input.sourceId,

@@ -41,7 +41,7 @@ criteria and reviewer still depend on #233.
    [NOT BUILT — tracked in #262]
 
 Current fallback: [check one business at a time](./help/check-ai-visibility.md).
-That produces assessments, not provider relationships or an imported client book.
+That produces assessments, not agency relationships or an imported client book.
 
 Done when: every client has a baseline or a named reason it could not be measured.
 Choose the first useful fix from the evidence, not just the lowest grade.
@@ -49,7 +49,7 @@ Choose the first useful fix from the evidence, not just the lowest grade.
 ## Day 3 — Connect existing sites
 
 1. [Connect each existing site](./help/connect-site.md) using its two header lines.
-   Agency provider access to the connection flow remains [NOT BUILT — tracked in #255].
+   Agency access to the connection flow remains [NOT BUILT — tracked in #255].
 2. Publish those lines with the site's current builder. Check the site in Strelva.
 3. On an authorized test site, make a visit and submit a test inquiry through
    the actual form. Check the activity and inquiry record; remove test noise from
@@ -110,7 +110,7 @@ partial or unproven. Do not send a success report based on approval alone.
 1. Show the client the baseline, proposed change, decision and observed result.
 2. Explain [export](./help/export-data.md) and [exit](./help/leave-or-change-agency.md).
    The current JSON download is a limited snapshot, not a complete site backup.
-3. Explain the provider-change flow and the agency-requested export delivered
+3. Explain the agency-change flow and the agency-requested export delivered
    only to the owner.
    These remain [NOT BUILT — tracked in #293] and [NOT BUILT — tracked in #295].
 4. Record what remains blocked and who takes the next action. Agree the next

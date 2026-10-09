@@ -18,7 +18,7 @@ import { readLinkedSite } from "@/platform/owner-entry/linked-sites";
 import { readBusinessRecord } from "@/platform/business-record/service";
 import { factValueSchemas } from "@/platform/business-record/contracts";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
-import { assertActingProvider } from "@/platform/workspaces/acting-provider";
+import { assertActingAgency } from "@/platform/workspaces/acting-provider";
 import { publishingEnabledForWorkspace } from "@/products/publishing/server";
 import { readPublishingSnapshot } from "@/products/publishing/server";
 import { defaultTenantReplyDeps } from "./tenant-replies";
@@ -102,8 +102,8 @@ export function isGoogleListingEvent(event: UnifiedEvent): boolean { return even
  * provider for Google on this location (#255), before its receipt and again
  * just before the call.
  */
-export function asActingProvider(ctx: ListingContext, actor: WorkspaceActor): ListingContext {
-  return { ...ctx, authorizeProvider: async () => { await assertActingProvider(actor, ctx.workspaceId, { effect: "google", kind: "google_location", ref: ctx.location.locationId }); } };
+export function asActingAgency(ctx: ListingContext, actor: WorkspaceActor): ListingContext {
+  return { ...ctx, authorizeProvider: async () => { await assertActingAgency(actor, ctx.workspaceId, { effect: "google", kind: "google_location", ref: ctx.location.locationId }); } };
 }
 
 export async function tenantListingContext(tenantId: string, workspaceId: string, locationId: string, nativeGrant?: z.infer<typeof nativeGoogleGrantPinSchema>): Promise<ListingContext> {
@@ -255,3 +255,6 @@ export async function googleTargetAllowed(actor: WorkspaceActor, workspaceId: st
   if (nativeWorkspace) return nativeWorkspace === workspaceId && (await readBusinessRecord(actor, workspaceId)).access === "owner";
   return !!await readLinkedSite(actor, workspaceId, scope) && await hasTenantPermission(scope, "publishing:manage");
 }
+
+/** @deprecated Use asActingAgency. */
+export const asActingProvider = asActingAgency;

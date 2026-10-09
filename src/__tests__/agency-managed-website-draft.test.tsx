@@ -112,13 +112,13 @@ describe("managed website agency draft authority", () => {
     expect(requests[2]?.body).toEqual({ action: "run", assignmentId });
     expect(requests[2]?.body).not.toHaveProperty("input");
     expect(container.textContent).toContain("Saved hero draft revision 1");
-    expect(container.textContent).toContain("The customer reviews and publishes your draft");
+    expect(container.textContent).toContain("The client reviews and publishes your draft");
     expect(container.querySelector<HTMLAnchorElement>('a[href="/client/website-draft-a/dashboard/site"]')).toBeTruthy();
     act(() => root.unmount());
     container.remove();
   });
 
-  it("withholds preparation controls when the customer grant is revoked or expired", async () => {
+  it("withholds preparation controls when the client grant is revoked or expired", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({
       grant: { ...grant, status: "revoked", revokedAt: "2026-09-20T13:00:00.000Z", revokedBy: ownerId },
       state,
@@ -130,7 +130,7 @@ describe("managed website agency draft authority", () => {
     container.remove();
   });
 
-  it("lets the customer grant and revoke the named operator through the access controls", async () => {
+  it("lets the client grant and revoke the named operator through the access controls", async () => {
     const requests: Array<Record<string, unknown>> = [];
     let granted = false;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
@@ -157,7 +157,7 @@ describe("managed website agency draft authority", () => {
     container.remove();
   });
 
-  it("does not present an expired customer grant as active and allows a fresh grant", async () => {
+  it("does not present an expired client grant as active and allows a fresh grant", async () => {
     const requests: Array<Record<string, unknown>> = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
       const body = typeof init?.body === "string" ? JSON.parse(init.body) as Record<string, unknown> : undefined;

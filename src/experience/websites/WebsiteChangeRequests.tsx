@@ -221,7 +221,7 @@ function WebsiteChangeRequestsContent({ workspaceId, systemId, siteLabel, editin
             {stage === "ready_for_review" ? canDecide ? <div className={styles.decide}>
               <Button size="sm" loading={busyStep === item.id} disabled={busyStep !== null || stepUnconfirmed} onClick={() => void step(item.id, { kind: "approved" })}>Approve the preview</Button>
               <Button size="sm" variant="secondary" disabled={busyStep !== null || stepUnconfirmed} onClick={() => void step(item.id, { kind: "declined" })}>Not yet</Button>
-              <small>Approving authorizes {preview ? "this preview" : "it"} for publication. Deployment still requires current provider authority.</small>
+              <small>Approving authorizes {preview ? "this preview" : "it"} for publication. Deployment still requires current agency authority.</small>
             </div> : <p className={styles.muted}>Waiting on the owner to approve or decline the preview.</p> : null}
             {operator && item.status === "requested" ? <OperatorStep stage={stage} busy={busyStep === item.id} blocked={busyStep !== null || stepUnconfirmed} onRecord={(payload) => void step(item.id, payload)} /> : null}
           </li>;

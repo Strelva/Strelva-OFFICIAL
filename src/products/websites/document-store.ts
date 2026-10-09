@@ -7,7 +7,7 @@ import { getRedis } from "@/platform/infra/redis";
 import { websiteRebuildReleaseEnabledForTenant, websiteRebuildReleaseMayBeOn } from "./rebuild-release";
 import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type SavedWork, type WorkspaceActor } from "@/platform/workspaces/types";
-import { actingProviderRefusal } from "@/platform/workspaces/acting-provider";
+import { actingAgencyRefusal } from "@/platform/workspaces/acting-provider";
 import { siteDocumentHash, siteDocumentSchema, unresolvedSiteFacts, type SiteDocument } from "./site-document";
 import { websiteLaunchReceiptSchema, type WebsiteLaunchReceipt } from "./contracts";
 import { bindToCurrentTenant } from "./hosted-routing";
@@ -91,7 +91,7 @@ export function createWebsiteDocumentStore(db?: WebsiteDocumentRpc, ownerLink?: 
     const result = await client.rpc(name,args);
     if (result.error) {
       // An agency launching or attaching a domain: not staffed, not verified for publishing, or no owner mandate.
-      const refusal = actingProviderRefusal(result.error.message);
+      const refusal = actingAgencyRefusal(result.error.message);
       if (refusal) throw new WorkspaceAccessError(refusal);
       if (result.error.message.includes("provider_seat_owner_required")) throw new WorkspaceAccessError("Only the business owner can authorize agency publishing.");
       if (/website_agency_provider_changed|provider_seat_required/.test(result.error.message)) throw new WorkspaceConflictError("Your agency access changed. Reload before authorizing publishing.");

@@ -112,7 +112,7 @@ describe("partial discovery preserves independent decisions and receipts", () =>
   it.each([true, false])("does not conflate partial discovery with handledAvailable=%s", async handledAvailable => {
     await home([ready({ handledAvailable })]); expect(text()).toContain("Some decisions could not be checked.");
     const section = node.querySelector('[aria-labelledby="home-handled"]')!;
-    expect(section.textContent).toContain(handledAvailable ? "Nothing this week." : "What Strelva did this week could not be loaded.");
+    expect(section.textContent).toContain(handledAvailable ? "Nothing this week." : "This week’s changes could not be loaded.");
   });
   it("still hides a complete empty caller-less queue while separately showing handled availability", async () => {
     await mount(<><NeedsYouSection state={ready({ complete: true })} pending={null} notices={{}} onDecide={noop} onRetry={noop} />

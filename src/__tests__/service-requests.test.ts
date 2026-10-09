@@ -53,7 +53,7 @@ class MemoryServiceRequestStore implements ServiceRequestStore {
 }
 
 describe("service request service", () => {
-  it("persists a submitted need with explicit scope/provider and keeps acceptance pending", async () => {
+  it("persists a submitted need with explicit scope/agency and keeps acceptance pending", async () => {
     const store = new MemoryServiceRequestStore();
     const service = new ServiceRequestService(store);
 
@@ -87,7 +87,7 @@ describe("service request service", () => {
     expect(store.lastSave).toMatchObject({ requestId, expectedRevision: 1, request: "Changed need", outcome: "Changed outcome", scope: ["scope"] });
   });
 
-  it("forwards explicit provider responses and later delivery linkage as separate commands", async () => {
+  it("forwards explicit agency responses and later delivery linkage as separate commands", async () => {
     const store = new MemoryServiceRequestStore();
     const service = new ServiceRequestService(store);
     await service.execute(actor, { action: "respond", requestId, expectedRevision: 1, decision: "accepted", idempotencyKey: "request:accept" });
@@ -99,7 +99,7 @@ describe("service request service", () => {
     expect(store.lastLink).toMatchObject({ requestId, installationId, deliveryId, expectedRevision: 2 });
   });
 
-  it("rejects an incomplete provider choice before persistence", async () => {
+  it("rejects an incomplete agency choice before persistence", async () => {
     const store = new MemoryServiceRequestStore();
     const service = new ServiceRequestService(store);
     await expect(service.execute(actor, {
@@ -118,7 +118,7 @@ describe("service request service", () => {
     expect(() => service.list(actor, { providerKind: "strelva" })).toThrow("historical Strelva inbox is retired");
   });
 
-  it("requires the provider to acknowledge the revision it reviewed", async () => {
+  it("requires the agency to acknowledge the revision it reviewed", async () => {
     const store = new MemoryServiceRequestStore();
     const service = new ServiceRequestService(store);
     await expect(service.execute(actor, {

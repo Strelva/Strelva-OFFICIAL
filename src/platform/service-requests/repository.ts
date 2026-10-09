@@ -35,12 +35,12 @@ function row(value: unknown): Record<string, unknown> {
 }
 function map(value: unknown): ServiceRequest {
   const item = row(value);
-  const provider = item.provider_kind === "strelva" ? { kind: "strelva" as const }
+  const agency = item.provider_kind === "strelva" ? { kind: "strelva" as const }
     : { kind: "agency" as const, agencyWorkspaceId: String(item.provider_agency_workspace_id ?? "") };
   try {
     return serviceRequestSchema.parse({
       id: item.id, businessId: item.business_workspace_id, status: item.status,
-      request: item.request_text, outcome: item.outcome, context: item.context, scope: item.scope, provider,
+      request: item.request_text, outcome: item.outcome, context: item.context, scope: item.scope, provider: agency,
       providerAcceptance: { status: item.provider_acceptance, actorId: item.accepted_by ?? null, acceptedAt: item.accepted_at ?? null, note: item.acceptance_note ?? null },
       installationId: item.installation_id ?? null, deliveryId: item.delivery_id ?? null,
       ...(item.delivery_commitment !== undefined ? { deliveryCommitment: item.delivery_commitment } : {}),

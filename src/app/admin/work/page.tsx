@@ -91,10 +91,10 @@ export default async function InternalWorkPage() {
           ]} />
         </Panel>
 
-        <Panel title="Customer support" bodyClassName="">
+        <Panel title="Support" bodyClassName="">
           <SurfaceLinks links={[
             { href: "/admin/clients", label: "Clients", detail: "Open the current client record, site health, access, and delivery controls." },
-            { href: "/admin/accounts", label: "Accounts", detail: "Inspect customer and payer groupings across managed sites." },
+            { href: "/admin/accounts", label: "Accounts", detail: "Inspect client and payer groupings across managed sites." },
             { href: "/admin/leads", label: "Leads", detail: "Work received requests without treating them as accepted delivery." },
           ]} />
         </Panel>

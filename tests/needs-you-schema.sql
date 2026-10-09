@@ -253,7 +253,7 @@ select pg_temp.ny_assert(jsonb_array_length(public.list_open_owner_decisions_for
        where x->>'workspaceId' = 'ae000000-0000-4000-8000-000000000010'),
   'delivery list carries the owner recipient');
 
--- Strelva handled reads policy receipts and expired items for members only.
+-- What changed reads policy receipts and expired items for members only.
 select pg_temp.ny_assert(jsonb_array_length(public.read_strelva_handled('ae000000-0000-4000-8000-000000000010','ae000000-0000-4000-8000-000000000003','ny-member@example.test',now() - interval '1 day')) >= 7,
   'handled read model lists the receipts');
 select pg_temp.ny_assert(jsonb_array_length(public.read_strelva_handled('ae000000-0000-4000-8000-000000000011','ae000000-0000-4000-8000-000000000004','ny-other-owner@example.test',now() - interval '1 day')) = 0,

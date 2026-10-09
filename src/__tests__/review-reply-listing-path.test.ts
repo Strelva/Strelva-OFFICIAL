@@ -20,11 +20,11 @@ const mockFinishEventAction = vi.fn();
 const mockMark = vi.fn();
 const mockPublishReviewReply = vi.fn();
 const mockRecordOutsideWrite = vi.fn();
-const mockAssertActingProvider = vi.fn();
+const mockAssertActingAgency = vi.fn();
 let deps: TenantReplyDeps;
 
 vi.mock("@/platform/workspaces/acting-provider", () => ({
-  assertActingProvider: (...args: unknown[]) => mockAssertActingProvider(...args),
+  assertActingAgency: (...args: unknown[]) => mockAssertActingAgency(...args),
 }));
 vi.mock("@/platform/infra/db/client", () => ({
   getSupabase: () => ({ from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { email: "staff@agency.example.test" } }) }) }) }) }),
@@ -265,11 +265,11 @@ describe("review reply approve on the listing System", () => {
     const staff = agencyStaffActorId(agency, userId);
     const { defaultTenantReplyDeps } = await vi.importActual<typeof import("@/products/google-listing/tenant-replies")>("@/products/google-listing/tenant-replies");
     const production = await defaultTenantReplyDeps();
-    mockAssertActingProvider.mockResolvedValueOnce(agency).mockResolvedValue("10000000-0000-4000-8000-0000000000dd");
+    mockAssertActingAgency.mockResolvedValueOnce(agency).mockResolvedValue("10000000-0000-4000-8000-0000000000dd");
     const { google, receipts } = setup({ authorizeProvider: production.authorizeProvider });
     expect(await resolveEventAction("tenant-a", "evt_rr", "approved", staff)).toEqual({ changed: false, reason: "review_reply_failed" });
-    expect(mockAssertActingProvider).toHaveBeenCalledTimes(2);
-    expect(mockAssertActingProvider).toHaveBeenCalledWith({ userId, verifiedEmail: "staff@agency.example.test" }, WORKSPACE, { effect: "google", kind: "google_location", ref: "333" });
+    expect(mockAssertActingAgency).toHaveBeenCalledTimes(2);
+    expect(mockAssertActingAgency).toHaveBeenCalledWith({ userId, verifiedEmail: "staff@agency.example.test" }, WORKSPACE, { effect: "google", kind: "google_location", ref: "333" });
     expect(google.writes).toEqual([]);
     expect(receipts.all()).toEqual([expect.objectContaining({ status: "failed", error: expect.stringMatching(/permission ended before the write/) })]);
     expect(mockMark).not.toHaveBeenCalled();

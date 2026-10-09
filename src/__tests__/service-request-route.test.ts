@@ -72,7 +72,7 @@ describe("service request route", () => {
     expect(mocks.save).not.toHaveBeenCalled();
   });
 
-  it("maps a stale persisted request to a conflict without exposing provider details", async () => {
+  it("maps a stale persisted request to a conflict without exposing agency details", async () => {
     mocks.save.mockRejectedValueOnce(new ServiceRequestConflictError("The request changed. Reload before continuing."));
     const response = await POST(post({ action: "save", businessId, status: "requested", request: "Need", outcome: "Result", context: {}, scope: ["scope"], provider: { kind: "agency", agencyWorkspaceId: "20000000-0000-4000-8000-000000000001" }, idempotencyKey: "request:one" }));
     expect(response.status).toBe(409);

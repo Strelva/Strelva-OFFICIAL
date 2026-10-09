@@ -1,3 +1,4 @@
+import { actorCopy, actorSentence } from "@/platform/presentation/actor";
 /**
  * Needs you: open items from each source, decide them through the source's
  * own resolver, chase them by email, and lapse them. Every dependency is a
@@ -269,7 +270,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     return {
       title: row.title,
       detail: row.detail ?? undefined,
-      note: `Approve: ${row.approveEffect} Not yet: ${row.notYetEffect}`,
+      note: `Approve: ${actorCopy(row.approveEffect, row.actor)} Not yet: ${actorCopy(row.notYetEffect, row.actor)}`,
       approve: { label: "Approve", url: buildWorkspaceApproveUrl(deps.appOrigin, claims("approve")) },
       notYet: { label: "Not yet", url: buildWorkspaceApproveUrl(deps.appOrigin, claims("not-yet")) },
       open,
@@ -278,7 +279,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
 
   function email(kind: "urgent" | "digest" | "reminder", business: string, rows: DeliveryRow[], recipient: string): EmailOptions {
     const count = rows.length;
-    const heading = kind === "urgent" ? "A customer is waiting on you" : kind === "reminder" ? `Still waiting on you: ${count === 1 ? "1 decision" : `${count} decisions`}` : `Strelva needs ${count === 1 ? "1 decision" : `${count} decisions`}`;
+    const heading = kind === "urgent" ? "A customer is waiting on you" : kind === "reminder" ? `Still waiting on you: ${count === 1 ? "1 decision" : `${count} decisions`}` : actorSentence(null, `needs ${count === 1 ? "1 decision" : `${count} decisions`}`, `${count === 1 ? "1 decision needs" : `${count} decisions need`} you`);
     return {
       preheader: rows.map(row => row.title).join(" · ").slice(0, 140),
       heading,

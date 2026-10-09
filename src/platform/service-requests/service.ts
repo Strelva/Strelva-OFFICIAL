@@ -17,7 +17,7 @@ const context = z.record(z.string(), z.unknown()).superRefine((value, ctx) => {
 });
 
 // Historical records retain their schema; new writes require an ordinary agency.
-const providerChoice = z.object({ kind: z.literal("agency"), agencyWorkspaceId: uuid }).strict();
+const agencyChoice = z.object({ kind: z.literal("agency"), agencyWorkspaceId: uuid }).strict();
 const saveSchema = z.object({
   action: z.literal("save"),
   businessId: uuid,
@@ -28,7 +28,7 @@ const saveSchema = z.object({
   outcome: shortText,
   context,
   scope,
-  provider: providerChoice,
+  provider: agencyChoice,
   idempotencyKey: z.string().trim().min(1).max(128).regex(/^[A-Za-z0-9][A-Za-z0-9_.:-]*$/),
 }).strict();
 type SaveCommand = z.infer<typeof saveSchema>;
@@ -123,7 +123,7 @@ export class ServiceRequestService {
 
   list(actor: ServiceRequestActor, query: ServiceRequestListQuery): Promise<ServiceRequest[]> {
     if ("businessId" in query) return this.store.list(actor, { businessId: parseUuid(query.businessId, "Choose a valid business workspace.") });
-    if ("providerWorkspaceId" in query) return this.store.list(actor, { providerWorkspaceId: parseUuid(query.providerWorkspaceId, "Choose a valid provider workspace.") });
+    if ("providerWorkspaceId" in query) return this.store.list(actor, { providerWorkspaceId: parseUuid(query.providerWorkspaceId, "Choose a valid agency workspace.") });
     throw new ServiceRequestAccessError("The historical Strelva inbox is retired. Choose an agency workspace.");
   }
 

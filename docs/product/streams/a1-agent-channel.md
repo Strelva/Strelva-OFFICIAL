@@ -43,6 +43,13 @@ preview adapter.
 
 ## Authorization and confirmation
 
+October 8 prepared owner-assistant update: rotating one-hour access within a
+30-day connection family, owner list/disconnect, business context and native
+website read/proposals are documented in
+[owner assistant MCP](../../operations/owner-assistant-mcp-2026-10-08.md).
+Claude and Croki/Codex native sign-in remain unproved. The original baseline
+below predates this renewable preparation.
+
 The independently implemented OAuth path accepts public CIMD clients, exact
 registered redirects, S256 PKCE and RFC8707 resource indicators on code issuance
 and exchange. Codes expire in five minutes and can be consumed once. Tokens

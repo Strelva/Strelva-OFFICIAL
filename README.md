@@ -119,3 +119,12 @@ pnpm check:prod     # production-readiness checklist
 pnpm version:check  # confirm app and marketing versions match
 pnpm provision-tenant   # CLI tenant provisioning
 ```
+
+## Owner assistant MCP preparation
+
+Business context and native website read/proposals are prepared behind the
+existing workspace and MCP OAuth gates. Owner connection management is at
+`/connect`; the universal endpoint is `/api/mcp/public`. See the
+[setup and client rehearsal](./docs/operations/owner-assistant-mcp-2026-10-08.md)
+for exact flags, ordered migrations, proof commands and Claude/Croki/Codex setup.
+This preparation does not qualify production or actual native-client sign-in.

@@ -1,5 +1,15 @@
 # One place to operate
 
+> **Changed by ADR 0013 / decisions 1–2.** Platform operators perform logged support,
+> incident and release work; they never sell to, serve or convert clients. Client delivery
+> uses the ordinary agency path, including Strelva's agency with no extra powers. The mixed
+> `/admin` queue described below is retained as local implementation history, not the
+> selected authority model. Engineering must reconcile client drafting/approval, quoting,
+> service acceptance, sales prospects, owner chasing, lead contents, assignment and
+> delivery-minute capture (§1, §3.1/3/5/8/12–14, §4, §9.1/5). Platform incident/check
+> coverage does not grant client-service authority. Receipts name the actual actor; agency
+> display names carry "Runs on Strelva". The decided place name is "What changed" (October 9).
+
 Status: locally implemented for wave 6 on `w6/agency-operator`, October 7,
 2026. Not deployed. The operator rollout is selected by
 `STRELVA_OPERATOR_QUEUE_RELEASE=1`, default off: `/admin` becomes the queue,
@@ -61,11 +71,11 @@ per business.
 
 ## 2. In the model
 
-- The queue is **operator machinery**, not a customer noun. Owners never see
+- The queue is **operator machinery**, not a business-screen noun. Owners never see
   it. It sits under **Requests** (finite work: change requests, service
   requests) and **Running** (what Strelva keeps true: site up, domain
   verified, leads kept).
-- Every item is keyed **Business → System**. Business is the customer
+- Every item is keyed **Business → System**. Business is the
   workspace (`workspaces.id`). Before a tenant is converted, the business is
   the tenant (`tenants.stable_id`) and the item says "not yet a workspace".
   System is a row in `systems` (`supabase/migrations/20261004120000_systems.sql`)
@@ -77,10 +87,11 @@ per business.
 - An item that waits on the owner is the owner's **Needs you** on their side,
   and an "owner's call" item on the operator's side. The operator can see it
   and chase it; the operator cannot decide it.
-- Every outside write produces a **Strelva handled** receipt the owner can
+- Every outside write produces a **What changed** receipt the owner can
   see, and the same receipt is the operator's evidence.
 - Proactive "Ready to work" ideas (`src/app/admin/actions/portfolio-opportunities.ts`)
-  are **Possibilities**, not queue items. They stay in their own lane.
+  are **Possibilities**, not queue items. Only working alternatives a person can open, use and compare qualify;
+  suggestions remain suggestions; proposed research responses are Proposals.
 
 ## 3. What it does at 1.0.0
 
@@ -100,15 +111,15 @@ per business.
    | `domain_alert` (down, parked, expiring) | `domain-monitor` cron, `src/lib/domain-monitor-store.ts` | Redis |
    | `domain_unverified` (hosted domain waiting 7+ days) | `website-domain-verification` cron, `reb:website-domain-alert:*` | Postgres + Redis marker |
    | `site_health` (published revision not verified, scan grade drop) | `website_document_health`; `portfolio-scan` + `scan-store` | Postgres, Redis |
-   | `service_request` (asked of Strelva, acceptance pending) | `service_requests` where `provider_kind='strelva'` and `provider_acceptance='pending'` (`src/platform/service-requests`) | Postgres |
+   | `service_request` (Request sent to Strelva's agency, acceptance pending) | `service_requests` where `provider_kind='strelva'` and `provider_acceptance='pending'` (`src/platform/service-requests`) | Postgres |
    | `operational_exception` (failed or uncertain step) | `listOperationalExceptions` (`src/products/operations/inbox.ts`) | Postgres |
    | `assignment_offer` | `operational_assignments` status `offered` | Postgres |
    | `lead_unkept` (client lead whose Postgres copy failed) | `reb:lead-mirror:pending` (`src/lib/lead-mirror.ts`) | Redis |
-   | `prospect_lead` (Strelva's own sales leads, workflow `new`) | `lead-workflow:{token}` (`src/lib/lead-workflow.ts`) | Redis |
+   | `prospect_lead` (legacy kind; Strelva's agency prospects, workflow `new`) | `lead-workflow:{token}` (`src/lib/lead-workflow.ts`) | Redis |
    | `readback_failed` (provider accepted, read-back failed) | new: from the receipt ledger (behavior 6) | Postgres |
 
 2. **Every item has the same shape:** business, System (or "not attached"),
-   kind, one-line plain title, whose move it is (Strelva, owner, provider),
+   kind, one-line plain title, whose move it is (platform, owner, agency),
    priority, opened at, due at, assignee, state, source link, and the receipts
    it produced. Each row deep-links to the existing screen that works it
    (`/admin/clients/[id]`, `/admin/drafts`, the workspace job link).
@@ -138,7 +149,8 @@ per business.
    super admins keep using the exact-job assignment link
    (`operational_assignments`); they do not enter `/admin`.
 6. **One receipt for every outside write.** Every write to a provider or a
-   live site records: business, System, provider, what was asked, the
+   live site records: actor identity and display name, business, System, provider,
+   what was asked, the
    provider's acceptance, a read-back result (`matched`, `differs`,
    `failed`, `not_possible`), the before-state when one can be read, and
    whether undo exists. A failed read-back becomes its own `readback_failed`
@@ -157,7 +169,7 @@ per business.
 
    | Write | Undo at 1.0.0 |
    | --- | --- |
-   | Tenant content publish | Yes: restore prior version (`src/lib/storage/version-store.ts`, `/api/content/[section]/versions`) |
+   | Tenant content publish | Yes: restore prior state from History (`src/lib/storage/version-store.ts`, `/api/content/[section]/versions`) |
    | Hosted v2 website publish | Yes: republish the prior immutable revision (`website_document_publications`) — *inference, to verify* |
    | Inquiry capability publish | Yes: existing `inquiry_capability_undo` (`src/lib/event-actions.ts`) |
    | Calendar event | Per `workspace_calendar_event_receipts` |
@@ -213,11 +225,11 @@ per business.
     and domain → `recovery`, `prospect_lead` → `sales`). The operator can edit
     or skip. Work done outside the queue is still logged by the existing form.
     `/admin/work` shows the monthly median, per business, per kind and per
-    System. Every in-scope customer business appears in the effort measure.
+    System. Every in-scope client business appears in the effort measure.
     Coverage means a non-voided log exists for that business and UTC month;
     it does not certify all work was logged. Explicit 0-minute manual logs
     confirm no human work; gaps remain "Not logged", including after a first
-    log. Portfolio median and average use all customer businesses (denominator
+    log. Portfolio median and average use all client businesses (denominator
     shown), including explicit zeros, and require complete log coverage.
     Partial sums are labeled logged minutes; incomplete months have no trend.
 14. **Owner reach outside the app.** An owner's-call item records how the
@@ -336,7 +348,7 @@ stay addressable as redirects.
   queue total equals source totals; one source down marks the list incomplete.
 - Receipt tests per write path: accepted + read-back matched, accepted +
   read-back failed (no retry), rejected.
-- Undo tests: content version restore; domain claim removal leaves Vercel
+- Undo tests: content History restore; domain claim removal leaves Vercel
   untouched (assert no Vercel delete call).
 - Health coverage test: every active tenant, including all 9 custom repos in
   `release-manifest.json`, yields a health result with the rebuild flag off.
@@ -352,7 +364,7 @@ stay addressable as redirects.
 1. **Where the queue lives.** (a) `/admin` only; (b) the agency surface Queue
    (`DESIGN.md` "Not built yet"), which Strelva uses as its own agency under
    assumption 2; (c) one projection rendered in both. **Recommend (c)** with
-   `/admin` first. If partner agencies come into 1.0.0, (c) is required and the
+   `/admin` first. ADR 0012 includes outside agencies on equal terms; (c) is required and the
    projection must filter by delegation.
 2. **Clocks.** Proposed: P1 acknowledged in 2 working hours; owner chase at 3
    and 7 days. Different numbers change only config.
@@ -362,9 +374,9 @@ stay addressable as redirects.
 4. **Undo for GBP hours.** (a) label only; (b) "Put back" drafts a new
    approved write from the stored before-state. **Recommend (b)**. It is a
    Google write, so it still needs approval and Google access.
-5. **Prospect leads in the same queue.** Strelva's sales leads are not a
-   client's business. Recommend in, as their own kind with no System, so one
-   list stays complete. If Jacob wants sales separate, drop the kind.
+5. **Agency prospects — changed by ADR 0013 / decision 2.** Sales belongs to
+   the agency path, never the platform operator queue. The local `prospect_lead`
+   kind is retained as implementation evidence; engineering must reconcile it.
 6. **Owner reach beyond email.** No SMS sender exists (no provider in
    `src/lib`; only a legacy `sms:pending:{tenant}` marker read by
    `src/lib/ops.ts`). Under assumption 6, email is the only channel and client

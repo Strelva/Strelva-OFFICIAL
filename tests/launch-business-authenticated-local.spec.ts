@@ -66,16 +66,16 @@ for (const width of [1440, 390]) {
     await makerPage.getByRole("button",{name:"Check proposed change",exact:true}).click();
     await expect(makerPage.getByRole("button",{name:"Publish",exact:true})).toBeEnabled();
     await makerPage.getByRole("button",{name:"Publish",exact:true}).click();
-    await expect(makerPage.getByText(/Version 1 is live/)).toBeVisible();
+    await expect(makerPage.getByText(/Release 1 is live/)).toBeVisible();
     await makerPage.reload();
     await expect(makerPage.getByRole("heading",{name:"Team requests",exact:true,level:1})).toBeVisible();
-    await expect(makerPage.getByText(/Version 1 is live/)).toBeVisible();
+    await expect(makerPage.getByText(/Release 1 is live/)).toBeVisible();
 
     await makerPage.close();
     // Continue as the original customer, who operates the agency-built app.
     await page.goto(`/workspace?workspaceId=${businessId}&work=${app.id}`);
     await expect(page.getByRole("heading", { name: "Team requests", exact: true, level: 1 })).toBeVisible();
-    await expect(page.getByText(/Version 1 is live/)).toBeVisible();
+    await expect(page.getByText(/Release 1 is live/)).toBeVisible();
 
     await page.goto(`/workspace?workspaceId=${businessId}&view=help`);
     await page.getByLabel("What are you trying to do?",{exact:true}).fill("Have Strelva build our website.");
@@ -136,12 +136,12 @@ for (const width of [1440, 390]) {
     const unrelatedBinding=await stranger.context.request.post("/api/offerings/websites",{headers:{origin:env.app},data:bindingCommand});
     expect(unrelatedBinding.status(),await unrelatedBinding.text()).toBe(403);
     await operatorPage.reload();
-    await operatorPage.getByLabel("Customer website",{exact:true}).selectOption(bindingId);
+    await operatorPage.getByLabel("Client website",{exact:true}).selectOption(bindingId);
     await operatorPage.getByLabel("Repository, owner/name",{exact:true}).fill("example/local-proof-site");
     await operatorPage.getByLabel("Full commit SHA",{exact:true}).fill("a".repeat(40));
     await operatorPage.getByLabel("Public HTTPS review URL",{exact:true}).fill("https://review.example.com/local-proof");
     for(const label of ["Desktop checked","Mobile checked","Primary action checked"]) await operatorPage.getByLabel(label,{exact:true}).check();
-    await operatorPage.getByRole("button",{name:"Submit for customer review",exact:true}).click();
+    await operatorPage.getByRole("button",{name:"Submit for client review",exact:true}).click();
     await expect(operatorPage.getByText("Ready for customer review",{exact:true})).toBeVisible();
     await page.reload();
     await page.getByLabel("Decision or blocker note",{exact:true}).fill("Accepted the synthetic result for this local test.");
@@ -151,14 +151,14 @@ for (const width of [1440, 390]) {
     await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await page.screenshot({path:testInfo.outputPath(`delivery-${width}.png`),fullPage:true});
     await page.goto(`/workspace?workspaceId=${businessId}`);
-    // Accepted work leaves "Needs you" and is listed as done under "Strelva handled".
-    const handledCard=page.getByRole("region",{name:/^Strelva handled/})
+    // Accepted work leaves "Needs you" and is listed as done under "What changed".
+    const handledCard=page.getByRole("region",{name:"What changed",exact:true})
       .locator(`a[href="/workspace/delivery/${requestId}"]`);
     await expect(handledCard.getByText(/^Done/)).toBeVisible();
     await expect(deliveryCard).toHaveCount(0);
     await page.goto(`/workspace?workspaceId=${businessId}&work=${app.id}`);
     await expect(page.getByRole("heading",{name:"Team requests",exact:true,level:1})).toBeVisible();
-    await expect(page.getByText(/Version 1 is live/)).toBeVisible();
+    await expect(page.getByText(/Release 1 is live/)).toBeVisible();
     const businesses=await owner.context.request.get("/api/workspace/businesses");
     expect((await businesses.json()).businesses.filter((value:{id:string})=>value.id===businessId)).toHaveLength(1);
     await operatorPage.close();

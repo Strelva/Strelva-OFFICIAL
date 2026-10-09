@@ -8,6 +8,7 @@ import {
   type WorkspaceActor,
 } from "@/platform/workspaces/types";
 
+
 const uuid = z.string().uuid();
 const email = z.string().trim().toLowerCase().email().max(254);
 

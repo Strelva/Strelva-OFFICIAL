@@ -163,7 +163,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     // draft. The live form has no candidate-only field yet.
     const ownerUsePage = await owner.context.newPage();
     await ownerUsePage.goto(`/workspace?workspaceId=${workspaceId}&work=${app.id}`);
-    await expect(ownerUsePage.getByText(/Version 1 is live\..*live use continues/i)).toBeVisible();
+    await expect(ownerUsePage.getByText(/Release 1 is live\..*live use continues/i)).toBeVisible();
     await expect(ownerUsePage.getByRole("tabpanel", { name: "Use", exact: true }).getByLabel("Internal note", { exact: true })).toHaveCount(0);
     await ownerUsePage.getByText("Add another record", { exact: true }).click();
     await ownerUsePage.getByRole("tabpanel", { name: "Use", exact: true }).getByLabel("Problem", { exact: true }).fill("Broken stopcock in utility room");
@@ -203,7 +203,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     await expect(review.getByText('Field changed: "Priority"; options change from standard, urgent to standard, urgent, vip.', { exact: true })).toBeVisible();
     await expect(review.getByText('View added: detail showing "Problem", "Internal note".', { exact: true })).toBeVisible();
     await expect(review.getByRole("button", { name: "Check proposed change", exact: true })).toHaveCount(0);
-    await expect(review.getByText("Checks for proposed version 2", { exact: true })).toBeVisible();
+    await expect(review.getByText("Checks for draft 2", { exact: true })).toBeVisible();
     await expect(review.getByText("Passed: Existing records fit this version", { exact: true })).toBeVisible();
     await expect(review.getByText(/Record compatibility check passed for this proposal/)).toBeVisible();
     await makerReviewPage.screenshot({ path: testInfo.outputPath("application-review-desktop.png"), fullPage: true });
@@ -230,7 +230,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     await makerReviewPage.setViewportSize({ width: 1440, height: 1000 });
     await expect(review.getByRole("button", { name: "Publish", exact: true })).toBeEnabled();
     await review.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(makerReviewPage.getByText(/Version 2 is live/)).toBeVisible();
+    await expect(makerReviewPage.getByText(/Release 2 is live/)).toBeVisible();
     await expect(makerReviewPage.getByText("Review changes", { exact: true })).toHaveCount(0);
     const publishedOwnerResult = await owner.context.request.get(`/api/bounded-work?productId=applications&workId=${app.id}`);
     expect(publishedOwnerResult.status(), await publishedOwnerResult.text()).toBe(200);
@@ -500,7 +500,7 @@ test("ordinary agency template becomes a private native app, then a live app wit
     if (!await customerReview.evaluate(element => (element as HTMLDetailsElement).open)) await customerReview.locator("summary").click();
     await expect(customerReview.getByRole("button", { name: "Publish", exact: true })).toBeEnabled();
     await customerReview.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(customerPage.getByText(/Version 1 is live\./).first()).toBeVisible();
+    await expect(customerPage.getByText(/Release 1 is live\./).first()).toBeVisible();
     await customerPage.getByRole("tab", { name: "Use", exact: true }).click();
     const use = customerPage.getByRole("tabpanel", { name: "Use", exact: true });
     await expect(use.getByText("This stays in preview", { exact: true })).toHaveCount(0);

@@ -1,10 +1,10 @@
 /**
  * Where everything in the workspace lives (October 2, 2026 navigation).
  *
- * Plain places, with Strelva as the only actor:
- * - Home: what needs you, what Strelva handled, what is in progress.
+ * Plain places, with each action attributed to whoever did it:
+ * - Home: what needs you, what changed, what is in progress.
  * - Requests: things someone asked for that have an end.
- * - Running: what Strelva keeps doing, named by the sentence it keeps true.
+ * - Running: agreed conditions kept true over time, named in plain words.
  * The business menu holds Business details, People & access and Help. The
  * website and apps are pinned by their own names; "apps", "work" and
  * "products" stay addressable as the full list so existing links keep working.

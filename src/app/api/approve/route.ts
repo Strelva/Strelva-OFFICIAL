@@ -1,3 +1,4 @@
+import { actorCopy } from "@/platform/presentation/actor";
 import { resolveOwnerBrand, resolveTenantBrand } from "@/platform/agency-brand/server";
 import { brandColors, BRAND_CREDIT, STRELVA_BRAND, type OwnerBrand } from "@/platform/infra/agency-brand";
 import { ownerNoticeUrl } from "@/lib/owner-notice-url";
@@ -173,7 +174,7 @@ async function workspaceConfirm(token: string, claims: WorkspaceApproveLinkClaim
   return confirmPage({
     token,
     heading: isApprove ? `Approve: ${item.title}` : `Not yet: ${item.title}`,
-    body: `${process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && (item.kind === "customer.message" || item.kind === "customer.commitment") && item.detail ? `${item.detail}\n\n` : ""}${isApprove ? item.approveEffect : item.notYetEffect} Nothing happens until you confirm.`,
+    body: `${process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && (item.kind === "customer.message" || item.kind === "customer.commitment") && item.detail ? `${item.detail}\n\n` : ""}${actorCopy(isApprove ? item.approveEffect : item.notYetEffect, item.actor)} Nothing happens until you confirm.`,
     confirmLabel: isApprove ? "Confirm — approve" : "Confirm — not yet",
     dashboardUrl: open,
     ...(item.sourceLifecycle === "website_document" && ownerWebsitePreviewMayBeOn() ? { previewUrl: ownerWebsitePreviewHref(token) } : {}),
@@ -206,7 +207,7 @@ async function workspaceResolve(claims: WorkspaceApproveLinkClaims): Promise<Nex
     case "done":
     case "done_unverified":
       return claims.action === "approve"
-        ? noticePage({ status: 200, heading: "Approved", body: result.status === "done" ? "Done. Strelva has it from here." : "Done. Strelva is confirming it went through.", dashboardUrl: openItem, buttonLabel: "Open" })
+        ? noticePage({ status: 200, heading: "Approved", body: result.status === "done" ? "Done." : "Done. Confirmation is still pending.", dashboardUrl: openItem, buttonLabel: "Open" })
         : noticePage({ status: 200, heading: "Not yet", body: "Nothing was done. It's still in Strelva when you want it.", dashboardUrl: openItem, buttonLabel: "Open" });
     case "already_handled":
       return noticePage({ status: 200, ...HANDLED, dashboardUrl: openItem, buttonLabel: "Open" });
@@ -222,7 +223,7 @@ async function workspaceResolve(claims: WorkspaceApproveLinkClaims): Promise<Nex
     case "not_found":
       return noticePage({ status: 400, ...INVALID.bad });
     default:
-      return noticePage({ status: 200, heading: "Strelva couldn't finish this", body: "We're on it. Nothing else is needed from you right now.", dashboardUrl: openItem, buttonLabel: "Open" });
+      return noticePage({ status: 200, heading: "Could not finish this", body: "Open the item to check its status.", dashboardUrl: openItem, buttonLabel: "Open" });
   }
 }
 

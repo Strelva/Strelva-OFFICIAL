@@ -1,3 +1,5 @@
+import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
+
 /**
  * Browser-side model for Ask Strelva (docs/product/specs/ask-strelva.md).
  *
@@ -103,9 +105,9 @@ export function sameAppPath(value: string | null | undefined): string | undefine
 
 const ROUTE_LINE: Record<string, string> = {
   owner_decides: "Waiting on the owner in Needs you. Nothing is live until they say yes.",
-  strelva_reviews: "Strelva reviews it first. Nothing is live yet.",
-  handle_after_notice: "Strelva will make it after a notice. Nothing is live yet.",
-  handle: "Strelva will make it and report it under Strelva handled.",
+  strelva_reviews: "It is reviewed first. Nothing is live yet.",
+  handle_after_notice: "The change will be made after a notice. Nothing is live yet.",
+  handle: `The change will be made and reported under ${STRELVA_HANDLED_LABEL}.`,
   never: "Nothing was sent anywhere.",
 };
 

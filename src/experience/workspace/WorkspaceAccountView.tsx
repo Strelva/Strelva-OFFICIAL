@@ -23,7 +23,7 @@ function workspaceKindLabel(kind: Workspace["kind"]): string {
     case "agency":
       return "Agency workspace";
     case "customer":
-      return "Customer workspace";
+      return "Your business";
     default:
       return "Personal workspace";
   }

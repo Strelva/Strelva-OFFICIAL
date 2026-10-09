@@ -160,7 +160,7 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
     const stored = versionBySystem.get(entry.ref.systemId);
     if (stored) {
       const sourceBusiness = stored.source.businessId === snapshot.workspaceId ? null : agencyNames.get(stored.source.businessId);
-      const sourceLabel = stored.source.hidden ? "this business's shared setup" : stored.source.name ?? (sourceBusiness ? `a source kept by ${sourceBusiness}` : "a source your provider keeps");
+      const sourceLabel = stored.source.hidden ? "this business's shared setup" : stored.source.name ?? (sourceBusiness ? `a source kept by ${sourceBusiness}` : "a source your agency keeps");
       const waiting = stored.latestRevision !== null && stored.latestRevision > stored.baselineRevision && !stored.declined.includes(stored.latestRevision);
       versions.push({ id: `${stored.id}:source`, relation: "source", context: stored.context.label, title: stored.source.name ?? "Source",
         lineage: `${stored.context.label} is adapted from ${sourceLabel}.${waiting ? " An improvement is waiting for a decision." : ""} Records and accounts stay here.` });
@@ -259,10 +259,10 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
       if (system) system.activations = [...(system.activations ?? []), view];
     }
   }
-  // History: the System's own changes and Strelva handled receipts for it, newest first, last five.
+  // History: the System's own changes and What changed receipts for it, newest first, last five.
   const history = new Map<string, SystemHistoryRow[]>();
-  for (const row of ready?.history ?? []) history.set(row.systemId, [...(history.get(row.systemId) ?? []), { id: row.id, sentence: row.sentence, at: row.at, releaseRef: row.releaseRef, implementationKind: row.implementationKind }]);
-  for (const receipt of ready?.handled ?? []) if (receipt.systemId) history.set(receipt.systemId, [...(history.get(receipt.systemId) ?? []), { id: receipt.id, sentence: receipt.sentence, at: receipt.at }]);
+  for (const row of ready?.history ?? []) history.set(row.systemId, [...(history.get(row.systemId) ?? []), { id: row.id, sentence: row.sentence, actor: row.actor, at: row.at, releaseRef: row.releaseRef, implementationKind: row.implementationKind }]);
+  for (const receipt of ready?.handled ?? []) if (receipt.systemId) history.set(receipt.systemId, [...(history.get(receipt.systemId) ?? []), { id: receipt.id, sentence: receipt.sentence, actor: receipt.actor, at: receipt.at }]);
   for (const [id, rows] of history) {
     const system = byId.get(id);
     if (system) system.history = rows.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 5);

@@ -77,7 +77,7 @@ it.each([
   const publishButton = [...node.querySelectorAll<HTMLButtonElement>("button")].find(button => button.textContent === "Publish");
   expect(Boolean(publishButton)).toBe(publish);
   if (publishButton) expect(publishButton.disabled).toBe(true);
-  if (!checks) expect(node.textContent).toContain("Ask your provider to run the checks before you publish.");
+  if (!checks) expect(node.textContent).toContain("Ask your agency to run the checks before you publish.");
   expect(transport.mock.calls.every(([, init]) => !(init as RequestInit | undefined)?.method)).toBe(true);
 });
 
@@ -85,5 +85,5 @@ it("does not offer application creation to a manager without maker authority", a
   const node = document.createElement("div"); document.body.append(node); root = createRoot(node);
   await act(async () => root!.render(createElement(BoundedWorkExperience, { workspaceId: "workspace-a", productId: "applications", initialRequest: "A team tool", canManage: true, canEdit: false, sources: [], onSaved: () => undefined })));
   expect(node.querySelector('form[aria-label="Application setup"]')).toBeNull();
-  expect(node.textContent).toContain("Ask your provider to create or copy an internal tool.");
+  expect(node.textContent).toContain("Ask your agency to create or copy an internal tool.");
 });

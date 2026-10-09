@@ -63,7 +63,7 @@ implemented; the palette and its contrast adjustments are in the
 - **Home is two sides under a dusk band.** The dusk band (greeting, the glass
   ask, live chips from real data) is the first screen of the day. Below it,
   "Strelva is working" on ink-moss (what is moving, with its steps, then what
-  Strelva handled) and "Your side" on linen (decisions as rows, the rule
+  What changed) and "Your side" on linen (decisions as rows, the rule
   behind them, the site's week).
 - **Needs you is a place.** With the Needs you release on, it has its own page:
   a deck with one card per decision, shaped by what is being decided (a price,
@@ -114,7 +114,7 @@ tacky. Objects keep plain names, and **Strelva** is the only name that acts:
 "Strelva updated your hours", "Strelva needs your call".
 
 - **Places** in the sidebar: **Home**, **Customers**, **Requests**, **Running**.
-  - **Home** lists, in order: **Needs you**, **Strelva handled**,
+  - **Home** lists, in order: **Needs you**, **What changed**,
     **In progress**, **Recent**.
     - Personal workspaces have no business requests, so they show only Needs
       you and Recent.

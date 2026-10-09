@@ -1,11 +1,11 @@
 # Strelva product ontology
 
 Status: **normative**
-Updated: 2026-09-11
+Updated: 2026-10-09
 
-> **October 4, 2026:** customer names now follow Systems, Connections,
-> Possibilities and Versions ([CONTEXT.md](../../CONTEXT.md#language)). This
-> page stays normative for deployed compatibility vocabulary and boundaries.
+[GLOSSARY.md](../../GLOSSARY.md) is the word authority. This page owns
+structure, persistence boundaries and governance rules, using glossary words.
+Deployed compatibility names remain unchanged.
 
 The [inquiry-first product specification](../capabilities/inquiries/inquiry-first-product-spec-2026-09-11.md)
 is authoritative for the selected local migration. It supersedes the generic
@@ -15,12 +15,11 @@ compatibility and behavior that has not migrated.
 
 ## Product transition
 
-The founder's current direction is one accessible conversational Strelva
-experience for Users, Paid Users, Clients, and Enterprise accounts. Existing
-managed clients retain Client status. Standard paid access and personalized
-managed service are independent facts; neither status grants permissions.
-Agencies are a partner relationship with explicit delegated access, not an
-additional user tier.
+The selected direction is a neutral platform where agencies make and run
+Systems for clients and businesses may also use Strelva directly. Strelva's own
+agency has the same standing as every other agency. Standard paid access and
+personalized managed service are independent facts; neither grants permissions.
+Agency delegation, payer and platform operator authority remain separate.
 
 The managed-presence model below describes the existing delivery system and its
 compatibility vocabulary. It must not impose a website or tenant requirement on
@@ -38,7 +37,7 @@ collapsing into one overloaded idea of a “feature.”
 ## Existing managed-presence product
 
 Strelva is a **managed business-presence operating service with a software
-control plane**. The customer buys an outcome—an effective presence that is
+control plane**. The business buys an outcome—an effective presence that is
 kept current and produces proof—not access to a self-serve website builder.
 
 The system has four layers:
@@ -60,7 +59,7 @@ explicit validation gates.
 ```text
 Prospect
   └─ AI Visibility / Audit / Access Request
-       └─ Delivery Lead
+       └─ prospect record
             └─ Tenant
                  ├─ Platform Memberships and roles
                  ├─ Commercial Plan
@@ -88,7 +87,7 @@ These axes answer different questions and must not be inferred from one another.
 
 | Axis | Question | Canonical values/examples |
 |---|---|---|
-| Actor | Who is acting? | prospect, client team member, end customer, operator, system |
+| Actor | Who is acting? | prospect, client team member, end customer, platform operator, system |
 | Access role | What may a platform user do? | viewer, editor, admin, owner, super-admin |
 | Lifecycle | Where is the relationship? | access request, building, live, at risk, churned/offboarded |
 | Commercial Plan | What service scope and price were agreed? | Presence, Growth, Scale |
@@ -101,7 +100,7 @@ These axes answer different questions and must not be inferred from one another.
 | Surface | Where is evidence or an action presented? | Today, Website, Analytics, Reports, Schedule |
 | Delivery Model | Where is the public experience implemented? | custom_repo; platform_template is legacy-only |
 | Provider | What external system can Strelva integrate with? | Google, Yelp, Instagram, Calendly |
-| Connection | Is one tenant configured with a provider? | connected, disconnected, error |
+| Account connection | Is one tenant configured with a provider? | connected, disconnected, error |
 | Authority | Which store decides truth? | Postgres, Redis, custom repository/provider |
 
 A Commercial Plan never implies a capability. A Vertical never implies a
@@ -109,7 +108,7 @@ Commercial Plan. A template is a legacy/default Site Archetype, not the live
 site contract. The capability manifest is the authoritative section inventory
 for a connected custom repository; omitted sections are unsupported.
 
-## Canonical glossary
+## Domain structure
 
 ### Tenant
 
@@ -130,9 +129,15 @@ property is represented by Tenant delivery metadata plus content/configuration.
 ### Actor
 
 An entity that initiates or owns an action. Canonical actor classes are
-Prospect, Client Team Member, End Customer, Operator, and System. Actor answers
-*who*; it does not encode authorization. A Platform Membership grants a client
-team member access, while a role describes what that authenticated actor may do.
+Prospect, Client Team Member, End Customer, Platform Operator, and System.
+An agency action names the agency display name with “Runs on Strelva” credit;
+Strelva is named only when the platform acted. Its own agency shows
+**Strelva Agency** under the same display-name rule as every agency. Receipts
+retain the actual executor and its display name recorded at action time;
+renames never rewrite past receipts. An approver is not the executor. Actor
+answers *who*; it does not encode authorization. A Platform Membership grants
+a client team member access, while a role describes what that authenticated
+actor may do.
 
 ### Tenant Capability, Site Capability, and Agent Capability
 
@@ -159,28 +164,30 @@ The authorization relation between an authenticated Strelva user and a Tenant.
 Its role is viewer, editor, admin, or owner. Owner contact fields are business
 metadata and do not grant authorization.
 
-### Customer / Studio Member
+### End customer
 
 An end customer of a client business. This is never called a Platform Member.
 Reward members and any future authenticated studio members belong to this
-customer domain.
+end-customer domain.
 
-### Prospect, Access Request, and Delivery Lead
+### Prospect, Access Request, and prospect record
 
-A Prospect is considering Strelva. An Access Request is their intake submission.
-The resulting Delivery Lead is Strelva’s pre-tenant sales/delivery record.
+A Prospect is an agency or business considering Strelva. An Access Request is
+their intake submission.
+The resulting prospect record is Strelva’s pre-tenant sales/delivery record.
 
 ### Customer Inquiry
 
-A lead captured for a Tenant through its public Site Property. It is recent
-customer activity, not Strelva’s own sales lead and not a full CRM record. In
-the inquiry-first product it is a durable instance handled by an exact published
-Capability version. Pause, Undo, or a later Capability edit cannot erase it.
+One end customer's request to a business through its public Site Property.
+It is end-customer activity, separate from Strelva's prospect record and from
+the stored copy of the end customer's words (the internal Lead). In the
+inquiry-first product it is a durable instance handled by an exact published
+Capability Version. Pause, Undo, or a later Capability edit cannot erase it.
 
 ### Record
 
 A Record is a typed thing one Business works with, such as an inquiry, booking,
-page, listing, customer, quote, or review. It has stable identity, typed fields,
+page, listing, end customer, quote, or review. It has stable identity, typed fields,
 links, and a timeline. Customer Inquiry is the first Record type in the selected
 migration.
 
@@ -191,8 +198,8 @@ a kind of business work. A **Capability Version** fixes its inputs, outputs,
 rules, approved interface parts, and supported actions. Inquiry intake is one
 implemented kind; scheduling, investigation, and other horizontal kinds must
 earn their own execution evidence. A **Rule** is a versioned condition and
-consequence. A published version is never edited in place. Existing Tenant
-Capability, Site Capability, and Agent Capability remain distinct compatibility
+consequence. A published Capability Version is never edited in place. Existing
+Tenant Capability, Site Capability, and Agent Capability remain distinct compatibility
 terms. This broader product definition does not rename or generalize the current
 inquiry contracts by itself.
 
@@ -203,18 +210,19 @@ Capability, or a Rule. It holds exact versions, authorization, and an inverse.
 Its receipt is the human-readable diff and result.
 
 **Work** is the durable thread from a person's intent to an answer, Change,
-Capability, or Responsibility. It is used for recent work and history. It does
-not grant authority and is not a generic replacement for those records.
+Capability, or Responsibility. It is an internal thread, not a business-screen
+noun: finite work is Requests and maintained conditions are Running. It does not grant authority and is not
+a generic replacement for those records.
 
 ### Responsibility
 
-A Responsibility is an explicit, ongoing assignment with a policy boundary over
-named work and capabilities. The current inquiry implementation binds it to one
-Capability. It states what
-Strelva may do, must never do, and must ask a person to approve. It also records
+A Responsibility is an ongoing condition kept true under stated limits over
+named work and capabilities. Assignment is explicit, limited permission to
+operate named work; it is distinct from the condition maintained. The current
+inquiry implementation binds it to one Capability. It states what Strelva may do, must never do, and must ask a person to approve. It also records
 limits, escalation, voice, hours, and supervised or trusted status. Promotion
 is the explicit action that changes this status. Service
-scope, provider connection, and actor role do not imply a Responsibility.
+scope, account connection, and actor role do not imply a Responsibility.
 
 ### Rehearsal
 
@@ -244,7 +252,7 @@ evidence. An **Unknown** names something not established. Repetition and synthet
 agreement cannot silently promote an inference into an observation.
 
 An **Opportunity** connects a pattern of behavior, constraint, and unresolved job
-to a possible improvement. A **Possibility** is one proposed response. Neither
+to a possible improvement. A **Proposal** is one proposed response. Neither
 is a supported Capability or an authorization to implement one.
 
 A **Capability Assessment** compares a dated technical claim with task-specific
@@ -282,11 +290,16 @@ Wellness currently means operational-lite Schedule, Roster, and read-only Member
 visibility. Classes, capacity, waitlists, packages, member authentication, and
 Stripe Connect are not implied by that set.
 
-### Provider and Connection
+### Provider, Connection, and account connection
 
-A Provider is a supported external system. A Connection is a Tenant’s actual
-credential/configuration and state for that provider. Registry availability does
-not prove a connection, write scope, provider approval, or quota.
+A Provider is an outside system only, such as Google, Resend, Stripe or a
+calendar. A human or agency serving a business is an Agency.
+
+A Connection is what a System reads, acts on, appears in, shares with, depends
+on or is triggered by. An account connection is one kind: the stored login or
+credential/configuration and state for an outside system. Registry availability
+does not prove an account connection, write scope, provider approval or quota.
+A Connection never grants authority by itself.
 
 ### Signal
 
@@ -315,10 +328,11 @@ A Content Event is public calendar/event content. A Workflow Event is a
 `UnifiedEvent` representing pending or resolved operational work. Product copy
 should not shorten both to “event” when the context is ambiguous.
 
-### Draft, Version, Activity, Audit, and Report
+### Draft, History, Activity, Audit, and Report
 
 - **Draft** — proposed unpublished state.
-- **Version** — restorable historical state.
+- **History** — past restorable states of a System; Version is adaptation to
+  another context.
 - **Activity** — client-facing proof of work performed.
 - **Audit** — operator/security accountability.
 - **Report** — an interpreted period narrative built from evidence.
@@ -335,7 +349,7 @@ Site/Agent Capability
   → risk classification
   → block / review / publish
   → authoritative mutation
-  → version + activity
+  → History + Activity
   → signed revalidation
 ```
 
@@ -371,7 +385,7 @@ write-approved. “Green tests” never prove an unapplied migration is live.
    monitoring conversion path.
 3. Keep client service scope separate from software capability.
 4. Treat operator automation as leverage for the managed service, not evidence
-   that customers want another self-serve surface.
+   that agencies or businesses want another self-serve surface.
 5. Expand vertical operations only after a paid workflow proves the domain.
 6. Preserve additive `/api/v1` and `x-reb-*`/`reb:` compatibility until a
    coordinated rollout explicitly versions them.

@@ -1,5 +1,9 @@
 # Claude client preparation: The Mooney Firm
 
+Historical business-context checkpoint. The current implementation and remaining
+release gates are in [owner assistant MCP](./owner-assistant-mcp-2026-10-08.md).
+The no-refresh/no-website limits below describe this original checkpoint only.
+
 Prepared October 8, 2026. Local implementation and rehearsal instructions;
 not a deployed connector, client invitation, accepted service or evidence of
 actual Claude use.

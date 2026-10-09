@@ -187,7 +187,7 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
         callTenant(ctx, input.view === "metrics" ? "get_metrics" : input.view === "traffic" ? "explain_traffic" : "show_report", {})),
     }),
     read_history: tool({
-      description: "Read recent changes and what Strelva handled on the site, optionally for one section.",
+      description: "Read recent changes on the site, optionally for one section.",
       inputSchema: z.object({ section: z.string().max(64).optional() }),
       execute: (input) => guarded("read_history", async () => {
         const output = await callTenant(ctx, "get_activity", input.section ? { section: input.section } : {});

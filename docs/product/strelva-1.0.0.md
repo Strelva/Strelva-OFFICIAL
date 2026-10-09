@@ -1,5 +1,13 @@
 # Strelva 1.0.0
 
+> **Changed by ADR 0013 / decisions 1–2.** Actor-named receipts show the agency display
+> name and "Runs on Strelva" for agency work, or Strelva for automatic platform work.
+> "What changed" is the decided place label (October 9). Operator policy settings, client
+> delivery/lead access in `/admin`, conversion and privileged admin agency access in the
+> local inventory below need engineering follow-up; they do not establish the selected
+> neutral-platform authority. Client service uses the ordinary agency path; the business or
+> agency is payer per business.
+
 Created: 2026-10-05
 Status: launch scope with local implementation on `integrate/reborn-1.0`.
 Reviewed against code and Git history at `1060551c` on 2026-10-07.
@@ -20,7 +28,7 @@ it, area by area.
 Jacob decided on 2026-10-07 that every rung of the
 [ADR 0009 ladder](../../../docs/adr/0009-make-strelva-how-businesses-get-found-and-served-in-the-ai-economy.md#the-ladder)
 is part of 1.0.0. This reverses the earlier "Out" list for Home Finder,
-enterprise customers and owner self-serve website building, and brings partner
+enterprise businesses and owner self-serve website building, and brings partner
 agencies in. Production still moves one step at a time behind flags and
 Jacob's yes. No price, payout rate or client agreement is set here.
 
@@ -39,7 +47,7 @@ Outside applications are long poles; code does not establish approval. The
 platform must apply for all agencies equally, including Strelva's own agency.
 No application, spend or production step is authorized by this page.
 
-The agency is the customer on a neutral platform; Strelva's agency is agency
+The agency uses a neutral platform; Strelva's agency is agency
 #1 with no special advantage. A business can also self-serve. These are the
 [October 7 decisions](../../../docs/adr/0012-make-agencies-strelvas-customer-on-a-neutral-platform.md),
 not claims that the full agency model is implemented.
@@ -54,7 +62,7 @@ and [Local Services Ads booking](https://developers.google.com/actions-center/ve
 | Area | Spec | State |
 | --- | --- | --- |
 | The model, every area | [product-model.md](./product-model.md) | Draft, Oct 6 |
-| Needs you and Strelva handled | [specs/needs-you.md](./specs/needs-you.md) | Draft, Oct 6 |
+| Needs you and What changed | [specs/needs-you.md](./specs/needs-you.md) | Draft, Oct 6 |
 | Owners entering, leaving `/dashboard` | [specs/owner-entry.md](./specs/owner-entry.md) | Draft, Oct 6 |
 | Ask Strelva in the workspace | [specs/ask-strelva.md](./specs/ask-strelva.md) | Draft, Oct 6 |
 | Agency surface and Versions | [specs/agency-and-versions.md](./specs/agency-and-versions.md) | Draft, Oct 6 |
@@ -75,16 +83,18 @@ not a second task tracker. States below were checked against this branch's
 code and merged history, rather than copied from earlier progress docs.
 "Local" means implemented in this branch unless another branch is named; it
 does not establish applied migrations, enabled flags, live provider effects
-or production proof. This documentation change did not rerun runtime tests.
+or production proof. The October 7 source review did not rerun runtime tests.
 
-## What a customer sees at launch
+<a id="what-a-customer-sees-at-launch"></a>
+
+## What an owner sees at launch
 
 ### 1. The workspace
 
 | Feature | Today | Source |
 | --- | --- | --- |
 | Home shows the business's actual Systems, each with Draft/Live/Paused and a separate health signal | Local, merged Systems Home | ADR 0011, `PRIM_SYSTEM` |
-| **Needs you**: only the decisions the owner must make, set by policy, not an approval per change | Local, flag off: one policy evaluator; every lifecycle resolves through Needs you (Ask, Make real, Versions included); policy settings for owners and operators; owners who never sign in get every workspace source by email, opened by the logged "Strelva (system)" service actor that never decides (`w3/decision-gaps`, migration `20261009100000` not applied); decided items listed under Strelva handled with an honest undo state, and an owner with no account approves Make real by email link (`w4/journey-gaps`, migrations `20261009130000` and `20261009131000` not applied) | agency-in-the-loop decision, Oct 2 |
+| **Needs you**: only the decisions the owner must make, set by policy, not an approval per change | Local, flag off: one policy evaluator; every lifecycle resolves through Needs you (Ask, Make real, Versions included); policy settings for owners and operators; owners who never sign in get every workspace source by email, opened by the logged "Strelva (system)" service actor that never decides (`w3/decision-gaps`, migration `20261009100000` not applied); decided items listed under What changed with an honest undo state, and an owner with no account approves Make real by email link (`w4/journey-gaps`, migrations `20261009130000` and `20261009131000` not applied) | agency-in-the-loop decision, Oct 2 |
 | System page: the real thing first (live site, inbox, calendar, tool), Connections, Possibilities and Versions beside it | Local | `DESIGN.md` Oct 4 |
 | Possibilities you can open, compare and **Make real**, with honest partial states and undo where undo exists | Local (branch `w2/systems-live`, Oct 6): Possibilities and activations in Postgres (migrations `20261008130000`, `20261008131000`, not applied anywhere), five live channel adapters behind `make_real_live:<channel>` flags (all off), one plan approval through Needs you, cron resume under the Strelva (system) service actor with the owner as approver of record (`w3/decision-gaps`); one Home item per rebuild. No live effect has run outside tests | `COMP_MULTI_SYSTEM_ACTIVATION` |
 | Versions: one System adapted per location or client, with shared improvements offered, never forced | Local: Postgres `system_versions` store, lineage, offered improvements and conflicts; Needs you approval; production not verified | `PRIM_CONTEXT_VERSION` |
@@ -154,7 +164,9 @@ business, monitoring, and at least the best competitor's bar.
 | Workspace plan and payer per business | Oct 7 scope adds a payer per business (business direct or agency resale), neutral agency access and transactions; **no price, rate or payout set** (ADR 0012) |
 | Outcome data loop: site → inquiry → reply → booking → review, measured per business | Local: `business_outcome_month` and workspace outcome line distinguish plain counts from supported joins (`src/platform/business-outcomes/index.ts`, `73df7fa5`); no live conversion or commercial result measured |
 
-## Underneath (customers don't see it, launch needs it)
+<a id="underneath-customers-dont-see-it-launch-needs-it"></a>
+
+## Underneath (business screens don't show it, launch needs it)
 
 - Shared infrastructure out of `src/lib`. (Local, Oct 6, `w5/structure`: in
   `src/platform/infra`; `src/lib` imports no workspace layer (21 files to 0,
@@ -164,7 +176,7 @@ business, monitoring, and at least the best competitor's bar.
 - One capability registry instead of seven declarations (local, Oct 6:
   `src/capability-registry.ts` over the six files, through adapters; the
   declarations are not folded together yet); one finite-job record instead of
-  four (service request, provider delivery, work job, budget).
+  four (Request sent to an agency, agency delivery, work job, budget).
 - One model-call helper (earlier audit: 12 call sites); one email sender
   (newsletter now uses `email/send.ts`, `3a0717f6`); one approval store
   (earlier audit: five stores). These counts were not re-audited here.
@@ -208,7 +220,7 @@ From the audit and the Reborn page, pending Jacob's confirmation where marked:
 1.0.0 ships when the whole ladder and every line in sections 1–7 is true in
 production, proven on a Strelva-owned test business and on converted clients,
 and Jacob says it is
-something Strelva would stand behind for any new customer.
+something Strelva would stand behind for any new agency or business.
 
 ## October 8 full-model convergence
 

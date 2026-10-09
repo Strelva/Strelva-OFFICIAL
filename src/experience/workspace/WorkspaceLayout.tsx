@@ -180,9 +180,9 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
   const workspaceMutationReadOnly = readOnly || workspaceExitBlocks;
   const applicationCreationBlocked = workspaceExitBlocks || snapshot.canMakeSystems !== true;
   const offeringUnavailableReason = current?.kind !== "customer"
-    ? `Choose a customer business workspace to view its ${systemsReleased ? "systems" : "installations"}. Personal and agency workspaces remain separate.`
+    ? `Choose your business workspace to view its ${systemsReleased ? "systems" : "installations"}. Personal and agency workspaces remain separate.`
     : readOnly
-      ? `This work-share does not include business-wide ${systemsReleased ? "" : "offering "}access. The customer can add direct business membership when that access is appropriate.`
+      ? `This work-share does not include business-wide ${systemsReleased ? "" : "offering "}access. The client can add direct business membership when that access is appropriate.`
       : workspaceExitBlocks
         ? `This workspace has stopped. Existing ${systemsReleased ? "systems" : "offerings"} remain available to review.`
       : "Offering access is unavailable in this workspace.";

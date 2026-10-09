@@ -310,7 +310,7 @@ being offered. Nobody edited a booking setting.
 At 10pm Tuesday a visitor requests a Thursday 2pm consult. The owner gets
 one email with **Approve** and **Suggest another time**, taps Approve on
 their phone, confirms on the page it opens, and the visitor gets the
-confirmation and calendar file. Strelva handled shows "Strelva confirmed
+confirmation and calendar file. What changed shows "Strelva confirmed
 Thursday's consult with Dana." The owner never signed in.
 
 This is the target. Today hours and services are copied into booking config
@@ -477,9 +477,9 @@ the visitor POST and keep it on owner routes.
 
 | Event | Route | Reaches the owner by |
 | --- | --- | --- |
-| Instant booking confirmed | Handled under the approved Running item | "New booking" email at once; Strelva handled receipt |
+| Instant booking confirmed | Handled under the approved Running item | "New booking" email at once; What changed receipt |
 | Booking request | `customer.commitment`, owner_decides, urgent | One email per request with Approve and Suggest another time; Home if signed in |
-| Customer cancels or reschedules | Handled | Email; Strelva handled |
+| Customer cancels or reschedules | Handled | Email; What changed |
 | Go live, pause, resume | `system.go_live`, `system.pause` | Morning Needs you email |
 | Turn on instant for a service | `running.approve` | Morning Needs you email |
 | Connect a calendar | `access.grant` | Magic-link sign-in; no one-tap |
@@ -647,7 +647,7 @@ Every status change writes a history row: actor, from, to, time and reason.
 - **[New Oct 6]** Instant mode is a standing approval. Choosing instant for a
   service is a **Running** item the owner approves once ("Strelva confirms
   Consultation bookings in your open hours", `running.approve`). Each
-  instant booking after that is handled and shows in Strelva handled.
+  instant booking after that is handled and shows in What changed.
 
 ### Notifications
 

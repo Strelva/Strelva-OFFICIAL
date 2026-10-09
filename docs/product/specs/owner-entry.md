@@ -1,5 +1,11 @@
 # Owner entry and the move off /dashboard
 
+> **Changed by ADR 0013 / decisions 1–2.** Owner screens say "your business" or its name;
+> agency screens say "clients". Receipts name the actor and show "Runs on Strelva" for
+> agency work. The operator-issued invitation/conversion/admin membership below is earlier
+> implementation; engineering must reconcile client onboarding and owner invitation through
+> the ordinary agency path, without platform powers used for client service.
+
 Status: implemented locally on `w6/owner-ask`, October 7, 2026. Not
 migrated or deployed; release and email flags remain off. Current proof and
 production stop points are in [the stream handoff](../streams/w6-owner-ask.md).
@@ -18,7 +24,7 @@ production stop points are in [the stream handoff](../streams/w6-owner-ask.md).
   member or admin, with
   `STRELVA_OWNER_INVITATION_CLAIM=1`; the existing accept transaction grants
   both memberships. Invitations remain deferred, and sends require the
-  existing global, customer and per-tenant email gates.
+  existing global, business and per-tenant email gates.
 - Reports, review alerts, health alerts, lead notices, lifecycle notices
   and billing return links resolve the moved destination through a narrow
   workspace port. Recipient ownership remains with the agency-operator
@@ -31,7 +37,7 @@ production stop points are in [the stream handoff](../streams/w6-owner-ask.md).
   website review shows complete copy and navigable pages without sign-in,
   disables visitor actions and refuses changed recipients or candidates.
   The prepared `20261014110000_owner_decision_effects.sql` migration binds the
-  intended approve/decline and rechecks the same active provider's actual
+  intended approve/decline and rechecks the same active agency's actual
   execution effect at admission and each session use. Website reserve and
   publish each require `publish`; Google decisions require `google`, sending
   decisions `email`. Preview/fact/plan approval and decline have no immediate
@@ -72,7 +78,8 @@ After her workspace is moved, the same link opens her workspace instead.
 
 - **If she's signed in and has the owner role,** she lands on Home with the
   report open. Needs you is at the top (one review reply waiting), then
-  Strelva handled ("Strelva fixed a broken image on the store page"). Her
+  What changed ("Acme Marketing fixed a broken image on the store page", with "Runs on
+  Strelva" credit; platform work names Strelva). Her
   store and website show by their own names: "greatlakesdriedfruit.com ·
   Live".
 - **If she isn't signed in,** she sees one sign-in screen titled "Sign in to
@@ -262,7 +269,7 @@ The other pages are reached from inside those.
 
 | `/dashboard` page | Lands in the workspace | Today | Work needed |
 | --- | --- | --- | --- |
-| `/` Today | Home: Needs you, **From your site** (visits, customer actions, who reached out, Strelva's work, links to the places below), Strelva handled, In progress, Recent | **Ready** while Needs you is on (`w2/owner-surfaces-a`). Approvals come through Needs you's tenant-event adapter; the rest from `/api/workspace/site-summary` | Parity gaps: no onboarding checklist or wizard, day-one cards, retention panel or "Do this next"; no sparklines; no Edit site / View live site buttons on Home |
+| `/` Today | Home: Needs you, **From your site** (visits, customer actions, who reached out, Strelva's work, links to the places below), What changed, In progress, Recent | **Ready** while Needs you is on (`w2/owner-surfaces-a`). Approvals come through Needs you's tenant-event adapter; the rest from `/api/workspace/site-summary` | Parity gaps: no onboarding checklist or wizard, day-one cards, retention panel or "Do this next"; no sparklines; no Edit site / View live site buttons on Home |
 | `/chat` Ask Strelva | Ask Strelva (`view=ask`) on Home and each System | **Ready** while Ask and Systems are released | No approvals in chat; workspace conversations start fresh |
 | `/site` Website editor | Website System ("greatlakesdriedfruit.com") | **Ready**, gate `systems`; native editor or repo-site request surface | Existing client APIs and governed Requests are reused; repo sites remain requests for Strelva |
 | `/content` | Website System, Edit | **Ready**, gate `systems` | Reuses the website editor |
@@ -446,7 +453,7 @@ last-owner guard in both stores.
 ## 10. Decisions and launch defaults
 
 These close implementation choices for this stream. They grant no production,
-invitation, pricing or provider authority.
+invitation, pricing or agency authority.
 
 1. **Flip rule:** operators can rehearse mixed surfaces; owner `on` requires
    settled dispositions. Settings is the requested retained exception.

@@ -91,7 +91,7 @@ describe("workspace help service request", () => {
 
     await act(async () => pending[1]!.resolve(response({ request: saved })));
     expect(container.textContent).toContain("Saved for review.");
-    expect(container.textContent).toContain("does not mean a provider accepted it");
+    expect(container.textContent).toContain("does not mean an agency accepted it");
 
     await act(async () => root.render(null));
     await act(async () => root.render(createElement(
@@ -102,7 +102,7 @@ describe("workspace help service request", () => {
     expect(pending).toHaveLength(3);
     await act(async () => pending[2]!.resolve(response({ requests: [saved] })));
     const savedRow = container.querySelector<HTMLButtonElement>("ul button")!;
-    expect(savedRow.textContent).toContain("Pending provider review");
+    expect(savedRow.textContent).toContain("Pending agency review");
     expect(savedRow.textContent).toContain("Ordinary Agency");
     expect(savedRow.textContent).not.toContain("help_request");
     await act(async () => savedRow.click());
@@ -148,7 +148,7 @@ describe("workspace help service request", () => {
     expect(container.textContent).toContain("New persisted request");
   });
 
-  it("offers only server-provided agency recipients and persists the selected provider", async () => {
+  it("offers only server-provided agency recipients and persists the selected agency", async () => {
     const transport = (input: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((resolve) => {
       expect(String(input)).toContain("/api/service-requests");
       pending.push({ init, resolve });
@@ -159,9 +159,9 @@ describe("workspace help service request", () => {
       { value: transport },
       createElement(WorkspaceHelp, {
         workspaceId: businessId,
-        providerOptions: [
-          { label: "Strelva", provider: { kind: "strelva" } },
-          { label: "North Studio", provider: { kind: "agency", agencyWorkspaceId: agencyId } },
+        agencyOptions: [
+          { label: "Strelva", agency: { kind: "strelva" } },
+          { label: "North Studio", agency: { kind: "agency", agencyWorkspaceId: agencyId } },
         ],
       }),
     )));
@@ -182,9 +182,10 @@ describe("workspace help service request", () => {
     await act(async () => { container.querySelector<HTMLButtonElement>('button[type="button"]')!.click(); });
     const body = JSON.parse(String(pending[1]!.init?.body)) as Record<string, unknown>;
     expect(body.provider).toEqual({ kind: "agency", agencyWorkspaceId: agencyId });
+    expect(body).not.toHaveProperty("agency");
   });
 
-  it("keeps a saved agency provider when that agency is no longer in the current options", async () => {
+  it("keeps a saved agency when that agency is no longer in the current options", async () => {
     const transport = (input: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((resolve) => {
       expect(String(input)).toContain("/api/service-requests");
       pending.push({ init, resolve });
@@ -238,7 +239,7 @@ describe("workspace help service request", () => {
     await act(async () => pending[0]!.resolve(response({ requests: [withdrawn] })));
     const row = container.querySelector<HTMLButtonElement>("ul button")!;
     expect(row.textContent).toContain("Withdrawn");
-    expect(row.textContent).not.toContain("Pending provider review");
+    expect(row.textContent).not.toContain("Pending agency review");
     await act(async () => row.click());
     const saveButton = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find((button) => ["Saved", "Save request"].includes(button.textContent || ""));
     expect(saveButton?.disabled).toBe(true);
@@ -318,6 +319,6 @@ describe("workspace help service request", () => {
     await act(async () => {});
     expect(calls.some((url) => url.includes("/api/offerings?")).valueOf()).toBe(true);
     expect(container.textContent).toContain("Exact accepted scope");
-    expect(container.textContent).toContain("Create exact provider assignment");
+    expect(container.textContent).toContain("Create exact agency assignment");
   });
 });

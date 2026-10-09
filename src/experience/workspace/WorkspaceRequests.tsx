@@ -39,7 +39,7 @@ function shortDate(value: string): string {
 
 /** Who is doing a request, by name. */
 export function deliveryProviderName(item: BusinessDeliveryItem, agencyNames: ReadonlyMap<string, string>): string {
-  return item.provider?.kind === "agency" ? agencyNames.get(item.provider.agencyWorkspaceId) || "your agency" : item.provider?.kind === "strelva" ? "Strelva" : "";
+  return item.provider?.kind === "agency" ? agencyNames.get(item.provider.agencyWorkspaceId) || "your agency" : item.provider?.kind === "strelva" ? "Strelva Agency" : "";
 }
 
 export function businessRequestRows(deliveries: readonly BusinessDeliveryItem[], work: readonly WorkspaceWork[], providerName: (item: BusinessDeliveryItem) => string): BusinessRequestRow[] {
@@ -47,7 +47,7 @@ export function businessRequestRows(deliveries: readonly BusinessDeliveryItem[],
     id: `delivery-${item.id}`,
     title: item.title,
     stage: item.stage,
-    detail: item.stage === "asked" ? `Asked · waiting for ${providerName(item) || "the provider"} to agree scope and deadline`
+    detail: item.stage === "asked" ? `Asked · waiting for ${providerName(item) || "your agency"} to agree scope and deadline`
       : item.stage === "done" ? ["Done", providerName(item) ? `by ${providerName(item)}` : null].filter(Boolean).join(" · ")
       : [item.detail, item.dueAt && item.stage !== "closed" ? `due ${shortDate(item.dueAt)}` : null, providerName(item) ? `by ${providerName(item)}` : null].filter(Boolean).join(" · "),
     href: item.href,

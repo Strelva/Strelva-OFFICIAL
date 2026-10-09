@@ -26,7 +26,7 @@ export default async function BusinessEffortPreview({ searchParams }: { searchPa
     return ["2026-08-31", "2026-09-30"].map((occurredOn, month) => ({
       id: `20000000-0000-4000-8000-${String(index * 2 + month + 1).padStart(12, "0")}`,
       businessId: business.id, minutes: index === 0 ? (month === 0 ? 90 : 30) : 0,
-      category: "other", occurredOn, note: index === 0 ? "Customer change review" : "No human work this month",
+      category: "other", occurredOn, note: index === 0 ? "Client change review" : "No human work this month",
       recordedBy: operator, recordedAt: `${occurredOn}T12:00:00Z`, void: null,
     }));
   });

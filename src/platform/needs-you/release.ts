@@ -1,5 +1,5 @@
 /**
- * Needs you and Strelva handled are a 1.0.0 feature behind
+ * Needs you and What changed are a 1.0.0 feature behind
  * STRELVA_NEEDS_YOU_RELEASE (off by default). Off: Home renders exactly as
  * before, the routes answer 503, workspace approve links refuse, and the
  * cron records a heartbeat and does nothing. On, email still goes through

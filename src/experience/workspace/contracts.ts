@@ -1,3 +1,4 @@
+import type { RecordedActor } from "@/platform/presentation/actor";
 import type { OwnerBrand } from "@/platform/infra/agency-brand";
 import type { ConnectionKind, ConnectionState, SystemLifecycle, SystemRef } from "@/platform/systems/contracts";
 import type { HealthStatus } from "@/platform/system-health/contracts";
@@ -177,7 +178,7 @@ export interface WorkspaceReleases {
   /** Agency-owned public check leads, off unless explicitly released. */
   agencyProspecting?: boolean;
   systems: boolean;
-  /** STRELVA_NEEDS_YOU_RELEASE: Home reads Needs you and Strelva handled from the policy model. */
+  /** STRELVA_NEEDS_YOU_RELEASE: Home reads Needs you and What changed from the policy model. */
   needsYou?: boolean;
   /** Ask Strelva opens in this workspace: STRELVA_ASK_RELEASE and the workspace release on, and Systems on for this workspace. */
   ask?: boolean;
@@ -223,7 +224,7 @@ export interface WorkspaceSystems {
   activations?: WorkspaceSystemActivation[];
   /** The last changes to each stored System, newest first. Additive. */
   history?: WorkspaceSystemHistoryRow[];
-  /** Strelva handled receipts from Make real and Possibilities (last 7 days),
+  /** What changed receipts from Make real and Possibilities (last 7 days),
    * newest first. Never an isolated run. Additive. */
   handled?: WorkspaceSystemReceipt[];
 }
@@ -244,6 +245,7 @@ export interface WorkspaceSystemActivation {
 }
 
 export interface WorkspaceSystemHistoryRow {
+  actor?: RecordedActor;
   id: string;
   systemId: string;
   /** "Strelva published the rebuilt site". Never called a Version. */
@@ -254,6 +256,7 @@ export interface WorkspaceSystemHistoryRow {
 }
 
 export interface WorkspaceSystemReceipt {
+  actor?: RecordedActor;
   id: string;
   systemId: string | null;
   sentence: string;
@@ -286,7 +289,7 @@ export interface WorkspacePublishing {
     systemId: string;
     health: string;
     healthMessage: string;
-    /** Strelva handled: newest first, in the customer's words. */
+    /** What changed: newest first, in the customer's words. */
     receipts: Array<{ id: string; headline: string; status: string; at: string }>;
   }>;
   /** Blog and collections, as parts of the website System they appear on. */

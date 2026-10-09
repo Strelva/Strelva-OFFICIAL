@@ -106,7 +106,7 @@ client whose repo reads its content from Strelva (`/api/v1/content`,
 - They tap Approve. Strelva publishes the content, calls the repo's
   revalidate hook (`revalidateClientSite`, `src/lib/revalidate-client.ts`),
   fetches the live homepage, and confirms the new hero is there.
-- The receipt lands under **Strelva handled**: "Strelva put the holiday gift
+- The receipt lands under **What changed**: "Strelva put the holiday gift
   boxes on greatlakesdriedfruit.com." It has **Undo**. On December 20 a
   Running item ("Holiday hero comes down December 20") reverts it, with its
   own receipt.

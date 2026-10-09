@@ -85,7 +85,7 @@ for (const [view, width] of [["home", 390], ["needs-you", 320]] as const) {
     const retry = () => f.queue.getByRole("button", { name: "Check again", exact: true });
     const outside = page.getByRole("button", { name: "Outside decision control", exact: true });
     await notClear(page);
-    if (view === "home") await expect(page.getByText("What Strelva did this week could not be loaded. Nothing about it changed.", { exact: true })).toBeVisible();
+    if (view === "home") await expect(page.getByText("This week’s changes could not be loaded. Nothing about it changed.", { exact: true })).toBeVisible();
     await evidence(page, f.queue, info, "partial-empty", view, screenshots);
     f.fail(true); await retry().focus(); await page.keyboard.press("Enter");
     await expect(f.queue.getByRole("status")).toContainText("Your decisions could not be checked. Nothing about them changed.");
@@ -97,7 +97,7 @@ for (const [view, width] of [["home", 390], ["needs-you", 320]] as const) {
     await expect(f.queue.getByText("Complete fictional reply.", { exact: true })).toBeVisible();
     await expect(f.queue.getByRole("button", { name: `Approve: ${fictionalAsk.title}`, exact: true })).toBeEnabled();
     await expect(outside).toBeFocused(); await notClear(page);
-    if (view === "home") await expect(page.getByText(/Nothing this week\. When Strelva changes/)).toBeVisible();
+    if (view === "home") await expect(page.getByText(/Nothing this week\. When something changes/)).toBeVisible();
     await evidence(page, f.queue, info, "known-partial", view, screenshots);
     f.state("complete"); await retry().focus(); await page.keyboard.press("Enter");
     await expect(page.getByText(view === "home" ? "Nothing needs you right now." : "Nothing needs you.", { exact: true })).toBeVisible();

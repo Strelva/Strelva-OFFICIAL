@@ -218,12 +218,12 @@ test("a named agency operator revises one assigned application and returns it fo
     await customerPage.locator("ul button").filter({ hasText: "Accepted for review" }).first().click();
     await customerPage.getByRole("button", { name: "Review delivery options", exact: true }).click();
     await expect(customerPage.getByRole("heading", { name: "Move this request into delivery", exact: true })).toBeVisible();
-    await customerPage.getByLabel("Named provider operator email", { exact: true }).fill(operator.email);
+    await customerPage.getByLabel("Named agency operator email", { exact: true }).fill(operator.email);
     for (const checkbox of await customerPage.getByRole("checkbox").all()) {
       if (!(await checkbox.isChecked())) await checkbox.check();
     }
-    await customerPage.getByRole("button", { name: "Create exact provider assignment", exact: true }).click();
-    await expect(customerPage.getByText("Provider acceptance is still pending.", { exact: false })).toBeVisible();
+    await customerPage.getByRole("button", { name: "Create exact agency assignment", exact: true }).click();
+    await expect(customerPage.getByText("Agency acceptance is still pending.", { exact: false })).toBeVisible();
 
     const pendingDeliveries = await getJson(operator.context.request, `/api/offerings/provider-delivery?businessId=${businessId}`) as unknown as DeliveryListResponse;
     const pending = pendingDeliveries.deliveries.find((item: { installationId: string }) => item.installationId === installationId);
@@ -252,7 +252,7 @@ test("a named agency operator revises one assigned application and returns it fo
     // Systems wording only when STRELVA_SYSTEMS_RELEASE is on for the app under test.
     await expect(agencyPage.getByRole("heading", { name: process.env.STRELVA_SYSTEMS_RELEASE === "1" ? "Internal-tool drafts for clients" : "Assigned application drafts", exact: true })).toBeVisible();
     await agencyPage.getByRole("link", { name: "Open draft", exact: true }).click();
-    await expect(agencyPage.getByText("The customer has not granted draft editing", { exact: false })).toBeVisible();
+    await expect(agencyPage.getByText("The client has not granted draft editing", { exact: false })).toBeVisible();
     await expect(agencyPage.getByRole("button", { name: "Save new draft", exact: true })).toHaveCount(0);
 
     // Opening the operator route can reload another tab in the dev proof app.
@@ -288,7 +288,7 @@ test("a named agency operator revises one assigned application and returns it fo
 
     // The named maker runs actual checks; the customer reviews and publishes.
     await agencyPage.getByRole("button", { name: "Check proposed change", exact: true }).click();
-    await expect(agencyPage.getByText("Checks passed. Return this draft to the customer for review and publication.", { exact: true })).toBeVisible();
+    await expect(agencyPage.getByText("Checks passed. Return this draft to the client for review and publication.", { exact: true })).toBeVisible();
 
     const customerAppPage = await owner.context.newPage();
     customerAppPage.setDefaultTimeout(20_000);
@@ -304,12 +304,12 @@ test("a named agency operator revises one assigned application and returns it fo
     await expect(customerAppPage.getByRole("button", { name: "Check proposed change", exact: true })).toHaveCount(0);
     await expect(customerAppPage.getByRole("button", { name: "Publish", exact: true })).toBeEnabled();
     await customerAppPage.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(customerAppPage.getByText(/Version 2 is live/)).toBeVisible();
+    await expect(customerAppPage.getByText(/Release 2 is live/)).toBeVisible();
 
     // The operator can still inspect the returned live result, but customer
     // publication remains the only release path.
     await agencyPage.reload({ waitUntil: "domcontentloaded" });
-    await expect(agencyPage.getByText("Version 2 is live.", { exact: false })).toBeVisible();
+    await expect(agencyPage.getByText("Release 2 is live.", { exact: false })).toBeVisible();
     await expect(agencyPage.getByRole("button", { name: "Publish", exact: true })).toHaveCount(0);
 
     await customerPage.bringToFront();
@@ -321,7 +321,7 @@ test("a named agency operator revises one assigned application and returns it fo
     await customerPage.getByRole("button", { name: /Prepare the exact permit request application/ }).click();
     await expect(customerPage.locator(`#delivery-controls-${serviceRequest.request.id}`)).toBeVisible();
     await customerPage.getByRole("button", { name: "Review delivery options", exact: true }).click();
-    await customerPage.getByRole("textbox", { name: "Customer review", exact: true }).fill("Verified the agency receipt and published the returned draft.");
+    await customerPage.getByRole("textbox", { name: "Your review", exact: true }).fill("Verified the agency receipt and published the returned draft.");
     await customerPage.getByRole("button", { name: "Confirm completed delivery", exact: true }).click();
     await expect(customerPage.getByText("The completed delivery is confirmed and linked to this request.", { exact: true })).toBeVisible();
 
@@ -339,7 +339,7 @@ test("a named agency operator revises one assigned application and returns it fo
     }, 403);
 
     await agencyPage.reload({ waitUntil: "domcontentloaded" });
-    await expect(agencyPage.getByText("The customer has not granted draft editing", { exact: false })).toBeVisible({ timeout: 20_000 });
+    await expect(agencyPage.getByText("The client has not granted draft editing", { exact: false })).toBeVisible({ timeout: 20_000 });
     await expect(agencyPage.getByRole("button", { name: "Save new draft", exact: true })).toHaveCount(0);
 
     await customerPage.reload({ waitUntil: "domcontentloaded" });

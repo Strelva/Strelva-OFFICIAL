@@ -124,7 +124,7 @@ describe("WebsiteExperience", () => {
   it("reopens the saved artifact with its canonical preview URL and exact next action", async () => {
     const { container, root } = await render(transport(), { workId });
     expect(container.textContent).toContain("Harbor Dental");
-    expect(container.textContent).toContain("Preview version 4");
+    expect(container.textContent).toContain("Saved preview 4");
     expect(container.textContent).toContain("Approve this preview");
     expect(container.textContent).not.toContain("Prepare launch");
     expect(container.querySelector<HTMLIFrameElement>("iframe")?.getAttribute("src")).toBe("/preview/websites/4");
@@ -133,7 +133,7 @@ describe("WebsiteExperience", () => {
   });
 
   it("keeps the edited brief when regeneration conflicts", async () => {
-    const api = transport({ revise: vi.fn(async () => { throw new Error("This website changed while you were editing. Reload the latest version before trying again."); }) });
+    const api = transport({ revise: vi.fn(async () => { throw new Error("This website changed while you were editing. Reload the latest saved state before trying again."); }) });
     const { container, root } = await render(api, { workId });
     const description = [...container.querySelectorAll<HTMLTextAreaElement>("textarea")].find((field) => field.value.includes("family dental"));
     expect(description).toBeTruthy();

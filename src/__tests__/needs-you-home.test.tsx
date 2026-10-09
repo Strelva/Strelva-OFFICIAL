@@ -7,6 +7,9 @@ import { BusinessHome } from "@/experience/workspace/BusinessHome";
 import { NeedsYouSection, StrelvaHandledSection } from "@/experience/workspace/NeedsYouSection";
 import type { NeedsYouState } from "@/experience/workspace/useNeedsYou";
 import type { HandledReceipt, OwnerDecision } from "@/platform/needs-you/contracts";
+import { handledReceiptSchema } from "@/platform/needs-you/contracts";
+import { handledFromStore } from "@/platform/needs-you/handled";
+import { projectRecordActors } from "@/platform/needs-you/record-attribution";
 import type { WorkspaceSnapshot } from "@/experience/workspace/contracts";
 
 const noop = () => undefined;
@@ -18,14 +21,26 @@ const item = (over: Partial<OwnerDecision> = {}): OwnerDecision => ({
   openedAt: "2026-10-06T11:00:00Z", expiresAt: "2026-10-20T11:00:00Z", reminded1At: null, reminded2At: null, deliveries: [], ...over,
 });
 const receipts: HandledReceipt[] = [
-  { id: "record:14", store: "business_record_revisions", systemId: null, sentence: "Strelva updated your hours in your business record", at: "2026-10-06T14:10:00Z", changed: "hours", evidence: null, undo: { state: "undo" } },
-  { id: "tenant_event:9", store: "tenant_events", systemId: null, sentence: "Strelva replied to Dana's review on Google", at: "2026-10-05T21:02:00Z", changed: null, evidence: { providerAccepted: true, readBack: "verified" }, undo: { state: "not_undoable", reason: "Google has the reply; delete it on Google." } },
+  { actor: { kind: "platform" }, id: "record:14", store: "business_record_revisions", systemId: null, sentence: "Strelva updated your hours in your business record", at: "2026-10-06T14:10:00Z", changed: "hours", evidence: null, undo: { state: "undo" } },
+  { actor: { kind: "platform" }, id: "tenant_event:9", store: "tenant_events", systemId: null, sentence: "Strelva replied to Dana's review on Google", at: "2026-10-05T21:02:00Z", changed: null, evidence: { providerAccepted: true, readBack: "verified" }, undo: { state: "not_undoable", reason: "Google has the reply; delete it on Google." } },
 ];
 const ready = (over: Partial<Extract<NeedsYouState, { status: "ready" }>> = {}): NeedsYouState => ({ status: "ready", role: "owner", items: [item()], complete: true, handled: receipts, handledAvailable: true, ...over });
 const needs = (state: NeedsYouState, extra?: { extraCount?: number }) => renderToStaticMarkup(createElement(NeedsYouSection, { state, pending: null, notices: {}, onDecide: noop, onRetry: noop, ...extra }));
 const handled = (state: NeedsYouState) => renderToStaticMarkup(createElement(StrelvaHandledSection, { state, pending: null, notices: {}, onUndo: noop }));
 
 describe("Needs you on Home", () => {
+  it("shows review copy without Undo for a supplemental agency receipt from filtered History", () => {
+    const rows = projectRecordActors([], [{
+      sequence: 10, revision: 10, actorKind: "agency", actorId: "aaaaaaaa-0000-4000-8000-000000000003", source: "agency",
+      actor: { kind: "agency", displayName: "Strelva Agency" }, undoOf: null, undoneBy: null, createdAt: "2026-10-09T12:00:00Z",
+      changes: [{ entity: "fact", id: "hours", before: null, after: null }],
+    }], "2026-10-02T12:00:00Z");
+    const receipt = handledReceiptSchema.parse(handledFromStore(rows[0]!));
+    const html = handled(ready({ handled: [receipt] }));
+    expect(html).toContain("Strelva Agency updated your hours in your business record");
+    expect(html).toContain("Undoing this change needs a review first.");
+    expect(html).not.toContain('aria-label="Undo:');
+  });
   it("shows each owner decision with Approve and Not yet and what each does", () => {
     const html = needs(ready({ items: [item(), item({ id: "d0000000-0000-4000-8000-000000000002", title: "Put the booking page live", openHref: "/workspace?view=apps" })] }));
     expect(html).toContain("Reply to Jordan quoting the consult fee");
@@ -83,7 +98,43 @@ describe("Needs you on Home", () => {
   });
 });
 
-describe("Strelva handled on Home", () => {
+describe("recorded actors on Home", () => {
+  it("shows the agency with platform credit and support as a separate actor", () => {
+    const html = needs(ready({ items: [item({ actor: { kind: "agency", displayName: "Acme Marketing" }, approveEffect: "Strelva sends the reply.", operatorNote: "Check the price.", noteActor: { kind: "operator", displayName: "Taylor" } })] }));
+    expect(html).toContain("Acme Marketing · Runs on Strelva");
+    expect(html).toContain("Approve: Acme Marketing sends the reply.");
+    expect(html).toContain("Taylor (platform support): Check the price.");
+    expect(html).not.toContain("Strelva&#x27;s note");
+  });
+
+  it("cannot label a support note as an agency action", () => {
+    const html = needs(ready({ items: [item({ operatorNote: "Check the price.", noteActor: { kind: "agency", displayName: "Acme Marketing" } })] }));
+    expect(html).toContain("Platform operator (support): Check the price.");
+    expect(html).not.toContain("Acme Marketing");
+  });
+
+  it.each(["Strelva Agency", "Acme Agency", "Strelva creative Agency"])("renders %s once and keeps missing actors neutral, including Undo", displayName => {
+    const row = { store: "business_record_revisions", id: "14", at: "2026-10-06T14:10:00Z", changes: ["fact:hours"], undo: "undo" };
+    const html = handled(ready({ handled: [
+      handledFromStore({ ...row, actor: { kind: "agency", displayName } })!,
+      handledFromStore({ ...row, id: "15" })!,
+    ] }));
+    expect(html).toContain(`${displayName} updated your hours`);
+    expect(html).toContain(`aria-label="Undo: ${displayName} updated your hours in your business record"`);
+    expect(html).toContain("Runs on Strelva");
+    expect(html).toContain('aria-label="Undo: Updated your hours in your business record"');
+    expect(html).not.toContain("Agency Agency");
+    expect(html).not.toContain("Strelva updated");
+  });
+
+  it("does not replace words inside the customer's quoted detail", () => {
+    const html = needs(ready({ items: [item({ detail: '\"Strelva updated my hours\"', approveEffect: "Strelva sends the reply." })] }));
+    expect(html).toContain("Strelva updated my hours");
+    expect(html).toContain("Approve: Sends the reply.");
+  });
+});
+
+describe("What changed on Home", () => {
   it("lists receipts with Strelva as the subject and undo only where it is one tap", () => {
     const html = handled(ready());
     expect(html).toContain("Strelva updated your hours in your business record");
@@ -112,10 +163,10 @@ describe("BusinessHome with the Needs you release", () => {
     onOpen: noop, onStart: noop, onRequest: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account",
   }));
 
-  it("reads Needs you and Strelva handled from the policy model when on", () => {
+  it("reads Needs you and What changed from the policy model when on", () => {
     const html = render(true);
     expect(html).toContain("Checking what needs you");
-    expect(html).toContain("Checking what Strelva did");
+    expect(html).toContain("Checking recent changes");
   });
 
   it("renders Home exactly as before when off", () => {

@@ -109,7 +109,7 @@ contact form at 9:40pm on a Saturday asking about a private party for 30.
 - The owner gets an urgent Needs you email at once: the inquiry, the draft,
   and **Approve**, **Not yet** and **Open**. They tap Approve on their phone,
   confirm on the page it opens, and the reply sends. They never sign in.
-- Strelva handled shows "Strelva replied to Dana about a private party", with
+- What changed shows "Strelva replied to Dana about a private party", with
   the provider receipt.
 
 This is the target. Today the lead lives only in Redis for reads, the owner
@@ -124,7 +124,7 @@ exists.
 | Capability (one inquiry workflow) | The **Inquiries System** (kind `inquiry`, origin `inquiry_workspaces.id`, `src/platform/systems/from-existing.ts`) | **Changed** on screen. `capability` stays the engine's internal word |
 | Capability version | System **History** (each published version is a release) | **Changed** on screen. Never called "Version" |
 | Inquiry / Record | Records inside the Inquiries System. Each points at one **business contact** | **Changed**: one person, one contact across inquiries and bookings |
-| Change, preview, receipt | Kept underneath. Owner sees Needs you items and **Strelva handled** receipts | **Changed** on screen |
+| Change, preview, receipt | Kept underneath. Owner sees Needs you items and **What changed** receipts | **Changed** on screen |
 | Responsibility | The inquiry policy, one source of routes in the Needs you evaluator, plus a **Running** sentence ("Every inquiry is answered within a day") | **Changed** |
 | Connection | Typed Connections on the System page | **Changed** (see C13) |
 | Work, Shape, Go | Requests and Ask Strelva | **Changed** (see C4) |
@@ -159,7 +159,7 @@ the business menu, and Ask Strelva as the way in
 carries a draft, selection or approval across is **Kept**.
 
 **C3. Changed: Home.** (§1 Home)
-Home is Needs you, Strelva handled, In progress, Recent, with Systems by
+Home is Needs you, What changed, In progress, Recent, with Systems by
 their own names ("Inquiries · Live · 2 new"). Empty Needs you disappears.
 September 11's fixed four-section order and "empty sections stay" are
 superseded. "No metric cards, no invented activity" is **Kept**.

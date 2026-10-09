@@ -1,4 +1,5 @@
 import { canonicalJson } from "@/platform/business-record/tenant-import";
+import { actorCopy, actorPresentation, type RecordedActor } from "@/platform/presentation/actor";
 import { createHash } from "node:crypto";
 import type { FactValues } from "@/platform/business-record/contracts";
 import type { SystemLifecycle } from "@/platform/systems/contracts";
@@ -94,25 +95,29 @@ export function routeReviewReply(mode: "off" | "approve" | "auto", rating: numbe
   return "owner";
 }
 
-/** The customer-facing line for a receipt. Strelva acts; no AI words. */
-export function receiptHeadline(receipt: Pick<ListingReceipt, "status" | "action"> & { error?: string | null }, subject?: string): string {
+/** The customer-facing line names the recorded executor; an approver is not the executor. */
+export function receiptHeadline(receipt: Pick<ListingReceipt, "status" | "action"> & { error?: string | null; actor?: RecordedActor }, subject?: string): string {
+  const line = (text: string) => {
+    const credit = actorPresentation(receipt.actor).credit;
+    return `${actorCopy(text, receipt.actor)}${credit ? ` ${credit}.` : ""}`;
+  };
   const who = subject ? `${subject}'s review` : "a review";
   if (receipt.status === "failed" && receipt.error?.startsWith("Google API access is still pending")) {
     return "Waiting for Google to approve access. Nothing was sent yet.";
   }
   if (receipt.status === "failed") return "Google didn't take this change. Nothing changed on Google.";
-  if (receipt.status === "undone") return "Strelva undid this change on Google.";
-  if (receipt.status === "posted_unverified") return "Posted. Google hasn't shown it yet.";
+  if (receipt.status === "undone") return line("Strelva undid this change on Google.");
+  if (receipt.status === "posted_unverified") return line("Strelva posted. Google hasn't shown it yet.");
   if (receipt.status === "held_by_google") return "Google is reviewing this change.";
   if (receipt.status === "posting") return "Google write in progress or unconfirmed. Check Google before trying again; Strelva will not repeat it.";
   switch (receipt.action) {
-    case "reply_post": return `Strelva replied to ${who} on Google.`;
-    case "reply_update": return `Strelva updated the reply to ${who} on Google.`;
-    case "reply_delete": return `Strelva removed the reply to ${who} on Google.`;
-    case "hours_patch": return "Strelva updated your hours on Google.";
-    case "info_patch": return "Strelva updated your business info on Google.";
-    case "post_create": return "Strelva posted to your Google listing.";
-    case "post_delete": return "Strelva removed a post from your Google listing.";
+    case "reply_post": return line(`Strelva replied to ${who} on Google.`);
+    case "reply_update": return line(`Strelva updated the reply to ${who} on Google.`);
+    case "reply_delete": return line(`Strelva removed the reply to ${who} on Google.`);
+    case "hours_patch": return line("Strelva updated your hours on Google.");
+    case "info_patch": return line("Strelva updated your business info on Google.");
+    case "post_create": return line("Strelva posted to your Google listing.");
+    case "post_delete": return line("Strelva removed a post from your Google listing.");
   }
 }
 

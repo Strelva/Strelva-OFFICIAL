@@ -191,7 +191,7 @@ describe("workspace start planner", () => {
     expect(html).toContain("Give staff one place to make requests");
     expect(html).toContain("Make supplier onboarding consistent");
     expect(html).toContain("Get a new website live");
-    expect(html).toContain("Continue with this request");
+    expect(html).toContain("Continue with this ask");
     expect(html).toContain("Stop customer inquiries being missed");
     expect(html).toContain("Make this spreadsheet operational");
     expect(html).toContain("See what AI understands about us");

@@ -54,7 +54,7 @@ test("an owner publishes, shares, updates, and resumes the staff request offerin
   await page.getByRole("button", { name: "Check proposed change", exact: true }).click();
     await expect(page.getByRole("button", { name: "Publish", exact: true })).toBeEnabled();
     await page.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(page.getByText(/Version 1 is live/)).toBeVisible();
+    await expect(page.getByText(/Release 1 is live/)).toBeVisible();
   await page.getByRole("tab", { name: "Use", exact: true }).click();
 
     // The offering stays in draft until the connected application is released
@@ -67,7 +67,7 @@ test("an owner publishes, shares, updates, and resumes the staff request offerin
     await draftStaffRequestOffering.getByRole("button", { name: "Staff request application: Open", exact: true }).click();
     await expect(page.getByText("Draft setup", { exact: true })).toBeVisible();
     await page.getByLabel("I published the connected application through its review.", { exact: true }).check();
-    await page.getByRole("button", { name: "Activate released version", exact: true }).click();
+    await page.getByRole("button", { name: "Activate release", exact: true }).click();
     await expect(page.getByText("Installed", { exact: true })).toBeVisible();
 
     const connectedBeforeUse = page.getByRole("region", { name: "Connected work", exact: true });
@@ -103,7 +103,7 @@ test("an owner publishes, shares, updates, and resumes the staff request offerin
   await page.getByRole("button", { name: "Check proposed change", exact: true }).click();
     await expect(page.getByRole("button", { name: "Publish", exact: true })).toBeEnabled();
     await page.getByRole("button", { name: "Publish", exact: true }).click();
-    await expect(page.getByText(/Version 2 is live/)).toBeVisible();
+    await expect(page.getByText(/Release 2 is live/)).toBeVisible();
   await page.getByRole("tab", { name: "Use", exact: true }).click();
     await page.getByText("Add another record", { exact: true }).click();
     await expect(page.getByRole("tabpanel", { name: "Use", exact: true }).getByLabel("Request details", { exact: true })).toBeVisible();

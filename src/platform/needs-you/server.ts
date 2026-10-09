@@ -121,7 +121,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, ef
   });
 }
 
-/** The last week of what Strelva did for this business, newest first. */
+/** The last week of recorded changes for this business, newest first. */
 export async function readStrelvaHandled(actor: WorkspaceActor, workspaceId: string, store: NeedsYouStore = PostgresNeedsYouStore, now = Date.now()): Promise<HandledReceipt[]> {
   const since = now - 7 * 24 * 60 * 60 * 1000;
   const rows = await store.handled(actor, workspaceId, new Date(since).toISOString());

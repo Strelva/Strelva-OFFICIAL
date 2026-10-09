@@ -1,3 +1,4 @@
+import type { RecordedActor } from "@/platform/presentation/actor";
 /**
  * Presentation view-model for the Systems, Connections, Possibilities and
  * Versions customer model (PRODUCT_MODEL.md DESIGN_SYSTEMS_PRODUCT_MODEL).
@@ -85,6 +86,7 @@ export interface SystemActivation {
 
 /** One past change to a System. Never called a Version. */
 export interface SystemHistoryRow {
+  actor?: RecordedActor;
   id: string;
   sentence: string;
   at: string;
@@ -147,7 +149,7 @@ export interface SystemView {
   offers?: ReadonlyArray<{ kind: "connect_google"; label: string }>;
   /** Make real in progress or partly live that changes this System. */
   activations?: SystemActivation[];
-  /** The last changes, newest first: revisions and Strelva handled receipts. */
+  /** The last changes, newest first: revisions and What changed receipts. */
   history?: SystemHistoryRow[];
 }
 

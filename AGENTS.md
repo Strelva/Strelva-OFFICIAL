@@ -161,6 +161,8 @@ cluster and never touch production:
 PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-sql
 PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-upgrade
 PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:agency-workflow
+PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH \
+  STRELVA_MCP_HTTP_SQL_PROOF=1 bash scripts/check-agent-channel-sql.sh
 ```
 
 For agency workflow or provider/owner permission changes, run
@@ -172,6 +174,10 @@ failure evidence. The bounded signed-in-owner three-flag browser runner is
 its own local Auth stack and app, with providers disabled and a fictional
 source-site transport. A passing local run is never proof of hosted delivery.
 
+The optional MCP proof above composes actual local HTTP with disposable
+Postgres; it rejects repository env files and proves no native assistant or
+Supabase browser sign-in. The [owner-assistant record](./docs/operations/owner-assistant-mcp-2026-10-08.md)
+owns setup, scopes and remaining HTTPS/client qualification.
 `CUSTOM_DOMAIN_MAP` routes custom domains locally.
 [docs/operations/testing-and-ci.md](./docs/operations/testing-and-ci.md) explains when Redis,
 Postgres, or bypass mode changes what a green run means.
@@ -214,7 +220,7 @@ distinguishes observed history from unavailable period-end state and billing.
 | Product model: Systems, Connections, Possibilities, Versions | [CONTEXT.md](./CONTEXT.md#product-model); the full ledger is `PRODUCT_MODEL.md` (untracked, main checkout only) |
 | Capabilities: status, code, specs, flags | [docs/capabilities/README.md](./docs/capabilities/README.md) |
 | Code layers and platform | [docs/architecture/README.md](./docs/architecture/README.md) |
-| Workspace domain terms | [GLOSSARY.md](./GLOSSARY.md), under [product-ontology](./docs/architecture/product-ontology.md) |
+| Workspace domain terms | [GLOSSARY.md](./GLOSSARY.md) is the word authority; [product-ontology](./docs/architecture/product-ontology.md) owns structure and governance rules |
 | Data authority and retention | [docs/architecture/persistence-boundaries.md](./docs/architecture/persistence-boundaries.md) |
 | CI and test modes | [docs/operations/testing-and-ci.md](./docs/operations/testing-and-ci.md) |
 | Client dashboard | [docs/architecture/client-dashboard-ia.md](./docs/architecture/client-dashboard-ia.md) |

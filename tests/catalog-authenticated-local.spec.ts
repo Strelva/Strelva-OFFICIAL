@@ -151,7 +151,7 @@ test("owners file Requests and a failed maker plan files one pending Request wit
     await expect(ownerPage).toHaveURL(/view=help/);
     await expect(ownerPage.getByRole("textbox").first()).toHaveValue(ownerSentence);
     await ownerPage.getByRole("button", { name: "Save request", exact: true }).click();
-    await expect(ownerPage.getByText("Saved for review. This does not mean a provider accepted it or that work has started.", { exact: true })).toBeVisible();
+    await expect(ownerPage.getByText("Saved for review. This does not mean an agency accepted it or that work has started.", { exact: true })).toBeVisible();
     expect(await ownerPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await ownerPage.screenshot({ path: testInfo.outputPath("catalog-owner-request-360.png"), fullPage: true });
     const budget = await post(operator.context.request, "/api/work-economics", { action: "create", workspaceId, productId: "work_plans", resourceKind: "plan", payerId: operator.userId, estimateCents: 0, maxAuthorizedCents: 0 });

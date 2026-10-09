@@ -498,7 +498,7 @@ test("returns from an empty agency view to My work", async ({ page }) => {
   await page.getByRole("link", { name: "Strelva home", exact: true }).click();
   await openWorkspaceHelp(page);
   await page.getByRole("main").getByRole("button", { name: "Sharing & agency access" }).click();
-  await expect(page.getByRole("heading", { name: "Prepare useful work before the customer arrives." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Prepare useful work before the client arrives." })).toBeVisible();
   await page.getByRole("link", { name: "Strelva home", exact: true }).click();
   await expectBusinessHome(page);
 });
@@ -523,7 +523,7 @@ test("keeps My work and Shared with me context-local and read-only", async ({ pa
   await page.goto("/workspace");
   await page.getByLabel("Current workspace").selectOption(CUSTOMER_ID);
   await expect(page.getByRole("heading", { name: "Review what was shared.", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Strelva handled", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What changed", exact: true })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("region", { name: "Recent work", exact: true }).getByRole("link", { name: "Customer-owned assessment" })).toBeVisible();
   await page.getByRole("link", { name: "All apps and files", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
@@ -583,7 +583,7 @@ test("hands work to the named customer with optional access unchecked, then revo
   await page.getByRole("link", { name: "Strelva home", exact: true }).click();
   await openWorkspaceHelp(page);
   await page.getByRole("main").getByRole("button", { name: "Sharing & agency access" }).click();
-  await page.getByLabel("Customer email").fill("owner@example.com");
+  await page.getByLabel("Client email").fill("owner@example.com");
   await page.getByRole("button", { name: "Create private handoff" }).click();
   await expect(page.getByText(/\/workspace#handoff=recipient-bound-secret/)).toBeVisible();
   await expect(page.getByText(/workspace\?handoff=/)).toHaveCount(0);
@@ -655,8 +655,8 @@ test("hands a tracker to the named customer and keeps optional agency access rea
 
   await page.goto(`/workspace?workspaceId=${AGENCY_ID}&view=work&work=${TRACKER_WORK_ID}`);
   await page.getByRole("button", { name: "Sharing & access", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Put finished work in the customer’s hands." })).toBeVisible();
-  await page.getByLabel("Customer email").fill("owner@example.com");
+  await expect(page.getByRole("heading", { name: "Put finished work in the client’s hands." })).toBeVisible();
+  await page.getByLabel("Client email").fill("owner@example.com");
   await page.getByRole("button", { name: "Create private handoff" }).click();
 
   await page.goto("/workspace#handoff=tracker-recipient-secret");
@@ -706,7 +706,7 @@ test("resets a created handoff link when the selected work changes", async ({ pa
   await page.getByRole("link", { name: "Strelva home", exact: true }).click();
   await openWorkspaceHelp(page);
   await page.getByRole("main").getByRole("button", { name: "Sharing & agency access" }).click();
-  await page.getByLabel("Customer email").fill("owner@example.com");
+  await page.getByLabel("Client email").fill("owner@example.com");
   await page.getByRole("button", { name: "Create private handoff" }).click();
   await expect(page.getByText(/recipient-bound-secret/)).toBeVisible();
 
@@ -715,7 +715,7 @@ test("resets a created handoff link when the selected work changes", async ({ pa
   await page.getByRole("button", { name: "Sharing & access", exact: true }).click();
   await expect(page.getByRole("button", { name: "Create private handoff" })).toBeVisible();
   await expect(page.getByText(/recipient-bound-secret/)).toHaveCount(0);
-  await expect(page.getByLabel("Customer email")).toHaveValue("");
+  await expect(page.getByLabel("Client email")).toHaveValue("");
 });
 
 test("drops a late handoff completion after the work context changes", async ({ page }) => {
@@ -749,7 +749,7 @@ test("drops a late handoff completion after the work context changes", async ({ 
   await page.getByRole("link", { name: "Strelva home", exact: true }).click();
   await openWorkspaceHelp(page);
   await page.getByRole("main").getByRole("button", { name: "Sharing & agency access" }).click();
-  await page.getByLabel("Customer email").fill("owner@example.com");
+  await page.getByLabel("Client email").fill("owner@example.com");
   await page.getByRole("button", { name: "Create private handoff" }).click();
   await expect.poll(() => handoffStarted).toBe(true);
   await page.getByRole("link", { name: "Strelva home", exact: true }).click();
@@ -785,11 +785,11 @@ test("keeps delegated customer work read-only while customer-owned work retains 
 
   await page.goto("/workspace");
   await page.getByRole("button", { name: "Open Harbor Dental" }).click();
-  await expect(page.getByText("Read-only access granted by the customer")).toBeVisible();
+  await expect(page.getByText("Read-only access granted by the client")).toBeVisible();
   await expect(page.getByRole("button", { name: "Retry assessment" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Sharing & access", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Customer work shared read-only." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Client work shared read-only." })).toBeVisible();
   await expect(page.getByRole("button", { name: "Create private handoff" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Revoke/ })).toHaveCount(0);
   await expect(page.getByText("You own this workspace.")).toHaveCount(0);

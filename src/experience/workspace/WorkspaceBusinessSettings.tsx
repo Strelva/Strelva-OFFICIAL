@@ -87,7 +87,7 @@ export function WorkspaceBusinessSettings({
     <section className="border-b border-gray-border py-8" aria-labelledby="business-settings-heading">
       <h2 id="business-settings-heading" className="text-base font-medium text-warm-black">Business</h2>
       {managedWorkUnavailable ? <p className="mt-4 text-sm text-gray-muted" role="status">Some website settings could not be loaded. No business setting was changed.</p> : null}
-      {!business ? <p className="mt-4 max-w-2xl text-sm leading-relaxed text-gray-muted">Choose a customer business workspace to manage business information, people, work, and website relationships.</p> : <div className="mt-6 space-y-8">
+      {!business ? <p className="mt-4 max-w-2xl text-sm leading-relaxed text-gray-muted">Choose your business workspace to manage business information, people, work, and website relationships.</p> : <div className="mt-6 space-y-8">
         <section aria-labelledby="business-information-heading">
           <h3 id="business-information-heading" className="text-sm font-medium text-warm-black">Business information</h3>
           <dl className="mt-4 grid gap-4 border-y border-gray-border py-4 sm:grid-cols-2">

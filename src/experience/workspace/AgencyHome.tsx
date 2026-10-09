@@ -235,27 +235,27 @@ export function AgencyHome({
 
   const applicationDraftSection = <section aria-labelledby={`${id}-application-drafts`}>
     <h2 id={`${id}-application-drafts`} className={sectionTitle}>{released ? "Internal-tool drafts for clients" : "Assigned application drafts"}</h2>
-    <p className={sectionNote}>{released ? "Open only the client tool named by an active customer delivery." : "Open only the installed application named by an active customer delivery."} Editing appears after the customer grants it.</p>
+    <p className={sectionNote}>{released ? "Open only the client tool named by an active client delivery." : "Open only the installed application named by an active client delivery."} Editing appears after the client grants it.</p>
     {applicationDrafts === null && !applicationDraftError ? <p role="status" className="mt-4 text-[13px] text-gray-muted">Checking assigned application drafts…</p> : applicationDraftError ? <p role="alert" className="mt-4 text-[13px] text-critical">{applicationDraftError}</p> : readyApplicationDrafts.length ? <ul className="mt-4 divide-y divide-gray-border border-y border-gray-border">{readyApplicationDrafts.map((draft) => {
       const editable = draft.draftGrantStatus === "active" && Boolean(draft.draftGrantExpiresAt) && Date.parse(draft.draftGrantExpiresAt!) > now;
-      return <li key={`${draft.assignmentId}:${draft.applicationWorkId}`} className="flex items-center gap-4 px-2 py-4"><FileText className="shrink-0 text-accent-text" size={18} aria-hidden="true" /><span className="min-w-0 flex-1"><strong className="block truncate text-[14px] font-medium text-warm-black">{draft.applicationTitle}</strong><small className="mt-1 block text-[12px] text-gray-muted">{draft.customerWorkspaceName} · {editable ? "Draft editing granted" : "Waiting for customer draft-edit permission"}</small></span><a className="shrink-0 text-[13px] text-warm-black underline" href={`/agency-applications/${encodeURIComponent(draft.applicationWorkId)}`}>Open draft</a></li>;
+      return <li key={`${draft.assignmentId}:${draft.applicationWorkId}`} className="flex items-center gap-4 px-2 py-4"><FileText className="shrink-0 text-accent-text" size={18} aria-hidden="true" /><span className="min-w-0 flex-1"><strong className="block truncate text-[14px] font-medium text-warm-black">{draft.applicationTitle}</strong><small className="mt-1 block text-[12px] text-gray-muted">{draft.customerWorkspaceName} · {editable ? "Draft editing granted" : "Waiting for client draft-edit permission"}</small></span><a className="shrink-0 text-[13px] text-warm-black underline" href={`/agency-applications/${encodeURIComponent(draft.applicationWorkId)}`}>Open draft</a></li>;
     })}</ul> : <p className="mt-4 border-y border-gray-border py-5 text-[13px] text-gray-muted">No accepted agency application delivery is assigned to you.</p>}
   </section>;
 
   const websiteDraftSection = <section aria-labelledby={`${id}-website-drafts`}>
     <h2 id={`${id}-website-drafts`} className={sectionTitle}>{released ? "Website possibilities for clients" : "Assigned website drafts"}</h2>
-    <p className={sectionNote}>{released ? "Prepare a possibility on the exact client website named by an active delivery. Preparation appears only after the customer grants it; it stays a possibility until the customer makes it real." : "Open the exact managed website named by an active customer delivery. Preparation appears only after the customer grants it; publishing stays with the customer."}</p>
+    <p className={sectionNote}>{released ? "Prepare a possibility on the exact client website named by an active delivery. Preparation appears only after the client grants it; it stays a possibility until the client makes it real." : "Open the exact managed website named by an active client delivery. Preparation appears only after the client grants it; publishing stays with the client."}</p>
     {websiteDrafts === null && !websiteDraftError ? <p role="status" className="mt-4 text-[13px] text-gray-muted">Checking assigned website drafts…</p> : websiteDraftError ? <p role="alert" className="mt-4 text-[13px] text-critical">{websiteDraftError}</p> : readyWebsiteDrafts.length ? <ul className="mt-4 divide-y divide-gray-border border-y border-gray-border">{readyWebsiteDrafts.map((draft) => {
-      const permission = draft.draftGrantStatus === "active" ? "Draft preparation granted" : "Waiting for customer draft permission";
+      const permission = draft.draftGrantStatus === "active" ? "Draft preparation granted" : "Waiting for client draft permission";
       return <li key={`${draft.assignmentId}:${draft.managedWebsiteBindingId}`} className="flex items-center gap-4 px-2 py-4"><Globe2 className="shrink-0 text-accent-text" size={18} aria-hidden="true" /><span className="min-w-0 flex-1"><strong className="block truncate text-[14px] font-medium text-warm-black">{draft.siteName}</strong><small className="mt-1 block text-[12px] text-gray-muted">{draft.customerWorkspaceName} · {permission}</small></span><a className="shrink-0 text-[13px] text-warm-black underline" href={`/agency-websites/${encodeURIComponent(draft.managedWebsiteBindingId)}`}>Open website</a></li>;
     })}</ul> : <p className="mt-4 border-y border-gray-border py-5 text-[13px] text-gray-muted">No accepted agency website delivery is assigned to you.</p>}
   </section>;
 
-  const accessNote = <div className="mt-3 flex items-start gap-3 border-y border-gray-border py-5 text-[13px] leading-relaxed text-gray-muted"><Users className="mt-0.5 shrink-0" size={17} aria-hidden="true" /><p>Use People &amp; access in the workspace navigation to review the agency’s handoffs and sharing. A customer’s access remains controlled from that customer’s workspace.</p></div>;
+  const accessNote = <div className="mt-3 flex items-start gap-3 border-y border-gray-border py-5 text-[13px] leading-relaxed text-gray-muted"><Users className="mt-0.5 shrink-0" size={17} aria-hidden="true" /><p>Use People &amp; access in the workspace navigation to review the agency’s handoffs and sharing. A client’s access remains controlled from that client’s workspace.</p></div>;
 
   const privateWork = <section className="mt-12" aria-labelledby={`${id}-private`}>
     <div className="flex flex-wrap items-end justify-between gap-4 border-b border-gray-border pb-3">
-      <div><h2 id={`${id}-private`} className={sectionTitle}>Private agency work</h2><p className={sectionNote}>Drafts and methods stay in {agencyName} until you hand specific work to a customer.</p></div>
+      <div><h2 id={`${id}-private`} className={sectionTitle}>Private agency work</h2><p className={sectionNote}>Drafts and methods stay in {agencyName} until you hand specific work to a client.</p></div>
       <button type="button" onClick={onStart} className="inline-flex min-h-11 items-center gap-2 text-[13px] font-medium text-warm-black">Start private work<ArrowRight size={15} aria-hidden="true" /></button>
     </div>
     {snapshot.work.length ? <ul>{snapshot.work.slice(0, 6).map((work) => <li key={work.id} className="border-b border-gray-border">
@@ -265,7 +265,7 @@ export function AgencyHome({
         <ArrowRight className="shrink-0 text-gray-muted" size={16} aria-hidden="true" />
       </button>
     </li>)}</ul> : <div className="flex items-start gap-3 border-b border-gray-border py-5 text-[13px] leading-relaxed text-gray-muted"><BriefcaseBusiness className="mt-0.5 shrink-0" size={17} aria-hidden="true" /><p>No private agency work has been saved yet.</p></div>}
-    <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">{released ? "Ready-made systems are set up and managed from the customer business that owns them. This agency workspace does not hold a private catalog yet." : "Business offerings are installed and managed from the customer business that owns them. This agency workspace does not currently hold a private offering catalog."}</p>
+    <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">{released ? "Ready-made systems are set up and managed from the client business that owns them. This agency workspace does not hold a private catalog yet." : "Business offerings are installed and managed from the client business that owns them. This agency workspace does not currently hold a private offering catalog."}</p>
   </section>;
 
   const creditSection = credits.length ? <section className="mt-12" aria-labelledby={`${id}-credits`}>
@@ -277,7 +277,7 @@ export function AgencyHome({
   const header = <header className="max-w-2xl border-b border-gray-border pb-8">
     <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-accent-text">{agencyName}</p>
     <h1 className="mt-3 font-display text-[28px] font-medium leading-tight text-warm-black sm:text-[32px]">Client work</h1>
-    <p className="mt-3 text-[14px] leading-relaxed text-gray-muted">Each client is shown with the access you have in that business. Customers keep ownership and control access.</p>
+    <p className="mt-3 text-[14px] leading-relaxed text-gray-muted">Each client is shown with the access you have in that business. Clients keep ownership and control access.</p>
     {canUseTools && (snapshot.releases?.agencyAddClient || snapshot.releases?.agencySetup || snapshot.releases?.agencyProspecting) ? <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2">
       {snapshot.releases?.agencyAddClient ? <a href={`/workspace/agency/clients/new?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-accent px-5 text-[13px] font-medium text-on-accent hover:bg-accent/85"><Plus size={15} aria-hidden="true" />Add a client</a> : null}
       {snapshot.releases?.agencySetup ? <a href={`/workspace/agency/start?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-11 items-center gap-2 text-[13px] font-medium text-warm-black underline-offset-4 hover:underline">Agency setup and verification<ArrowRight size={15} aria-hidden="true" /></a> : null}
@@ -315,7 +315,7 @@ export function AgencyHome({
         <ProviderClientQueue workspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} />
       </section>
       <section className="mt-12" aria-labelledby={`${id}-clients`}>
-        <div className="pb-3"><h2 id={`${id}-clients`} className={sectionTitle}>Clients</h2><p className={sectionNote}>Opening a client keeps you inside the access that customer granted.</p></div>
+        <div className="pb-3"><h2 id={`${id}-clients`} className={sectionTitle}>Clients</h2><p className={sectionNote}>Opening a client keeps you inside the access that client granted.</p></div>
         {clientList}
       </section>
       {privateWork}
