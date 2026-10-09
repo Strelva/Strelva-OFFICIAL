@@ -123,8 +123,9 @@ local function equal(a,b) if type(a)~=type(b) then return false end; if type(a)~
 if not equal(cjson.decode(value),cjson.decode(ARGV[1])) then return 0 end
 redis.call('SET',KEYS[1],ARGV[2]); return 1`, [connectionKey(next.tenantId, next.provider)], [JSON.stringify(raw), JSON.stringify(encoded)]).catch(error => { if (!durable) throw error; return 0; });
     if (!durable && changed !== 1) throw new Error("Connection mutation was superseded or revoked.");
+    if (!durable && changed === 1) await mirrorRecord("provider_connections", next.tenantId, next.provider, encoded, capturedAt);
   }
-  if (durable) {
+  if (durable || redis) {
     const current = await getConnection(next.tenantId, next.provider);
     if (!current || current.status !== next.status || current.accessToken !== next.accessToken || current.refreshToken !== next.refreshToken) throw new Error("Connection mutation was superseded or revoked.");
   }
