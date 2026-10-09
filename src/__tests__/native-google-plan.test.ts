@@ -12,9 +12,9 @@ const scope:NativeGooglePlan={workspaceId:id,possibilityId:proposal.id,candidate
 describe("native Google full approval and grant binding",()=>{
  it("accepts actual native NULL origin and rejects scope/account/place/grant changes",()=>{
   expect(()=>assertNativeGooglePlan(scope,proposal,binding)).not.toThrow();
-  for(const change of [{originTenantId:"legacy"},{subject:null},{status:"revoked"},{refreshTokenCiphertext:"rotated"},{locations:[{...binding.locations[0]!,accountId:"accounts/other"}]},{scopes:null}])expect(()=>assertNativeGooglePlan(scope,proposal,{...binding,...change})).toThrow();
+  for(const change of [{originTenantId:"legacy"},{subject:null},{status:"revoked" as const},{refreshTokenCiphertext:"rotated"},{locations:[{...binding.locations[0]!,accountId:"accounts/other"}]},{scopes:null}])expect(()=>assertNativeGooglePlan(scope,proposal,{...binding,...change})).toThrow();
  });
  it("rejects whole-plan changes, introductions, connections, revisions and extra effects",()=>{
-  for(const change of [{candidateRevision:2},{changes:[{baseline:{systemId:"other",revisionId:"revision"},candidate:{summary:"Unapproved",content:{x:1}}}]},{introduces:[{key:"extra",name:"Unapproved",purpose:"Unapproved",candidate:{summary:"Unapproved",content:{x:1}},extractedFrom:[],conflicts:[]}]},{connections:[{id:"extra",from:{introducedKey:"listing"},to:{introducedKey:"extra"},kind:"reads" as const,purpose:"Unapproved"}]},{effects:[...proposal.effects,{...proposal.effects[0]!,id:"extra"}]}])expect(()=>assertNativeGooglePlan(scope,{...proposal,...change},binding)).toThrow();
+  for(const change of [{candidateRevision:2},{changes:[{baseline:{businessId:id,systemId:"other",revisionId:"revision",number:1},candidate:{summary:"Unapproved",content:{x:1}}}]},{introduces:[{key:"extra",name:"Unapproved",purpose:"Unapproved",candidate:{summary:"Unapproved",content:{x:1}},extractedFrom:[],conflicts:[]}]},{connections:[{id:"extra",from:{introducedKey:"listing"},to:{introducedKey:"extra"},kind:"reads" as const,purpose:"Unapproved"}]},{effects:[...proposal.effects,{...proposal.effects[0]!,id:"extra"}]}])expect(()=>assertNativeGooglePlan(scope,{...proposal,...change},binding)).toThrow();
  });
 });
