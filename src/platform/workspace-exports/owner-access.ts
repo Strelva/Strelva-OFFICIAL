@@ -1,3 +1,4 @@
+import { assertGoogleReviewArchiveCurrent } from "@/platform/google-review-content";
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import type { WorkspaceActor } from "@/platform/workspaces";
@@ -32,5 +33,7 @@ export async function readOwnerExportBody(actor: WorkspaceActor, buildId: string
     if (part > 0 && row.partCount !== count) throw new WorkspaceExportV3Error("unavailable", "The export changed while being read.");
     count = row.partCount; parts.push(row.body);
   }
-  return parts.join("");
+  const body = parts.join("");
+  try { assertGoogleReviewArchiveCurrent(body); } catch { throw new WorkspaceExportV3Error("denied", "This export must be rebuilt before download."); }
+  return body;
 }

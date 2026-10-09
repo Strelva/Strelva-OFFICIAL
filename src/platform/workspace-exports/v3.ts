@@ -1,4 +1,4 @@
-import { projectGoogleReviewExport } from "@/platform/google-review-content";
+import { projectGoogleReviewExport, assertGoogleReviewArchiveCurrent } from "@/platform/google-review-content";
 /**
  * Workspace export schema 3 (money-and-data spec, part c).
  *
@@ -251,6 +251,7 @@ export async function writeWorkspaceExportBuild(buildId: string, body: string, r
       const appended = await rpc("append_workspace_export_build_part", { p_build_id: buildId, p_part: i, p_body: parts[i] });
       if (appended.error) return await fail(`part ${i}: ${appended.error.message ?? "error"}`.slice(0, 200));
     }
+    assertGoogleReviewArchiveCurrent(body);
     const document = JSON.parse(body) as V3Document;
     const token = randomBytes(32).toString("base64url");
     onToken?.(token);
@@ -277,5 +278,7 @@ export async function readWorkspaceExportBuild(buildId: string, token: string, r
     partCount = row.partCount;
     chunks.push(row.body);
   }
-  return chunks.join("");
+  const body = chunks.join("");
+  try { assertGoogleReviewArchiveCurrent(body); } catch { throw new WorkspaceExportV3Error("denied", "This export must be rebuilt before download."); }
+  return body;
 }

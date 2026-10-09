@@ -1,3 +1,4 @@
+import { reconcileLegacyReviewImports } from "./review-import-provenance";
 import { projectGoogleReview } from "@/platform/google-review-content";
 import { promises as fs } from "fs";
 import path from "path";
@@ -13,7 +14,8 @@ function devReviewsPath(tenant: string): string {
 async function readDevReviews(tenant: string): Promise<ReviewItem[]> {
   try {
     const raw = await fs.readFile(devReviewsPath(tenant), "utf-8");
-    return (JSON.parse(raw) as ReviewItem[]).map(row => projectGoogleReview(row));
+    const rows = await reconcileLegacyReviewImports(tenant, JSON.parse(raw) as ReviewItem[]);
+    return rows.map(row => projectGoogleReview(row));
   } catch {
     return [];
   }

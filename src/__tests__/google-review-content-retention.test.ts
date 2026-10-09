@@ -46,10 +46,10 @@ describe("review retention scheduled endpoint", () => {
     expect(CRON_MAX_AGE_SECONDS["google-review-content-retention"]).toBe(3 * 3600);
   });
   it("purges while Google listing release is off", async () => {
-    mocks.purge.mockResolvedValue({ reviews: 2, events: 3, devFiles: 1 });
+    mocks.purge.mockResolvedValue({ reviews: 2, events: 3, devFiles: 1, archiveParts: 1 });
     expect((await GET(new Request("http://localhost", { headers: { authorization: "Bearer local-proof" } }))).status).toBe(200);
     expect(mocks.purge).toHaveBeenCalledOnce();
-    expect(mocks.heartbeat).toHaveBeenCalledWith("google-review-content-retention", { ok: true, processed: 6 });
+    expect(mocks.heartbeat).toHaveBeenCalledWith("google-review-content-retention", { ok: true, processed: 7 });
   });
   it("rejects unauthenticated calls and marks storage failures for retry without exposing provider content", async () => {
     expect((await GET(new Request("http://localhost"))).status).toBe(401);

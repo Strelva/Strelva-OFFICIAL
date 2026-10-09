@@ -10,7 +10,7 @@ import { purgeGoogleReviewContent } from "@/lib/google-review-content-retention"
 const event = { id: "old", source: "google", type: "review", title: "Provider author", body: "Provider comment", createdAt: "2020-01-01", metadata: { reviewId: "provider", execution: { state: "external_accepted" } } };
 beforeEach(() => {
   vi.clearAllMocks();
-  state.rpc.mockResolvedValue({ data: { reviews: 1, events: 2 }, error: null });
+  state.rpc.mockResolvedValue({ data: { reviews: 1, events: 2, archiveParts: 3 }, error: null });
   state.scan.mockImplementation(async (_cursor, { match }) => [0, match === "event:*" ? ["event:old"] : ["events:tenant"]]);
   state.get.mockResolvedValue(event);
   state.zrange.mockResolvedValue([JSON.stringify(event)]);
@@ -19,7 +19,7 @@ beforeEach(() => {
   state.readFile.mockResolvedValue(JSON.stringify([{ source: "google", author: "Provider author", text: "Provider comment", reply: "Customer reply" }, { source: "manual", text: "Customer review" }]));
 });
 it("physically scrubs PG, Redis bodies and legacy embedded members plus dev mirrors while preserving customer text/history", async () => {
-  expect(await purgeGoogleReviewContent()).toEqual({ reviews: 1, events: 4, devFiles: 1 });
+  expect(await purgeGoogleReviewContent()).toEqual({ reviews: 1, events: 4, devFiles: 1, archiveParts: 3 });
   expect(state.rpc).toHaveBeenCalledWith("purge_google_review_content");
   const callback = state.update.mock.calls[0][1];
   expect(callback(event)).toMatchObject({ body: "", metadata: { execution: { state: "external_accepted" } } });

@@ -11194,6 +11194,7 @@ export type Database = {
       }
       workspace_export_builds: {
         Row: {
+          provider_content_expires_at: string | null
           byte_size: number
           completed_at: string | null
           created_at: string
@@ -11211,6 +11212,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          provider_content_expires_at?: string | null
           byte_size?: number
           completed_at?: string | null
           created_at?: string
@@ -11228,6 +11230,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          provider_content_expires_at?: string | null
           byte_size?: number
           completed_at?: string | null
           created_at?: string

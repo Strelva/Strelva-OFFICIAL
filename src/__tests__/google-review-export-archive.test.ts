@@ -1,0 +1,30 @@
+import { afterEach, expect, it, vi } from "vitest";
+import { googleReviewContent, googleReviewArchiveDeadline, GOOGLE_REVIEW_CACHE_MS } from "@/platform/google-review-content";
+import { readWorkspaceExportBuild, type V3Rpc } from "@/platform/workspace-exports/v3";
+import { readOwnerExportBody } from "@/platform/workspace-exports/owner-access";
+const fetched = Date.parse("2026-09-01T00:00:00Z");
+const buildId = "11111111-1111-4111-8111-111111111111";
+const actor = { userId: "22222222-2222-4222-8222-222222222222", verifiedEmail: "owner@example.test" };
+afterEach(() => vi.useRealTimers());
+it("both download paths refuse the original day28 archive after provider expiry without modifying sealed bytes", async () => {
+  const body = JSON.stringify({ data: { reviews: [{ source: "google", external_id: "api-id", text: "Cached API comment", author: "API author", rating: 5, reply: "Customer reply", provider_content: googleReviewContent(new Date(fetched)) }] } });
+  const parts = [body.slice(0, 47), body.slice(47)];
+  const rpc: V3Rpc = vi.fn(async (_name, args) => ({ data: { body: parts[Number(args.p_part)], partCount: parts.length }, error: null }));
+  vi.useFakeTimers(); vi.setSystemTime(fetched + 28 * 86400000);
+  expect(googleReviewArchiveDeadline(JSON.parse(body))).toBe(fetched + GOOGLE_REVIEW_CACHE_MS);
+  expect(await readWorkspaceExportBuild(buildId, "fixture-token", rpc)).toBe(body);
+  expect(await readOwnerExportBody(actor, buildId, rpc)).toBe(body);
+  vi.setSystemTime(fetched + GOOGLE_REVIEW_CACHE_MS);
+  await expect(readWorkspaceExportBuild(buildId, "fixture-token", rpc)).rejects.toThrow("rebuilt");
+  await expect(readOwnerExportBody(actor, buildId, rpc)).rejects.toThrow("rebuilt");
+  expect(parts.join("")).toBe(body);
+});
+it("customer imports and replies survive in archives while unproven Google cache is unavailable", async () => {
+  const manual = JSON.stringify({ reviews: [{ source: "google", text: "Customer import", author: "Customer", rating: 5, external_id: null, reply: "Customer reply", provider_content: { source: "customer_import", producer: "authenticated_reviews_post" } }] });
+  const rpc: V3Rpc = async () => ({ data: { body: manual, partCount: 1 }, error: null });
+  expect(googleReviewArchiveDeadline(JSON.parse(manual))).toBeNull();
+  expect(await readOwnerExportBody(actor, buildId, rpc)).toBe(manual);
+  const unknown: V3Rpc = async () => ({ data: { body: JSON.stringify({ reviews: [{ source: "google", external_id: "provider", text: "Unknown API cache" }] }), partCount: 1 }, error: null });
+  await expect(readWorkspaceExportBuild(buildId, "token", unknown)).rejects.toThrow("rebuilt");
+  await expect(readOwnerExportBody(actor, buildId, unknown)).rejects.toThrow("rebuilt");
+});

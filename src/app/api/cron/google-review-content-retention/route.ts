@@ -8,7 +8,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   if (denied) return denied;
   try {
     const result = await purgeGoogleReviewContent();
-    await recordHeartbeat("google-review-content-retention", { ok: true, processed: result.reviews + result.events + result.devFiles });
+    await recordHeartbeat("google-review-content-retention", { ok: true, processed: result.reviews + result.events + result.devFiles + result.archiveParts });
     return NextResponse.json(result);
   } catch {
     await recordHeartbeat("google-review-content-retention", { ok: false, processed: 0, failed: 1 });

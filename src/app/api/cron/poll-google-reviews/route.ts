@@ -165,6 +165,7 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
   // Emit events for new reviews and queue drafted replies for human approval.
   // Review replies are customer-facing copy — ALWAYS pending (never auto-published).
   for (const review of newReviews) {
+    if (typeof review.reviewId !== "string" || !review.reviewId.trim()) throw new Error("Google review identity unavailable.");
     const rating = starRatingToNumber(review.starRating);
     const providerContent = googleReviewContent();
 
