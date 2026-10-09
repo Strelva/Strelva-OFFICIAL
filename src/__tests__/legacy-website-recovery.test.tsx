@@ -125,32 +125,6 @@ it('peer does not announce pending launch after actual saved launch failure',asy
  expect(container.textContent).toContain('Launch preparation failed');
 });
 
-it.each(['create','revise'] as const)('peer does not announce generated preview after actual %s artifact failure',async(action)=>{
- const provider=providerFixture(),service=createWebsiteService(memoryBoundedStore(),{provider});
- const initial=action==='revise'?await service.create(owner,'workspace-a',{requestId:'legacy-failure-revise',brief}):null;
- provider.generate.mockRejectedValueOnce(new Error('Fictional artifact preparation failed'));
- let saved: Awaited<ReturnType<typeof service.create>>|null=null;let posts=0;
- vi.stubGlobal('fetch',vi.fn(async(input:string|URL|Request,init?:RequestInit)=>{
-  if(String(input).includes('/connections'))return Response.json({tenants:[]});
-  if(init?.method==='POST'){posts++;const {action:_action,workspaceId,...body}=JSON.parse(String(init.body));saved=action==='revise'?await service.revise(owner,initial!.workId,body):await service.create(owner,workspaceId,body);return Response.json(saved);}
-  return Response.json(await service.read(owner,initial!.workId));
- }));await mount(initial?.workId);
- if(action==='create')await change(container.querySelector('input')!,brief.businessName);
- await change(container.querySelector('textarea')!,'Retained failed request');
- await act(async()=>button(action==='create'?'Generate a private preview':'Generate a new preview').click());
- expect(posts).toBe(1);expect(saved!.website.status).toBe('failed');expect(saved!.website.candidate).toBeNull();expect(saved!.website.lastError?.stage).toBe('artifact');
- expect(container.textContent).not.toContain('Private website preview generated');
- expect(container.textContent).toContain('Preview generation failed');
-});
-it('peer does not announce pending launch after actual saved launch failure',async()=>{
- const {service,provider,record}=await setup(true);provider.prepareLaunch.mockRejectedValueOnce(new Error('Fictional launch preparation failed'));
- let saved:Awaited<ReturnType<typeof service.read>>|null=null;
- route(service,record.workId,async({action:_action,...body})=>{saved=await service.prepareLaunch(owner,record.workId,body);return Response.json(saved);});
- await mount(record.workId);await act(async()=>button('Prepare launch').click());
- expect(saved!.website.status).toBe('failed');expect(saved!.website.lastError?.stage).toBe('launch');expect(provider.prepareLaunch).toHaveBeenCalledTimes(1);
- expect(container.textContent).not.toContain('Launch preparation is pending.');
- expect(container.textContent).toContain('Launch preparation failed');
-});
 it('peer keeps captured unsaved wording distinct from a newer actual saved brief read',async()=>{
  const {service,record}=await setup(true);let posts=0;let saved=record;
  vi.stubGlobal('fetch',vi.fn(async(input:string|URL|Request,init?:RequestInit)=>{
