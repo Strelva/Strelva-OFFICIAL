@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page, type Response } from "@playwright/test";
 import { localEnvironment, signedInContext } from "./support/local-auth";
 import { ordinaryAgencyMaker, ordinaryCustomerBusiness } from "./support/ordinary-agency-maker";
 import { websiteRebuildSchema } from "../src/products/websites/client";
@@ -20,6 +20,17 @@ async function snapshot(request: APIRequestContext, workspaceId: string) {
   const response = await request.get(`/api/workspace?workspaceId=${workspaceId}`);
   expect(response.status(), await response.text()).toBe(200);
   return await response.json() as WorkspaceSnapshot;
+}
+
+async function exactPreview(page: Page, observed: Response[], href: string, contentHash: string, app: string) {
+  const expectedUrl = new URL(href, app).toString();
+  const matches = (response: Response) => response.url() === expectedUrl && response.request().method() === "GET" && response.request().resourceType() === "document";
+  // Observe before building/navigation so a fast iframe response cannot be
+  // missed; a cold or stalled exact response still has a finite phase budget.
+  const response = observed.find(matches) ?? await page.waitForResponse(matches, { timeout: 20_000 });
+  expect(response.status(), await response.text()).toBe(200);
+  expect(response.headers()["content-type"]).toContain("text/html");
+  expect(await response.text()).toContain(`content="${contentHash}"`);
 }
 
 for (const width of [1440, 390]) {
@@ -52,6 +63,10 @@ for (const width of [1440, 390]) {
       workspaceId = await ordinaryCustomerBusiness(owner, "Website creation proof");
       agencyId = (await ordinaryAgencyMaker(browser, admin, owner, workspaceId, maker)).agencyId;
       const page = await owner.context.newPage();
+      const previewResponses: Response[] = [];
+      page.on("response", response => {
+        if (response.request().method() === "GET" && response.request().resourceType() === "document" && /^\/api\/websites\/[^/]+\/preview$/.test(new URL(response.url()).pathname)) previewResponses.push(response);
+      });
       await page.setViewportSize({ width, height: 900 });
       await page.goto(`/workspace/site?workspaceId=${workspaceId}&entry=rebuild`);
       await page.getByRole("button", { name: "No site yet? Describe your business", exact: true }).click();
@@ -71,13 +86,14 @@ for (const width of [1440, 390]) {
       // a failed or stalled real pipeline must fail before preview assertions.
       await expect.poll(async () => (await readRebuild(owner.context.request, workspaceId, workId)).status,
         { timeout: 30_000, intervals: [500, 1000, 2500], message: "The native website build must reach review_ready; no fixture candidate is substituted." }).toBe("review_ready");
-      const preview = page.frameLocator('iframe[title="Private website preview for Juniper Bread"]');
-      await expect(preview.getByRole("heading", { name: "Juniper Bread", exact: true }).first()).toBeVisible();
-      await expect(preview.getByText(description, { exact: true }).first()).toBeVisible();
       const first = await readRebuild(owner.context.request, workspaceId, workId);
       expect(first.status).toBe("review_ready");
       expect(first.candidate).not.toBeNull();
       expect(first.stages.filter(stage => stage.status === "completed").map(stage => stage.stage)).toEqual(expect.arrayContaining(["crawl", "extract", "write", "compose", "verify"]));
+      await exactPreview(page, previewResponses, first.candidate!.previewHref, first.candidate!.contentHash, env.app);
+      const preview = page.frameLocator('iframe[title="Private website preview for Juniper Bread"]');
+      await expect(preview.getByRole("heading", { name: "Juniper Bread", exact: true }).first()).toBeVisible();
+      await expect(preview.getByText(description, { exact: true }).first()).toBeVisible();
       expect(await preview.locator('meta[name="strelva-site-hash"]').getAttribute("content")).toBe(first.candidate!.contentHash);
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
@@ -151,6 +167,8 @@ for (const width of [1440, 390]) {
       const possibilityLink = page.locator(`a[href="${possibility!.tryHref || `/workspace?workspaceId=${workspaceId}&view=websites&work=${workId}`}"]`).first();
       await expect(possibilityLink).toBeVisible();
       await possibilityLink.click();
+      await exactPreview(page, previewResponses, revised.candidate!.previewHref, revised.candidate!.contentHash, env.app);
+      await expect(preview.locator('meta[name="strelva-site-hash"]')).toHaveAttribute("content", revised.candidate!.contentHash);
       await expect(preview.getByText(correction, { exact: true }).first()).toBeVisible();
       const approveRevision = mutation(page, `/api/websites/${workId}/approve`);
       await page.getByRole("button", { name: "Approve this preview", exact: true }).click();
