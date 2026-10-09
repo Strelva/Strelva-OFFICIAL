@@ -53,6 +53,7 @@ it('can read the actual committed current candidate without replay after history
   await act(async () => find('Reload current state')!.click());
   expect(field.value).toBe(corrected);
   expect(node.querySelector('[role="alert"]')?.textContent).toContain('could not be loaded');
+  expect(node.querySelector('[role="alert"]')?.textContent?.match(/Your inputs/g)).toHaveLength(1);
   expect(find('Save correction')?.disabled).toBe(true);
   expect(find('Publish approved website')?.disabled).toBe(true);
   await act(async () => { factArticle.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); find('Publish approved website')!.click(); });

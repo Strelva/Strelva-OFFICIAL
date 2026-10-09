@@ -28,3 +28,23 @@ describe("website report citation presentation",()=>{
   expect(citation.querySelector("dd")?.textContent).toBe("Not named in check");expect(citation.textContent).toContain("Not recommended in this saved check");expect(citation.textContent).toContain(value.visibility.note);
  });
 });
+
+it("keeps the full selected month described and queries that same month after a native picker change", async () => {
+ await mount(report());
+ const input = container.querySelector<HTMLInputElement>('input[type="month"]')!;
+ const description = () => document.getElementById(input.getAttribute("aria-describedby")!);
+ expect(description()?.textContent).toBe(`Selected month: ${input.value}`);
+ expect(String(vi.mocked(fetch).mock.calls[0]![0])).toContain(`month=${input.value}`);
+ input.focus(); expect(document.activeElement).toBe(input);
+ await act(async () => {
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "2026-08");
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+ });
+ expect(input.type).toBe("month"); expect(input.value).toBe("2026-08");
+ expect(description()?.textContent).toBe("Selected month: 2026-08");
+ expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2);
+ const [url, options] = vi.mocked(fetch).mock.calls[1]!;
+ expect(new URL(String(url), "http://localhost").searchParams.get("month")).toBe("2026-08");
+ expect(options).toMatchObject({ cache: "no-store", credentials: "same-origin" });
+ expect(options?.method).toBeUndefined();
+});

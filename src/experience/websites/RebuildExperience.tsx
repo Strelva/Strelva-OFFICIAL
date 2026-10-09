@@ -228,7 +228,7 @@ function ScopedRebuildExperience({ workspaceId, workId, readOnly = false, manage
       if (next.workspaceId !== work.workspaceId || next.workId !== work.workId) throw new Error("The current saved website could not be confirmed. Reload again to check it.");
       if (mounted.current && sameScope(scope)) { setRecord(next); setConnectionReadRevision(value => value + 1); requireReload(false); if (cutoverRestored.current) { cutoverBlockedRef.current = false; setCutoverBlocked(false); } setError(""); setEditing(null); setNotice(domainRequestBlockedRef.current ? "The saved website was refreshed. The domain request still needs its exact saved request checked." : cutoverBlockedRef.current ? "The saved website was refreshed. The routing undo still needs its exact command receipt." : cutoverRestored.current ? "Saved preview and history refreshed. The previous website remains restored." : "Saved state refreshed. Review the current preview before continuing."); }
     } catch {
-      if (mounted.current && sameScope(scope)) setError("The current saved website could not be loaded. Your inputs are retained. Reload again to check what was saved.");
+      if (mounted.current && sameScope(scope)) setError("The current saved website could not be loaded. Reload again to check what was saved.");
     } finally {
       inFlight.current = false;
       if (mounted.current) setBusy(false);
