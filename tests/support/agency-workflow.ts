@@ -17,7 +17,6 @@ import { localEnvironment, signedInContext } from "./local-auth";
 // a runner-owned fictional source-site transport. No email leaves and nobody
 // gains platform operator privileges.
 const expect = baseExpect.configure({ timeout: 60_000 });
-const pathSites = process.env.STRELVA_SITES_PATH_PROOF === "1";
 
 function sql(query: string): string {
   const url = process.env.STRELVA_LOCAL_DB_URL || "";
@@ -56,6 +55,20 @@ async function fits(page: Page) {
 export async function agencyWorkflow(browser: Browser, testInfo: TestInfo, neutral = false) {
   const minimumFlags = neutral || process.env.STRELVA_AGENCY_MINIMUM_PROOF === "1";
   const env = localEnvironment();
+  // Match the app's configured delivery origin, not a separate proof flag.
+  // Full-native owns this exact socket; missing/mismatched configuration fails.
+  const fullNative = process.env.STRELVA_FULL_MODEL_PROFILE === "full-native";
+  const configuredSites = process.env.NEXT_PUBLIC_SITES_PATH_ORIGIN;
+  const sitesOrigin = configuredSites ? new URL(configuredSites) : null;
+  if (fullNative && !sitesOrigin) throw new Error("Full-native agency publication requires its owned sites origin.");
+  if (sitesOrigin) {
+    const app = new URL(env.app);
+    if (sitesOrigin.protocol !== "http:" || sitesOrigin.hostname !== "sites.localhost" || !sitesOrigin.port || sitesOrigin.port !== app.port
+      || sitesOrigin.pathname !== "/" || sitesOrigin.username || sitesOrigin.password || sitesOrigin.search || sitesOrigin.hash)
+      throw new Error("Agency sites proof must use sites.localhost on the exact owned app port, without credentials, query or path.");
+  }
+  const pathSites = sitesOrigin !== null;
+  const ownedReadBack = fullNative && pathSites;
   if (minimumFlags && !neutral) {
     for (const flag of ["STRELVA_WORKSPACE_RELEASE", "STRELVA_AGENCY_ADD_CLIENT_RELEASE", "STRELVA_WEBSITE_REBUILD_RELEASE"]) expect(process.env[flag], flag).toBe("1");
     for (const flag of ["STRELVA_SYSTEMS_RELEASE", "STRELVA_NEEDS_YOU_RELEASE", "STRELVA_OWNER_ENTRY", "STRELVA_OWNER_DECISION_LINKS_RELEASE", "STRELVA_MAKE_REAL_OWNER_LINK_RELEASE", "STRELVA_AGENCY_PROSPECTING_RELEASE", "STRELVA_AGENCY_SIGNUP_RELEASE", "STRELVA_WEBSITE_MODEL_CALLS_ENABLED"]) expect(process.env[flag] ?? "0", flag).toBe("0");
@@ -259,9 +272,10 @@ export async function agencyWorkflow(browser: Browser, testInfo: TestInfo, neutr
     tenantId = record.rebuild.tenantId;
     expect(record.rebuild.status).toBe("published");
     expect(record.rebuild.launch.receipt).toMatchObject({ status: "published", provider: "strelva-hosted", artifactHash: record.rebuild.candidate!.contentHash, candidateRevision: record.rebuild.candidate!.revision });
-    // Local publication does not claim DNS or public HTTPS exists. The real
-    // public transport records its unconfirmed read-back separately.
-    expect(record.rebuild.launch.readBack?.status).toBe("failed");
+    // The full-native transport verifies this owned renderer over HTTP. Other
+    // profiles retain the failed pinned-public read. Neither claims public DNS,
+    // public HTTPS or external provider qualification.
+    expect(record.rebuild.launch.readBack?.status).toBe(ownedReadBack ? "verified" : "failed");
     const receiptId = record.rebuild.launch.receipt!.receiptId;
     const replay = await launch();
     expect(replay.status(), await replay.text()).toBe(200);
@@ -278,12 +292,11 @@ export async function agencyWorkflow(browser: Browser, testInfo: TestInfo, neutr
     expect(sql(`select count(*) from public.website_document_receipts where website_work_id='${workId}'`)).toBe("1");
     expect(sql(`select approved_by from public.website_document_heads where website_work_id='${workId}'`)).toBe(owner.userId);
 
-    // Read the actual published renderer over loopback, independently of the
-    // failed public HTTPS check. This verifies the served hash and layout;
-    // it does not manufacture a healthy public provider receipt.
-    const localSite = new URL(env.app);
-    localSite.hostname = pathSites ? "sites.localhost" : `${tenantId}.localhost`;
-    if (pathSites) localSite.pathname = `/sites/${tenantId}/`;
+    // Independently read the actual published renderer and its authoritative
+    // hash. Full-native checks its exact issued URL, canonical links, inquiry
+    // and route isolation; no public provider qualification is claimed.
+    const localSite = sitesOrigin ? new URL(`/sites/${tenantId}/`, sitesOrigin) : new URL(env.app);
+    if (!pathSites) localSite.hostname = `${tenantId}.localhost`;
     // Node's resolver does not resolve *.localhost; send its API probes to the
     // owned loopback socket with the exact HTTP Host, as an upstream proxy does.
     const pathGet = (raw: string, extraHeaders: Record<string, string> = {}) => {
@@ -353,13 +366,14 @@ export async function agencyWorkflow(browser: Browser, testInfo: TestInfo, neutr
       }
     } finally { await publicContext.close(); }
 
-    // The owner opens the saved website, sees the accepted publication receipt
-    // and failed public read-back, and returns to the same result on mobile.
+    // The owner sees the accepted receipt and the exact required read-back
+    // result, with custom-domain/undo authority still separate, at both widths.
     await claim.setViewportSize({ width: 1440, height: 1000 });
     await claim.goto(`/workspace/site?workspaceId=${businessId}&entry=rebuild&workId=${workId}`);
     await expect(claim.getByText("This revision has been published.", { exact: true })).toBeVisible();
-    const publicReadBack = claim.getByText("Published, but readback failed. Verification is required before calling this confirmed; checking does not republish the site.", { exact: true });
+    const publicReadBack = claim.getByText(ownedReadBack ? "The published document was verified." : "Published, but readback failed. Verification is required before calling this confirmed; checking does not republish the site.", { exact: true });
     await expect(claim.getByText(pathSites ? "This publication uses a hosted address. Ask Northside Web Care about a custom domain." : "Ask Northside Web Care about domain setup and verification.", { exact: true })).toBeVisible();
+    await expect(claim.getByRole("button", { name: "Connect domain", exact: true })).toHaveCount(0);
     if (pathSites) await expect(claim.getByRole("heading", { name: "Return to the previous website" })).toHaveCount(0);
     const receipt = claim.getByText(/Published receipt recorded/).first();
     await publicReadBack.scrollIntoViewIfNeeded();
