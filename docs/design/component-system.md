@@ -765,6 +765,12 @@ lettering change. Both the material study and React preview use the switch.
 
 StrelvaShell, StrelvaSidebar and AppFrame now provide the customer Home/navigation frame, including the existing mobile focus boundary. BusinessHome composes WorkspaceComposer, shared Button, recorded attention and saved work. WorkspaceStart uses the same composer. Templates use TextInput, SelectInput, TextArea, Button and IconButton, and ApplicationDraftPreview uses ApplicationUseRenderer rather than a second form renderer. Native app creation, app draft changes and plan-output application proposals include that preview; published record surfaces keep their existing runtime.
 
+The frame's main landmark is a programmatic focus target for Skip to work.
+Coarse-pointer navigation, disclosure controls and workspace header actions use
+44 px minimum touch geometry, including the compact linen rail. Template
+navigation restores focus to the originating card after All templates or browser
+Back. These contracts retain the existing desktop geometry and owned primitives.
+
 This adoption does not certify every legacy page control. The library supports four curated form/list templates, not arbitrary generated application code. Search is complete over supplied authorized items, not every provider's records. Session storage is continuity only and is cleared on sign-out. Request approval, budgets, external actions and publication remain server-enforced. The implementation and rendered evidence are recorded in [current component context](./current-component-context.md).
 
 Catalog extension (October 7, local): `ApplicationUseRenderer` accepts contact

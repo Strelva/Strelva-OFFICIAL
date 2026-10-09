@@ -4,6 +4,13 @@ import { createPreviewRequest } from "@/experience/workspace/preview/fixture";
 import type { WorkspaceSnapshot } from "@/experience/workspace/contracts";
 
 describe("isolated Strelva interface preview", () => {
+  it("models maker permission explicitly for creation and keeps shared access read-only", async () => {
+    for (const scenario of ["business", "agency", "read-only", "free"] as const) {
+      const request = createPreviewRequest(scenario);
+      const snapshot = await (await request("/api/workspace")).json() as WorkspaceSnapshot;
+      expect(snapshot.canMakeSystems).toBe(scenario === "business" || scenario === "agency");
+    }
+  });
   it.each([
     ["preview", "1", true], ["production", "1", false],
     ["development", "1", false], [undefined, "1", false], ["preview", "", false],

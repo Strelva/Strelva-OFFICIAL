@@ -104,6 +104,10 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
   const workspaceId = scenario === "agency" ? AGENCY : scenario === "read-only" || scenario === "business" ? CUSTOMER : PERSONAL;
   const base: WorkspaceSnapshot = {
     actor: { email: "alex@example.com", localPreview: true },
+    // The Business/Agency creation walkthroughs explicitly model a fictional
+    // maker permission. Owner membership alone is never the production grant.
+    // Shared and other examples retain no maker permission.
+    canMakeSystems: scenario === "business" || scenario === "agency",
     workspaceId,
     workspaces: [
       { id: PERSONAL, kind: "personal", name: "Alex’s work" },

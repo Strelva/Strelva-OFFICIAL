@@ -551,3 +551,18 @@
 :global([data-workspace-theme="linen"]) .sidebar :is(a, button, select):focus-visible {
   outline-color: var(--navigation-focus);
 }
+
+@media (pointer: coarse) {
+  /* Apply after the linen treatment so its compact desktop rows cannot
+     override the touch geometry. */
+  .sidebar :is(a, button, select),
+  :global([data-workspace-theme="linen"]) .sidebar :is(a, button, select) {
+    min-height: 44px;
+  }
+
+  .mobileClose {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+  }
+}

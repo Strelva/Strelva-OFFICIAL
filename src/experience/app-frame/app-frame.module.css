@@ -231,6 +231,15 @@
   }
 }
 
+@media (pointer: coarse) {
+  .navigationToggle,
+  .closeButton {
+    width: 44px;
+    height: 44px;
+    flex-basis: 44px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .navigation,
   .navigationToggle,

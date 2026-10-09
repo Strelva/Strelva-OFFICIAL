@@ -41,12 +41,19 @@ export function WorkspaceTemplateLibrary(props: WorkspaceTemplateLibraryProps) {
   const heading = useRef<HTMLHeadingElement>(null);
   const listTrigger = useRef<string | null>(null);
   useEffect(() => {
-    const restore = () => setSelected(selectedTemplate());
+    const restore = () => {
+      const template = selectedTemplate();
+      if (template) listTrigger.current = template.id;
+      setSelected(template);
+    };
     const frame = window.requestAnimationFrame(restore);
     window.addEventListener("popstate", restore);
     return () => { window.cancelAnimationFrame(frame); window.removeEventListener("popstate", restore); };
   }, []);
-  useEffect(() => { if (selected) heading.current?.focus({ preventScroll: true }); }, [selected]);
+  useEffect(() => {
+    if (selected) heading.current?.focus({ preventScroll: true });
+    else if (listTrigger.current) document.getElementById(`template-${listTrigger.current}`)?.focus({ preventScroll: true });
+  }, [selected]);
   function select(template: AppTemplate | null) {
     setSelected(template);
     const url = new URL(window.location.href);
@@ -55,7 +62,6 @@ export function WorkspaceTemplateLibrary(props: WorkspaceTemplateLibraryProps) {
       url.searchParams.set("template", template.id);
     } else url.searchParams.delete("template");
     window.history.pushState(workspaceHistoryState(window.history.state), "", `${url.pathname}${url.search}${url.hash}`);
-    if (!template) window.requestAnimationFrame(() => document.getElementById(`template-${listTrigger.current}`)?.focus());
   }
   if (selected) return <div className={styles.library}>
     <Button variant="ghost" onClick={() => select(null)}><ArrowLeft size={16} aria-hidden="true" />All templates</Button>

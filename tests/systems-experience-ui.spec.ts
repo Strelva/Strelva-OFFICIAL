@@ -26,17 +26,18 @@ test("Home presents The Mooney Firm's actual Systems and what needs the owner", 
   await page.goto("/preview/strelva?scenario=mooney&systems=on");
   // October 6: the dusk band names the business above the greeting; Systems are a live chip.
   await expect(page.locator("h1#business-start-title")).toBeVisible();
-  await expect(page.getByRole("list", { name: "Right now" }).getByText("3 systems live")).toBeVisible();
+  await expect(page.getByRole("list", { name: "Right now" }).getByText("4 systems live")).toBeVisible();
   const needsYou = page.getByRole("region", { name: "Needs you" });
   await expect(needsYou.getByText("Let attorneys request a session date from attymooney.com")).toBeVisible();
   await expect(needsYou.getByText("Confirm 40 flagged facts on the rebuilt site")).toBeVisible();
   const systems = page.getByRole("list", { name: "The Mooney Firm systems" });
-  await expect(systems.getByRole("link")).toHaveCount(4);
+  await expect(systems.getByRole("link")).toHaveCount(5);
   // Health comes from evidence; no evidence reads Unknown, never Working.
   await expect(systems.getByRole("link", { name: "Open attymooney.com, Website, Live, Working" })).toBeVisible();
   await expect(systems.getByRole("link", { name: "Open The Mooney Firm inquiries, Inquiries, Live, Unknown" })).toBeVisible();
   await expect(systems.getByRole("link", { name: "Open Mediation sessions, Bookings, Draft, Unknown" })).toBeVisible();
-  await expect(page.getByRole("complementary", { name: "Strelva navigation" }).getByRole("region", { name: "Systems" }).getByRole("link")).toHaveCount(5); // four Systems and the full list
+  await expect(systems.getByRole("link", { name: "Open Arbitration intake, Internal tool, Live, Unknown" })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "Strelva navigation" }).getByRole("region", { name: "Systems" }).getByRole("link")).toHaveCount(6); // five Systems and the full list
 });
 
 test("opening the website gives it the page, compares, and runs Make real on an isolated copy", async ({ page }) => {

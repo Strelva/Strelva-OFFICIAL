@@ -168,6 +168,19 @@
   }
 }
 
+@media (pointer: coarse) {
+  .mobileMenu {
+    width: 44px;
+    height: 44px;
+  }
+
+  .context select,
+  .actions button,
+  .actions a {
+    min-height: 44px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shell * {
     scroll-behavior: auto;
