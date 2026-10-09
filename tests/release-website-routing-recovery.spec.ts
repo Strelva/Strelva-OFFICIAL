@@ -41,7 +41,7 @@ async function fixture(page: Page, info: TestInfo, mode: "domain" | "undo", widt
     if (method === "GET" && url.pathname === `${endpoint}/report`) {
       expect([...url.searchParams.keys()]).toEqual(["month"]);
       expect(url.searchParams.get("month")).toMatch(/^\d{4}-\d{2}$/);
-      return route.fulfill({ json: { inquiries: { count: null }, bookings: { scheduledInPeriod: null, providerVerified: null }, visibility: { status: "unavailable", note: "Fictional interface has no provider measurements." }, readiness: { status: "unavailable" }, changes: [] } });
+      return route.fulfill({ json: { workId, workspaceId, tenantId: null, siteName: "Fictional routing website", month: url.searchParams.get("month"), generatedAt: "2026-10-09T00:00:00Z", inquiries: { status: "unavailable", count: null, limitedToRecentRecords: true }, bookings: { status: "unavailable", scheduledInPeriod: null, providerAccepted: null, providerVerified: null }, visibility: { status: "unavailable", note: "Fictional interface has no provider measurements." }, readiness: { status: "unavailable", passedChecks: null, totalChecks: null }, changes: [] } });
     }
     if (method === "GET" && url.pathname === `${endpoint}/preview` && !url.search) return route.fulfill({ contentType: "text/html", body: `<!doctype html><html><head><meta name="strelva-site-hash" content="${record.rebuild.candidate.contentHash}"></head><body><h1>Fictional private website</h1><p>No routing or provider is invoked.</p></body></html>` });
     if (url.pathname.startsWith("/api/")) { blocked.push(`${method} ${url.pathname}`); return route.abort(); }
