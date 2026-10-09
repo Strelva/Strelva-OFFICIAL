@@ -14,6 +14,11 @@ const transactionBody = name => {
   return source.replace(/^begin;\n/m, "").replace(/^commit;\n?$/m, "");
 };
 const snapshot = names => `(select jsonb_agg(jsonb_build_array(p.oid::regprocedure::text,p.proowner,pg_get_functiondef(p.oid),p.proacl::text) order by p.oid::regprocedure::text) from pg_proc p where p.oid=any(array[${names.map(s => `${quote(s)}::regprocedure`).join(",")}]))`;
+const journalSnapshot = `(select jsonb_build_object(
+ 'relation',(select jsonb_build_array(relowner,relacl::text,relrowsecurity) from pg_class where oid='public.tenant_newsletter_teardown_function_journal'::regclass),
+ 'columns',(select jsonb_agg(jsonb_build_array(attnum,attacl::text) order by attnum) from pg_attribute where attrelid='public.tenant_newsletter_teardown_function_journal'::regclass and attnum>0 and not attisdropped),
+ 'policies',(select jsonb_agg(to_jsonb(policy) order by policy.polname) from pg_policy policy where polrelid='public.tenant_newsletter_teardown_function_journal'::regclass),
+ 'rows',(select jsonb_agg(to_jsonb(journal) order by journal.signature) from public.tenant_newsletter_teardown_function_journal journal)))`;
 const grantee = "newsletter_342_proof_grantee";
 const delegate = "newsletter_342_proof_delegate";
 const createRole = `create role ${grantee};`;
@@ -30,34 +35,38 @@ const forwardCases = [
   ["predecessor body drift", `select prosrc into src from pg_proc where oid=${quote(signatures[1])}::regprocedure; execute replace(pg_get_functiondef(${quote(signatures[1])}::regprocedure),src,src||chr(10)||'-- fictional predecessor drift'||chr(10));`],
   ["predecessor properties drift", `alter function ${signatures[0]} volatile;`],
 ];
-const inverseCases = successors.flatMap(signature => [
+const inverseCases = [
+  ["journal column ACL drift", `${createRole} grant update(before_definition) on public.tenant_newsletter_teardown_function_journal to ${grantee};`, "newsletter_teardown_journal_authority_changed"],
+  ["journal policy drift", `${createRole} create policy newsletter_proof_policy on public.tenant_newsletter_teardown_function_journal for all to ${grantee} using (true) with check (true);`, "newsletter_teardown_journal_authority_changed"],
+  ...successors.flatMap(signature => [
   [`successor owner drift ${signature}`, `${createRole} alter function ${signature} owner to ${grantee};`],
   [`successor ACL drift ${signature}`, `${createRole} grant execute on function ${signature} to ${grantee};`],
   [`successor body drift ${signature}`, `select prosrc into src from pg_proc where oid=${quote(signature)}::regprocedure; execute replace(pg_get_functiondef(${quote(signature)}::regprocedure),src,src||chr(10)||'-- fictional body drift'||chr(10));`],
-]);
+])];
 
 /** Generates SQL only; the coordinator supplies the owned native341 session. */
 export function buildNewsletterBaselineProof() {
   const forward = transactionBody(filename);
   const inverse = transactionBody(`rollback-${filename}`);
-  const cases = (items, mode) => items.map(([label, setup]) => `
+  const cases = (items, mode) => items.map(([label, setup, expectedError]) => `
 do $proof$
-declare before_state jsonb; after_state jsonb; src text;
+declare before_state jsonb; after_state jsonb; before_journal jsonb; src text;
 begin
  begin
   ${mode === "inverse" ? `execute $forward$${forward}$forward$;` : ""}
   ${setup}
   before_state:=${snapshot(mode === "inverse" ? successors : signatures)};
+  ${mode === "inverse" ? `before_journal:=${journalSnapshot};` : ""}
   begin
    execute $candidate$${mode === "inverse" ? inverse : forward}$candidate$;
    raise exception 'proof_candidate_was_allowed';
   exception when others then
-   if sqlerrm not like ${quote(mode === "inverse" ? "newsletter_teardown_successor%changed%" : "newsletter_teardown_unsupported%baseline%")}
+   if sqlerrm not like ${quote(expectedError ?? (mode === "inverse" ? "newsletter_teardown_successor%changed%" : "newsletter_teardown_unsupported%baseline%"))}
     then raise; end if;
   end;
   after_state:=${snapshot(mode === "inverse" ? successors : signatures)};
   if after_state is distinct from before_state then raise exception 'proof_refusal_changed_packet';end if;
-  ${mode === "inverse" ? "if (select count(*) from public.tenant_newsletter_teardown_function_journal)<>3 then raise exception 'proof_refusal_changed_journal';end if;" : "if to_regclass('public.tenant_newsletter_teardown_function_journal') is not null or to_regprocedure('public.tenant_cleanup_teardown_blockers_before_newsletter(text)') is not null then raise exception 'proof_refusal_created_successor';end if;"}
+  ${mode === "inverse" ? `if ${journalSnapshot} is distinct from before_journal then raise exception 'proof_refusal_changed_journal';end if;` : "if to_regclass('public.tenant_newsletter_teardown_function_journal') is not null or to_regprocedure('public.tenant_cleanup_teardown_blockers_before_newsletter(text)') is not null then raise exception 'proof_refusal_created_successor';end if;"}
   raise exception 'proof_case_rollback';
  exception when others then if sqlerrm<>'proof_case_rollback' then raise;end if;end;
  raise notice ${quote(`PASS ${mode}: ${label}`)};

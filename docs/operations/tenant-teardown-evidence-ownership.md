@@ -74,3 +74,12 @@ body/property refusal; successor body/ACL drift on all three functions; and an
 exact forward/inverse catalog round trip. It refuses pre-existing fixture-role
 names, creates only fictional transactional roles, and rolls back each case and
 the whole script. Source syntax/lint checks do not prove native matrix results.
+
+Journal authority also includes column ACLs and policies. The forward asserts
+no nonowner column privileges and no journal policies before recording the
+successor. The inverse repeats those catalog gates **before reading journal
+rows**, so table ACL/RLS alone cannot hide a later column grant or policy.
+Prepared native probes add each form of drift independently; every inverse
+probe compares the journal's rows, relation authority, column ACLs and policies
+before and after refusal, alongside the function catalog. Native execution is
+still owned by the coordinator.

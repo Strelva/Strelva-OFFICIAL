@@ -7,7 +7,12 @@ begin
  if not exists(select 1 from pg_class where oid='public.tenant_newsletter_teardown_function_journal'::regclass
   and relowner=(current_user::regrole)::oid and relrowsecurity)
   or exists(select 1 from pg_class t cross join lateral aclexplode(coalesce(t.relacl,acldefault('r',t.relowner))) a
-   where t.oid='public.tenant_newsletter_teardown_function_journal'::regclass and a.grantee<>t.relowner) then
+   where t.oid='public.tenant_newsletter_teardown_function_journal'::regclass and a.grantee<>t.relowner)
+  or exists(select 1 from pg_attribute col join pg_class rel on rel.oid=col.attrelid
+   cross join lateral aclexplode(col.attacl) acl
+   where col.attrelid='public.tenant_newsletter_teardown_function_journal'::regclass
+    and col.attnum>0 and not col.attisdropped and acl.grantee<>rel.relowner)
+  or exists(select 1 from pg_policy where polrelid='public.tenant_newsletter_teardown_function_journal'::regclass) then
   raise exception 'newsletter_teardown_journal_authority_changed';
  end if;
  if (select count(*) from public.tenant_newsletter_teardown_function_journal)<>3
