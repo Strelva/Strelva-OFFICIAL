@@ -47,6 +47,23 @@ test("custom template drafts survive reload without creating an app", async ({ p
   await expect(page.getByText("Your private tool is ready.", { exact: true })).toHaveCount(0);
 });
 
+test("selected template URL survives delayed router updates and reload", async ({ page }) => {
+  await page.goto("/preview/strelva?scenario=business&systems=on&view=products");
+  await page.getByRole("button", { name: "Preview Staff requests", exact: true }).click();
+  await expect(page).toHaveURL(/template=staff-requests/);
+  await page.waitForTimeout(5_000);
+
+  const settledUrl = new URL(page.url());
+  expect(settledUrl.searchParams.get("scenario")).toBe("business");
+  expect(settledUrl.searchParams.get("systems")).toBe("on");
+  expect(settledUrl.searchParams.get("view")).toBe("products");
+  expect(settledUrl.searchParams.get("template")).toBe("staff-requests");
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Staff requests", level: 2 })).toBeVisible();
+  await expect.poll(() => new URL(page.url()).searchParams.get("template")).toBe("staff-requests");
+});
+
 test("read-only users can inspect templates without creating apps", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=read-only&view=products&template=staff-requests");
   await expect(page.getByRole("button", { name: "Create private tool", exact: true })).toBeDisabled();
