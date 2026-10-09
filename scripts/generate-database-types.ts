@@ -30,6 +30,8 @@ const DEFAULT_OUT = "src/platform/infra/db/database.types.ts";
 // accepts NULL to clear a signing key (20261012120000_track_signing_key_rotation).
 const nullableRpcArguments: Readonly<Record<string, readonly string[]>> = {
   rotate_tenant_track_signing_key: ["p_public_key"],
+  // Takeover intentionally supplies no creator agreement/reference.
+  record_creator_maintenance_from_workspace: ["p_agreement", "p_rate"],
 };
 
 function arg(name: string): string | undefined {

@@ -80,3 +80,12 @@ begin
     or has_function_privilege('anon', helper, 'execute')
   ) then raise exception 'agency prospect RLS helper lost its request-session boundary'; end if;
 end $$;
+
+-- Creator operations remain absent on older focused fixtures. When installed,
+-- both exact supplied-actor RPCs must be private service-only; no direct journal.
+do $$
+declare reader regprocedure:=to_regprocedure('public.read_creator_maintenance_operations(uuid,uuid,text)');writer regprocedure:=to_regprocedure('public.record_creator_maintenance_from_workspace(uuid,uuid,uuid,uuid,text,text,text,text,timestamptz)');j regclass:=to_regclass('release_rollback_baseline.creator_maintenance_operations_catalog');
+begin
+ if (reader is null)<>(writer is null) or (reader is null)<>(j is null) then raise exception 'creator maintenance operations incomplete exposure boundary';end if;
+ if reader is not null and (not has_function_privilege('service_role',reader,'EXECUTE') or not has_function_privilege('service_role',writer,'EXECUTE') or has_function_privilege('anon',reader,'EXECUTE') or has_function_privilege('anon',writer,'EXECUTE') or has_function_privilege('authenticated',reader,'EXECUTE') or has_function_privilege('authenticated',writer,'EXECUTE') or has_table_privilege('service_role',j,'SELECT') or has_table_privilege('anon',j,'SELECT') or has_table_privilege('authenticated',j,'SELECT')) then raise exception 'creator maintenance operations lost exact private service-only boundary';end if;
+end $$;

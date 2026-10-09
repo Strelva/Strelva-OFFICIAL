@@ -1786,6 +1786,19 @@
           "rollbackStatus": "Prepared exact authority/body/ACL baseline and successor drift guards; native refusal and inverse/reapply qualification pending"
         }
       ]
+    },
+    {
+      "id": "creator-maintenance-operations",
+      "status": "Prepared exact canonical predecessor/owner/ACL/property and locked inverse-journal guards; source/runtime checks pass; ordered native refusal/inverse/reapply and Auth/UI qualification pending; no provider or commercial authority",
+      "items": [
+        {
+          "file": "20261022170000_creator_maintenance_operations.sql",
+          "sha256": "670b0926604f9d7a9a68ea1fd82d58fcc28528fbfcb16d02559c0f5e7ebec513",
+          "rollback": "rollback-20261022170000_creator_maintenance_operations.sql",
+          "rollbackSha256": "f3fc9c9970a69d09638e6dc7fcb9f85cee2cb5b20466dfbcd3cd94a93a88bc22",
+          "rollbackStatus": "Prepared exact canonical two-signature inverse after ACCESS EXCLUSIVE journal lock; retains all original writer/history bytes; 31 native refusal probes and populated inverse/reapply UNRUN"
+        }
+      ]
     }
   ]
 }

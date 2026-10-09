@@ -96,4 +96,19 @@ describe("generate-database-types render", () => {
       expect(out).toContain(name);
     }
   });
+
+  it("models the exact creator takeover null agreement/reference without widening actor or source", () => {
+    const generated = render({ ...catalog, functions: [{
+      name: "record_creator_maintenance_from_workspace", oid: 7, retset: false, rettype: T.jsonb,
+      argnames: ["p_workspace_id", "p_listing_id", "p_source_revision_id", "p_user_id", "p_verified_email", "p_state", "p_agreement", "p_rate", "p_effective"],
+      argmodes: null, alltypes: null, argtypes: [T.uuid, T.uuid, T.uuid, T.uuid, T.text, T.text, T.text, T.text, T.timestamptz], ndefaults: 0,
+    }] });
+    expect(generated).toContain("p_agreement: string | null");
+    expect(generated).toContain("p_rate: string | null");
+    for (const name of ["p_workspace_id", "p_listing_id", "p_source_revision_id", "p_user_id", "p_verified_email", "p_state", "p_effective"]) {
+      expect(generated).toContain(`${name}: string\n`);
+      expect(generated).not.toContain(`${name}: string | null`);
+    }
+    expect(generated).toContain("Returns: Json");
+  });
 });

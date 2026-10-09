@@ -92,4 +92,5 @@ query "$rows" >"$cluster_root/history-after"
 cmp "$cluster_root/history-before" "$cluster_root/history-after"
 psql "${psql_args[@]}" -f "$forward" >/dev/null
 psql "${psql_args[@]}" -f "$repo_root/tests/function-exposure-schema.sql" >/dev/null
+node --import tsx "$repo_root/scripts/check-readonly-rpcs.mjs" "postgresql:///postgres?host=$cluster_socket&port=$cluster_port"
 printf 'GREEN legitimate inverse/reapply preserves migration35 writer/catalog and retained history bytes.\n'

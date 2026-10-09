@@ -71,7 +71,7 @@ export function runPrivateAuthorityWindow(rootInput, workInput) {
     const value = JSON.parse(execFileSync(process.execPath, [join(root, 'scripts/full-model-stack-qualification.mjs'), 'verify', root, join(work, 'env')], {
       cwd: root, encoding: 'utf8', env: Object.fromEntries([...baselineKeys, 'LC_ALL'].filter(key => browserEnv[key]).map(key => [key, browserEnv[key]])), stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 16 * 1024 * 1024,
     }));
-    if (!value.qualified || value.current?.migrations?.length !== 342 || value.current?.ledger?.length !== 342) throw new Error('Exact actual 342-migration native catalog and ledger qualification required.');
+    if (!value.qualified || value.current?.migrations?.length !== 343 || value.current?.ledger?.length !== 343) throw new Error('Exact actual 343-migration native catalog and ledger qualification required.');
     return value;
   };
   const before = qualify(); save('stack-before.json', before);
