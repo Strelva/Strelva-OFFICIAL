@@ -22,6 +22,7 @@ export interface WebsiteExperienceProps {
   rebuildEnabled?: boolean;
   managed?: boolean;
   agency?: boolean;
+  canPublish?: boolean;
   workId?: string;
   readOnly?: boolean;
   initialRequest?: string;
@@ -180,7 +181,7 @@ function StatusIcon({ website }: { website: Website }) {
 }
 
 export function WebsiteExperience(props: WebsiteExperienceProps) {
-  if (!props.transport && ((!props.workId && props.rebuildEnabled) || props.rebuildVersion === 2)) return <RebuildExperience workspaceId={props.workspaceId} workId={props.workId} readOnly={props.readOnly} managed={props.managed} agency={props.agency} initialRequest={props.initialRequest} onSaved={props.onSaved} />;
+  if (!props.transport && ((!props.workId && props.rebuildEnabled) || props.rebuildVersion === 2)) return <RebuildExperience workspaceId={props.workspaceId} workId={props.workId} readOnly={props.readOnly} managed={props.managed} canPublish={props.canPublish} agency={props.agency} initialRequest={props.initialRequest} onSaved={props.onSaved} />;
   return <WebsiteSession key={`${props.workspaceId}:${props.workId ?? "new"}`} {...props} />;
 }
 

@@ -205,7 +205,7 @@ export function websiteSandbox(src: string): string {
   }
 }
 
-function SystemSurface({ system, workspaceId, readOnly, versionReadOnly, useReadOnly = readOnly, canEditApplications = false, rebuildEnabled, managed, agency, sources, localPreview, workspaceStopped, calendarRecoveryAllowed, inquiryAdapter, inquiryInbox }: SystemPageProps & { system: SystemView }) {
+function SystemSurface({ system, workspaceId, readOnly, versionReadOnly, useReadOnly = readOnly, canEditApplications = false, rebuildEnabled, managed, agency, canMakeReal, sources, localPreview, workspaceStopped, calendarRecoveryAllowed, inquiryAdapter, inquiryInbox }: SystemPageProps & { system: SystemView }) {
   const noop = () => undefined;
   if (system.surface.kind === "inquiries") {
     if (inquiryInbox) return <WorkspaceInquirySystem key={workspaceId} workspaceId={workspaceId} />;
@@ -225,7 +225,7 @@ function SystemSurface({ system, workspaceId, readOnly, versionReadOnly, useRead
   if (productId === "documents" && !localPreview) return <DocumentExperience key={workId} workspaceId={workspaceId} workId={workId} readOnly={readOnly} onSaved={noop} sources={[...sources]} />;
   if (productId === "tracker" && !localPreview) return <TrackerExperience key={workId} workspaceId={workspaceId} workId={workId} readOnly={readOnly} onSaved={noop} />;
   if (productId === "onboarding") return <OnboardingWorkspaceExperience key={workId} workspaceId={workspaceId} initialCaseId={workId} readOnly={readOnly} onSaved={noop} />;
-  if (productId === "websites") return <WebsiteExperience key={workId} workspaceId={workspaceId} workId={workId} rebuildVersion={websiteDocumentVersion(sources.find(work => work.id === workId)?.payload)} rebuildEnabled={rebuildEnabled} managed={managed} agency={agency} readOnly={readOnly} onSaved={noop} />;
+  if (productId === "websites") return <WebsiteExperience key={workId} workspaceId={workspaceId} workId={workId} rebuildVersion={websiteDocumentVersion(sources.find(work => work.id === workId)?.payload)} rebuildEnabled={rebuildEnabled} managed={managed} canPublish={canMakeReal === true} agency={agency} readOnly={readOnly} onSaved={noop} />;
   if (productId === "unknown" && system.views?.length) return <div className="p-6 text-sm">
     <p className="text-gray-muted">These bookings are taken on the site and kept in its own booking store. Open a view of them:</p>
     <ul className="mt-3 space-y-2">{system.views.map(view => <li key={view.id}>{view.href ? <a className="underline" href={view.href}>{view.label}</a> : <span>{view.label} · not available from here</span>}</li>)}</ul>
