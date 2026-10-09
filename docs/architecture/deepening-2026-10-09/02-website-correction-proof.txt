@@ -63,3 +63,31 @@ pnpm lint (exit 0)
 
 git diff --check (exit 0): no output.
 Browser: fictional /preview/strelva/rebuild?scenario=empty after shared normalizer extraction, desktop1280x900/mobile360x800. Invalid https:// retains editable value, no exact-check action, URL focused (mobile outline2px), no page overflow. Corrected example.com/path#section accepts fixture record and clears invalid-input error. No Auth/provider/production qualification. Local app started with env -i and no runtime repository env files; only checked-in .env*.example files exist.
+
+Final independent-contract review follow-up (test/docs only; runtime unchanged from 683c6efe5):
+
+pnpm exec vitest run src/__tests__/rebuild-transport-uncertainty.test.ts src/__tests__/rebuild-start-recovery.test.tsx src/__tests__/website-rebuild-pipeline.test.ts (exit 0)
+RUN  v4.1.11 /Users/jacobrhinehart/.croki/worktrees/REB/arch-website-settlement-depth-20261009
+
+(node:89005) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:89012) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  3 passed (3)
+      Tests  60 passed (60)
+   Start at  17:08:15
+   Duration  3.24s (transform 3.64s, setup 85ms, import 5.66s, tests 332ms, environment 522ms)
+
+pnpm typecheck (exit 0)
+> strelva@0.2.0 typecheck /Users/jacobrhinehart/.croki/worktrees/REB/arch-website-settlement-depth-20261009
+> next typegen && tsc --noEmit
+
+[@sentry/nextjs] DEPRECATION WARNING: disableLogger is deprecated and will be removed in a future version. Use webpack.treeshake.removeDebugLogging instead. (Not supported with Turbopack.)
+Generating route types...
+✓ Types generated successfully
+
+pnpm exec eslint src/__tests__/rebuild-transport-uncertainty.test.ts (exit 0)
+
+
+git diff --check (exit 0): no output. Unchanged runtime boundary/ontology/full-lint/UI proof above was not repeated for test/docs correction.

@@ -2,18 +2,32 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { rebuildHttpFailure } from '@/app/api/websites/rebuild-http';
 import { parseRebuildView, RebuildTransportError, RebuildUnconfirmedError, serverRebuildTransport } from '@/experience/websites/rebuild-transport';
 import { normalizeWebsiteRebuildUrl } from '@/products/websites/client';
-import { normalizeRebuildUrl } from '@/products/websites/rebuild-crawl';
 import { WorkspaceAccessError } from '@/platform/workspaces/types';
 import { harness, actor, selection } from './rebuild-recovery-independent-harness';
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
-it.each(['test', 'production'])('matches server deterministic URL normalization and rejection under %s rules', environment => {
+it.each(['test', 'production'])('preserves explicit deterministic URL outcomes under %s rules', environment => {
   vi.stubEnv('NODE_ENV', environment);
-  const outcome = (normalize: (url: string) => string, url: string) => {
-    try { return { normalized: normalize(url) }; }
+  const outcome = (url: string) => {
+    try { return { normalized: normalizeWebsiteRebuildUrl(url) }; }
     catch (cause) { return { error: cause instanceof Error ? cause.message : 'Unknown error' }; }
   };
-  for (const url of ['https://', '', 'ftp://example.com', 'https://owner:secret@example.com', 'https://example.com:8080', ' example.com/path#section ', 'HTTPS://EXAMPLE.COM:443/path?q=1#section', 'https://example.com:80/path', 'http://example.com', 'https://127.0.0.1', 'https://[::1]', 'http://localhost:80']) {
-    expect(outcome(normalizeWebsiteRebuildUrl, url), url).toEqual(outcome(normalizeRebuildUrl, url));
+  const invalid = { error: 'Enter a valid public website address.' };
+  const restricted = { error: 'Enter a public HTTP or HTTPS website address without credentials or a custom port.' };
+  const expected: Array<[string, { normalized: string } | { error: string }]> = [
+    ['https://', invalid], ['', invalid],
+    ['ftp://example.com', { error: 'Enter a public HTTP or HTTPS website address.' }],
+    ['https://owner:secret@example.com', restricted], ['https://example.com:8080', restricted],
+    [' example.com/path#section ', { normalized: 'https://example.com/path' }],
+    ['HTTPS://EXAMPLE.COM:443/path?q=1#section', { normalized: 'https://example.com/path?q=1' }],
+    ['https://example.com:80/path', { normalized: 'https://example.com:80/path' }],
+    ['http://example.com', environment === 'production' ? restricted : { normalized: 'http://example.com/' }],
+    ['https://localhost', environment === 'production' ? restricted : { normalized: 'https://localhost/' }],
+    ['https://127.0.0.1', environment === 'production' ? restricted : { normalized: 'https://127.0.0.1/' }],
+    ['https://[::1]', environment === 'production' ? restricted : { normalized: 'https://[::1]/' }],
+    ['http://localhost:80', environment === 'production' ? restricted : { normalized: 'http://localhost/' }],
+  ];
+  for (const [url, result] of expected) {
+    expect(outcome(url), url).toEqual(result);
   }
 });
 it.each(['approve', 'launch'] as const)('marks the actual %s postcommit membership403 unknown, preserving committed document authority', async action => {

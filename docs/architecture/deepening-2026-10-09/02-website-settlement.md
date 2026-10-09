@@ -223,21 +223,22 @@ deterministic error, preserves editable input and focuses the URL field. Correct
 then admits one valid command. Already admitted checks bypass this preflight;
 generic503 remains unknown and the original body/ID remains immutable. The
 normalizer also replaces the transport's existing acknowledgement URL conversion.
-Public props, keyed session lifetime, permission epochs and service/API behavior
-are unchanged. Runtime scope adds `products/websites/rebuild-url.ts`, its single
+Public props, keyed session lifetime, permission epochs, server permission and
+API contracts are unchanged. Runtime scope adds `products/websites/rebuild-url.ts`, its single
 client-entry export and only the crawler normalization import/function hunk to the
 two experience files. The existing `WebsiteCrawlError` name/code/message and
 `normalizeRebuildUrl` export remain compatible.
 
 Retained review regression: [four failures and seven passes](./02-website-correction-initial-regression.txt)
-on `8ff3578f` showed invalid input reaching the POST. Final [local proof](./02-website-correction-proof.txt):
+on `8ff3578f` showed invalid input reaching the POST. Runtime [local proof](./02-website-correction-proof.txt):
 **377 tests / 31 suites, no skips**, typecheck, boundaries, ontology, full
 `pnpm lint` and whitespace check passed. The added URL lost-ack test checks a
 committed schemeless/fragment URL verbatim after attempted invalid edits, with one
 record. Existing description lost-ack, optional-read acceptance, permission,
 double-click, stale scope and focus independent-peer regressions remain passing.
-The shared normalizer and server wrapper are tested under test/production literal
-rules for invalid input, HTTP/private hosts, credentials, ports and canonical URLs.
+The shared normalizer has independent explicit test/production expectations for
+invalid input, public HTTP, localhost, IPv4/IPv6 loopback, credentials, ports and
+canonical URLs. The server wrapper retains separate class/code/message checks.
 
 Croki fictional fixture inspected at 1280×900 and 360×800: `https://` leaves intake
 editable with URL focus, a 2px mobile keyboard outline, and no page overflow.
@@ -274,3 +275,12 @@ in the correction callback `architecture-20261009-website-correction-complete`.
 During extraction, tests/typecheck/lint caught a missing normalizer argument in
 the renamed test call. It was corrected before final proof; the intermediate
 [failed run](./02-website-normalizer-review-failure.txt) is retained separately.
+
+Final independent-contract review replaced shared-function/wrapper comparison
+with explicit expected outcomes per environment, including public HTTP and
+localhost/IPv4/IPv6 production refusals. Follow-up proof: **60 tests / 3 suites**,
+typecheck, targeted test ESLint and whitespace check passed. Runtime is unchanged
+from `683c6efe5`; its 377-test, boundary/ontology/full-lint and desktop/mobile proof
+remains the source verification. Only the contract test and handoff/evidence changed
+after that source freeze. Server permission/API contracts remain unchanged; the
+authorized crawler source scope is listed above. The final SHA is in the callback.
