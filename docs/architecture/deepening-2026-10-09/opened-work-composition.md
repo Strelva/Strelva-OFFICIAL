@@ -136,9 +136,16 @@ clears selectedWorkId before awaiting `/api/workspace`, momentarily opening a ne
 website and dropping a settled notice. Fast batched DOM tests do not expose that
 paint. The location peer received the exact observation and owns the fix. This
 composition preserves same-scope mounted pending/unknown attempts and existing
-keys; it does not claim that location bug is fixed. Integration must combine the
-location owner's refresh behavior, then defer the workspace snapshot response after
-a save and verify the selected work, mounted attempt and notice stay truthful.
+keys; it does not claim that location bug is fixed.
+
+Mandatory combined acceptance case: combine the location owner's refresh behavior,
+then deliberately defer the same-work `/api/workspace` snapshot response after a
+save. While it is pending and after it settles, verify the selected saved work,
+mounted tool/attempt identity and truthful save notice are preserved. Fast batched
+DOM proof alone does not satisfy this case. The coordinator owns reconciliation
+and union proof against location PR #619 (`ebbeda6e2ea0402220461c0a050c6f36c4cd70ba`)
+and website PR #620 (`8ff3578f485f4b207fbbf5be5af2a78d13faa70c`), supplied as
+integration inputs; neither peer's source or worktree was edited here.
 
 Proposed canonical evidence deltas (integration owner only): shared internal-work
 dispatch is locally implemented; bounded website projection reader divergence is
