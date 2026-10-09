@@ -4,6 +4,14 @@ import { describe, expect, it } from "vitest";
 const forward = readFileSync("supabase/migrations/20261022172000_governed_money_operations.sql", "utf8");
 const inverse = readFileSync("supabase/migrations/rollback-20261022172000_governed_money_operations.sql", "utf8");
 describe("governed money source packet", () => {
+  it("uses a non-keyword payout authorization row identifier throughout immutable replay validation", () => {
+    expect(forward).not.toMatch(/\bauthorization\s+public\.|\binto authorization\b|\bauthorization\./);
+    const configuration = forward.slice(forward.indexOf("create function public.record_governed_money_configuration"), forward.indexOf("create function public.read_governed_money_configuration"));
+    expect(configuration).not.toMatch(/\bauthorization\s+public\.|\binto authorization\b|\bauthorization\./);
+    expect(configuration).toContain("payout_authorization public.split_payout_authorizations");
+    expect(configuration).toContain("payout_authorization.approved_by is distinct from p_user_id");
+    expect(configuration).toContain("payout_authorization.profile_version is distinct from p_command->>'profileVersion'");
+  });
   it("binds inverse to all six actual current bodies, owners, ACLs and properties", () => {
     const bodies = [...forward.matchAll(/create function public\.(\w+)\((.*?)\)\nreturns jsonb language plpgsql( stable)? security definer set search_path=public,pg_temp as \$\$([\s\S]*?)\$\$;/g)];
     expect(bodies).toHaveLength(6);

@@ -1819,9 +1819,9 @@
       "items": [
         {
           "file": "20261022172000_governed_money_operations.sql",
-          "sha256": "8e41892780c0d8858a1a7708aae552d02b4011a40b1c82e1273b9b4f5456dc58",
+          "sha256": "6f6761a0c84c77d71e26c8247a0e6fb2c851937f96129aed88995455bd41c997",
           "rollback": "rollback-20261022172000_governed_money_operations.sql",
-          "rollbackSha256": "c4acd86966b64f54ec119834c54d0aa4948b1738e9b3228035d78cd3a440f1ce",
+          "rollbackSha256": "506d7bab6db586e82a0c20b0952c7ce96e8f5dbc1d8f397cbbb9bfb6374be763",
           "rollbackStatus": "Prepared canonical exact6 source/owner/full props/args/ACL/overload refusal before dropping additive ports only; written terms/periods/listings/approvals/accepted receipts and historical writers retained; native UNRUN"
         }
       ]

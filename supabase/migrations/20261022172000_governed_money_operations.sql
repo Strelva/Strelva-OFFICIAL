@@ -6,7 +6,7 @@ do $$begin if exists(select 1 from pg_proc where pronamespace='public'::regnames
 
 create function public.record_governed_money_configuration(p_user_id uuid,p_verified_email text,p_command jsonb)
 returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
-declare action text:=p_command->>'action'; a public.money_agreements; price public.platform_collection_prices; payout public.split_payouts; authorization public.split_payout_authorizations; c public.connected_accounts; found_before boolean; keys text[];
+declare action text:=p_command->>'action'; a public.money_agreements; price public.platform_collection_prices; payout public.split_payouts; payout_authorization public.split_payout_authorizations; c public.connected_accounts; found_before boolean; keys text[];
 begin
  perform 1 from public.users u join public.super_admins s on s.user_id=u.id
  where u.id=p_user_id and u.verified_at is not null and lower(btrim(u.email))=lower(btrim(p_verified_email)) and lower(btrim(s.email))=lower(btrim(p_verified_email)) and s.revoked_at is null for share of u,s;
@@ -38,9 +38,9 @@ begin
   if payout.id is null or payout.source_account_id<>'platform' then raise exception 'governed_money_denied';end if;
   select ca.* into c from public.connected_accounts ca join public.revenue_splits s on s.beneficiary_workspace_id=ca.workspace_id where s.id=payout.split_id and ca.stripe_account_id=payout.recipient_account_id for share of ca;
   if c.workspace_id is null or c.state<>'ready' or c.profile_version is distinct from p_command->>'profileVersion' or not 'recipient'=any(c.configurations) or c.capabilities#>>'{recipient,capabilities,stripe_balance,stripe_transfers,status}' is distinct from 'active' then raise exception 'governed_money_not_configured';end if;
-  select * into authorization from public.split_payout_authorizations where payout_id=payout.id;found_before:=found;
-  if not found_before then insert into public.split_payout_authorizations values(payout.id,p_user_id,clock_timestamp(),p_command->>'profileVersion') returning * into authorization;end if;
-  if authorization.approved_by is distinct from p_user_id or authorization.profile_version is distinct from p_command->>'profileVersion' then raise exception 'governed_money_conflict';end if;
+  select * into payout_authorization from public.split_payout_authorizations where payout_id=payout.id;found_before:=found;
+  if not found_before then insert into public.split_payout_authorizations values(payout.id,p_user_id,clock_timestamp(),p_command->>'profileVersion') returning * into payout_authorization;end if;
+  if payout_authorization.approved_by is distinct from p_user_id or payout_authorization.profile_version is distinct from p_command->>'profileVersion' then raise exception 'governed_money_conflict';end if;
  else raise exception 'governed_money_invalid';end if;
  return jsonb_build_object('action',action,'recordedBy',p_user_id,'replayed',found_before,'command',p_command);
 end $$;
@@ -129,20 +129,20 @@ end $$;
 
 create function public.assert_governed_payout_dispatch(p_payout_id uuid,p_user_id uuid,p_verified_email text,p_profile_version text,p_recipient text,p_charge text,p_amount bigint,p_currency text,p_available bigint)
 returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
-declare payout public.split_payouts; authorization public.split_payout_authorizations; receipt public.split_transfer_receipts; recipient public.connected_accounts; split public.revenue_splits; started timestamptz; remaining bigint;
+declare payout public.split_payouts; payout_authorization public.split_payout_authorizations; receipt public.split_transfer_receipts; recipient public.connected_accounts; split public.revenue_splits; started timestamptz; remaining bigint;
 begin
- select * into authorization from public.split_payout_authorizations where payout_id=p_payout_id;
+ select * into payout_authorization from public.split_payout_authorizations where payout_id=p_payout_id;
  -- Lock both actual operator identities in the same order before any payout
  -- row. Configuration takes its operator lock before that same payout row.
- perform 1 from public.users where id in(p_user_id,authorization.approved_by) order by id for share;
- perform 1 from public.super_admins where user_id in(p_user_id,authorization.approved_by) order by user_id for share;
+ perform 1 from public.users where id in(p_user_id,payout_authorization.approved_by) order by id for share;
+ perform 1 from public.super_admins where user_id in(p_user_id,payout_authorization.approved_by) order by user_id for share;
  select * into payout from public.split_payouts where id=p_payout_id for update;
  if payout.id is null or payout.source_account_id<>'platform' or payout.recipient_account_id is distinct from p_recipient or payout.source_transaction is distinct from p_charge or payout.amount_cents is distinct from p_amount or payout.currency is distinct from p_currency then raise exception 'governed_money_changed';end if;
  -- An accepted effect is an observation/recovery job. It is not a new grant
  -- to create a transfer, and its historical receipt survives later revocation.
  select * into receipt from public.split_transfer_receipts where payout_id=payout.id;
  if receipt.payout_id is not null then return to_jsonb(payout)||jsonb_build_object('transfer_id',receipt.transfer_id);end if;
- if not exists(select 1 from public.users u join public.super_admins s on s.user_id=u.id where u.id=p_user_id and u.verified_at is not null and lower(btrim(u.email))=lower(btrim(p_verified_email)) and lower(btrim(s.email))=lower(btrim(p_verified_email)) and s.revoked_at is null) or authorization.payout_id is null or authorization.profile_version is distinct from p_profile_version or not exists(select 1 from public.users u join public.super_admins s on s.user_id=u.id where u.id=authorization.approved_by and u.verified_at is not null and lower(btrim(u.email))=lower(btrim(s.email)) and s.revoked_at is null) then raise exception 'governed_money_denied';end if;
+ if not exists(select 1 from public.users u join public.super_admins s on s.user_id=u.id where u.id=p_user_id and u.verified_at is not null and lower(btrim(u.email))=lower(btrim(p_verified_email)) and lower(btrim(s.email))=lower(btrim(p_verified_email)) and s.revoked_at is null) or payout_authorization.payout_id is null or payout_authorization.profile_version is distinct from p_profile_version or not exists(select 1 from public.users u join public.super_admins s on s.user_id=u.id where u.id=payout_authorization.approved_by and u.verified_at is not null and lower(btrim(u.email))=lower(btrim(s.email)) and s.revoked_at is null) then raise exception 'governed_money_denied';end if;
  -- Existing loss/reconciliation and reservation writers use these source
  -- locks. Current accrual and source capacity are checked after both waits.
  perform pg_advisory_xact_lock(hashtextextended('platform:'||p_charge,8811));
@@ -163,12 +163,12 @@ do $canonical_governed_money$
 declare expected record; p record; migrator oid:=(current_user::regrole)::oid;
 begin
  for expected in select * from (values
- ('public.record_governed_money_configuration(uuid,text,jsonb)','c50a9dbfea6cd8fb74158f9c3131306e','v',array['p_user_id','p_verified_email','p_command']::text[]),
+ ('public.record_governed_money_configuration(uuid,text,jsonb)','4dca3848341aa93db19ad42c4236eb56','v',array['p_user_id','p_verified_email','p_command']::text[]),
  ('public.read_governed_money_configuration(uuid,uuid,text)','782c1f0df744dc307442b45776907142','s',array['p_workspace_id','p_user_id','p_verified_email']::text[]),
  ('public.read_governed_money_preparation(uuid,uuid,text)','069ebd4ec0274185bf97814ea64f6523','s',array['p_workspace_id','p_user_id','p_verified_email']::text[]),
  ('public.prepare_governed_collection_terms(uuid,text,jsonb)','d76caf2ab026b72931ce6af8570b7d36','v',array['p_user_id','p_verified_email','p_command']::text[]),
  ('public.register_governed_creator_listing(uuid,text,jsonb)','e67a0cb58c80c3622be80e31bfa98940','v',array['p_user_id','p_verified_email','p_command']::text[]),
- ('public.assert_governed_payout_dispatch(uuid,uuid,text,text,text,text,bigint,text,bigint)','b8fb6dd56365665db132b300ce564d70','v',array['p_payout_id','p_user_id','p_verified_email','p_profile_version','p_recipient','p_charge','p_amount','p_currency','p_available']::text[])) v(signature,source_hash,volatility,arg_names) loop
+ ('public.assert_governed_payout_dispatch(uuid,uuid,text,text,text,text,bigint,text,bigint)','fbe629ed5c9e16e863afd76292c47ee4','v',array['p_payout_id','p_user_id','p_verified_email','p_profile_version','p_recipient','p_charge','p_amount','p_currency','p_available']::text[])) v(signature,source_hash,volatility,arg_names) loop
   if (select count(*) from pg_proc where pronamespace='public'::regnamespace and proname=split_part(split_part(expected.signature,'.',2),'(',1))<>1 then raise exception 'governed_money_catalog_drift';end if;
   select f.*,l.lanname into p from pg_proc f join pg_language l on l.oid=f.prolang where f.oid=to_regprocedure(expected.signature);
   if p.oid is null or p.proowner<>migrator or p.pronamespace<>'public'::regnamespace or p.lanname<>'plpgsql' or p.prokind<>'f' or p.prorettype<>'jsonb'::regtype or p.proretset or p.proisstrict or not p.prosecdef or p.proleakproof or p.provolatile::text<>expected.volatility or p.proparallel<>'u' or p.proconfig is distinct from array['search_path=public, pg_temp']::text[] or p.provariadic<>0 or p.prosupport<>0 or p.procost<>100 or p.prorows<>0 or p.pronargdefaults<>0 or p.proargdefaults is not null or p.proargmodes is not null or p.proallargtypes is not null or p.proargnames is distinct from expected.arg_names or p.pronargs<>cardinality(expected.arg_names) or md5(p.prosrc)<>expected.source_hash then raise exception 'governed_money_catalog_drift';end if;
