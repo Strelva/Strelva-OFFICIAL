@@ -70,10 +70,14 @@ async function frozenBrief(page: Page, region: Locator) {
 async function geometry(page: Page, region: Locator, width: number) {
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   if (width >= 768) return;
-  const boxes = [];
-  for (const control of await region.locator("input:visible, textarea:visible, button:visible").all()) {
-    const box = await control.boundingBox(); expect(box).not.toBeNull();
-    expect(box!.width).toBeGreaterThanOrEqual(44); expect(box!.height).toBeGreaterThanOrEqual(44); boxes.push(box!);
+  // One layout snapshot avoids comparing viewport coordinates across focus-driven scrolling.
+  const boxes = await region.locator("input:visible, textarea:visible, button:visible").evaluateAll(nodes => nodes.map(node => {
+    const { x, y, width, height } = node.getBoundingClientRect();
+    return { x, y, width, height };
+  }));
+  expect(boxes.length).toBeGreaterThan(0);
+  for (const box of boxes) {
+    expect(box.width).toBeGreaterThanOrEqual(44); expect(box.height).toBeGreaterThanOrEqual(44);
   }
   for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
     const a = boxes[i]!, b = boxes[j]!;
