@@ -44,6 +44,8 @@ describe("supplied contact details in a new website description", () => {
     expect(Object.values(result.document.nodes).some(node => node.type === "Cta")).toBe(false);
   });
   it.each([
+    ["Email:orders@example.test.", "orders@example.test", "mailto:orders@example.test"],
+    ["E-mail:pickup@example.test.", "pickup@example.test", "mailto:pickup@example.test"],
     ["Email Orders+pickup@example.test.", "Orders+pickup@example.test", "mailto:Orders+pickup@example.test"],
     ["Phone: (716) 555-0100.", "(716) 555-0100", "tel:7165550100"],
     ["Call us at +1 716 555 0100.", "+1 716 555 0100", "tel:+17165550100"],
@@ -58,6 +60,8 @@ describe("supplied contact details in a new website description", () => {
     "Call us on 2026-10-09 or 10.09.2026. Phone: 123456. Tel: 1234567890123456.",
     "Call about order #7165550100. Telephone order number 7165550100.",
     "Reference 716-555-0100. Event +2026-10-09.",
+    "Do not email:old@example.test. Email:old@example.test is discontinued.",
+    "Email:javascript:orders@example.test or email:mailto:orders@example.test or email:orders@example.test?subject=Injected or email:orders%0D%0A@example.test.",
     "Email orders@@example.test, a..b@example.test, orders@example or javascript:orders@example.test.",
     "Email orders@example.test?subject=Injected or orders%0D%0A@example.test.",
     "Order +1234567890. Use https://example.test/+17165550100 or javascript:tel:7165550100. Phone: 7165550100ABC.",

@@ -28,7 +28,13 @@ export function descriptionContactSpans(description: string): Array<{ text: stri
     return !context || context.test(prefix);
   };
   for (const match of description.matchAll(/[^\s<>"(),;]+@[^\s<>"(),;]+/g)) {
-    if (offered(match.index!, match[0].length, /\b(?:email|e-mail|mail|contact|reach|write)\b/i)) add(match[0].replace(/\.$/, ""), match.index!);
+    // A literal cue can touch its address (Email:orders@…). Do not peel off
+    // arbitrary URI schemes: javascript:/mailto: remain invalid destinations.
+    const labelled = /^(?:email|e-mail|mail|contact|reach|write):(.+)$/i.exec(match[0]);
+    const value = labelled?.[1] ?? match[0];
+    const start = match.index! + match[0].length - value.length;
+    const text = value.replace(/\.$/, "");
+    if (offered(start, text.length, /\b(?:email|e-mail|mail|contact|reach|write)\b/i)) add(text, start);
   }
   // Unlabelled local numbers could be dates, prices, quantities or order IDs.
   for (const match of description.matchAll(/(?<![\w:/])(?:call|phone|telephone|tel)\b(?:\s+(?:us|me|at|on|number)){0,2}\s*:?\s*(\+?[\d(][\d(). -]*\d\)?)(?![\w@/])/gi)) {

@@ -112,6 +112,7 @@ describe("website rebuild service lifecycle and durable recovery", () => {
   });
   it.each([
     ["Phone: (716) 555-0100.", "(716) 555-0100", "+1 716 555 0199", "tel:7165550100", "tel:+17165550199"],
+    ["Email:Orders@example.test.", "Orders@example.test", "orders+pickup@example.test", "mailto:Orders@example.test", "mailto:orders+pickup@example.test"],
     ["Email Orders@example.test.", "Orders@example.test", "orders+pickup@example.test", "mailto:Orders@example.test", "mailto:orders+pickup@example.test"],
   ])("updates the exact contact copy and destination together after publication: %s", async (description, before, after, oldHref, newHref) => {
     const h = harness(); let record = await h.create({ ...brief, description });
@@ -165,7 +166,7 @@ describe("website rebuild service lifecycle and durable recovery", () => {
     expect(html).toContain('href="tel:7165550199"'); expect(html).toContain("Call 716-555-0199 for orders."); expect(html).not.toContain("716.555.0100");
     expect(record.rebuild.status).toBe("review_ready"); expect(record.rebuild.approvedCandidateRevision).toBeNull();
   });
-  it.each(["javascript:alert(1)", "orders@example.test?subject=unsafe", "2026-10-09"])("refuses an unsafe contact correction before committing: %s", async text => {
+  it.each(["javascript:alert(1)", "orders@example.test?subject=unsafe", "orders%0D%0A@example.test", "2026-10-09"])("refuses an unsafe contact correction before committing: %s", async text => {
     const h = harness(); const record = await h.create({ ...brief, description: "Call 716-555-0100." });
     const [factId] = Object.entries(record.rebuild.candidate!.document.facts).find(([,fact]) => fact.kind === "contact")!;
     const commits = vi.mocked(h.documents.commitCandidate).mock.calls.length;
