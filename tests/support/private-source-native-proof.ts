@@ -51,3 +51,8 @@ export function runPrivateSourceInverseDriftProof(){
  return execFileSync("python3",[resolve("scripts/check-private-source-inverse-drift.py"),resolve("supabase/migrations/rollback-20261022123000_private_definition_versions.sql")],
   {encoding:"utf8",timeout:60_000});
 }
+
+export function runPrivateSourcePopulatedInverseProof(mode:"source-only"|"marked-grant"){
+ return execFileSync("python3",[resolve("scripts/check-private-source-populated-inverse.py"),resolve("supabase/migrations/rollback-20261022123000_private_definition_versions.sql")],
+ {encoding:"utf8",timeout:60_000,env:{...process.env,STRELVA_PRIVATE_INVERSE_HISTORY_CASE:mode}});
+}

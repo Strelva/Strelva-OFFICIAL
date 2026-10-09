@@ -1,5 +1,22 @@
 begin;
 set local lock_timeout='2s';
+-- Audit journal authority before trusting any journal row.
+do $private_table_authority$
+declare table_name text;
+begin
+ foreach table_name in array array['public.private_application_sources','public.private_source_install_grants','public.private_definition_predecessors','public.private_definition_function_receipts'] loop
+  if exists(select 1 from pg_policy where polrelid=table_name::regclass)
+   or exists(select 1 from pg_attribute attribute join pg_class c on c.oid=attribute.attrelid
+    cross join lateral aclexplode(attribute.attacl) acl
+    where attribute.attrelid=table_name::regclass and attribute.attnum>0 and not attribute.attisdropped
+     and (acl.grantee<>c.relowner or acl.grantor<>c.relowner))
+   or not exists(select 1 from pg_class where oid=table_name::regclass and relowner=(current_user::regrole)::oid and relrowsecurity)
+   or exists(select 1 from pg_class c cross join lateral aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) acl
+    where c.oid=table_name::regclass and (acl.grantee<>c.relowner or acl.grantor<>c.relowner)) then
+   raise exception 'private_definition_table_authority_changed: %',table_name;
+  end if;
+ end loop;
+end $private_table_authority$;
 do $audit_all$
 declare item record; current_acl jsonb;
 begin
@@ -21,6 +38,11 @@ begin
     or not exists(select 1 from pg_roles where oid=acl.grantor)
     or (acl.grantee<>0 and not exists(select 1 from pg_roles where oid=acl.grantee))) then
   raise exception 'private_definition_unsupported_acl_baseline';
+ end if;
+ -- Serialize history producers before the fresh emptiness check and keep locks through drops.
+ lock table public.private_application_sources,public.private_source_install_grants in access exclusive mode;
+ if exists(select 1 from public.private_application_sources) or exists(select 1 from public.private_source_install_grants) then
+  raise exception 'private_definition_populated_forward_only';
  end if;
 end $audit_all$;
 do $restore$
@@ -50,16 +72,19 @@ begin
   if current_acl is distinct from expected_acl then raise exception 'private_definition_predecessor_acl_restore_mismatch: %',item.signature;end if;
  end loop;
 end $restore$;
+drop function public.create_version_system_command_private_core(uuid,text,jsonb,text,text,uuid,jsonb);
 drop function public.create_private_version_system_command(uuid,text,jsonb,text,text,uuid,jsonb);
 drop function public.require_private_application_source_share(uuid,uuid,text,uuid);
 drop function public.grant_private_application_install(uuid,uuid,text,uuid,uuid,uuid,timestamptz);
 drop function public.require_system_package_install_scope_private_core(uuid,uuid,text,uuid,integer,uuid);
+drop function public.system_version_access_private_core(public.system_versions,uuid,text,boolean);
 drop function public.system_actor_scope_private_core(uuid,uuid,text,boolean);
 drop function public.lock_system_package_install_grant_private_core(uuid,uuid,text);
 drop function public.system_package_install_grant_active_private_core(public.system_package_install_grants,uuid,text);
 drop table public.private_source_install_grants;
 drop function public.set_private_application_source_share(uuid,uuid,text,uuid,uuid,boolean);
 drop function public.publish_private_application_source(uuid,uuid,text,uuid,uuid,integer,jsonb);
+drop table public.private_application_sources;
 drop table public.private_definition_function_receipts;
 drop table public.private_definition_predecessors;
 commit;

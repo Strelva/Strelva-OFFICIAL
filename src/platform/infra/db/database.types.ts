@@ -11100,6 +11100,26 @@ export type Database = {
           },
         ]
       }
+      private_application_sources: {
+        Row: {
+          source_system_id: string
+        }
+        Insert: {
+          source_system_id: string
+        }
+        Update: {
+          source_system_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "private_application_sources_source_system_id_fkey"
+            columns: ["source_system_id"]
+            isOneToOne: true
+            referencedRelation: "system_version_sources"
+            referencedColumns: ["system_id"]
+          },
+        ]
+      }
       private_definition_function_receipts: {
         Row: {
           acl: Json
@@ -23026,6 +23046,18 @@ export type Database = {
           }
           Returns: Json
         }
+      create_version_system_command_private_core: {
+        Args: {
+          p_command_id: string
+          p_kind: string
+          p_lineage: Json
+          p_name: string
+          p_native_payload: Json
+          p_user_id: string
+          p_verified_email: string
+        }
+        Returns: Json
+      }
       create_workspace_handoff: {
         Args: {
           p_expires_at: string
@@ -31958,6 +31990,15 @@ export type Database = {
         Returns: string[]
       }
       system_version_access: {
+        Args: {
+          p_user_id: string
+          p_verified_email: string
+          p_write: boolean
+          v: unknown
+        }
+        Returns: Record<string, unknown>
+      }
+      system_version_access_private_core: {
         Args: {
           p_user_id: string
           p_verified_email: string

@@ -1773,10 +1773,10 @@
         },
         {
           "file": "20261022123000_private_definition_versions.sql",
-          "sha256": "e913b3aedfb9bec59757501ea237aa2a49483908f3bee601e9726e39bf86dbdb",
+          "sha256": "34bd761600daf4345ca11006a0cc0dd9701adbcfde0d3deb13c8dfebdc872161",
           "rollback": "rollback-20261022123000_private_definition_versions.sql",
-          "rollbackSha256": "082aebf140e7d604fede2870525facab7b99de8d4fb87a966023334f1ac4b60d",
-          "rollbackStatus": "Owner-issued/migrator-owner baseline preflight refuses unsupported ACL atomically; all13 successor body/ACL guards and exact predecessor ACL restoration; native qualification pending"
+          "rollbackSha256": "764b9dd997adfdc129ed08ea09b438ee91e0b0134e069e05bba9799466e2feb0",
+          "rollbackStatus": "Prepared17 successor/six predecessor/four table authority guards; ordered history table locks and populated forward-only refusal; native/Auth qualification pending"
         },
         {
           "file": "20261022130000_tenant_newsletter_teardown_hold.sql",

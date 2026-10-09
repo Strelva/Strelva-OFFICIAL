@@ -9,7 +9,9 @@ begin
   'public.system_package_install_grant_active(public.system_package_install_grants,uuid,text)',
   'public.lock_system_package_install_grant(uuid,uuid,text)',
   'public.system_actor_scope(uuid,uuid,text,boolean)',
-  'public.require_system_package_install_scope(uuid,uuid,text,uuid,integer,uuid)'] loop
+  'public.require_system_package_install_scope(uuid,uuid,text,uuid,integer,uuid)',
+ 'public.system_version_access(public.system_versions,uuid,text,boolean)',
+ 'public.create_version_system_command(uuid,text,jsonb,text,text,uuid,jsonb)'] loop
   if not exists(select 1 from pg_proc p where p.oid=signature::regprocedure and p.proowner=migrator)
    or exists(select 1 from pg_proc p cross join lateral aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) acl
     where p.oid=signature::regprocedure and (acl.grantor<>p.proowner or acl.privilege_type<>'EXECUTE'
@@ -20,6 +22,10 @@ begin
  end loop;
 end $acl_preflight$;
 
+-- Immutable provenance: private publication remains private-command governed even if listed later.
+create table public.private_application_sources(source_system_id uuid primary key references public.system_version_sources(system_id));
+alter table public.private_application_sources enable row level security;
+revoke all on public.private_application_sources from public,anon,authenticated,service_role;
 -- Source authoring is already supported by create_system_version_source.
 -- This wrapper binds HTTP replay and expected revision to the immutable writer.
 create function public.publish_private_application_source(p_workspace_id uuid,p_user_id uuid,p_verified_email text,p_system_id uuid,p_command_id uuid,p_expected_revision integer,p_revision jsonb)
@@ -38,6 +44,7 @@ begin
   or p_expected_revision<0 or p_revision->'requires'->'bindingKinds' is distinct from '[]'::jsonb
  then raise exception 'system_version_input_invalid'; end if;
  perform public.validate_application_spec((shape-'kind')||jsonb_build_object('maintenanceOwner',p_user_id));
+ insert into public.private_application_sources(source_system_id) values(p_system_id) on conflict do nothing;
  select * into r from public.system_version_source_revisions where id=p_command_id;
  if found then
   if r.source_system_id<>p_system_id or r.number<>p_expected_revision+1 or r.published_by<>p_user_id
@@ -80,7 +87,9 @@ insert into public.private_definition_predecessors(signature,before_definition,b
  'public.system_package_install_grant_active(public.system_package_install_grants,uuid,text)',
  'public.lock_system_package_install_grant(uuid,uuid,text)',
  'public.system_actor_scope(uuid,uuid,text,boolean)',
- 'public.require_system_package_install_scope(uuid,uuid,text,uuid,integer,uuid)']) signature join pg_proc p on p.oid=signature::regprocedure;
+ 'public.require_system_package_install_scope(uuid,uuid,text,uuid,integer,uuid)',
+ 'public.system_version_access(public.system_versions,uuid,text,boolean)',
+ 'public.create_version_system_command(uuid,text,jsonb,text,text,uuid,jsonb)']) signature join pg_proc p on p.oid=signature::regprocedure;
 alter function public.system_package_install_grant_active(public.system_package_install_grants,uuid,text) rename to system_package_install_grant_active_private_core;
 revoke all on function public.system_package_install_grant_active_private_core(public.system_package_install_grants,uuid,text) from public,anon,authenticated,service_role;
 create function public.system_package_install_grant_active(g public.system_package_install_grants,p_user_id uuid,p_verified_email text)
@@ -182,29 +191,60 @@ returns boolean language plpgsql security definer set search_path=public,pg_temp
 declare g public.system_package_install_grants; role text;
 begin
  perform public.require_system_package_install_scope_private_core(p_workspace_id,p_user_id,p_verified_email,p_source_system_id,p_revision,p_command_id);
- role:=public.system_version_member_role(p_workspace_id,p_user_id,p_verified_email);
+ -- Provider seats can project admin through system_version_member_role.
+ -- Only actual customer membership may bypass the exact private install grant.
+ select membership.role into role from public.workspace_memberships membership
+  join public.users actor on actor.id=membership.user_id
+  where membership.workspace_id=p_workspace_id and membership.user_id=p_user_id
+   and actor.verified_at is not null and lower(actor.email)=lower(btrim(p_verified_email))
+   for share of membership,actor;
  if coalesce(role,'') not in ('owner','admin') then
   select item.* into g from public.system_package_install_grants item join public.private_source_install_grants marker on marker.grant_id=item.id
    where item.business_workspace_id=p_workspace_id and item.command_id=p_command_id;
-  if found and not public.lock_system_package_install_grant(g.id,p_user_id,p_verified_email) then raise exception 'business_record_access_denied';end if;
+  if found then
+   if not exists(select 1 from public.system_version_source_revisions revision
+    where revision.id=g.source_revision_id and revision.source_system_id=p_source_system_id and revision.number=p_revision)
+    then raise exception 'business_record_access_denied';end if;
+   if not public.lock_system_package_install_grant(g.id,p_user_id,p_verified_email) then raise exception 'business_record_access_denied';end if;
+  end if;
  end if;
  return true;
 end $$;
 revoke all on function public.require_system_package_install_scope(uuid,uuid,text,uuid,integer,uuid) from public,anon,authenticated;
 grant execute on function public.require_system_package_install_scope(uuid,uuid,text,uuid,integer,uuid) to service_role;
+alter function public.create_version_system_command(uuid,text,jsonb,text,text,uuid,jsonb) rename to create_version_system_command_private_core;
+revoke all on function public.create_version_system_command_private_core(uuid,text,jsonb,text,text,uuid,jsonb) from public,anon,authenticated,service_role;
 -- Repeat the private-share requirement inside the same transaction that
 -- creates native work + System + lineage, even if the source becomes listed.
 create function public.create_private_version_system_command(p_user_id uuid,p_verified_email text,p_lineage jsonb,p_name text,p_kind text,p_command_id uuid,p_native_payload jsonb)
 returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
-declare business uuid; source_id uuid;
+declare business uuid; source_id uuid; direct_role text; permission public.system_package_install_grants;
 begin
  business:=(p_lineage->'version'->>'businessId')::uuid;
  source_id:=(p_lineage->'source'->>'systemId')::uuid;
  -- Current target writer scope and qualification locks precede private source.
  perform public.require_system_package_install_scope(business,p_user_id,p_verified_email,source_id,(p_lineage->'baseline'->>'revision')::integer,p_command_id);
+ select membership.role into direct_role from public.workspace_memberships membership
+  join public.users actor on actor.id=membership.user_id
+  where membership.workspace_id=business and membership.user_id=p_user_id
+   and actor.verified_at is not null and lower(actor.email)=lower(btrim(p_verified_email))
+   for share of membership,actor;
+ if coalesce(direct_role,'') not in ('owner','admin') then
+  select g.* into permission from public.system_package_install_grants g
+   join public.private_source_install_grants marker on marker.grant_id=g.id
+   join public.system_version_source_revisions revision on revision.id=g.source_revision_id
+   join public.system_version_sources source on source.system_id=revision.source_system_id
+   where g.business_workspace_id=business and g.command_id=p_command_id
+    and revision.source_system_id=source_id and revision.number=(p_lineage->'baseline'->>'revision')::integer
+    and revision.id=(p_lineage->>'sourceRevisionId')::uuid
+    and source.business_workspace_id=(p_lineage->'source'->>'businessId')::uuid
+    and revision.definition=p_lineage->'baseline'->'definition';
+  if not found then raise exception 'business_record_access_denied';end if;
+  if not public.lock_system_package_install_grant(permission.id,p_user_id,p_verified_email) then raise exception 'business_record_access_denied';end if;
+ end if;
  perform 1 from public.system_version_source_shares where source_system_id=source_id and grantee_workspace_id=business and revoked_at is null for share;
  if not found then raise exception 'business_record_access_denied';end if;
- return public.create_version_system_command(p_user_id,p_verified_email,p_lineage,p_name,p_kind,p_command_id,p_native_payload);
+ return public.create_version_system_command_private_core(p_user_id,p_verified_email,p_lineage,p_name,p_kind,p_command_id,p_native_payload);
 end $$;
 revoke all on function public.create_private_version_system_command(uuid,text,jsonb,text,text,uuid,jsonb) from public,anon,authenticated;
 grant execute on function public.create_private_version_system_command(uuid,text,jsonb,text,text,uuid,jsonb) to service_role;
@@ -212,11 +252,133 @@ revoke all on function public.system_package_install_grant_active(public.system_
 grant execute on function public.system_package_install_grant_active(public.system_package_install_grants,uuid,text),public.grant_private_application_install(uuid,uuid,text,uuid,uuid,uuid,timestamptz),public.require_private_application_source_share(uuid,uuid,text,uuid) to service_role;
 revoke all on function public.publish_private_application_source(uuid,uuid,text,uuid,uuid,integer,jsonb),public.set_private_application_source_share(uuid,uuid,text,uuid,uuid,boolean) from public,anon,authenticated;
 grant execute on function public.publish_private_application_source(uuid,uuid,text,uuid,uuid,integer,jsonb),public.set_private_application_source_share(uuid,uuid,text,uuid,uuid,boolean) to service_role;
+-- Generic callers cannot bypass durable private source provenance.
+create function public.create_version_system_command(p_user_id uuid,p_verified_email text,p_lineage jsonb,p_name text,p_kind text,p_command_id uuid,p_native_payload jsonb)
+returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
+begin
+ -- Private publication owns source FOR UPDATE before recording provenance.
+ -- Acquire the same source first, then classify with a fresh statement snapshot.
+ perform 1 from public.system_version_sources
+  where system_id=(p_lineage->'source'->>'systemId')::uuid for share;
+ if not found then raise exception 'business_record_access_denied';end if;
+ if exists(select 1 from public.private_application_sources where source_system_id=(p_lineage->'source'->>'systemId')::uuid) then
+  return public.create_private_version_system_command(p_user_id,p_verified_email,p_lineage,p_name,p_kind,p_command_id,p_native_payload);
+ end if;
+ return public.create_version_system_command_private_core(p_user_id,p_verified_email,p_lineage,p_name,p_kind,p_command_id,p_native_payload);
+end $$;
+revoke all on function public.create_version_system_command(uuid,text,jsonb,text,text,uuid,jsonb) from public,anon,authenticated;
+grant execute on function public.create_version_system_command(uuid,text,jsonb,text,text,uuid,jsonb) to service_role;
+-- Bound only an installed private Version, preserving unrelated provider scope.
+alter function public.system_version_access(public.system_versions,uuid,text,boolean) rename to system_version_access_private_core;
+revoke all on function public.system_version_access_private_core(public.system_versions,uuid,text,boolean) from public,anon,authenticated,service_role;
+create function public.system_version_access(v public.system_versions,p_user_id uuid,p_verified_email text,p_write boolean,out access text,out actor_role text)
+language plpgsql security definer set search_path=public,pg_temp as $$
+declare g public.system_package_install_grants; prior record; direct_role text; private_maker boolean:=false;
+begin
+ if p_write then
+  select item.* into g from public.system_version_native_applications native
+   join public.system_package_install_grants item on item.work_id=native.work_id and item.business_workspace_id=v.business_workspace_id
+   join public.private_source_install_grants marker on marker.grant_id=item.id
+   where native.version_id=v.id;
+  if found then
+   select membership.role into direct_role from public.workspace_memberships membership
+    join public.users actor on actor.id=membership.user_id
+    where membership.workspace_id=v.business_workspace_id and membership.user_id=p_user_id
+     and actor.verified_at is not null and lower(actor.email)=lower(btrim(p_verified_email))
+   for share of membership,actor;
+   if direct_role is null then
+    if not public.lock_system_package_install_grant(g.id,p_user_id,p_verified_email) then raise exception 'business_record_access_denied';end if;
+    private_maker:=true;
+   end if;
+  end if;
+ end if;
+ prior:=public.system_version_access_private_core(v,p_user_id,p_verified_email,p_write);
+ access:=prior.access;actor_role:=prior.actor_role;
+ if private_maker and access='full' then actor_role:='agency';end if;
+end $$;
+revoke all on function public.system_version_access(public.system_versions,uuid,text,boolean) from public,anon,authenticated,service_role;
+-- Close inherited custom ACLs and custom default privileges before journaling.
+-- Captured predecessor ACLs remain unchanged for exact inverse restoration.
+do $forward_acl_closure$
+declare signature text; grantee oid; function_owner oid; actual jsonb; expected jsonb;
+begin
+ foreach signature in array array[
+ 'public.publish_private_application_source(uuid,uuid,text,uuid,uuid,integer,jsonb)',
+ 'public.set_private_application_source_share(uuid,uuid,text,uuid,uuid,boolean)',
+ 'public.system_package_install_grant_active(public.system_package_install_grants,uuid,text)',
+ 'public.system_package_install_grant_active_private_core(public.system_package_install_grants,uuid,text)',
+ 'public.lock_system_package_install_grant(uuid,uuid,text)',
+ 'public.lock_system_package_install_grant_private_core(uuid,uuid,text)',
+ 'public.grant_private_application_install(uuid,uuid,text,uuid,uuid,uuid,timestamptz)',
+ 'public.require_private_application_source_share(uuid,uuid,text,uuid)',
+ 'public.system_actor_scope(uuid,uuid,text,boolean)',
+ 'public.system_actor_scope_private_core(uuid,uuid,text,boolean)',
+ 'public.require_system_package_install_scope(uuid,uuid,text,uuid,integer,uuid)',
+ 'public.require_system_package_install_scope_private_core(uuid,uuid,text,uuid,integer,uuid)',
+ 'public.create_private_version_system_command(uuid,text,jsonb,text,text,uuid,jsonb)',
+ 'public.system_version_access(public.system_versions,uuid,text,boolean)',
+ 'public.system_version_access_private_core(public.system_versions,uuid,text,boolean)',
+ 'public.create_version_system_command(uuid,text,jsonb,text,text,uuid,jsonb)',
+ 'public.create_version_system_command_private_core(uuid,text,jsonb,text,text,uuid,jsonb)'] loop
+  select proowner into function_owner from pg_proc where oid=signature::regprocedure;
+  if function_owner<>(current_user::regrole)::oid then raise exception 'private_definition_unsupported_acl_baseline: %',signature;end if;
+  for grantee in select distinct acl.grantee from pg_proc p
+   cross join lateral aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) acl
+   where p.oid=signature::regprocedure and acl.grantee<>function_owner loop
+   execute format('revoke all on function %s from %s cascade',signature,
+    case when grantee=0 then 'PUBLIC' else quote_ident((select rolname from pg_roles where oid=grantee)) end);
+  end loop;
+  execute format('grant execute on function %s to %I with grant option',signature,current_user);
+  if signature=any(array['public.publish_private_application_source(uuid,uuid,text,uuid,uuid,integer,jsonb)','public.set_private_application_source_share(uuid,uuid,text,uuid,uuid,boolean)','public.system_package_install_grant_active(public.system_package_install_grants,uuid,text)','public.grant_private_application_install(uuid,uuid,text,uuid,uuid,uuid,timestamptz)','public.require_private_application_source_share(uuid,uuid,text,uuid)','public.require_system_package_install_scope(uuid,uuid,text,uuid,integer,uuid)','public.create_private_version_system_command(uuid,text,jsonb,text,text,uuid,jsonb)','public.create_version_system_command(uuid,text,jsonb,text,text,uuid,jsonb)']) then
+   execute format('grant execute on function %s to service_role',signature);
+  end if;
+  select coalesce(jsonb_agg(jsonb_build_array(acl.grantor,acl.grantee,acl.privilege_type,acl.is_grantable)
+    order by acl.grantor,acl.grantee,acl.privilege_type,acl.is_grantable),'[]'::jsonb) into actual
+   from pg_proc p cross join lateral aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) acl where p.oid=signature::regprocedure;
+  select jsonb_agg(jsonb_build_array(function_owner,allowed.grantee,'EXECUTE',allowed.grantable)
+   order by function_owner,allowed.grantee,'EXECUTE',allowed.grantable) into expected
+   from (select function_owner grantee,true grantable union all
+    select ('service_role'::regrole)::oid,false where signature=any(array['public.publish_private_application_source(uuid,uuid,text,uuid,uuid,integer,jsonb)','public.set_private_application_source_share(uuid,uuid,text,uuid,uuid,boolean)','public.system_package_install_grant_active(public.system_package_install_grants,uuid,text)','public.grant_private_application_install(uuid,uuid,text,uuid,uuid,uuid,timestamptz)','public.require_private_application_source_share(uuid,uuid,text,uuid)','public.require_system_package_install_scope(uuid,uuid,text,uuid,integer,uuid)','public.create_private_version_system_command(uuid,text,jsonb,text,text,uuid,jsonb)','public.create_version_system_command(uuid,text,jsonb,text,text,uuid,jsonb)'])) allowed;
+  if actual is distinct from expected then raise exception 'private_definition_forward_acl_not_closed: %',signature;end if;
+ end loop;
+end $forward_acl_closure$;
 -- Journal every restored or dropped function, including renamed cores.
 -- Rollback audits the entire successor before executing any restoration.
 create table public.private_definition_function_receipts(signature text primary key,body_sha256 text not null,acl jsonb not null);
 alter table public.private_definition_function_receipts enable row level security;
 revoke all on public.private_definition_function_receipts from public,anon,authenticated,service_role;
+-- The marker and both journals must remain owner-only even with custom defaults.
+do $private_table_closure$
+declare table_name text; grantee oid; table_owner oid; column_grant record;
+begin
+ foreach table_name in array array['public.private_application_sources','public.private_source_install_grants','public.private_definition_predecessors','public.private_definition_function_receipts'] loop
+  select relowner into table_owner from pg_class where oid=table_name::regclass and relrowsecurity;
+  if table_owner is distinct from (current_user::regrole)::oid then raise exception 'private_definition_table_authority_changed: %',table_name;end if;
+  for grantee in select distinct acl.grantee from pg_class c
+   cross join lateral aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) acl
+   where c.oid=table_name::regclass and acl.grantee<>table_owner loop
+   execute format('revoke all on table %s from %s cascade',table_name,
+    case when grantee=0 then 'PUBLIC' else quote_ident((select rolname from pg_roles where oid=grantee)) end);
+  end loop;
+  for column_grant in select attribute.attname,acl.grantee,acl.privilege_type from pg_attribute attribute
+   cross join lateral aclexplode(attribute.attacl) acl
+   where attribute.attrelid=table_name::regclass and attribute.attnum>0 and not attribute.attisdropped and acl.grantee<>table_owner loop
+   if column_grant.privilege_type not in ('SELECT','INSERT','UPDATE','REFERENCES') then raise exception 'private_definition_table_authority_changed: %',table_name;end if;
+   execute format('revoke %s (%I) on table %s from %s cascade',column_grant.privilege_type,column_grant.attname,table_name,
+    case when column_grant.grantee=0 then 'PUBLIC' else quote_ident((select rolname from pg_roles where oid=column_grant.grantee)) end);
+  end loop;
+  if exists(select 1 from pg_policy where polrelid=table_name::regclass)
+   or exists(select 1 from pg_attribute attribute cross join lateral aclexplode(attribute.attacl) acl
+    where attribute.attrelid=table_name::regclass and attribute.attnum>0 and not attribute.attisdropped
+     and (acl.grantee<>table_owner or acl.grantor<>table_owner)) then
+   raise exception 'private_definition_table_authority_changed: %',table_name;
+  end if;
+  if exists(select 1 from pg_class c cross join lateral aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) acl
+   where c.oid=table_name::regclass and (acl.grantee<>c.relowner or acl.grantor<>c.relowner)) then
+   raise exception 'private_definition_table_authority_changed: %',table_name;
+  end if;
+ end loop;
+end $private_table_closure$;
 insert into public.private_definition_function_receipts(signature,body_sha256,acl)
  select signature,encode(sha256(convert_to(pg_get_functiondef(signature::regprocedure),'UTF8')),'hex'),
  (select coalesce(jsonb_agg(jsonb_build_array(a.grantor,a.grantee,a.privilege_type,a.is_grantable)
@@ -235,7 +397,11 @@ insert into public.private_definition_function_receipts(signature,body_sha256,ac
  'public.system_actor_scope_private_core(uuid,uuid,text,boolean)',
  'public.require_system_package_install_scope(uuid,uuid,text,uuid,integer,uuid)',
  'public.require_system_package_install_scope_private_core(uuid,uuid,text,uuid,integer,uuid)',
- 'public.create_private_version_system_command(uuid,text,jsonb,text,text,uuid,jsonb)']) signature;
+ 'public.create_private_version_system_command(uuid,text,jsonb,text,text,uuid,jsonb)',
+ 'public.system_version_access(public.system_versions,uuid,text,boolean)',
+ 'public.system_version_access_private_core(public.system_versions,uuid,text,boolean)',
+ 'public.create_version_system_command(uuid,text,jsonb,text,text,uuid,jsonb)',
+ 'public.create_version_system_command_private_core(uuid,text,jsonb,text,text,uuid,jsonb)']) signature;
 update public.private_definition_predecessors receipt set
  after_sha256=encode(sha256(convert_to(pg_get_functiondef(signature::regprocedure),'UTF8')),'hex'),
  after_acl=(select coalesce(jsonb_agg(jsonb_build_array(acl.grantor,acl.grantee,acl.privilege_type,acl.is_grantable)

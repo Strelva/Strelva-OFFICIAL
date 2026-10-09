@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { localEnvironment, signedInContext } from "./support/local-auth";
 import { ordinaryAgencyMaker, ordinaryCustomerBusiness } from "./support/ordinary-agency-maker";
-import { privateSourceNativeReceipt, runPrivateSourceNativeProof, runPrivateSourceInverseDriftProof } from "./support/private-source-native-proof";
+import { privateSourceNativeReceipt, runPrivateSourceNativeProof, runPrivateSourceInverseDriftProof, runPrivateSourcePopulatedInverseProof } from "./support/private-source-native-proof";
 import { configuredPackageReviewer } from "./support/configured-package-reviewer";
 
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local Supabase Auth and database.");
@@ -65,7 +65,17 @@ test("independently owned businesses install and update definitions without copy
       return revision;
     }
     const first = await publishSource();
+    if(process.env.STRELVA_PRIVATE_SOURCE_NATIVE_PROOFS==="1")await info.attach("private-source-only-populated-inverse",
+      {contentType:"application/json",body:Buffer.from(runPrivateSourcePopulatedInverseProof("source-only"))});
+
     for(const businessId of [sourceSpace,customerSpace])await post(builder.context.request,"/api/workspace/version-sources",{action:"share",workspaceId:maker.agencyId,systemId:source.systemId,businessId,shared:true});
+    await post(builder.context.request,"/api/workspace/version-sources",{action:"install",workspaceId:customerSpace,
+      source:first.source,name:"Maker without exact owner grant",commandId:randomUUID()},403);
+    await post(builder.context.request,"/api/workspace/versions/manage",{action:"create",agencyWorkspaceId:maker.agencyId,
+      workspaceId:customerSpace,source:first.source,context:{kind:"agency_client",label:"Generic route missing private grant"},
+      name:"Generic route missing private grant",commandId:randomUUID()},403);
+    const noGrantWorks=await admin.from("saved_product_work").select("id").eq("workspace_id",customerSpace).eq("product_id","applications");
+    expect(noGrantWorks.error).toBeNull();expect(noGrantWorks.data).toEqual([]);
     // Optional root-owned native window, inside this same real Auth identity.
     if(process.env.STRELVA_PRIVATE_SOURCE_NATIVE_PROOFS==="1"){
       for(const mode of ["withdrawal","expiry"] as const){
@@ -119,6 +129,9 @@ test("independently owned businesses install and update definitions without copy
     expect(nativeTarget.error).toBeNull();
     const target={...installedVersion,workId:nativeTarget.data.workId as string};
     expect(grant.commandId).toBe(commandId);
+    if(process.env.STRELVA_PRIVATE_SOURCE_NATIVE_PROOFS==="1")await info.attach("private-marked-grant-populated-inverse",
+      {contentType:"application/json",body:Buffer.from(runPrivateSourcePopulatedInverseProof("marked-grant"))});
+
     let installed = await read(customer.context.request, target.workId);
     expect(installed.workspaceId).toBe(customerSpace);
     expect(installed.payload.records).toEqual([]);
@@ -204,6 +217,8 @@ test("independently owned businesses install and update definitions without copy
     await post(builder.context.request,"/api/workspace/version-sources",{action:"share",workspaceId:maker.agencyId,systemId:source.systemId,businessId:customerSpace,shared:false});
     await post(customer.context.request, "/api/workspace/version-sources", { action: "install", workspaceId: customerSpace,
       source: third.source, name: "Withdrawn package", commandId: randomUUID() }, 403);
+    await post(builder.context.request,"/api/workspace/versions/manage",{action:"override",workspaceId:customerSpace,
+      systemId:target.systemId,versionId:target.versionId,rowRevision:current.rowRevision,path:"title",value:"Withdrawn maker write"},403);
     expect(await read(customer.context.request, target.workId)).toEqual(before);
     expect((await builder.context.request.get(`/api/bounded-work?productId=applications&workId=${target.workId}`)).status()).toBe(403);
   } finally { await reviewer?.context.close(); await builder.context.close(); await customer.context.close(); }

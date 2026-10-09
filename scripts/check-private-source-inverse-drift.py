@@ -25,8 +25,8 @@ def execute(sql):
         raise RuntimeError(result.stderr)
     return result.stdout.strip()
 before=json.loads(execute(snapshot_sql))
-if len(before)!=13:
-    raise SystemExit('Expected complete 13-function successor journal.')
+if len(before)!=17:
+    raise SystemExit('Expected complete 17-function successor journal.')
 for target in [
     'public.system_package_install_grant_active(public.system_package_install_grants,uuid,text)',
     'public.system_package_install_grant_active_private_core(public.system_package_install_grants,uuid,text)']:
@@ -40,6 +40,30 @@ for target in [
     if execute("select exists(select 1 from pg_roles where rolname='"+role+"');")!='f':
         raise AssertionError('Transactional role drift was not rolled back.')
     print(json.dumps({'case':'custom-role ACL drift refused before restoration','target':target}))
+for table in ['public.private_application_sources','public.private_source_install_grants','public.private_definition_predecessors','public.private_definition_function_receipts']:
+    role='private_table_drift_'+uuid.uuid4().hex[:16]
+    result=subprocess.run(base,input='begin;create role '+role+' nologin;grant insert,update,delete on table '+table+' to '+role+';\n'+inverse.read_text(),text=True,capture_output=True,timeout=20)
+    if result.returncode==0 or 'private_definition_table_authority_changed' not in result.stderr:
+        raise AssertionError('Actual inverse failed to refuse private table authority drift.')
+    if json.loads(execute(snapshot_sql))!=before or execute("select exists(select 1 from pg_roles where rolname='"+role+"');")!='f':
+        raise AssertionError('Refused table-authority inverse changed baseline or retained drift role.')
+    print(json.dumps({'case':'private table custom-write ACL drift refused before journal trust','table':table}))
+for table,column in [('public.private_application_sources','source_system_id'),('public.private_source_install_grants','grant_id'),('public.private_definition_predecessors','signature'),('public.private_definition_function_receipts','signature')]:
+    role='private_column_drift_'+uuid.uuid4().hex[:16]
+    for kind in ['column_acl','policy']:
+        setup='create role '+role+' nologin bypassrls;'
+        if kind=='column_acl':
+            setup+='grant insert('+column+'),update('+column+') on table '+table+' to '+role+';'
+        else:
+            setup+='create policy private_drift_policy on '+table+' to '+role+' using (true) with check (true);'
+        result=subprocess.run(base,input='begin;'+setup+'\n'+inverse.read_text(),text=True,capture_output=True,timeout=20)
+        if result.returncode==0 or 'private_definition_table_authority_changed' not in result.stderr:
+            raise AssertionError('Actual inverse failed to refuse '+kind+' drift before journal trust.')
+        if json.loads(execute(snapshot_sql))!=before or execute("select exists(select 1 from pg_roles where rolname='"+role+"');")!='f':
+            raise AssertionError('Refused column/policy inverse changed baseline or retained fixture role.')
+        if execute("select exists(select 1 from pg_policy where polrelid='"+table+"'::regclass and polname='private_drift_policy');")!='f':
+            raise AssertionError('Transactional policy drift remained after refusal.')
+        print(json.dumps({'case':kind+' drift refused before journal trust','table':table,'fixtureBypassRls':True}))
 core='public.lock_system_package_install_grant_private_core(uuid,uuid,text)'
 # A harmless comment changes the actual core definition hash without altering
 # privileges; the complete inverse must detect it before dropping that core.

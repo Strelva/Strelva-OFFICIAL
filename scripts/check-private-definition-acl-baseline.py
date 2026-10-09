@@ -101,8 +101,13 @@ ordinary='private_acl_owner_leaf_'+uuid.uuid4().hex[:12]
 execute('create role '+ident(custom)+' nologin;create role '+ident(ordinary)+' nologin;grant EXECUTE on function '+signature+' to '+ident(custom)+' with grant option;grant EXECUTE on function '+signature+' to '+ident(ordinary)+';')
 acl_query="select coalesce(jsonb_agg(jsonb_build_array(a.grantor,a.grantee,a.privilege_type,a.is_grantable) order by a.grantor,a.grantee,a.privilege_type,a.is_grantable),'[]'::jsonb) from pg_proc p cross join lateral aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a where p.oid="+literal(signature)+'::regprocedure;'
 before=json.loads(execute(acl_query))
+# Actual custom default privileges challenge every new table/function.
+execute('alter default privileges grant execute on functions to '+ident(custom)+';alter default privileges grant all on tables to '+ident(custom)+';')
 try:
     execute(forward)
+    closed=execute("select not exists(select 1 from public.private_definition_function_receipts receipt join pg_proc p on p.oid=receipt.signature::regprocedure cross join lateral aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) acl where acl.grantee=("+literal(custom)+"::regrole)::oid) and not exists(select 1 from pg_class c cross join lateral aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) acl where c.oid=any(array['public.private_application_sources'::regclass,'public.private_source_install_grants'::regclass,'public.private_definition_predecessors'::regclass,'public.private_definition_function_receipts'::regclass]) and acl.grantee<>c.relowner);")
+    if closed!='t':raise AssertionError('Custom predecessor/default grants retained forward function/table access.')
+    print(json.dumps({'case':'actual custom function/table defaults and predecessor grants closed in forward','closed':True}))
     execute(inverse)
     after=json.loads(execute(acl_query))
     if after!=before:
@@ -110,6 +115,7 @@ try:
     print(json.dumps({'case':'owner-issued custom grantee/grant-option forward→inverse exact ACL','normalizedAcl':after}))
 finally:
     # Restrict cleanup to exact fixture role grants. No provider/data cleanup.
+    execute('alter default privileges revoke execute on functions from '+ident(custom)+';alter default privileges revoke all on tables from '+ident(custom)+';')
     execute('revoke all on function '+signature+' from '+ident(custom)+','+ident(ordinary)+' cascade;drop role '+ident(custom)+';drop role '+ident(ordinary)+';')
 if catalog()!=initial:
     raise AssertionError('Supported ACL roundtrip/fixture cleanup changed predecessor catalog.')
