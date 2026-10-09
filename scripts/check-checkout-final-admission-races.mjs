@@ -1,6 +1,7 @@
 // PREPARED, UNRUN: explicit owned loopback clone only. All rows are fictional.
 // The coordinator retains this private evidence directory and owns DB cleanup.
 import { spawn } from "node:child_process";
+import { startRetainedNativeChild } from "./lib/retained-native-child.mjs";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
@@ -18,22 +19,28 @@ const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !ke
 const args = [db, "-X", "-qAt", "-v", "ON_ERROR_STOP=1"];
 const literal = value => `'${String(value).replaceAll("'", "''")}'`;
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+const inventory = JSON.parse(readFileSync(join(root, "scripts/sql/historical-forward-inventory.json"), "utf8"));
+const sources = ["scripts/check-checkout-final-admission-races.mjs", "scripts/lib/retained-native-child.mjs", "scripts/sql/checkout-final-admission-contract.sql", "supabase/migrations/rollback-20261022171000_checkout_final_admission.sql", "scripts/sql/historical-forward-inventory.json", ...inventory.forwardFiles.map(name => `supabase/migrations/${name}`)];
+const hash = bytes => createHash("sha256").update(bytes).digest("hex");
+const sourceSnapshot = () => Object.fromEntries(sources.map(path => [path, hash(readFileSync(join(root, path)))]));
+const sourceBefore = sourceSnapshot();
 const outputs = [];
-const retain = (name, value) => { writeFileSync(join(evidence, name), value, { mode: 0o600 }); outputs.push(name); };
+const retain = (name, value) => { writeFileSync(join(evidence, name), value, { mode: 0o600 }); if (!outputs.includes(name)) outputs.push(name); };
+retain("source-before.json", JSON.stringify(sourceBefore, null, 2));
+const children = new Set();
 function processSql(name) {
-  const child = spawn("psql", args, { stdio: ["pipe", "pipe", "pipe"], env });
-  let stdout = "", stderr = "", done = false;
-  child.stdout.on("data", chunk => { stdout += chunk; }); child.stderr.on("data", chunk => { stderr += chunk; });
-  const completed = new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => { child.kill("SIGTERM"); reject(new Error(`${name}: native query timed out`)); }, 15000);
-    child.on("error", error => { clearTimeout(timeout); reject(error); });
-    child.on("exit", code => { done = true; clearTimeout(timeout); retain(`${name}.log`, `${stdout}\n${stderr}`); resolve({ code, stdout: stdout.trim(), stderr }); });
-  });
-  return { child, completed, output: () => stdout, done: () => done };
+  const process = startRetainedNativeChild(name, { spawn, args, env, retain });
+  children.add(process);
+  return process;
+}
+async function closeOwnedChildren() {
+  for (const process of children) if (!process.done()) process.terminate();
+  const results = await Promise.allSettled([...children].map(process => process.completed));
+  if (results.some(result => result.status !== 'fulfilled') || [...children].some(process => !process.done())) throw new Error('Owned child cleanup closure unconfirmed; final hash receipt refused.');
 }
 async function run(name, sql) {
   const process = processSql(name); process.child.stdin.end(sql + "\n"); const result = await process.completed;
-  if (result.code !== 0) throw new Error(`${name}: ${result.stderr}`); return result.stdout;
+  if (result.code !== 0 || result.signal || result.error || result.timedOut) throw new Error(`${name}: ${result.stderr}`); return result.stdout;
 }
 async function waitUntil(check, message) {
   const end = Date.now() + 5000;
@@ -90,26 +97,46 @@ try {
     fixtureWorkspaces.push(f.business, f.agency);
     const admission = `select public.assert_business_checkout_admission('${f.payment}',${literal(f.account)},${f.generation},${f.agencyCase ? `'${f.manager}',${literal(f.managerEmail)},${literal(f.ownerEmail)}` : "null,null,null"});`;
     if (await run(`${label}-initial`, admission) !== "t") throw new Error(`${kind}: initial current authority was not admitted`);
+    let relation = "connected_accounts";
     const merchantLock = `select 1 from public.connected_accounts where workspace_id='${f.workspace}' for update;`;
     let mutation = "", lock = merchantLock;
     if (kind === "merchant restriction") mutation = `update public.connected_accounts set state='restricted' where workspace_id='${f.workspace}';`;
     if (kind === "merchant generation") mutation = `update public.connected_accounts set generation=generation+1 where workspace_id='${f.workspace}';`;
-    if (kind === "clock expiry") await run(`${label}-expiry`, `update public.business_payment_requests set expires_at=clock_timestamp()+interval '1200 milliseconds' where id='${f.request}';`);
-    if (kind === "quote cancellation") { lock = `select 1 from public.business_payment_requests where id='${f.request}' for update;`; mutation = `insert into public.payment_request_actions(request_id,action) values('${f.request}','cancelled');`; }
-    if (kind === "deposit cancellation") { lock = `select 1 from public.business_bookings where id='${f.booking}' for update;`; mutation = `update public.business_bookings set status='cancelled',cancelled_at=clock_timestamp() where id='${f.booking}';`; }
-    if (kind === "agency actor withdrawal" || kind === "agency owner withdrawal") { const id = kind === "agency actor withdrawal" ? f.manager : f.owner; lock = `select 1 from public.users where id='${id}' for update;`; mutation = `update public.users set verified_at=null where id='${id}';`; }
-    if (kind === "agency payer withdrawal") { lock = `select 1 from public.accounts where workspace_id='${f.business}' for update;`; mutation = `update public.accounts set payer_kind='business',payer_workspace_id=null where workspace_id='${f.business}';`; }
+    if (kind === "clock expiry") await run(`${label}-expiry`, `update public.business_payment_requests set expires_at=clock_timestamp()+interval '5 seconds' where id='${f.request}';`);
+    if (kind === "quote cancellation") { relation = "business_payment_requests"; lock = `select 1 from public.business_payment_requests where id='${f.request}' for update;`; mutation = `insert into public.payment_request_actions(request_id,action) values('${f.request}','cancelled');`; }
+    if (kind === "deposit cancellation") { relation = "business_bookings"; lock = `select 1 from public.business_bookings where id='${f.booking}' for update;`; mutation = `update public.business_bookings set status='cancelled',cancelled_at=clock_timestamp() where id='${f.booking}';`; }
+    if (kind === "agency actor withdrawal" || kind === "agency owner withdrawal") { relation = "users"; const id = kind === "agency actor withdrawal" ? f.manager : f.owner; lock = `select 1 from public.users where id='${id}' for update;`; mutation = `update public.users set verified_at=null where id='${id}';`; }
+    if (kind === "agency payer withdrawal") { relation = "accounts"; lock = `select 1 from public.accounts where workspace_id='${f.business}' for update;`; mutation = `update public.accounts set payer_kind='business',payer_workspace_id=null where workspace_id='${f.business}';`; }
     if (kind === "agency customer exit") mutation = `insert into public.workspace_exit_requests(workspace_id,requested_by,idempotency_key,command_digest,future_work,provider_participation,maintained_resource_action,state,completed_at) values('${f.business}','${f.owner}','fictional-checkout-exit-${f.payment}',repeat('4',64),'pause','keep','stop','{"status":"completed"}',clock_timestamp());`;
-    const holder = processSql(`${label}-holder`); holder.child.stdin.write(`begin;${lock}select 'CHECKOUT_LOCK_HELD';\n`);
-    await waitUntil(() => holder.output().includes("CHECKOUT_LOCK_HELD"), `${kind}: holder did not acquire the expected lock`);
-    const worker = processSql(`${label}-admission`); worker.child.stdin.end(`set application_name=${literal(app)};${admission}\n`);
+    const holder = processSql(`${label}-holder`); holder.child.stdin.write(`begin;${lock}select 'CHECKOUT_LOCK_HELD|'||jsonb_build_object('pid',pg_backend_pid(),'transaction',pg_current_xact_id()::text);\n`);
+    await waitUntil(() => holder.output().includes("CHECKOUT_LOCK_HELD|"), `${kind}: holder did not acquire the expected lock`);
+    const holding = JSON.parse(holder.output().split("\n").find(line => line.startsWith("CHECKOUT_LOCK_HELD|")).slice("CHECKOUT_LOCK_HELD|".length));
+    if (!Number.isInteger(holding.pid) || holding.pid <= 0 || !/^[0-9]+$/.test(holding.transaction)) throw new Error("Holder backend identity was invalid");
+    retain(`${label}-holder-binding.json`, JSON.stringify({ ...holding, relation, app }, null, 2));
+    const worker = processSql(`${label}-admission`); worker.child.stdin.end(`set application_name=${literal(app)};select 'CHECKOUT_WORKER_PID|'||pg_backend_pid();${admission}\n`);
     try {
-      await waitUntil(async () => await run(`${label}-wait-${++sequence}`, `select exists(select 1 from pg_stat_activity where application_name=${literal(app)} and wait_event_type='Lock' and cardinality(pg_blocking_pids(pid))>0)`) === "t", `${kind}: admission was never observed waiting`);
-      if (kind === "clock expiry") await pause(1400);
+      let witness;
+      await waitUntil(() => worker.output().includes("CHECKOUT_WORKER_PID|"), `${kind}: actual worker PID was not observed`);
+      const workerPid = Number(worker.output().split("\n").find(line => line.startsWith("CHECKOUT_WORKER_PID|")).slice("CHECKOUT_WORKER_PID|".length));
+      if (!Number.isInteger(workerPid) || workerPid <= 0) throw new Error("Worker backend identity was invalid");
+      await waitUntil(async () => {
+        const output = await run(`${label}-wait-${++sequence}`, `select coalesce((select jsonb_build_object('workerPid',w.pid,'workerApplication',w.application_name,'workerXactStart',w.xact_start,'observedAt',clock_timestamp(),'holderPid',${holding.pid},'holderTransaction',${literal(holding.transaction)},'blockers',pg_blocking_pids(w.pid),'expectedRelation','public.${relation}','relationLocks',(select jsonb_agg(jsonb_build_object('pid',l.pid,'relation',l.relation::regclass::text,'mode',l.mode,'granted',l.granted)) from pg_locks l where l.pid in(${holding.pid},${workerPid}) and l.relation='public.${relation}'::regclass),'workerWaitLocks',(select jsonb_agg(jsonb_build_object('mode',l.mode,'transaction',l.transactionid::text,'granted',l.granted)) from pg_locks l where l.pid=w.pid and l.locktype='transactionid'),'expiresAt',(select expires_at from public.business_payment_requests where id='${f.request}'),'preExpiry',${kind === "clock expiry" ? `(select w.xact_start<expires_at and clock_timestamp()<expires_at from public.business_payment_requests where id='${f.request}')` : "true"}) from pg_stat_activity w where w.pid=${workerPid} and w.application_name=${literal(app)} and w.wait_event_type='Lock' and ${holding.pid}=any(pg_blocking_pids(w.pid)) and exists(select 1 from pg_locks l where l.pid=w.pid and not l.granted and l.locktype='transactionid' and l.mode='ShareLock' and l.transactionid::text=${literal(holding.transaction)}) and exists(select 1 from pg_locks l where l.pid=w.pid and l.granted and l.relation='public.${relation}'::regclass and l.mode='RowShareLock') and exists(select 1 from pg_locks l where l.pid=${holding.pid} and l.granted and l.relation='public.${relation}'::regclass and l.mode='RowShareLock'))::text,'')`);
+        if (!output) return false;
+        witness = JSON.parse(output);
+        return true;
+      }, `${kind}: exact holder/transaction/relation wait was never observed`);
+      retain(`${label}-wait-witness.json`, JSON.stringify(witness, null, 2));
+      if (kind === "clock expiry") {
+        if (witness.preExpiry !== true) throw new Error("Expiry transaction did not begin AND actually wait before the PostgreSQL deadline");
+        await waitUntil(async () => await run(`${label}-deadline-${++sequence}`, `select clock_timestamp()>=expires_at from public.business_payment_requests where id='${f.request}'`) === "t", "PostgreSQL expiry deadline never passed while the lock was held");
+        const deadline = JSON.parse(await run(`${label}-deadline-state`, `select jsonb_build_object('observedAt',clock_timestamp(),'expiresAt',r.expires_at,'workerPid',w.pid,'workerXactStart',w.xact_start,'holderStillBlocking',${holding.pid}=any(pg_blocking_pids(w.pid)),'afterDeadline',clock_timestamp()>=r.expires_at) from public.business_payment_requests r cross join pg_stat_activity w where r.id='${f.request}' and w.pid=${workerPid} and w.application_name=${literal(app)}`));
+        retain(`${label}-deadline-witness.json`, JSON.stringify(deadline, null, 2));
+        if (deadline.afterDeadline !== true || deadline.holderStillBlocking !== true) throw new Error("Expiry lock was not still held after the PostgreSQL deadline");
+      }
       holder.child.stdin.end(`${mutation}commit;\n`);
-      const held = await holder.completed; if (held.code !== 0) throw new Error(`${kind}: holder mutation failed`);
+      const held = await holder.completed; if (held.code !== 0 || held.signal || held.error || held.timedOut) throw new Error(`${kind}: holder mutation failed`);
       const result = await worker.completed;
-      if (result.code === 0 || !/checkout_admission_denied|agency_invoice_denied/.test(result.stderr)) throw new Error(`${kind}: final admission did not refuse actual committed authority loss`);
+      if (result.code !== 3 || result.signal || result.error || result.timedOut || !/checkout_admission_denied|agency_invoice_denied/.test(result.stderr)) throw new Error(`${kind}: final admission did not refuse actual committed authority loss`);
       // Original accepted-effect port remains usable; no new session was sent.
       const session = `cs_CheckoutWait${randomBytes(6).toString("hex")}`;
       await run(`${label}-accepted-observation`, `select public.record_business_payment_event(${literal(f.account)},${literal(`checkout:${session}`)},${literal(session)},'${f.payment}','checkout_created',0);`);
@@ -117,7 +144,7 @@ try {
       console.log(`Checkout final admission after observed lock wait PASS: ${kind}; accepted receipt remains readable.`);
     } finally {
       if (!holder.done()) { holder.child.stdin.end("rollback;\n"); await holder.completed; }
-      if (!worker.done()) { worker.child.kill("SIGTERM"); await worker.completed; }
+      if (!worker.done()) { worker.terminate(); await worker.completed; }
     }
   }
   const baseline = await run("catalog-before-probes", catalogSql);
@@ -132,7 +159,7 @@ try {
   ]) {
     const probe = processSql(label); probe.child.stdin.end(`begin;${mutation}select 'CHECKOUT_PROBE_PREPARED';\n\\i ${packet}\n`);
     const result = await probe.completed;
-    if (result.code === 0 || !result.stdout.includes("CHECKOUT_PROBE_PREPARED") || !result.stderr.includes(expected)) throw new Error(`${label}: mutation and exact atomic refusal were not observed`);
+    if (result.code !== 3 || result.signal || result.error || result.timedOut || !result.stdout.includes("CHECKOUT_PROBE_PREPARED") || !result.stderr.includes(expected)) throw new Error(`${label}: mutation and exact atomic refusal were not observed`);
     if (await run(`${label}-catalog-after`, catalogSql) !== baseline) throw new Error(`${label}: refused packet changed the catalog`);
     console.log(`Checkout migration atomic refusal PASS: ${label}.`);
   }
@@ -146,9 +173,11 @@ try {
   status = "passed";
 } catch (failure) { error = failure instanceof Error ? failure.message : String(failure); process.exitCode = 1; }
 finally {
-  const inventory = JSON.parse(readFileSync(join(root, "scripts/sql/historical-forward-inventory.json"), "utf8"));
-  const sources = ["scripts/check-checkout-final-admission-races.mjs", "scripts/sql/checkout-final-admission-contract.sql", "supabase/migrations/rollback-20261022171000_checkout_final_admission.sql", "scripts/sql/historical-forward-inventory.json", ...inventory.forwardFiles.map(name => `supabase/migrations/${name}`)];
-  const hash = bytes => createHash("sha256").update(bytes).digest("hex");
-  retain("receipt.json", JSON.stringify({ status, error, nativeProviderQualified: false, cleanupOwner: "coordinator-owned disposable clone", sources: Object.fromEntries(sources.map(path => [path, hash(readFileSync(join(root, path)))])), artifacts: Object.fromEntries(outputs.map(name => [name, hash(readFileSync(join(evidence, name)))])) }, null, 2));
+  await closeOwnedChildren();
+  const sourceAfter = sourceSnapshot();
+  retain("source-end.json", JSON.stringify(sourceAfter, null, 2));
+  const sourceUnchanged = JSON.stringify(sourceBefore) === JSON.stringify(sourceAfter);
+  if (!sourceUnchanged) { status = "failed"; error ||= "Execution source changed between native start and all owned child CLOSEs"; process.exitCode = 1; }
+  retain("receipt.json", JSON.stringify({ status, error, allOwnedChildrenClosed: true, sourceUnchanged, nativeProviderQualified: false, fullStackQualifiedByHarness: false, cleanupOwner: "coordinator-owned disposable clone", sourceBefore, sourceAfter, artifacts: Object.fromEntries(outputs.map(name => [name, hash(readFileSync(join(evidence, name)))])) }, null, 2));
   if (error) console.error("Checkout admission race qualification failed. Retained private receipt and logs identify the exact native failure.");
 }
