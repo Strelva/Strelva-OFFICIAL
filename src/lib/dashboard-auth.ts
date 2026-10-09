@@ -1,3 +1,4 @@
+import "@/register-workspace-ports";
 import { workspacePorts } from "./workspace-ports";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";

@@ -13,7 +13,9 @@ import { WorkspaceBusinessDetails } from "@/experience/places/WorkspaceBusinessD
 import { saveBusinessDetailsAction } from "./actions";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Business details", robots: { index: false, follow: false }, referrer: "no-referrer" };
+// Keep private workspace URLs off cross-origin requests while preserving the
+// same-origin browser Origin required by progressive-enhancement Server Actions.
+export const metadata: Metadata = { title: "Business details", robots: { index: false, follow: false }, referrer: "same-origin" };
 
 const OUTCOMES = new Set<DetailsSaveOutcome>(["saved", "unchanged", "conflict", "invalid", "denied", "failed"]);
 

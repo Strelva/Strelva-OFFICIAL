@@ -157,14 +157,28 @@ test("a real anonymous URL check survives Auth and becomes private business evid
     const sources = z.object({ sites: z.array(z.object({ systemId: z.string(), verifiedAt: z.string().nullable() })) }).parse(await stillUnverified.json());
     expect(sources.sites.find(item => item.systemId === site.systemId)?.verifiedAt).toBeNull();
     measurements.conversion = { savedWorkId: stored.id, systemId: site.systemId, possibilityId: possibility!.id, status: possibility!.status, auditScope: prepared.rebuild.audit?.scope, unavailable: prepared.rebuild.audit?.unavailable };
-    // Readiness is the owner's exact business read, not a guessed compile wait.
-    const systemRead = page.waitForResponse(response => {
-      const url = new URL(response.url());
-      return response.request().method() === "GET"
+    // The document and hydration must dispatch the exact business read within
+    // the existing navigation window. Its actual response keeps its 5s bound.
+    const systemNavigationStarted = Date.now();
+    const systemRequestArrival = page.waitForRequest(request => {
+      const url = new URL(request.url());
+      return request.method() === "GET"
         && url.origin === new URL(env.app).origin
         && url.pathname === "/api/workspace"
         && url.searchParams.get("workspaceId") === businessId;
-    }, { timeout: 5_000 });
+    }, { timeout: 30_000 });
+    const systemRead = systemRequestArrival.then(async request => {
+      const requestArrived = Date.now();
+      measurements.systemRead = { method: request.method(), url: request.url(),
+        requestArrivalElapsedMs: requestArrived - systemNavigationStarted, responseStatus: null };
+      // Match this physical request; another context or a later refresh cannot
+      // satisfy the readiness gate. Install the listener at request arrival.
+      const response = await page.waitForResponse(value => value.request() === request, { timeout: 5_000 });
+      measurements.systemRead = { method: request.method(), url: request.url(),
+        requestArrivalElapsedMs: requestArrived - systemNavigationStarted,
+        responseElapsedMs: Date.now() - requestArrived, responseStatus: response.status() };
+      return response;
+    });
     const [systemResponse] = await Promise.all([
       systemRead,
       page.goto(`/workspace?${new URLSearchParams({ workspaceId: businessId, view: "system", system: site.systemId })}`, { timeout: 30_000 }),

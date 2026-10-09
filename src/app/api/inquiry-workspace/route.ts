@@ -1,3 +1,6 @@
+// This request runtime can load before instrumentation's registry reaches it.
+// Register the existing lazy ports at the app edge before governed publication.
+import "@/register-workspace-ports";
 import { authorizeTenantOperatorRead } from "@/platform/operator-read-audit/admission";
 import { NextResponse } from "next/server";
 import { getAuthUserId, requireTenantAccess, requireTenantPermission, verifyAuth } from "@/platform/infra/auth";

@@ -2,6 +2,8 @@ import { createClient } from "@supabase/supabase-js";
 import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import { localEnvironment, signedInContext } from "./support/local-auth";
+import type { WorkspaceSnapshot } from "../src/experience/workspace/contracts";
+import { workspaceExitStateSchema } from "../src/platform/workspace-exit/contracts";
 
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires a separately created, isolated local Supabase Auth and database.");
 test.setTimeout(90_000);
@@ -64,7 +66,12 @@ test("owner records a local exit choice through the real Auth route and can stil
     await page.screenshot({ path: testInfo.outputPath("workspace-exit-mobile.png"), fullPage: true });
     const save = page.getByRole("button", { name: "Save exit choice" });
     await save.focus();
+    const savingExit = page.waitForResponse(response => new URL(response.url()).pathname === "/api/workspace-exit" && response.request().method() === "POST");
     await page.keyboard.press("Enter");
+    const exitResponse = await savingExit;
+    expect(exitResponse.status(), await exitResponse.text()).toBe(200);
+    const completedExit = workspaceExitStateSchema.parse((await exitResponse.json()).state);
+    expect(completedExit).toMatchObject({ workspaceId, requestedBy: owner.userId, status: "completed", futureWork: "cancelled", providerParticipation: "kept", maintainedResources: { kind: "stopped" } });
     await expect(page.getByRole("heading", { name: "New work has been cancelled." })).toBeVisible();
 
     const exportPage = await owner.context.newPage();
@@ -102,7 +109,21 @@ test("owner records a local exit choice through the real Auth route and can stil
     await expect(page.getByRole("link", { name: "review it in website billing settings" })).toHaveAttribute("href", "/dashboard/settings#plan");
 
     await page.setViewportSize({ width: 1280, height: 900 });
+    // This link loads a public shell, then Auth loads the selected private
+    // snapshot. The frozen trace spent 17.6s on the shell, then began this
+    // exact GET two seconds later; URL arrival alone did not finish the read.
+    // Bound that real navigation/read phase inside the unchanged 90s case.
+    const reopening = page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.pathname === "/api/workspace" && url.searchParams.get("workspaceId") === workspaceId && response.request().method() === "GET";
+    }, { timeout: 25_000 });
     await page.getByRole("link", { name: "Return to workspace" }).click();
+    const reopenedResponse = await reopening;
+    expect(reopenedResponse.status(), await reopenedResponse.text()).toBe(200);
+    const reopened = await reopenedResponse.json() as WorkspaceSnapshot;
+    expect(reopened.workspaceId).toBe(workspaceId);
+    expect(reopened.workspaceExitReadStatus).toBe("available");
+    expect(workspaceExitStateSchema.parse(reopened.workspaceExitState)).toEqual(completedExit);
     await expect(page).toHaveURL(new RegExp(`/workspace\\?workspaceId=${workspaceId}.*view=access`));
     await expect(page.getByRole("status", { name: "Workspace stopped" })).toBeVisible();
     const stoppedNewButton = page.getByRole("button", { name: "New" });
@@ -135,6 +156,7 @@ test("owner records a local exit choice through the real Auth route and can stil
       p_verified_email: owner.email,
     });
     expect(stored.error).toBeNull();
+    expect(stored.data.state.id).toBe(completedExit.id);
     expect(stored.data).toMatchObject({ state: { status: "completed", futureWork: "cancelled", providerParticipation: "kept", maintainedResources: { kind: "stopped" } } });
     await page.reload();
     await expect(page.getByText(/Work in this workspace has stopped\.|Workspace status is temporarily unavailable\./)).toBeVisible();

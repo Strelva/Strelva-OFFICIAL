@@ -4,6 +4,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 import { localEnvironment, signedInContext } from "./support/local-auth";
 import { ordinaryAgencyMaker, ordinaryCustomerBusiness } from "./support/ordinary-agency-maker";
 import { privateSourceNativeReceipt, runPrivateSourceNativeProof, runPrivateSourceInverseDriftProof, runPrivateSourcePopulatedInverseProof } from "./support/private-source-native-proof";
+import { observeBrowserRead } from "./support/observed-browser-read";
 import { configuredPackageReviewer } from "./support/configured-package-reviewer";
 
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local Supabase Auth and database.");
@@ -205,19 +206,32 @@ test("independently owned businesses install and update definitions without copy
     // The application keeps A live until that exact Version decision releases B.
     const ownerPage = await customer.context.newPage();
     async function readOwnerSystem() {
-      const ownerWorkRead = ownerPage.waitForResponse(response => {
-        const url = new URL(response.url());
-        return response.request().method() === "GET"
-          && url.origin === new URL(env.app).origin
+      const isOwnerWorkUrl = (value: string) => {
+        const url = new URL(value);
+        return url.origin === new URL(env.app).origin
           && url.pathname === "/api/bounded-work"
           && url.searchParams.get("productId") === "applications"
           && url.searchParams.get("workId") === target.workId;
-      }, { timeout: 5_000 });
-      const [ownerWork] = await Promise.all([
-        ownerWorkRead,
-        ownerPage.goto(`/workspace?workspaceId=${customerSpace}&view=system&system=${target.systemId}`),
-      ]);
+      };
+      // The retained failure dispatched the exact read after workspace hydration,
+      // then ended with both Strict Mode requests pending. Bound arrival and the
+      // actual response separately; keep the original 180-second whole-job cap.
+      const observed = observeBrowserRead(ownerPage, request => request.method() === "GET" && isOwnerWorkUrl(request.url()), { arrivalMs: 10_000, responseMs: 10_000 });
+      let actualRead: Awaited<typeof observed.promise>;
+      try {
+        [actualRead] = await Promise.all([
+          observed.promise,
+          ownerPage.goto(`/workspace?workspaceId=${customerSpace}&view=system&system=${target.systemId}`),
+        ]);
+      } finally { observed.cancel(); }
+      const ownerWork = actualRead.response;
+      expect(ownerWork.request()).toBe(actualRead.request);
       expect(ownerWork.status(), "The owner's exact application browser read must succeed before checking its controls.").toBe(200);
+      await info.attach(`owner-system-read-${randomUUID()}`, { contentType: "application/json", body: Buffer.from(JSON.stringify({
+        exactWorkId: target.workId, status: ownerWork.status(), requestArrivalMs: actualRead.arrivalMs,
+        responseAfterArrivalMs: actualRead.responseMs, originalCaseBudgetMs: 180_000,
+        productionQualification: false,
+      })) });
       return ownerWork.json();
     }
     const ownerBeforeB = await readOwnerSystem();

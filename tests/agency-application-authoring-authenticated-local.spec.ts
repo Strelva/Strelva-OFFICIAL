@@ -286,13 +286,22 @@ test("a named agency operator revises one assigned application and returns it fo
       command: { kind: "revise", expectedDesignRevision: 0, spec: revised.payload.spec },
     }, 409);
 
+    // The named maker runs actual checks; the customer reviews and publishes.
+    await agencyPage.getByRole("button", { name: "Check proposed change", exact: true }).click();
+    await expect(agencyPage.getByText("Checks passed. Return this draft to the customer for review and publication.", { exact: true })).toBeVisible();
+
     const customerAppPage = await owner.context.newPage();
     customerAppPage.setDefaultTimeout(20_000);
     await customerAppPage.setViewportSize({ width: 1280, height: 900 });
     await customerAppPage.goto(`/workspace?workspaceId=${businessId}&view=applications&work=${appId}`, { waitUntil: "domcontentloaded" });
     await expect(customerAppPage.getByRole("heading", { name: "Agency permit requests", exact: true })).toBeVisible();
+    const customerReview = customerAppPage.getByRole("tab", { name: "Review", exact: true });
+    await customerReview.click();
+    await expect(customerReview).toHaveAttribute("aria-selected", "true");
+    const reviewDisclosure = customerAppPage.locator("details").filter({ has: customerAppPage.getByText("Review changes", { exact: true }) });
+    if (await reviewDisclosure.getAttribute("open") === null) await reviewDisclosure.getByText("Review changes", { exact: true }).click();
     await expect(customerAppPage.getByText('Field changed: "Request details"; label changes from "Request" to "Request details".', { exact: true })).toBeVisible();
-    await customerAppPage.getByRole("button", { name: "Check proposed change", exact: true }).click();
+    await expect(customerAppPage.getByRole("button", { name: "Check proposed change", exact: true })).toHaveCount(0);
     await expect(customerAppPage.getByRole("button", { name: "Publish", exact: true })).toBeEnabled();
     await customerAppPage.getByRole("button", { name: "Publish", exact: true }).click();
     await expect(customerAppPage.getByText(/Version 2 is live/)).toBeVisible();
