@@ -39,7 +39,7 @@ it.each(['approve', 'launch'] as const)('marks the actual %s postcommit membersh
     expect(h.documents.publish).toHaveBeenCalledTimes(1);
   }
 });
-it.each([400,403,409])('keeps atomic fact HTTP%s refusal editable instead of classifying it as an unknown save', async status => {
+it.each([400])('keeps prevalidated fact HTTP%s refusal editable instead of classifying it as an unknown save', async status => {
   const h = harness(); const record = await h.create();
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: 'Check the fact before saving.' }, { status })));
   await expect(serverRebuildTransport.mutate(parseRebuildView(record), 'edit', { factId: 'claim', text: 'Correction' })).rejects.toBeInstanceOf(RebuildTransportError);

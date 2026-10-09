@@ -34,11 +34,10 @@ export class RebuildUnconfirmedError extends Error {
 function refusedMutation(error: unknown, action: Parameters<RebuildTransport["mutate"]>[1]) {
   if (!(error instanceof RebuildTransportError)) return false;
   if (error.status === 401) return true;
-  // Approval and publication can commit before later row parsing or work CAS.
-  // Fact/restore conflicts precede their atomic candidate commit. Retry may
-  // save progress before a later refusal, but its input parsing is precommit.
-  if (action === "retry") return error.status === 400;
-  return (error.status === 400 || error.status === 403 || error.status === 409) && !["approve", "launch"].includes(action);
+  // RPC success can precede work acknowledgment parsing into a403/409.
+  // Only input400 on these candidate commands is precommit; approval and
+  // publication can also produce400 after their separate authority writes.
+  return error.status === 400 && !["approve", "launch"].includes(action);
 }
 async function request(path: string, options?: RequestInit): Promise<RebuildView> {
   const response = await fetch(path, { credentials: "same-origin", cache: "no-store", ...options });
