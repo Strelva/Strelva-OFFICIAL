@@ -2,7 +2,7 @@ import { privateApplicationDefinition } from "./private-definition-contracts";
 import { jsonEqual } from "@/platform/system-versions/compare";
 import { createSystemVersions, VersionAccessError, VersionStaleError, type SourceRevision, type SystemRef } from "@/platform/system-versions";
 import { createSourceSystem, createSupabaseConnectionOwnership, createSupabaseVersionStore, readVersionActor, mapVersionsError, versionsDb, type VersionsDb } from "@/platform/system-versions/supabase-store";
-import { rehearseApplicationPackage } from "@/products/applications/package-rehearsal";
+import { rehearseApplicationPackage } from "@/products/applications/server";
 import { requireAgencyAuthoring } from "./authoring-server";
 import { installBusinessPackage } from "./version-server";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
