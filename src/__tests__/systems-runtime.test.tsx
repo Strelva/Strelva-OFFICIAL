@@ -123,9 +123,9 @@ async function mountLayout(state: WorkspaceSnapshot, request: typeof fetch) {
   })));
 }
 
-it.each([{ version: 2 }, { rebuild: { version: 2 } }])("opens a standalone v2 website System in rebuild review even when new rebuilds are disabled (%j)", async payload => {
+it.each([{ payload: { version: 2 } }, { payload: { rebuild: { version: 2 } } }, { payload: null, website: { version: 2 as const } }])("opens a standalone v2 website System in rebuild review even when new rebuilds are disabled (%j)", async ({ payload, ...projection }) => {
   const record = fixtureRebuild();
-  const work: WorkspaceWork<typeof payload> = { id: record.workId, workspaceId: record.workspaceId, title: record.title, productId: "websites", resourceKind: "website", input: {}, payload, createdAt: "2026-10-05T12:00:00Z" };
+  const work: WorkspaceWork<typeof payload> = { id: record.workId, workspaceId: record.workspaceId, title: record.title, productId: "websites", resourceKind: "website", input: {}, payload, ...projection, createdAt: "2026-10-05T12:00:00Z" };
   const state = await snapshot(work);
   const { systems, files } = readBusinessSystems({ snapshot: state, sites: [] });
   expect(systems[0]?.surface).toEqual({ kind: "work", workId: record.workId, productId: "websites" });

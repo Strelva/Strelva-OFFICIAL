@@ -21,17 +21,9 @@ import { WorkspaceLayout } from "./WorkspaceLayout";
 import { normalizeWorkspaceHandoffPreview, normalizeWorkspaceSnapshot, normalizeWorkspaceWork } from "./result";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { WorkspaceRequestContext, useWorkspaceRequest, WorkspaceRequestError, readResponse, usePostAction } from "./WorkspaceRequest";
-import { TrackerExperience } from "./TrackerExperience";
-import { LocalTrackerPreview } from "./preview/LocalTrackerPreview";
-import { DocumentExperience } from "./DocumentExperience";
-import { LocalDocumentPreview } from "./preview/LocalDocumentPreview";
+import { OpenedWork } from "./OpenedWork";
 import { WorkPlanExperience } from "./WorkPlanExperience";
 import { WorkBudgetPanel } from "./WorkBudgetPanel";
-import { OnboardingWorkspaceExperience } from "./OnboardingWorkspaceExperience";
-import { websiteWorkDocumentVersion } from "@/experience/websites/contracts";
-import { WebsiteExperience } from "@/experience/websites/WebsiteExperience";
-import { CustomApplicationManageExperience } from "@/experience/custom-applications/CustomApplicationManageExperience";
-import { BoundedWorkExperience } from "@/experience/operations/BoundedWorkExperience";
 import { LearningExperience } from "@/experience/operations/LearningExperience";
 import { WorkAuthorityPanel } from "@/experience/operations/WorkAuthorityPanel";
 import { WorkspaceOngoing } from "./WorkspaceOngoing";
@@ -478,18 +470,14 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   }
 
   const trackerContent: React.ReactNode | undefined = snapshot && view === "tracker"
-    ? snapshot.actor.localPreview
-      ? <LocalTrackerPreview workspaceId={snapshot.workspaceId} readOnly={workspaceReadOnly} templateId={trackerTemplateId(trackerStartContext?.trackerTemplateId)} />
-      : <>
-        <TrackerExperience workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === "tracker" ? selectedWork.id : undefined} readOnly={workspaceReadOnly} onSaved={handleTrackerSaved} templateId={trackerTemplateId(trackerStartContext?.trackerTemplateId)} />
-        {canShowWorkBudget && selectedWork?.productId === "tracker" && selectedWork.resourceKind === "tracker" ? <WorkBudgetPanel workspaceId={snapshot.workspaceId} workId={selectedWork.id} productId="tracker" resourceKind="tracker" /> : null}
-      </>
+    ? <>
+      <OpenedWork productId="tracker" workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === "tracker" ? selectedWork.id : undefined} sources={snapshot.work} localPreview={snapshot.actor.localPreview} readOnly={workspaceReadOnly} onSaved={handleTrackerSaved} templateId={trackerTemplateId(trackerStartContext?.trackerTemplateId)} />
+      {!snapshot.actor.localPreview && canShowWorkBudget && selectedWork?.productId === "tracker" && selectedWork.resourceKind === "tracker" ? <WorkBudgetPanel workspaceId={snapshot.workspaceId} workId={selectedWork.id} productId="tracker" resourceKind="tracker" /> : null}
+    </>
     : undefined;
   const documentRequestText = documentStartContext?.route === "document" ? documentStartContext.request : undefined;
   const documentContent: React.ReactNode | undefined = snapshot && view === "document"
-    ? snapshot.actor.localPreview
-      ? <LocalDocumentPreview key={`${snapshot.workspaceId}:${documentRequestText || "new"}`} workspaceId={snapshot.workspaceId} readOnly={workspaceReadOnly} initialRequestText={documentRequestText} />
-      : <><DocumentExperience key={`${snapshot.workspaceId}:${selectedWork?.productId === "documents" ? selectedWork.id : "new"}:${documentRequestText || "new"}`} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === "documents" ? selectedWork.id : undefined} readOnly={workspaceReadOnly} onSaved={handleDocumentSaved} initialRequestText={documentRequestText} sources={snapshot.work} />{selectedWork?.productId === "documents" ? <WorkAuthorityPanel key={selectedWork.id} workId={selectedWork.id} canManage={!workspaceReadOnly && (currentWorkspace?.role === "owner" || currentWorkspace?.role === "admin")} sources={snapshot.work} /> : null}</>
+    ? <><OpenedWork key={snapshot.actor.localPreview ? `${snapshot.workspaceId}:${documentRequestText || "new"}` : `${snapshot.workspaceId}:${selectedWork?.productId === "documents" ? selectedWork.id : "new"}:${documentRequestText || "new"}`} productId="documents" workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === "documents" ? selectedWork.id : undefined} sources={snapshot.work} localPreview={snapshot.actor.localPreview} readOnly={workspaceReadOnly} onSaved={handleDocumentSaved} initialRequestText={documentRequestText} />{!snapshot.actor.localPreview && selectedWork?.productId === "documents" ? <WorkAuthorityPanel key={selectedWork.id} workId={selectedWork.id} canManage={!workspaceReadOnly && (currentWorkspace?.role === "owner" || currentWorkspace?.role === "admin")} sources={snapshot.work} /> : null}</>
     : undefined;
   const planContent: WorkspacePlanRenderer | undefined = snapshot && view === "plan"
     ? onRequest => <WorkPlanExperience systemsRelease={snapshot.releases?.systems === true} onRequest={onRequest} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === "work_plans" ? selectedWork.id : undefined} initialRequest={planStartAsk || undefined} sources={snapshot.work} readOnly={workspaceReadOnly} localPreview={snapshot.actor.localPreview} onSaved={handlePlanSaved} onOpenWork={openWorkFromPlan} />
@@ -668,11 +656,13 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
               onOpenStanding={openStanding}
               onSaved={horizontalSaved}
             />
-              : view === "websites" ? selectedWork?.productId === "websites" && selectedWork.unavailableReason ? <p role="alert">{selectedWork.unavailableReason}</p> : <WebsiteExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} rebuildEnabled={snapshot.releases?.websiteRebuild ?? rebuildEnabled} rebuildVersion={websiteWorkDocumentVersion(selectedWork)} managed={Boolean(snapshot.managedWork?.length)} canPublish={currentWorkspace?.access === "member" && currentWorkspace?.role === "owner"} agency={currentWorkspace?.kind === "agency" || currentWorkspace?.access === "provider_seat"} readOnly={workspaceExitBlocks || (workspaceReadOnly && currentWorkspace?.access !== "provider_seat")} initialRequest={horizontalRequest} onSaved={horizontalSaved} />
-              : view === "custom-applications" ? selectedWork?.productId === view ? <CustomApplicationManageExperience key={selectedWork.id} workId={selectedWork.id} readOnly={Boolean(workspaceReadOnly || currentWorkspace?.role === "member")} /> : <p role="status">Select a saved custom application to review its delivery.</p>
-              : view === "onboarding" ? <OnboardingWorkspaceExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} initialCaseId={selectedWork?.productId === view ? selectedWork.id : undefined} initialRequest={horizontalRequest} readOnly={workspaceReadOnly} onSaved={horizontalSaved} />
               : view === "product-learning" ? <LearningExperience workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} sources={snapshot.work} readOnly={workspaceReadOnly} onSaved={horizontalSaved} />
-              : <BoundedWorkExperience key={`${snapshot.workspaceId}:${view}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} productId={view} sources={snapshot.work} canEdit={!workspaceExitBlocks && (snapshot.canMakeSystems === true || selectedWork?.creatorDraft === true)} readOnly={view === "applications" && (selectedWork?.creatorDraft || (!selectedWork && snapshot.canMakeSystems === true)) ? workspaceExitBlocks : workspaceReadOnly} draftEditOnly={!workspaceExitBlocks && view === "applications" && (selectedWork?.creatorDraft === true || (!selectedWork && currentWorkspace?.access === "provider_seat" && snapshot.canMakeSystems === true))} workspaceStopped={workspaceStopped} calendarRecoveryAllowed={calendarRecoveryAllowed} initialRequest={horizontalRequest} onSaved={horizontalSaved} />}
+              : view === "websites" && selectedWork?.productId === "websites" && selectedWork.unavailableReason ? <p role="alert">{selectedWork.unavailableReason}</p>
+              : <OpenedWork key={view === "custom-applications" ? selectedWork?.id : view === "websites" || view === "onboarding" ? `${snapshot.workspaceId}:${selectedWork?.id || "new"}` : `${snapshot.workspaceId}:${view}:${selectedWork?.id || "new"}`} productId={view} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} sources={snapshot.work}
+                readOnly={view === "websites" ? workspaceExitBlocks || (workspaceReadOnly && currentWorkspace?.access !== "provider_seat") : view === "custom-applications" ? Boolean(workspaceReadOnly || currentWorkspace?.role === "member") : view === "applications" && (selectedWork?.creatorDraft || (!selectedWork && snapshot.canMakeSystems === true)) ? workspaceExitBlocks : workspaceReadOnly}
+                canEdit={!workspaceExitBlocks && (snapshot.canMakeSystems === true || selectedWork?.creatorDraft === true)} draftEditOnly={!workspaceExitBlocks && view === "applications" && (selectedWork?.creatorDraft === true || (!selectedWork && currentWorkspace?.access === "provider_seat" && snapshot.canMakeSystems === true))} workspaceStopped={workspaceStopped} calendarRecoveryAllowed={calendarRecoveryAllowed}
+                rebuildEnabled={snapshot.releases?.websiteRebuild ?? rebuildEnabled} managed={Boolean(snapshot.managedWork?.length)} canPublish={currentWorkspace?.access === "member" && currentWorkspace?.role === "owner"} agency={currentWorkspace?.kind === "agency" || currentWorkspace?.access === "provider_seat"}
+                initialRequest={horizontalRequest} onSaved={horizontalSaved} />}
             {selectedWork && view !== "product-learning" && view !== "websites" && !snapshot.actor.localPreview ? <WorkAuthorityPanel key={selectedWork.id} workId={selectedWork.id} canManage={!workspaceReadOnly && (currentWorkspace?.role === "owner" || currentWorkspace?.role === "admin")} sources={snapshot.work} /> : null}
           </> : selectedWork?.assessment?.kind === "website_audit" && selectedWork.assessment.payload ? (
             <WebsiteAuditPage key={selectedWork.id} initialResult={selectedWork.assessment.payload} saved />
