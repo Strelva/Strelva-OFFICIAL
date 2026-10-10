@@ -408,6 +408,8 @@ a.row:hover, button.row:hover { background: var(--gray-bg-alt); }
 
 .holdLabel, .holdHint { position: relative; }
 .holdHint { font-family: var(--st-font-mono); font-size: 11px; font-weight: 400; opacity: 0.75; }
+/* Touch has no keyboard shortcut to show. */
+@media (pointer: coarse) { .holdKeys { display: none; } }
 
 /* ---------- Toast ---------- */
 .toast {

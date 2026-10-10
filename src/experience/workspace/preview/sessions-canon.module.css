@@ -9,7 +9,7 @@
 .dates button[aria-checked="true"] { border-color: var(--st-accent); outline: 1px solid var(--st-accent); }
 .dates button span { font-size: 12px; color: var(--st-text-3); }
 .dates button strong { font-size: 16px; font-weight: 600; }
-.dates button:focus-visible { outline: 2px solid var(--st-focus); outline-offset: 3px; }
+.dates button:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 3px; }
 .explanation { font-size: 13px; color: var(--st-text-2); line-height: 1.5; margin: 0; }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
 .footer { display: flex; justify-content: space-between; align-items: center; gap: 24px; color: var(--st-text-2); font-size: 13px; }

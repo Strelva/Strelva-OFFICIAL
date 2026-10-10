@@ -30,7 +30,8 @@ describe("read-only copy names the real reason", () => {
     }));
     // Systems Home (STRELVA_SYSTEMS_RELEASE on) and the pre-Systems Home both name who shared it.
     const html = render(true);
-    expect(html).toContain("Shared with you");
+    expect(html).toMatch(/<h1[^>]*>Alder Workshop<\/h1>/);
+    expect(html).toMatch(/<p[^>]*>Alder Workshop shared this with your agency to review\.<\/p>/);
     expect(html).toContain("Alder Workshop shared this with your agency to review.");
     expect(html).not.toContain("owners can make changes");
     const before = render(false);

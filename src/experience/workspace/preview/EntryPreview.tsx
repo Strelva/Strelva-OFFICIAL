@@ -12,7 +12,7 @@ export function EntryPreview({ view, state }: { view: string; state: string }) {
   const [note, setNote] = useState("");
   if (view === "back-bar") return <><DashboardBackBar businessName="The Mooney Firm" homeHref="/preview/strelva?scenario=business" route="/dashboard/schedule" /><StNotice>Fictional legacy page. Only the back bar belongs to this preview.</StNotice></>;
   const previewNotice = <p className="text-sm text-gray-muted">Local interface preview · fictional accounts · no live actions</p>;
-  return <StEntry brand={view === "admin-host" ? "The Mooney Firm" : undefined} host={view === "admin-host" ? "admin.attymooney.com" : undefined} helpHref="/preview/strelva">
+  return <StEntry brand={view === "admin-host" ? "The Mooney Firm" : undefined} brandFontFamily={view === "admin-host" ? "Georgia, serif" : undefined} host={view === "admin-host" ? "admin.attymooney.com" : undefined} helpHref="/preview/strelva">
     {state === "loading" ? <><StHead title="Opening your account" /><StSkeleton label="Loading entry" /></>
       : state === "error" ? <><StHead title="Entry unavailable" /><StNotice tone="critical">Sign-in could not be loaded. Try again.</StNotice><StPill variant="soft" onClick={() => setSubmitted(true)}>Retry</StPill>{submitted ? <StNotice>Fictional sign-in remains unavailable.</StNotice> : null}</>
         : state === "empty" ? <><StHead title="No invitation found" /><StEmpty>Ask the business owner for a new invitation.</StEmpty></>

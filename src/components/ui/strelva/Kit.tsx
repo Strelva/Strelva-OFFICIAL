@@ -57,8 +57,8 @@ export function StSplit({ children, aside, balance = "main" }: { children: React
 }
 
 /** Account entry uses the same paper and controls, at a focused reading width. */
-export function StEntry({ children, brand, host, width = "form", helpHref = "/workspace?view=help" }: { children: ReactNode; brand?: ReactNode; host?: string; width?: "form" | "account"; helpHref?: string }) {
-  return <main className={styles.entry} data-workspace-theme="linen"><header className={styles.entryHeader}><Link href="/" className={styles.entryBrand}>{brand ?? <><LogoMark className="size-6" />Strelva</>}</Link>{host ? <StMono>{host}</StMono> : <StTextButton href={helpHref}>Help</StTextButton>}</header><div className={styles.entryColumn} data-width={width}>{children}</div></main>;
+export function StEntry({ children, brand, brandFontFamily, host, width = "form", helpHref = "/workspace?view=help" }: { children: ReactNode; brand?: ReactNode; brandFontFamily?: string; host?: string; width?: "form" | "account"; helpHref?: string }) {
+  return <main className={styles.entry} data-workspace-theme="linen"><header className={styles.entryHeader}><Link href="/" className={styles.entryBrand} style={brandFontFamily ? { fontFamily: brandFontFamily } : undefined}>{brand ?? <><LogoMark className="size-6" />Strelva</>}</Link>{host ? <StMono>{host}</StMono> : <StTextButton href={helpHref}>Help</StTextButton>}</header><div className={styles.entryColumn} data-width={width}>{children}</div></main>;
 }
 
 /** Own field geometry while preserving native input semantics. */
@@ -295,7 +295,7 @@ export function StHold({ label, onAccept, disabled, block, hint = "⌘ Enter", "
     onClick={event => event.preventDefault()}>
     <span className={styles.holdFill} aria-hidden="true" />
     <span className={styles.holdLabel}>{label}</span>
-    <span id={hintId} className={styles.holdHint}><span className="sr-only">Press and hold, or press </span>{hint}</span>
+    <span id={hintId} className={styles.holdHint}><span className="sr-only">Press and hold. With a keyboard, press </span><span className={styles.holdKeys}>{hint}</span></span>
   </button>;
 }
 

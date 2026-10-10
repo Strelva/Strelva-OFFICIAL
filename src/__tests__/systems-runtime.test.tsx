@@ -108,7 +108,8 @@ it.each([true, false])("opens a registry-only inquiry in the released business i
   if (inquiryInbox) {
     expect(request.mock.calls).toHaveLength(1);
     expect(request.mock.calls[0]![0]).toBe("/api/workspace/inquiries?workspaceId=33333333-3333-4333-8333-333333333333");
-    expect(container.textContent).toContain("This belongs to another business");
+    expect(container.textContent).toContain("Your account isn't a member of this business. Ask its owner to invite you.");
+    expect([...container.querySelectorAll("a")].find(link => link.textContent === "Open your workspace")?.getAttribute("href")).toBe("/workspace");
     expect(container.textContent).not.toContain("There is nothing to open");
   } else {
     expect(request).not.toHaveBeenCalled();
@@ -207,26 +208,47 @@ it.each([undefined, "delegated_read" as const, "provider_seat" as const])("lists
   state.work = [{ ...state.work[0]!, id: "supporting-file", title: "Campaign evidence", productId: "ai_visibility", resourceKind: "assessment" }];
   state.workspaces[0]!.access = access;
   state.systems!.systems = ["inquiry", "listing", "newsletter"].map((kind, index) => ({ ref: { businessId: state.workspaceId, systemId: `51000000-0000-4000-8000-00000000000${index + 2}` }, name: `Registry ${kind}`, kind, lifecycle: "live", basis: null, savedWorkId: null, tenantId: null, health: { status: "unknown", summary: "No evidence", lastVerifiedAt: null } }));
-  window.history.replaceState(null, "", "/workspace?view=work");
+  window.history.replaceState(null, "", "/workspace?view=apps");
   const onChoose = vi.fn();
   const request = vi.fn(async () => new Response(JSON.stringify({ error: "Unavailable" }), { status: 503 }));
   await mount(createElement(WorkspaceRequestContext.Provider, { value: request }, createElement(WorkspaceLayout, { snapshot: state, home: true, agency: false, busy: false, selectedWork: null, onHome: noop, onNew: noop, onOngoing: noop, onAgency: noop, onChoose, onWorkspace: noop, onOpenClientWork: noop, notice: null })));
+  const directory = container.querySelector('[aria-labelledby="systems-directory-title"]')!;
+  expect(directory).not.toBeNull();
   for (const [index, kind] of ["inquiry", "listing", "newsletter"].entries()) {
-    const link = [...container.querySelectorAll("a")].find(item => item.textContent?.includes(`Registry ${kind}`));
+    const link = [...directory.querySelectorAll("a")].find(item => item.textContent?.includes(`Registry ${kind}`));
     expect(link?.getAttribute("href")).toContain(`system=51000000-0000-4000-8000-00000000000${index + 2}`);
   }
-  expect(container.textContent).toContain("Files");
-  const file = container.querySelector<HTMLButtonElement>('[aria-label="Open file Campaign evidence"]')!;
+  const files = container.querySelector('[aria-labelledby="systems-files-title"]')!;
+  expect(files.querySelector("h2")?.textContent).toBe("Files and results");
+  const file = [...files.querySelectorAll("button")].find(item => item.textContent?.includes("Campaign evidence"))!;
+  expect(file).toBeInstanceOf(HTMLButtonElement);
   await act(async () => file.click());
   expect(onChoose).toHaveBeenCalledWith("supporting-file");
   const search = container.querySelector<HTMLInputElement>('#workspace-search')!;
   await fill(search, "newsletter");
-  expect(container.textContent).toContain("Registry newsletter");
-  expect(container.querySelector('[aria-labelledby="systems-directory-title"]')?.textContent).not.toContain("Registry listing");
-  expect(container.querySelector('[aria-label="Open file Campaign evidence"]')).toBeNull();
+  expect(directory.textContent).toContain("Registry newsletter");
+  expect(directory.textContent).not.toContain("Registry listing");
+  expect(files.textContent).toContain("No files match this name.");
+  expect(files.querySelector("button")).toBeNull();
   await fill(search, "campaign");
-  expect(container.textContent).toContain("Campaign evidence");
-  expect(container.querySelector('[aria-labelledby="systems-directory-title"]')?.textContent).not.toContain("Registry newsletter");
+  expect(files.textContent).toContain("Campaign evidence");
+  expect(directory.textContent).not.toContain("Registry newsletter");
+});
+
+it("keeps the released Files and results view focused on supporting files", async () => {
+  const state = await snapshot({ id: "supporting-file", workspaceId: "33333333-3333-4333-8333-333333333333", title: "Campaign evidence", productId: "ai_visibility", resourceKind: "assessment", payload: null, input: {}, createdAt: "2026-10-08T00:00:00Z" });
+  state.systems!.systems[0]!.name = "Client intake";
+  state.systems!.systems[0]!.savedWorkId = null;
+  window.history.replaceState(null, "", "/workspace?view=work");
+  const onChoose = vi.fn();
+  const request = vi.fn(async () => new Response(JSON.stringify({ error: "Unavailable" }), { status: 503 }));
+  await mount(createElement(WorkspaceRequestContext.Provider, { value: request }, createElement(WorkspaceLayout, { snapshot: state, home: true, agency: false, busy: false, selectedWork: null, onHome: noop, onNew: noop, onOngoing: noop, onAgency: noop, onChoose, onWorkspace: noop, onOpenClientWork: noop, notice: null })));
+  expect(container.querySelector("h1")?.textContent).toBe("Files and results");
+  expect(container.querySelector('[aria-labelledby="systems-directory-title"]')).toBeNull();
+  const file = container.querySelector<HTMLButtonElement>('[aria-labelledby="systems-files-title"] button')!;
+  expect(file.textContent).toContain("Campaign evidence");
+  await act(async () => file.click());
+  expect(onChoose).toHaveBeenCalledWith("supporting-file");
 });
 
 it("projects registry HomeFinder to the native business management surface", async () => {

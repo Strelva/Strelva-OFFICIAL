@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGetInvite = vi.hoisted(() => vi.fn());
 const mockGetTenantConfig = vi.hoisted(() => vi.fn());
+const mockGetStoredContent = vi.hoisted(() => vi.fn());
 const mockHeaderValues = vi.hoisted(() => new Map<string, string>());
 
 vi.mock("@/components/auth/SupabaseSignIn", () => ({
@@ -27,11 +28,14 @@ vi.mock("@/lib/tenants", () => ({
   getTenantConfig: mockGetTenantConfig,
 }));
 
+vi.mock("@/lib/storage/content-store", () => ({ getStoredContent: mockGetStoredContent }));
+
 describe("auth access pages", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "0");
+    mockGetStoredContent.mockResolvedValue(null);
     mockHeaderValues.clear();
     mockHeaderValues.set("x-client-fallback-root", "/client/gldf");
     mockHeaderValues.set("x-tenant", "gldf");
@@ -98,6 +102,30 @@ describe("auth access pages", () => {
 
     expect(html).toContain("Manage Great Lakes Dried Fruit");
     expect(html).toContain('data-supabase="sign-in"');
+    expect(html).toContain("&quot;next&quot;:&quot;/client/gldf/dashboard&quot;");
+  });
+
+  it("uses a known business display font on trusted-host entry and preserves the return", async () => {
+    mockGetInvite.mockResolvedValue(null);
+    mockGetStoredContent.mockResolvedValue({ fontDisplay: "Georgia, serif" });
+    const { default: SignInPage } = await import("@/app/sign-in/[[...sign-in]]/page");
+    const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
+    for (const page of [SignInPage, SignUpPage]) {
+      const html = renderToStaticMarkup(await page({ searchParams: Promise.resolve({}) }));
+      expect(html).toMatch(/<a[^>]+style="font-family:Georgia, serif"[^>]*>Great Lakes Dried Fruit<\/a>/);
+      expect(html).toContain("&quot;next&quot;:&quot;/client/gldf/dashboard&quot;");
+    }
+    expect(mockGetStoredContent).toHaveBeenCalledWith("theme", "gldf");
+  });
+
+  it.each([null, new Error("Theme read unavailable")])("keeps sign-in working when the business theme is absent or unavailable (%s)", async theme => {
+    mockGetInvite.mockResolvedValue(null);
+    if (theme instanceof Error) mockGetStoredContent.mockRejectedValue(theme);
+    else mockGetStoredContent.mockResolvedValue(theme);
+    const { default: SignInPage } = await import("@/app/sign-in/[[...sign-in]]/page");
+    const html = renderToStaticMarkup(await SignInPage({ searchParams: Promise.resolve({}) }));
+    expect(html).toContain("Manage Great Lakes Dried Fruit");
+    expect(html).not.toContain("font-family:");
     expect(html).toContain("&quot;next&quot;:&quot;/client/gldf/dashboard&quot;");
   });
 

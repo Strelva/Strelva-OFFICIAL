@@ -187,14 +187,16 @@ describe("workspace start planner", () => {
       onHelp: () => undefined,
     }));
     expect(html).toContain("data-workspace-start");
-    expect(html).toContain("What should happen next?");
+    expect(html).toContain("What should Strelva run for your business?");
+    expect(html.match(/<textarea\b/g)).toHaveLength(1);
+    expect(html).not.toContain('aria-label="Proposed next step"');
     expect(html).toContain("Give staff one place to make requests");
     expect(html).toContain("Make supplier onboarding consistent");
     expect(html).toContain("Get a new website live");
     expect(html).toContain("Continue with this ask");
     expect(html).toContain("Stop customer inquiries being missed");
     expect(html).toContain("Make this spreadsheet operational");
-    expect(html).toContain("See what AI understands about us");
+    expect(html).toContain("See what assistants understand about us");
     expect(html).toContain("Make our website work better");
     expect(html).not.toContain("general AI task");
   });
