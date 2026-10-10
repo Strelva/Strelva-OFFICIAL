@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/Button";
+import { StHold, StPill } from "@/components/ui/strelva/Kit";
 
 /**
  * Check in, undo, or cancel one booking. Plain POST to /api/workspace/bookings,
@@ -55,31 +55,31 @@ export function BookingActions({ workspaceId, tenantId, bookingId, status, clien
   return (
     <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
       {view === "day" && status === "confirmed" ? (
-        <Button className="max-sm:min-h-11" size="sm" variant="secondary" loading={busy === "completed"} disabled={Boolean(busy)} onClick={() => change("completed")}>
+        <StPill variant="soft" busy={busy === "completed"} disabled={Boolean(busy)} onClick={() => change("completed")}>
           Check in
-        </Button>
+        </StPill>
       ) : null}
       {view === "day" && status === "completed" ? (
-        <Button className="max-sm:min-h-11" size="sm" variant="ghost" loading={busy === "confirmed"} disabled={Boolean(busy)} onClick={() => change("confirmed")}>
+        <StPill variant="soft" busy={busy === "confirmed"} disabled={Boolean(busy)} onClick={() => change("confirmed")}>
           Undo check-in
-        </Button>
+        </StPill>
       ) : null}
       {status === "confirmed" && canMarkNoShow ? (
         noShowConfirming ? <>
           <span className="text-sm text-gray-muted">Mark {clientName} as a no-show?</span>
-          <Button className="max-sm:min-h-11" size="sm" variant="danger" loading={busy === "no_show"} disabled={Boolean(busy)} onClick={() => change("no_show")}>Confirm no-show</Button>
-          <Button className="max-sm:min-h-11" size="sm" variant="ghost" disabled={Boolean(busy)} onClick={() => setNoShowConfirming(false)}>Keep booked</Button>
-        </> : <Button className="max-sm:min-h-11" size="sm" variant="ghost" disabled={Boolean(busy)} onClick={() => { setNoShowConfirming(true); setConfirming(false); }}>Mark no-show</Button>
+          <StHold label={busy === "no_show" ? "Saving…" : "Hold to confirm no-show"} disabled={Boolean(busy)} onAccept={() => void change("no_show")} />
+          <StPill variant="soft" disabled={Boolean(busy)} onClick={() => setNoShowConfirming(false)}>Keep booked</StPill>
+        </> : <StPill variant="soft" disabled={Boolean(busy)} onClick={() => { setNoShowConfirming(true); setConfirming(false); }}>Mark no-show</StPill>
       ) : null}
       {status === "confirmed" && !noShowConfirming ? (
         confirming ? (
           <>
             <span className="text-sm text-gray-muted">Cancel {clientName}&apos;s booking?</span>
-            <Button className="max-sm:min-h-11" size="sm" variant="danger" loading={busy === "cancelled"} disabled={Boolean(busy)} onClick={() => change("cancelled")}>Cancel booking</Button>
-            <Button className="max-sm:min-h-11" size="sm" variant="ghost" disabled={Boolean(busy)} onClick={() => setConfirming(false)}>Keep it</Button>
+            <StHold label={busy === "cancelled" ? "Cancelling…" : "Hold to cancel booking"} disabled={Boolean(busy)} onAccept={() => void change("cancelled")} />
+            <StPill variant="soft" disabled={Boolean(busy)} onClick={() => setConfirming(false)}>Keep it</StPill>
           </>
         ) : (
-          <Button className="max-sm:min-h-11" size="sm" variant="ghost" disabled={Boolean(busy)} onClick={() => { setConfirming(true); setNoShowConfirming(false); }}>Cancel</Button>
+          <StPill variant="soft" disabled={Boolean(busy)} onClick={() => { setConfirming(true); setNoShowConfirming(false); }}>Cancel</StPill>
         )
       ) : null}
       {error ? <p role="alert" className="w-full text-sm text-critical sm:text-right">{error}</p> : null}

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/Button";
+import { StPill, StSurface, StNotice, StTextButton } from "@/components/ui/strelva/Kit";
 import type { BookingHoursView } from "@/products/bookings/server";
 
 /**
@@ -127,10 +127,10 @@ export function BookingHoursEditor({ workspaceId, tenantId, siteName, hours }: {
           <p className="text-sm font-medium">Booking hours</p>
           <p className="mt-0.5 text-sm text-gray-muted">{summarizeBookingHours(hours)}</p>
         </div>
-        {!open ? <Button className="max-sm:min-h-11" size="sm" variant="ghost" onClick={() => setOpen(true)} aria-label={`Change booking hours for ${siteName}`}>Change</Button> : null}
+        {!open ? <StTextButton onClick={() => setOpen(true)} aria-label={`Change booking hours for ${siteName}`}>Change</StTextButton> : null}
       </div>
       {open ? (
-        <form onSubmit={submit} className="mt-4">
+        <div className="mt-4"><StSurface label="Booking hours"><form onSubmit={submit}>
           <p className="text-sm leading-6 text-gray-muted">
             Choose when people can book. These can only be narrower than your opening hours; to change opening hours, ask Strelva.
           </p>
@@ -169,13 +169,13 @@ export function BookingHoursEditor({ workspaceId, tenantId, siteName, hours }: {
               );
             })}
           </ul>
-          {error ? <p role="alert" className="mt-2 text-sm text-critical">{error}</p> : null}
+          {error ? <StNotice tone="critical">{error}</StNotice> : null}
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button type="submit" className="max-sm:min-h-11" size="sm" loading={saving} disabled={saving}>Save booking hours</Button>
-            {hours.bookable ? <Button type="button" className="max-sm:min-h-11" size="sm" variant="ghost" disabled={saving} onClick={() => void save(null)}>Use opening hours</Button> : null}
-            <Button type="button" className="max-sm:min-h-11" size="sm" variant="ghost" disabled={saving} onClick={() => { setOpen(false); setError(null); }}>Cancel</Button>
+            <StPill type="submit" busy={saving} disabled={saving}>Save booking hours</StPill>
+            {hours.bookable ? <StTextButton disabled={saving} onClick={() => void save(null)}>Use opening hours</StTextButton> : null}
+            <StTextButton disabled={saving} onClick={() => { setOpen(false); setError(null); }}>Cancel</StTextButton>
           </div>
-        </form>
+        </form></StSurface></div>
       ) : null}
     </div>
   );

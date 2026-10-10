@@ -1651,3 +1651,7 @@ This consolidation instead retains the newer ordinary-agency selection and
 restricted delivery controls from the private integration. Full combined native
 and authenticated qualification remains separate. Revocation reason copy maps
 the legacy stored reason at display time; commands retain that stored value.
+
+### October 9 · L4 inquiry and booking adoption
+
+`StPill` and `StTextButton` accept React 19 button refs so inquiry reply and held-message controls preserve their existing focus recovery after a pending command or uncertain response. The kit specimen’s “Focus soft action” demonstrates this native focus path. L4 adopts open inquiry rows with a persistent selected record, reply surfaces, and owner booking/calendar controls. Inquiry record lists and factual history also use kit rows, surfaces and steps. The owner rules editor reads and writes the existing gated settings endpoint, preserves revisions and service policies, and keeps instant-policy approval in Needs you. Existing `InquiryMessageReview` uses a kit draft surface, exact recipient/subject/body, one Send reply control, native review details, and its original approval token/digest and transport state machine; visitor pages retain separate client-theme hooks. Canon draft replies, calendar confirmation and missing visitor forms are explicitly isolated preview fixtures, not new production authority. See `docs/design/ui-1.0-l4-inquiries-handoff.md` for local proof and limits.

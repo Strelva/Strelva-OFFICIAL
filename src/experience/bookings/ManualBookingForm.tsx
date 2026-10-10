@@ -1,7 +1,7 @@
 "use client";
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/Button";
+import { StPill, StSurface } from "@/components/ui/strelva/Kit";
 import { TextInput, TextArea, SelectInput } from "@/components/ui/TextInput";
 type Service = { id: string; name: string; intake?: Array<{ id: string; label: string; type: "text" | "textarea"; required: boolean }> };
 type Options = { timeZone: string; paused: boolean; services: Service[]; slots: Array<{ start: string; end: string }> };
@@ -38,7 +38,7 @@ export function ManualBookingForm({ workspaceId, tenantId, request = fetch }: { 
   }
   const service = options?.services.find(s => s.id === serviceId);
   return <div className="mt-4">
-    {!open ? <Button className="max-sm:min-h-11" variant="secondary" size="sm" onClick={() => { setOpen(true); void load(); }}>Take a booking request</Button> : <form className="grid gap-4 rounded-xl border border-gray-border p-4" onSubmit={submit} aria-label="Take a booking request">
+    {!open ? <StPill className="max-sm:min-h-11" variant="soft" onClick={() => { setOpen(true); void load(); }}>Take a booking request</StPill> : <StSurface label="Take a booking request"><form className="grid gap-4" onSubmit={submit} aria-label="Take a booking request">
       <p className="text-sm leading-6 text-gray-muted">Choose an open time for the customer. The owner confirms the request.</p>
       {busy && !options ? <p role="status" className="text-sm text-gray-muted">Reading open times…</p> : null}
       {options?.paused ? <p role="status" className="text-sm text-gray-muted">Bookings are paused. Existing bookings are kept.</p> : null}
@@ -49,12 +49,12 @@ export function ManualBookingForm({ workspaceId, tenantId, request = fetch }: { 
         <TextInput className="max-sm:min-h-11" label="Customer email" type="email" autoComplete="email" required maxLength={320} value={customer.email} disabled={busy || !!receipt} onChange={e => { edit(); setCustomer({ ...customer, email: e.target.value }); }} />
         <TextInput className="max-sm:min-h-11" label="Customer phone (optional)" type="tel" autoComplete="tel" maxLength={80} value={customer.phone} disabled={busy || !!receipt} onChange={e => { edit(); setCustomer({ ...customer, phone: e.target.value }); }} />
         {service?.intake?.map(q => { const props = { className: "max-sm:min-h-11", label: q.label, required: q.required, maxLength: 2000, value: answers[q.id] ?? "", disabled: busy || !!receipt, onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => { edit(); setAnswers({ ...answers, [q.id]: e.target.value }); } }; return q.type === "textarea" ? <TextArea key={q.id} {...props} /> : <TextInput key={q.id} {...props} />; })}
-        {!receipt ? <Button className="max-sm:min-h-11" type="submit" size="sm" loading={busy} disabled={busy || !start}>Save booking request</Button> : null}
+        {!receipt ? <StPill className="max-sm:min-h-11" type="submit" busy={busy} disabled={busy || !start}>Save booking request</StPill> : null}
       </> : null}
       {error ? <p role="alert" className="text-sm text-critical">{error}</p> : null}
       {receipt ? <p role="status" className="text-sm text-gray-muted">{receipt}</p> : null}
-      {error && !options ? <Button className="max-sm:min-h-11" type="button" size="sm" variant="secondary" disabled={busy} onClick={() => void load(serviceId)}>Try loading again</Button> : null}
-      <Button className="max-sm:min-h-11" type="button" size="sm" variant="ghost" disabled={busy} onClick={() => setOpen(false)}>Close</Button>
-    </form>}
+      {error && !options ? <StPill className="max-sm:min-h-11" type="button" variant="soft" disabled={busy} onClick={() => void load(serviceId)}>Try loading again</StPill> : null}
+      <StPill className="max-sm:min-h-11" type="button" variant="soft" disabled={busy} onClick={() => setOpen(false)}>Close</StPill>
+    </form></StSurface>}
   </div>;
 }

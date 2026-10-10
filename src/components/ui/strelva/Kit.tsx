@@ -17,7 +17,7 @@
 
 import Link from "next/link";
 import { Check, ChevronLeft, Circle, Loader2, X } from "lucide-react";
-import { useCallback, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type ReactNode, type Ref } from "react";
 import styles from "./kit.module.css";
 
 type Tone = "need" | "critical" | "live" | "text";
@@ -120,7 +120,7 @@ export function StStamp({ children }: { children: ReactNode }) {
 
 /* ---------- Actions ---------- */
 
-type PillProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "soft"; size?: "md" | "lg"; block?: boolean; busy?: boolean };
+type PillProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "soft"; size?: "md" | "lg"; block?: boolean; busy?: boolean; ref?: Ref<HTMLButtonElement> };
 
 export function StPill({ variant = "primary", size = "md", block, busy, children, disabled, ...rest }: PillProps) {
   return <button type="button" {...rest} className={styles.pill} data-variant={variant} data-size={size} data-block={block || undefined} disabled={disabled || busy} aria-busy={busy || undefined}>{busy ? <Loader2 size={16} className="motion-safe:animate-spin" aria-hidden="true" /> : null}{children}</button>;
@@ -130,7 +130,7 @@ export function StPillLink({ href, variant = "primary", size = "md", block, chil
   return <Link href={href} className={styles.pill} data-variant={variant} data-size={size} data-block={block || undefined}>{children}</Link>;
 }
 
-export function StTextButton({ tone, children, href, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { tone?: "accent" | "danger"; href?: string }) {
+export function StTextButton({ tone, children, href, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { tone?: "accent" | "danger"; href?: string; ref?: Ref<HTMLButtonElement> }) {
   if (href) return <Link href={href} className={styles.textButton} data-tone={tone}>{children}</Link>;
   return <button type="button" {...rest} className={styles.textButton} data-tone={tone}>{children}</button>;
 }

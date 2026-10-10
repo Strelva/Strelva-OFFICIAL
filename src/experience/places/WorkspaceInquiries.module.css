@@ -1,6 +1,12 @@
-/* Keep the owned action link's focus geometry above legacy global defaults. */
-.emailReply.emailReply:focus-visible {
-  outline: 2px solid var(--accent-text);
-  outline-offset: 2px;
-  border-radius: 0.5rem;
+/* Composition only. Rows, state marks and reply objects are owned by the kit. */
+.inbox { display: grid; grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.15fr); gap: 24px; }
+.people, .record { min-width: 0; }
+.summary { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.back { display: none; }
+@media (max-width: 767px) {
+  .inbox { display: block; }
+  .record { display: none; }
+  .inbox[data-detail="true"] .people { display: none; }
+  .inbox[data-detail="true"] .record { display: block; }
+  .back { display: block; margin-bottom: 16px; }
 }

@@ -1,7 +1,6 @@
 "use client";
 
-import { AlertCircle, CheckCircle2, Clock3, Mail, ShieldCheck } from "lucide-react";
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import type {
   InquiryMessageReviewAction,
   InquiryMessageReviewOutcome,
@@ -9,6 +8,7 @@ import type {
   InquiryMessageReviewRequest,
 } from "./message-review-contract";
 import { classifyInquiryMessageOutcome } from "@/products/inquiries/contracts";
+import { StEmpty, StMono, StNotice, StPill, StSkeleton, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
 import styles from "./message-review.module.css";
 
 export type {
@@ -365,7 +365,6 @@ export function InquiryMessageReview({
   const completed = state.status === "completed" ? messageReviewCompletionCopy(state.outcome) : null;
   const canSend = Boolean(review) && state.status === "ready";
   const busy = state.status === "preparing" || state.status === "approving";
-  const context = useMemo(() => businessId ? `Business ${businessId}` : "Authorized inquiry scope", [businessId]);
 
   async function approve(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -416,46 +415,35 @@ export function InquiryMessageReview({
     }
   }
 
-  return <section className={styles.panel} aria-labelledby={headingId} aria-busy={busy} data-message-review data-tenant-id={tenantId} data-inquiry-id={inquiryId}>
-    <div className={styles.header}>
-      <div>
-        <span className={styles.eyebrow}>MESSAGE REVIEW</span>
-        <h2 id={headingId} className="font-display">Review before sending</h2>
-        <p>Strelva prepares the exact message first. Sending requires your explicit approval for this inquiry.</p>
-      </div>
-      <span className={styles.scope}><ShieldCheck size={15} aria-hidden="true" />{context}</span>
-    </div>
+  return <section className={styles.panel} aria-labelledby={headingId} aria-busy={busy} data-workspace-theme="linen" data-message-review data-tenant-id={tenantId} data-inquiry-id={inquiryId} data-business-id={businessId}>
+    <h2 id={headingId} className={styles.heading}>Review before sending</h2>
+    {state.status === "preparing" ? <div className={styles.stack} role="status"><p className={styles.help}>Strelva is preparing the current message…</p><StSkeleton label="Preparing the current message" /><StSkeleton width="76%" /></div> : null}
+    {state.status === "idle" && !autoPrepare ? <StEmpty action={<StPill variant="soft" onClick={() => void prepare()} disabled={busy} data-review-prepare>Review current message</StPill>}>{initialReviewMismatch ? requestError : `Review the current ${actionLabel(action)} to inspect its recipient and text.`}</StEmpty> : null}
+    {state.status === "error" && !review ? <div className={styles.stack}><StNotice tone="critical">{state.message}</StNotice><StPill variant="soft" onClick={() => void prepare()} disabled={busy} data-review-prepare>Try again</StPill></div> : null}
 
-    {state.status === "preparing" ? <div className={styles.status} role="status"><Clock3 size={17} aria-hidden="true" /><div className={styles.statusContent}><p>Preparing the current message…</p></div></div> : null}
-    {state.status === "idle" && !autoPrepare ? <div className={styles.status}><Mail size={17} aria-hidden="true" /><div className={styles.statusContent}><p>{initialReviewMismatch ? requestError : `Review the current ${actionLabel(action)} to inspect its recipient and text.`}</p><button type="button" className={styles.secondaryButton} onClick={() => void prepare()} disabled={busy} data-review-prepare>Review current message</button></div></div> : null}
-    {state.status === "error" && !review ? <div className={styles.statusError} role="alert"><AlertCircle size={17} aria-hidden="true" /><div className={styles.statusContent}><p>{state.message}</p><button type="button" className={styles.secondaryButton} onClick={() => void prepare()} disabled={busy} data-review-prepare>Try again</button></div></div> : null}
-
-    {review ? <div className={styles.reviewBody}>
+    {review ? <StSurface tone={!completed ? "need" : undefined} label="Exact message review"><div className={styles.stack}>
+      <StState kind={completed ? completed.tone === "success" ? "live" : completed.tone === "warning" ? "need" : "down" : "need"}>{completed ? "Message review outcome" : `Strelva drafted this ${actionLabel(action)} · not sent`}</StState>
       <dl className={styles.facts}>
-        <div><dt>Recipient</dt><dd data-review-recipient>{review.recipient}</dd></div>
-        <div><dt>Subject</dt><dd data-review-subject>{review.subject}</dd></div>
-        <div><dt>Prepared</dt><dd>{preparedLabel(review.preparedAt)}</dd></div>
-        <div><dt>Expires</dt><dd>{expiryLabel(review.expiresAt)}</dd></div>
-        <div><dt>Policy</dt><dd>{review.policyVersion}</dd></div>
+        <dt>To</dt><dd data-review-recipient><StMono>{review.recipient}</StMono></dd>
+        <dt>Subject</dt><dd data-review-subject>{review.subject}</dd>
       </dl>
-      <div className={styles.message}>
-        <span className={styles.messageLabel}>Exact message</span>
-        <pre data-review-body>{review.body}</pre>
-      </div>
+      <p className={styles.message} data-review-body>{review.body}</p>
+      <details className={styles.details}><summary>Review details</summary><dl className={styles.facts}>
+        <dt>Prepared</dt><dd><StMono>{preparedLabel(review.preparedAt)}</StMono></dd>
+        <dt>Expires</dt><dd><StMono>{expiryLabel(review.expiresAt)}</StMono></dd>
+        <dt>Policy</dt><dd><StMono>{review.policyVersion}</StMono></dd>
+      </dl></details>
 
-      {completed ? <div className={completed.tone === "success" ? styles.success : completed.tone === "warning" ? styles.warning : styles.statusError} role={completed.tone === "error" ? "alert" : "status"}>
-        {completed.tone === "success" ? <CheckCircle2 size={17} aria-hidden="true" /> : <AlertCircle size={17} aria-hidden="true" />}
-        <div><strong>{completed.title}</strong><p>{completed.detail}</p></div>
-      </div> : null}
-      {state.status === "error" && review ? <div className={styles.statusError} role="alert"><AlertCircle size={17} aria-hidden="true" /><p>{requestError || "The message review could not be completed."}</p></div> : null}
+      {completed ? <div role={completed.tone === "error" ? undefined : "status"}><StNotice tone={completed.tone === "success" ? undefined : completed.tone === "warning" ? "need" : "critical"}><strong>{completed.title}</strong><p className={styles.outcomeDetail}>{completed.detail}</p></StNotice></div> : null}
+      {state.status === "error" && review ? <StNotice tone="critical">{requestError || "The message review could not be completed."}</StNotice> : null}
       {!completed ? <form onSubmit={(event) => void approve(event)} className={styles.actions}>
-        <button type="submit" className={styles.primaryButton} disabled={!canSend || busy} aria-describedby={sendHelpId} data-review-send>{busy ? "Checking approval…" : "Send this message"}</button>
-        <button type="button" className={styles.secondaryButton} onClick={() => void prepare()} disabled={busy}>Prepare again</button>
-        <p id={sendHelpId}>Only the reviewed recipient, subject, and body can be approved. A changed or revoked review is rejected by the server.</p>
+        <StTextButton onClick={() => void prepare()} disabled={busy}>Prepare again</StTextButton>
+        <StPill type="submit" disabled={!canSend || busy} busy={state.status === "approving"} aria-describedby={sendHelpId} data-review-send>{busy ? "Checking approval…" : action === "reply" ? "Send reply" : "Send message"}</StPill>
+        <p id={sendHelpId} className={styles.help}>Only this recipient and exact message are approved. Strelva checks the current permission before sending.</p>
       </form> : completed && state.status === "completed" && outcomeAllowsNewReview(state.outcome) ? <div className={styles.actions}>
-        <button type="button" className={styles.secondaryButton} onClick={() => void prepare()} disabled={busy}>Prepare a new review</button>
-        <p>The failed attempt was recorded. Resolve the issue before preparing another message.</p>
+        <StPill variant="soft" onClick={() => void prepare()} disabled={busy}>Prepare a new review</StPill>
+        <p className={styles.help}>The failed attempt was recorded. Resolve the issue before preparing another message.</p>
       </div> : null}
-    </div> : null}
+    </div></StSurface> : null}
   </section>;
 }

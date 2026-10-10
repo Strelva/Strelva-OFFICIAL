@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/Button";
+import { StPill } from "@/components/ui/strelva/Kit";
 import { SelectInput } from "@/components/ui/TextInput";
 import type { InquiryBookingOffer } from "@/products/inquiries";
 
@@ -29,11 +29,11 @@ export function InquiryBookingOfferComposer({ workspaceId, rowId, disabled, appe
     finally { setBusy(false); }
   }
   const locked = disabled || busy || added;
-  return <section className="grid gap-3 rounded-xl border border-gray-border p-4" aria-label="Appointment times for this inquiry">
-    {!offer ? <Button variant="secondary" disabled={locked} loading={busy} onClick={() => void prepare()}>Prepare appointment times</Button> : <>
+  return <section className="grid gap-3" aria-label="Appointment times for this inquiry">
+    {!offer ? <StPill variant="soft" disabled={locked} busy={busy} onClick={() => void prepare()}>Prepare appointment times</StPill> : <>
       <SelectInput label="Appointment service" value={offer.serviceId} options={offer.services.map(service => ({ value: service.id, label: service.name }))} disabled={locked} onChange={event => void prepare(event.target.value)} />
       <fieldset disabled={locked} className="grid gap-2"><legend className="mb-2 text-sm">Choose the times to offer</legend>{offer.slots.map(slot => <label key={slot.start} className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={selected.includes(slot.start)} onChange={event => setSelected(value => event.target.checked ? [...value, slot.start] : value.filter(start => start !== slot.start))} />{slot.label}</label>)}</fieldset>
-      <Button variant="secondary" disabled={locked || selected.length === 0} loading={busy} onClick={() => void prepare(offer.serviceId, selected)}>{added ? "Times added to your reply" : "Add these times to reply"}</Button>
+      <StPill variant="soft" disabled={locked || selected.length === 0} busy={busy} onClick={() => void prepare(offer.serviceId, selected)}>{added ? "Times added to your reply" : "Add these times to reply"}</StPill>
     </>}
     <p className="text-xs text-gray-muted">Preparing times sends nothing. Review the complete reply before approving it. An appointment request still needs the business&apos;s confirmation.</p>
     {error ? <p role="alert" className="text-sm text-critical">{error}</p> : null}

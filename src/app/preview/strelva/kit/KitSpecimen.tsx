@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { StBeacon, StComposerBar, StComposerDock, StEmpty, StHead, StHold, StKbd, StLabel, StLedger, StMono, StNotice, StPage, StPill, StRow, StRows, StSection, StSegmented, StSkeleton, StStamp, StState, StSteps, StSurface, StTextButton, StToast } from "@/components/ui/strelva/Kit";
 
 /** Fictional content only. Every kit piece in its states, light and dark. */
@@ -8,6 +8,7 @@ export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
   const [who, setWho] = useState<"handles" | "after" | "ask">("ask");
   const [ask, setAsk] = useState("");
   const [accepted, setAccepted] = useState(false);
+  const actionRef = useRef<HTMLButtonElement>(null);
   return <div data-dashboard data-workspace-theme="linen" data-workspace-mode={mode} style={{ minHeight: "100dvh", background: "radial-gradient(circle at 1px 1px, var(--st-dot) 1px, transparent 1.4px) 0 0 / 24px 24px, var(--st-canvas)", fontFamily: "var(--font-workspace), system-ui, sans-serif" }}>
     <StPage>
       <StHead crumb={{ label: "Preview", href: "/preview/strelva" }} title="Strelva 1.0 kit" meta="Fictional content · every piece in its states" actions={<StTextButton href={`/preview/strelva/kit?mode=${mode === "dark" ? "light" : "dark"}`}>{mode === "dark" ? "Light" : "Dark"}</StTextButton>} />
@@ -44,7 +45,7 @@ export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
         <StNotice tone="critical">Couldn’t load this client at 2:06. Showing Tuesday’s numbers. Strelva retries every 5 min.</StNotice>
         <StEmpty action={<StPill variant="soft">Rehearse the form</StPill>}>No inquiries yet. The form was checked at 7:00 and works.</StEmpty>
         <div style={{ display: "grid", gap: 8, maxWidth: 360 }}><StSkeleton width="70%" /><StSkeleton width="45%" /></div>
-        <p style={{ margin: 0, display: "flex", gap: 12, alignItems: "center" }}><StStamp>checked 2m ago</StStamp><StKbd>⌘ K</StKbd><StPill variant="soft">Soft action</StPill><StPill size="lg">Large primary</StPill></p>
+        <p style={{ margin: 0, display: "flex", gap: 12, alignItems: "center" }}><StStamp>checked 2m ago</StStamp><StKbd>⌘ K</StKbd><StPill ref={actionRef} variant="soft">Soft action</StPill><StTextButton onClick={() => actionRef.current?.focus()}>Focus soft action</StTextButton><StPill size="lg">Large primary</StPill></p>
       </StSection>
     </StPage>
     <StComposerDock><StComposerBar scope="attymooney.com" placeholder="Ask about attymooney.com" value={ask} onChange={setAsk} onSubmit={() => setAsk("")} /></StComposerDock>
