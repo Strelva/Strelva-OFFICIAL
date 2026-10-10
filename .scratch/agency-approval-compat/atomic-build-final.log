@@ -1,0 +1,53 @@
+
+> strelva@0.2.0 build /private/tmp/strelva-agency-approval-compat-20261009
+> next build
+
+▲ Next.js 16.3.8 (Turbopack)
+[@sentry/nextjs] DEPRECATION WARNING: disableLogger is deprecated and will be removed in a future version. Use webpack.treeshake.removeDebugLogging instead. (Not supported with Turbopack.)
+✓ Running next.config.ts took 1205ms
+- Experiments (use with caution):
+  · clientTraceMetadata
+
+  Creating an optimized production build ...
+[@sentry/nextjs] DEPRECATION WARNING: disableLogger is deprecated and will be removed in a future version. Use webpack.treeshake.removeDebugLogging instead. (Not supported with Turbopack.)
+(node:14687) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:14727) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+✓ Compiled successfully in 20.9s
+  Running next.config.js provided runAfterProductionCompile ...
+✓ Completed runAfterProductionCompile in 678ms
+  Running TypeScript ...
+scripts/check-restored-production-security-runtime.ts(39,109): error TS2322: Type '{ file: string; sha256: string; rollback: string; }[] | ({ file: string; sha256: string; rollback: string; rollbackKind?: undefined; rollbackSha256?: undefined; } | { file: string; sha256: string; rollback: string; rollbackKind: string; rollbackSha256: string; })[] | { ...; }[] | { ...; }[] | { ...; }[]' is not assignable to type '{ file: string; sha256: string; rollback: string; } | readonly { file: string; sha256: string; rollback: string; }[]'.
+  Type '{ file: string; sha256: string; rollbackStatus: string; }[]' is not assignable to type '{ file: string; sha256: string; rollback: string; } | readonly { file: string; sha256: string; rollback: string; }[]'.
+    Type '{ file: string; sha256: string; rollbackStatus: string; }[]' is not assignable to type 'readonly { file: string; sha256: string; rollback: string; }[]'.
+      Property '"rollback"' is missing in type '{ file: string; sha256: string; rollbackStatus: string; }' but required in type '{ file: string; sha256: string; rollback: string; }'.
+scripts/check-restored-production-security-runtime.ts(43,173): error TS2322: Type '{ file: string; sha256: string; rollback: string; }[] | ({ file: string; sha256: string; rollback: string; rollbackKind?: undefined; rollbackSha256?: undefined; } | { file: string; sha256: string; rollback: string; rollbackKind: string; rollbackSha256: string; })[] | { ...; }[] | { ...; }[] | { ...; }[]' is not assignable to type '{ file: string; sha256: string; rollback: string; } | readonly { file: string; sha256: string; rollback: string; }[]'.
+  Type '{ file: string; sha256: string; rollbackStatus: string; }[]' is not assignable to type '{ file: string; sha256: string; rollback: string; } | readonly { file: string; sha256: string; rollback: string; }[]'.
+    Type '{ file: string; sha256: string; rollbackStatus: string; }[]' is not assignable to type 'readonly { file: string; sha256: string; rollback: string; }[]'.
+      Property '"rollback"' is missing in type '{ file: string; sha256: string; rollbackStatus: string; }' but required in type '{ file: string; sha256: string; rollback: string; }'.
+scripts/check-restored-production-security-runtime.ts(44,88): error TS18046: 'item' is of type 'unknown'.
+scripts/check-restored-production-security-runtime.ts(46,81): error TS18046: 'item' is of type 'unknown'.
+scripts/check-restored-production-security-runtime.ts(48,113): error TS18046: 'item' is of type 'unknown'.
+scripts/check-restored-production-security-runtime.ts(48,155): error TS18046: 'item' is of type 'unknown'.
+scripts/check-restored-production-security-runtime.ts(49,83): error TS18046: 'item' is of type 'unknown'.
+scripts/check-restored-production-security-runtime.ts(50,73): error TS18046: 'current' is of type 'unknown'.
+scripts/check-restored-production-security-runtime.ts(50,103): error TS18046: 'current' is of type 'unknown'.
+scripts/check-restored-production-security-runtime.ts(51,49): error TS18046: 'item' is of type 'unknown'.
+scripts/check-restored-production-security-runtime.ts(53,65): error TS18046: 'item' is of type 'unknown'.
+scripts/check-restored-production-security-runtime.ts(63,259): error TS18046: 'item' is of type 'unknown'.
+scripts/check-restored-production-security-runtime.ts(63,278): error TS18046: 'item' is of type 'unknown'.
+scripts/check-restored-production-security-runtime.ts(92,35): error TS18046: 'item' is of type 'unknown'.
+scripts/check-restored-production-security-runtime.ts(151,80): error TS18046: 'row' is of type 'unknown'.
+scripts/check-restored-production-security-runtime.ts(152,81): error TS18046: 'row' is of type 'unknown'.
+scripts/check-restored-production-security-runtime.ts(155,11): error TS18046: 'item' is of type 'unknown'.
+scripts/check-restored-production-security-runtime.ts(159,15): error TS18046: 'item' is of type 'unknown'.
+scripts/check-restored-production-security-runtime.ts(160,54): error TS18046: 'item' is of type 'unknown'.
+scripts/check-restored-production-security-runtime.ts(161,32): error TS18046: 'item' is of type 'unknown'.
+scripts/check-restored-production-security-runtime.ts(168,54): error TS18046: 'item' is of type 'unknown'.
+scripts/check-restored-production-security-runtime.ts(169,11): error TS18046: 'item' is of type 'unknown'.
+scripts/check-restored-production-security-runtime.ts(257,120): error TS18046: 'item' is of type 'unknown'.
+scripts/check-restored-production-security-runtime.ts(257,136): error TS18046: 'item' is of type 'unknown'.
+Failed to type check.
+
+ ELIFECYCLE  Command failed with exit code 1.

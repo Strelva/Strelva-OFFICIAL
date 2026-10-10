@@ -1,0 +1,5 @@
+
+> strelva@0.2.0 version:check /private/tmp/strelva-agency-approval-compat-20261009
+> node scripts/check-version-sync.mjs
+
+Strelva app and marketing are both v0.2.0.

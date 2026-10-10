@@ -1,0 +1,4 @@
+NOTICE:  extension "pgcrypto" already exists, skipping
+{"schemaFunctionComparison": "matched", "capturedFunctionCount": 1203, "migrationCount": 266}
+Controlled PostgreSQL orderings passed: transition wins, admission wins, explicit busy retry, immutable settlement, revoked replay, unsupported stale isolation. Fictional provider dispatch count: one admitted command; no network calls.
+Actual live266 schema-only upgrade and controlled review admission concurrency passed. No production data or provider writes.

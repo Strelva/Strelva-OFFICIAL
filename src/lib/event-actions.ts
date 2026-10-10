@@ -24,7 +24,7 @@ import type { ContentMap, ContentSection } from "./types";
 import type { CustomChangeRequestStatus } from "./types";
 // Inquiries and the Google listing System through the ports src/lib
 // declares (Strelva Reborn section 7).
-import { workspacePorts } from "./workspace-ports";
+import { workspacePorts, type TenantReviewDispatchHook } from "./workspace-ports";
 
 /** The actor the review auto-post cron approves with: the listing receipt's
  * authority is then the auto-reply policy, never an owner approval. */
@@ -295,6 +295,7 @@ export async function resolveEventAction(
     action === "approved" ? await shadowStartExecutionAttempt(eventId, claim.attemptId) : null;
 
   try {
+    let executionEvent = event;
     if (authorization) {
       const { isManagedReviewApproval, reviewApprovalTokenAllowed } = await import("./review-approval-authority");
       const current = await getEventRaw(eventId);
@@ -304,8 +305,9 @@ export async function resolveEventAction(
         await shadowFinishExecutionAttempt(shadowAttemptId, { success: false, detail: result.reason });
         return result;
       }
+      executionEvent = current;
     }
-    const result = await executeResolvedEventAction(tenantId, eventId, action, event, actorId, claim.attemptId);
+    const result = await executeResolvedEventAction(tenantId, eventId, action, executionEvent, actorId, claim.attemptId, authorization);
     await finishEventAction(eventId, claim.attemptId, {
       state: result.changed ? "completed" : "failed",
       reason: result.reason,
@@ -330,6 +332,7 @@ async function executeResolvedEventAction(
   event: NonNullable<Awaited<ReturnType<typeof getEvent>>>,
   actorId: string,
   attemptId: string,
+  authorization?: { reviewApprovalToken: string },
 ): Promise<{ changed: boolean; reason?: string }> {
 
   const inquiries = await workspacePorts().inquiries();
@@ -567,6 +570,11 @@ async function executeResolvedEventAction(
   // as handled.
   if (event.type === "review" && event.metadata?.kind === "review_reply_draft") {
     const metaReviewId = typeof event.metadata?.reviewId === "string" ? event.metadata.reviewId : "";
+    if (authorization && action === "dismissed") {
+      const { admitReviewApprovalDispatch } = await import("./review-approval-authority");
+      await admitReviewApprovalDispatch(authorization.reviewApprovalToken, { tenantId, eventId, action, attemptId,
+        ledger: "event", ledgerId: attemptId, request: { reviewId: metaReviewId } });
+    }
     if (action === "approved") {
       const reviewId = metaReviewId;
       const replyText =
@@ -582,6 +590,16 @@ async function executeResolvedEventAction(
       // else keeps the legacy publisher and its outside-write receipt.
       const { defaultTenantReplyDeps, postTenantReviewReply, routeTenantReviewReply } = await workspacePorts().tenantReviewReplies();
       const deps = await defaultTenantReplyDeps();
+      if (authorization) {
+        const beforeReplyDispatch: TenantReviewDispatchHook = async (location, dispatchedReviewId, text, receiptId) => {
+          const { admitReviewApprovalDispatch } = await import("./review-approval-authority");
+          const account = location.accountId.startsWith("accounts/") ? location.accountId : `accounts/${location.accountId}`;
+          return admitReviewApprovalDispatch(authorization.reviewApprovalToken, { tenantId, eventId, action, attemptId,
+            ledger: "listing", ledgerId: receiptId, request: { reviewId: dispatchedReviewId, reply: text, locationId: location.locationId,
+              providerTarget: `https://mybusiness.googleapis.com/v4/${account}/locations/${encodeURIComponent(location.locationId)}/reviews/${encodeURIComponent(dispatchedReviewId)}/reply` } });
+        };
+        Object.assign(deps, { beforeReplyDispatch });
+      }
       const route = await routeTenantReviewReply(tenantId, deps);
       let acceptedUnverified = false;
       if (route.kind === "listing") {
@@ -601,7 +619,12 @@ async function executeResolvedEventAction(
         acceptedUnverified = posted.status === "posted_unverified" || posted.status === "held_by_google" || posted.status === "accepted_unrecorded";
       } else {
         const { publishReviewReply } = await import("./gbp-replies");
-        const result = await publishReviewReply(tenantId, reviewId, replyText, { actor: isDelegateActor(actorId) ? `${actorId} approved event ${eventId}` : `approved event ${eventId}`, ...(process.env.STRELVA_OPERATOR_QUEUE_RELEASE === "1" ? { commandKey: `approval:${eventId}` } : {}) });
+        const result = await publishReviewReply(tenantId, reviewId, replyText, { actor: isDelegateActor(actorId) ? `${actorId} approved event ${eventId}` : `approved event ${eventId}`, ...(process.env.STRELVA_OPERATOR_QUEUE_RELEASE === "1" || authorization ? { commandKey: `approval:${eventId}` } : {}),
+          ...(authorization ? { beforeDispatch: async (ledgerId: string, providerTarget: string) => {
+            const { admitReviewApprovalDispatch } = await import("./review-approval-authority");
+            return admitReviewApprovalDispatch(authorization.reviewApprovalToken, { tenantId, eventId, action, attemptId,
+              ledger: "legacy", ledgerId, request: { reviewId, reply: replyText, providerTarget } });
+          } } : {}) });
         if (!result.published) return { changed: false, reason: "review_reply_failed" };
       }
       // Reply accepted by Google — mark acceptance before resolving so a lost

@@ -1,0 +1,1574 @@
+diff --git a/scripts/check-agency-workflow-sql.sh b/scripts/check-agency-workflow-sql.sh
+index ea14b8c57..cd3edb1de 100755
+--- a/scripts/check-agency-workflow-sql.sh
++++ b/scripts/check-agency-workflow-sql.sh
+@@ -105,6 +105,7 @@ psql "${psql_args[@]}" -Atc "$owner_boundary_query" >"$cluster_root/owner-bounda
+ cmp "$cluster_root/owner-boundary-after.hash" "$cluster_root/owner-boundary-reapplied.hash"
+ psql "${psql_args[@]}" --file="$repo_root/tests/operator-owner-decisions-schema.sql" >/dev/null
+ psql "${psql_args[@]}" -Atc "$function_catalog_query" >"$cluster_root/final-functions-after.catalog"
++psql "${psql_args[@]}" --file="$repo_root/tests/tenant-review-approval-continuity-schema.sql" >/dev/null
+ cmp "$cluster_root/final-functions-before.catalog" "$cluster_root/final-functions-after.catalog"
+ # The contract rolls back every fictional row, including the immutable history.
+ remaining="$(psql "${psql_args[@]}" -Atc "select count(*) from public.users where email like 'aw-%@%.example.test'")"
+diff --git a/scripts/check-restored-production-security-runtime.ts b/scripts/check-restored-production-security-runtime.ts
+index 1fbc4ca4b..bc761bd5e 100644
+--- a/scripts/check-restored-production-security-runtime.ts
++++ b/scripts/check-restored-production-security-runtime.ts
+@@ -16,6 +16,7 @@ const digest = (value: string) => createHash("sha256").update(value).digest("hex
+ const fileDigest = (file: string) => digest(readFileSync(file, "utf8"));
+ type Fingerprint = { count: string; hash: string; columns: string[]; retiredEmpty?: boolean; retiredSeedMetadata?: boolean };
+ type Snapshot = Record<string, Fingerprint>;
++type ReleaseManifestItem = { file: string; sha256: string; rollback?: string };
+ 
+ function main() {
+   const argv = process.argv.slice(2), args = new Map<string, string>();
+@@ -36,11 +37,11 @@ function main() {
+   const sourceInventory = JSON.parse(readFileSync(inventoryFile, "utf8")) as { rows: Array<{ snapshot: { migrations: string[] } }> };
+   const applied = sourceInventory.rows[0]?.snapshot.migrations;
+   if (!applied || new Set(applied).size !== applied.length || applied.some(value => !/^\d{14}$/.test(value))) throw new Error("Invalid hosted applied-version receipt");
+-  const allItems = [...manifest.baseline, ...manifest.batches.flat(), ...manifest.proposed.flatMap(batch => batch.items)];
++  const allItems = [...manifest.baseline, ...manifest.batches.flat(), ...manifest.proposed.flatMap<ReleaseManifestItem>(batch => batch.items)];
+   // This exact deployment order captures the original scope before any new
+   // entrypoint can enter it. The combined-release supplements follow the
+   // complete previously rehearsed security packet, matching hosted sequence.
+-  const prerequisites = [...manifest.baseline, ...manifest.batches.flat(), ...manifest.proposed.filter(batch => ["H", "7A"].includes(String(batch.batch))).flatMap(batch => batch.items)];
++  const prerequisites = [...manifest.baseline, ...manifest.batches.flat(), ...manifest.proposed.filter(batch => ["H", "7A"].includes(String(batch.batch))).flatMap<ReleaseManifestItem>(batch => batch.items)];
+   const capturedNames = new Set([...prerequisites, ...originalScope.items].map(item => item.file));
+   const supplementalNames = ["20261015111000_website_owner_agency_publish.sql", "20261019100000_actor_rpc_service_boundary.sql"];
+   const supplements = supplementalNames.flatMap(file => allItems.filter(item => item.file === file));
+diff --git a/scripts/check-review-approval-concurrency.py b/scripts/check-review-approval-concurrency.py
+new file mode 100644
+index 000000000..bd3177015
+--- /dev/null
++++ b/scripts/check-review-approval-concurrency.py
+@@ -0,0 +1,87 @@
++#!/usr/bin/env python3
++"""Controlled real-Postgres ordering against fictional rows on the owned cluster."""
++import json, os, subprocess, sys, time, uuid
++
++args = ['psql', *sys.argv[1:]]
++
++def sql(statement, check=True):
++    result = subprocess.run([*args, '-Atc', statement], text=True, capture_output=True)
++    if check and result.returncode:
++        raise RuntimeError(result.stderr)
++    return result
++
++def literal(value):
++    return "'" + json.dumps(value).replace("'", "''") + "'::jsonb"
++
++def worker(statement, name):
++    return subprocess.Popen([*args, '-Atc', statement], env={**os.environ, 'PGAPPNAME': name}, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
++
++def sleeping(name):
++    for _ in range(100):
++        if sql("select count(*) from pg_stat_activity where application_name='" + name + "' and wait_event='PgSleep'").stdout.strip() == '1':
++            return
++        time.sleep(.02)
++    raise RuntimeError('Owned contention worker did not reach its controlled pause')
++
++sql("""do $$ declare op uuid:='90400000-0000-4000-8000-000000000001'; agency uuid; result jsonb;
++begin
++ insert into public.users(id,email,verified_at) values(op,'race-operator@strelva.example.test',now());
++ insert into public.super_admins(user_id,email) values(op,'race-operator@strelva.example.test');
++ select id into agency from public.create_owned_workspace(op,'race-operator@strelva.example.test','agency','Race fixture');
++ insert into public.tenants(id,stable_id,site_name,active,owner_email) values('race-site','90400000-0000-4000-8000-000000000003','Race fixture',true,'race-owner@example.test');
++ result:=public.convert_tenant_to_business('race-operator@strelva.example.test','race-site',jsonb_build_object(
++ 'tenantId','race-site','tenantStableId','90400000-0000-4000-8000-000000000003','workspaceName','Race fixture','agencyWorkspaceId',agency,
++ 'agencyStaffEmails',jsonb_build_array('race-operator@strelva.example.test'),'agencySelectionBasis','owner_choice','billing',null,'account',null,'contacts',jsonb_build_array(),
++ 'patch',jsonb_build_object('facts',jsonb_build_object('owner_recipient',jsonb_build_object('value',jsonb_build_object('email','race-owner@example.test'),'verified',false)))),
++ '90400000-0000-4000-8000-000000000004',repeat('a',64));
++end $$;""")
++
++def command(event):
++    authority = json.loads(sql("select public.read_tenant_review_approval_authority('race-site')").stdout)
++    request = {'reviewId': event, 'reply': 'Thank you'}
++    claim = json.loads(sql('select public.begin_operator_google_write(' + literal({'commandKey':'approval:'+event,'tenantId':'race-site','writeKind':'review_reply','request':request}) + ')').stdout)
++    return {'grantId':str(uuid.uuid4()),'tenantId':'race-site','eventId':event,'attemptId':'owned-race-attempt','action':'approved','tokenKind':'review',
++        'tokenExpiresAt':int(time.time()*1000)+86400000,'workspaceId':authority['workspaceId'],'recipient':authority['recipient'],
++        'authorityVersion':authority['version'],'ledger':'legacy','ledgerId':claim['attemptId'],
++        'request':{**request,'providerTarget':'https://mybusiness.googleapis.com/v4/accounts/race/locations/race/reviews/'+event+'/reply'}}
++
++def change():
++    return "update public.business_owner_recipient_trust set trusted_at=clock_timestamp(),trusted_via='owner_write' where workspace_id=(select workspace_id from public.tenant_workspace_links where tenant_slug_at_link='race-site')"
++
++# Transition wins: while its uncommitted epoch owns admission, no send can be
++# admitted; after it commits, the old exact token is denied by fresh authority.
++old = command('transition-first')
++w = worker('begin; '+change()+"; select pg_sleep(1.5); commit;", 'review-transition-first')
++sleeping('review-transition-first')
++r = sql('select public.admit_tenant_review_approval_dispatch('+literal(old)+')', check=False)
++assert r.returncode and 'review_authority_busy_retry' in r.stderr
++out, err = w.communicate(timeout=10)
++assert w.returncode == 0, err
++r = sql('select public.admit_tenant_review_approval_dispatch('+literal(old)+')', check=False)
++assert r.returncode and 'review_approval_authority_changed' in r.stderr
++assert sql("select count(*) from public.tenant_review_dispatch_grants where event_id='transition-first'").stdout.strip() == '0'
++
++# Admission wins: competing transition rolls back promptly instead of holding
++# an owner/exit row across a network request. Its explicit retry succeeds after
++# command admission; the admitted exact command settles without present-owner
++# authority, and neither grant replay nor a new old-token admission can send.
++accepted = command('admission-first')
++w = worker('begin; select public.admit_tenant_review_approval_dispatch('+literal(accepted)+'); select pg_sleep(1.5); commit;', 'review-admission-first')
++sleeping('review-admission-first')
++r = sql(change(), check=False)
++assert r.returncode and 'review_authority_busy_retry' in r.stderr
++out, err = w.communicate(timeout=10)
++assert w.returncode == 0, err
++admission_rows=[json.loads(line) for line in out.splitlines() if line.startswith('{')]
++assert len(admission_rows)==1 and admission_rows[0]['admitted'] is True
++sql(change())
++sql("select public.settle_tenant_review_dispatch_admission('"+accepted['grantId']+"','"+accepted['ledgerId']+"',"+literal(accepted['request'])+",200)")
++assert sql("select count(*) from public.tenant_review_dispatch_grants where event_id='admission-first' and dispatch_state='spent'").stdout.strip() == '1'
++r = sql('select public.admit_tenant_review_approval_dispatch('+literal({**accepted,'grantId':str(uuid.uuid4())})+')', check=False)
++assert r.returncode and 'review_approval_authority_changed' in r.stderr
++
++# Repeatable-read cannot smuggle a stale owner snapshot through admission.
++fresh = command('unsupported-isolation')
++r = sql('begin isolation level repeatable read; select public.admit_tenant_review_approval_dispatch('+literal(fresh)+'); commit;', check=False)
++assert r.returncode and 'review_dispatch_isolation_unsupported' in r.stderr
++print('Controlled PostgreSQL orderings passed: transition wins, admission wins, explicit busy retry, immutable settlement, revoked replay, unsupported stale isolation. Fictional provider dispatch count: one admitted command; no network calls.')
+diff --git a/scripts/check-review-approval-upgrade.sh b/scripts/check-review-approval-upgrade.sh
+new file mode 100644
+index 000000000..5ad7fef98
+--- /dev/null
++++ b/scripts/check-review-approval-upgrade.sh
+@@ -0,0 +1,37 @@
++#!/usr/bin/env bash
++# Actual schema-only live266 upgrade, entirely on an owned disposable cluster.
++set -euo pipefail
++repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
++schema_dump="${STRELVA_REVIEW_SCHEMA_DUMP:?Provide the protected schema-only dump explicitly.}"
++[[ -f "$schema_dump" ]] || exit 1
++source "$repo_root/scripts/temp-postgres.sh"
++create_temp_postgres strelva-review-upgrade strelva-review-upgrade-socket
++cluster_port="$((62000 + ($$ % 2000)))"
++initdb -D "$cluster_data" --locale=C --encoding=UTF8 --auth=trust --no-instructions >/dev/null
++pg_ctl -D "$cluster_data" -l "$cluster_log" -o "-F -k '$cluster_socket' -c listen_addresses='' -p $cluster_port" -w start >/dev/null
++psql_args=(--host="$cluster_socket" --port="$cluster_port" --username="$(id -un)" --dbname=postgres --set=ON_ERROR_STOP=1 --no-psqlrc --quiet)
++psql "${psql_args[@]}" --file="$repo_root/scripts/sql/local-supabase-shim.sql" >/dev/null
++psql "${psql_args[@]}" -c 'create role postgres superuser; create extension if not exists btree_gist with schema public; create extension if not exists pgcrypto with schema public;' >/dev/null
++if ! psql "${psql_args[@]}" --file="$schema_dump" >"$cluster_root/restore.log" 2>&1; then
++  # Avoid printing private definitions in a failure diagnostic.
++  rg '^psql:.*(ERROR|FATAL):' "$cluster_root/restore.log" | head -n 8
++  exit 1
++fi
++psql "${psql_args[@]}" -c 'create extension if not exists pgcrypto with schema public;' >/dev/null
++psql "${psql_args[@]}" -Atc "select jsonb_agg(jsonb_build_object('signature',p.oid::regprocedure::text,'acl',p.proacl::text,'definition',pg_get_functiondef(p.oid)) order by p.oid::regprocedure::text) from pg_proc p where p.pronamespace='public'::regnamespace and p.prokind='f'" >"$cluster_root/functions-before.json"
++if [[ -n "${STRELVA_REVIEW_LIVE_CATALOG:-}" ]]; then
++  python3 - "$STRELVA_REVIEW_LIVE_CATALOG" "$cluster_root/functions-before.json" <<'PY'
++import sys,json,hashlib
++live=json.load(open(sys.argv[1])); replay=json.load(open(sys.argv[2]))
++actual={f['signature']:f for f in replay}
++missing=[f['signature'] for f in live['functions'] if f['signature'] not in actual]
++changed=[f['signature'] for f in live['functions'] if f['signature'] in actual and f['definition']!=actual[f['signature']]['definition']]
++if missing or changed:
++ print(json.dumps({'schemaFunctionComparison':'failed','missingCount':len(missing),'definitionDifferenceCount':len(changed)}));sys.exit(1)
++print(json.dumps({'schemaFunctionComparison':'matched','capturedFunctionCount':len(live['functions']),'migrationCount':live['migrationCount']}))
++PY
++fi
++psql "${psql_args[@]}" -c 'set role postgres;' --file="$repo_root/supabase/migrations/20261023200000_tenant_review_approval_continuity.sql" >/dev/null
++psql "${psql_args[@]}" --file="$repo_root/tests/tenant-review-approval-continuity-schema.sql" >/dev/null
++python3 "$repo_root/scripts/check-review-approval-concurrency.py" "${psql_args[@]}"
++echo 'Actual live266 schema-only upgrade and controlled review admission concurrency passed. No production data or provider writes.'
+diff --git a/scripts/check-workspace-upgrade.sh b/scripts/check-workspace-upgrade.sh
+index 8fbae3d47..48a889c9d 100755
+--- a/scripts/check-workspace-upgrade.sh
++++ b/scripts/check-workspace-upgrade.sh
+@@ -78,6 +78,12 @@ for migration in $(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -na
+     fi
+     tail_started=1
+   fi
++  if [[ "$migration_name" == "20261023200000_tenant_review_approval_continuity.sql" ]]; then
++    # Historical owner-trust rollback deliberately drops its table CASCADE.
++    # Rehearse those reversals before installing its additive admission trigger;
++    # then qualify continuity on the restored final schema below.
++    continue
++  fi
+   if [[ "$migration_name" == "20261013220000_provider_seat_tenant_conversion.sql" ]]; then
+     # Apply it after the historical conversion fixtures below so they
+     # continue to prove their original RPC;
+@@ -470,3 +476,10 @@ node --test "$repo_root/scripts/tests/readonly-rpcs.node-test.mjs"
+ # Legacy calendar row-existence compatibility and receipt-preserving rollback.
+ psql "${psql_args[@]}" --file="$repo_root/tests/legacy-calendar-revoke-result-schema.sql"
+ bash "$repo_root/scripts/check-reader-writer-locks.sh" "postgresql:///postgres?host=$cluster_socket&port=$cluster_port"
++
++# Install the forward-only review authority evidence after historical destructive
++# rollback rehearsals; application rollback must retain admitted command history.
++psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261023200000_tenant_review_approval_continuity.sql"
++psql "${psql_args[@]}" --file="$repo_root/tests/tenant-review-approval-continuity-schema.sql"
++python3 "$repo_root/scripts/check-review-approval-concurrency.py" "${psql_args[@]}"
++printf 'Review approval continuity and dispatch admission passed on the upgraded final schema.\n'
+diff --git a/scripts/readiness-snapshot.ts b/scripts/readiness-snapshot.ts
+index 6fdec917f..55de24693 100644
+--- a/scripts/readiness-snapshot.ts
++++ b/scripts/readiness-snapshot.ts
+@@ -106,6 +106,7 @@ export const SEPT30_EXTRA_APPLIED = ["20260930120000"];
+  * `accounts`. "missing" there is a stop.
+  */
+ export const MIGRATION_SENTINELS: Record<string, string> = {
++  "20261023200000": "tenant_review_dispatch_grants",
+   "20261017111000": "inquiry_retention_receipts",
+   "20261016110000": "operator_action_approvals",
+   "20261015110000": "super_admin_access_events",
+diff --git a/scripts/release-safety/batches.json b/scripts/release-safety/batches.json
+index eaf734b97..7c77b055f 100644
+--- a/scripts/release-safety/batches.json
++++ b/scripts/release-safety/batches.json
+@@ -1263,6 +1263,18 @@
+           "rollback": "rollback-20261019100000_actor_rpc_service_boundary.sql"
+         }
+       ]
++    },
++    {
++      "batch": "12",
++      "status": "isolated; qualification in progress; no deployment authorization",
++      "description": "Review approval continuity and atomic provider admission; additive, forward-only authority evidence retained on application rollback",
++      "items": [
++        {
++          "file": "20261023200000_tenant_review_approval_continuity.sql",
++          "sha256": "9a6ff9ecc24b735e2d167f6ebf1840bd011e221e8ff747c8bbc9531f7568a5dd",
++          "rollbackStatus": "forward-only; retain epoch and command evidence; revert app without deleting accepted or unknown outcomes"
++        }
++      ]
+     }
+   ]
+ }
+diff --git a/scripts/temp-postgres.sh b/scripts/temp-postgres.sh
+index 2dfd31991..1cd4f19ea 100644
+--- a/scripts/temp-postgres.sh
++++ b/scripts/temp-postgres.sh
+@@ -22,6 +22,12 @@ cleanup_temp_postgres() {
+     if ! pg_ctl -D "$cluster_data" -m fast -w stop >/dev/null 2>&1; then
+       pg_ctl -D "$cluster_data" -m immediate -w stop >/dev/null 2>&1 || true
+     fi
++    # pg_ctl can return after shutdown while the owned postmaster is briefly
++    # awaiting OS reaping. Observe its exit before reporting a retained server.
++    for _ in {1..20}; do
++      [[ "$cluster_postmaster_pid" =~ ^[0-9]+$ ]] && kill -0 "$cluster_postmaster_pid" 2>/dev/null || break
++      sleep 0.05
++    done
+     if [[ "$cluster_postmaster_pid" =~ ^[0-9]+$ ]] && kill -0 "$cluster_postmaster_pid" 2>/dev/null; then
+       printf 'Unable to stop owned PostgreSQL PID %s; retained cluster: %s\n' "$cluster_postmaster_pid" "$cluster_root" >&2
+       exit 1
+diff --git a/src/__tests__/event-actions.test.ts b/src/__tests__/event-actions.test.ts
+index 634330dce..7fe158516 100644
+--- a/src/__tests__/event-actions.test.ts
++++ b/src/__tests__/event-actions.test.ts
+@@ -93,6 +93,7 @@ vi.mock("../lib/gbp-replies", () => ({
+ 
+ import { agencyStaffActorId, operatorActorId, resolveEventAction } from "../lib/event-actions";
+ import { recordApproval, recordRejection } from "../lib/ai-auto-approve";
++import { signApproveToken } from "../lib/approve-link";
+ 
+ describe("resolveEventAction", () => {
+   beforeEach(() => {
+@@ -104,6 +105,29 @@ describe("resolveEventAction", () => {
+     mockAuthorizeInquiryPublicationActor.mockResolvedValue({ allowed: true });
+   });
+ 
++  it.each([
++    { eventId: "different-review", action: "approve" as const, resolveAction: "approved" as const },
++    { eventId: "review-fixture", action: "approve" as const, resolveAction: "dismissed" as const },
++  ])("refuses a review token for a different event or action before claiming", async fixture => {
++    process.env.APPROVE_LINK_SECRET = "fixture-review-secret";
++    mockGetEvent.mockResolvedValue({ id: "review-fixture", tenantId: "tenant-a", type: "review", status: "pending", metadata: { kind: "review_reply_draft" } });
++    const token = signApproveToken({ tenantId: "tenant-a", eventId: fixture.eventId, action: fixture.action });
++    expect(await resolveEventAction("tenant-a", "review-fixture", fixture.resolveAction, "user", { reviewApprovalToken: token }))
++      .toEqual({ changed: false, reason: "review_approval_authority_changed" });
++    expect(mockClaimEventAction).not.toHaveBeenCalled(); expect(mockPublishReviewReply).not.toHaveBeenCalled();
++  });
++
++  it("refuses a changed event kind after claiming rather than dispatching another effect", async () => {
++    process.env.APPROVE_LINK_SECRET = "fixture-review-secret";
++    const event = { id: "review-fixture", tenantId: "tenant-a", type: "review", status: "pending", metadata: { kind: "review_reply_draft" } };
++    mockGetEvent.mockResolvedValueOnce(event).mockResolvedValueOnce({ ...event, type: "content_update", metadata: { kind: "agent_preview" } });
++    const token = signApproveToken({ tenantId: "tenant-a", eventId: event.id, action: "approve" });
++    expect(await resolveEventAction("tenant-a", event.id, "approved", "user", { reviewApprovalToken: token }))
++      .toEqual({ changed: false, reason: "review_approval_authority_changed" });
++    expect(mockClaimEventAction).toHaveBeenCalledTimes(1); expect(mockFinishEventAction).toHaveBeenCalledWith(event.id, "attempt_1", { state: "failed", reason: "review_approval_authority_changed" });
++    expect(mockPublishReviewReply).not.toHaveBeenCalled(); expect(mockSetContent).not.toHaveBeenCalled();
++  });
++
+   it("keeps approved content resolved when public observation fails, without a second publish", async () => {
+     const event = { id: "accepted-content", tenantId: "tenant-a", type: "content_update", status: "pending", metadata: { kind: "agent_preview", section: "hero", proposedData: { title: "Approved title" } } };
+     mockGetEvent.mockResolvedValue(event);
+diff --git a/src/__tests__/review-approval-continuity.test.ts b/src/__tests__/review-approval-continuity.test.ts
+new file mode 100644
+index 000000000..e56a87bd7
+--- /dev/null
++++ b/src/__tests__/review-approval-continuity.test.ts
+@@ -0,0 +1,123 @@
++import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
++import { signApproveToken, signReviewApproveToken, verifyReviewApproveToken, verifyAnyApproveToken, verifyApproveToken, verifyWorkspaceApproveToken, APPROVE_LINK_TTL_MS } from "@/lib/approve-link";
++import { reviewApprovalTokenAllowed, readReviewApprovalAuthority, admitReviewApprovalDispatch } from "@/lib/review-approval-authority";
++
++const deps = vi.hoisted(() => ({ rpc: vi.fn(), event: vi.fn(), resolve: vi.fn(), send: vi.fn(), redis: vi.fn() }));
++vi.mock("@/platform/infra/db/client", () => ({ isSupabaseConfigured: () => true, getSupabase: () => ({ rpc: deps.rpc }) }));
++vi.mock("@/lib/events", () => ({ getEventRaw: deps.event }));
++vi.mock("@/lib/event-actions", () => ({ resolveEventAction: deps.resolve }));
++vi.mock("@/lib/tenants", () => ({ getTenantConfig: async () => ({ id: "fixture-site", siteName: "Fixture", ownerEmail: "owner@example.test" }) }));
++vi.mock("@/lib/tenant-urls", () => ({ getTenantDashboardUrl: (_t: unknown, path: string) => `https://admin.example.test${path}` }));
++vi.mock("@/platform/agency-brand/server", () => ({ resolveTenantBrand: async () => ({ agencyId: null }), resolveOwnerBrand: async () => ({ agencyId: null }) }));
++vi.mock("@/lib/delivery-email", () => ({ sendReviewNeedsReplyEmail: deps.send }));
++vi.mock("@/platform/infra/redis", () => ({ getRedis: deps.redis }));
++vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: async () => false, rateLimitKey: () => "fixture" }));
++const workspace = "90300000-0000-4000-8000-000000000007";
++const baseClaims = { tenantId: "fixture-site", eventId: "event-fixture", action: "approve" as const };
++let authority = { tenantId: "fixture-site", workspaceId: workspace, recipient: "owner@example.test", version: "a".repeat(64), conversionAt: new Date(Date.now() + 1000).toISOString(), legacyAllowed: true };
++const bound = () => signReviewApproveToken({ ...baseClaims, workspaceId: workspace, recipient: authority.recipient, authorityVersion: authority.version });
++async function request(token: string, method: "GET" | "POST") {
++  const route = await import("@/app/api/approve/route");
++  return method === "GET" ? route.GET(new Request(`https://admin.example.test/api/approve?token=${encodeURIComponent(token)}`))
++    : route.POST(new Request("https://admin.example.test/api/approve", { method, body: new URLSearchParams({ token }) }));
++}
++beforeEach(() => {
++  vi.clearAllMocks();
++  process.env.APPROVE_LINK_SECRET = "fixture-review-secret";
++  authority = { tenantId: "fixture-site", workspaceId: workspace, recipient: "owner@example.test", version: "a".repeat(64), conversionAt: new Date(Date.now() + 1000).toISOString(), legacyAllowed: true };
++  deps.rpc.mockImplementation(async (name: string) => ({ data: name === "read_tenant_review_approval_authority" ? authority
++    : { email: authority.recipient, name: null, from: "record", workspaceId: authority.workspaceId, tenantId: authority.tenantId }, error: null }));
++  deps.event.mockResolvedValue({ id: baseClaims.eventId, tenantId: "fixture-site", type: "review", metadata: { kind: "review_reply_draft" }, status: "pending" });
++  deps.resolve.mockResolvedValue({ changed: true });
++  deps.send.mockResolvedValue(true);
++  deps.redis.mockReturnValue({ set: async () => "OK", del: vi.fn() });
++});
++afterEach(() => { vi.useRealTimers(); });
++
++describe("review approval continuity", () => {
++  it("carries a review token into dispatch even when the route reads an unconverted site", async () => {
++    deps.rpc.mockImplementation(async (name: string) => ({ data: name === "read_tenant_review_approval_authority" ? { ...authority, workspaceId: null, conversionAt: null }
++      : { email: authority.recipient, name: null, from: "tenant", workspaceId: null, tenantId: authority.tenantId }, error: null }));
++    const token = signApproveToken(baseClaims);
++    expect((await request(token, "POST")).status).toBe(200);
++    expect(deps.resolve).toHaveBeenCalledWith("fixture-site", "event-fixture", "approved", "user", { reviewApprovalToken: token });
++  });
++  it("persists exact verified claims and returns a scope-bound settlement handle", async () => {
++    deps.rpc.mockImplementation(async (name: string, args: Record<string, unknown>) => ({ data: name === "admit_tenant_review_approval_dispatch"
++      ? { admitted: true, grantId: (args.p_input as Record<string, unknown>).grantId } : null, error: null }));
++    const scope = { ...baseClaims, action: "approved" as const, attemptId: "attempt-fixture", ledger: "legacy" as const, ledgerId: "ledger-fixture", request: { reviewId: "review", reply: "Thanks", providerTarget: "fixture-target" } };
++    const grant = await admitReviewApprovalDispatch(bound(), scope);
++    const command = deps.rpc.mock.calls[0]![1].p_input;
++    expect(command).toMatchObject({ ...scope, tokenKind: "review", workspaceId: workspace, recipient: authority.recipient, authorityVersion: authority.version });
++    await grant.settle(200);
++    expect(deps.rpc).toHaveBeenLastCalledWith("settle_tenant_review_dispatch_admission", { p_grant_id: grant.grantId, p_ledger_id: scope.ledgerId, p_request: scope.request, p_response_status: 200 });
++  });
++  it("cannot admit wrong-event or opposite-action claims", async () => {
++    for (const over of [{ eventId: "other" }, { action: "dismissed" as const }]) {
++      await expect(admitReviewApprovalDispatch(bound(), { tenantId: baseClaims.tenantId, eventId: baseClaims.eventId, action: "approved", attemptId: "fixture", ledger: "legacy", ledgerId: "fixture", request: {}, ...over })).rejects.toThrow("review_approval_authority_changed");
++    }
++    expect(deps.rpc).not.toHaveBeenCalled();
++  });
++  it("keeps old GET scanner safe and old POST working across unchanged conversion", async () => {
++    const token = signApproveToken(baseClaims);
++    const get = await request(token, "GET");
++    expect(get.status).toBe(200); expect(await get.text()).toContain('method="POST"'); expect(deps.resolve).not.toHaveBeenCalled();
++    expect((await request(token, "POST")).status).toBe(200);
++    expect(deps.resolve).toHaveBeenCalledWith("fixture-site", "event-fixture", "approved", "user", { reviewApprovalToken: token });
++  });
++  it("rejects newly signed recipient-unbound tokens after conversion cutoff", async () => {
++    authority.conversionAt = new Date(Date.now() - 10000).toISOString();
++    expect(await reviewApprovalTokenAllowed(signApproveToken(baseClaims), { id: "fixture-site" })).toBe(false);
++  });
++  it("preserves future bound review decisions and isolates token domains", async () => {
++    const token = bound();
++    expect(verifyAnyApproveToken(token)?.kind).toBe("review"); expect(verifyApproveToken(token)).toBeNull(); expect(verifyWorkspaceApproveToken(token)).toBeNull();
++    expect((await request(token, "POST")).status).toBe(200);
++    expect(deps.resolve).toHaveBeenCalledWith("fixture-site", "event-fixture", "approved", "user", { reviewApprovalToken: token });
++  });
++  it.each(["workspace_collection_publish", "workspace_newsletter_issue", "workspace_google_listing_draft", "inquiry_message_review", "make_real"])("denies publishing kind %s for a review token", async kind => {
++    deps.event.mockResolvedValue({ tenantId: "fixture-site", type: "change_request", metadata: { kind } });
++    expect((await request(bound(), "GET")).status).toBe(403); expect((await request(bound(), "POST")).status).toBe(403);
++    expect(deps.resolve).not.toHaveBeenCalled();
++  });
++  it("rejects wrong-tenant events even with a valid signature", async () => {
++    deps.event.mockResolvedValue({ tenantId: "other-site", type: "review", metadata: { kind: "review_reply_draft" } });
++    expect((await request(bound(), "POST")).status).toBe(403); expect(deps.resolve).not.toHaveBeenCalled();
++    expect(await reviewApprovalTokenAllowed(bound(), { id: "other-site" })).toBe(false);
++  });
++  it("rejects forged/expired bound tokens before any resolver", async () => {
++    const token = bound(); expect((await request(token.slice(0, -3) + "bad", "POST")).status).toBe(400);
++    const expired = signReviewApproveToken({ ...baseClaims, workspaceId: workspace, recipient: authority.recipient, authorityVersion: authority.version }, Date.now() - APPROVE_LINK_TTL_MS - 1000);
++    expect(verifyReviewApproveToken(expired)).toBeNull(); expect((await request(expired, "POST")).status).toBe(400); expect(deps.resolve).not.toHaveBeenCalled();
++  });
++  it("rejects both old and bound tokens after trust/ownership change-back", async () => {
++    const old = signApproveToken(baseClaims), future = bound();
++    authority.legacyAllowed = false; authority.version = "b".repeat(64);
++    expect((await request(old, "POST")).status).toBe(403); expect((await request(future, "POST")).status).toBe(403); expect(deps.resolve).not.toHaveBeenCalled();
++  });
++  it("denies accepted owner legacy tokens, while newly bound current owner can decide", async () => {
++    authority.legacyAllowed = false;
++    expect((await request(signApproveToken(baseClaims), "POST")).status).toBe(403);
++    expect((await request(bound(), "POST")).status).toBe(200);
++  });
++  it("fails closed on unavailable or malformed authority", async () => {
++    deps.rpc.mockResolvedValue({ data: null, error: { message: "unavailable" } });
++    expect((await request(bound(), "POST")).status).toBe(403);
++    deps.rpc.mockResolvedValue({ data: { ...authority, legacyAllowed: "yes" }, error: null });
++    expect(await readReviewApprovalAuthority("fixture-site")).toBeNull(); expect(deps.resolve).not.toHaveBeenCalled();
++  });
++  it("fails closed on timeout", async () => {
++    vi.useFakeTimers(); deps.rpc.mockReturnValue(new Promise(() => {}));
++    const result = readReviewApprovalAuthority("fixture-site"); await vi.advanceTimersByTimeAsync(1501); expect(await result).toBeNull();
++  });
++  it("keeps converted review email action buttons with exact current authority", async () => {
++    const { maybeAlertNewReview } = await import("@/lib/review-alert");
++    await maybeAlertNewReview({ tenant: { id: "fixture-site", siteName: "Fixture", ownerEmail: "owner@example.test" } as never,
++      reviewId: "review-fixture", review: { author: "Fixture Owner", rating: 5 }, draftedReply: "Thank you", reviewsUrl: "https://admin.example.test/dashboard/reviews", reviewEventId: baseClaims.eventId });
++    const mail = deps.send.mock.calls[0]![0];
++    for (const [key, action] of [["approveUrl", "approve"], ["notYetUrl", "not-yet"]] as const) {
++      const token = new URL(mail[key]).searchParams.get("token")!;
++      expect(verifyReviewApproveToken(token)).toEqual({ ...baseClaims, action, workspaceId: workspace, recipient: authority.recipient, authorityVersion: authority.version });
++    }
++  });
++});
+diff --git a/src/__tests__/review-reply-listing-path.test.ts b/src/__tests__/review-reply-listing-path.test.ts
+index 92762fa68..84af352f9 100644
+--- a/src/__tests__/review-reply-listing-path.test.ts
++++ b/src/__tests__/review-reply-listing-path.test.ts
+@@ -3,6 +3,8 @@ import type { GoogleListingClient, GoogleResult, GoogleReview } from "@/products
+ import { createMemoryReceiptStore, type ListingReceiptStore } from "@/products/google-listing/receipts";
+ import type { TenantReplyDeps } from "@/products/google-listing/tenant-replies";
+ import type { GoogleGrant } from "@/lib/google-access";
++import { postTenantReviewReply } from "@/products/google-listing/tenant-replies";
++import { paceGoogleWrites } from "@/products/google-listing/pacing";
+ 
+ /**
+  * The tenant approve path for review replies, moved onto the Google listing
+@@ -37,6 +39,7 @@ vi.mock("../lib/events", () => ({
+   claimEventAction: (...args: unknown[]) => mockClaimEventAction(...args),
+   finishEventAction: (...args: unknown[]) => mockFinishEventAction(...args),
+   markExecutionExternalAccepted: (...args: unknown[]) => mockMark(...args),
++  markExecutionExternalUnconfirmed: vi.fn(async () => {}),
+   updateEvent: vi.fn(),
+ }));
+ vi.mock("@/products/inquiries", () => ({
+@@ -124,6 +127,34 @@ beforeEach(() => {
+ });
+ 
+ describe("review reply approve on the listing System", () => {
++  it("checks admission at raw PUT and never writes after refusal", async () => {
++    const beforeReplyDispatch = vi.fn(async () => { throw new Error("owner changed"); });
++    const { google, receipts } = setup({ beforeReplyDispatch });
++    const result = await postTenantReviewReply({ tenantId: "tenant-a", workspaceId: WORKSPACE, eventId: "evt_rr", attemptId: "attempt_1", reviewId: "rev_9", text: "Thanks", authority: { kind: "owner_approval", actor: "user", approvalRef: "event:evt_rr" } }, deps);
++    expect(result.status).toBe("failed"); expect(google.writes).toHaveLength(0);
++    expect(beforeReplyDispatch).toHaveBeenCalledWith({ accountId: "accounts/111", locationId: "333" }, "rev_9", "Thanks", expect.any(String));
++    expect(receipts.all()).toHaveLength(1);
++  });
++  it("rechecks admission after429 backoff and sends no second PUT after transfer", async () => {
++    let owner = true;
++    const settle = vi.fn(async () => {});
++    const beforeReplyDispatch = vi.fn(async () => { if (!owner) throw new Error("owner changed"); return { settle }; });
++    const { google } = setup({ beforeReplyDispatch, pace: (client, workspaceId, locationId) => paceGoogleWrites(client, workspaceId, locationId,
++      { limited: async () => false, wait: async () => { owner = false; } }) });
++    vi.mocked(google.client.updateReply).mockResolvedValueOnce({ ok: false, kind: "rate_limited", status: 429, detail: "slow" });
++    const result = await postTenantReviewReply({ tenantId: "tenant-a", workspaceId: WORKSPACE, eventId: "evt_rr", attemptId: "attempt_1", reviewId: "rev_9", text: "Thanks", authority: { kind: "owner_approval", actor: "user", approvalRef: "event:evt_rr" } }, deps);
++    expect(result.status).toBe("failed"); expect(google.client.updateReply).toHaveBeenCalledTimes(1);
++    expect(beforeReplyDispatch).toHaveBeenCalledTimes(2); expect(settle).toHaveBeenCalledWith(429);
++  });
++  it("preserves accepted command after owner change and settlement failure without resend", async () => {
++    const settle = vi.fn(async () => { throw new Error("settlement unavailable"); });
++    const beforeReplyDispatch = vi.fn(async () => ({ settle }));
++    const { google } = setup({ beforeReplyDispatch });
++    const input = { tenantId: "tenant-a", workspaceId: WORKSPACE, eventId: "evt_rr", attemptId: "attempt_1", reviewId: "rev_9", text: "Thanks", authority: { kind: "owner_approval" as const, actor: "user", approvalRef: "event:evt_rr" } };
++    expect((await postTenantReviewReply(input, deps)).status).toBe("posted");
++    expect((await postTenantReviewReply(input, deps)).status).toBe("already_on_google");
++    expect(google.client.updateReply).toHaveBeenCalledTimes(1); expect(settle).toHaveBeenCalledWith(200);
++  });
+   it("posts through the listing System with one listing receipt and no outside-write receipt", async () => {
+     const { google, receipts } = setup();
+     const result = await resolveEventAction("tenant-a", "evt_rr", "approved", "owner-user-1");
+diff --git a/src/__tests__/w6-review-reply-reservations.test.ts b/src/__tests__/w6-review-reply-reservations.test.ts
+index a11421781..98d3777ca 100644
+--- a/src/__tests__/w6-review-reply-reservations.test.ts
++++ b/src/__tests__/w6-review-reply-reservations.test.ts
+@@ -19,6 +19,32 @@ beforeEach(() => {
+ });
+ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
+ describe("review replies through durable dispatch reservations", () => {
++  it("compatibility admits the exact reserved PUT even with the operator release off", async () => {
++    vi.stubEnv("STRELVA_OPERATOR_QUEUE_RELEASE", "0");
++    const settle = vi.fn(async () => {});
++    const beforeDispatch = vi.fn(async () => ({ settle }));
++    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(json({})).mockResolvedValueOnce(json({})).mockResolvedValueOnce(json({ reviewReply: { comment: "Thanks" } }));
++    expect(await publishReviewReply("alpha", "review", "Thanks", { ...options, beforeDispatch })).toMatchObject({ published: true });
++    expect(beforeDispatch).toHaveBeenCalledWith("attempt", "https://mybusiness.googleapis.com/v4/accounts/1/locations/2/reviews/review/reply");
++    expect(beforeDispatch.mock.invocationCallOrder[0]!).toBeLessThan(fetch.mock.invocationCallOrder[1]!);
++    expect(settle).toHaveBeenCalledWith(200);
++  });
++  it("sends no PUT after lost admission response and records definitive no-dispatch", async () => {
++    const beforeDispatch = vi.fn(async () => { throw new Error("lost admission response"); });
++    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(json({}));
++    expect(await publishReviewReply("alpha", "review", "Thanks", { ...options, beforeDispatch })).toMatchObject({ published: false });
++    expect(fetch.mock.calls.filter(([, init]) => init?.method === "PUT")).toHaveLength(0);
++    expect(mocks.complete).toHaveBeenCalledWith("attempt", expect.objectContaining({ acceptance: "rejected", acceptanceDetail: expect.stringContaining("Nothing sent") }));
++  });
++  it.each([0, 503])("compatibility keeps provider uncertainty %s unretryable", async status => {
++    const settle = vi.fn(async () => {});
++    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(json({}));
++    if (status) fetch.mockResolvedValueOnce(json({}, status)); else fetch.mockRejectedValueOnce(new Error("lost Google response"));
++    const result = await publishReviewReply("alpha", "review", "Thanks", { ...options, beforeDispatch: async () => ({ settle }) });
++    expect(result).toMatchObject({ published: false, evidence: expect.stringMatching(/uncertain/i) });
++    expect(mocks.complete).toHaveBeenCalledWith("attempt", expect.objectContaining({ acceptance: "unknown" }));
++    expect(settle).toHaveBeenCalledWith(status);
++  });
+   it.each(["matched", "differs", "failed"])("settles accepted before %s read-back and reads the review resource", async result => {
+     const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(json({ reviewReply: { comment: "Before" } })).mockResolvedValueOnce(json({}));
+     fetch.mockResolvedValueOnce(result === "failed" ? json({}, 503) : json({ reviewReply: { comment: result === "matched" ? "Thank you!" : "Other" } }));
+diff --git a/src/app/api/approve/route.ts b/src/app/api/approve/route.ts
+index f2290417d..a40fe8d37 100644
+--- a/src/app/api/approve/route.ts
++++ b/src/app/api/approve/route.ts
+@@ -13,8 +13,9 @@ import { ownerNoticeUrl } from "@/lib/owner-notice-url";
+  * reply), not-yet → "dismissed".
+  *
+  * Security:
+- *  - The token is the ONLY authorization — the route is public (no session) so it
+- *    works from an email client. Tampering the eventId/tenantId/action breaks the
++ *  - The signed token and current database authority authorize converted reviews.
++ *    The route is public (no session) so it works from an email client.
++ *    Tampering the eventId/tenantId/action breaks the
+  *    HMAC; an expired token is rejected. The action is bound into the signature,
+  *    so an "approve" link can't be edited into a different event or tenant.
+  *  - **GET never mutates.** Approving posts a review reply to Google (a
+@@ -27,10 +28,10 @@ import { ownerNoticeUrl } from "@/lib/owner-notice-url";
+  *  - Idempotent: a re-submitted or replayed (unexpired) token hits an already-
+  *    resolved event and renders a friendly "already handled" page, never a
+  *    double action.
+- *  - A tenant link binds no recipient, so it decides only for a site with no
+- *    business. Once the site is converted, its owner decides in Strelva, where
+- *    links go only to the trusted owner address (#524); an old tenant link,
+- *    or one sent to an address an operator edited, does nothing.
++ *  - Old tenant links survive initial conversion only for review drafts whose
++ *    original recipient remains trusted and has never accepted or transferred
++ *    ownership. New converted review links bind recipient, workspace and a
++ *    rotating authority version; workspace publishing keeps its own token.
+  */
+ import { NextResponse } from "next/server";
+ import { verifyAnyApproveToken, type ApproveLinkClaims, type WorkspaceApproveLinkClaims } from "@/lib/approve-link";
+@@ -40,6 +41,7 @@ import { getTenantDashboardUrl } from "@/lib/tenant-urls";
+ import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
+ import { ownerWebsitePreviewHref, ownerWebsitePreviewMayBeOn } from "@/app/api/owner-website-preview/links";
+ import { legacyOwnerLinkAllowed } from "@/lib/owner-recipient";
++import { isManagedReviewApproval, reviewApprovalTokenAllowed } from "@/lib/review-approval-authority";
+ 
+ export const dynamic = "force-dynamic";
+ 
+@@ -243,9 +245,14 @@ async function getPage(request: Request): Promise<NextResponse> {
+   const tenant = await getTenantConfig(claims.tenantId).catch(() => null);
+   const businessName = tenant?.siteName || "your site";
+   const dashboardUrl = tenant ? await ownerNoticeUrl(tenant, "/dashboard", getTenantDashboardUrl(tenant, "/dashboard")) : undefined;
+-  if (!await legacyOwnerLinkAllowed({ id: claims.tenantId, ownerEmail: tenant?.ownerEmail })) {
++  if (!await reviewApprovalTokenAllowed(token, { id: claims.tenantId, ownerEmail: tenant?.ownerEmail })) {
+     return noticePage({ status: 403, ...MOVED, dashboardUrl, buttonLabel: "Open your dashboard" });
+   }
++  const reviewOnly = verified.kind === "review" || !await legacyOwnerLinkAllowed({ id: claims.tenantId, ownerEmail: tenant?.ownerEmail });
++  if (reviewOnly) {
++    const event = await (await import("@/lib/events")).getEventRaw(claims.eventId).catch(() => null);
++    if (!event || !isManagedReviewApproval(event, claims.tenantId)) return noticePage({ status: 403, ...MOVED, dashboardUrl });
++  }
+   const isApprove = claims.action === "approve";
+ 
+   return confirmPage({
+@@ -280,7 +287,7 @@ async function postPage(request: Request): Promise<NextResponse> {
+   const businessName = tenant?.siteName || "your site";
+   const dashboardUrl = tenant ? await ownerNoticeUrl(tenant, "/dashboard", getTenantDashboardUrl(tenant, "/dashboard")) : undefined;
+   const workflowAction = claims.action === "approve" ? "approved" : "dismissed";
+-  if (!await legacyOwnerLinkAllowed({ id: claims.tenantId, ownerEmail: tenant?.ownerEmail })) {
++  if (!await reviewApprovalTokenAllowed(token, { id: claims.tenantId, ownerEmail: tenant?.ownerEmail })) {
+     return noticePage({ status: 403, ...MOVED, dashboardUrl, buttonLabel: "Open your dashboard" });
+   }
+ 
+@@ -290,10 +297,18 @@ async function postPage(request: Request): Promise<NextResponse> {
+     // live emails working; new workspace publishing requires the ws2 link.
+     const { getEventRaw } = await import("@/lib/events");
+     const event = await getEventRaw(claims.eventId);
++    const reviewOnly = verified.kind === "review" || !await legacyOwnerLinkAllowed({ id: claims.tenantId, ownerEmail: tenant?.ownerEmail });
++    if (reviewOnly && (!event || !isManagedReviewApproval(event, claims.tenantId))) {
++      return noticePage({ status: 403, ...MOVED, dashboardUrl });
++    }
+     if (event && ["workspace_collection_publish", "workspace_newsletter_issue", "workspace_google_listing_draft"].includes(String(event.metadata?.kind))) {
+       return noticePage({ status: 403, heading: "Use the current approval link", body: "Open this item in Needs you, or use the recipient-bound approval link Strelva prepared for it." });
+     }
+-    result = await resolveEventAction(claims.tenantId, claims.eventId, workflowAction);
++    // Every review carries authorization, even if the route observed an
++    // unconverted tenant: conversion may commit before the provider call.
++    result = reviewOnly || (event && isManagedReviewApproval(event, claims.tenantId))
++      ? await resolveEventAction(claims.tenantId, claims.eventId, workflowAction, "user", { reviewApprovalToken: token })
++      : await resolveEventAction(claims.tenantId, claims.eventId, workflowAction);
+   } catch (err) {
+     console.error(`[api/approve] resolveEventAction threw for ${claims.tenantId}/${claims.eventId}:`, err);
+     return noticePage({
+diff --git a/src/app/api/cron/poll-google-reviews/route.ts b/src/app/api/cron/poll-google-reviews/route.ts
+index e61a7d4dd..dce563fec 100644
+--- a/src/app/api/cron/poll-google-reviews/route.ts
++++ b/src/app/api/cron/poll-google-reviews/route.ts
+@@ -270,6 +270,7 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
+         review: { author: review.reviewer.displayName, rating, text: review.comment },
+         reviewsUrl: await ownerNoticeUrl(tenant, "/dashboard/reviews", getTenantDashboardUrl(tenant, "/dashboard/reviews")),
+         draftedReply,
++        reviewEventId: draftEventId,
+         approveUrl,
+         notYetUrl,
+         logPrefix: "[cron poll-google-reviews]",
+diff --git a/src/lib/approve-link.ts b/src/lib/approve-link.ts
+index 9beb6ff93..0c890003c 100644
+--- a/src/lib/approve-link.ts
++++ b/src/lib/approve-link.ts
+@@ -35,7 +35,7 @@ interface ApproveLinkPayload extends ApproveLinkClaims {
+ 
+ /** Approval links live longer than an OAuth handshake — an owner may not open
+  *  the email for days — but not forever. */
+-const APPROVE_LINK_TTL_MS = 14 * 24 * 60 * 60 * 1000;
++export const APPROVE_LINK_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+ 
+ function getApproveLinkSecret(): string {
+   const secret =
+@@ -59,6 +59,12 @@ export function signApproveToken(claims: ApproveLinkClaims, now = Date.now()): s
+ 
+ /** Verify a token, returning its claims or null when tampered/expired/malformed. */
+ export function verifyApproveToken(token: string, now = Date.now()): ApproveLinkClaims | null {
++  const payload = verifyLegacyApprovePayload(token, now);
++  return payload ? { eventId: payload.eventId, tenantId: payload.tenantId, action: payload.action } : null;
++}
++
++/** Retain signed expiry for conversion cutoff checks; never decode unverified claims. */
++export function verifyLegacyApprovePayload(token: string, now = Date.now()): ApproveLinkPayload | null {
+   // Split on the first '.' only, so a base64url payload that somehow contains
+   // a '.' (e.g. from a future encoding change) doesn't silently truncate the
+   // signature portion.
+@@ -82,8 +88,8 @@ export function verifyApproveToken(token: string, now = Date.now()): ApproveLink
+     if (typeof payload.eventId !== "string" || !payload.eventId.trim()) return null;
+     if (typeof payload.tenantId !== "string" || !payload.tenantId.trim()) return null;
+     if (payload.action !== "approve" && payload.action !== "not-yet") return null;
+-    if (typeof payload.exp !== "number" || payload.exp < now) return null;
+-    return { eventId: payload.eventId, tenantId: payload.tenantId, action: payload.action };
++    if (typeof payload.exp !== "number" || !Number.isFinite(payload.exp) || payload.exp < now || payload.exp > now + APPROVE_LINK_TTL_MS) return null;
++    return { eventId: payload.eventId, tenantId: payload.tenantId, action: payload.action, exp: payload.exp };
+   } catch {
+     return null;
+   }
+@@ -173,14 +179,55 @@ export function verifyWorkspaceApproveToken(token: string, now = Date.now()): Wo
+ /** Which kind of approve link a token is, or null when it is neither. */
+ export function verifyAnyApproveToken(token: string, now = Date.now()):
+   | { kind: "tenant"; claims: ApproveLinkClaims }
++  | { kind: "review"; claims: ReviewApproveLinkClaims }
+   | { kind: "workspace"; claims: WorkspaceApproveLinkClaims }
+   | null {
+   const workspace = verifyWorkspaceApproveToken(token, now);
+   if (workspace) return { kind: "workspace", claims: workspace };
++  const review = verifyReviewApproveToken(token, now);
++  if (review) return { kind: "review", claims: review };
+   const tenant = verifyApproveToken(token, now);
+   return tenant ? { kind: "tenant", claims: tenant } : null;
+ }
+ 
++/** Review-only links preserve the tenant/event resolver and bind current authority. */
++export interface ReviewApproveLinkClaims extends ApproveLinkClaims {
++  workspaceId: string;
++  recipient: string;
++  authorityVersion: string;
++}
++const REVIEW_LINK_DOMAIN = "review3.";
++export function signReviewApproveToken(claims: ReviewApproveLinkClaims, now = Date.now()): string {
++  const payload = { ...claims, recipient: claims.recipient.trim().toLowerCase(), v: 3, exp: now + APPROVE_LINK_TTL_MS };
++  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
++  return `${encoded}.${sign(REVIEW_LINK_DOMAIN + encoded)}`;
++}
++export function verifyReviewApproveToken(token: string, now = Date.now()): ReviewApproveLinkClaims | null {
++  const payload = verifyReviewApprovePayload(token, now);
++  if (!payload) return null;
++  return { tenantId: payload.tenantId, eventId: payload.eventId, action: payload.action, workspaceId: payload.workspaceId,
++    recipient: payload.recipient, authorityVersion: payload.authorityVersion };
++}
++export function verifyReviewApprovePayload(token: string, now = Date.now()): (ReviewApproveLinkClaims & { exp: number }) | null {
++  const dot = token.indexOf(".");
++  if (dot < 1) return null;
++  const encoded = token.slice(0, dot), provided = Buffer.from(token.slice(dot + 1));
++  const expected = Buffer.from(sign(REVIEW_LINK_DOMAIN + encoded));
++  if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) return null;
++  try {
++    const p = JSON.parse(Buffer.from(encoded, "base64url").toString());
++    if (p.v !== 3 || typeof p.tenantId !== "string" || !p.tenantId.trim() || typeof p.eventId !== "string" || !p.eventId.trim()
++      || typeof p.workspaceId !== "string" || !UUID.test(p.workspaceId) || typeof p.recipient !== "string"
++      || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(p.recipient) || p.recipient !== p.recipient.trim().toLowerCase()
++      || typeof p.authorityVersion !== "string" || !/^[0-9a-f]{64}$/.test(p.authorityVersion)
++      || !["approve", "not-yet"].includes(p.action) || !Number.isFinite(p.exp) || p.exp < now || p.exp > now + APPROVE_LINK_TTL_MS) return null;
++    return { tenantId: p.tenantId, eventId: p.eventId, action: p.action, workspaceId: p.workspaceId, recipient: p.recipient, authorityVersion: p.authorityVersion, exp: p.exp };
++  } catch { return null; }
++}
++export function buildReviewApproveUrl(origin: string, claims: ReviewApproveLinkClaims): string {
++  return `${origin.replace(/\/+$/, "")}/api/approve?token=${encodeURIComponent(signReviewApproveToken(claims))}`;
++}
++
+ export function buildWorkspaceApproveUrl(baseOrigin: string, claims: WorkspaceApproveLinkClaims): string {
+   const origin = baseOrigin.replace(/\/+$/, "");
+   return `${origin}/api/approve?token=${encodeURIComponent(signWorkspaceApproveToken(claims))}`;
+diff --git a/src/lib/event-actions.ts b/src/lib/event-actions.ts
+index b6daaced1..316205c39 100644
+--- a/src/lib/event-actions.ts
++++ b/src/lib/event-actions.ts
+@@ -24,7 +24,7 @@ import type { ContentMap, ContentSection } from "./types";
+ import type { CustomChangeRequestStatus } from "./types";
+ // Inquiries and the Google listing System through the ports src/lib
+ // declares (Strelva Reborn section 7).
+-import { workspacePorts } from "./workspace-ports";
++import { workspacePorts, type TenantReviewDispatchHook } from "./workspace-ports";
+ 
+ /** The actor the review auto-post cron approves with: the listing receipt's
+  * authority is then the auto-reply policy, never an owner approval. */
+@@ -147,6 +147,7 @@ export async function resolveEventAction(
+   eventId: string,
+   action: EventWorkflowAction,
+   actorId = "user",
++  authorization?: { reviewApprovalToken: string },
+ ): Promise<{ changed: boolean; reason?: string }> {
+   // Redis-authoritative read: this path EXECUTES the event's payload (the
+   // external write), so it must see live metadata — an owner-edited review reply,
+@@ -156,6 +157,12 @@ export async function resolveEventAction(
+   if (!event) return { changed: false, reason: "not_found" };
+   if (event.tenantId !== tenantId) return { changed: false, reason: "wrong_tenant" };
+   if (event.status !== "pending") return { changed: false, reason: "already_resolved" };
++  if (authorization) {
++    const { isManagedReviewApproval, reviewApprovalTokenAllowed } = await import("./review-approval-authority");
++    if (!isManagedReviewApproval(event, tenantId) || !await reviewApprovalTokenAllowed(authorization.reviewApprovalToken, { id: tenantId }, { eventId, action })) {
++      return { changed: false, reason: "review_approval_authority_changed" };
++    }
++  }
+ 
+   // A message review has a provider checkpoint in addition to its event. If a
+   // process stopped after the provider accepted the message, recover the
+@@ -288,7 +295,19 @@ export async function resolveEventAction(
+     action === "approved" ? await shadowStartExecutionAttempt(eventId, claim.attemptId) : null;
+ 
+   try {
+-    const result = await executeResolvedEventAction(tenantId, eventId, action, event, actorId, claim.attemptId);
++    let executionEvent = event;
++    if (authorization) {
++      const { isManagedReviewApproval, reviewApprovalTokenAllowed } = await import("./review-approval-authority");
++      const current = await getEventRaw(eventId);
++      if (!current || !isManagedReviewApproval(current, tenantId) || !await reviewApprovalTokenAllowed(authorization.reviewApprovalToken, { id: tenantId }, { eventId, action })) {
++        const result = { changed: false, reason: "review_approval_authority_changed" };
++        await finishEventAction(eventId, claim.attemptId, { state: "failed", reason: result.reason });
++        await shadowFinishExecutionAttempt(shadowAttemptId, { success: false, detail: result.reason });
++        return result;
++      }
++      executionEvent = current;
++    }
++    const result = await executeResolvedEventAction(tenantId, eventId, action, executionEvent, actorId, claim.attemptId, authorization);
+     await finishEventAction(eventId, claim.attemptId, {
+       state: result.changed ? "completed" : "failed",
+       reason: result.reason,
+@@ -313,6 +332,7 @@ async function executeResolvedEventAction(
+   event: NonNullable<Awaited<ReturnType<typeof getEvent>>>,
+   actorId: string,
+   attemptId: string,
++  authorization?: { reviewApprovalToken: string },
+ ): Promise<{ changed: boolean; reason?: string }> {
+ 
+   const inquiries = await workspacePorts().inquiries();
+@@ -550,6 +570,11 @@ async function executeResolvedEventAction(
+   // as handled.
+   if (event.type === "review" && event.metadata?.kind === "review_reply_draft") {
+     const metaReviewId = typeof event.metadata?.reviewId === "string" ? event.metadata.reviewId : "";
++    if (authorization && action === "dismissed") {
++      const { admitReviewApprovalDispatch } = await import("./review-approval-authority");
++      await admitReviewApprovalDispatch(authorization.reviewApprovalToken, { tenantId, eventId, action, attemptId,
++        ledger: "event", ledgerId: attemptId, request: { reviewId: metaReviewId } });
++    }
+     if (action === "approved") {
+       const reviewId = metaReviewId;
+       const replyText =
+@@ -565,6 +590,16 @@ async function executeResolvedEventAction(
+       // else keeps the legacy publisher and its outside-write receipt.
+       const { defaultTenantReplyDeps, postTenantReviewReply, routeTenantReviewReply } = await workspacePorts().tenantReviewReplies();
+       const deps = await defaultTenantReplyDeps();
++      if (authorization) {
++        const beforeReplyDispatch: TenantReviewDispatchHook = async (location, dispatchedReviewId, text, receiptId) => {
++          const { admitReviewApprovalDispatch } = await import("./review-approval-authority");
++          const account = location.accountId.startsWith("accounts/") ? location.accountId : `accounts/${location.accountId}`;
++          return admitReviewApprovalDispatch(authorization.reviewApprovalToken, { tenantId, eventId, action, attemptId,
++            ledger: "listing", ledgerId: receiptId, request: { reviewId: dispatchedReviewId, reply: text, locationId: location.locationId,
++              providerTarget: `https://mybusiness.googleapis.com/v4/${account}/locations/${encodeURIComponent(location.locationId)}/reviews/${encodeURIComponent(dispatchedReviewId)}/reply` } });
++        };
++        Object.assign(deps, { beforeReplyDispatch });
++      }
+       const route = await routeTenantReviewReply(tenantId, deps);
+       let acceptedUnverified = false;
+       if (route.kind === "listing") {
+@@ -584,7 +619,12 @@ async function executeResolvedEventAction(
+         acceptedUnverified = posted.status === "posted_unverified" || posted.status === "held_by_google" || posted.status === "accepted_unrecorded";
+       } else {
+         const { publishReviewReply } = await import("./gbp-replies");
+-        const result = await publishReviewReply(tenantId, reviewId, replyText, { actor: isDelegateActor(actorId) ? `${actorId} approved event ${eventId}` : `approved event ${eventId}`, ...(process.env.STRELVA_OPERATOR_QUEUE_RELEASE === "1" ? { commandKey: `approval:${eventId}` } : {}) });
++        const result = await publishReviewReply(tenantId, reviewId, replyText, { actor: isDelegateActor(actorId) ? `${actorId} approved event ${eventId}` : `approved event ${eventId}`, ...(process.env.STRELVA_OPERATOR_QUEUE_RELEASE === "1" || authorization ? { commandKey: `approval:${eventId}` } : {}),
++          ...(authorization ? { beforeDispatch: async (ledgerId: string, providerTarget: string) => {
++            const { admitReviewApprovalDispatch } = await import("./review-approval-authority");
++            return admitReviewApprovalDispatch(authorization.reviewApprovalToken, { tenantId, eventId, action, attemptId,
++              ledger: "legacy", ledgerId, request: { reviewId, reply: replyText, providerTarget } });
++          } } : {}) });
+         if (!result.published) return { changed: false, reason: "review_reply_failed" };
+       }
+       // Reply accepted by Google — mark acceptance before resolving so a lost
+diff --git a/src/lib/gbp-replies.ts b/src/lib/gbp-replies.ts
+index 102368878..676381570 100644
+--- a/src/lib/gbp-replies.ts
++++ b/src/lib/gbp-replies.ts
+@@ -123,7 +123,7 @@ export async function publishReviewReply(
+   tenantId: string,
+   reviewId: string,
+   replyText: string,
+-  options: { actor?: string; commandKey?: string } = {}
++  options: { actor?: string; commandKey?: string; beforeDispatch?: (attemptId: string, replyUrl: string) => Promise<{ settle(responseStatus: number): Promise<void> }> } = {}
+ ): Promise<PublishReplyResult> {
+   const actor = options.actor ?? "strelva";
+   const checkedAt = new Date().toISOString();
+@@ -162,8 +162,8 @@ export async function publishReviewReply(
+ 
+   const replyUrl = reviewReplyUrl(meta.accountId, meta.locationId, reviewId);
+ 
+-  if (process.env.STRELVA_OPERATOR_QUEUE_RELEASE === "1") {
+-    return publishReceiptedReply({ tenantId, reviewId, replyText, actor, commandKey: options.commandKey, accessToken, replyUrl });
++  if (process.env.STRELVA_OPERATOR_QUEUE_RELEASE === "1" || options.beforeDispatch) {
++    return publishReceiptedReply({ tenantId, reviewId, replyText, actor, commandKey: options.commandKey, accessToken, replyUrl, beforeDispatch: options.beforeDispatch });
+   }
+ 
+   // ── Publish ────────────────────────────────────────────────────────────────
+@@ -238,6 +238,7 @@ export async function publishReviewReply(
+ async function publishReceiptedReply(input: {
+   tenantId: string; reviewId: string; replyText: string; actor: string;
+   commandKey?: string; accessToken: string; replyUrl: string;
++  beforeDispatch?: (attemptId: string, replyUrl: string) => Promise<{ settle(responseStatus: number): Promise<void> }>;
+ }): Promise<PublishReplyResult> {
+   const { tenantId, reviewId, replyText, actor, accessToken, replyUrl } = input;
+   const commandKey = input.commandKey ?? `review-reply:${createHash("sha256").update(JSON.stringify([tenantId, reviewId, replyText])).digest("hex")}`;
+@@ -260,16 +261,27 @@ async function publishReceiptedReply(input: {
+   const beforeState = await getReply(accessToken, readUrl);
+   const base = { commandKey, tenantId, writeKind: "review_reply" as const, request, beforeState,
+     subject: "Reply to a Google review", actor };
++  let admission: { settle(responseStatus: number): Promise<void> } | undefined;
++  if (input.beforeDispatch) {
++    try { admission = await input.beforeDispatch(attemptId, replyUrl); }
++    catch {
++      try { await port.completeGoogleWrite(attemptId, { ...base, acceptance: "rejected", acceptanceDetail: "Review authority changed before dispatch. Nothing sent." }); } catch { /* Pending attempt remains conservative. */ }
++      return { published: false, verified: false, evidence: "Review authority changed. Nothing sent." };
++    }
++  }
+   let response: Response;
+   try {
+-    response = await fetch(replyUrl, { method: "PUT", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ comment: replyText }) });
++    response = await fetch(replyUrl, { method: "PUT", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ comment: replyText }), ...(input.beforeDispatch ? { signal: AbortSignal.timeout(10_000) } : {}) });
+   } catch {
++    await admission?.settle(0).catch(() => {});
+     try { await port.completeGoogleWrite(attemptId, { ...base, acceptance: "unknown", acceptanceDetail: "No response from Google. Reconcile before any new approval." }); } catch { /* Pending attempt blocks replay. */ }
+     return { published: false, verified: false, evidence: "Google acceptance uncertain. Do not resend." };
+   }
++  await admission?.settle(response.status).catch(() => {});
+   if (!response.ok) {
+-    try { await port.completeGoogleWrite(attemptId, { ...base, acceptance: "rejected", acceptanceDetail: `Google answered ${response.status}.` }); } catch { /* Pending attempt blocks replay. */ }
+-    return { published: false, verified: false, evidence: `Google rejected the reply (${response.status}).` };
++    const acceptance = input.beforeDispatch && response.status >= 500 ? "unknown" : "rejected";
++    try { await port.completeGoogleWrite(attemptId, { ...base, acceptance, acceptanceDetail: `Google answered ${response.status}.` }); } catch { /* Pending attempt blocks replay. */ }
++    return { published: false, verified: false, evidence: acceptance === "unknown" ? "Google acceptance uncertain. Reconcile before any resend." : `Google rejected the reply (${response.status}).` };
+   }
+   // Acceptance is saved before parsing or verification. A failed settlement leaves
+   // the pending reservation and must still return accepted to the approval path.
+diff --git a/src/lib/review-alert.ts b/src/lib/review-alert.ts
+index e01009ef2..31edc95cc 100644
+--- a/src/lib/review-alert.ts
++++ b/src/lib/review-alert.ts
+@@ -8,14 +8,17 @@
+  * email is switched on rather than being lost forever — the same "only stamp on a
+  * real send" discipline the review-nudge cron uses.
+  *
+- * One-click Approve / Not-yet links go only to a site with no business: the
+- * route refuses them once the site is converted (src/app/api/approve), so a
+- * converted owner gets the review and the dashboard link.
++ * Converted review links bind the current trusted recipient, workspace and
++ * authority version. Missing or inconsistent authority suppresses the buttons.
++ * Unconverted sites retain their existing tenant links.
+  */
+ import { resolveOwnerNoticeRecipient } from "./owner-recipient";
+ import { getRedis } from "@/platform/infra/redis";
+ import { sendReviewNeedsReplyEmail } from "./delivery-email";
+ import type { TenantConfig } from "./types";
++import { readReviewApprovalAuthority } from "./review-approval-authority";
++import { buildReviewApproveUrl } from "./approve-link";
++import { getTenantDashboardUrl } from "./tenant-urls";
+ 
+ /** Keep the per-review marker well past the poll window so a re-seen review can't
+  *  re-alert. `reb:` persistent-key prefix per AGENTS.md. */
+@@ -33,12 +36,24 @@ export async function maybeAlertNewReview(params: {
+   draftedReply?: string;
+   approveUrl?: string;
+   notYetUrl?: string;
++  reviewEventId?: string;
+   logPrefix?: string;
+ }): Promise<boolean> {
+   const recipient = await resolveOwnerNoticeRecipient(params.tenant);
+   if (!recipient) return false;
+   const { email } = recipient;
+-  const links = recipient.workspaceId === null ? { approveUrl: params.approveUrl, notYetUrl: params.notYetUrl } : {};
++  let links: { approveUrl?: string; notYetUrl?: string } = recipient.workspaceId === null
++    ? { approveUrl: params.approveUrl, notYetUrl: params.notYetUrl } : {};
++  if (recipient.workspaceId !== null && params.reviewEventId && params.draftedReply) {
++    const authority = await readReviewApprovalAuthority(params.tenant.id);
++    if (authority?.workspaceId === recipient.workspaceId && authority.recipient === email) {
++      const origin = getTenantDashboardUrl(params.tenant, "/");
++      const claims = { tenantId: params.tenant.id, eventId: params.reviewEventId, workspaceId: authority.workspaceId,
++        recipient: authority.recipient, authorityVersion: authority.version };
++      links = { approveUrl: buildReviewApproveUrl(origin, { ...claims, action: "approve" }),
++        notYetUrl: buildReviewApproveUrl(origin, { ...claims, action: "not-yet" }) };
++    }
++  }
+ 
+   const redis = getRedis();
+   // No dedup store → don't risk re-alerting the same review on every poll.
+diff --git a/src/lib/review-approval-authority.ts b/src/lib/review-approval-authority.ts
+new file mode 100644
+index 000000000..015071025
+--- /dev/null
++++ b/src/lib/review-approval-authority.ts
+@@ -0,0 +1,70 @@
++import { legacyOwnerLinkAllowed } from "./owner-recipient";
++import { isSupabaseConfigured } from "@/platform/infra/db/client";
++import { workspacePorts, type TenantReviewApprovalAuthority } from "./workspace-ports";
++import { APPROVE_LINK_TTL_MS, verifyLegacyApprovePayload, verifyReviewApproveToken } from "./approve-link";
++import type { UnifiedEvent } from "./types";
++import { randomUUID } from "node:crypto";
++import { verifyReviewApprovePayload } from "./approve-link";
++
++const TIMEOUT_MS = 1500;
++/** No cache: every decision reads current authority. Errors and timeouts deny. */
++export async function readReviewApprovalAuthority(tenantId: string): Promise<TenantReviewApprovalAuthority | null> {
++  let timer: ReturnType<typeof setTimeout> | undefined;
++  try {
++    return await Promise.race([
++      Promise.resolve().then(async () => (await workspacePorts().businessRecord()).readTenantReviewApprovalAuthority(tenantId)),
++      new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), TIMEOUT_MS); }),
++    ]);
++  } catch { return null; }
++  finally { if (timer) clearTimeout(timer); }
++}
++
++export function isManagedReviewApproval(event: Pick<UnifiedEvent, "tenantId" | "type" | "metadata">, tenantId: string): boolean {
++  return event.tenantId === tenantId && event.type === "review" && event.metadata?.kind === "review_reply_draft";
++}
++
++export async function reviewApprovalTokenAllowed(token: string, tenant: { id: string; ownerEmail?: string | null }, expected?: { eventId: string; action: string }): Promise<boolean> {
++  const review = verifyReviewApproveToken(token);
++  const legacy = review ? null : verifyLegacyApprovePayload(token);
++  const claims = review ?? legacy;
++  if (!claims || claims.tenantId !== tenant.id) return false;
++  if (expected && (claims.eventId !== expected.eventId || claims.action !== (expected.action === "approved" ? "approve" : expected.action === "dismissed" ? "not-yet" : null))) return false;
++  // Local tests/development retain the existing unconverted behavior. Bound
++  // workspace review tokens always require the database helper.
++  if (!isSupabaseConfigured()) return !review && legacyOwnerLinkAllowed(tenant);
++  const authority = await readReviewApprovalAuthority(tenant.id);
++  if (!authority || authority.tenantId !== tenant.id) return false;
++  if (review) return authority.workspaceId === review.workspaceId && authority.recipient === review.recipient && authority.version === review.authorityVersion;
++  if (!authority.legacyAllowed || !legacy) return false;
++  return !authority.conversionAt || legacy.exp - APPROVE_LINK_TTL_MS <= Date.parse(authority.conversionAt);
++}
++
++/** Commit admits this exact one-shot command. Subsequent owner changes revoke
++ * new admissions, while an already-admitted command may finish and reconcile. */
++export async function admitReviewApprovalDispatch(token: string, scope: {
++  tenantId: string; eventId: string; action: "approved" | "dismissed"; attemptId: string;
++  ledger: "legacy" | "listing" | "event"; ledgerId: string; request: Record<string, unknown>;
++}): Promise<{ grantId: string; settle(responseStatus: number): Promise<void> }> {
++  const review = verifyReviewApprovePayload(token);
++  const legacy = review ? null : verifyLegacyApprovePayload(token);
++  const claims = review ?? legacy;
++  if (!claims || claims.tenantId !== scope.tenantId || claims.eventId !== scope.eventId
++    || claims.action !== (scope.action === "approved" ? "approve" : "not-yet") || !isSupabaseConfigured()) {
++    throw new Error("review_approval_authority_changed");
++  }
++  const input = { ...scope, grantId: randomUUID(), tokenKind: review ? "review" : "legacy", tokenExpiresAt: claims.exp,
++    tokenIssuedAt: claims.exp - APPROVE_LINK_TTL_MS, workspaceId: review?.workspaceId ?? null,
++    recipient: review?.recipient ?? null, authorityVersion: review?.authorityVersion ?? null };
++  let timer: ReturnType<typeof setTimeout> | undefined;
++  try {
++    const grant = await Promise.race([
++      Promise.resolve().then(async () => (await workspacePorts().businessRecord()).admitTenantReviewApprovalDispatch(input)),
++      new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), TIMEOUT_MS); }),
++    ]);
++    // A lost response is not permission to send or to reuse its grant.
++    if (!grant?.admitted || grant.grantId !== input.grantId) throw new Error("review_approval_authority_changed");
++    return { grantId: input.grantId, settle: async responseStatus => {
++      await (await workspacePorts().businessRecord()).settleTenantReviewDispatchAdmission(input.grantId, scope.ledgerId, scope.request, responseStatus);
++    } };
++  } finally { if (timer) clearTimeout(timer); }
++}
+diff --git a/src/lib/workspace-ports.ts b/src/lib/workspace-ports.ts
+index 069252abe..1780dc4c1 100644
+--- a/src/lib/workspace-ports.ts
++++ b/src/lib/workspace-ports.ts
+@@ -146,12 +146,24 @@ export interface TenantBusinessContext {
+ }
+ 
+ export interface BusinessRecordPort {
++  readTenantReviewApprovalAuthority(tenantId: string): Promise<TenantReviewApprovalAuthority | null>;
++  admitTenantReviewApprovalDispatch(input: Record<string, unknown>): Promise<{ admitted: boolean; grantId: string }>;
++  settleTenantReviewDispatchAdmission(grantId: string, ledgerId: string, request: Record<string, unknown>, responseStatus: number): Promise<void>;
+   ownerNoticeWorkspaceUrl?(tenant: { id: string; stableId?: string }, path: string, legacyUrl: string): Promise<string>;
+   /** The owner-recipient rule for one tenant. Server-only; sends nothing. */
+   resolveTenantOwnerRecipient(tenantId: string): Promise<TenantOwnerRecipientRow | null>;
+   readTenantBusinessContext(tenantId: string): Promise<TenantBusinessContext | null>;
+ }
+ 
++export interface TenantReviewApprovalAuthority {
++  tenantId: string;
++  workspaceId: string | null;
++  recipient: string;
++  version: string;
++  conversionAt: string | null;
++  legacyAllowed: boolean;
++}
++
+ // ── Google account bindings (src/platform/account-bindings) ────────────────────
+ 
+ export type BindingStatus = "connected" | "needs_reauth" | "revoked" | "error";
+@@ -253,6 +265,7 @@ export interface InquiriesPort {
+ 
+ /** Opaque: built by the port, handed back to it. */
+ export type TenantReplyDepsHandle = object;
++export type TenantReviewDispatchHook = (location: { accountId: string; locationId: string }, reviewId: string, text: string, receiptId: string) => Promise<{ settle(responseStatus: number): Promise<void> }>;
+ 
+ export type TenantReplyAuthority =
+   | { kind: "auto_reply_policy"; rating: number }
+diff --git a/src/platform/business-record/service.ts b/src/platform/business-record/service.ts
+index 986517412..ec3b35e05 100644
+--- a/src/platform/business-record/service.ts
++++ b/src/platform/business-record/service.ts
+@@ -145,6 +145,24 @@ export async function resolveTenantOwnerRecipient(tenantId: string): Promise<Ten
+     tenantOwnerRecipientSchema.nullable(), "The owner recipient could not be resolved.");
+ }
+ 
++/** Read only. Missing migration or malformed authority must fail closed. */
++export async function readTenantReviewApprovalAuthority(tenantId: string) {
++  return callBusinessRecord("read_tenant_review_approval_authority", { p_tenant_id: z.string().min(1).max(120).parse(tenantId) },
++    z.object({ tenantId: z.string().min(1), workspaceId: z.string().uuid().nullable(), recipient: z.string().email(),
++      version: z.string().regex(/^[0-9a-f]{64}$/), conversionAt: z.string().datetime({ offset: true }).nullable(), legacyAllowed: z.boolean() }).strict().nullable(),
++    "Review approval authority could not be read.");
++}
++
++/** One-shot command admission; the SQL function serializes identity changes. */
++export async function admitTenantReviewApprovalDispatch(input: Record<string, unknown>) {
++  return callBusinessRecord("admit_tenant_review_approval_dispatch", { p_input: input },
++    z.object({ admitted: z.boolean(), grantId: z.string().uuid() }).strict(), "Review dispatch could not be admitted.");
++}
++export async function settleTenantReviewDispatchAdmission(grantId: string, ledgerId: string, request: Record<string, unknown>, responseStatus: number): Promise<void> {
++  await callBusinessRecord("settle_tenant_review_dispatch_admission", { p_grant_id: workspaceId.parse(grantId), p_ledger_id: ledgerId,
++    p_request: request, p_response_status: responseStatus }, z.unknown(), "Review dispatch settlement could not be recorded.");
++}
++
+ export async function readTenantWorkspaceLink(operatorEmail: string, tenantId: string): Promise<TenantLinkState> {
+   return callBusinessRecord("read_tenant_workspace_link", {
+     p_operator_email: z.string().email().parse(operatorEmail.trim().toLowerCase()), p_tenant_id: z.string().min(1).parse(tenantId),
+diff --git a/src/products/google-listing/service.ts b/src/products/google-listing/service.ts
+index 8c2d6950a..908607e10 100644
+--- a/src/products/google-listing/service.ts
++++ b/src/products/google-listing/service.ts
+@@ -47,6 +47,8 @@ export interface ListingContext {
+   /** SSRF guard for URLs Google will fetch. Defaults to the audit check. */
+   onWriteAccepted?: () => Promise<void>;
+   onWriteUnconfirmed?: () => Promise<void>;
++  /** Captures the selected durable receipt before raw dispatch/pacing. */
++  onDispatchReady?: (receipt: ListingReceipt) => void;
+   checkUrl?: (url: string) => Promise<void>;
+   /** Throws unless the person behind an operator_* authority is the
+    * business's acting provider for Google on this location (seat, staff row,
+@@ -175,6 +177,7 @@ async function governedWrite<T>(ctx: ListingContext, plan: WritePlan<T>): Promis
+     return { status: "failed", receipt: settled, accessPending: false, message: MESSAGES.provider };
+   }
+   let written: GoogleResult<T>;
++  ctx.onDispatchReady?.(receipt);
+   try { written = await plan.write(); }
+   catch {
+     await ctx.onWriteUnconfirmed?.();
+diff --git a/src/products/google-listing/tenant-replies.ts b/src/products/google-listing/tenant-replies.ts
+index 754e69775..aed376bc1 100644
+--- a/src/products/google-listing/tenant-replies.ts
++++ b/src/products/google-listing/tenant-replies.ts
+@@ -55,6 +55,7 @@ export interface TenantReplyDeps {
+   noteAccess?(workspaceId: string, locationId: string, pending: boolean): Promise<unknown>;
+   /** Throws unless this person acts for Google on this location through the named agency, when supplied. */
+   authorizeProvider?(workspaceId: string, userId: string, locationId: string, expectedAgencyWorkspaceId?: string): Promise<void>;
++  beforeReplyDispatch?(location: GoogleLocationRef, reviewId: string, comment: string, receiptId: string): Promise<{ settle(responseStatus: number): Promise<void> }>;
+ }
+ 
+ /** Recheck a delegate's current provider, preserving an agency staff actor's named agency. */
+@@ -116,16 +117,26 @@ export async function postTenantReviewReply(input: {
+   // Track whether Google took the reply, so a failure after acceptance is
+   // never reported as "nothing sent".
+   const rawClient = deps.client(token);
+-  const base = deps.pace ? deps.pace(rawClient, input.workspaceId, locationId) : rawClient;
+   let accepted = false;
+-  const client: GoogleListingClient = {
+-    ...base,
++  let dispatchReceiptId = "";
++  // Wrap the raw method before pacing. Every retry after a definitive 429
++  // requires a new atomic admission; a backoff cannot retain old authority.
++  const tracked: GoogleListingClient = {
++    ...rawClient,
+     async updateReply(location, reviewId, comment) {
+-      const result = await base.updateReply(location, reviewId, comment);
++      let admission: { settle(responseStatus: number): Promise<void> } | undefined;
++      try { admission = await deps.beforeReplyDispatch?.(location, reviewId, comment, dispatchReceiptId); }
++      catch { return { ok: false, kind: "auth", status: 403, detail: "Review authority changed. Nothing sent." }; }
++      let result;
++      try { result = await rawClient.updateReply(location, reviewId, comment); }
++      catch (error) { await admission?.settle(0).catch(() => {}); throw error; }
+       if (result.ok) accepted = true;
++      try { await admission?.settle(result.ok ? 200 : result.status); }
++      catch { if (!result.ok) return { ok: false, kind: "error", status: 0, detail: "Dispatch settlement unavailable. Reconcile before retry." }; }
+       return result;
+     },
+   };
++  const client = deps.pace ? deps.pace(tracked, input.workspaceId, locationId) : tracked;
+   try {
+     const outcome = await postReviewReply({
+       workspaceId: input.workspaceId,
+@@ -136,6 +147,7 @@ export async function postTenantReviewReply(input: {
+       onWriteAccepted: async () => (await (await import("@/platform/infra/tenant-publishing")).tenantPublishingPorts()).markExecutionExternalAccepted(input.eventId),
+       onWriteUnconfirmed: async () => (await (await import("@/platform/infra/tenant-publishing")).tenantPublishingPorts()).markExecutionExternalUnconfirmed(input.eventId),
+       receipts: deps.receipts(),
++      onDispatchReady: receipt => { dispatchReceiptId = receipt.id; },
+       ...providerCheck(input.authority, input.workspaceId, locationId, deps),
+     }, {
+       reviewId: input.reviewId,
+diff --git a/supabase/migrations/20261023200000_tenant_review_approval_continuity.sql b/supabase/migrations/20261023200000_tenant_review_approval_continuity.sql
+new file mode 100644
+index 000000000..157812d15
+--- /dev/null
++++ b/supabase/migrations/20261023200000_tenant_review_approval_continuity.sql
+@@ -0,0 +1,294 @@
++-- Preparation only: preserve managed review approval across a silent conversion.
++-- Depends on tenant conversion, owner-recipient trust, owner claims and workspace exit.
++-- The reader performs no writes. Epochs retain revocation across change-back.
++-- A durable command admission below serializes owner transitions. Network
++-- dispatch occurs only for that already-admitted exact command, never under locks.
++begin;
++
++create table public.tenant_review_approval_epochs (
++  tenant_stable_id uuid primary key references public.tenants(stable_id) on delete cascade,
++  -- Keep the last workspace after unlink/deletion so ownership changes cannot
++  -- resurrect an old link. This is evidence, deliberately not a workspace FK.
++  workspace_id uuid,
++  version uuid not null default gen_random_uuid(),
++  legacy_revoked boolean not null default false
++);
++alter table public.tenant_review_approval_epochs enable row level security;
++revoke all on public.tenant_review_approval_epochs from public, anon, authenticated, service_role;
++
++create function public.rotate_tenant_review_approval_epoch(p_stable uuid, p_workspace uuid, p_revoke boolean)
++returns void language plpgsql security definer set search_path = public, pg_temp as $$
++begin
++  -- Existing writers may already hold identity/workspace tuples. Never wait
++  -- while acquiring admission in the reverse order: one conflicting mutation
++  -- fails atomically and can retry its existing command.
++  if not pg_try_advisory_xact_lock(hashtextextended('review-authority:'||p_stable::text,7719)) then
++    raise exception 'review_authority_busy_retry';
++  end if;
++  insert into public.tenant_review_approval_epochs(tenant_stable_id, workspace_id, legacy_revoked)
++  values(p_stable, p_workspace, p_revoke)
++  on conflict(tenant_stable_id) do update set
++    workspace_id = coalesce(excluded.workspace_id, tenant_review_approval_epochs.workspace_id),
++    version = gen_random_uuid(),
++    legacy_revoked = tenant_review_approval_epochs.legacy_revoked or excluded.legacy_revoked;
++end $$;
++
++create function public.rotate_workspace_review_approval_epochs(p_workspace uuid)
++returns void language plpgsql security definer set search_path = public, pg_temp as $$
++declare t record;
++begin
++  for t in select tenant_stable_id from public.tenant_workspace_links where workspace_id=p_workspace and tenant_stable_id is not null
++    union select tenant_stable_id from public.tenant_review_approval_epochs where workspace_id=p_workspace order by tenant_stable_id
++  loop perform public.rotate_tenant_review_approval_epoch(t.tenant_stable_id,p_workspace,true); end loop;
++end $$;
++
++create function public.tenant_review_approval_link_epoch() returns trigger
++language plpgsql security definer set search_path = public, pg_temp as $$
++begin
++  if tg_op='DELETE' then
++    if old.tenant_stable_id is not null then perform public.rotate_tenant_review_approval_epoch(old.tenant_stable_id,old.workspace_id,true); end if;
++    return old;
++  end if;
++  if new.tenant_stable_id is not null then
++    perform public.rotate_tenant_review_approval_epoch(new.tenant_stable_id,new.workspace_id,
++      exists(select 1 from public.tenant_review_approval_epochs e where e.tenant_stable_id=new.tenant_stable_id));
++  end if;
++  return new;
++end $$;
++create trigger tenant_workspace_links_review_epoch after insert or delete on public.tenant_workspace_links
++for each row execute function public.tenant_review_approval_link_epoch();
++
++create function public.tenant_review_approval_owner_epoch() returns trigger
++language plpgsql security definer set search_path = public, pg_temp as $$
++declare old_ws uuid; new_ws uuid; v record;
++begin
++  if tg_table_name='business_owner_recipient_trust' then
++    -- Initial conversion trust precedes its link. Later owner-confirmed writes
++    -- revoke old links even if the address changes back or stays identical.
++    if tg_op='INSERT' and new.trusted_via='conversion' then return new; end if;
++    if tg_op<>'INSERT' then old_ws:=old.workspace_id; end if;
++    if tg_op<>'DELETE' then new_ws:=new.workspace_id; end if;
++  elsif tg_table_name='workspace_memberships' then
++    if tg_op<>'INSERT' and old.role='owner' then old_ws:=old.workspace_id; end if;
++    if tg_op<>'DELETE' and new.role='owner' then new_ws:=new.workspace_id; end if;
++  elsif tg_table_name='users' then
++    if new.email is not distinct from old.email and new.verified_at is not distinct from old.verified_at then return new; end if;
++    for v in select m.workspace_id from public.workspace_memberships m where m.user_id=old.id and m.role='owner'
++      union select t.workspace_id from public.business_owner_recipient_trust t where t.email in(lower(btrim(old.email)),lower(btrim(new.email)))
++    loop perform public.rotate_workspace_review_approval_epochs(v.workspace_id); end loop;
++    return new;
++  elsif tg_table_name='tenants' then
++    -- This compatibility migration does not change unconverted approval
++    -- contracts. Track only current/prior workspace authority.
++    if new.owner_email is distinct from old.owner_email and (
++      exists(select 1 from public.tenant_workspace_links where tenant_stable_id=new.stable_id)
++      or exists(select 1 from public.tenant_review_approval_epochs where tenant_stable_id=new.stable_id)) then
++      perform public.rotate_tenant_review_approval_epoch(new.stable_id,
++        (select workspace_id from public.tenant_workspace_links where tenant_stable_id=new.stable_id),true);
++    end if;
++    return new;
++  end if;
++  if old_ws is not null then perform public.rotate_workspace_review_approval_epochs(old_ws); end if;
++  if new_ws is not null and new_ws is distinct from old_ws then perform public.rotate_workspace_review_approval_epochs(new_ws); end if;
++  if tg_op='DELETE' then return old; end if;
++  return new;
++end $$;
++create trigger owner_recipient_trust_review_epoch after insert or update or delete on public.business_owner_recipient_trust
++for each row execute function public.tenant_review_approval_owner_epoch();
++create trigger workspace_owner_review_epoch after insert or update or delete on public.workspace_memberships
++for each row execute function public.tenant_review_approval_owner_epoch();
++create trigger user_identity_review_epoch after update of email,verified_at on public.users
++for each row execute function public.tenant_review_approval_owner_epoch();
++create trigger tenant_owner_identity_review_epoch after update of owner_email on public.tenants
++for each row execute function public.tenant_review_approval_owner_epoch();
++
++-- Existing conversions lack a provable complete pre-install ownership epoch.
++-- Refuse their recipient-unbound tokens; bound future tokens still work.
++insert into public.tenant_review_approval_epochs(tenant_stable_id,workspace_id,legacy_revoked)
++select tenant_stable_id,workspace_id,true from public.tenant_workspace_links where tenant_stable_id is not null;
++
++create function public.read_tenant_review_approval_authority(p_tenant_id text) returns jsonb
++language plpgsql stable security definer set search_path = public, pg_temp as $$
++declare t record; l public.tenant_workspace_links; e public.tenant_review_approval_epochs;
++  trust public.business_owner_recipient_trust; imported_email text; legacy boolean; v_version text;
++begin
++  select id,stable_id,owner_email into t from public.tenants where id=p_tenant_id;
++  if not found then return null; end if;
++  select * into e from public.tenant_review_approval_epochs where tenant_stable_id=t.stable_id;
++  select * into l from public.tenant_workspace_links where tenant_stable_id=t.stable_id;
++  if not found then
++    -- Unlink is never permission to resurrect a converted or transferred token.
++    if e.workspace_id is not null then return null; end if;
++    if not public.business_record_email_valid(lower(btrim(t.owner_email))) then return null; end if;
++    return jsonb_build_object('tenantId',t.id,'workspaceId',null,'recipient',lower(btrim(t.owner_email)),
++      'version',encode(sha256(convert_to(t.stable_id::text||coalesce(e.version::text,'')||lower(btrim(t.owner_email)),'UTF8')),'hex'),
++      'conversionAt',null,'legacyAllowed',not coalesce(e.legacy_revoked,false));
++  end if;
++  if public.workspace_exit_completed(l.workspace_id) or e.version is null then return null; end if;
++  select * into trust from public.business_owner_recipient_trust where workspace_id=l.workspace_id;
++  if not found or not public.business_record_email_valid(trust.email) then return null; end if;
++  -- A contradictory or unverified current owner must use signed-in recovery.
++  if exists(select 1 from public.workspace_memberships m left join public.users u on u.id=m.user_id
++    where m.workspace_id=l.workspace_id and m.role='owner'
++      and (u.verified_at is null or lower(btrim(u.email)) is distinct from trust.email)) then return null; end if;
++  select lower(btrim(c#>>'{after,value,email}')) into imported_email
++    from public.business_record_revisions r cross join lateral jsonb_array_elements(r.changes) c
++    where r.workspace_id=l.workspace_id and r.sequence=(l.receipt->>'sequence')::bigint and r.source='tenant_import'
++      and c->>'entity'='fact' and c->>'id'='owner_recipient' limit 1;
++  legacy:=not e.legacy_revoked and trust.trusted_via='conversion'
++    and trust.email is not distinct from imported_email
++    and trust.email is not distinct from lower(btrim(t.owner_email))
++    and not exists(select 1 from public.workspace_memberships m where m.workspace_id=l.workspace_id and m.role='owner')
++    and not exists(select 1 from public.workspace_invitations i where i.workspace_id=l.workspace_id and i.role='owner' and i.accepted_at is not null)
++    and not exists(select 1 from public.agency_client_owner_claims c where c.customer_workspace_id=l.workspace_id and c.accepted_at is not null);
++  v_version:=encode(sha256(convert_to(jsonb_build_object('epoch',e.version,'link',l.id,'workspace',l.workspace_id,
++    'recipient',trust.email,'trustedAt',trust.trusted_at,'via',trust.trusted_via)::text,'UTF8')),'hex');
++  return jsonb_build_object('tenantId',t.id,'workspaceId',l.workspace_id,'recipient',trust.email,
++    'version',v_version,'conversionAt',l.linked_at,'legacyAllowed',coalesce(legacy,false));
++end $$;
++revoke all on function public.rotate_tenant_review_approval_epoch(uuid,uuid,boolean),
++ public.rotate_workspace_review_approval_epochs(uuid),public.tenant_review_approval_link_epoch(),
++ public.tenant_review_approval_owner_epoch(),public.read_tenant_review_approval_authority(text)
++from public,anon,authenticated,service_role;
++grant execute on function public.read_tenant_review_approval_authority(text) to service_role;
++
++-- One authorization record, not another provider-outcome ledger. Existing
++-- operator/listing receipts still own accepted, rejected and uncertain outcomes.
++-- No FK to mutable tenant/workspace identity: admitted historical commands and
++-- their reconciliation survive unlink, deletion, transfer and exit.
++create table public.tenant_review_dispatch_grants (
++  id uuid primary key,
++  tenant_stable_id uuid not null,
++  workspace_id uuid,
++  event_id text not null,
++  action text not null check(action in ('approved','dismissed')),
++  authority_version text not null,
++  recipient text not null,
++  command jsonb not null,
++  command_digest text not null,
++  dispatch_state text not null default 'admitted' check(dispatch_state in ('admitted','spent','retry_allowed')),
++  sequence bigint generated always as identity unique,
++  admitted_at timestamptz not null default clock_timestamp()
++);
++alter table public.tenant_review_dispatch_grants enable row level security;
++revoke all on public.tenant_review_dispatch_grants from public,anon,authenticated,service_role;
++
++-- Exit/accepted owner evidence rotates the same per-tenant boundary. These
++-- AFTER triggers use the fail-fast helper; no broad pre-statement lock changes
++-- established unlink/invitation ordering or unrelated tenant updates.
++create function public.tenant_review_authority_acceptance_epoch() returns trigger
++language plpgsql security definer set search_path=public,pg_temp as $$
++begin
++  if tg_table_name='workspace_exit_requests' then
++    if tg_op<>'INSERT' then perform public.rotate_workspace_review_approval_epochs(old.workspace_id); end if;
++    if tg_op<>'DELETE' and (tg_op='INSERT' or new.workspace_id is distinct from old.workspace_id) then
++      perform public.rotate_workspace_review_approval_epochs(new.workspace_id);
++    end if;
++  elsif tg_table_name='workspace_invitations' then
++    if new.role='owner' and new.accepted_at is not null then perform public.rotate_workspace_review_approval_epochs(new.workspace_id); end if;
++  elsif tg_table_name='agency_client_owner_claims' then
++    if new.accepted_at is not null then perform public.rotate_workspace_review_approval_epochs(new.customer_workspace_id); end if;
++  end if;
++  if tg_op='DELETE' then return old; end if; return new;
++end $$;
++create trigger review_admission_invitation_epoch after insert or update on public.workspace_invitations
++for each row execute function public.tenant_review_authority_acceptance_epoch();
++create trigger review_admission_owner_claim_epoch after insert or update on public.agency_client_owner_claims
++for each row execute function public.tenant_review_authority_acceptance_epoch();
++create trigger review_admission_exit_epoch after insert or update or delete on public.workspace_exit_requests
++for each row execute function public.tenant_review_authority_acceptance_epoch();
++
++create function public.admit_tenant_review_approval_dispatch(p_input jsonb) returns jsonb
++language plpgsql volatile security definer set search_path=public,pg_temp as $$
++declare a jsonb; stable uuid; captured_stable uuid; prior public.tenant_review_dispatch_grants; grant_id uuid; expires numeric;
++begin
++  -- Fresh statement snapshots after admission-lock waits are required. A stale
++  -- caller snapshot must fail closed rather than admit a revoked token.
++  if current_setting('transaction_isolation') <> 'read committed' then raise exception 'review_dispatch_isolation_unsupported'; end if;
++  if jsonb_typeof(p_input) is distinct from 'object' or jsonb_typeof(p_input->'request') is distinct from 'object'
++    or coalesce(p_input->>'eventId','')='' or length(p_input->>'eventId')>200
++    or coalesce(p_input->>'attemptId','')='' or length(p_input->>'attemptId')>200
++    or coalesce(p_input->>'action','') not in ('approved','dismissed')
++    or coalesce(p_input->>'tokenKind','') not in ('legacy','review')
++    or coalesce(p_input->>'ledger','') not in ('legacy','listing','event')
++    or coalesce(p_input->>'ledgerId','')='' then raise exception 'review_dispatch_invalid'; end if;
++  grant_id:=(p_input->>'grantId')::uuid;
++  expires:=(p_input->>'tokenExpiresAt')::numeric;
++  if grant_id is null or expires is null or expires < extract(epoch from clock_timestamp())*1000
++    or expires > extract(epoch from clock_timestamp())*1000+1209600000 then raise exception 'review_dispatch_token_expired'; end if;
++  if p_input->>'action'='approved' and (p_input->>'ledger'='event'
++    or coalesce(p_input#>>'{request,reviewId}','')='' or coalesce(p_input#>>'{request,reply}','')=''
++    or coalesce(p_input#>>'{request,providerTarget}','')='') then raise exception 'review_dispatch_invalid'; end if;
++  if p_input->>'action'='dismissed' and p_input->>'ledger'<>'event' then raise exception 'review_dispatch_invalid'; end if;
++  select stable_id into stable from public.tenants where id=p_input->>'tenantId';
++  if stable is null then raise exception 'review_approval_authority_changed'; end if;
++  captured_stable:=stable;
++  if not pg_try_advisory_xact_lock(hashtextextended('review-authority:'||stable::text,7719)) then
++    raise exception 'review_authority_busy_retry';
++  end if;
++  if expires < extract(epoch from clock_timestamp())*1000 then raise exception 'review_dispatch_token_expired'; end if;
++  -- VOLATILE function: this query starts after the lock and sees committed
++  -- owner/link/exit changes that won admission. No identity tuple locks.
++  a:=public.read_tenant_review_approval_authority(p_input->>'tenantId');
++  if a is null then raise exception 'review_approval_authority_changed'; end if;
++  if p_input->>'tokenKind'='review' then
++    if a->>'workspaceId' is distinct from p_input->>'workspaceId'
++      or a->>'recipient' is distinct from p_input->>'recipient'
++      or a->>'version' is distinct from p_input->>'authorityVersion' then raise exception 'review_approval_authority_changed'; end if;
++  else
++    if a->'legacyAllowed' is distinct from 'true'::jsonb
++      or (p_input->>'tokenIssuedAt')::numeric is distinct from expires-1209600000
++      or (a->>'conversionAt' is not null and (p_input->>'tokenIssuedAt')::numeric > extract(epoch from (a->>'conversionAt')::timestamptz)*1000)
++      then raise exception 'review_approval_authority_changed'; end if;
++  end if;
++  select stable_id into stable from public.tenants where id=p_input->>'tenantId';
++  if stable is null or stable is distinct from captured_stable then raise exception 'review_approval_authority_changed'; end if;
++  if p_input->>'ledger'='legacy' and not exists(
++    select 1 from public.operator_google_write_attempts x where x.attempt_id=(p_input->>'ledgerId')::uuid
++      and x.tenant_id=p_input->>'tenantId' and x.write_kind='review_reply' and x.acceptance='pending'
++      and x.command_key='approval:'||(p_input->>'eventId')
++      and x.request=jsonb_build_object('reviewId',p_input#>>'{request,reviewId}','reply',p_input#>>'{request,reply}'))
++    then raise exception 'review_dispatch_receipt_mismatch'; end if;
++  if p_input->>'ledger'='listing' and not exists(
++    select 1 from public.google_listing_receipts x where x.id=(p_input->>'ledgerId')::uuid
++      and x.workspace_id=(a->>'workspaceId')::uuid and x.status='posting' and x.action in ('reply_post','reply_update')
++      and x.target_ref=p_input#>>'{request,reviewId}' and x.after_state=jsonb_build_object('reply',p_input#>>'{request,reply}')
++      and x.location_id=p_input#>>'{request,locationId}' and x.authority->>'kind'='owner_approval'
++      and x.authority->>'approvalRef'='event:'||(p_input->>'eventId'))
++    then raise exception 'review_dispatch_receipt_mismatch'; end if;
++  select * into prior from public.tenant_review_dispatch_grants where id=grant_id;
++  if found then
++    if prior.command is distinct from p_input then raise exception 'review_dispatch_conflict'; end if;
++    return jsonb_build_object('admitted',false,'grantId',grant_id);
++  end if;
++  -- A different random UUID is not permission to replay a pending/accepted/
++  -- uncertain raw request. Only a recorded definitive 4xx response opens a
++  -- new admission for this same provider receipt, which rechecks authority.
++  select * into prior from public.tenant_review_dispatch_grants
++    where command->>'ledger'=p_input->>'ledger' and command->>'ledgerId'=p_input->>'ledgerId'
++    order by sequence desc limit 1;
++  if found and prior.dispatch_state<>'retry_allowed' then raise exception 'review_dispatch_already_admitted'; end if;
++  insert into public.tenant_review_dispatch_grants(id,tenant_stable_id,workspace_id,event_id,action,authority_version,recipient,command,command_digest)
++  values(grant_id,stable,(a->>'workspaceId')::uuid,p_input->>'eventId',p_input->>'action',a->>'version',a->>'recipient',p_input,
++    encode(sha256(convert_to(p_input::text,'UTF8')),'hex'));
++  return jsonb_build_object('admitted',true,'grantId',grant_id);
++end $$;
++create function public.settle_tenant_review_dispatch_admission(p_grant_id uuid,p_ledger_id text,p_request jsonb,p_response_status integer)
++returns void language plpgsql volatile security definer set search_path=public,pg_temp as $$
++declare g public.tenant_review_dispatch_grants; next_state text;
++begin
++  -- Historical outcome reporting is allowed after transfer/exit. This cannot
++  -- grant dispatch and never changes the captured command or authority.
++  select * into g from public.tenant_review_dispatch_grants where id=p_grant_id for update;
++  if not found or g.command->>'ledgerId' is distinct from p_ledger_id or g.command->'request' is distinct from p_request
++    or p_response_status is null or p_response_status<0 or p_response_status>599 then raise exception 'review_dispatch_settlement_mismatch'; end if;
++  next_state:=case when g.action='approved' and p_response_status between 400 and 499 then 'retry_allowed' else 'spent' end;
++  if g.dispatch_state='admitted' then update public.tenant_review_dispatch_grants set dispatch_state=next_state where id=g.id;
++  elsif g.dispatch_state<>next_state then raise exception 'review_dispatch_settlement_conflict'; end if;
++end $$;
++revoke all on function public.tenant_review_authority_acceptance_epoch(),public.admit_tenant_review_approval_dispatch(jsonb)
++from public,anon,authenticated,service_role;
++revoke all on function public.settle_tenant_review_dispatch_admission(uuid,text,jsonb,integer) from public,anon,authenticated,service_role;
++grant execute on function public.admit_tenant_review_approval_dispatch(jsonb) to service_role;
++grant execute on function public.settle_tenant_review_dispatch_admission(uuid,text,jsonb,integer) to service_role;
++commit;
+diff --git a/tests/tenant-review-approval-continuity-schema.sql b/tests/tenant-review-approval-continuity-schema.sql
+new file mode 100644
+index 000000000..38da1ff26
+--- /dev/null
++++ b/tests/tenant-review-approval-continuity-schema.sql
+@@ -0,0 +1,112 @@
++\set ON_ERROR_STOP on
++-- Exact forward migration on the ordered local history. All fictional rows roll back.
++begin;
++create function pg_temp.ra_assert(v boolean, why text) returns void language plpgsql as $$
++begin if v is not true then raise exception 'review approval continuity: %',why; end if; end $$;
++select pg_temp.ra_assert(not has_table_privilege('service_role','public.tenant_review_approval_epochs','select'), 'epoch rows private');
++select pg_temp.ra_assert(has_function_privilege('service_role','public.read_tenant_review_approval_authority(text)','execute')
++  and not has_function_privilege('anon','public.read_tenant_review_approval_authority(text)','execute')
++  and not has_function_privilege('service_role','public.rotate_tenant_review_approval_epoch(uuid,uuid,boolean)','execute'), 'server-only reader, internal writes');
++do $$
++declare op uuid:='90300000-0000-4000-8000-000000000001'; owner_id uuid:='90300000-0000-4000-8000-000000000002';
++ stable uuid:='90300000-0000-4000-8000-000000000003'; agency uuid; ws uuid; result jsonb; initial jsonb; previous jsonb; changed jsonb; command jsonb; dispatch jsonb;
++begin
++ insert into public.users(id,email,verified_at) values(op,'ra-operator@strelva.example.test',now()),(owner_id,'ra-owner@example.test',now());
++ insert into public.super_admins(user_id,email) values(op,'ra-operator@strelva.example.test');
++ select id into agency from public.create_owned_workspace(op,'ra-operator@strelva.example.test','agency','Review fixture agency');
++ insert into public.tenants(id,stable_id,site_name,active,owner_email) values('ra-site',stable,'Review fixture',true,'ra-owner@example.test');
++ initial:=public.read_tenant_review_approval_authority('ra-site');
++ perform pg_temp.ra_assert(initial->'workspaceId'='null'::jsonb and initial->'legacyAllowed'='true'::jsonb,'unconverted unchanged identity');
++ update public.tenants set owner_email='ra-updated@example.test' where stable_id=stable;
++ perform pg_temp.ra_assert(public.read_tenant_review_approval_authority('ra-site')->'legacyAllowed'='true'::jsonb,
++   'unconverted owner edit keeps future legacy mail working');
++ update public.tenants set owner_email='ra-owner@example.test' where stable_id=stable;
++ result:=public.convert_tenant_to_business('ra-operator@strelva.example.test','ra-site',jsonb_build_object(
++ 'tenantId','ra-site','tenantStableId',stable,'workspaceName','Review fixture','agencyWorkspaceId',agency,
++ 'agencyStaffEmails',jsonb_build_array('ra-operator@strelva.example.test'),'agencySelectionBasis','owner_choice',
++ 'billing',null,'account',null,'contacts',jsonb_build_array(),
++ 'patch',jsonb_build_object('facts',jsonb_build_object('owner_recipient',jsonb_build_object('value',jsonb_build_object('email','ra-owner@example.test'),'verified',false)))),
++ '90300000-0000-4000-8000-000000000004',repeat('a',64));
++ ws:=(result->>'workspaceId')::uuid;
++ initial:=public.read_tenant_review_approval_authority('ra-site');
++ perform pg_temp.ra_assert(initial->>'workspaceId'=ws::text and initial->>'recipient'='ra-owner@example.test'
++   and initial->'legacyAllowed'='true'::jsonb and initial->>'conversionAt' is not null,'silent conversion keeps original old links');
++ perform pg_temp.ra_assert(public.read_tenant_review_approval_authority('ra-site')=initial,'reader has no writes');
++ perform pg_temp.ra_assert(public.read_tenant_review_approval_authority('missing-site') is null,'unknown tenant denied');
++ dispatch:=public.begin_operator_google_write(jsonb_build_object('commandKey','approval:ra-review','tenantId','ra-site','writeKind','review_reply',
++   'request',jsonb_build_object('reviewId','ra-review','reply','Thank you')));
++ command:=jsonb_build_object('grantId','90300000-0000-4000-8000-000000000008','tenantId','ra-site','eventId','ra-review','attemptId','ra-attempt',
++   'action','approved','tokenKind','review','tokenExpiresAt',extract(epoch from clock_timestamp())*1000+86400000,
++   'workspaceId',ws,'recipient',initial->>'recipient','authorityVersion',initial->>'version','ledger','legacy','ledgerId',dispatch->>'attemptId',
++   'request',jsonb_build_object('reviewId','ra-review','reply','Thank you','providerTarget','https://mybusiness.googleapis.com/v4/accounts/ra/locations/ra/reviews/ra-review/reply'));
++ perform pg_temp.ra_assert((public.admit_tenant_review_approval_dispatch(command)->>'admitted')::boolean,'exact command admitted');
++ perform pg_temp.ra_assert(not (public.admit_tenant_review_approval_dispatch(command)->>'admitted')::boolean,'same grant never dispatches twice');
++ begin
++   perform public.admit_tenant_review_approval_dispatch(command||'{"grantId":"90300000-0000-4000-8000-000000000009"}');
++   raise exception 'missing duplicate-ledger refusal';
++ exception when others then if sqlerrm<>'review_dispatch_already_admitted' then raise; end if; end;
++ begin
++   perform public.admit_tenant_review_approval_dispatch(jsonb_set(command||'{"grantId":"90300000-0000-4000-8000-000000000009"}','{request,reply}','"Substituted"'));
++   raise exception 'missing provider request refusal';
++ exception when others then if sqlerrm<>'review_dispatch_receipt_mismatch' then raise; end if; end;
++ perform public.settle_tenant_review_dispatch_admission((command->>'grantId')::uuid,command->>'ledgerId',command->'request',429);
++ command:=command||'{"grantId":"90300000-0000-4000-8000-000000000009"}';
++ perform pg_temp.ra_assert((public.admit_tenant_review_approval_dispatch(command)->>'admitted')::boolean,'definitive429 opens fresh checked admission');
++
++ -- Deprovisioned sites retain nullable audit links. Their presence must not
++ -- prevent authority rotation for a surviving sibling in the same workspace.
++ insert into public.tenant_workspace_links(tenant_stable_id,tenant_slug_at_link,workspace_id,linked_by,command_id,command_digest,receipt)
++ values(null,'ra-deprovisioned',ws,op,'90300000-0000-4000-8000-000000000007',repeat('d',64),result);
++
++ -- Operator proposals do not rotate trusted authority or redirect mail.
++ perform public.business_record_apply(ws,op,'operator','operator','{"facts":{"owner_recipient":{"value":{"email":"ra-proposed@example.test"},"verified":false}}}',null,null,
++   '90300000-0000-4000-8000-000000000005',repeat('b',64));
++ perform pg_temp.ra_assert(public.read_tenant_review_approval_authority('ra-site')=initial,'pending operator edit leaves authority unchanged');
++
++ -- Current email, trust, owner membership and verified identity change-back
++ -- must permanently rotate bound authority and never resurrect old links.
++ update public.tenants set owner_email='ra-other@example.test' where stable_id=stable;
++ -- No network-duration owner lock: old admitted command settles after change.
++ perform public.settle_tenant_review_dispatch_admission((command->>'grantId')::uuid,command->>'ledgerId',command->'request',200);
++ begin
++   perform public.admit_tenant_review_approval_dispatch(command||'{"grantId":"90300000-0000-4000-8000-000000000010"}');
++   raise exception 'missing revoked-token refusal';
++ exception when others then if sqlerrm<>'review_approval_authority_changed' then raise; end if; end;
++ perform pg_temp.ra_assert(not (public.read_tenant_review_approval_authority('ra-site')->>'legacyAllowed')::boolean,'tenant owner change revokes old links');
++ update public.tenants set owner_email='ra-owner@example.test' where stable_id=stable;
++ changed:=public.read_tenant_review_approval_authority('ra-site');
++ perform pg_temp.ra_assert(changed->>'version'<>initial->>'version' and changed->'legacyAllowed'='false'::jsonb,'tenant email change-back stays revoked');
++ previous:=changed;
++ update public.business_owner_recipient_trust set email='ra-other@example.test',trusted_via='owner_write',trusted_at=clock_timestamp() where workspace_id=ws;
++ update public.business_owner_recipient_trust set email='ra-owner@example.test',trusted_via='conversion',trusted_at=clock_timestamp() where workspace_id=ws;
++ changed:=public.read_tenant_review_approval_authority('ra-site');
++ perform pg_temp.ra_assert(changed->>'version'<>previous->>'version' and changed->'legacyAllowed'='false'::jsonb,'trust change-back version never repeats');
++ previous:=changed;
++ insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values(ws,owner_id,'owner',op);
++ update public.workspace_memberships set role='member' where workspace_id=ws and user_id=owner_id;
++ update public.workspace_memberships set role='owner' where workspace_id=ws and user_id=owner_id;
++ changed:=public.read_tenant_review_approval_authority('ra-site');
++ perform pg_temp.ra_assert(changed->>'version'<>previous->>'version','owner demotion/restoration rotates version');
++ previous:=changed;
++ update public.users set verified_at=null where id=owner_id;
++ perform pg_temp.ra_assert(public.read_tenant_review_approval_authority('ra-site') is null,'unverified owner denied');
++ update public.users set verified_at=now() where id=owner_id;
++ changed:=public.read_tenant_review_approval_authority('ra-site');
++ perform pg_temp.ra_assert(changed->>'version'<>previous->>'version','verification change-back rotates version');
++ previous:=changed;
++ update public.users set email='ra-new@example.test' where id=owner_id;
++ perform pg_temp.ra_assert(public.read_tenant_review_approval_authority('ra-site') is null,'mismatched verified owner denied');
++ update public.users set email='ra-owner@example.test' where id=owner_id;
++ changed:=public.read_tenant_review_approval_authority('ra-site');
++ perform pg_temp.ra_assert(changed->>'version'<>previous->>'version','user email change-back rotates version');
++ previous:=changed;
++ delete from public.workspace_memberships where workspace_id=ws and user_id=owner_id;
++ insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values(ws,owner_id,'owner',op);
++ changed:=public.read_tenant_review_approval_authority('ra-site');
++ perform pg_temp.ra_assert(changed->>'version'<>previous->>'version','delete/readd rotates version');
++ -- Real unlink contract, without restoring removed authority.
++ perform public.unlink_tenant_from_business('ra-operator@strelva.example.test','ra-site',ws,
++   '90300000-0000-4000-8000-000000000006',repeat('c',64));
++ perform pg_temp.ra_assert(public.read_tenant_review_approval_authority('ra-site') is null,'unlink does not resurrect old tokens');
++end $$;
++rollback;
+diff --git a/tsconfig.json b/tsconfig.json
+index 59cff4b6c..cb310fc27 100644
+--- a/tsconfig.json
++++ b/tsconfig.json
+@@ -65,7 +65,9 @@
+     ".next-inquiry-running-proof/types/**/*.ts",
+     ".next-inquiry-running-proof/dev/types/**/*.ts",
+     ".next-w6-ui/types/**/*.ts",
+-    ".next-w6-ui/dev/types/**/*.ts"
++    ".next-w6-ui/dev/types/**/*.ts",
++    ".next-agency-minimum/types/**/*.ts",
++    ".next-agency-minimum/dev/types/**/*.ts"
+   ],
+   "exclude": [
+     "node_modules",

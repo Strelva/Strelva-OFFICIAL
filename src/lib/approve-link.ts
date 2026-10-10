@@ -203,6 +203,12 @@ export function signReviewApproveToken(claims: ReviewApproveLinkClaims, now = Da
   return `${encoded}.${sign(REVIEW_LINK_DOMAIN + encoded)}`;
 }
 export function verifyReviewApproveToken(token: string, now = Date.now()): ReviewApproveLinkClaims | null {
+  const payload = verifyReviewApprovePayload(token, now);
+  if (!payload) return null;
+  return { tenantId: payload.tenantId, eventId: payload.eventId, action: payload.action, workspaceId: payload.workspaceId,
+    recipient: payload.recipient, authorityVersion: payload.authorityVersion };
+}
+export function verifyReviewApprovePayload(token: string, now = Date.now()): (ReviewApproveLinkClaims & { exp: number }) | null {
   const dot = token.indexOf(".");
   if (dot < 1) return null;
   const encoded = token.slice(0, dot), provided = Buffer.from(token.slice(dot + 1));
@@ -215,7 +221,7 @@ export function verifyReviewApproveToken(token: string, now = Date.now()): Revie
       || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(p.recipient) || p.recipient !== p.recipient.trim().toLowerCase()
       || typeof p.authorityVersion !== "string" || !/^[0-9a-f]{64}$/.test(p.authorityVersion)
       || !["approve", "not-yet"].includes(p.action) || !Number.isFinite(p.exp) || p.exp < now || p.exp > now + APPROVE_LINK_TTL_MS) return null;
-    return { tenantId: p.tenantId, eventId: p.eventId, action: p.action, workspaceId: p.workspaceId, recipient: p.recipient, authorityVersion: p.authorityVersion };
+    return { tenantId: p.tenantId, eventId: p.eventId, action: p.action, workspaceId: p.workspaceId, recipient: p.recipient, authorityVersion: p.authorityVersion, exp: p.exp };
   } catch { return null; }
 }
 export function buildReviewApproveUrl(origin: string, claims: ReviewApproveLinkClaims): string {

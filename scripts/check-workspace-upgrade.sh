@@ -78,6 +78,12 @@ for migration in $(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -na
     fi
     tail_started=1
   fi
+  if [[ "$migration_name" == "20261023200000_tenant_review_approval_continuity.sql" ]]; then
+    # Historical owner-trust rollback deliberately drops its table CASCADE.
+    # Rehearse those reversals before installing its additive admission trigger;
+    # then qualify continuity on the restored final schema below.
+    continue
+  fi
   if [[ "$migration_name" == "20261013220000_provider_seat_tenant_conversion.sql" ]]; then
     # Apply it after the historical conversion fixtures below so they
     # continue to prove their original RPC;
@@ -470,3 +476,10 @@ node --test "$repo_root/scripts/tests/readonly-rpcs.node-test.mjs"
 # Legacy calendar row-existence compatibility and receipt-preserving rollback.
 psql "${psql_args[@]}" --file="$repo_root/tests/legacy-calendar-revoke-result-schema.sql"
 bash "$repo_root/scripts/check-reader-writer-locks.sh" "postgresql:///postgres?host=$cluster_socket&port=$cluster_port"
+
+# Install the forward-only review authority evidence after historical destructive
+# rollback rehearsals; application rollback must retain admitted command history.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261023200000_tenant_review_approval_continuity.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-review-approval-continuity-schema.sql"
+python3 "$repo_root/scripts/check-review-approval-concurrency.py" "${psql_args[@]}"
+printf 'Review approval continuity and dispatch admission passed on the upgraded final schema.\n'

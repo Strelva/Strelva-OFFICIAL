@@ -1,0 +1,9 @@
+
+> strelva@0.2.0 typecheck /private/tmp/strelva-agency-approval-compat-20261009
+> next typegen && tsc --noEmit
+
+[@sentry/nextjs] DEPRECATION WARNING: disableLogger is deprecated and will be removed in a future version. Use webpack.treeshake.removeDebugLogging instead. (Not supported with Turbopack.)
+Generating route types...
+✓ Types generated successfully
+src/__tests__/review-approval-continuity.test.ts(96,34): error TS2538: Type 'undefined' cannot be used as an index type.
+ ELIFECYCLE  Command failed with exit code 2.

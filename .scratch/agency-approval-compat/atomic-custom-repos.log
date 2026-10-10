@@ -1,0 +1,37 @@
+
+> strelva@0.2.0 check:custom-repos /private/tmp/strelva-agency-approval-compat-20261009
+> tsx scripts/custom-repo-workspace-run.ts
+
+PASS contract:revalidation:sign-verify-roundtrip
+PASS contract:revalidation:tampered-body-rejected
+PASS contract:revalidation:tampered-signature-rejected
+PASS contract:revalidation:wrong-secret-rejected
+PASS contract:revalidation:stale-timestamp-rejected
+PASS contract:revalidation:payload-parse-roundtrip
+PASS contract:revalidation:payload-parse-rejects-junk
+PASS contract:manifest:control-plane-accepts
+PASS contract:manifest:editable-section-set
+PASS contract:manifest:custom-only-features-preserved
+PASS contract:manifest:contract-version-agrees
+PASS gldf:manifest:compatible-commit
+FAIL gldf:sibling - release checkout missing at /private/tmp/greatlakesdriedfruits
+PASS rohlax:manifest:compatible-commit
+FAIL rohlax:sibling - release checkout missing at /private/tmp/rohlax-wellness
+PASS mclears:manifest:compatible-commit
+FAIL mclears:sibling - release checkout missing at /private/tmp/mclears-cottage
+PASS orange-crate:manifest:compatible-commit
+FAIL orange-crate:sibling - release checkout missing at /private/tmp/orange-crate-brewing
+PASS leslie-bookkeeping:manifest:compatible-commit
+FAIL leslie-bookkeeping:sibling - release checkout missing at /private/tmp/leslie-bookkeeping
+PASS rhm-innovations:manifest:compatible-commit
+FAIL rhm-innovations:sibling - release checkout missing at /private/tmp/rhm-innovations
+PASS smokin-buddha:manifest:compatible-commit
+FAIL smokin-buddha:sibling - release checkout missing at /private/tmp/smokin-buddha
+PASS cocard-anderson:manifest:compatible-commit
+FAIL cocard-anderson:sibling - release checkout missing at /private/tmp/cocard-anderson
+PASS vermont-unlimited:manifest:compatible-commit
+FAIL vermont-unlimited:sibling - release checkout missing at /private/tmp/vermont-unlimited
+Custom repo workspace check failed: 9/29 checks failed.
+(node:66373) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ELIFECYCLE  Command failed with exit code 1.

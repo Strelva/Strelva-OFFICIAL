@@ -9,7 +9,7 @@ select pg_temp.ra_assert(has_function_privilege('service_role','public.read_tena
   and not has_function_privilege('service_role','public.rotate_tenant_review_approval_epoch(uuid,uuid,boolean)','execute'), 'server-only reader, internal writes');
 do $$
 declare op uuid:='90300000-0000-4000-8000-000000000001'; owner_id uuid:='90300000-0000-4000-8000-000000000002';
- stable uuid:='90300000-0000-4000-8000-000000000003'; agency uuid; ws uuid; result jsonb; initial jsonb; previous jsonb; changed jsonb;
+ stable uuid:='90300000-0000-4000-8000-000000000003'; agency uuid; ws uuid; result jsonb; initial jsonb; previous jsonb; changed jsonb; command jsonb; dispatch jsonb;
 begin
  insert into public.users(id,email,verified_at) values(op,'ra-operator@strelva.example.test',now()),(owner_id,'ra-owner@example.test',now());
  insert into public.super_admins(user_id,email) values(op,'ra-operator@strelva.example.test');
@@ -33,6 +33,25 @@ begin
    and initial->'legacyAllowed'='true'::jsonb and initial->>'conversionAt' is not null,'silent conversion keeps original old links');
  perform pg_temp.ra_assert(public.read_tenant_review_approval_authority('ra-site')=initial,'reader has no writes');
  perform pg_temp.ra_assert(public.read_tenant_review_approval_authority('missing-site') is null,'unknown tenant denied');
+ dispatch:=public.begin_operator_google_write(jsonb_build_object('commandKey','approval:ra-review','tenantId','ra-site','writeKind','review_reply',
+   'request',jsonb_build_object('reviewId','ra-review','reply','Thank you')));
+ command:=jsonb_build_object('grantId','90300000-0000-4000-8000-000000000008','tenantId','ra-site','eventId','ra-review','attemptId','ra-attempt',
+   'action','approved','tokenKind','review','tokenExpiresAt',extract(epoch from clock_timestamp())*1000+86400000,
+   'workspaceId',ws,'recipient',initial->>'recipient','authorityVersion',initial->>'version','ledger','legacy','ledgerId',dispatch->>'attemptId',
+   'request',jsonb_build_object('reviewId','ra-review','reply','Thank you','providerTarget','https://mybusiness.googleapis.com/v4/accounts/ra/locations/ra/reviews/ra-review/reply'));
+ perform pg_temp.ra_assert((public.admit_tenant_review_approval_dispatch(command)->>'admitted')::boolean,'exact command admitted');
+ perform pg_temp.ra_assert(not (public.admit_tenant_review_approval_dispatch(command)->>'admitted')::boolean,'same grant never dispatches twice');
+ begin
+   perform public.admit_tenant_review_approval_dispatch(command||'{"grantId":"90300000-0000-4000-8000-000000000009"}');
+   raise exception 'missing duplicate-ledger refusal';
+ exception when others then if sqlerrm<>'review_dispatch_already_admitted' then raise; end if; end;
+ begin
+   perform public.admit_tenant_review_approval_dispatch(jsonb_set(command||'{"grantId":"90300000-0000-4000-8000-000000000009"}','{request,reply}','"Substituted"'));
+   raise exception 'missing provider request refusal';
+ exception when others then if sqlerrm<>'review_dispatch_receipt_mismatch' then raise; end if; end;
+ perform public.settle_tenant_review_dispatch_admission((command->>'grantId')::uuid,command->>'ledgerId',command->'request',429);
+ command:=command||'{"grantId":"90300000-0000-4000-8000-000000000009"}';
+ perform pg_temp.ra_assert((public.admit_tenant_review_approval_dispatch(command)->>'admitted')::boolean,'definitive429 opens fresh checked admission');
 
  -- Deprovisioned sites retain nullable audit links. Their presence must not
  -- prevent authority rotation for a surviving sibling in the same workspace.
@@ -47,6 +66,12 @@ begin
  -- Current email, trust, owner membership and verified identity change-back
  -- must permanently rotate bound authority and never resurrect old links.
  update public.tenants set owner_email='ra-other@example.test' where stable_id=stable;
+ -- No network-duration owner lock: old admitted command settles after change.
+ perform public.settle_tenant_review_dispatch_admission((command->>'grantId')::uuid,command->>'ledgerId',command->'request',200);
+ begin
+   perform public.admit_tenant_review_approval_dispatch(command||'{"grantId":"90300000-0000-4000-8000-000000000010"}');
+   raise exception 'missing revoked-token refusal';
+ exception when others then if sqlerrm<>'review_approval_authority_changed' then raise; end if; end;
  perform pg_temp.ra_assert(not (public.read_tenant_review_approval_authority('ra-site')->>'legacyAllowed')::boolean,'tenant owner change revokes old links');
  update public.tenants set owner_email='ra-owner@example.test' where stable_id=stable;
  changed:=public.read_tenant_review_approval_authority('ra-site');

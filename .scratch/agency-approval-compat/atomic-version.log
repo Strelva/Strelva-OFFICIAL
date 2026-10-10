@@ -1,0 +1,17 @@
+
+> strelva@0.2.0 version:check /private/tmp/strelva-agency-approval-compat-20261009
+> node scripts/check-version-sync.mjs
+
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+[Error: ENOENT: no such file or directory, open '/private/tmp/strelva-marketing/package.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/private/tmp/strelva-marketing/package.json'
+}
+
+Node.js v26.8.2
+ ELIFECYCLE  Command failed with exit code 1.

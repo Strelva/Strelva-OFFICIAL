@@ -153,6 +153,16 @@ export async function readTenantReviewApprovalAuthority(tenantId: string) {
     "Review approval authority could not be read.");
 }
 
+/** One-shot command admission; the SQL function serializes identity changes. */
+export async function admitTenantReviewApprovalDispatch(input: Record<string, unknown>) {
+  return callBusinessRecord("admit_tenant_review_approval_dispatch", { p_input: input },
+    z.object({ admitted: z.boolean(), grantId: z.string().uuid() }).strict(), "Review dispatch could not be admitted.");
+}
+export async function settleTenantReviewDispatchAdmission(grantId: string, ledgerId: string, request: Record<string, unknown>, responseStatus: number): Promise<void> {
+  await callBusinessRecord("settle_tenant_review_dispatch_admission", { p_grant_id: workspaceId.parse(grantId), p_ledger_id: ledgerId,
+    p_request: request, p_response_status: responseStatus }, z.unknown(), "Review dispatch settlement could not be recorded.");
+}
+
 export async function readTenantWorkspaceLink(operatorEmail: string, tenantId: string): Promise<TenantLinkState> {
   return callBusinessRecord("read_tenant_workspace_link", {
     p_operator_email: z.string().email().parse(operatorEmail.trim().toLowerCase()), p_tenant_id: z.string().min(1).parse(tenantId),

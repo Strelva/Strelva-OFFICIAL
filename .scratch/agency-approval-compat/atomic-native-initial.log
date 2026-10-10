@@ -1,0 +1,3 @@
+Legacy owner-link migration/companion retired; exact runtime successor and current owner-link policy proved.
+psql:/private/tmp/strelva-agency-approval-compat-20261009/supabase/migrations/20261017120000_owner_decision_operator_refusal.sql:7: NOTICE:  schema "release_rollback_baseline" already exists, skipping
+Agency workflow SQL passed on 267 ordered migrations: add client, seat-only draft, owner claim/approval, guarded publish, readback receipt, isolation, revocation, stale revisions and replay.

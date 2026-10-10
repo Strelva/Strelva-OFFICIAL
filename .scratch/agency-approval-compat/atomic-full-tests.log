@@ -1,0 +1,149 @@
+
+> strelva@0.2.0 test /private/tmp/strelva-agency-approval-compat-20261009
+> vitest run
+
+
+ RUN  v4.1.11 /private/tmp/strelva-agency-approval-compat-20261009
+
+(node:66349) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ src/__tests__/release-safety-tools.test.ts (27 tests | 15 failed) 1187ms
+     × requires every integrated migration to have one pinned packet entry 20ms
+     × stages precisely pending batch +0 plus its packet prerequisites 11ms
+     × stages precisely pending batch 'H' plus its packet prerequisites 12ms
+     × stages precisely pending batch 1 plus its packet prerequisites 15ms
+     × stages precisely pending batch 2 plus its packet prerequisites 14ms
+     × stages precisely pending batch 3 plus its packet prerequisites 11ms
+     × stages precisely pending batch 4 plus its packet prerequisites 15ms
+     × stages precisely pending batch 5 plus its packet prerequisites 12ms
+     × stages precisely pending batch 6 plus its packet prerequisites 10ms
+     × stages precisely pending batch 7 plus its packet prerequisites 11ms
+     × stages precisely pending batch '7A' plus its packet prerequisites 13ms
+     × stages precisely pending batch '8' plus its packet prerequisites 11ms
+     × stages precisely pending batch '9' plus its packet prerequisites 12ms
+     × refuses missing prerequisites, unknown history, invalid batches and existing output 16ms
+     × the CLI accepts an exact proposed ID without granting deployment authority 349ms
+(node:70325) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:70617) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:71015) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ ❯ src/__tests__/production-readiness-snapshot.test.ts (23 tests | 1 failed) 76ms
+     × has a sentinel table for every unapplied migration that creates a table 43ms
+(node:71109) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:71129) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+tar: Failed to set default locale
+(node:71146) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:71294) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Bootstrapped super-admin access for first@example.test.
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 16 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/production-readiness-snapshot.test.ts > production readiness snapshot > has a sentinel table for every unapplied migration that creates a table
+AssertionError: 20261023200000_tenant_review_approval_continuity.sql needs a sentinel: expected undefined to be truthy
+
+- Expected:
+true
+
++ Received:
+undefined
+
+ ❯ src/__tests__/production-readiness-snapshot.test.ts:392:82
+    390|     for (const file of pending) {
+    391|       if (!/create table (if not exists )?public\./i.test(readFileSync…
+    392|       expect(MIGRATION_SENTINELS[file.slice(0, 14)], `${file} needs a …
+       |                                                                                  ^
+    393|     }
+    394|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/16]⎯
+
+ FAIL  src/__tests__/release-safety-tools.test.ts > offline batch staging > requires every integrated migration to have one pinned packet entry
+AssertionError: expected [Function] to not throw an error but 'Error: Migrations missing from the pr…' was thrown
+
+- Expected:
+undefined
+
++ Received:
+"Error: Migrations missing from the prepared packet: 20261023200000_tenant_review_approval_continuity.sql"
+
+ ❯ src/__tests__/release-safety-tools.test.ts:55:61
+     53|   });
+     54|   it("requires every integrated migration to have one pinned packet en…
+     55|     expect(() => verifyReleaseInventory(process.cwd())).not.toThrow();
+       |                                                             ^
+     56|   });
+     57|   it("pins H between 0 and 1 and the proposed tail after 7", () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/16]⎯
+
+ FAIL  src/__tests__/release-safety-tools.test.ts > offline batch staging > stages precisely pending batch +0 plus its packet prerequisites
+ FAIL  src/__tests__/release-safety-tools.test.ts > offline batch staging > stages precisely pending batch 'H' plus its packet prerequisites
+ FAIL  src/__tests__/release-safety-tools.test.ts > offline batch staging > stages precisely pending batch 1 plus its packet prerequisites
+ FAIL  src/__tests__/release-safety-tools.test.ts > offline batch staging > stages precisely pending batch 2 plus its packet prerequisites
+ FAIL  src/__tests__/release-safety-tools.test.ts > offline batch staging > stages precisely pending batch 3 plus its packet prerequisites
+ FAIL  src/__tests__/release-safety-tools.test.ts > offline batch staging > stages precisely pending batch 4 plus its packet prerequisites
+ FAIL  src/__tests__/release-safety-tools.test.ts > offline batch staging > stages precisely pending batch 5 plus its packet prerequisites
+ FAIL  src/__tests__/release-safety-tools.test.ts > offline batch staging > stages precisely pending batch 6 plus its packet prerequisites
+ FAIL  src/__tests__/release-safety-tools.test.ts > offline batch staging > stages precisely pending batch 7 plus its packet prerequisites
+ FAIL  src/__tests__/release-safety-tools.test.ts > offline batch staging > stages precisely pending batch '7A' plus its packet prerequisites
+ FAIL  src/__tests__/release-safety-tools.test.ts > offline batch staging > stages precisely pending batch '8' plus its packet prerequisites
+ FAIL  src/__tests__/release-safety-tools.test.ts > offline batch staging > stages precisely pending batch '9' plus its packet prerequisites
+Error: Migrations missing from the prepared packet: 20261023200000_tenant_review_approval_continuity.sql
+ ❯ verifyReleaseInventory scripts/release-safety/inventory.ts:42:29
+     40|   }
+     41|   const missing = forwardFiles.filter(file => !names.has(file));
+     42|   if (missing.length) throw new Error(`Migrations missing from the pre…
+       |                             ^
+     43| }
+     44|
+ ❯ stageReleaseBatch scripts/stage-release-batch.ts:44:3
+ ❯ src/__tests__/release-safety-tools.test.ts:65:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/16]⎯
+
+ FAIL  src/__tests__/release-safety-tools.test.ts > offline batch staging > refuses missing prerequisites, unknown history, invalid batches and existing output
+Error: Migrations missing from the prepared packet: 20261023200000_tenant_review_approval_continuity.sql
+ ❯ verifyReleaseInventory scripts/release-safety/inventory.ts:42:29
+     40|   }
+     41|   const missing = forwardFiles.filter(file => !names.has(file));
+     42|   if (missing.length) throw new Error(`Migrations missing from the pre…
+       |                             ^
+     43| }
+     44|
+ ❯ stageReleaseBatch scripts/stage-release-batch.ts:44:3
+ ❯ src/__tests__/release-safety-tools.test.ts:84:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/16]⎯
+
+ FAIL  src/__tests__/release-safety-tools.test.ts > offline batch staging > the CLI accepts an exact proposed ID without granting deployment authority
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ src/__tests__/release-safety-tools.test.ts:126:27
+    124|     const out = join(temp(),"hotfix");
+    125|     const result = spawnSync(process.execPath,["--import","tsx","scrip…
+    126|     expect(result.status).toBe(0);
+       |                           ^
+    127|     expect(result.stdout).toContain("Qualification: proposed");
+    128|     expect(result.stdout).toContain("No network access or deployment a…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/16]⎯
+
+
+ Test Files  2 failed | 898 passed | 2 skipped (902)
+      Tests  16 failed | 8517 passed | 46 skipped (8579)
+   Start at  23:05:41
+   Duration  36.71s (transform 44.56s, setup 16.07s, import 270.45s, tests 76.09s, environment 22.93s)
+
+ ELIFECYCLE  Test failed. See above for more details.

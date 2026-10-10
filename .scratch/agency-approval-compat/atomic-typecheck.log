@@ -1,0 +1,13 @@
+
+> strelva@0.2.0 typecheck /private/tmp/strelva-agency-approval-compat-20261009
+> next typegen && tsc --noEmit
+
+[@sentry/nextjs] DEPRECATION WARNING: disableLogger is deprecated and will be removed in a future version. Use webpack.treeshake.removeDebugLogging instead. (Not supported with Turbopack.)
+Generating route types...
+✓ Types generated successfully
+src/lib/event-actions.ts(594,14): error TS2339: Property 'beforeReplyDispatch' does not exist on type 'object'.
+src/lib/event-actions.ts(594,43): error TS7006: Parameter 'location' implicitly has an 'any' type.
+src/lib/event-actions.ts(594,53): error TS7006: Parameter 'dispatchedReviewId' implicitly has an 'any' type.
+src/lib/event-actions.ts(594,73): error TS7006: Parameter 'text' implicitly has an 'any' type.
+src/lib/event-actions.ts(594,79): error TS7006: Parameter 'receiptId' implicitly has an 'any' type.
+ ELIFECYCLE  Command failed with exit code 2.

@@ -55,6 +55,7 @@ export interface TenantReplyDeps {
   noteAccess?(workspaceId: string, locationId: string, pending: boolean): Promise<unknown>;
   /** Throws unless this person acts for Google on this location through the named agency, when supplied. */
   authorizeProvider?(workspaceId: string, userId: string, locationId: string, expectedAgencyWorkspaceId?: string): Promise<void>;
+  beforeReplyDispatch?(location: GoogleLocationRef, reviewId: string, comment: string, receiptId: string): Promise<{ settle(responseStatus: number): Promise<void> }>;
 }
 
 /** Recheck a delegate's current provider, preserving an agency staff actor's named agency. */
@@ -116,16 +117,26 @@ export async function postTenantReviewReply(input: {
   // Track whether Google took the reply, so a failure after acceptance is
   // never reported as "nothing sent".
   const rawClient = deps.client(token);
-  const base = deps.pace ? deps.pace(rawClient, input.workspaceId, locationId) : rawClient;
   let accepted = false;
-  const client: GoogleListingClient = {
-    ...base,
+  let dispatchReceiptId = "";
+  // Wrap the raw method before pacing. Every retry after a definitive 429
+  // requires a new atomic admission; a backoff cannot retain old authority.
+  const tracked: GoogleListingClient = {
+    ...rawClient,
     async updateReply(location, reviewId, comment) {
-      const result = await base.updateReply(location, reviewId, comment);
+      let admission: { settle(responseStatus: number): Promise<void> } | undefined;
+      try { admission = await deps.beforeReplyDispatch?.(location, reviewId, comment, dispatchReceiptId); }
+      catch { return { ok: false, kind: "auth", status: 403, detail: "Review authority changed. Nothing sent." }; }
+      let result;
+      try { result = await rawClient.updateReply(location, reviewId, comment); }
+      catch (error) { await admission?.settle(0).catch(() => {}); throw error; }
       if (result.ok) accepted = true;
+      try { await admission?.settle(result.ok ? 200 : result.status); }
+      catch { if (!result.ok) return { ok: false, kind: "error", status: 0, detail: "Dispatch settlement unavailable. Reconcile before retry." }; }
       return result;
     },
   };
+  const client = deps.pace ? deps.pace(tracked, input.workspaceId, locationId) : tracked;
   try {
     const outcome = await postReviewReply({
       workspaceId: input.workspaceId,
@@ -136,6 +147,7 @@ export async function postTenantReviewReply(input: {
       onWriteAccepted: async () => (await (await import("@/platform/infra/tenant-publishing")).tenantPublishingPorts()).markExecutionExternalAccepted(input.eventId),
       onWriteUnconfirmed: async () => (await (await import("@/platform/infra/tenant-publishing")).tenantPublishingPorts()).markExecutionExternalUnconfirmed(input.eventId),
       receipts: deps.receipts(),
+      onDispatchReady: receipt => { dispatchReceiptId = receipt.id; },
       ...providerCheck(input.authority, input.workspaceId, locationId, deps),
     }, {
       reviewId: input.reviewId,

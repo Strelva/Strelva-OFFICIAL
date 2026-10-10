@@ -1,0 +1,3 @@
+Browser harness did not start. Shell redirection failed before execution:
+zsh:1: no space left on device: .scratch/agency-approval-compat/browser-final.log
+Read-only disk check: /System/Volumes/Data 100%, 285 MiB available. No Auth/app/container started; no unrelated workloads or files were modified.

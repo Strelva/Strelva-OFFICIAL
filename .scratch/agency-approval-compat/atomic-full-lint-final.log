@@ -1,0 +1,5 @@
+
+> strelva@0.2.0 lint /private/tmp/strelva-agency-approval-compat-20261009
+> eslint .
+
+[BABEL] Note: The code generator has deoptimised the styling of /private/tmp/strelva-agency-approval-compat-20261009/src/platform/infra/db/database.types.ts as it exceeds the max of 500KB.

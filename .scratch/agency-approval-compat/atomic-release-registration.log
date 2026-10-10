@@ -1,0 +1,11 @@
+
+ RUN  v4.1.11 /private/tmp/strelva-agency-approval-compat-20261009
+
+(node:83674) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+ Test Files  2 passed (2)
+      Tests  50 passed (50)
+   Start at  23:10:41
+   Duration  1.59s (transform 103ms, setup 72ms, import 60ms, tests 1.52s, environment 0ms)
+

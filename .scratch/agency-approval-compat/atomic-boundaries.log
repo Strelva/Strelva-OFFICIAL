@@ -1,0 +1,7 @@
+
+> strelva@0.2.0 check:boundaries /private/tmp/strelva-agency-approval-compat-20261009
+> tsx scripts/check-product-boundaries.ts
+
+Product boundaries passed (source and scripts, including untracked files). Baseline, shrink only: 202 workspace -> src/lib imports in 92 files, 43 older boundary imports.
+(node:66371) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)

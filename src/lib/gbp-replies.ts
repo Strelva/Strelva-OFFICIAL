@@ -123,7 +123,7 @@ export async function publishReviewReply(
   tenantId: string,
   reviewId: string,
   replyText: string,
-  options: { actor?: string; commandKey?: string } = {}
+  options: { actor?: string; commandKey?: string; beforeDispatch?: (attemptId: string, replyUrl: string) => Promise<{ settle(responseStatus: number): Promise<void> }> } = {}
 ): Promise<PublishReplyResult> {
   const actor = options.actor ?? "strelva";
   const checkedAt = new Date().toISOString();
@@ -162,8 +162,8 @@ export async function publishReviewReply(
 
   const replyUrl = reviewReplyUrl(meta.accountId, meta.locationId, reviewId);
 
-  if (process.env.STRELVA_OPERATOR_QUEUE_RELEASE === "1") {
-    return publishReceiptedReply({ tenantId, reviewId, replyText, actor, commandKey: options.commandKey, accessToken, replyUrl });
+  if (process.env.STRELVA_OPERATOR_QUEUE_RELEASE === "1" || options.beforeDispatch) {
+    return publishReceiptedReply({ tenantId, reviewId, replyText, actor, commandKey: options.commandKey, accessToken, replyUrl, beforeDispatch: options.beforeDispatch });
   }
 
   // ── Publish ────────────────────────────────────────────────────────────────
@@ -238,6 +238,7 @@ export async function publishReviewReply(
 async function publishReceiptedReply(input: {
   tenantId: string; reviewId: string; replyText: string; actor: string;
   commandKey?: string; accessToken: string; replyUrl: string;
+  beforeDispatch?: (attemptId: string, replyUrl: string) => Promise<{ settle(responseStatus: number): Promise<void> }>;
 }): Promise<PublishReplyResult> {
   const { tenantId, reviewId, replyText, actor, accessToken, replyUrl } = input;
   const commandKey = input.commandKey ?? `review-reply:${createHash("sha256").update(JSON.stringify([tenantId, reviewId, replyText])).digest("hex")}`;
@@ -260,16 +261,27 @@ async function publishReceiptedReply(input: {
   const beforeState = await getReply(accessToken, readUrl);
   const base = { commandKey, tenantId, writeKind: "review_reply" as const, request, beforeState,
     subject: "Reply to a Google review", actor };
+  let admission: { settle(responseStatus: number): Promise<void> } | undefined;
+  if (input.beforeDispatch) {
+    try { admission = await input.beforeDispatch(attemptId, replyUrl); }
+    catch {
+      try { await port.completeGoogleWrite(attemptId, { ...base, acceptance: "rejected", acceptanceDetail: "Review authority changed before dispatch. Nothing sent." }); } catch { /* Pending attempt remains conservative. */ }
+      return { published: false, verified: false, evidence: "Review authority changed. Nothing sent." };
+    }
+  }
   let response: Response;
   try {
-    response = await fetch(replyUrl, { method: "PUT", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ comment: replyText }) });
+    response = await fetch(replyUrl, { method: "PUT", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ comment: replyText }), ...(input.beforeDispatch ? { signal: AbortSignal.timeout(10_000) } : {}) });
   } catch {
+    await admission?.settle(0).catch(() => {});
     try { await port.completeGoogleWrite(attemptId, { ...base, acceptance: "unknown", acceptanceDetail: "No response from Google. Reconcile before any new approval." }); } catch { /* Pending attempt blocks replay. */ }
     return { published: false, verified: false, evidence: "Google acceptance uncertain. Do not resend." };
   }
+  await admission?.settle(response.status).catch(() => {});
   if (!response.ok) {
-    try { await port.completeGoogleWrite(attemptId, { ...base, acceptance: "rejected", acceptanceDetail: `Google answered ${response.status}.` }); } catch { /* Pending attempt blocks replay. */ }
-    return { published: false, verified: false, evidence: `Google rejected the reply (${response.status}).` };
+    const acceptance = input.beforeDispatch && response.status >= 500 ? "unknown" : "rejected";
+    try { await port.completeGoogleWrite(attemptId, { ...base, acceptance, acceptanceDetail: `Google answered ${response.status}.` }); } catch { /* Pending attempt blocks replay. */ }
+    return { published: false, verified: false, evidence: acceptance === "unknown" ? "Google acceptance uncertain. Reconcile before any resend." : `Google rejected the reply (${response.status}).` };
   }
   // Acceptance is saved before parsing or verification. A failed settlement leaves
   // the pending reservation and must still return accepted to the approval path.

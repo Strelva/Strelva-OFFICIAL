@@ -1,0 +1,31 @@
+
+> strelva@0.2.0 test /private/tmp/strelva-agency-approval-compat-20261009
+> vitest run
+
+
+ RUN  v4.1.11 /private/tmp/strelva-agency-approval-compat-20261009
+
+(node:85683) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:90225) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:90327) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:90857) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:91151) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:91200) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+tar: Failed to set default locale
+(node:91713) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:91711) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Bootstrapped super-admin access for first@example.test.
+
+ Test Files  900 passed | 2 skipped (902)
+      Tests  8533 passed | 46 skipped (8579)
+   Start at  23:11:09
+   Duration  49.12s (transform 53.76s, setup 19.43s, import 382.80s, tests 103.39s, environment 29.56s)
+

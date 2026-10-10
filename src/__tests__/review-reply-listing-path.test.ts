@@ -3,6 +3,8 @@ import type { GoogleListingClient, GoogleResult, GoogleReview } from "@/products
 import { createMemoryReceiptStore, type ListingReceiptStore } from "@/products/google-listing/receipts";
 import type { TenantReplyDeps } from "@/products/google-listing/tenant-replies";
 import type { GoogleGrant } from "@/lib/google-access";
+import { postTenantReviewReply } from "@/products/google-listing/tenant-replies";
+import { paceGoogleWrites } from "@/products/google-listing/pacing";
 
 /**
  * The tenant approve path for review replies, moved onto the Google listing
@@ -37,6 +39,7 @@ vi.mock("../lib/events", () => ({
   claimEventAction: (...args: unknown[]) => mockClaimEventAction(...args),
   finishEventAction: (...args: unknown[]) => mockFinishEventAction(...args),
   markExecutionExternalAccepted: (...args: unknown[]) => mockMark(...args),
+  markExecutionExternalUnconfirmed: vi.fn(async () => {}),
   updateEvent: vi.fn(),
 }));
 vi.mock("@/products/inquiries", () => ({
@@ -124,6 +127,34 @@ beforeEach(() => {
 });
 
 describe("review reply approve on the listing System", () => {
+  it("checks admission at raw PUT and never writes after refusal", async () => {
+    const beforeReplyDispatch = vi.fn(async () => { throw new Error("owner changed"); });
+    const { google, receipts } = setup({ beforeReplyDispatch });
+    const result = await postTenantReviewReply({ tenantId: "tenant-a", workspaceId: WORKSPACE, eventId: "evt_rr", attemptId: "attempt_1", reviewId: "rev_9", text: "Thanks", authority: { kind: "owner_approval", actor: "user", approvalRef: "event:evt_rr" } }, deps);
+    expect(result.status).toBe("failed"); expect(google.writes).toHaveLength(0);
+    expect(beforeReplyDispatch).toHaveBeenCalledWith({ accountId: "accounts/111", locationId: "333" }, "rev_9", "Thanks", expect.any(String));
+    expect(receipts.all()).toHaveLength(1);
+  });
+  it("rechecks admission after429 backoff and sends no second PUT after transfer", async () => {
+    let owner = true;
+    const settle = vi.fn(async () => {});
+    const beforeReplyDispatch = vi.fn(async () => { if (!owner) throw new Error("owner changed"); return { settle }; });
+    const { google } = setup({ beforeReplyDispatch, pace: (client, workspaceId, locationId) => paceGoogleWrites(client, workspaceId, locationId,
+      { limited: async () => false, wait: async () => { owner = false; } }) });
+    vi.mocked(google.client.updateReply).mockResolvedValueOnce({ ok: false, kind: "rate_limited", status: 429, detail: "slow" });
+    const result = await postTenantReviewReply({ tenantId: "tenant-a", workspaceId: WORKSPACE, eventId: "evt_rr", attemptId: "attempt_1", reviewId: "rev_9", text: "Thanks", authority: { kind: "owner_approval", actor: "user", approvalRef: "event:evt_rr" } }, deps);
+    expect(result.status).toBe("failed"); expect(google.client.updateReply).toHaveBeenCalledTimes(1);
+    expect(beforeReplyDispatch).toHaveBeenCalledTimes(2); expect(settle).toHaveBeenCalledWith(429);
+  });
+  it("preserves accepted command after owner change and settlement failure without resend", async () => {
+    const settle = vi.fn(async () => { throw new Error("settlement unavailable"); });
+    const beforeReplyDispatch = vi.fn(async () => ({ settle }));
+    const { google } = setup({ beforeReplyDispatch });
+    const input = { tenantId: "tenant-a", workspaceId: WORKSPACE, eventId: "evt_rr", attemptId: "attempt_1", reviewId: "rev_9", text: "Thanks", authority: { kind: "owner_approval" as const, actor: "user", approvalRef: "event:evt_rr" } };
+    expect((await postTenantReviewReply(input, deps)).status).toBe("posted");
+    expect((await postTenantReviewReply(input, deps)).status).toBe("already_on_google");
+    expect(google.client.updateReply).toHaveBeenCalledTimes(1); expect(settle).toHaveBeenCalledWith(200);
+  });
   it("posts through the listing System with one listing receipt and no outside-write receipt", async () => {
     const { google, receipts } = setup();
     const result = await resolveEventAction("tenant-a", "evt_rr", "approved", "owner-user-1");

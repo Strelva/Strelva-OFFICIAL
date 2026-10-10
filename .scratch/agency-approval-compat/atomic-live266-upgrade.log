@@ -1,0 +1,1 @@
+psql:/Users/jacobrhinehart/.strelva-prod-ops/strelva-agency-client-setup-20261009/public-schema-resume.sql:41382: ERROR:  data type uuid has no default operator class for access method "gist"

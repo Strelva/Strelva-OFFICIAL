@@ -304,7 +304,9 @@ async function postPage(request: Request): Promise<NextResponse> {
     if (event && ["workspace_collection_publish", "workspace_newsletter_issue", "workspace_google_listing_draft"].includes(String(event.metadata?.kind))) {
       return noticePage({ status: 403, heading: "Use the current approval link", body: "Open this item in Needs you, or use the recipient-bound approval link Strelva prepared for it." });
     }
-    result = reviewOnly
+    // Every review carries authorization, even if the route observed an
+    // unconverted tenant: conversion may commit before the provider call.
+    result = reviewOnly || (event && isManagedReviewApproval(event, claims.tenantId))
       ? await resolveEventAction(claims.tenantId, claims.eventId, workflowAction, "user", { reviewApprovalToken: token })
       : await resolveEventAction(claims.tenantId, claims.eventId, workflowAction);
   } catch (err) {

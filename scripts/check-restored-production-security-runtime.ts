@@ -16,6 +16,7 @@ const digest = (value: string) => createHash("sha256").update(value).digest("hex
 const fileDigest = (file: string) => digest(readFileSync(file, "utf8"));
 type Fingerprint = { count: string; hash: string; columns: string[]; retiredEmpty?: boolean; retiredSeedMetadata?: boolean };
 type Snapshot = Record<string, Fingerprint>;
+type ReleaseManifestItem = { file: string; sha256: string; rollback?: string };
 
 function main() {
   const argv = process.argv.slice(2), args = new Map<string, string>();
@@ -36,11 +37,11 @@ function main() {
   const sourceInventory = JSON.parse(readFileSync(inventoryFile, "utf8")) as { rows: Array<{ snapshot: { migrations: string[] } }> };
   const applied = sourceInventory.rows[0]?.snapshot.migrations;
   if (!applied || new Set(applied).size !== applied.length || applied.some(value => !/^\d{14}$/.test(value))) throw new Error("Invalid hosted applied-version receipt");
-  const allItems = [...manifest.baseline, ...manifest.batches.flat(), ...manifest.proposed.flatMap(batch => batch.items)];
+  const allItems = [...manifest.baseline, ...manifest.batches.flat(), ...manifest.proposed.flatMap<ReleaseManifestItem>(batch => batch.items)];
   // This exact deployment order captures the original scope before any new
   // entrypoint can enter it. The combined-release supplements follow the
   // complete previously rehearsed security packet, matching hosted sequence.
-  const prerequisites = [...manifest.baseline, ...manifest.batches.flat(), ...manifest.proposed.filter(batch => ["H", "7A"].includes(String(batch.batch))).flatMap(batch => batch.items)];
+  const prerequisites = [...manifest.baseline, ...manifest.batches.flat(), ...manifest.proposed.filter(batch => ["H", "7A"].includes(String(batch.batch))).flatMap<ReleaseManifestItem>(batch => batch.items)];
   const capturedNames = new Set([...prerequisites, ...originalScope.items].map(item => item.file));
   const supplementalNames = ["20261015111000_website_owner_agency_publish.sql", "20261019100000_actor_rpc_service_boundary.sql"];
   const supplements = supplementalNames.flatMap(file => allItems.filter(item => item.file === file));

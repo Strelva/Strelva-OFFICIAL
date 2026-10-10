@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
 import { signApproveToken, signReviewApproveToken, verifyReviewApproveToken, verifyAnyApproveToken, verifyApproveToken, verifyWorkspaceApproveToken, APPROVE_LINK_TTL_MS } from "@/lib/approve-link";
-import { reviewApprovalTokenAllowed, readReviewApprovalAuthority } from "@/lib/review-approval-authority";
+import { reviewApprovalTokenAllowed, readReviewApprovalAuthority, admitReviewApprovalDispatch } from "@/lib/review-approval-authority";
 
 const deps = vi.hoisted(() => ({ rpc: vi.fn(), event: vi.fn(), resolve: vi.fn(), send: vi.fn(), redis: vi.fn() }));
 vi.mock("@/platform/infra/db/client", () => ({ isSupabaseConfigured: () => true, getSupabase: () => ({ rpc: deps.rpc }) }));
@@ -35,6 +35,29 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); });
 
 describe("review approval continuity", () => {
+  it("carries a review token into dispatch even when the route reads an unconverted site", async () => {
+    deps.rpc.mockImplementation(async (name: string) => ({ data: name === "read_tenant_review_approval_authority" ? { ...authority, workspaceId: null, conversionAt: null }
+      : { email: authority.recipient, name: null, from: "tenant", workspaceId: null, tenantId: authority.tenantId }, error: null }));
+    const token = signApproveToken(baseClaims);
+    expect((await request(token, "POST")).status).toBe(200);
+    expect(deps.resolve).toHaveBeenCalledWith("fixture-site", "event-fixture", "approved", "user", { reviewApprovalToken: token });
+  });
+  it("persists exact verified claims and returns a scope-bound settlement handle", async () => {
+    deps.rpc.mockImplementation(async (name: string, args: Record<string, unknown>) => ({ data: name === "admit_tenant_review_approval_dispatch"
+      ? { admitted: true, grantId: (args.p_input as Record<string, unknown>).grantId } : null, error: null }));
+    const scope = { ...baseClaims, action: "approved" as const, attemptId: "attempt-fixture", ledger: "legacy" as const, ledgerId: "ledger-fixture", request: { reviewId: "review", reply: "Thanks", providerTarget: "fixture-target" } };
+    const grant = await admitReviewApprovalDispatch(bound(), scope);
+    const command = deps.rpc.mock.calls[0]![1].p_input;
+    expect(command).toMatchObject({ ...scope, tokenKind: "review", workspaceId: workspace, recipient: authority.recipient, authorityVersion: authority.version });
+    await grant.settle(200);
+    expect(deps.rpc).toHaveBeenLastCalledWith("settle_tenant_review_dispatch_admission", { p_grant_id: grant.grantId, p_ledger_id: scope.ledgerId, p_request: scope.request, p_response_status: 200 });
+  });
+  it("cannot admit wrong-event or opposite-action claims", async () => {
+    for (const over of [{ eventId: "other" }, { action: "dismissed" as const }]) {
+      await expect(admitReviewApprovalDispatch(bound(), { tenantId: baseClaims.tenantId, eventId: baseClaims.eventId, action: "approved", attemptId: "fixture", ledger: "legacy", ledgerId: "fixture", request: {}, ...over })).rejects.toThrow("review_approval_authority_changed");
+    }
+    expect(deps.rpc).not.toHaveBeenCalled();
+  });
   it("keeps old GET scanner safe and old POST working across unchanged conversion", async () => {
     const token = signApproveToken(baseClaims);
     const get = await request(token, "GET");

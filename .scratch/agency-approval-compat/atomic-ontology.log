@@ -1,0 +1,7 @@
+
+> strelva@0.2.0 check:ontology /private/tmp/strelva-agency-approval-compat-20261009
+> tsx scripts/check-ontology.ts
+
+check:ontology passed (file-size ceiling + lifecycle CHECK constraints).
+(node:66372) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
