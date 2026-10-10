@@ -10,7 +10,6 @@ import { useRef, useState } from "react";
 import { z } from "zod";
 import { ArrowLeft, ArrowUpRight, MessageSquareText } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { StHead, StNotice, StPage, StPill, StState, StTextButton } from "@/components/ui/strelva/Kit";
 import { InquiryServerWorkspaceExperience } from "@/experience/inquiries/InquiryServerExperience";
 import type { InquirySurfaceAdapter } from "@/experience/inquiries/contracts";
 import { OpenedWork } from "@/experience/workspace/OpenedWork";

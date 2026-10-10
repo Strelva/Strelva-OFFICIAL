@@ -10,7 +10,6 @@ export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
   const focusControl = useRef<HTMLButtonElement>(null);
   const [who, setWho] = useState<"handles" | "after" | "ask">("ask");
   const [ask, setAsk] = useState("");
-  const titleRef = useRef<HTMLHeadingElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [accepted, setAccepted] = useState(false);

@@ -1,4 +1,3 @@
-import { StPage, StHead } from "@/components/ui/strelva/Kit";
 import { notFound } from "next/navigation";
 import { strelvaUiPreviewEnabled } from "@/experience/workspace/preview/enabled";
 import { AccessReviewPreview } from "@/experience/workspace/preview/AccessReviewPreview";
