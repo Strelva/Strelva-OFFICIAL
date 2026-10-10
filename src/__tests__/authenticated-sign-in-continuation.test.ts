@@ -1,4 +1,4 @@
-import { createElement } from "react";
+import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 
@@ -10,9 +10,9 @@ vi.mock("@/lib/invites", () => ({ getInvite: invite }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: vi.fn(async () => ({ id: "example", siteName: "Example", active: true })) }));
 vi.mock("next/headers", () => ({ headers: vi.fn(async () => new Headers()) }));
 vi.mock("next/navigation", () => ({ redirect }));
-vi.mock("@/components/auth/SupabaseSignIn", () => ({ SupabaseSignIn: (props: Record<string, unknown>) => createElement("pre", null, JSON.stringify(props)) }));
+vi.mock("@/components/auth/SupabaseSignIn", () => ({ SupabaseSignIn: (props: Record<string, unknown>) => createElement("div", null, props.heading as ReactNode, createElement("pre", null, JSON.stringify({ next: props.next, prefillEmail: props.prefillEmail }))) }));
 vi.mock("@/components/AuthDocumentTitle", () => ({ AuthDocumentTitle: () => null }));
-vi.mock("@/components/Logo", () => ({ LogoFull: () => null }));
+vi.mock("@/components/Logo", () => ({ LogoFull: () => null, LogoMark: () => null }));
 import SignInPage from "@/app/sign-in/[[...sign-in]]/page";
 
 const confirmed = { id: "b9100000-0000-4000-8000-000000000001", email: "owner@example.test", email_confirmed_at: "2026-09-21T12:00:00Z" };
@@ -38,7 +38,7 @@ describe("authenticated public start continuation", () => {
   it("keeps a signed-out visitor at sign-in with the original destination", async () => {
     user.mockResolvedValue(null);
     const html = renderToStaticMarkup(await page({ next: start }));
-    expect(html).toContain("Your work starts here.");
+    expect(html).toContain("Sign in");
     expect(html).toContain(start);
     expect(redirect).not.toHaveBeenCalled();
   });
@@ -51,7 +51,7 @@ describe("authenticated public start continuation", () => {
 
   it("keeps sign-in available if the Auth verification service fails", async () => {
     user.mockRejectedValue(new Error("Synthetic Auth outage"));
-    expect(renderToStaticMarkup(await page({ next: start }))).toContain("Your work starts here.");
+    expect(renderToStaticMarkup(await page({ next: start }))).toContain("Sign in");
     expect(redirect).not.toHaveBeenCalled();
   });
 
@@ -78,7 +78,7 @@ describe("authenticated public start continuation", () => {
   it("does not skip the existing invite-claim boundary for a signed-in person", async () => {
     invite.mockResolvedValue({ tenant: "example", role: "owner" });
     const html = renderToStaticMarkup(await page({ next: start, email: "invited@example.test" }));
-    expect(html).toContain("Sign in to manage Example.");
+    expect(html).toContain("Sign in to manage Example");
     expect(html).toContain(`/account?next=${encodeURIComponent(start)}`);
     expect(user).not.toHaveBeenCalled();
     expect(redirect).not.toHaveBeenCalled();

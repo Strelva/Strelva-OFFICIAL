@@ -8,7 +8,7 @@ const mockHeaderValues = vi.hoisted(() => new Map<string, string>());
 
 vi.mock("@/components/auth/SupabaseSignIn", () => ({
   SupabaseSignIn: (props: Record<string, unknown>) =>
-    React.createElement("pre", { "data-supabase": "sign-in" }, JSON.stringify(props)),
+    React.createElement("div", null, props.heading as React.ReactNode, React.createElement("pre", { "data-supabase": "sign-in" }, JSON.stringify({ next: props.next, prefillEmail: props.prefillEmail }))),
 }));
 
 vi.mock("next/headers", () => ({
@@ -55,7 +55,7 @@ describe("auth access pages", () => {
     }));
 
     expect(mockGetInvite).toHaveBeenCalledWith("owner@example.com");
-    expect(html).toContain("Create access for Great Lakes Dried Fruit.");
+    expect(html).toContain("Create access for Great Lakes Dried Fruit");
     expect(html).toContain('data-supabase="sign-in"');
     expect(html).toContain("&quot;next&quot;:&quot;/account&quot;");
     expect(html).toContain("&quot;prefillEmail&quot;:&quot;owner@example.com&quot;");
@@ -70,7 +70,7 @@ describe("auth access pages", () => {
       searchParams: Promise.resolve({ email: "owner@example.com" }),
     }));
 
-    expect(html).toContain("Dashboard access is invite-only.");
+    expect(html).toContain("Dashboard access is invite-only");
     expect(html).toContain("Request your build");
     expect(html).not.toContain('data-clerk="sign-up"');
   });
@@ -82,7 +82,7 @@ describe("auth access pages", () => {
       searchParams: Promise.resolve({ email: "owner@example.com" }),
     }));
 
-    expect(html).toContain("Sign in to manage Great Lakes Dried Fruit.");
+    expect(html).toContain("Sign in to manage Great Lakes Dried Fruit");
     expect(html).toContain('data-supabase="sign-in"');
     expect(html).toContain("&quot;next&quot;:&quot;/account&quot;");
     expect(html).toContain("&quot;prefillEmail&quot;:&quot;owner@example.com&quot;");
@@ -96,7 +96,7 @@ describe("auth access pages", () => {
       searchParams: Promise.resolve({}),
     }));
 
-    expect(html).toContain("Sign in to manage Great Lakes Dried Fruit.");
+    expect(html).toContain("Manage Great Lakes Dried Fruit");
     expect(html).toContain('data-supabase="sign-in"');
     expect(html).toContain("&quot;next&quot;:&quot;/client/gldf/dashboard&quot;");
   });
@@ -109,7 +109,7 @@ describe("auth access pages", () => {
       searchParams: Promise.resolve({}),
     }));
 
-    expect(html).toContain("Create access for Great Lakes Dried Fruit.");
+    expect(html).toContain("Manage Great Lakes Dried Fruit");
     expect(html).toContain('data-supabase="sign-in"');
     expect(html).toContain("&quot;next&quot;:&quot;/client/gldf/dashboard&quot;");
   });
@@ -124,12 +124,12 @@ describe("auth access pages", () => {
     const signIn = renderToStaticMarkup(await SignInPage({ searchParams: Promise.resolve({}) }));
     const signUp = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve({}) }));
 
-    expect(signIn).toContain("Sign in to your work.");
+    expect(signIn).toContain("Sign in");
     expect(signIn).toContain("&quot;next&quot;:&quot;/workspace&quot;");
-    expect(signIn).toContain("Try the free AI Visibility audit");
-    expect(signUp).toContain("Start your work here.");
+    expect(signIn).not.toContain("AI Visibility");
+    expect(signUp).toContain("Create your account");
     expect(signUp).toContain("&quot;next&quot;:&quot;/workspace&quot;");
-    expect(signUp).toContain("Need a managed website? Request your build");
+    expect(signUp).toContain("Already have an account? Sign in");
   });
 
   it("asks business or agency when the agency front door is on, and sends agencies to setup", async () => {
@@ -140,18 +140,18 @@ describe("auth access pages", () => {
     const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
 
     const business = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve({ next: "/workspace?save=scan_public123" }) }));
-    expect(business).toContain("Who is this account for?");
+    expect(business).toContain("Who is this for?");
     expect(business).toContain("I run a business");
     expect(business).toContain('href="/sign-up?as=agency"');
     expect(business).toContain('aria-current="page"');
-    expect(business).toContain("Start your work here.");
+    expect(business).toContain("Create your account");
     expect(business).toContain("&quot;next&quot;:&quot;/workspace?save=scan_public123&quot;");
     // Strelva is not the default provider on the neutral front door (ADR 0012).
     expect(business).not.toContain("Request your build");
 
     const agency = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve({ as: "agency", next: "/workspace?save=scan_public123" }) }));
-    expect(agency).toContain("Run your client work in Strelva.");
-    expect(agency).toContain("turns on once Strelva verifies your agency for it");
+    expect(agency).toContain("Create your account");
+    expect(agency).toContain("Clients own their workspace; you work inside it.");
     expect(agency).toContain("&quot;next&quot;:&quot;/workspace/agency/start&quot;");
     expect(agency).toContain('href="/sign-up?next=%2Fworkspace%3Fsave%3Dscan_public123"');
   });
@@ -163,8 +163,8 @@ describe("auth access pages", () => {
     const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
 
     const html = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve({ as: "agency" }) }));
-    expect(html).not.toContain("Who is this account for?");
-    expect(html).toContain("Start your work here.");
+    expect(html).not.toContain("Who is this for?");
+    expect(html).toContain("Create your account");
     expect(html).toContain("&quot;next&quot;:&quot;/workspace&quot;");
   });
 
@@ -290,7 +290,7 @@ describe("auth access pages", () => {
     }));
 
     expect(html).toContain(`&quot;next&quot;:&quot;${wrapped}&quot;`);
-    expect(html).toContain("Sign in to manage Great Lakes Dried Fruit.");
+    expect(html).toContain("Sign in to manage Great Lakes Dried Fruit");
   });
 
   it("falls back to the workspace root for an unsafe signup destination", async () => {

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { notFound } from "next/navigation";
 import { strelvaUiPreviewEnabled } from "@/experience/workspace/preview/enabled";
 import { WorkspaceInquiries } from "@/experience/places/WorkspaceInquiries";
@@ -75,8 +76,8 @@ export default async function PlacesPreviewPage({ searchParams }: { searchParams
     const outcome = (["saved", "unchanged", "conflict", "invalid", "denied", "failed"] as const).find((item) => item === result) as DetailsSaveOutcome | undefined;
     const action = async () => { "use server"; };
     const data = { record: record(state === "member" ? "member" : "owner"), operator: false, sites: [SITE], denied: [] };
-    return <WorkspaceBusinessDetails workspaceId={WORKSPACE} result={outcome ?? null} field={outcome === "invalid" ? "phone" : null} action={action}
-      state={frame(state === "member" ? undefined : state, data, { ...data, record: { ...record("owner"), facts: {}, services: [], people: [] }, sites: [] }, data, { ...data, denied: DENIED })} />;
+    return <StrelvaShell signedIn={false} appBase="/preview/strelva" active="settings" title="Business details" businessContext="Juniper Bakery" systemsReleased><WorkspaceBusinessDetails workspaceId={WORKSPACE} result={outcome ?? null} field={outcome === "invalid" ? "phone" : null} action={action}
+      state={frame(state === "member" ? undefined : state, data, { ...data, record: { ...record("owner"), facts: {}, services: [], people: [] }, sites: [] }, data, { ...data, denied: DENIED })} /></StrelvaShell>;
   }
 
   const leads = [

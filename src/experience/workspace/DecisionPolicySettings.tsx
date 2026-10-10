@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { RotateCcw, ShieldCheck, Undo2 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { SelectInput } from "@/components/ui/TextInput";
+import { StSection, StRows, StRow, StSegmented, StNotice, StEmpty, StSkeleton, StTextButton } from "@/components/ui/strelva/Kit";
+import { LADDER_ROUTES } from "@/platform/needs-you/contracts";
 import type { ConfigurableKind, LadderRoute } from "@/platform/needs-you/contracts";
 import { OPERATOR_ONLY_KIND_LIST, ROUTE_WORDS } from "@/platform/needs-you/policy-words";
 import type { PolicyKindView, PolicyView } from "@/platform/needs-you/policy-model";
@@ -106,37 +105,20 @@ export function DecisionPolicyPanel({ state, pending, notice, onChange, onRetry 
 }) {
   if (state.status === "disabled") return null;
 
-  return <section id="who-decides" className="border-b border-gray-border py-8" aria-labelledby="who-decides-heading">
-    <h2 id="who-decides-heading" className="flex items-center gap-2 text-base font-medium text-warm-black"><ShieldCheck className="h-5 w-5 text-accent-text" strokeWidth={1.5} aria-hidden="true" />Who decides</h2>
-    <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-muted">For each kind of change, whether Strelva just does it, a Strelva person checks it, or it waits for you. Strelva sets the starting point. You can make any of them stricter, and set them back.</p>
-    {state.status === "loading" ? <p role="status" className="mt-5 text-sm text-gray-muted">Checking who decides…</p> : null}
-    {state.status === "error" ? <div role="status" className="mt-5 flex flex-wrap items-center gap-3 text-sm text-gray-muted">{state.message}<Button size="sm" variant="secondary" onClick={onRetry}>Check again</Button></div> : null}
+  return <StSection id="who-decides" title="Who decides" meta="Only stricter than Strelva's default">
+    <p className="text-sm text-gray-muted">You can always ask to see more before it happens. Dimmed choices are looser than Strelva allows for that kind.</p>
+    {state.status === "loading" ? <><p role="status" className="text-sm text-gray-muted">Checking who decides…</p><StSkeleton /><StSkeleton width="70%" /></> : null}
+    {state.status === "error" ? <StNotice tone="critical" action={<StTextButton onClick={onRetry}>Check again</StTextButton>}>{state.message}</StNotice> : null}
     {state.status === "ready" ? <>
-      {state.role !== "owner" ? <p className="mt-4 max-w-2xl text-sm text-gray-muted">Only the owner can change these. You can see how each kind of change is decided.</p> : null}
+      {state.role !== "owner" ? <StNotice>Only the owner can change these. You can see how each kind of change is decided.</StNotice> : null}
       {GROUPS.map(group => {
         const rows = group.kinds.flatMap(kind => state.view.kinds.filter(item => item.kind === kind && !HIDDEN.has(item.kind)));
-        if (!rows.length) return null;
-        const groupId = `who-decides-${group.title.toLowerCase().replace(/[^a-z]+/g, "-")}`;
-        return <section key={group.title} className="mt-6" aria-labelledby={groupId}>
-          <h3 id={groupId} className="text-sm font-medium text-warm-black">{group.title}</h3>
-          <ul className="mt-3 divide-y divide-gray-border border-y border-gray-border">
-            {rows.map(item => <PolicyRow key={item.kind} item={item} canChange={state.role === "owner"} busy={pending === item.kind} locked={Boolean(pending)}
-              notice={notice?.kind === item.kind ? notice : null} onChange={onChange} />)}
-          </ul>
-        </section>;
+        return rows.length ? <StSection key={group.title} title={group.title}><StRows>{rows.map(item => <PolicyRow key={item.kind} item={item} canChange={state.role === "owner"} busy={pending === item.kind} locked={Boolean(pending)} notice={notice?.kind === item.kind ? notice : null} onChange={onChange} />)}</StRows></StSection> : null;
       })}
-      <section className="mt-6" aria-labelledby="who-decides-always">
-        <h3 id="who-decides-always" className="text-sm font-medium text-warm-black">Always yours</h3>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-muted">No setting changes these. Access, money and leaving need you signed in.</p>
-        <ul className="mt-3 divide-y divide-gray-border border-y border-gray-border">
-          {state.view.kinds.filter(item => item.fixed).map(item => <li key={item.kind} className="px-2 py-3">
-            <strong className="block text-sm font-medium text-warm-black">{item.label}</strong>
-            <small className="mt-1 block text-xs leading-relaxed text-gray-muted">{item.example}</small>
-          </li>)}
-        </ul>
-      </section>
+      {!state.view.kinds.length ? <StEmpty>No decision settings have been recorded.</StEmpty> : null}
+      <StSection title="Always yours"><p className="text-sm text-gray-muted">No setting changes these. Access, money and leaving need you signed in.</p><StRows>{state.view.kinds.filter(item => item.fixed).map(item => <StRow key={item.kind} title={item.label} detail={item.example} end="Ask me first" />)}</StRows></StSection>
     </> : null}
-  </section>;
+  </StSection>;
 }
 
 function PolicyRow({ item, canChange, busy, locked, notice, onChange }: {
@@ -148,38 +130,16 @@ function PolicyRow({ item, canChange, busy, locked, notice, onChange }: {
   onChange: (item: PolicyKindView, change: Change, done: string) => void;
 }) {
   const strelva = ROUTE_WORDS[item.strelvaRoute].label;
-  const options = item.ownerChoices.map(route => ({ value: route, label: route === item.ownerChoices[0] ? `${ROUTE_WORDS[route].label} (default)` : ROUTE_WORDS[route].label }));
-  return <li className="grid gap-3 px-2 py-4 sm:grid-cols-[minmax(0,1fr)_minmax(14rem,20rem)] sm:items-start">
-    <div className="min-w-0">
-      <strong className="block text-sm font-medium text-warm-black">{item.label}</strong>
-      <small className="mt-1 block text-xs leading-relaxed text-gray-muted">{item.example}</small>
-      {!canChange || item.ownerChoices.length < 2 ? <small className="mt-1 block text-xs leading-relaxed text-warm-black">{ROUTE_WORDS[item.route].label}. {ROUTE_WORDS[item.route].detail}</small> : null}
-      {item.ownerRoute ? <small className="mt-1 block text-xs leading-relaxed text-gray-muted">{canChange ? "Your setting." : "The owner's setting."} Strelva&apos;s default is &ldquo;{strelva}&rdquo;.</small> : null}
-      {notice ? <small role="status" className={`mt-1 block text-xs leading-relaxed ${notice.tone === "error" ? "text-critical" : "text-accent-text"}`}>{notice.text}</small> : null}
-    </div>
-    {canChange && item.ownerChoices.length > 1 ? <div className="grid gap-2">
-      <SelectInput
-        aria-label={`Who decides: ${item.label}`}
-        value={item.route}
-        options={options}
-        disabled={locked}
-        aria-busy={busy || undefined}
-        onChange={event => {
-          const route = event.target.value as LadderRoute;
-          if (route === item.route) return;
-          if (route === item.ownerChoices[0] && item.ownerRoute) onChange(item, { action: "reset", kind: item.kind, systemId: null, expectedVersion: item.ownerVersion }, `Back to Strelva's default: ${ROUTE_WORDS[route].label.toLowerCase()}.`);
-          else onChange(item, { action: "set", kind: item.kind, systemId: null, route, expectedVersion: item.ownerVersion }, `Saved: ${ROUTE_WORDS[route].label.toLowerCase()}.`);
-        }}
-      />
-      {item.ownerRoute || item.ownerUndo ? <div className="flex flex-wrap gap-2">
-        {item.ownerRoute ? <Button size="sm" variant="ghost" disabled={locked} loading={busy} onClick={() => onChange(item, { action: "reset", kind: item.kind, systemId: null, expectedVersion: item.ownerVersion }, "Back to Strelva's default.")}>
-          <RotateCcw className="h-4 w-4" aria-hidden="true" />Back to default
-        </Button> : null}
-        {item.ownerUndo ? <Button size="sm" variant="ghost" disabled={locked} onClick={() => onChange(item, { action: "undo", kind: item.kind, systemId: null, historyId: item.ownerUndo!.historyId, expectedVersion: item.ownerVersion }, "Undone.")}
-          aria-label={`Undo your last change to ${item.label}`}>
-          <Undo2 className="h-4 w-4" aria-hidden="true" />Undo
-        </Button> : null}
-      </div> : null}
+  const options = LADDER_ROUTES.map(route => ({ value: route, label: route === "owner_decides" ? "Ask me first" : ROUTE_WORDS[route].label }));
+  return <StRow title={item.label} detail={<>{item.example}{!canChange || item.ownerChoices.length < 2 ? <span className="block">{ROUTE_WORDS[item.route].label}. {ROUTE_WORDS[item.route].detail}</span> : null}{item.ownerRoute ? <span className="block">{canChange ? "Your setting." : "The owner's setting."} Strelva&apos;s default is “{strelva}”.</span> : null}{notice ? <span role="status" className="block">{notice.text}</span> : null}</>} end={<div className="grid gap-2">
+    <StSegmented label={`Who decides: ${item.label}`} value={item.route} options={options} disabledValues={LADDER_ROUTES.filter(route => !item.ownerChoices.includes(route))} disabledReason="Looser than Strelva allows for this kind. You can only choose its default or stricter." onChange={canChange && !locked ? route => {
+      if (route === item.route || !item.ownerChoices.includes(route)) return;
+      if (route === item.ownerChoices[0] && item.ownerRoute) onChange(item, { action: "reset", kind: item.kind, systemId: null, expectedVersion: item.ownerVersion }, `Back to Strelva's default: ${ROUTE_WORDS[route].label.toLowerCase()}.`);
+      else onChange(item, { action: "set", kind: item.kind, systemId: null, route, expectedVersion: item.ownerVersion }, `Saved: ${ROUTE_WORDS[route].label.toLowerCase()}.`);
+    } : undefined} />
+    {canChange && (item.ownerRoute || item.ownerUndo) ? <div className="flex flex-wrap gap-4">
+      {item.ownerRoute ? <StTextButton disabled={locked} aria-busy={busy || undefined} onClick={() => onChange(item, { action: "reset", kind: item.kind, systemId: null, expectedVersion: item.ownerVersion }, "Back to Strelva's default.")}>Back to default</StTextButton> : null}
+      {item.ownerUndo ? <StTextButton disabled={locked} onClick={() => onChange(item, { action: "undo", kind: item.kind, systemId: null, historyId: item.ownerUndo!.historyId, expectedVersion: item.ownerVersion }, "Undone.")} aria-label={`Undo your last change to ${item.label}`}>Undo</StTextButton> : null}
     </div> : null}
-  </li>;
+  </div>} />;
 }

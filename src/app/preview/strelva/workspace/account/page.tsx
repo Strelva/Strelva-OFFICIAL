@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AccountCanonPreview } from "@/experience/workspace/preview/AccountCanonPreview";
 import { notFound } from "next/navigation";
 import { WorkspaceAccountView } from "@/experience/workspace/WorkspaceAccountView";
 import { strelvaUiPreviewEnabled } from "@/experience/workspace/preview/enabled";
@@ -15,6 +16,7 @@ export default async function AccountPreviewPage({ searchParams }: {
 }) {
   if (!strelvaUiPreviewEnabled()) notFound();
   const { state } = await searchParams;
+  if (!state || state === "canon") return <AccountCanonPreview />;
   const emailConfirmed = state !== "unconfirmed";
   const workspacesUnavailable = state === "unavailable";
   return <WorkspaceAccountView

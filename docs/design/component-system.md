@@ -15,9 +15,19 @@ in `src/app/styles/workspace-paper.css`. Specimen: `/preview/strelva/kit`
 `StRows`/`StRow`, `StBeacon`, `StState`, `StMono`, `StKbd`, `StStamp`,
 `StPill`, `StPillLink`, `StTextButton`, `StSegmented`, `StSteps`, `StLedger`,
 `StHold`, `StToast`, `StSurface`, `StNotice`, `StEmpty`, `StSkeleton`,
-`StComposerBar`, `StComposerDock`. Rules and adoption lanes:
+`StComposerBar`, `StComposerDock`, `StSplit`, `StField`, `StEntry`.
+L6 adds native labeled fields (44px minimum), a responsive object/consequence
+split within the calm column, and the 400px sign-in entry column (`width="account"` gives the personal account
+a wider column with the same brand/help header). `StRow.value`
+keeps fact values separate from source/action; `StSurface.selected` marks a selected
+account choice; `StTextButton` preserves new-tab link attributes;
+`StSegmented` arrow/Home/End keys skip forbidden choices, with a roving tab stop.
+The hold follows the canon’s 800ms duration; `StNotice.action` keeps recovery
+with its explanation. These additions are presentation only and preserve native
+form semantics. Rules and adoption lanes:
 [ui-1.0-integration.md](./ui-1.0-integration.md). Proven: rendered locally in
-both modes on October 9; consumers are added lane by lane.
+both modes on October 9 for the original kit. L6 extensions and consumers
+have local source/DOM proof; their rendered desktop/phone proof remains blocked.
 
 Website adoption preserves focus recovery with `StHead.headingRef` and button
 refs on `StPill` / `StTextButton` (React 19). The specimen includes a focus-title

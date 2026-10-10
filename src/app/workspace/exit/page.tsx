@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { redirect } from "next/navigation";
 import { WorkspaceExit } from "@/experience/workspace/WorkspaceExit";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
@@ -10,5 +11,5 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ w
   if (!workspaceReleaseEnabled()) redirect("/workspace");
   const workspaceId = (await searchParams).workspaceId;
   if (typeof workspaceId !== "string") redirect("/workspace");
-  return <WorkspaceExit workspaceId={workspaceId} />;
+  return <StrelvaShell workspaceId={workspaceId} title="Business details" active="settings" systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}><WorkspaceExit workspaceId={workspaceId} /></StrelvaShell>;
 }

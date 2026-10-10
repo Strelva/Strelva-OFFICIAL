@@ -1,3 +1,4 @@
+import { DashboardBackBar } from "@/experience/workspace/DashboardBackBar";
 import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -210,12 +211,7 @@ export default async function DashboardLayout({
           </div>
         )}
         {ownerEntry.kind === "render-with-back" && (
-          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 border-b border-accent/30 bg-accent-dim px-4 py-2 text-center text-[12px] text-warm-black" data-owner-entry-back={ownerEntry.route}>
-            <span>This page hasn&apos;t moved to your workspace yet.</span>
-            <a href={ownerEntry.homeHref} className="font-semibold text-accent underline-offset-2 hover:underline focus-visible:underline">
-              Back to {siteName}
-            </a>
-          </div>
+          <DashboardBackBar businessName={siteName} homeHref={ownerEntry.homeHref} route={ownerEntry.route} />
         )}
         {!isDemo && <SessionKeeper />}
         <BillingBanner subscriptionStatus={subscriptionStatus} />

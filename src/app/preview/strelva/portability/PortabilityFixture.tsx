@@ -1,32 +1,14 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
+import { STRELVA_BRAND } from "@/platform/infra/agency-brand";
 import { WorkspaceExport } from "@/experience/workspace/WorkspaceExport";
+import { PortabilityExitCanon } from "@/experience/workspace/preview/PortabilityExitCanon";
 import { WorkspaceExit } from "@/experience/workspace/WorkspaceExit";
-import type { WorkspaceExitOptions, WorkspaceExitState } from "@/platform/workspace-exit/contracts";
+import type { WorkspaceExitOptions } from "@/platform/workspace-exit/contracts";
 
-const WORKSPACE = "6e000000-0000-4000-8000-000000000010";
-const BUILD = "6e000000-0000-4000-8000-000000000020";
-const USER = "6e000000-0000-4000-8000-000000000030";
-const HANDOFF: NonNullable<WorkspaceExitOptions["handoff"]> = {
-  businessRecordRetained: true, dataDeleted: false,
-  systems: [{ id: "6e000000-0000-4000-8000-000000000040", name: "Harbor Workshop website", lifecycle: "live" }],
-  sites: [{ tenantId: "harbor-fixture", tenantStableId: "6e000000-0000-4000-8000-000000000050", siteName: "Harbor Workshop — Buffalo", steps: [
-    { kind: "export", status: "completed", detail: "Export the business record and every linked System.", evidence: "Business archive prepared; owner download available for seven days." },
-    { kind: "files", status: "pending", detail: "Hand over the repository, website files and assets." },
-    { kind: "billing", status: "pending", detail: "Review billing cancellation with the owner. No charge has changed." },
-    { kind: "domain", status: "pending", detail: "Arrange the domain move. No DNS change has been made." },
-  ] }],
-};
-const COMPLETED: WorkspaceExitState = {
-  id: "6e000000-0000-4000-8000-000000000060", workspaceId: WORKSPACE, status: "completed",
-  requestedAt: "2026-10-07T12:00:00.000Z", completedAt: "2026-10-07T12:01:00.000Z", requestedBy: USER,
-  futureWork: "paused", providerParticipation: "revoked", maintainedResources: { kind: "stopped" },
-  summary: { standingPaused: 1, standingRevoked: 0, scheduledPaused: 2, scheduledCancelled: 0, assignmentsRevoked: 1, providerDeliveriesRevoked: 1, investigationsPaused: 2, retainedAccepted: 1, retainedUnknown: 1 },
-  retainedObligations: [{ workId: "6e000000-0000-4000-8000-000000000070", title: "Published opening hours", status: "accepted", effect: "accepted" },
-    { workId: "6e000000-0000-4000-8000-000000000080", title: "Provider handover confirmation", status: "unknown", effect: "unknown" }],
-  resources: [], handoff: HANDOFF,
-};
+import { PORTABILITY_BUILD as BUILD, PORTABILITY_COMPLETED as COMPLETED, PORTABILITY_HANDOFF as HANDOFF, PORTABILITY_USER as USER, PORTABILITY_WORKSPACE as WORKSPACE, PORTABILITY_MANIFEST } from "@/experience/workspace/preview/portability-fixture";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -34,6 +16,12 @@ function json(body: unknown, status = 200) {
 
 /** Fictional state only: requests and exit choices never leave this component. */
 export function PortabilityFixture({ surface, state }: { surface: "export" | "exit"; state: string }) {
+  const container = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (surface !== "export" || state === "ready" || state === "empty") return;
+    const button = Array.from(container.current?.querySelectorAll("button") ?? []).find(item => item.textContent?.includes("Prepare business export"));
+    button?.click();
+  }, [surface, state]);
   const request = useMemo<typeof fetch>(() => async (input, init) => {
     if (state === "permission") return json({ error: "Only the business owner can export records or confirm an exit." }, 403);
     if (state === "error") return json({ error: "Business records are unavailable. Nothing was changed. Try again." }, 503);
@@ -47,15 +35,20 @@ export function PortabilityFixture({ surface, state }: { surface: "export" | "ex
       };
       return json(options);
     }
-    if (String(input).includes("/status?")) return json({ status: state === "loading" ? "building" : state === "failed" ? "failed" : "ready" });
+    if (String(input).includes("/status?")) return json({ status: (state === "loading" || state === "running") ? "building" : state === "failed" ? "failed" : "ready" });
     return json({ buildId: BUILD, message: "Your business export is being prepared." }, 202);
   }, [surface, state]);
-  return <div onClick={event => {
+  return <div ref={container} onClickCapture={event => {
     // Fixture links cannot hit the real APIs or escape into authenticated work.
-    if (event.target instanceof Element && event.target.closest("a")) event.preventDefault();
+    if (event.target instanceof Element) {
+      const href = event.target.closest("a")?.getAttribute("href");
+      if (href && !href.startsWith("/preview/strelva")) { event.preventDefault(); event.stopPropagation(); }
+    }
   }}>
     <p className="bg-surface-raised px-6 py-3 text-xs text-gray-muted">Local preview · fictional Harbor Workshop · {surface} / {state}</p>
-    {surface === "exit" ? <WorkspaceExit key={state} workspaceId={WORKSPACE} request={request} />
-      : <WorkspaceExport key={state} workspaceId={WORKSPACE} schema3 request={request} />}
+    <StrelvaShell title="" workspaceId={WORKSPACE} ownerBrand={STRELVA_BRAND} businessContext="Harbor Workshop" accountName="Harbor owner" systemsReleased>
+    {surface === "exit" ? state === "ready" || state === "canon" ? <PortabilityExitCanon /> : <WorkspaceExit key={state} workspaceId={WORKSPACE} request={request} />
+      : <WorkspaceExport key={state} workspaceId={WORKSPACE} schema3 request={request} businessName="Harbor Workshop" manifest={state === "empty" ? [] : PORTABILITY_MANIFEST} />}
+    </StrelvaShell>
   </div>;
 }

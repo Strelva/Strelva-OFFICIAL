@@ -9,10 +9,10 @@ import {
   Link2,
   Loader2,
   LockKeyhole,
-  ShieldCheck,
   UserRound,
 } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { StPage, StHead, StSection, StRows, StRow, StState, StTextButton, StPillLink, StEmpty } from "@/components/ui/strelva/Kit";
 import { Button } from "@/components/ui/Button";
 import { TextInput } from "@/components/ui/TextInput";
 import { AiVisibilityAssessmentResult } from "@/products/ai-visibility";
@@ -56,7 +56,7 @@ export function AccessPanel({ snapshot, currentKind, currentAccess, currentRole,
   if (currentAccess === "provider_seat") return <div className="mx-auto max-w-3xl"><h1 className="font-display text-[36px]">Agency access.</h1><p className="mt-3 text-gray-muted">Your agency has an active agency seat and has assigned you to this business. You can work on its website. The business controls ownership and access to customer records.</p></div>;
   if (currentAccess === "delegated_read") return <DelegatedAccessSurface key={contextKey} />;
   if (currentKind === "personal") return <CreateAgency key={contextKey} postAction={postAction} isActive={isActive} onCreated={onAgencyCreated} />;
-  if (currentKind === "customer") return <><a href={`/workspace/access-review?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="mb-6 inline-block text-sm text-accent-text underline">Review all people and access</a><CustomerAccess key={contextKey} snapshot={snapshot} currentRole={currentRole} postAction={postAction} isActive={isActive} onChanged={onChanged} setNotice={setNotice} /></>;
+  if (currentKind === "customer") return <><CustomerAccess key={contextKey} snapshot={snapshot} currentRole={currentRole} postAction={postAction} isActive={isActive} onChanged={onChanged} setNotice={setNotice} /></>;
   return <><a href={`/workspace/access-review?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="mb-6 inline-block text-sm text-accent-text underline">Review all people and access</a><AgencyHandoff key={contextKey} snapshot={snapshot} currentRole={currentRole} selectedWork={selectedWork} postAction={postAction} isActive={isActive} onChanged={onChanged} setNotice={setNotice} /></>;
 }
 
@@ -179,20 +179,17 @@ function CustomerAccess({ snapshot, currentRole, postAction, isActive, onChanged
     finally { if (isActive()) setSubmitting(false); }
   }
 
-  const heading = currentRole === "owner" ? "You own this workspace." : currentRole === "admin" ? "You manage access for this workspace." : "Your workspace access.";
-  const description = currentRole === "owner" || currentRole === "admin"
-    ? "Agency access is read-only and can be removed without deleting the work handed to you."
-    : "Agency access is read-only. The workspace owner controls membership and may revoke it.";
+  const description = currentRole === "owner" ? `Who can see and change ${snapshot.workspaces.find(workspace => workspace.id === snapshot.workspaceId)?.name || "this business"}. You own this workspace.` : currentRole === "admin" ? "You manage access for this workspace." : "The workspace owner controls membership and may revoke access.";
+  return <StPage>
+    <StHead title="People & access" meta={description} actions={currentRole === "owner" ? <StPillLink href={`/workspace/invitations?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Invite someone</StPillLink> : undefined} />
+    <StSection title="Your access" action={<StTextButton tone="accent" href={`/workspace/access-review?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Review all people and access</StTextButton>}><StRows><StRow title={snapshot.actor.email} detail={currentRole ? `${currentRole} · you` : "Your confirmed account"} /></StRows></StSection>
+    <StSection title="Agency access" meta="Agencies can see the work but not change it.">
+      <p className="text-sm text-gray-muted">Removing one never deletes the work they handed to you.</p>
+      {snapshot.delegations.length ? <StRows>{snapshot.delegations.map(delegation => <StRow key={delegation.id} title="Agency" detail="Can view Systems and requests" end={<><StState kind={delegation.status === "active" ? "live" : "draft"}>{delegation.status === "active" ? "Read-only · active" : "Revoked"}</StState>{delegation.status === "active" && delegation.canRevoke ? <StTextButton tone="accent" disabled={submitting} onClick={() => void revoke(delegation.id)}>Revoke access</StTextButton> : null}</>} />)}</StRows> : <StEmpty>No agency can access this workspace.</StEmpty>}
+    </StSection>
+    {currentRole === "owner" ? <StSection title="Your data"><div className="flex flex-wrap gap-6"><StTextButton tone="accent" href={`/workspace/invitations?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Manage invitations</StTextButton><StTextButton tone="accent" href={`/workspace/export?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Export all workspace data</StTextButton></div></StSection> : null}
+  </StPage>;
 
-  return (
-    <div className="mx-auto max-w-3xl">
-      <ShieldCheck className="h-6 w-6 text-accent-text" strokeWidth={1.5} />
-      <h1 className="mt-5 font-display text-[36px] font-medium text-warm-black">{heading}</h1>
-      <p className="mt-3 max-w-xl text-[14px] leading-relaxed text-gray-muted">{description}</p>
-      {currentRole === "owner" ? <div className="mt-5 flex flex-wrap gap-3"><a href={`/workspace/invitations?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-10 items-center rounded-xl border border-gray-border px-4 text-[13px] font-medium text-warm-black hover:bg-gray-bg">Manage workspace invitations</a><a href={`/workspace/export?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-10 items-center rounded-xl border border-gray-border px-4 text-[13px] font-medium text-warm-black hover:bg-gray-bg">Export workspace data</a></div> : null}
-      <section className="mt-8"><h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">Agency access</h2>{snapshot.delegations.length ? <ul className="mt-3 divide-y divide-gray-border border-y border-gray-border">{snapshot.delegations.map((delegation) => <li key={delegation.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[13px] font-medium text-warm-black">Read-only access</p><p className="mt-1 text-[11px] text-gray-muted">{delegation.status === "active" ? "Active" : "Revoked"}</p></div>{delegation.status === "active" && delegation.canRevoke ? <Button size="sm" variant="danger" disabled={submitting} onClick={() => void revoke(delegation.id)}>Revoke access</Button> : null}</li>)}</ul> : <p className="mt-3 text-[13px] text-gray-muted">No agency can access this workspace.</p>}</section>
-    </div>
-  );
 }
 
 export interface AccessHandoffOverlayProps {

@@ -21,8 +21,9 @@ describe("who decides settings", () => {
     expect(html).toContain("Google posts");
     // Routine edits: Strelva reviews is the loosest an owner can pick.
     const routine = html.slice(html.indexOf("Routine website edits"), html.indexOf("New website copy"));
-    expect(routine).toContain("Strelva reviews it (default)");
-    expect(routine).not.toContain(">Strelva handles it<");
+    expect(routine).toContain("Strelva reviews it");
+    expect(routine).toMatch(/disabled="" title="Looser than Strelva allows[^>]*>Strelva handles it<\/button>/);
+    expect(routine).toContain('role="radiogroup"');
     const posts = html.slice(html.indexOf("Google posts"), html.indexOf("Google photos"));
     expect(posts).toContain("Back to default");
     expect(posts).toContain('aria-label="Undo your last change to Google posts"');
