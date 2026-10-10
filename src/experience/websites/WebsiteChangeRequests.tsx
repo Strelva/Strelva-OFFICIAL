@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { z } from "zod";
-import { ArrowUpRight, CircleAlert, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { ArrowUpRight, CircleAlert } from "lucide-react";
+import { StEmpty, StHead, StPage, StPill, StRow, StRows, StSection, StSkeleton, StState, StMono, StTextButton } from "@/components/ui/strelva/Kit";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import { SITE_CHANGE_STAGE_LABEL, siteChangeReceiptSchema, siteChangeRequestSchema, siteChangeStage, type SiteChangeReceipt, type SiteChangeRequest } from "@/products/websites/client";
 import { beginFocusRecovery, type FocusRecovery } from "./focus-recovery";
@@ -176,13 +176,10 @@ function WebsiteChangeRequestsContent({ workspaceId, systemId, siteLabel, editin
     }
   }
 
-  return <section ref={scope} className={styles.wrap} aria-labelledby="site-changes-title">
-    <div className={styles.intro}>
-      <h1 id="site-changes-title" className="font-display">Ask for a change to {siteLabel}</h1>
-      <p>{editing === "request"
-        ? "This site runs on its own code. Request a change from the selected agency and review its preview before approving publication."
-        : "Text and photos change in the editor. Request a new page, feature or design change from the selected agency, then review its preview."}</p>
-    </div>
+  return <section ref={scope} aria-labelledby="site-changes-title"><StPage className={styles.wrap}>
+    <StHead titleId="site-changes-title" title={`Ask for a change to ${siteLabel}`} meta={editing === "request"
+      ? "This site runs on its own code. Request a change from the selected agency and review its preview before approving publication."
+      : "Text and photos change in the editor. Request a new page, feature or design change from the selected agency, then review its preview."} />
 
     {canAsk ? <form className={styles.form} onSubmit={(event) => void ask(event)}>
       <label htmlFor="site-change-words">What should change?</label>
@@ -191,43 +188,40 @@ function WebsiteChangeRequestsContent({ workspaceId, systemId, siteLabel, editin
       <input id="site-change-page" maxLength={200} value={page} readOnly={sending || unconfirmed} placeholder="Home, Menu, a new page…" onChange={(event) => { if (!filing.current && !attempt.current) setPage(event.target.value); }} />
       <div className={styles.formFoot}>
         <small>A Request isn&apos;t accepted work until the selected agency agrees scope and timing with you.</small>
-        <Button type="submit" loading={sending} disabled={!unconfirmed && words.trim().length < 3}>{unconfirmed ? "Check this request" : "Ask for a change"}</Button>
+        <StPill type="submit" busy={sending} disabled={!unconfirmed && words.trim().length < 3}>{unconfirmed ? "Check this request" : "Ask for a change"}</StPill>
       </div>
     </form> : <p className={styles.readOnly}>Only an owner or admin of this business can ask for a change. You can follow each request here.</p>}
 
     {notice ? <p role={notice.kind === "error" ? "alert" : "status"} className={styles.notice} data-kind={notice.kind}>{notice.kind === "error" ? <CircleAlert size={16} aria-hidden="true" /> : null}{notice.message}</p> : null}
 
     {stepError ? <p ref={stepAlert} tabIndex={-1} role="alert" className={styles.notice} data-kind="error"><CircleAlert size={16} aria-hidden="true" />{stepError}</p> : null}
-    {stepUnconfirmed ? <Button ref={reloadReceipts} type="button" variant="secondary" disabled={busyStep !== null} onClick={() => { if (!recording.current) window.location.reload(); }}>Reload receipts</Button> : null}
+    {stepUnconfirmed ? <StPill ref={reloadReceipts} type="button" variant="soft" disabled={busyStep !== null} onClick={() => { if (!recording.current) window.location.reload(); }}>Reload receipts</StPill> : null}
 
-    <div className={styles.list} aria-labelledby="site-changes-list-title">
-      <h2 id="site-changes-list-title">Requests for this site</h2>
-      {state.kind === "loading" ? <p role="status" className={styles.muted}><Loader2 size={14} className="animate-spin" aria-hidden="true" />Loading requests…</p>
-        : state.kind === "error" ? <p role="alert" className={styles.muted}>{state.message} <button type="button" onClick={() => void load()}>Try again</button></p>
-        : state.requests.length === 0 ? <p className={styles.muted}>Nothing asked yet. Requests and their previews show here.</p>
-        : <ol>{state.requests.map((item) => {
+    <StSection title="Requests for this site" id="site-changes-list-title">
+      {state.kind === "loading" ? <StSkeleton label="Loading requests…" />
+        : state.kind === "error" ? <p role="alert" className={styles.muted}>{state.message} <StTextButton onClick={() => void load()}>Try again</StTextButton></p>
+        : state.requests.length === 0 ? <StEmpty>Nothing asked yet. Requests and their previews show here.</StEmpty>
+        : <StRows>{state.requests.map((item) => {
           const stage = siteChangeStage(item);
           const preview = [...item.receipts].reverse().find((receipt) => receipt.kind === "preview");
-          return <li key={item.id}>
-            <p className={styles.words}>{item.request}</p>
-            <p className={styles.stage} data-stage={stage}>{SITE_CHANGE_STAGE_LABEL[stage]}</p>
+          return <StRow key={item.id} align="start" title={item.request} detail={<StState kind={stage === "done" ? "live" : stage === "ready_for_review" || stage === "done_unconfirmed" ? "need" : "draft"}>{SITE_CHANGE_STAGE_LABEL[stage]}</StState>}>
             {item.receipts.length ? <ul className={styles.receipts} aria-label="Receipts">{item.receipts.map((receipt) => <li key={receipt.id}>
               <span>{receiptLine(receipt)}</span>
               {receipt.kind === "preview" && receipt.previewUrl ? <a href={receipt.previewUrl} target="_blank" rel="noreferrer">Open the preview<ArrowUpRight size={13} aria-hidden="true" /></a> : null}
               {receipt.kind === "deployed" && receipt.deploymentUrl ? <a href={receipt.deploymentUrl} target="_blank" rel="noreferrer">Deployment<ArrowUpRight size={13} aria-hidden="true" /></a> : null}
               {receipt.note ? <small>{receipt.note}</small> : null}
-              <time dateTime={receipt.recordedAt}>{when(receipt.recordedAt)}</time>
+              <StMono as="time" dateTime={receipt.recordedAt}>{when(receipt.recordedAt)}</StMono>
             </li>)}</ul> : <p className={styles.muted}>Asked {when(item.createdAt)}.</p>}
             {stage === "ready_for_review" ? canDecide ? <div className={styles.decide}>
-              <Button size="sm" loading={busyStep === item.id} disabled={busyStep !== null || stepUnconfirmed} onClick={() => void step(item.id, { kind: "approved" })}>Approve the preview</Button>
-              <Button size="sm" variant="secondary" disabled={busyStep !== null || stepUnconfirmed} onClick={() => void step(item.id, { kind: "declined" })}>Not yet</Button>
+              <StPill busy={busyStep === item.id} disabled={busyStep !== null || stepUnconfirmed} onClick={() => void step(item.id, { kind: "approved" })}>Approve the preview</StPill>
+              <StPill variant="soft" disabled={busyStep !== null || stepUnconfirmed} onClick={() => void step(item.id, { kind: "declined" })}>Not yet</StPill>
               <small>Approving authorizes {preview ? "this preview" : "it"} for publication. Deployment still requires current agency authority.</small>
             </div> : <p className={styles.muted}>Waiting on the owner to approve or decline the preview.</p> : null}
             {operator && item.status === "requested" ? <OperatorStep stage={stage} busy={busyStep === item.id} blocked={busyStep !== null || stepUnconfirmed} onRecord={(payload) => void step(item.id, payload)} /> : null}
-          </li>;
-        })}</ol>}
-    </div>
-  </section>;
+          </StRow>;
+        })}</StRows>}
+    </StSection>
+  </StPage></section>;
 }
 
 /** Record a preview, or the deploy after the owner approved. Operators only; the database checks it. */
@@ -241,13 +235,13 @@ function OperatorStep({ stage, busy, blocked, onRecord }: { stage: ReturnType<ty
       <label>Commit<input value={commit} readOnly={blocked} onChange={(event) => setCommit(event.target.value)} placeholder="abc1234" /></label>
       <label>Deployment URL<input value={url} readOnly={blocked} onChange={(event) => setUrl(event.target.value)} placeholder="https://…" /></label>
       <label>Read-back<select value={readBack} disabled={blocked} onChange={(event) => setReadBack(event.target.value as typeof readBack)}><option value="confirmed">Confirmed on the live site</option><option value="not_confirmed">Not confirmed</option><option value="not_checked">Not checked yet</option></select></label>
-      <Button size="sm" type="submit" loading={busy} disabled={blocked}>Record deploy</Button>
+      <StPill type="submit" busy={busy} disabled={blocked}>Record deploy</StPill>
     </form>;
   }
   if (stage === "ready_for_review" || stage === "done" || stage === "done_unconfirmed") return null;
   return <form className={styles.operator} onSubmit={(event) => { event.preventDefault(); if (!blocked) onRecord({ kind: "preview", previewUrl: url.trim() }); }}>
     <p>Record a preview for the owner</p>
     <label>Preview URL<input value={url} readOnly={blocked} onChange={(event) => setUrl(event.target.value)} placeholder="https://…vercel.app" /></label>
-    <Button size="sm" type="submit" loading={busy} disabled={blocked}>Record preview</Button>
+    <StPill type="submit" busy={busy} disabled={blocked}>Record preview</StPill>
   </form>;
 }

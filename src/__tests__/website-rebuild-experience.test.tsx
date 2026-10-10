@@ -16,8 +16,26 @@ async function mount(element: ReturnType<typeof createElement>) {
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
   await act(async () => { root!.render(element); });
 }
-function button(name: string) { return Array.from(container.querySelectorAll("button")).find(item => item.textContent?.trim() === name)!; }
+function button(name: string) { return Array.from(container.querySelectorAll("button")).find(item => (item.getAttribute("aria-label") ?? item.textContent?.trim()) === name)!; }
 describe("website rebuild review", () => {
+  it("reviews one flagged source fact at a time and advances after its saved confirmation", async () => {
+    const record = fixtureRebuild();
+    const mutate = vi.fn(async (current: typeof record, action: string, extra?: { factId?: string }) => {
+      const next = structuredClone(current); next.revision++;
+      if (action === "confirm" && extra?.factId) next.candidate!.facts[extra.factId]!.origin = "owner_confirmed";
+      return next;
+    });
+    const transport = { read: async () => record, start: async () => record, mutate };
+    await mount(createElement(RebuildExperience, { workspaceId: record.workspaceId, initialRecord: record, transport }));
+    const decisions = container.querySelector('[aria-labelledby="rebuild-decisions-heading"]')!;
+    expect(decisions.textContent).toContain(record.candidate!.facts.sensitive!.text);
+    expect(decisions.textContent).not.toContain(record.candidate!.facts.uncertain!.text);
+    await act(async () => button("Confirm").click());
+    expect(decisions.textContent).toContain("1 decision needs you");
+    expect(decisions.textContent).toContain(record.candidate!.facts.uncertain!.text);
+    expect(button("Approve this preview").disabled).toBe(true);
+  });
+
   it("keeps skipped source paths and their reasons visible after checkpoints are pruned", async () => {
     const record = fixtureRebuild();
     const skippedPaths = [{ url: "https://attymooney.com/blocked", reason: "robots" as const }, { url: "https://attymooney.com/app", reason: "javascript_only" as const }, { url: "https://attymooney.com/missing", reason: "unreachable" as const }];

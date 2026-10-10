@@ -16,7 +16,7 @@ function envelope(revision = 1, approved = true) {
  return { workId, workspaceId, rebuild: { version: 2, revision, title: "Fictional bakery", input: { requestId: "selector-peer-fixture", businessName: "Fictional bakery", description: "A fictional independent recovery fixture." }, status: approved ? "approved" : "review_ready", stages: [], checkpoint: null, candidate: { revision, contentHash: siteDocumentHash(document), document, previewHref: `/api/websites/${workId}/preview` }, approvedCandidateRevision: approved ? revision : null, publishedCapabilitySelection: { tenantId: "fictional-bakery", inquiryCapabilityId: revision === 1 ? "orders" : "catering" }, tenantId: "fictional-bakery", launch: { receipt: null, readBack: null }, lastError: null, createdBy: "fixture-owner", createdAt: "2026-10-01T12:00:00Z", history: [] } };
 }
 let root: Root; let node: HTMLDivElement;
-const button = (name: string) => [...node.querySelectorAll("button")].find(value => value.textContent?.trim() === name);
+const button = (name: string) => [...node.querySelectorAll("button")].find(value => (value.getAttribute("aria-label") ?? value.textContent?.trim()) === name);
 beforeEach(() => vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true));
 afterEach(async () => { await act(async () => root?.unmount()); document.body.innerHTML = ""; vi.unstubAllGlobals(); });
 async function mount() { node = document.createElement("div"); document.body.append(node); root = createRoot(node); await act(async () => root.render(createElement(RebuildExperience, { workspaceId, initialRecord: parseRebuildView(envelope()) }))); }

@@ -21,7 +21,8 @@ it.each(["progress", "pending"] as const)("mounts the actual wrapper/default HTT
   expect(fetcher.mock.calls.some(([url]) => String(url) === `/api/websites/${workId}/rebuild?workspaceId=${workspaceId}`)).toBe(true);
   const select = node.querySelector<HTMLSelectElement>("select")!;
   expect(select.value).toBe(workId); expect(select.selectedOptions[0]!.textContent).toBe(`Fictional bakery · ${recovery === "pending" ? "published" : "review"}`);
-  expect(node.querySelector('section[aria-label="Website rebuild"] h1')?.textContent).toBe("Fictional bakery");
+  expect(node.querySelector('section[aria-label="Website rebuild"] h1')?.textContent).toBe(recovery === "pending" ? "The rebuilt site is published." : "Fictional bakery");
+  expect(node.querySelector('section[aria-label="Website rebuild"]')?.textContent).toContain("Fictional bakery");
   expect(node.textContent).toContain("Fictional saved-work recovery · no Auth, provider or publication proof");
 });
 it("parses fictional progress envelopes with work and candidate revisions distinct", () => {

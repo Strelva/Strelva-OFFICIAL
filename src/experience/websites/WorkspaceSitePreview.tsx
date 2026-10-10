@@ -51,7 +51,7 @@ function siteChangesFixture(mode: "ready" | "empty" | "error"): typeof fetch {
 }
 
 /** Local preview of the workspace website: fictional site, real frame and panels, no live actions. */
-export function WorkspaceSitePreview({ kind, tab, role, state }: { kind: "native" | "request"; tab: SiteTab | null; role: "owner" | "admin" | "member" | "operator"; state: "ready" | "empty" | "error" | "permission" | "not_found" }) {
+export function WorkspaceSitePreview({ kind, tab, role, state, mode = "light" }: { kind: "native" | "request"; tab: SiteTab | null; role: "owner" | "admin" | "member" | "operator"; state: "ready" | "empty" | "error" | "permission" | "not_found"; mode?: "light" | "dark" }) {
   const request = useMemo(() => withAskPreview(siteChangesFixture(state === "error" ? "error" : state === "empty" ? "empty" : "ready"), "on", role === "operator"), [state, role]);
   if (state === "permission") return <WorkspaceSiteMessage title="This business is unavailable to your account." body="It may belong to another account, or your access may have changed. Nothing about the site was changed." href="/preview/strelva" action="Open your workspace" />;
   if (state === "not_found") return <WorkspaceSiteMessage title="This website isn't connected to this business." body="It may belong to another business, or its link was removed. Nothing about the site was changed." href="/preview/strelva" action="Back to Home" />;
@@ -60,7 +60,7 @@ export function WorkspaceSitePreview({ kind, tab, role, state }: { kind: "native
   const siteLabel = kind === "native" ? "greatlakesdriedfruit.com" : "mclearsbuffalo.com";
   return <WorkspaceRequestContext.Provider value={request}>
     <WorkspaceSiteFrame workspaceId={WS} systemId={SYSTEM} workspaceName={kind === "native" ? "Great Lakes Dried Fruit" : "McClear's Pub"} siteLabel={siteLabel} tab={current}
-      tabs={tabs} tenantRoot={FIXTURE_API} tenantId="preview-business" workspaceBase="/preview/strelva" askReleased readOnly={readOnly || role !== "operator"}
+      mode={mode} tabs={tabs} tenantRoot={FIXTURE_API} tenantId="preview-business" workspaceBase="/preview/strelva" askReleased readOnly={readOnly || role !== "operator"}
       liveUrl="https://example.com" site={{ siteUrl: "", previewUrl: `${FIXTURE_API}/dashboard/site`, liveSyncEnabled: false, siteModel: "food-brand", autoPublish: false }}
       notice={readOnly ? "You can see this site. Only an owner or admin of this business can change it." : undefined}>
       {current === "edit" && readOnly ? <p className="p-8 text-sm text-gray-muted">Only an owner or admin can edit this site. The page links to History instead.</p>

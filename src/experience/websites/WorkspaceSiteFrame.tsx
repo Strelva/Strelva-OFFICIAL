@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, type ReactNode } from "react";
-import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
+import { StHead, StNotice, StPage, StTextButton } from "@/components/ui/strelva/Kit";
 import { DashboardProvider } from "@/components/dashboard/DashboardContext";
 import { resolveRelationship } from "@/platform/relationships";
 import { SITE_TAB_LABEL, workspaceDashboardHref, workspaceSiteHref, type SiteTab } from "@/platform/workspaces/site-places";
@@ -26,6 +27,7 @@ export interface WorkspaceSiteFrameProps {
   site?: { siteUrl: string; previewUrl: string; liveSyncEnabled: boolean; siteModel: string; autoPublish: boolean };
   /** One sentence above the panel (who can change what), when it matters. */
   notice?: string;
+  mode?: "light" | "dark";
   children: ReactNode;
 }
 
@@ -40,18 +42,14 @@ export function WorkspaceSiteFrame(props: WorkspaceSiteFrameProps) {
   const resolveHref = useMemo(() => workspaceDashboardHref({ workspaceId, systemId, tenantRoot, workspaceBase, askReleased }), [askReleased, systemId, tenantRoot, workspaceBase, workspaceId]);
   const systemPage = `${workspaceBase}/workspace?${new URLSearchParams({ workspaceId, view: "system", system: systemId })}`;
   const relationship = useMemo(() => resolveRelationship({ context: { kind: "tenant", tenantId: props.tenantId }, serviceRelationship: "managed_client" }), [props.tenantId]);
-  return <div data-dashboard className={styles.frame}>
+  return <div data-dashboard data-workspace-theme="linen" data-workspace-mode={props.mode ?? "light"} className={styles.frame}>
     <header className={styles.bar}>
-      <div className={styles.titleRow}>
-        <a className={styles.back} href={systemPage}><ArrowLeft size={16} aria-hidden="true" />{props.siteLabel}</a>
-        <p className={styles.business}>{props.workspaceName}</p>
-        {props.liveUrl ? <a className={styles.visit} href={props.liveUrl} target="_blank" rel="noreferrer">Visit site<ArrowUpRight size={14} aria-hidden="true" /></a> : null}
-      </div>
+      <StHead crumb={{ label: props.siteLabel, href: systemPage }} title={SITE_TAB_LABEL[tab]} meta={props.workspaceName} actions={props.liveUrl ? <StTextButton href={props.liveUrl} target="_blank" rel="noreferrer">Visit site<ArrowUpRight size={14} aria-hidden="true" /></StTextButton> : undefined} />
       <nav className={styles.tabs} aria-label={`${props.siteLabel} pages`}>
         {tabs.map((item) => <a key={item} href={workspaceSiteHref({ workspaceId, systemId, tab: item }, workspaceBase)} aria-current={item === tab || (tab === "source" && item === "connections") ? "page" : undefined}>{SITE_TAB_LABEL[item]}</a>)}
       </nav>
     </header>
-    {props.notice ? <p role="status" className={styles.notice}>{props.notice}</p> : null}
+    {props.notice ? <div className={styles.notice}><StNotice>{props.notice}</StNotice></div> : null}
     <main id="workspace-site-main" className={styles.panel} data-tab={tab}>
       <DashboardProvider
         tenantId={props.tenantId}
@@ -73,11 +71,7 @@ export function WorkspaceSiteFrame(props: WorkspaceSiteFrameProps) {
 
 /** The same frame's states when there is no site to show. */
 export function WorkspaceSiteMessage({ title, body, href, action }: { title: string; body: string; href: string; action: string }) {
-  return <div data-dashboard className={styles.frame}>
-    <main className={styles.message}>
-      <h1 className="font-display">{title}</h1>
-      <p>{body}</p>
-      <a href={href}>{action}</a>
-    </main>
+  return <div data-dashboard data-workspace-theme="linen" className={styles.frame}>
+    <main><StPage><StHead title={title} meta={body} /><StTextButton href={href}>{action}</StTextButton></StPage></main>
   </div>;
 }

@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { exactBusinessPageUrl } from "@/products/connected-sites/client";
 import { beginFocusRecovery, type FocusRecovery } from "@/experience/websites/focus-recovery";
-import { Button } from "@/components/ui/Button";
+import { StEmpty, StNotice, StPill, StSection, StState, StMono, StSurface, StTextButton, StPage } from "@/components/ui/strelva/Kit";
+import styles from "./connected-sites.module.css";
 import { SelectInput, TextInput } from "@/components/ui/TextInput";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 
@@ -110,43 +111,38 @@ function ServerVisibilityContent({ workspaceId, canManage, initial, suggestedHan
     catch { setError("Copy is unavailable. Select the block and copy it manually."); }
   }
 
-  return <div ref={scope} className="mx-auto grid w-full max-w-2xl gap-8 px-4 pb-12 md:px-8">
-    <header className="grid gap-2 border-t border-gray-border pt-8">
-      <h2 className="text-lg font-medium">Readable by AI assistants</h2>
-      <p className="text-sm text-gray-muted">Most AI assistants don&rsquo;t run JavaScript, so they miss details a script adds. These put your confirmed details in the page itself. Only details you or Strelva confirmed are included.</p>
-    </header>
+  return <div ref={scope}><StPage>
+    <StSection title="Readable by assistants"><p className={styles.body}>Assistants may miss details a script adds. These put your confirmed details in the page itself. Only details you or Strelva confirmed are included.</p></StSection>
 
-    {initial.pagesEnabled ? <section className="grid gap-3" aria-labelledby="visibility-page">
-      <h3 id="visibility-page" className="text-base font-medium">Your public business page</h3>
-      <p className="text-sm text-gray-muted">A plain page with your hours, contact details and services, plus a fact sheet for assistants. Strelva hosts it.</p>
+    {initial.pagesEnabled ? <StSection title="Your public business page" id="visibility-page">
+      <p className={styles.body}>A plain page with your hours, contact details and services, plus a fact sheet for assistants. Strelva hosts it.</p>
       {page?.published ? <p className="text-sm">Live at <a className="break-all underline" href={page.url}>{page.url}</a> · <a className="underline" href={`${page.url}/llms.txt`}>fact sheet</a></p> : null}
-      {canManage ? <form className="grid gap-3" noValidate onSubmit={event => void savePage(event, true)} aria-label="Public business page">
+      {canManage ? <StSurface label="Public business page"><form className={styles.stack} noValidate onSubmit={event => void savePage(event, true)} aria-label="Public business page">
         <TextInput label="Page address" helperText="3 to 48 lowercase letters, numbers and hyphens." value={handle} readOnly={busy !== null || pageUnconfirmed} spellCheck={false} autoCapitalize="none" maxLength={48}
           onChange={event => { if (!pageFlight.current && !pageNeedsReload.current) { setHandle(event.target.value); setPageError(""); } }} />
         <div className="flex flex-wrap gap-3">
-          <Button type="submit" loading={busy === "page"} disabled={busy !== null || pageUnconfirmed}>{page?.published ? "Save address" : "Publish page"}</Button>
-          {page?.published ? <Button type="button" variant="secondary" disabled={busy !== null || pageUnconfirmed} onClick={event => void savePage(event, false)}>Unpublish</Button> : null}
+          <StPill type="submit" busy={busy === "page"} disabled={busy !== null || pageUnconfirmed}>{page?.published ? "Save address" : "Publish page"}</StPill>
+          {page?.published ? <StTextButton disabled={busy !== null || pageUnconfirmed} onClick={event => void savePage(event, false)}>Unpublish</StTextButton> : null}
         </div>
-      </form> : page?.published ? null : <p className="text-sm text-gray-muted">An owner or admin of this business publishes its page.</p>}
-    </section> : null}
+      </form></StSurface> : page?.published ? null : <p className={styles.body}>An owner or admin of this business publishes its page.</p>}
+    </StSection> : null}
 
-    <section className="grid gap-3" aria-labelledby="visibility-block">
-      <h3 id="visibility-block" className="text-base font-medium">Details block for your site</h3>
-      {!target ? <p className="text-sm text-gray-muted">Confirm your business name in your details first. The block is built from confirmed details only.</p> : <>
-        <p className="text-sm text-gray-muted">Paste this into your site&rsquo;s header code, on the home page at least. It works on any builder and without the Strelva script. When your details change, paste the new block; a check tells you when it&rsquo;s out of date.</p>
+    <StSection title="Details block for your site" id="visibility-block">
+      {!target ? <StEmpty>Confirm your business name in your details first. The block is built from confirmed details only.</StEmpty> : <>
+        <p className={styles.body}>Paste this into your site&rsquo;s header code, on the home page at least. It works on any builder and without the Strelva script. When your details change, paste the new block; a check tells you when it&rsquo;s out of date.</p>
         {initial.blocks && initial.blocks.length > 1 ? <SelectInput label="For" value={target.id} disabled={busy !== null}
           options={initial.blocks.map(item => ({ value: item.id, label: item.label }))} onChange={event => { setTargetId(event.target.value); setCheck(null); setCopied(false); }} /> : null}
-        <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-gray-bg p-3 text-xs" aria-label="Details block to paste" tabIndex={0}>{target.block.html}</pre>
+        <pre className={styles.code} aria-label="Details block to paste" tabIndex={0}>{target.block.html}</pre>
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="button" variant="secondary" onClick={() => void copy()}>{copied ? "Copied" : "Copy block"}</Button>
-          {target.checkable ? <Button type="button" variant="secondary" loading={busy === "check"} disabled={busy !== null && busy !== "check"} onClick={() => void runCheck()}>Check {target.label}</Button> : null}
-          <span className="text-xs text-gray-muted">History reference {target.block.hash}</span>
+          <StPill type="button" variant="soft" onClick={() => void copy()}>{copied ? "Copied" : "Copy block"}</StPill>
+          {target.checkable ? <StPill type="button" variant="soft" busy={busy === "check"} disabled={busy !== null && busy !== "check"} onClick={() => void runCheck()}>Check {target.label}</StPill> : null}
+          <StMono>History reference {target.block.hash}</StMono>
         </div>
-        {check && check.siteId === target.id ? <p role="status" className="text-sm">{CHECK_MESSAGE[check.status]}</p> : null}
+        {check && check.siteId === target.id ? <div role="status"><StState kind={check.status === "current" ? "live" : "need"}>{CHECK_MESSAGE[check.status]}</StState></div> : null}
       </>}
-    </section>
-    {pageError ? <p ref={pageAlert} tabIndex={-1} role="alert" className="text-sm text-terra">{pageError}</p> : null}
-    {pageUnconfirmed ? <Button ref={reloadAction} type="button" variant="secondary" disabled={busy === "page"} className="justify-self-start" onClick={() => { if (!pageFlight.current) window.location.reload(); }}>Reload page</Button> : null}
-    {error ? <p role="alert" className="text-sm text-terra">{error}</p> : null}
-  </div>;
+    </StSection>
+    {pageError ? <StNotice tone="critical"><p ref={pageAlert} tabIndex={-1}>{pageError}</p></StNotice> : null}
+    {pageUnconfirmed ? <div><StPill ref={reloadAction} variant="soft" disabled={busy === "page"} onClick={() => { if (!pageFlight.current) window.location.reload(); }}>Reload page</StPill></div> : null}
+    {error ? <StNotice tone="critical">{error}</StNotice> : null}
+  </StPage></div>;
 }
