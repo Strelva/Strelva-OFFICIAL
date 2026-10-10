@@ -102,4 +102,3 @@ export function getDeliveryStepIndex(status: DeliveryStatus): number {
   const index = deliverySteps.findIndex((step) => step.id === status);
   return index >= 0 ? index : 0;
 }
-
