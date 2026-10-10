@@ -40,6 +40,7 @@ contracts beneath the common composition.
 | `platform/` | Shared relationship concepts | Product or presentation dependencies |
 | `platform/infra/` | Shared infrastructure both models use: db, redis, auth, email, crypto, rate-limit, logger, ai-models, safe-fetch, model calls, monitoring, heartbeat | Workspace or tenant domain rules |
 | `lib/` | Existing implementations awaiting deliberate extraction | A second copy of an extracted implementation; any import of a workspace layer |
+| `server/` | Runtime composition of product operations: live Make real, Needs you sources/delivery, operator queue readers, booking compatibility adapters | Shared domain rules or a second product writer |
 | `server/workspace-ports.ts`, `register-workspace-ports.ts` | The app edge: what `lib/` needs from the workspace layers, through the ports in `lib/workspace-ports.ts` | Logic of its own |
 
 `lib/` never imports `platform/` (outside `platform/infra`), `products/`,
@@ -50,6 +51,10 @@ once per runtime (`instrumentation.ts`, `vitest.setup.ts`, and scripts that
 reach those modules). A workspace layer's existing `lib/` imports are listed
 in `scripts/boundary-baseline.json`, which only shrinks: fix one, then run
 `pnpm check:boundaries --prune`.
+
+Booking calendar reads and owner notices also receive their product callbacks at this
+registration edge. Platform booking rules retain the provider/downstream ports;
+they do not load scheduling or the Needs you runtime themselves.
 
 New product consumers import `index`, `contracts`, `server`, or `client` entry
 points. Keep browser-safe types and components separate from server operations.

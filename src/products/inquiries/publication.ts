@@ -7,7 +7,7 @@ import { stateForReceive } from "./receive";
 import { commitPatternInstallationAfterVerification } from "./inquiry-pattern-updates";
 import { inquiryRecordsEnabled, inquiryRecordsRpc } from "@/platform/infra/inquiry-records";
 import { tenantEventRevision } from "@/platform/needs-you/tenant-classify";
-import { readInquiryDecisionEvent } from "@/platform/needs-you/server";
+import { readInquiryDecisionEvent } from "@/server/needs-you/server";
 type UnifiedEvent = Parameters<typeof tenantEventRevision>[0];
 
 interface PublicationActorInput {

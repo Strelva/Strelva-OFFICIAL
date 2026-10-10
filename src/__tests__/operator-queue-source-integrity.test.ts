@@ -7,7 +7,7 @@ vi.mock("@/lib/maintenance-digest", () => ({ listPendingDigests: deps.digests })
 vi.mock("@/lib/storage", () => ({ listDrafts: deps.drafts }));
 vi.mock("@/platform/operator-queue/site-health-store", () => ({ readSiteHealth: deps.health }));
 vi.mock("@/lib/ops", () => ({ buildOpsReport: deps.ops }));
-import { readMaintenanceDigests, readOpsAlerts, readSiteDrafts, readSiteHealthItems } from "@/platform/operator-queue/sources";
+import { readMaintenanceDigests, readOpsAlerts, readSiteDrafts, readSiteHealthItems } from "@/server/operator-queue/sources";
 const NOW = Date.parse("2026-10-07T12:00:00Z");
 const DAY = 86_400_000;
 const digest = { tenant: "alpha", siteName: "Alpha", weekOf: "2026-10-01", items: [], status: "pending", createdAt: "2026-10-01T12:00:00Z" };

@@ -10,8 +10,8 @@ import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJ
 import { listManagedPresenceWork } from "@/products/managed-presence/server";
 import { makeRealForWorkspace } from "@/experience/systems/server";
 import { sendEmailWithReceipt } from "@/platform/infra/email/send";
-import { needsYouAppOrigin, needsYouReleaseEnabled, needsYouStore } from "@/platform/needs-you/server";
-import { makeRealThroughNeedsYou } from "@/platform/needs-you/systems-sources";
+import { needsYouAppOrigin, needsYouReleaseEnabled, needsYouStore } from "@/server/needs-you/server";
+import { makeRealThroughNeedsYou } from "@/server/needs-you/systems-sources";
 import { liveMakeRealPorts, makeRealPath } from "@/experience/systems/live-make-real";
 
 export const dynamic = "force-dynamic";

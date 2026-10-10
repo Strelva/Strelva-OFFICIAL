@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({ admin: vi.fn(), actor: vi.fn(), queue: vi.fn()
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: mocks.admin, requireTenantPermission: mocks.permission }));
 vi.mock("@/platform/workspaces/http", () => ({ workspaceHttpActor: mocks.actor }));
-vi.mock("@/platform/operator-queue/service", () => ({ readOperatorQueue: mocks.queue }));
+vi.mock("@/server/operator-queue/service", () => ({ readOperatorQueue: mocks.queue }));
 vi.mock("@/platform/service-requests", () => ({ PostgresServiceRequestStore: {}, ServiceRequestService: class { read = mocks.request; execute = mocks.execute; } }));
 vi.mock("@/lib/lead-mirror", () => ({ parsePendingMember: (ref: string) => { const [tenant, leadId] = ref.split(":"); return { tenant, leadId }; }, mirrorLead: mocks.mirror, clearLeadMirrorPending: mocks.clear }));
 vi.mock("@/lib/leads", () => ({ getRedisLeadById: mocks.lead, leadSubmissionHash: () => "hash" }));

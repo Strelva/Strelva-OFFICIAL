@@ -17,14 +17,14 @@ import { readVersionRuntime, requireVersionRuntime } from "@/platform/system-ver
 import { listWork } from "@/platform/workspaces";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { listManagedPresenceWork } from "@/products/managed-presence/server";
-import type { SourceAdapter } from "./adapters";
-import type { NeedsYouStore } from "./repository";
-import { createNeedsYouService, type DecideStatus, type NeedsYouDeps } from "./service";
+import type { SourceAdapter } from "@/platform/needs-you/adapters";
+import type { NeedsYouStore } from "@/platform/needs-you/repository";
+import { createNeedsYouService, type DecideStatus, type NeedsYouDeps } from "@/platform/needs-you/service";
 import type { WorkspaceMakeRealResult } from "@/experience/workspace/contracts";
-import { makeRealAdapter, needsYouMakeRealApprovals, type ReadyPlan } from "./sources/make-real";
-import { versionReleaseAdapter, type PendingVersionRelease } from "./sources/version-release";
+import { makeRealAdapter, needsYouMakeRealApprovals, type ReadyPlan } from "@/platform/needs-you/sources/make-real";
+import { versionReleaseAdapter, type PendingVersionRelease } from "@/platform/needs-you/sources/version-release";
 import type { GoogleMakeRealPorts } from "@/platform/make-real/google-adapter";
-import { recordServiceAction } from "./service-actor";
+import { recordServiceAction } from "@/platform/needs-you/service-actor";
 
 function systemsOn(workspaceId: string, actor: WorkspaceActor): Promise<boolean> {
   return systemsReleaseEnabledForWorkspace(workspaceId, { operator: false, tester: false, userId: actor.userId }).catch(() => false);
@@ -68,7 +68,7 @@ async function pendingVersionReleases(actor: WorkspaceActor, workspaceId: string
 
 /** Stored plans with a live channel on (systems-live). Lazy: the live bindings load the write paths. */
 async function liveReadyPlans(workspaceId: string): Promise<ReadyPlan[]> {
-  const { readLiveReadyPlans } = await import("@/platform/make-real/live-server");
+  const { readLiveReadyPlans } = await import("@/server/make-real/live-server");
   return readLiveReadyPlans(workspaceId);
 }
 
@@ -90,7 +90,7 @@ function makeRealSource(store: NeedsYouStore, google: GoogleMakeRealPorts | unde
     async start(actor, workspaceId, possibilityId, approvalId, service) {
       const live = (await liveReadyPlans(workspaceId)).find((plan) => plan.possibilityId === possibilityId);
       if (live) {
-        const { startLiveMakeReal } = await import("@/platform/make-real/live-server");
+        const { startLiveMakeReal } = await import("@/server/make-real/live-server");
         if (!google) throw new Error("Google Make real composition is unavailable.");
         return startLiveMakeReal(google, { actor, workspaceId, possibilityId, approvalId, title: live.title, ...(service ? { service } : {}) });
       }

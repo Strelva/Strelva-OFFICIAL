@@ -1,6 +1,6 @@
 import { CRON_MAX_AGE_SECONDS } from "@/platform/infra/heartbeat";
 import { OperatorQueueAccessError, QUEUE_KIND_LABELS, type QueueActor } from "@/platform/operator-queue/contracts";
-import { readOperatorQueue } from "@/platform/operator-queue/service";
+import { readOperatorQueue } from "@/server/operator-queue/service";
 import { readSiteHealth } from "@/platform/operator-queue/site-health-store";
 import type { AgencyClientsPage, AgencyQueueItem } from "../agency-clients";
 

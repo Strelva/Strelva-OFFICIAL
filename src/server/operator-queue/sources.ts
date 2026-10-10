@@ -1,4 +1,4 @@
-import { readAgentAbuseAlarms } from "./agent-abuse";
+import { readAgentAbuseAlarms } from "@/platform/operator-queue/agent-abuse";
 import { createHash } from "node:crypto";
 import { getRedis } from "@/platform/infra/redis";
 import { getSupabase } from "@/platform/infra/db/client";
@@ -18,15 +18,15 @@ import { readCatalogReportFailures } from "@/platform/catalog-reports/operator-s
 import { readToolNoticeFailures } from "@/platform/catalog-reports/tool-notices";
 import { readToolContactConflicts } from "@/platform/catalog-reports/tool-history";
 import { isCustomChangeRequestMetadata } from "@/lib/custom-repos";
-import { listOperationalExceptions } from "@/products/operations/inbox";
+import { listOperationalExceptions } from "@/products/operations/server";
 import type { UnifiedEvent } from "@/lib/types";
-import type { QueueActor, QueueContext, QueueItemRaw, QueueKind } from "./contracts";
-import type { SourceRead } from "./project";
-import { readSiteHealth } from "./site-health-store";
-import { readGoogleWriteUncertainty, readListingReadbackFailures, type ListingReadbackFailure } from "./store";
-import { operatorQueueReleaseEnabled } from "./release";
-import { EVENT_RETENTION_DAYS, DOMAIN_VERIFICATION_ESCALATION_DAYS } from "./rules";
-import { readInquiryOwnerNoticeIssues } from "./inquiry-owner-notices";
+import type { QueueActor, QueueContext, QueueItemRaw, QueueKind } from "@/platform/operator-queue/contracts";
+import type { SourceRead } from "@/platform/operator-queue/project";
+import { readSiteHealth } from "@/platform/operator-queue/site-health-store";
+import { readGoogleWriteUncertainty, readListingReadbackFailures, type ListingReadbackFailure } from "@/platform/operator-queue/store";
+import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
+import { EVENT_RETENTION_DAYS, DOMAIN_VERIFICATION_ESCALATION_DAYS } from "@/platform/operator-queue/rules";
+import { readInquiryOwnerNoticeIssues } from "@/platform/operator-queue/inquiry-owner-notices";
 
 /**
  * Readers for every source in spec §3.1. Each reader returns its rows or names
@@ -39,7 +39,8 @@ const EVENT_WINDOW = 200;
 const PROSPECT_WINDOW_DAYS = 45;
 const DOMAIN_EXPIRY_WATCH_DAYS = 30;
 
-export interface QueueTenant { id: string; siteName?: string; stableId?: string }
+export type { QueueTenant } from "@/platform/operator-queue/contracts";
+import type { QueueTenant } from "@/platform/operator-queue/contracts";
 
 function clientHref(tenantId: string, anchor?: string) {
   return `/admin/clients/${encodeURIComponent(tenantId)}${anchor ? `#${anchor}` : ""}`;

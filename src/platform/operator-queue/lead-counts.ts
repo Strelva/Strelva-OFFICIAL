@@ -1,7 +1,7 @@
 import { getRedis } from "@/platform/infra/redis";
 import { getSupabase } from "@/platform/infra/db/client";
 import type { QueueBusinessLeadCount, QueueLink } from "./contracts";
-import type { QueueTenant } from "./sources";
+import type { QueueTenant } from "./contracts";
 
 /** Counts only: no names, messages or contact fields are read into the queue.
  * The durable copy and Redis index are deduplicated by original lead id. */

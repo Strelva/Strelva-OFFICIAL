@@ -22,7 +22,7 @@ import "../src/register-workspace-ports"; // workspace ports src/lib declares (S
 import { getSupabase } from "../src/platform/infra/db/client";
 import { getAllTenants } from "../src/lib/tenants";
 import { backfillScheduleReservations, backfillTenantBookings, checkTenantBookingParity } from "../src/platform/bookings/move";
-import { legacyBookingPorts, scheduleReservationPorts } from "../src/platform/bookings/legacy-ports";
+import { legacyBookingPorts, scheduleReservationPorts } from "../src/server/bookings/legacy-ports";
 import { parseBookingMoveArgs, runBookingMove } from "./booking-store-move-plan";
 
 async function tenants(): Promise<string[]> {

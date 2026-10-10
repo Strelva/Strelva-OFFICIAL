@@ -30,7 +30,7 @@ import { selectWebsiteRequestHistory } from "@/lib/website-history";
 import { tenantEventItem } from "@/platform/needs-you/adapters";
 import { needsYouReleaseEnabled, needsYouService } from "@/experience/workspace/needs-you-server";
 import { PostgresServiceRequestStore } from "@/platform/service-requests";
-import { websiteDocumentStore } from "@/products/websites/document-store";
+import { websiteDocumentStore } from "@/products/websites";
 import { websiteRebuildReleaseEnabled } from "@/products/websites/index";
 import { createSiteChangeStore } from "@/products/websites/index";
 import { reconcileWebsiteSystemReleases } from "@/products/websites/index";

@@ -7,7 +7,7 @@ import { TrafficSourcesPanel } from "@/components/dashboard/TrafficSourcesPanel"
 import { MilestonePanel } from "@/components/dashboard/MilestonePanel";
 import { AiVisibilityScorecard } from "@/components/dashboard/AiVisibilityScorecard";
 import { periodHeadline, type RangeKey } from "@/lib/analytics/period";
-import type { SiteResults, WorkspaceResults } from "@/products/websites/linked-results";
+import type { SiteResults, WorkspaceResults } from "@/products/websites/client";
 import { NoSiteCard, SiteHeading, WorkspacePlace, whenLabel, type PlaceState } from "./WorkspacePlace";
 
 /**

@@ -6,7 +6,7 @@ import { alertOnce } from "@/platform/infra/monitoring";
 import { requireCronRequest } from "@/lib/cron-auth";
 import { repairPendingClientRecords } from "@/platform/client-records/move";
 import { repairPendingBookings } from "@/platform/bookings/move";
-import { legacyBookingPorts } from "@/platform/bookings/legacy-ports";
+import { legacyBookingPorts } from "@/server/bookings/legacy-ports";
 
 export const maxDuration = 120;
 

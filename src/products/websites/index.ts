@@ -77,3 +77,9 @@ export {prepareBundleWebsiteUpdate} from "./bundle-lifecycle";
 
 export * from "./legacy-archive";
 export * from "./legacy-archive-store";
+
+export const resolveWebsiteRebuildCopyReview: typeof import("./rebuild-service").resolveWebsiteRebuildCopyReview = (...args) => import("./rebuild-service").then(module => module.resolveWebsiteRebuildCopyReview(...args));
+
+export const launchWebsiteRebuildByOwnerLink: typeof import("./rebuild-service").launchWebsiteRebuildByOwnerLink = (...args) => import("./rebuild-service").then(module => module.launchWebsiteRebuildByOwnerLink(...args));
+
+export const approveWebsiteDomainRequest: typeof import("./rebuild-service").approveWebsiteDomainRequest = (...args) => import("./rebuild-service").then(module => module.approveWebsiteDomainRequest(...args));

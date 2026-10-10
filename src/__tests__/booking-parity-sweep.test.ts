@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { runBookingParitySweep } from "@/platform/bookings/parity-sweep";
+import { runBookingParitySweep } from "@/server/bookings/parity-sweep";
 import type { BookingParityReport } from "@/platform/bookings/move";
 
-vi.mock("@/platform/bookings/legacy-ports", () => ({ legacyBookingPorts: {} }));
+vi.mock("@/server/bookings/legacy-ports", () => ({ legacyBookingPorts: {} }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => null }));
 const report = (tenant: string): BookingParityReport => ({ tenant, ok: true, legacyCount: 2, storeCount: 2, missing: [], mismatched: [], slotDifferences: [], slotDifferencesExplained: false, recorded: false });
 function deps() {

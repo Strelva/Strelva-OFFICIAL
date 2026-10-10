@@ -1,3 +1,4 @@
+import { getBookingRequestNotifier } from "./runtime-ports";
 import { agentConfirmationEmailAllowed, isolatedAgentConfirmation } from "@/platform/agent-channel/policy";
 import { bookingScopeFor } from "./booking-scope";
 import { businessBookingEmailEnabled } from "./email-enablement";
@@ -112,7 +113,8 @@ export async function deliverBookingUpdates(bookingId: string | null = null, dep
 export async function notifyBookingRequestNow(booking: StoreBooking) {
   if (booking.status !== "requested" || !bookingOwnerNoticeEnabled()) return;
   try {
-    const { notifyBookingRequestNow: notify } = await import("@/platform/needs-you/server");
-    await notify(booking);
+    const bookingRequestNotifier = getBookingRequestNotifier();
+    if (!bookingRequestNotifier) throw new Error("booking_notice_unconfigured");
+    await bookingRequestNotifier(booking);
   } catch { /* The durable request will be reconciled by the cron. */ }
 }

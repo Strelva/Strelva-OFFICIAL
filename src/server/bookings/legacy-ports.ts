@@ -8,8 +8,8 @@ import { getLeadById } from "@/lib/leads";
 import { getContent } from "@/lib/storage/content-store";
 import { getLegacyBookingById, getLegacyBookingSettings, legacyGetBookings } from "@/platform/bookings/legacy-store";
 import { scheduleSchema } from "@/products/scheduling/contracts";
-import type { LegacyBookingPorts, ScheduleReservationPorts, WorkspaceSchedule } from "./move";
-import type { StoreBookingInput } from "./store";
+import type { LegacyBookingPorts, ScheduleReservationPorts, WorkspaceSchedule } from "@/platform/bookings/move";
+import type { StoreBookingInput } from "@/platform/bookings/store";
 
 /** Legacy inquiry lookup reused by booking reply discovery and receipt imports. */
 export const readLegacyBookingInquiry = getLeadById;

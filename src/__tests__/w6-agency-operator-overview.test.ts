@@ -7,7 +7,7 @@ import type { AgencyClientsPage } from "@/experience/workspace/agency-clients";
 import type { SiteHealthSnapshot } from "@/platform/operator-queue/site-coverage";
 import { readAgencyClientsPage } from "@/experience/workspace/agency-server";
 const reads = vi.hoisted(() => ({ queue: vi.fn(), health: vi.fn() }));
-vi.mock("@/platform/operator-queue/service", () => ({ readOperatorQueue: reads.queue }));
+vi.mock("@/server/operator-queue/service", () => ({ readOperatorQueue: reads.queue }));
 vi.mock("@/platform/operator-queue/site-health-store", () => ({ readSiteHealth: reads.health }));
 
 const now = Date.parse("2026-10-07T14:00:00Z"), at = new Date(now).toISOString();

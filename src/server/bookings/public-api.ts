@@ -11,14 +11,14 @@
  */
 import { alertOnce } from "@/platform/infra/monitoring";
 import { getRedis } from "@/platform/infra/redis";
-import type { PublicBookingSlot, PublicBookingStatus, PublicBookingStoreHook } from "@/products/scheduling/public-booking";
-import { nativeRpc } from "./native";
-import { recordPublicSlot } from "./public-record";
-import { PublicBookingError } from "./errors";
-import { blocksTime } from "./availability";
-import { bookingMessagesEnabled, bookingReadSource, bookingStoreWriteEnabled } from "./flags";
-import { readTenantBookings, recordBooking, type StoreBookingStatus } from "./store";
-import { BOOKING_STORE_PENDING_KEY, bookingPendingMember } from "./tenant";
+import type { PublicBookingSlot, PublicBookingStatus, PublicBookingStoreHook } from "@/products/scheduling/server";
+import { nativeRpc } from "@/platform/bookings/native";
+import { recordPublicSlot } from "@/platform/bookings/public-record";
+import { PublicBookingError } from "@/platform/bookings/errors";
+import { blocksTime } from "@/platform/bookings/availability";
+import { bookingMessagesEnabled, bookingReadSource, bookingStoreWriteEnabled } from "@/platform/bookings/flags";
+import { readTenantBookings, recordBooking, type StoreBookingStatus } from "@/platform/bookings/store";
+import { BOOKING_STORE_PENDING_KEY, bookingPendingMember } from "@/platform/bookings/tenant";
 
 const STATUS: Record<PublicBookingStatus, StoreBookingStatus> = { pending: "requested", confirmed: "confirmed", cancelled: "cancelled" };
 
@@ -82,7 +82,7 @@ export function publicBookingStoreHook(): PublicBookingStoreHook | undefined {
       if (input.binding.recordBooking) {
         const booking = (await readTenantBookings(input.binding.tenantId)).find(b => b.publicReservationId === input.reservationId);
         if (booking?.serviceRef) {
-          const { deliverBookingUpdates, notifyBookingRequestNow } = await import("./updates");
+          const { deliverBookingUpdates, notifyBookingRequestNow } = await import("@/platform/bookings/updates");
           await notifyBookingRequestNow(booking);
           if (bookingMessagesEnabled()) await deliverBookingUpdates(booking.id).catch(() => undefined);
           return;
@@ -102,7 +102,7 @@ export function publicBookingStoreHook(): PublicBookingStoreHook | undefined {
           ...(input.status === "cancelled" ? { cancelledAt: new Date().toISOString() } : {}),
         }, "native");
         if (bookingMessagesEnabled() && result.status !== "conflict") {
-          const { deliverBookingUpdates } = await import("./updates");
+          const { deliverBookingUpdates } = await import("@/platform/bookings/updates");
           await deliverBookingUpdates(result.booking.id).catch(() => undefined);
         }
       } catch (error) {

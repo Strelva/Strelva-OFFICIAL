@@ -12,13 +12,13 @@ export interface InquiryDecisionNoticeDependencies {
 }
 const defaults: InquiryDecisionNoticeDependencies = {
   released: inquiryReleaseEnabledForTenant,
-  events: async (tenantId) => (await import("@/platform/needs-you/server")).pendingInquiryDecisionEvents(tenantId),
+  events: async (tenantId) => (await import("@/server/needs-you/server")).pendingInquiryDecisionEvents(tenantId),
   workspace: async (tenantId) => {
     const context = await inquiryRecordsRpc("read_inquiry_business_context", { p_tenant_id: tenantId }) as { workspaceId?: unknown } | null;
     return typeof context?.workspaceId === "string" ? context.workspaceId : null;
   },
   deliver: async (workspaceId, sourceId, notice) => {
-    const { needsYouService } = await import("@/platform/needs-you/server");
+    const { needsYouService } = await import("@/server/needs-you/server");
     return needsYouService().deliverUrgentSource(workspaceId, "tenant_event", sourceId, notice);
   },
 };

@@ -225,31 +225,11 @@ export async function getMailLogPg(tenantId: string, limit = 50): Promise<Row<"m
 
 // users -----------------------------------------------------------------------
 
-export async function upsertUser(user: Insert<"users">): Promise<void> {
-  const label = `upsertUser ${user.email}`;
-  const db = requiredDb(label);
-  await required(label, async () => {
-    const { error } = await db.from("users").upsert(user, { onConflict: "email" });
-    if (error) throw error;
-  });
-}
-
 export async function getUserByEmail(email: string): Promise<Row<"users"> | null> {
   const db = getSupabase();
   if (!db) return null;
   return bestEffort(`getUserByEmail ${email}`, async () => {
     const { data, error } = await db.from("users").select("*").eq("email", email).maybeSingle();
-    if (error) throw error;
-    return data;
-  }, null);
-}
-
-/** Legacy identity lookup retained only for rows imported during the Clerk cutover. */
-export async function getUserByClerkId(clerkId: string): Promise<Row<"users"> | null> {
-  const db = getSupabase();
-  if (!db) return null;
-  return bestEffort(`getUserByClerkId ${clerkId}`, async () => {
-    const { data, error } = await db.from("users").select("*").eq("clerk_id", clerkId).maybeSingle();
     if (error) throw error;
     return data;
   }, null);
@@ -419,7 +399,7 @@ export async function createInvite(invite: Insert<"invites">): Promise<void> {
   });
 }
 
-/** Mark an invite claimed once access is granted (mirrors consumeInvite). */
+/** Mark a Postgres invite claimed once access is granted. */
 export async function markInviteClaimed(email: string, tenantId: string): Promise<void> {
   const label = `markInviteClaimed ${email}/${tenantId}`;
   const db = requiredDb(label);

@@ -15,6 +15,7 @@
  *
  * Off unless STRELVA_BOOKING_CALENDAR_BUSY=1, and only on store-served reads.
  */
+import { getCalendarBusyProviderRead } from "./runtime-ports";
 import { isRateLimitedAsync } from "@/platform/infra/rate-limit";
 import { getRedis } from "@/platform/infra/redis";
 import { zonedLocalToUtc } from "./availability";
@@ -146,7 +147,8 @@ export function defaultBusyPorts(): CalendarBusyPorts | null {
       const user = await db.from("users").select("email,verified_at").eq("id", userId).maybeSingle();
       const email = String((user.data as { email?: unknown } | null)?.email ?? "").trim().toLowerCase();
       if (!email || !(user.data as { verified_at?: unknown } | null)?.verified_at) throw new Error("calendar_owner_unverified");
-      const { readWorkspaceProviderAvailability } = await import("@/products/scheduling/server");
+      const readWorkspaceProviderAvailability = getCalendarBusyProviderRead();
+      if (!readWorkspaceProviderAvailability) throw new Error("calendar_provider_unconfigured");
       const result = await readWorkspaceProviderAvailability({ userId, verifiedEmail: email }, workspaceId, provider, query);
       return result.busy.map((b) => ({ start: b.start, end: b.end }));
     },

@@ -4,7 +4,7 @@ import { AgencyManagedWebsiteDraftExperience } from "@/experience/agency-website
 import { createAgencyManagedWebsiteDraftAccessService } from "@/platform/offerings/agency-website-draft";
 import { releaseViewerFor } from "@/platform/release-flags/viewer";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
-import { websiteRebuildReleaseEnabled, websiteRebuildReleaseEnabledForTenant, websiteRebuildReleaseMayBeOn } from "@/products/websites/rebuild-release";
+import { websiteRebuildReleaseEnabled, websiteRebuildReleaseEnabledForTenant, websiteRebuildReleaseMayBeOn } from "@/products/websites";
 
 /**
  * The v2 document draft when the rebuild is on for the client's site: env `1`,

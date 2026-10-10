@@ -1,6 +1,6 @@
 import { ProposeBookingTimes } from "@/experience/bookings/ProposeBookingTimes";
 import { Card } from "@/components/ui/Card";
-import type { HeldInquiries, HeldView, LeadView, WorkspaceLeads } from "@/products/inquiries/linked-leads";
+import type { HeldInquiries, HeldView, LeadView, WorkspaceLeads } from "@/products/inquiries/client";
 import { REPLY_OUTCOME, WorkspaceInquiryReply } from "./WorkspaceInquiryReply";
 import { HeldInquiryActions } from "./HeldInquiryActions";
 import styles from "./WorkspaceInquiries.module.css";

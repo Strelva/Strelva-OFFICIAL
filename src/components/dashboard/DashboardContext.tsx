@@ -54,7 +54,7 @@ interface DashboardContextValue {
   selectedNode: EditableNode | null;
   setSelectedNode: (node: EditableNode | null) => void;
 
-  // Active page (selected in ContentBrowser Pages tab). Shared so
+  // Active page (selected in the managed website editor). Shared so
   // SitePreview's iframe src and PageStructurePanel can react to it.
   activePage: string;
   setActivePage: (page: string) => void;

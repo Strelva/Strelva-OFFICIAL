@@ -9,7 +9,7 @@ import { PropertiesEditor } from "./PropertiesEditor";
 import { ChatPanel } from "./ChatPanel";
 import { CustomChangeRequestPanel } from "./CustomChangeRequestPanel";
 import { PublishBar, type PublishOutcome } from "./design/PublishBar";
-import type { SectionData } from "./ContentBrowser";
+import type { SectionData } from "@/platform/infra/section-summary";
 import { SECTION_LABELS, COMPOSITE_SECTIONS } from "@/components/ui/section-labels";
 import { getDefaultPageConfig } from "@/lib/pageConfigDefaults";
 

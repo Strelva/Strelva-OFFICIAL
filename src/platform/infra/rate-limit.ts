@@ -144,28 +144,6 @@ export async function getRateLimitStatusAsync(
   return redisStatus(key, maxPerMinute, 60);
 }
 
-/** Like isRateLimited but accepts a custom window (in ms) instead of the default 60s.
- *
- * @deprecated In-memory only — does not scale across serverless instances and
- *   resets on every cold start. Prefer `isRateLimitedWindowedAsync` for all
- *   production API routes. This export is retained only for test helpers and
- *   local-dev code paths where Redis is unavailable. Calling it in production
- *   will throw — use `isRateLimitedWindowedAsync` instead.
- */
-export function isRateLimitedWindowed(
-  key: string,
-  max: number,
-  windowMs: number
-): boolean {
-  if (isProductionEnv()) {
-    throw new Error(
-      "isRateLimitedWindowed is in-memory only and must not be called in production. " +
-      "Use isRateLimitedWindowedAsync instead."
-    );
-  }
-  return memCheck(key, max, windowMs);
-}
-
 /** Async windowed rate limit — uses Redis when available. */
 export async function isRateLimitedWindowedAsync(
   key: string,

@@ -7,7 +7,7 @@ import {
   type DeliveryStatus,
   DELIVERY_STATUSES,
   deliveryStatusLabel,
-} from "@/lib/access-request-delivery";
+} from "@/lib/access-request-delivery-contracts";
 import type { LeadWorkflow, LeadWorkflowStatus } from "@/lib/lead-workflow";
 import { Chip } from "@/app/admin/console";
 

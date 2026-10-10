@@ -52,7 +52,7 @@ export async function liveMakeRealPorts(expectedPlan?: { candidateRevision: numb
   const [{ createSupabasePossibilityRepository, isStoredPossibilityId }, server, { makeRealThroughNeedsYou }, { PostgresNeedsYouStore }, { sendEmailWithReceipt }] = await Promise.all([
     import("@/platform/possibilities/supabase-repository"),
     import("@/experience/systems/live-server"),
-    import("@/platform/needs-you/systems-sources"),
+    import("@/server/needs-you/systems-sources"),
     import("@/platform/needs-you/repository"),
     import("@/platform/infra/email/send"),
   ]);
