@@ -506,3 +506,7 @@ a.row:hover, button.row:hover { background: var(--gray-bg-alt); }
 @media (pointer: coarse) { .segment, .textButton { min-height: 44px; } }
 
 .surface[data-selected="true"] { border-color: var(--st-accent); box-shadow: inset 0 0 0 1px var(--st-accent); }
+
+textarea.composerInput { resize: none; max-height: 144px; }
+
+@media (max-width: 767px) { .composerDock { bottom: calc(80px + env(safe-area-inset-bottom)); } .composerScope { display: none; } }

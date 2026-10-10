@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { StEmpty, StMono, StNotice, StPill, StRow, StRows, StSection, StSkeleton, StState, StSurface } from "@/components/ui/strelva/Kit";
 import { TextInput } from "@/components/ui/TextInput";
 import type { WorkspaceWork } from "@/experience/workspace/contracts";
 import { WorkBudgetPanel } from "@/experience/workspace/WorkBudgetPanel";
@@ -368,15 +369,20 @@ export function StandingResponsibilityPicker({ workspaceId, sources, selectedId,
     } finally { setBusy(false); }
   }
 
-  return <section className="rounded-xl border border-gray-border p-4" aria-labelledby="ongoing-work-entry-heading">
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><h2 id="ongoing-work-entry-heading" className="font-medium">Saved checks that can run again</h2><p className="mt-1 max-w-2xl text-sm text-gray-muted">Each check has its own run and result. The approved scope stays visible for review.</p></div>
-      {!readOnly && !newWorkBlocked ? <Button variant="secondary" disabled={busy} onClick={() => { const next = !creating; setCreating(next); onCreatingChange?.(next); setError(""); }}>{creating ? "Close" : "Keep something running"}</Button> : null}
-    </div>
-    {newWorkBlocked && !readOnly ? <p className="mt-3 text-sm text-gray-muted">{NEW_WORK_PAUSED_COPY}</p> : null}
-    {error ? <p className="mt-3 text-sm" role="alert">{error}</p> : null}
-    {loading ? <p className="mt-3 text-sm" role="status">Loading what Strelva keeps running…</p> : items.length ? <ul className="mt-4 space-y-2" role="list">{items.map(item => <li key={item.id}><button type="button" className={`w-full rounded-lg border p-3 text-left ${selectedId === item.id ? "border-accent" : "border-gray-border"}`} aria-current={selectedId === item.id ? "page" : undefined} onClick={() => onOpen(item.id)}><span className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium">{item.policy.title}</span><span className="text-sm text-gray-muted">{standingActionLabel(item.policy.status)}</span></span><span className="mt-1 block text-sm text-gray-muted">Version {item.policy.version} · {item.policy.scope.steps.length} saved check{item.policy.scope.steps.length === 1 ? "" : "s"}</span></button></li>)}</ul> : error ? null : <p className="mt-4 text-sm text-gray-muted">No ongoing work has been created.</p>}
-    {creating && !readOnly && !newWorkBlocked ? <form className="mt-5 space-y-4 border-t border-gray-border pt-4" onSubmit={create}>
+  return <StSection title="Saved checks that can run again" id="ongoing-work-entry-heading"
+    meta="Each approved scope stays visible for review."
+    action={!readOnly && !newWorkBlocked ? <StPill variant="soft" disabled={busy} onClick={() => { const next = !creating; setCreating(next); onCreatingChange?.(next); setError(""); }}>{creating ? "Close" : "Keep something running"}</StPill> : undefined}
+  >
+    {newWorkBlocked && !readOnly ? <StNotice>{NEW_WORK_PAUSED_COPY}</StNotice> : null}
+    {error ? <StNotice tone="critical"><p role="alert">{error}</p></StNotice> : null}
+    {loading ? <div role="status" aria-label="Loading what Strelva keeps running"><StSkeleton /><StSkeleton width="78%" /></div> : items.length ? <StRows label="Saved running checks">{items.map(item => <StRow key={item.id}
+      title={item.policy.title}
+      detail={<>{item.policy.intent}<br /><StMono>Version {item.policy.version} · {item.policy.scope.steps.length} saved check{item.policy.scope.steps.length === 1 ? "" : "s"}</StMono></>}
+      selected={selectedId === item.id}
+      onClick={() => onOpen(item.id)}
+      end={<StState kind={item.policy.status === "active" ? "live" : item.policy.status === "proposed" ? "need" : "draft"}>{standingActionLabel(item.policy.status)}</StState>}
+    />)}</StRows> : error ? null : <StEmpty>No ongoing work has been created.</StEmpty>}
+    {creating && !readOnly && !newWorkBlocked ? <StSurface><form className="space-y-4" onSubmit={create}>
       <h3 className="font-medium">Keep something running</h3>
       <TextInput label="Name" value={title} onChange={event => setTitle(event.target.value)} maxLength={160} required />
       <TextInput label="Result" value={intent} onChange={event => setIntent(event.target.value)} maxLength={4000} required />
@@ -385,9 +391,9 @@ export function StandingResponsibilityPicker({ workspaceId, sources, selectedId,
       {triggerKind === "interval" ? <TextInput label="Interval in minutes" type="number" min={1} max={525600} value={everyMinutes} onChange={event => setEveryMinutes(event.target.value)} required /> : null}
       {!investigations.length ? <p className="text-sm text-gray-muted">Create a saved investigation first. Running currently supports saved checks.</p> : null}
       <p className="text-sm text-gray-muted">No external message or provider call is made by creating this proposal. Approval is required before a check can run. This setup allows up to 10 checks.</p>
-      <Button type="submit" disabled={busy || !investigations.length || !sourceId}>Start running it</Button>
-    </form> : null}
-  </section>;
+      <StPill type="submit" disabled={busy || !investigations.length || !sourceId} busy={busy}>Start running it</StPill>
+    </form></StSurface> : null}
+  </StSection>;
 }
 
 function parseStandingView(value: unknown): StandingView {

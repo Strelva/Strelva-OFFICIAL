@@ -1,0 +1,33 @@
+/* First run is a centered invitation; proposed work stays a real object. */
+.startPage [data-workspace-start] { display: flex; flex-direction: column; gap: 28px; }
+.startPage [data-first-run] { padding-top: min(12vh, 120px); }
+.startHeader { display: flex; flex-direction: column; align-items: center; gap: 28px; text-align: center; }
+.mark { width: 28px; height: 32px; }
+.firstComposer { display: flex; justify-content: center; }
+.startExampleList { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.startProposal { color: var(--st-text); }
+.startProposalHeader { display: flex; align-items: center; gap: 12px; }
+.startProposalHeader h2 { margin: 0; font-size: 16px; font-weight: 600; line-height: 24px; }
+.startProposalIcon { color: var(--st-text-2); }
+.eyebrow { margin: 0 0 4px; color: var(--st-text-3); font-size: 13px; font-weight: 500; }
+.startProposalSummary, .startAskEcho, .startNextAction { margin-top: 16px; font-size: 14px; line-height: 22px; }
+.startParts { margin-top: 20px; border-block: 1px solid var(--st-line); }
+.startPart { display: flex; align-items: flex-start; gap: 12px; padding-block: 14px; }
+.startPart + .startPart { border-top: 1px solid var(--st-line); }
+.startPartCopy { display: flex; flex-direction: column; gap: 4px; font-size: 14px; line-height: 22px; }
+.startPartCopy small { color: var(--st-text-2); font-size: 13px; line-height: 20px; }
+.startPartCheck { color: var(--st-live); }
+.startPart input { accent-color: var(--st-accent); }
+.startSelect, .startAskField { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; font-size: 14px; }
+.startSelect select, .startAskField textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--st-line); border-radius: var(--st-r-sm); background: var(--st-inset); color: var(--st-text); font: inherit; font-size: 16px; line-height: 24px; }
+.startSelect select:focus-visible, .startAskField textarea:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
+.startBlocked, .startHelp { display: flex; align-items: flex-start; gap: 10px; margin-top: 16px; color: var(--st-text-2); font-size: 14px; line-height: 22px; }
+.startBlocked svg, .startHelp svg { flex-shrink: 0; margin-top: 3px; }
+.startError { margin-top: 16px; color: var(--st-critical); font-size: 14px; }
+.startProposalActions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 20px; }
+.startFootnote { margin-top: 12px; color: var(--st-text-3); font-size: 13px; line-height: 20px; }
+@media (max-width: 767px) { .startPage [data-first-run] { padding-top: 40px; } .startHeader { gap: 20px; } .startProposalActions { align-items: stretch; flex-direction: column; } }
+
+.externalLink { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; color: var(--st-text-2); font-size: 14px; font-weight: 500; text-decoration: none; }
+.externalLink:hover { color: var(--st-text); }
+.externalLink:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }

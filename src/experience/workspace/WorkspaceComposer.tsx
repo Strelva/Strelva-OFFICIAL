@@ -2,6 +2,7 @@
 
 import { ArrowUp, LayoutGrid } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { StComposerBar, StNotice, StTextButton } from "@/components/ui/strelva/Kit";
 import { Button } from "@/components/ui/Button";
 import { readRequestDraft, writeRequestDraft } from "./request-draft";
 import styles from "./workspace-composer.module.css";
@@ -19,7 +20,8 @@ export interface WorkspaceComposerProps {
   /** STRELVA_SYSTEMS_RELEASE. Off (the default): the pre-Systems "Get or build an app" label. */
   systemsReleased?: boolean;
   /** `glass`: the compact frosted composer on Home's dusk band (October 6, 2026). */
-  tone?: "default" | "glass";
+  tone?: "default" | "glass" | "dock";
+  scope?: string;
 }
 
 export function WorkspaceComposer(props: WorkspaceComposerProps) {
@@ -27,7 +29,7 @@ export function WorkspaceComposer(props: WorkspaceComposerProps) {
 }
 
 /** One ask editor. Routing, permission and execution remain with its caller. */
-function ComposerSession({ initialRequest = "", draftKey, disabled = false, placeholder = "What do you want Strelva to make happen?", autoFocus = false, onSubmit, onTemplates, onChange, onEdited, systemsReleased = false, tone = "default" }: WorkspaceComposerProps) {
+function ComposerSession({ initialRequest = "", draftKey, disabled = false, placeholder = "What do you want Strelva to make happen?", autoFocus = false, onSubmit, onTemplates, onChange, onEdited, systemsReleased = false, tone = "default", scope }: WorkspaceComposerProps) {
   const id = useId();
   const textarea = useRef<HTMLTextAreaElement>(null);
   const submitting = useRef(false);
@@ -67,8 +69,8 @@ function ComposerSession({ initialRequest = "", draftKey, disabled = false, plac
     catch { setStorageUnavailable(true); }
   }
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function submit(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
     const value = ask.trim();
     if (!value || disabled || submitting.current) return;
     submitting.current = true;
@@ -78,6 +80,14 @@ function ComposerSession({ initialRequest = "", draftKey, disabled = false, plac
     catch (cause) { setError(cause instanceof Error ? cause.message : "That ask could not be opened. Your draft is still here."); }
     finally { submitting.current = false; setPending(false); }
   }
+
+  if (tone === "dock") return <div className={styles.dockWrap}>
+    <StComposerBar multiline textareaRef={textarea} scope={scope} placeholder={placeholder} value={ask} onChange={change} onSubmit={() => void submit()} disabled={disabled || pending} maxLength={3000} inputLabel="What do you want to accomplish?" />
+    {onTemplates ? <StTextButton disabled={pending} onClick={onTemplates}>{systemsReleased ? "Browse ready-made systems" : "Get or build an app"}</StTextButton> : null}
+    {pending ? <span role="status" className="sr-only">Opening your ask…</span> : null}
+    {storageUnavailable ? <StNotice>Browser storage is unavailable. Keep this page open to retain your draft.</StNotice> : null}
+    {error ? <div role="alert"><StNotice tone="critical">{error}</StNotice></div> : null}
+  </div>;
 
   return <div className={styles.wrap} data-tone={tone === "glass" ? "glass" : undefined}>
     <form className={styles.composer} onSubmit={event => void submit(event)} aria-label="Start new work" aria-busy={pending || undefined}>

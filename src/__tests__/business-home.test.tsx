@@ -6,6 +6,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => undefined, r
 import { BusinessHome } from "@/experience/workspace/BusinessHome";
 import type { WorkspaceSnapshot, WorkspaceWork } from "@/experience/workspace/contracts";
 import type { WorkspaceOfferingState } from "@/experience/workspace/WorkspaceOfferings";
+import type { SystemView } from "@/experience/systems/model";
 import { HomeOutcomesProvider } from "@/experience/workspace/outcomes/HomeOutcomes";
 import { BAKERY_LOOP } from "@/experience/workspace/preview/outcomes-fixture";
 
@@ -83,16 +84,39 @@ describe("business home", () => {
       systems: [{ id: "work:Mediation intake", kind: "app", name: "Mediation intake", detail: "Used by your team", lifecycle: "live", health: { state: "unknown", summary: "Nothing has checked this yet." }, surface: { kind: "work", workId: "Mediation intake", productId: "applications" }, connections: [], possibilities: [], versions: [] }],
       files: [items[1]!], systemsReleased: true,
     }));
-    // October 6: the dusk band greets the owner; the business is named on the line above.
-    expect(html).toContain("<h1 id=\"business-start-title\" class=\"font-display\">Welcome back.</h1>");
-    expect(html).toContain("Alder Workshop</p>");
-    expect(html).toContain("1 system live");
+    // October 9 A1: the business and open sections replace the dusk hero.
+    expect(html).toMatch(/<h1 id="business-start-title"[^>]*>Alder Workshop<\/h1>/);
+    expect(html).toContain("1 live");
+    expect(html).not.toContain("Welcome back.");
     expect(html.indexOf("Needs you")).toBeLessThan(html.indexOf("id=\"home-systems\""));
-    expect(html).toContain("Open Mediation intake, Internal tool, Live, Unknown");
-    expect(html).toContain("Ask Strelva for anything your business needs");
+    expect(html).toContain("Mediation intake");
+    expect(html).toContain("Unknown");
+    expect(html).toContain("Ask Strelva to change or make something");
     expect(html).toContain("All systems and files");
+    const main = html.slice(html.indexOf('<main id="business-home-main"'));
+    const positions = ['id="home-attention"', 'id="home-systems"', 'id="home-handled"', '>In progress<', '>Files and results<'].map(marker => main.indexOf(marker));
+    expect(positions.every(position => position >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
     expect(html).not.toContain("Open Mediation intake\"");
-    expect(html).toContain("Open AI check");
+    expect(html).toContain("AI check");
+  });
+
+  it("orders not-working Systems before off and live, then by name within each group", () => {
+    function system(name: string, lifecycle: SystemView["lifecycle"], health: SystemView["health"]["state"]): SystemView {
+      return { id: name, name, kind: "app", detail: "", lifecycle, health: { state: health, summary: "Recorded check" }, surface: { kind: "work", workId: name, productId: "applications" }, connections: [], possibilities: [], versions: [] };
+    }
+    const html = renderToStaticMarkup(createElement(BusinessHome, {
+      snapshot: snapshot([]), sites: [], unassignedSites: [], siteAssignmentsKnown: true, offerings: offeringState, busy: false,
+      onOpen: noop, onStart: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account", systemsReleased: true,
+      systems: [system("Zulu live", "live", "healthy"), system("Beta off", "paused", "unknown"), system("Zulu broken", "live", "blocked"), system("Alpha broken", "live", "degraded"), system("Alpha live", "live", "healthy")], files: [],
+    }));
+    const main = html.slice(html.indexOf('<main id="business-home-main"'));
+    const names = ["Alpha broken", "Zulu broken", "Beta off", "Alpha live", "Zulu live"];
+    const positions = names.map(name => main.indexOf(name));
+    expect(positions.every(position => position >= 0)).toBe(true);
+    expect(positions).toEqual([...positions].sort((a, b) => a - b));
+    expect(main).toContain("Paused");
+    expect(main).toContain("Unknown");
   });
 
   it("tells an empty business that Strelva builds its systems, without a build-it-yourself prompt", () => {
@@ -156,7 +180,7 @@ describe("business home", () => {
 
     expect(html).toContain("Needs you");
     expect(html).toContain("Review urgency field");
-    expect(html).toContain("What changed");
+    expect(html).toContain("Strelva handled");
     expect(html).toContain("In progress");
     expect(html).toContain("All requests");
     expect(html).toContain("Files and results");

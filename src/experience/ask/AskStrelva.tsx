@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { ArrowUp, CircleAlert, History, Loader2, Plus } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { CircleAlert, Loader2 } from "lucide-react";
+import { LogoMark } from "@/components/Logo";
+import { StComposerBar, StComposerDock, StEmpty, StHead, StMono, StNotice, StRows, StRow, StSection, StSkeleton, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
 import { SelectInput } from "@/components/ui/TextInput";
 import { ConversationStreamDecoder } from "@/experience/conversation/stream";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
@@ -28,6 +30,13 @@ export interface AskStrelvaProps {
   canAskOnBehalf?: boolean;
   /** Lets a caller supply transport (the local preview). Defaults to the workspace request. */
   request?: typeof fetch;
+  /** Optional saved snapshot; callers still own the source and authority. Preview fixtures use this. */
+  initialMessages?: readonly AskMessageView[];
+  /** Render a supplied result object. This is presentation only; it never grants write authority. */
+  renderResult?: (message: AskMessageView) => ReactNode;
+  /** Local previews keep recovery navigation inside their fictional business. */
+  refusalLinks?: { needsYou: string; help: string };
+
 }
 
 type HistoryState = "loading" | "ready" | "unavailable" | "off";
@@ -38,7 +47,7 @@ type HistoryState = "loading" | "ready" | "unavailable" | "off";
  * shows what it actually did: answered, drafted (not live), opened a
  * Possibility, or filed a Request. Nothing typed here approves anything.
  */
-export function AskStrelva({ workspaceId, businessName, systemId = null, systemName, initialText = "", readOnly = false, readOnlyReason, compact = false, canAskOnBehalf: initialCanAskOnBehalf = false, request: requestOverride }: AskStrelvaProps) {
+export function AskStrelva({ workspaceId, businessName, systemId = null, systemName, initialText = "", readOnly = false, readOnlyReason, compact = false, canAskOnBehalf: initialCanAskOnBehalf = false, request: requestOverride, initialMessages = [], renderResult, refusalLinks }: AskStrelvaProps) {
   const contextRequest = useWorkspaceRequest();
   const request = requestOverride ?? contextRequest;
   const [canAskOnBehalf, setCanAskOnBehalf] = useState(initialCanAskOnBehalf);
@@ -48,7 +57,7 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [conversationSystemId, setConversationSystemId] = useState<string | null>(systemId);
   const [conversationMine, setConversationMine] = useState(true);
-  const [messages, setMessages] = useState<AskMessageView[]>([]);
+  const [messages, setMessages] = useState<AskMessageView[]>(() => [...initialMessages]);
   const [input, setInput] = useState(initialText);
   const [streaming, setStreaming] = useState(false);
   const [toolLabel, setToolLabel] = useState<string | null>(null);
@@ -170,68 +179,49 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
     }
   }
 
-  function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-      event.preventDefault();
-      void send();
-    }
-  }
 
   const examples = systemId ? ASK_EXAMPLES.system : ASK_EXAMPLES.home;
   const blockedReason = readOnly ? readOnlyReason || "You can read this business's conversations but can't ask here." : !conversationMine ? "This conversation was started by someone else. Start a new one to ask." : null;
   const unsaved = messages.some((message) => message.result && !message.result.saved);
 
+  const composer = <StComposerBar scope={place} placeholder={blockedReason ?? `Ask about ${place}`} value={input} onChange={setInput} onSubmit={() => void send()} disabled={streaming || Boolean(blockedReason)} inputLabel={`Ask Strelva about ${place}`} multiline textareaRef={inputRef} maxLength={20_000} />;
+
   return <section className={styles.ask} data-compact={compact || undefined} aria-labelledby="ask-strelva-title">
-    <header className={styles.head}>
-      <div>
-        <h1 id="ask-strelva-title" className={compact ? styles.compactTitle : "font-display"}>Ask Strelva</h1>
-        <p>{systemName ? `About ${systemName}.` : `About ${businessName}.`} Strelva answers, drafts a change, opens a Possibility or files a Request. Decisions stay in Needs you.</p>
-      </div>
-      <button type="button" className={styles.newButton} onClick={startNew} disabled={streaming || (!conversationId && messages.length === 0)}><Plus size={16} aria-hidden="true" />New conversation</button>
-    </header>
+    <StHead title="Ask Strelva" titleId="ask-strelva-title" meta={<>{systemName ? `About ${systemName}.` : `About ${businessName}.`} Strelva answers, drafts a change, opens a Possibility or files a Request. Decisions stay in Needs you.</>} actions={<StTextButton onClick={startNew} disabled={streaming || (!conversationId && messages.length === 0)}>New conversation</StTextButton>} />
 
-    <div className={styles.body}>
-      <div ref={logRef} className={styles.log} role="log" aria-live="polite" aria-relevant="additions" aria-busy={streaming || undefined} aria-label={`Conversation about ${place}`}>
-        {messages.length === 0 ? <div className={styles.empty}>
-          <p>Ask in your own words. For example:</p>
-          <ul>{examples.map((example) => <li key={example}><button type="button" disabled={Boolean(blockedReason)} onClick={() => { setInput(example); inputRef.current?.focus(); }}>{example}</button></li>)}</ul>
-        </div> : messages.map((message) => <article key={message.id} className={styles.message} data-role={message.role}>
-          <h2 className="sr-only">{message.role === "user" ? "You asked" : "Strelva"}</h2>
+    <div ref={logRef} className={styles.log} role="log" aria-live="polite" aria-relevant="additions" aria-busy={streaming || undefined} aria-label={`Conversation about ${place}`}>
+      {messages.length === 0 ? <StSection title="Ask in your own words" meta="For example">
+        <StRows>{examples.map(example => <StRow key={example} title={<StTextButton disabled={Boolean(blockedReason)} onClick={() => { setInput(example); inputRef.current?.focus(); }}>{example}</StTextButton>} />)}</StRows>
+      </StSection> : messages.map(message => <article key={message.id} className={styles.message} data-role={message.role}>
+        <h2 className="sr-only">{message.role === "user" ? "You asked" : "Strelva"}</h2>
+        {message.role === "assistant" ? <LogoMark className={styles.mark} /> : null}
+        <div className={styles.messageBody}>
           {message.role === "user" && message.askedOnBehalf ? <small>Asked for the owner by {message.askedOnBehalf}</small> : null}
-          {message.pending && !message.content ? <p className={styles.thinking}><Loader2 size={14} className="animate-spin" aria-hidden="true" />{toolLabel || "Strelva is reading…"}</p> : <p className={styles.text}>{message.content}</p>}
-          {message.pending && message.content && toolLabel ? <p className={styles.thinking}><Loader2 size={14} className="animate-spin" aria-hidden="true" />{toolLabel}</p> : null}
-          {message.result ? <TurnReceipt result={message.result} /> : null}
-        </article>)}
-      </div>
-
-      <aside className={styles.history} aria-label="Earlier conversations">
-        <h2><History size={15} aria-hidden="true" />Earlier</h2>
-        {historyState === "loading" ? <p role="status">Loading conversations…</p>
-          : historyState === "unavailable" ? <p role="status">Earlier conversations can&apos;t be read right now. New ones may not be saved.</p>
-          : historyState === "off" ? <p role="status">Ask Strelva isn&apos;t on for this business yet.</p>
-          : conversations.length === 0 ? <p>Nothing yet. Conversations you start here are kept for this business.</p>
-          : <ul>{conversations.map((item) => <li key={item.id}><button type="button" aria-current={item.id === conversationId || undefined} disabled={streaming || opening === item.id} onClick={() => void openConversation(item.id)}>
-            <span>{item.title}</span>
-            <small>{new Date(item.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}{item.mine ? "" : " · someone else's"}</small>
-          </button></li>)}</ul>}
-      </aside>
+          {message.pending && !message.content ? <StSurface label="Strelva is working"><p className={styles.thinking}><Loader2 size={14} className="motion-safe:animate-spin" aria-hidden="true" />{toolLabel || "Strelva is reading…"}</p></StSurface> : <p className={styles.text}>{message.content}</p>}
+          {message.pending && message.content && toolLabel ? <p className={styles.thinking}><Loader2 size={14} className="motion-safe:animate-spin" aria-hidden="true" />{toolLabel}</p> : null}
+          {renderResult?.(message) ?? (message.result ? <TurnReceipt result={message.result} /> : null)}
+          {message.result?.kind === "refusal" ? <div className={styles.refusalActions}>{message.result.items.some(item => item.summary === "approval_in_chat") ? <StTextButton href={refusalLinks?.needsYou ?? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=needs-you`}>Open Needs you</StTextButton> : null}<StTextButton href={refusalLinks?.help ?? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=help`}>Ask for help</StTextButton></div> : null}
+        </div>
+      </article>)}
     </div>
 
-    {error ? <p role="alert" className={styles.error}><CircleAlert size={16} aria-hidden="true" />{error}</p> : null}
-    {unsaved ? <p role="status" className={styles.note}>Part of this conversation couldn&apos;t be saved. What Strelva drafted or filed is unaffected.</p> : null}
+    {error ? <StNotice tone="critical" icon={<CircleAlert size={16} aria-hidden="true" />}>{error}</StNotice> : null}
+    {unsaved ? <StNotice>Part of this conversation couldn&apos;t be saved. What Strelva drafted or filed is unaffected.</StNotice> : null}
 
     {canAskOnBehalf ? <SelectInput label="Who asked for this?" value={askedOnBehalf} disabled={streaming || Boolean(blockedReason)}
       options={[{ value: "", label: "I am asking" }, { value: "email", label: "The owner, by email" }, { value: "phone", label: "The owner, by phone" }]}
-      onChange={(event) => setAskedOnBehalf(event.target.value as "email" | "phone" | "")}
+      onChange={event => setAskedOnBehalf(event.target.value as "email" | "phone" | "")}
       helperText="The owner still decides in Needs you." /> : null}
-    <form className={styles.composer} onSubmit={(event) => void send(event)}>
-      <label htmlFor="ask-strelva-input" className="sr-only">Ask Strelva about {place}</label>
-      <textarea id="ask-strelva-input" ref={inputRef} value={input} rows={2} maxLength={20_000} disabled={Boolean(blockedReason)} placeholder={blockedReason ?? `Ask about ${place}`} onChange={(event) => setInput(event.target.value)} onKeyDown={onKeyDown} />
-      <div className={styles.composerFoot}>
-        <small>{blockedReason ?? "Saying yes here never approves anything. Approvals happen in Needs you."}</small>
-        <button type="submit" aria-label="Send" disabled={streaming || !input.trim() || Boolean(blockedReason)}>{streaming ? <Loader2 size={18} className="animate-spin" aria-hidden="true" /> : <ArrowUp size={18} aria-hidden="true" />}</button>
-      </div>
-    </form>
+    <details className={styles.history}>
+      <summary>Earlier conversations</summary>
+      {historyState === "loading" ? <><p role="status">Loading conversations…</p><StSkeleton label="Loading conversations" /></>
+        : historyState === "unavailable" ? <StNotice>Earlier conversations can&apos;t be read right now. New ones may not be saved. <StTextButton onClick={() => void loadConversations()}>Try again</StTextButton></StNotice>
+        : historyState === "off" ? <StNotice>Ask Strelva isn&apos;t on for this business yet.</StNotice>
+        : conversations.length === 0 ? <StEmpty>Nothing yet. Conversations you start here are kept for this business.</StEmpty>
+        : <StRows>{conversations.map(item => <StRow key={item.id} selected={item.id === conversationId} title={<StTextButton disabled={streaming || opening === item.id} onClick={() => void openConversation(item.id)}>{item.title}</StTextButton>} detail={item.mine ? undefined : "Someone else's conversation"} end={<StMono>{new Date(item.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</StMono>} />)}</StRows>}
+    </details>
+    <p className={styles.note}>{blockedReason ?? "Saying yes here never approves anything. Approvals happen in Needs you."}</p>
+    {compact ? composer : <StComposerDock>{composer}</StComposerDock>}
   </section>;
 }
 
@@ -239,11 +229,11 @@ function TurnReceipt({ result }: { result: AskTurnResult }) {
   const lines = receiptLines(result);
   const headline = lines.length ? null : resultHeadline(result);
   if (!lines.length && !headline) return null;
-  return <div className={styles.receipt} aria-label="What Strelva did">
-    {headline ? <p>{headline}</p> : <ul>{lines.map((line) => <li key={line.key} data-tone={line.tone}>
-      <span>{line.text}</span>
-      {line.decideHref ? <a href={line.decideHref}>Open Needs you</a> : null}
-      {line.ref ? <small>Ref {line.ref}</small> : null}
-    </li>)}</ul>}
-  </div>;
+  return <StSurface label="What Strelva did">
+    {headline ? <p className={styles.receiptHeadline}>{headline}</p> : <StRows>{lines.map(line => <StRow key={line.key}
+      title={<StState kind={line.tone === "failed" ? "down" : line.tone === "waiting" ? "need" : "live"}>{line.text}</StState>}
+      detail={line.ref ? <StMono>Ref {line.ref}</StMono> : undefined}
+      end={line.decideHref ? <StTextButton tone="accent" href={line.decideHref}>Open Needs you</StTextButton> : undefined}
+    />)}</StRows>}
+  </StSurface>;
 }

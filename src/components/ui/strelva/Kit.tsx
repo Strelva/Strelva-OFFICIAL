@@ -54,7 +54,7 @@ export function StField({ label, children, hint }: { label: ReactNode; children:
   return <div className={styles.field}><label className={styles.fieldLabel}>{label}{children}</label>{hint ? <p className={styles.fieldHint}>{hint}</p> : null}</div>;
 }
 
-export function StHead({ crumb, title, meta, beacon, actions, titleId, headingRef }: {
+export function StHead({ crumb, title, meta, beacon, actions, titleId, headingRef, titleRef }: {
   crumb?: { label: string; href?: string; onClick?: () => void };
   title: ReactNode;
   meta?: ReactNode;
@@ -63,6 +63,8 @@ export function StHead({ crumb, title, meta, beacon, actions, titleId, headingRe
   titleId?: string;
   /** Stable focus destination when a saved state read replaces its controls. */
   headingRef?: Ref<HTMLHeadingElement>;
+  /** Alias kept for owner surfaces. */
+  titleRef?: Ref<HTMLHeadingElement>;
 }) {
   const crumbNode = crumb ? (crumb.href
     ? <Link className={styles.crumb} href={crumb.href} onClick={crumb.onClick}><ChevronLeft size={14} aria-hidden="true" />{crumb.label}</Link>
@@ -71,7 +73,7 @@ export function StHead({ crumb, title, meta, beacon, actions, titleId, headingRe
   return <header className={styles.headRow}>
     <div className={styles.head}>
       {crumbNode}
-      <div className={styles.titleRow}>{beacon ? <StBeacon kind={beacon} /> : null}<h1 ref={headingRef} tabIndex={headingRef ? -1 : undefined} id={titleId} className={styles.title}>{title}</h1></div>
+      <div className={styles.titleRow}>{beacon ? <StBeacon kind={beacon} /> : null}<h1 ref={headingRef ?? titleRef} tabIndex={headingRef || titleRef ? -1 : undefined} id={titleId} className={styles.title}>{title}</h1></div>
       {meta ? <p className={styles.meta}>{meta}</p> : null}
     </div>
     {actions ? <div className={styles.headActions}>{actions}</div> : null}
@@ -131,7 +133,10 @@ interface RowProps {
 export function StRow({ kind, title, detail, lead, value, end, href, onClick, selected, align = "center", stackOnPhone = true, children }: RowProps) {
   const body = <>{lead}<span className={styles.rowMain}>{kind ? <span className={styles.rowKind}>{kind}</span> : null}<span className={styles.rowTitle}>{title}</span>{detail ? <span className={styles.rowDetail}>{detail}</span> : null}{children}</span>{value ? <span className={styles.rowValue}>{value}</span> : null}{end ? <span className={styles.rowEnd}>{end}</span> : null}</>;
   const shared = { className: styles.row, "data-selected": selected || undefined, "data-align": align, "data-stack": stackOnPhone || undefined } as const;
-  if (href) return <li><Link {...shared} href={href} aria-current={selected ? "true" : undefined}>{body}</Link></li>;
+  if (href) return <li><Link {...shared} href={href} aria-current={selected ? "true" : undefined} onClick={onClick ? event => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    event.preventDefault(); onClick();
+  } : undefined}>{body}</Link></li>;
   if (onClick) return <li><button {...shared} type="button" onClick={onClick} aria-pressed={selected || undefined}>{body}</button></li>;
   return <li {...shared}>{body}</li>;
 }
@@ -232,7 +237,7 @@ const HOLD_MS = 800;
  * with pointer, Space or Enter; Command/Ctrl + Enter while focused accepts at
  * once. Reduced motion keeps the hold, without the moving fill.
  */
-export function StHold({ label, onAccept, disabled, block, hint = "⌘ Enter" }: { label: string; onAccept: () => void; disabled?: boolean; block?: boolean; hint?: string }) {
+export function StHold({ label, onAccept, disabled, block, hint = "⌘ Enter", "aria-label": ariaLabel }: { "aria-label"?: string; label: string; onAccept: () => void; disabled?: boolean; block?: boolean; hint?: string }) {
   const [progress, setProgress] = useState(0);
   const frame = useRef<number | null>(null);
   const start = useRef<number | null>(null);
@@ -265,7 +270,7 @@ export function StHold({ label, onAccept, disabled, block, hint = "⌘ Enter" }:
   useEffect(() => () => { if (frame.current) cancelAnimationFrame(frame.current); }, []);
   useLayoutEffect(() => { accept.current = onAccept; blocked.current = disabled; }, [onAccept, disabled]);
 
-  return <button type="button" className={styles.hold} data-block={block || undefined} disabled={disabled} aria-label={label} aria-describedby={hintId}
+  return <button type="button" className={styles.hold} data-block={block || undefined} disabled={disabled} aria-label={ariaLabel ?? label} aria-describedby={hintId}
     style={{ "--hold-progress": disabled ? 0 : progress } as CSSProperties}
     onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); begin(); }}
     onPointerUp={stop} onPointerCancel={stop} onPointerLeave={stop}
@@ -309,10 +314,12 @@ export function StSkeleton({ width = "100%", label = "Loading" }: { width?: stri
 /* ---------- Composer ---------- */
 
 /** The floating Ask Strelva bar. Visual only: the caller owns submission and authority. */
-export function StComposerBar({ scope, placeholder, value, onChange, onSubmit, disabled, inputLabel = "Ask Strelva" }: { scope?: string; placeholder: string; value: string; onChange: (value: string) => void; onSubmit: () => void; disabled?: boolean; inputLabel?: string }) {
-  return <form className={styles.composer} onSubmit={event => { event.preventDefault(); if (value.trim()) onSubmit(); }}>
-    {scope ? <span className={styles.composerScope}><StBeacon kind="live" />{scope}</span> : null}
-    <input className={styles.composerInput} aria-label={inputLabel} placeholder={placeholder} value={value} onChange={event => onChange(event.target.value)} disabled={disabled} />
+export function StComposerBar({ scope, placeholder, value, onChange, onSubmit, disabled, inputLabel = "Ask Strelva", inputRef, maxLength, multiline, textareaRef }: { scope?: string; placeholder: string; value: string; onChange: (value: string) => void; onSubmit: () => void; disabled?: boolean; inputLabel?: string; inputRef?: Ref<HTMLInputElement>; maxLength?: number; multiline?: boolean; textareaRef?: Ref<HTMLTextAreaElement> }) {
+  return <form className={styles.composer} onSubmit={event => { event.preventDefault(); if (!disabled && value.trim()) onSubmit(); }}>
+    {scope ? <span className={styles.composerScope}>{scope}</span> : null}
+    {multiline ? <textarea ref={textareaRef} rows={1} maxLength={maxLength} className={styles.composerInput} aria-label={inputLabel} placeholder={placeholder} value={value} onChange={event => onChange(event.target.value)} disabled={disabled} onKeyDown={event => {
+      if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
+    }} /> : <input ref={inputRef} maxLength={maxLength} className={styles.composerInput} aria-label={inputLabel} placeholder={placeholder} value={value} onChange={event => onChange(event.target.value)} disabled={disabled} />}
     <button className={styles.composerSend} type="submit" aria-label="Send" disabled={disabled || !value.trim()}><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg></button>
   </form>;
 }

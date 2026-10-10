@@ -9,6 +9,9 @@ export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
   const focusControl = useRef<HTMLButtonElement>(null);
   const [who, setWho] = useState<"handles" | "after" | "ask">("ask");
   const [ask, setAsk] = useState("");
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [accepted, setAccepted] = useState(false);
   const actionRef = useRef<HTMLButtonElement>(null);
   return <div data-dashboard data-workspace-theme="linen" data-workspace-mode={mode} style={{ minHeight: "100dvh", background: "radial-gradient(circle at 1px 1px, var(--st-dot) 1px, transparent 1.4px) 0 0 / 24px 24px, var(--st-canvas)", fontFamily: "var(--font-workspace), system-ui, sans-serif" }}>
@@ -37,7 +40,7 @@ export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
       <StSection title="A change, and the yes">
         <StLedger path="attymooney.com/fees" count="2 lines" lines={[{ sign: "-", text: "Half-day: [2026 fee]" }, { sign: "+", text: "Half-day: [2027 fee]" }]} />
         <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
-          <StHold label={accepted ? "Published" : "Hold to publish"} onAccept={() => setAccepted(true)} />
+          <StHold aria-label="Publish the fictional fees change" label={accepted ? "Published" : "Hold to publish"} onAccept={() => setAccepted(true)} />
           <StTextButton>Not yet</StTextButton>
           {accepted ? <StToast onUndo={() => setAccepted(false)}>Published · attymooney.com/fees</StToast> : null}
         </div>
@@ -46,6 +49,12 @@ export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
       <StSection title="Fields and consequences" action={<StTextButton href="/preview/strelva/entry">Open entry specimen</StTextButton>}><StSplit aside={<StNotice action={<StPill variant="soft">Review</StPill>}>A change shows where it will go before you save.</StNotice>}><StField label="Business name" hint="The same fact wherever it is used"><input defaultValue="The Mooney Firm" /></StField><StRows><StRow title="Hours" value={<StMono>9 AM – 5 PM</StMono>} end={<StMono>in 4 places</StMono>} /></StRows></StSplit></StSection>
       <StSection title="Who decides" meta="only stricter than Strelva’s default">
         <StSegmented label="Fixing a broken link" value={who} onChange={setWho} options={[{ value: "handles", label: "Strelva handles it" }, { value: "after", label: "Tell me after" }, { value: "ask", label: "Ask me first" }]} disabledValues={["handles"]} disabledReason="Looser than Strelva allows for this kind" />
+      </StSection>
+      <StSection title="Composer states" meta="Scoped context is not a Live claim">
+        <StComposerBar scope="The Mooney Firm" inputRef={inputRef} maxLength={3000} placeholder="Ask Strelva to change something" value={ask} onChange={setAsk} onSubmit={() => setAsk("")} />
+        <StComposerBar multiline textareaRef={textareaRef} maxLength={20000} placeholder="Enter sends · Shift + Enter adds a line" value={ask} onChange={setAsk} onSubmit={() => setAsk("")} />
+        <StComposerBar disabled placeholder="Shared for review · ask the owner to make changes" value="" onChange={setAsk} onSubmit={() => {}} />
+        <StTextButton ref={undefined} onClick={() => inputRef.current?.focus()}>Focus the composer</StTextButton>
       </StSection>
       <StSection title="Objects, notices, empty, loading">
         <StPage><StLabel>Native page inside a System · shares its outer insets</StLabel><StSurface label="Embedded document">The object keeps the whole column, including on a phone.</StSurface></StPage>
