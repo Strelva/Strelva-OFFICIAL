@@ -1,22 +1,17 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/Button";
+import { StEmpty, StMono, StNotice, StPill, StRow, StRows, StSection, StState, StSurface, StTextButton, StToast } from "@/components/ui/strelva/Kit";
 import { SelectInput, TextInput } from "@/components/ui/TextInput";
-import { Chip } from "../console";
 import {
   PRIORITY_LABELS, QUEUE_KIND_LABELS,
-  type OperatorQueue, type QueueBusiness, type QueueItem, type QueuePriority,
+  type OperatorQueue, type QueueBusiness, type QueueItem,
 } from "@/platform/operator-queue/contracts";
 import { prefillMinutes } from "@/platform/operator-queue/rules";
 import { closeQueueItemAction, markQueueItemAction, resolveQueueDraftsAction, type QueueActionResult } from "./actions";
 import { QueueEventDetail, hasQueueEventDetail } from "@/components/dashboard/QueueEventDetail";
 import { QueueSourceActions } from "./QueueSourceActions";
-
-type Tone = "good" | "warn" | "crit" | "neutral" | "accent";
-const PRIORITY_TONE: Record<QueuePriority, Tone> = { P1: "crit", P2: "warn", P3: "accent", P4: "neutral" };
 
 function businessName(business: QueueBusiness) {
   if (business.kind === "strelva") return "Strelva";
@@ -120,58 +115,46 @@ function Row({ item, me, operators, now, onResult, actionsEnabled, businessLeads
   }
 
   return (
-    <li className="px-[18px] py-3.5">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open}
-          className="min-w-0 flex-1 rounded-md text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
-          <span className="flex flex-wrap items-center gap-1.5">
-            <Chip tone={PRIORITY_TONE[item.priority]}>{item.priority} · {PRIORITY_LABELS[item.priority]}</Chip>
-            <Chip>{QUEUE_KIND_LABELS[item.kind]}</Chip>
-            {item.pinned && <Chip tone="accent">Pinned</Chip>}
-            {late && <Chip tone="crit">Late</Chip>}
-          </span>
-          <span className="mt-1.5 block text-[13.5px] font-semibold leading-snug text-warm-white">{item.title}</span>
-          <span className="mt-1 block text-[12px] leading-5 text-gray-muted">
-            {businessName(item.business)}
-            {item.business.kind === "tenant" && <span className="text-gray-faint"> · not yet a workspace</span>}
-            {item.system && <> · {item.system.label}</>}
-            {" · "}{age(item.ageMs)} old
-            {leadCount && <> · {leadCount.lastSevenDays === null ? "Lead count unavailable" : `${leadCount.lastSevenDays} leads in 7 days`}</>}
-            {due && <> · <span className={late ? "text-critical" : undefined}>{due}</span></>}
-          </span>
-          {(item.priorityReason || reach || item.assignee) && (
-            <span className="mt-1 block text-[12px] leading-5 text-gray-faint">
-              {[item.priorityReason, reach, item.assignee ? `Taken by ${mine ? "you" : item.assignee.email ?? "an operator"}` : null].filter(Boolean).join(" · ")}
-            </span>
-          )}
-        </button>
-        <div className="flex shrink-0 flex-wrap gap-1.5">
-          <Link href={item.href} className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full px-3 py-1.5 text-[12px] font-medium text-gray-muted transition-colors hover:bg-gray-bg hover:text-warm-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
-            Open
-          </Link>
-          {mine
-            ? <Button size="lg" variant="ghost" disabled={pending} onClick={() => mark("release")}>Release</Button>
-            : <Button size="lg" variant="secondary" disabled={pending} onClick={() => mark("take")}>Take</Button>}
-          <Button size="lg" variant="primary" disabled={pending} onClick={openClose}>Close</Button>
-        </div>
-      </div>
-
+    <StRow align="start"
+      lead={<StMono tone={item.priority === "P1" ? "critical" : item.priority === "P2" ? "need" : undefined}>{item.priority}</StMono>}
+      kind={businessName(item.business)}
+      title={<StTextButton tone="text" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-label={`Review ${item.title}`}>{item.title}</StTextButton>}
+      detail={<>
+        <span>{QUEUE_KIND_LABELS[item.kind]} · <StMono>{age(item.ageMs)}</StMono></span>
+        {item.business.kind === "tenant" && <> · Not yet a workspace</>}
+        {item.system && <> · {item.system.label}</>}
+        {due && <> · {due}</>}
+        {item.pinned && <> · Pinned</>}
+        {late && <> · Late</>}
+        <span className="block">{[item.priorityReason, reach].filter(Boolean).join(" · ")}</span>
+      </>}
+      end={<div className="flex flex-wrap items-center gap-4">
+        <StState kind={item.move === "owner" ? "draft" : item.priority === "P1" ? "down" : "need"}>
+          {item.assignee ? mine ? "You" : item.assignee.email ?? "Operator" : item.move === "owner" ? "Owner" : item.move === "provider" ? "Provider" : "Unassigned"}
+        </StState>
+        {mine
+          ? <StTextButton disabled={pending} onClick={() => mark("release")}>Release</StTextButton>
+          : <StTextButton disabled={pending} onClick={() => mark("take")}>Take</StTextButton>}
+        <StTextButton href={item.href}>Open</StTextButton>
+      </div>}>
       {open && (
-        <div className="mt-3 rounded-xl border border-glass-border bg-white/[0.02] p-3">
+        <div className="mt-3 space-y-3">
+          <p className="text-[13px] text-gray-muted">{PRIORITY_LABELS[item.priority]}{leadCount && <> · {leadCount.lastSevenDays === null ? "Lead count unavailable" : `${leadCount.lastSevenDays} leads in 7 days`}</>}</p>
+          <StTextButton disabled={pending} onClick={openClose}>Close</StTextButton>
           {actionsEnabled && <QueueSourceActions item={item} onResult={onResult} />}
           {actionsEnabled && item.kind === "draft_review" && item.review && hasQueueEventDetail(item.review) && <QueueEventDetail event={item.review} />}
           {actionsEnabled && item.kind === "draft_review" && item.move === "strelva" && <div className="mb-3 flex flex-wrap gap-2">
-            {(["approve", "skip", "escalate"] as const).map((action) => <Button key={action} size="lg" disabled={pending} onClick={() => start(async () => {
+            {(["approve", "skip", "escalate"] as const).map((action) => <StPill variant="soft" key={action} disabled={pending} onClick={() => start(async () => {
               const result = await resolveQueueDraftsAction({ keys: [item.key], action });
               onResult(result); router.refresh();
-            })}>{action === "approve" ? "Approve" : action === "skip" ? "Skip" : "Ask the owner"}</Button>)}
+            })}>{action === "approve" ? "Approve" : action === "skip" ? "Skip" : "Ask the owner"}</StPill>)}
           </div>}
           <div className="flex flex-wrap gap-1.5">
-            <Button size="lg" variant="ghost" disabled={pending} onClick={() => mark(item.pinned ? "unpin" : "pin")}>{item.pinned ? "Unpin" : "Pin for a day"}</Button>
-            <Button size="lg" variant="ghost" disabled={pending || item.priority === "P1"} title={item.priority === "P1" ? "Harm-now items can't be snoozed" : undefined} onClick={() => setPanel("snooze")}>Snooze</Button>
-            <Button size="lg" variant="ghost" disabled={pending} onClick={() => setPanel("note")}>Add note</Button>
-            {operators.length > 1 && <Button size="lg" variant="ghost" disabled={pending} onClick={() => setPanel("handoff")}>Hand off</Button>}
-            {item.move === "owner" && <Button size="lg" variant="ghost" disabled={pending} onClick={() => mark("owner_told", { via: "email" })}>Owner told by email</Button>}
+            <StPill variant="soft" disabled={pending} onClick={() => mark(item.pinned ? "unpin" : "pin")}>{item.pinned ? "Unpin" : "Pin for a day"}</StPill>
+            <StPill variant="soft" disabled={pending || item.priority === "P1"} title={item.priority === "P1" ? "Harm-now items can't be snoozed" : undefined} onClick={() => setPanel("snooze")}>Snooze</StPill>
+            <StPill variant="soft" disabled={pending} onClick={() => setPanel("note")}>Add note</StPill>
+            {operators.length > 1 && <StPill variant="soft" disabled={pending} onClick={() => setPanel("handoff")}>Hand off</StPill>}
+            {item.move === "owner" && <StPill variant="soft" disabled={pending} onClick={() => mark("owner_told", { via: "email" })}>Owner told by email</StPill>}
           </div>
           {item.notes.length > 0 && (
             <ul className="mt-3 space-y-1.5 text-[12px] leading-5 text-gray-muted">
@@ -185,7 +168,7 @@ function Row({ item, me, operators, now, onResult, actionsEnabled, businessLeads
               <div className="min-w-[200px] flex-1">
                 <TextInput label="Reason" value={text} onChange={(event) => setText(event.target.value)} maxLength={280} required />
               </div>
-              <Button size="lg" type="submit" disabled={pending || !text.trim()}>Snooze</Button>
+              <StPill variant="soft" type="submit" disabled={pending || !text.trim()}>Snooze</StPill>
             </form>
           )}
           {panel === "note" && (
@@ -193,7 +176,7 @@ function Row({ item, me, operators, now, onResult, actionsEnabled, businessLeads
               <div className="min-w-[200px] flex-1">
                 <TextInput label="Note" value={text} onChange={(event) => setText(event.target.value)} maxLength={1000} required />
               </div>
-              <Button size="lg" type="submit" disabled={pending || !text.trim()}>Add note</Button>
+              <StPill variant="soft" type="submit" disabled={pending || !text.trim()}>Add note</StPill>
             </form>
           )}
           {panel === "handoff" && (
@@ -202,14 +185,14 @@ function Row({ item, me, operators, now, onResult, actionsEnabled, businessLeads
                 <SelectInput label="Hand to" value={handTo} onChange={(event) => setHandTo(event.target.value)} required
                   options={[{ value: "", label: "Choose an operator" }, ...operators.filter((operator) => operator.userId !== me).map((operator) => ({ value: operator.userId, label: operator.email }))]} />
               </div>
-              <Button size="lg" type="submit" disabled={pending || !handTo}>Hand off</Button>
+              <StPill variant="soft" type="submit" disabled={pending || !handTo}>Hand off</StPill>
             </form>
           )}
         </div>
       )}
 
       {panel === "close" && (
-        <form onSubmit={submitClose} className="mt-3 rounded-xl border border-accent/30 bg-accent-dim/40 p-3" aria-label={`Close ${item.title}`}>
+        <StSurface label={`Close ${item.title}`}><form onSubmit={submitClose} className="space-y-3" aria-label={`Close ${item.title}`}>
           <div className="flex flex-wrap items-end gap-2">
             <SelectInput label="Outcome" value={closeState} onChange={(event) => setCloseState(event.target.value as "done" | "dismissed")}
               options={actionsEnabled && item.move === "owner" ? [{ value: "dismissed", label: "Stop chasing" }] : [{ value: "done", label: "Done" }, { value: "dismissed", label: "Dismissed" }]} />
@@ -226,17 +209,17 @@ function Row({ item, me, operators, now, onResult, actionsEnabled, businessLeads
               Log minutes
             </label>
             <div className="ml-auto flex gap-1.5">
-              <Button size="lg" variant="ghost" disabled={pending} onClick={() => setPanel("none")}>Cancel</Button>
-              <Button size="lg" type="submit" loading={pending} disabled={pending}>Close item</Button>
+              <StPill variant="soft" disabled={pending} onClick={() => setPanel("none")}>Cancel</StPill>
+              <StPill variant="soft" type="submit" busy={pending} disabled={pending}>Close item</StPill>
             </div>
           </div>
-          <p id={`${item.key}-minutes-hint`} className="mt-2 text-[11.5px] leading-5 text-gray-faint">
+          <p id={`${item.key}-minutes-hint`} className="mt-2 text-[12px] leading-5 text-gray-faint">
             Prefilled from the time this item was open in front of you. Edit or skip it.
             {item.business.kind !== "workspace" && " This business is not yet a workspace, so minutes can't be logged against it."}
           </p>
-        </form>
+        </form></StSurface>
       )}
-    </li>
+    </StRow>
   );
 }
 
@@ -244,76 +227,46 @@ export function QueueBoard({ queue, me, actionsEnabled = false }: { queue: Opera
   const [message, setMessage] = useState<QueueActionResult | null>(null);
   const [showParked, setShowParked] = useState(false);
   const now = Date.parse(queue.generatedAt);
-  const urgent = queue.items.filter((item) => item.pinned || item.priority === "P1" || item.priority === "P2");
-  const rest = queue.items.filter((item) => !urgent.includes(item));
-  const groups = new Map<string, { name: string; items: QueueItem[] }>();
-  for (const item of rest) {
+  const readyNow = (item: QueueItem) => item.pinned || item.priority === "P1" || item.move === "strelva";
+  const current = queue.items.filter(readyNow);
+  const waiting = queue.items.filter((item) => !readyNow(item));
+  const groups = new Map<string, QueueItem[]>();
+  for (const item of queue.items) {
     const key = item.business.kind === "workspace" ? item.business.workspaceId : item.business.kind === "tenant" ? item.business.tenantId : "strelva";
-    const group = groups.get(key) ?? { name: businessName(item.business), items: [] };
-    group.items.push(item);
-    groups.set(key, group);
+    groups.set(key, [...(groups.get(key) ?? []), item]);
   }
   const rowProps = { me, operators: queue.operators, now, onResult: setMessage, actionsEnabled, businessLeads: queue.businessLeads };
 
   return (
-    <div className="space-y-4">
-      {!queue.complete && (
-        <div role="alert" className="rounded-2xl border border-warning/40 bg-warning/10 px-[18px] py-3 text-[13px] leading-5 text-warm-white">
-          <p className="font-semibold">This list is incomplete.</p>
-          <ul className="mt-1 text-gray-muted">
-            {queue.gaps.map((gap) => <li key={`${gap.kind}:${gap.source}`}>Couldn&apos;t read {gap.source.toLowerCase()} ({gap.reason}).</li>)}
-          </ul>
-        </div>
-      )}
-      {message && (
-        <p role="status" className={`rounded-xl px-[18px] py-2.5 text-[13px] ${message.ok ? "bg-positive/10 text-positive" : "bg-critical/10 text-critical"}`}>{message.message}</p>
-      )}
+    <div className="space-y-8">
+      {!queue.complete && <StNotice tone="need">
+        <p>This list is incomplete.</p>
+        <ul>{queue.gaps.map((gap) => <li key={`${gap.kind}:${gap.source}`}>Couldn&apos;t read {gap.source.toLowerCase()} ({gap.reason}).</li>)}</ul>
+      </StNotice>}
+      {message && (message.ok ? <StToast>{message.message}</StToast> : <StNotice tone="critical">{message.message}</StNotice>)}
 
-      <section className="rounded-2xl border border-glass-border bg-glass overflow-hidden">
-        <div className="flex items-center justify-between gap-3 px-[18px] pt-[15px] pb-3">
-          <h2 className="text-[13.5px] font-semibold tracking-[-0.01em] text-warm-white">Now</h2>
-          <span className="text-[11px] font-mono text-gray-faint tabular-nums">{urgent.length} harm now or waiting on Strelva</span>
-        </div>
-        {urgent.length === 0
-          ? <p className="px-[18px] pb-4 text-[13px] text-gray-muted">Nothing is harming a site or waiting on Strelva{queue.complete ? "." : " in the sources that could be read."}</p>
-          : <ul className="divide-y divide-glass-border border-t border-glass-border">{urgent.map((item) => <Row key={item.key} item={item} {...rowProps} />)}</ul>}
-      </section>
+      <StSection title="Now" meta={<StMono>{current.length}</StMono>}>
+        {current.length === 0
+          ? <StEmpty>Nothing is harming a site or waiting on Strelva{queue.complete ? "." : " in the sources that could be read."}</StEmpty>
+          : <StRows label="Now">{current.map((item) => <Row key={item.key} item={item} {...rowProps} />)}</StRows>}
+      </StSection>
 
-      {[...groups.entries()].map(([key, group]) => (
-        <section key={key} className="rounded-2xl border border-glass-border bg-glass overflow-hidden">
-          <div className="flex items-center justify-between gap-3 px-[18px] pt-[15px] pb-3">
-            <h2 className="text-[13.5px] font-semibold tracking-[-0.01em] text-warm-white">{group.name}</h2>
-            <span className="text-[11px] font-mono text-gray-faint tabular-nums">{group.items.length}</span>
-          </div>
-          {actionsEnabled && <BulkDraftReview items={group.items} onResult={setMessage} />}
-          <ul className="divide-y divide-glass-border border-t border-glass-border">{group.items.map((item) => <Row key={item.key} item={item} {...rowProps} />)}</ul>
-        </section>
-      ))}
+      <StSection title="Waiting on someone else" meta={<StMono>{waiting.length}</StMono>}>
+        {waiting.length === 0
+          ? <StEmpty>Nothing is waiting on an owner or provider{queue.complete ? "." : " in the sources that could be read."}</StEmpty>
+          : <StRows label="Waiting on someone else">{waiting.map((item) => <Row key={item.key} item={item} {...rowProps} />)}</StRows>}
+      </StSection>
 
-      {queue.parked.length > 0 && (
-        <section className="rounded-2xl border border-glass-border bg-glass overflow-hidden">
-          <button type="button" onClick={() => setShowParked((value) => !value)} aria-expanded={showParked}
-            className="flex w-full items-center justify-between gap-3 px-[18px] py-[15px] text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
-            <span className="text-[13.5px] font-semibold text-warm-white">Closed and snoozed</span>
-            <span className="text-[11px] font-mono text-gray-faint tabular-nums">{queue.parked.length}</span>
-          </button>
-          {showParked && (
-            <ul className="divide-y divide-glass-border border-t border-glass-border">
-              {queue.parked.map((item) => (
-                <li key={item.key} className="flex flex-col gap-2 px-[18px] py-3 sm:flex-row sm:items-center sm:justify-between">
-                  <span className="min-w-0 text-[12.5px] leading-5 text-gray-muted">
-                    <span className="text-warm-white">{item.title}</span> · {businessName(item.business)} ·{" "}
-                    {item.closedElsewhere ? `Closed by ${item.closedElsewhere.by}` : item.closed ? `${item.closed.state === "done" ? "Done" : "Dismissed"}${item.closed.reason ? `: ${item.closed.reason}` : ""}` : item.snoozed ? `Snoozed: ${item.snoozed.reason}` : ""}
-                  </span>
-                  {!item.closedElsewhere && (
-                    <ParkedAction item={item} onResult={setMessage} />
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
+      {actionsEnabled && [...groups.entries()].map(([key, items]) => <BulkDraftReview key={key} items={items} onResult={setMessage} />)}
+
+      <StSection title="Closed and snoozed" meta={<StMono>{queue.parked.length}</StMono>}
+        action={queue.parked.length ? <StTextButton onClick={() => setShowParked((value) => !value)} aria-expanded={showParked}>{showParked ? "Hide" : "Show"}</StTextButton> : undefined}>
+        {!queue.parked.length && <StEmpty>No closed or snoozed items.</StEmpty>}
+        {showParked && <StRows label="Closed and snoozed">{queue.parked.map((item) => <StRow key={item.key}
+          kind={businessName(item.business)} title={item.title}
+          detail={item.closedElsewhere ? `Closed by ${item.closedElsewhere.by}` : item.closed ? `${item.closed.state === "done" ? "Done" : "Dismissed"}${item.closed.reason ? `: ${item.closed.reason}` : ""}` : item.snoozed ? `Snoozed: ${item.snoozed.reason}` : ""}
+          end={!item.closedElsewhere ? <ParkedAction item={item} onResult={setMessage} /> : undefined} />)}</StRows>}
+      </StSection>
     </div>
   );
 }
@@ -326,17 +279,17 @@ function BulkDraftReview({ items, onResult }: { items: QueueItem[]; onResult: (r
   const [pending, start] = useTransition();
   const router = useRouter();
   if (drafts.length < 2) return null;
-  return <div className="border-t border-glass-border p-4">
-    <Button size="lg" variant="secondary" onClick={() => setOpen(!open)} aria-expanded={open}>Review {drafts.length} drafts together</Button>
+  return <div className="space-y-3">
+    <StPill variant="soft" onClick={() => setOpen(!open)} aria-expanded={open}>Review {drafts.length} drafts together</StPill>
     {open && <div className="mt-3 space-y-3">
       {drafts.map((item) => <div key={item.key} className="space-y-2">
         <label className="flex min-h-12 items-center gap-2 text-[13px] text-warm-white"><input type="checkbox" checked={selected.includes(item.key)} disabled={pending} onChange={(event) => setSelected((keys) => event.target.checked ? [...keys, item.key] : keys.filter((key) => key !== item.key))} />{item.title}</label>
         {item.review && <QueueEventDetail event={item.review} />}
       </div>)}
-      <Button size="lg" loading={pending} disabled={pending || !selected.length} onClick={() => start(async () => {
+      <StPill variant="soft" busy={pending} disabled={pending || !selected.length} onClick={() => start(async () => {
         const result = await resolveQueueDraftsAction({ keys: selected, action: "approve" }); onResult(result);
         setSelected((keys) => keys.filter((key) => !result.results.some((row) => row.key === key && row.changed))); router.refresh();
-      })}>Approve {selected.length} reviewed drafts</Button>
+      })}>Approve {selected.length} reviewed drafts</StPill>
     </div>}
   </div>;
 }
@@ -346,10 +299,10 @@ function ParkedAction({ item, onResult }: { item: QueueItem; onResult: (result: 
   const [pending, start] = useTransition();
   const action = item.closed ? "reopen" : "unsnooze";
   return (
-    <Button size="lg" variant="ghost" disabled={pending} onClick={() => start(async () => {
+    <StPill variant="soft" disabled={pending} onClick={() => start(async () => {
       const result = await markQueueItemAction({ commandId: newId(), key: item.key, action });
       onResult(result);
       if (result.ok) router.refresh();
-    })}>{item.closed ? "Reopen" : "Unsnooze"}</Button>
+    })}>{item.closed ? "Reopen" : "Unsnooze"}</StPill>
   );
 }

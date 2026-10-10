@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { StBeacon, StComposerBar, StComposerDock, StEmpty, StSignedPage, StField, StSplit, StHead, StHold, StKbd, StLabel, StLedger, StMono, StNotice, StPage, StPill, StRow, StRows, StSection, StSegmented, StSkeleton, StStamp, StState, StSteps, StSurface, StTable, StTextButton, StToast } from "@/components/ui/strelva/Kit";
+import { StBeacon, StComposerBar, StComposerDock, StEmpty, StInput, StGrid, StCell, StToggle, StSignedPage, StField, StSplit, StHead, StHold, StKbd, StLabel, StLedger, StMono, StNotice, StPage, StPill, StRow, StRows, StSection, StSegmented, StSkeleton, StStamp, StState, StSteps, StSurface, StTable, StTextButton, StToast } from "@/components/ui/strelva/Kit";
 
 /** Fictional content only. Every kit piece in its states, light and dark. */
 export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
@@ -55,6 +55,12 @@ export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
         <StComposerBar multiline textareaRef={textareaRef} maxLength={20000} placeholder="Enter sends · Shift + Enter adds a line" value={ask} onChange={setAsk} onSubmit={() => setAsk("")} />
         <StComposerBar disabled placeholder="Shared for review · ask the owner to make changes" value="" onChange={setAsk} onSubmit={() => {}} />
         <StTextButton ref={undefined} onClick={() => inputRef.current?.focus()}>Focus the composer</StTextButton>
+      </StSection>
+      <StSection title="Forms, switches and comparison">
+        <StInput label="Reason" hint="Fictional field, no changes are saved." placeholder="Why should this change?" />
+        <StToggle label="Owner emails" checked={false} disabled reason="Off globally during rollout" />
+        <StToggle label="Preview switch" checked={accepted} onChange={setAccepted} />
+        <StGrid label="Fictional site checks" columns={["Site", "State", "Checked"]}><tr><StCell heading label="Site">example.test</StCell><StCell label="State"><StState kind="live">Up</StState></StCell><StCell label="Checked"><StMono>2m ago</StMono></StCell></tr></StGrid>
       </StSection>
       <StSection title="Objects, notices, empty, loading">
         <StPage><StLabel>Native page inside a System · shares its outer insets</StLabel><StSurface label="Embedded document">The object keeps the whole column, including on a phone.</StSurface></StPage>

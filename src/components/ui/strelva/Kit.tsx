@@ -18,7 +18,7 @@
 import Link from "next/link";
 import { LogoMark } from "@/components/Logo";
 import { Check, ChevronLeft, Circle, Loader2, X } from "lucide-react";
-import { createContext, useContext, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type HTMLAttributeAnchorTarget, type ReactNode, type Ref } from "react";
+import { createContext, useContext, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type HTMLAttributeAnchorTarget, type InputHTMLAttributes, type ReactNode, type Ref } from "react";
 import styles from "./kit.module.css";
 
 type Tone = "need" | "critical" | "live" | "text";
@@ -179,7 +179,7 @@ export function StPillLink({ href, variant = "primary", size = "md", block, chil
   return <Link href={href} className={styles.pill} data-variant={variant} data-size={size} data-block={block || undefined}>{children}</Link>;
 }
 
-export function StTextButton({ tone, children, href, target, rel, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { ref?: Ref<HTMLButtonElement>; tone?: "accent" | "danger"; href?: string; target?: HTMLAttributeAnchorTarget; rel?: string }) {
+export function StTextButton({ tone, children, href, target, rel, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { ref?: Ref<HTMLButtonElement>; tone?: "accent" | "danger" | "text"; href?: string; target?: HTMLAttributeAnchorTarget; rel?: string }) {
   if (href) return <Link href={href} target={target} rel={rel} className={styles.textButton} data-tone={tone}>{children}</Link>;
   return <button type="button" {...rest} className={styles.textButton} data-tone={tone}>{children}</button>;
 }
@@ -326,4 +326,28 @@ export function StComposerBar({ scope, placeholder, value, onChange, onSubmit, d
 
 export function StComposerDock({ children }: { children: ReactNode }) {
   return <div className={styles.composerDock}>{children}</div>;
+}
+
+/* ---------- Forms and dense comparison ---------- */
+
+/** A named field with the same paper geometry as the rest of the kit. */
+export function StInput({ label, hint, id, ...props }: InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string }) {
+  const generated = useId();
+  const fieldId = id || generated;
+  return <div className={styles.input}><label htmlFor={fieldId}>{label}</label><input {...props} id={fieldId} className={styles.inputControl} aria-describedby={hint ? `${fieldId}-hint` : props["aria-describedby"]} />{hint ? <p id={`${fieldId}-hint`} className={styles.inputHint}>{hint}</p> : null}</div>;
+}
+
+/** A switch must always have a name and an explanation of any disabled state. */
+export function StToggle({ label, checked, onChange, disabled, reason }: { label: string; checked: boolean; onChange?: (checked: boolean) => void; disabled?: boolean; reason?: string }) {
+  const hintId = useId();
+  return <span className={styles.toggleWrap}><button type="button" className={styles.toggle} role="switch" aria-label={label} aria-checked={checked} aria-describedby={reason ? hintId : undefined} disabled={disabled || !onChange} onClick={() => onChange?.(!checked)} /><span className="sr-only" id={hintId}>{reason}</span></span>;
+}
+
+/** Open comparison table. On a phone each row keeps its column names. */
+export function StGrid({ label, columns, children }: { label: string; columns: readonly string[]; children: ReactNode }) {
+  return <table className={styles.grid}><caption className="sr-only">{label}</caption><thead><tr>{columns.map(column => <th scope="col" key={column}>{column}</th>)}</tr></thead><tbody>{children}</tbody></table>;
+}
+export function StCell({ label, children, heading = false }: { label: string; children: ReactNode; heading?: boolean }) {
+  const As = heading ? "th" : "td";
+  return <As scope={heading ? "row" : undefined} data-label={label}>{children}</As>;
 }

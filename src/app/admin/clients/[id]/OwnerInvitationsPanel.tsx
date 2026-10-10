@@ -1,9 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Panel } from "@/app/admin/console";
-import { Button } from "@/components/ui/Button";
-import { TextInput } from "@/components/ui/TextInput";
+import { StEmpty, StInput, StNotice, StPill, StRow, StRows, StSection, StState, StTextButton } from "@/components/ui/strelva/Kit";
 import type { OwnerInvitationsLoad } from "@/platform/owner-entry/operator-invitations";
 import type { OwnerInvitationResult } from "@/platform/workspaces/business-ownership";
 
@@ -77,36 +75,27 @@ export function OwnerInvitationsPanel({ tenantId, load, request = fetch }: { ten
     finally { setBusy(false); }
   }
 
-  return (
-    <Panel title="Business owner" bodyClassName="p-6 space-y-4">
-      {load.kind === "unconverted" ? <p className="text-sm text-gray-muted">Convert this site to a business before inviting its owner.</p>
-        : load.kind === "denied" ? <p className="text-sm text-gray-muted">An active Strelva operator with business admin membership is required.</p>
-        : load.kind === "unavailable" ? <p role="alert" className="text-sm text-critical">Owner invitation state could not be read. Refresh to try again.</p>
-        : state?.hasOwner ? <p className="text-sm text-gray-muted">This business already has an owner.</p>
-        : state?.exited ? <p className="text-sm text-gray-muted">This business has left Strelva. New invitations are closed.</p>
-        : state && <>
-          {state.pending.length > 0 ? <ul className="space-y-4">
-            {state.pending.map((invitation) => <li key={invitation.invitationId} className="flex flex-wrap items-center justify-between gap-4">
-              <p className="min-w-0 break-words text-sm text-gray-muted">
-                Waiting for {invitation.recipientEmail}. Expires {new Date(invitation.expiresAt).toLocaleDateString()}.
-              </p>
-              <Button type="button" variant="danger" disabled={busy} onClick={() => void submit({ action: "revoke", invitationId: invitation.invitationId })}>Revoke invitation</Button>
-            </li>)}
-          </ul> : <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void submit({ action: "invite" }); }}>
-            <TextInput type="email" label="Owner email" value={recipient} onChange={(event) => { setRecipient(event.target.value); setApprovalId(""); setMessage(null); }} required disabled={busy} />
-            {recipientIsTrusted ? <p className="text-sm text-gray-muted">This matches the business&apos;s trusted owner address. Preparing the link records your approval after a sign-in from the last 10 minutes.</p> : <>
-              <TextInput label="Approval ID from a different operator" value={approvalId} onChange={(event) => setApprovalId(event.target.value)} disabled={busy} autoComplete="off" helperText="A second active operator can record approval for this exact address below. Use that ID while signed in as the issuing operator." />
-              <Button type="button" variant="secondary" disabled={busy || !recipient.trim()} onClick={() => void recordApproval()}>Record approval as this operator</Button>
+  return <StSection title="Owner">
+    {load.kind === "unconverted" ? <StEmpty>Convert this site to a business before inviting its owner.</StEmpty>
+      : load.kind === "denied" ? <StEmpty>An active Strelva operator with business admin membership is required.</StEmpty>
+      : load.kind === "unavailable" ? <StNotice tone="critical">Owner invitation state could not be read. Refresh to try again.</StNotice>
+      : state?.hasOwner ? <StEmpty>This business already has an owner.</StEmpty>
+      : state?.exited ? <StEmpty>This business has left Strelva. New invitations are closed.</StEmpty>
+      : state && <>
+        {state.pending.length > 0 ? <StRows label="Pending owner invitations">{state.pending.map(invitation => <StRow key={invitation.invitationId} title={invitation.recipientEmail} detail={<>Waiting for the owner. Expires {new Date(invitation.expiresAt).toLocaleDateString()}.</>} end={<StTextButton tone="danger" disabled={busy} onClick={() => void submit({ action: "revoke", invitationId: invitation.invitationId })}>Revoke invitation</StTextButton>} />)}</StRows>
+          : <form className="space-y-4" onSubmit={event => { event.preventDefault(); void submit({ action: "invite" }); }}>
+            <StInput type="email" label="Owner email" value={recipient} onChange={event => { setRecipient(event.target.value); setApprovalId(""); setMessage(null); }} required disabled={busy} />
+            {recipientIsTrusted ? <StNotice>This matches the business&apos;s trusted owner address. Preparing the link records your approval after a sign-in from the last 10 minutes.</StNotice> : <>
+              <StInput label="Approval ID from a different operator" value={approvalId} onChange={event => setApprovalId(event.target.value)} disabled={busy} autoComplete="off" hint="A second active operator can record approval for this exact address below. Use that ID while signed in as the issuing operator." />
+              <StTextButton disabled={busy || !recipient.trim()} onClick={() => void recordApproval()}>Record approval as this operator</StTextButton>
             </>}
-            <div className="flex flex-wrap gap-4">
-              <Button type="submit" disabled={busy || !recipient.trim() || (!recipientIsTrusted && !approvalId.trim())} loading={busy}>Prepare invitation link</Button>
-            </div>
-            <p className="text-sm text-gray-muted">Email delivery remains disabled. The link appears only in this authenticated response.</p>
+            <StPill type="submit" disabled={busy || !recipient.trim() || (!recipientIsTrusted && !approvalId.trim())} busy={busy}>Prepare invitation link</StPill>
           </form>}
-        </>}
-      {message && <p role="status" className="text-sm text-gray-muted">{message}</p>}
-      {acceptUrl && <TextInput label="Invitation link — keep private" value={acceptUrl} readOnly helperText="Available only now. Revoke and prepare a new invitation if the link is lost." onFocus={(event) => event.target.select()} />}
-      {error && <p role="alert" className="text-sm text-critical">{error}</p>}
-    </Panel>
-  );
+      </>}
+    <StState kind="draft">Owner emails off globally during rollout</StState>
+    <StNotice>Email delivery remains disabled. The link appears only in this authenticated response.</StNotice>
+    {message && <div role="status"><StNotice>{message}</StNotice></div>}
+    {acceptUrl && <StInput label="Invitation link — keep private" value={acceptUrl} readOnly hint="Available only now. Revoke and prepare a new invitation if the link is lost." onFocus={event => event.target.select()} />}
+    {error && <StNotice tone="critical">{error}</StNotice>}
+  </StSection>;
 }

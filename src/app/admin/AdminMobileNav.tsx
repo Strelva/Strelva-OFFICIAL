@@ -12,8 +12,10 @@ export function AdminMobileNav({
   operatorName = "Operator",
   badges = {},
   moneyEnabled = false,
+  preview = false,
 }: {
   moneyEnabled?: boolean;
+  preview?: boolean;
   operatorName?: string;
   badges?: Record<string, number | undefined>;
 }) {
@@ -70,7 +72,7 @@ export function AdminMobileNav({
   return (
     <div className="md:hidden">
       <div className="sticky top-0 z-40 flex items-center justify-between border-b border-glass-border bg-surface-base px-4 py-2.5">
-        <RailBrand />
+        <RailBrand preview={preview} />
         <button
           ref={openButtonRef}
           type="button"
@@ -86,6 +88,8 @@ export function AdminMobileNav({
         <div className="fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" onClick={() => setOpen(false)} />
           <aside
+            data-workspace-theme="linen"
+            data-workspace-mode="dark"
             ref={drawerRef}
             role="dialog"
             aria-modal="true"
@@ -94,7 +98,7 @@ export function AdminMobileNav({
             onKeyDown={trapFocus}
           >
             <div className="mb-5 flex items-center justify-between">
-              <RailBrand />
+              <RailBrand preview={preview} />
               <button
                 ref={closeButtonRef}
                 type="button"
@@ -105,7 +109,7 @@ export function AdminMobileNav({
                 <X className="h-[18px] w-[18px]" strokeWidth={1.8} />
               </button>
             </div>
-            <NavList moneyEnabled={moneyEnabled} badges={badges} onNavigate={() => setOpen(false)} />
+            <NavList preview={preview} moneyEnabled={moneyEnabled} badges={badges} onNavigate={() => setOpen(false)} />
             <RailFooter operatorName={operatorName} />
           </aside>
         </div>
