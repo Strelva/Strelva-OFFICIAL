@@ -2,9 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/Button";
-import { TextInput } from "@/components/ui/TextInput";
-import { Chip } from "../console";
+import { StEmpty, StMono, StRow, StRows, StTextButton, StTextField } from "@/components/ui/strelva/Kit";
 import {
   BUSINESS_EFFORT_CATEGORY_LABELS, MAX_EFFORT_TEXT, type BusinessEffortEntry,
 } from "@/platform/business-effort/types";
@@ -18,7 +16,7 @@ function VoidControl({ entryId }: { entryId: string }) {
   const [pending, startTransition] = useTransition();
 
   if (!open) {
-    return <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(true)}>Void</Button>;
+    return <StTextButton onClick={() => setOpen(true)}>Void</StTextButton>;
   }
 
   function submit(event: FormEvent) {
@@ -36,7 +34,7 @@ function VoidControl({ entryId }: { entryId: string }) {
   return (
     <form onSubmit={submit} className="flex w-full flex-wrap items-end gap-2" aria-label="Void entry">
       <div className="min-w-[200px] flex-1">
-        <TextInput
+        <StTextField
           label="Reason for voiding"
           value={reason}
           maxLength={MAX_EFFORT_TEXT}
@@ -45,8 +43,8 @@ function VoidControl({ entryId }: { entryId: string }) {
           required
         />
       </div>
-      <Button type="submit" variant="danger" size="sm" loading={pending} disabled={!reason.trim() || pending}>Void entry</Button>
-      <Button type="button" variant="ghost" size="sm" onClick={() => { setOpen(false); setError(null); }} disabled={pending}>Cancel</Button>
+      <StTextButton type="submit" tone="danger" aria-busy={pending} disabled={!reason.trim() || pending}>Void entry</StTextButton>
+      <StTextButton onClick={() => { setOpen(false); setError(null); }} disabled={pending}>Cancel</StTextButton>
     </form>
   );
 }
@@ -55,33 +53,16 @@ function VoidControl({ entryId }: { entryId: string }) {
 export function EffortEntries({
   entries,
   businessNames,
+  readOnly = false,
 }: {
   entries: BusinessEffortEntry[];
   businessNames?: Record<string, string>;
+  readOnly?: boolean;
 }) {
-  if (entries.length === 0) {
-    return <p className="text-[12px] leading-5 text-gray-muted">No entries recorded yet.</p>;
-  }
-  return (
-    <ul className="divide-y divide-glass-border" aria-label="Recent human-minute entries">
-      {entries.map((entry) => (
-        <li key={entry.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
-          <span className={`font-mono text-[13px] tabular-nums ${entry.void ? "text-gray-faint line-through" : "text-warm-white"}`}>
-            {entry.minutes} min
-          </span>
-          <Chip>{BUSINESS_EFFORT_CATEGORY_LABELS[entry.category]}</Chip>
-          <span className="text-[12px] text-gray-muted">{entry.occurredOn}</span>
-          {businessNames && (
-            <span className="text-[12px] font-semibold text-warm-white">{businessNames[entry.businessId] ?? "Unlisted business"}</span>
-          )}
-          {entry.note && <span className="min-w-0 flex-1 break-words text-[12px] text-gray-muted">{entry.note}</span>}
-          {entry.void ? (
-            <span className="w-full text-[12px] text-gray-faint">Voided: {entry.void.reason}</span>
-          ) : (
-            <div className="ml-auto"><VoidControl entryId={entry.id} /></div>
-          )}
-        </li>
-      ))}
-    </ul>
-  );
+  if (entries.length === 0) return <StEmpty>No entries recorded yet.</StEmpty>;
+  return <StRows label="Recent human-minute entries">{entries.map(entry => <StRow key={entry.id}
+    title={businessNames ? businessNames[entry.businessId] ?? "Unlisted business" : BUSINESS_EFFORT_CATEGORY_LABELS[entry.category]}
+    kind={businessNames ? BUSINESS_EFFORT_CATEGORY_LABELS[entry.category] : undefined}
+    detail={<><StMono>{entry.occurredOn}</StMono>{entry.note ? ` · ${entry.note}` : ""}{entry.void ? <span className="block">Voided: {entry.void.reason}</span> : null}</>}
+    end={<><StMono>{entry.void ? <s>{entry.minutes} min</s> : `${entry.minutes} min`}</StMono>{!entry.void && !readOnly ? <VoidControl entryId={entry.id} /> : null}</>} />)}</StRows>;
 }

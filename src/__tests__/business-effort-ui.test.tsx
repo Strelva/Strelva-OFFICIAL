@@ -13,6 +13,9 @@ vi.mock("@/app/admin/work/effort-actions", () => ({
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mockRefresh }) }));
 
 import { BusinessEffortForSite, BusinessEffortPortfolio } from "@/app/admin/work/BusinessEffort";
+import { InternalWorkView } from "@/app/admin/work/WorkView";
+import WorkLoading from "@/app/admin/work/loading";
+import WorkError from "@/app/admin/work/error";
 import type { BusinessEffortLoad } from "@/app/admin/work/effort-data";
 import { readBusinessEffortOverview, type BusinessEffortStore } from "@/platform/business-effort";
 import type { BusinessEffortEntry, EffortBusiness } from "@/platform/business-effort/types";
@@ -184,6 +187,33 @@ describe("human minutes on Internal work", () => {
     await act(async () => { form.requestSubmit(); });
     expect(form.textContent).toContain("already saved differently");
     expect(mockVoid).toHaveBeenCalledWith({ entryId: "20000000-0000-4000-8000-000000000005", reason: "Wrong business" });
+  });
+});
+
+describe("internal work paper presentation", () => {
+  it("keeps preview records read only and never opens the live inbox", async () => {
+    const network = vi.spyOn(globalThis, "fetch");
+    try {
+      render(createElement(InternalWorkView, { effort: await readyLoad(), workspaceOpen: true, learningOpen: false, operationsHref: "/workspace/operations", learningHref: "/workspace/product-learning", preview: true }));
+      expect(container.querySelector("h1")?.textContent).toBe("Internal work");
+      expect(container.querySelector("form")).toBeNull();
+      expect(container.textContent).toContain("Preview only");
+      expect(container.querySelector('ul[aria-label="Human-minute summary"]')).not.toBeNull();
+      expect(container.querySelector('a[href="/workspace/operations"]')).not.toBeNull();
+      expect(network).not.toHaveBeenCalled();
+      expect(mockRecord).not.toHaveBeenCalled();
+      expect(mockVoid).not.toHaveBeenCalled();
+    } finally { network.mockRestore(); }
+  });
+  it("shows a named loading state and retries the error boundary", () => {
+    render(createElement(WorkLoading));
+    expect(container.textContent).toContain("Reading recorded work and human minutes");
+    expect(container.querySelector('[role="status"]')).not.toBeNull();
+    const reset = vi.fn();
+    render(createElement(WorkError, { reset }));
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("unconfirmed");
+    act(() => container.querySelector("button")!.click());
+    expect(reset).toHaveBeenCalledOnce();
   });
 });
 

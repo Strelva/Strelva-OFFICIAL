@@ -24,6 +24,7 @@ export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
           <StRow lead={<StBeacon kind="need" />} kind="Website change" title="Update the fees page for 2027" detail="2 lines change on attymooney.com/fees." end={<><StTextButton>Not yet</StTextButton><StPill>Review</StPill></>} />
         </StRows>
       </StSection>
+      <StSection title="Waiting for approval across businesses" meta={<StMono>[count] items · [count] businesses</StMono>} action={<StPill variant="soft">Review selected changes</StPill>}><StCopy muted>Section headings and controls wrap within the phone column.</StCopy></StSection>
       <StSection title="Systems" meta="not working first" action={<StTextButton>All Systems</StTextButton>}>
         <StRows label="Systems">
           <StRow href="#" title="North Coast form" detail="Stopped sending at 7:00" end={<><StState kind="down">Not working</StState><StMono tone="critical">2h</StMono></>} />

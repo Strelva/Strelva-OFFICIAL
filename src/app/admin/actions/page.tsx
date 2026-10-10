@@ -4,6 +4,8 @@ import { scanPortfolioOpportunities } from "./portfolio-opportunities";
 import { PortfolioActionsClient } from "./PortfolioActionsClient";
 import { PortfolioOpportunitiesClient } from "./PortfolioOpportunitiesClient";
 
+import { StHead, StPage } from "@/components/ui/strelva/Kit";
+
 export const dynamic = "force-dynamic";
 
 /**
@@ -27,9 +29,10 @@ export default async function PortfolioActionsPage() {
     getPortfolioActions(),
   ]);
   return (
-    <div className="space-y-8">
+    <StPage>
+      <StHead title="Portfolio actions" meta="Prepare changes and review approvals across clients." />
       <PortfolioOpportunitiesClient snapshot={opportunities} />
       <PortfolioActionsClient snapshot={snapshot} />
-    </div>
+    </StPage>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState, useTransition } from "react";
-import { Button } from "@/components/ui/Button";
+import { StCopy, StField, StMono, StTable, StTextButton } from "@/components/ui/strelva/Kit";
 import type { LadderRoute } from "@/platform/needs-you/contracts";
 import { ROUTE_WORDS } from "@/platform/needs-you/policy-words";
 import { STRELVA_REASONS, type PolicyKindView, type PolicyView } from "@/platform/needs-you/policy-model";
@@ -19,14 +19,13 @@ function routeLabel(route: LadderRoute): string {
   return route === "owner_decides" ? "Owner decides" : ROUTE_WORDS[route].label;
 }
 
-const selectClass = "w-full rounded-md bg-gray-bg border border-glass-border px-3 py-2 text-sm text-warm-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:opacity-50";
 
 /**
  * Strelva's layer for one business: per kind, Strelva's route (never below
  * the floor), with the owner's stricter setting and the route in force shown
  * beside it. The owner's layer is read only here.
  */
-export function OperatorPolicyEditor({ workspaceId, view: initial }: { workspaceId: string; view: PolicyView }) {
+export function OperatorPolicyEditor({ workspaceId, view: initial, readOnly = false }: { workspaceId: string; view: PolicyView; readOnly?: boolean }) {
   const [view, setView] = useState(initial);
   const [reason, setReason] = useState<(typeof STRELVA_REASONS)[number]>("strelva_default");
   const [notice, setNotice] = useState<{ kind: string; ok: boolean; text: string } | null>(null);
@@ -34,6 +33,7 @@ export function OperatorPolicyEditor({ workspaceId, view: initial }: { workspace
   const reasonId = useId();
 
   function save(item: PolicyKindView, route: LadderRoute | null) {
+    if (readOnly) return;
     setNotice(null);
     start(async () => {
       const change = route
@@ -45,49 +45,20 @@ export function OperatorPolicyEditor({ workspaceId, view: initial }: { workspace
     });
   }
 
-  return (
-    <div className="space-y-3">
-      <div className="max-w-sm px-[18px]">
-        <label htmlFor={reasonId} className="mb-1 block text-xs text-gray-muted">Reason recorded with each change</label>
-        <select id={reasonId} className={selectClass} value={reason} onChange={event => setReason(event.target.value as typeof reason)}>
-          {STRELVA_REASONS.map(value => <option key={value} value={value}>{REASON_WORDS[value]}</option>)}
-        </select>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full border-t border-glass-border text-left text-[12.5px]">
-          <caption className="sr-only">Strelva&apos;s route, the floor, the owner&apos;s setting and the route in force for each kind of change</caption>
-          <thead className="text-gray-faint">
-            <tr>
-              <th scope="col" className="px-[18px] py-2 font-medium">Kind</th>
-              <th scope="col" className="px-2 py-2 font-medium">Strelva&apos;s route</th>
-              <th scope="col" className="px-2 py-2 font-medium">Owner</th>
-              <th scope="col" className="px-[18px] py-2 font-medium">In force</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-glass-border">
-            {view.kinds.map(item => (
-              <tr key={item.kind} className="align-top">
-                <th scope="row" className="px-[18px] py-2.5 font-normal">
-                  <span className="block text-warm-white">{item.label}</span>
-                  <span className="block font-mono text-[11px] text-gray-faint">{item.kind} · floor {routeLabel(item.floor).toLowerCase()}</span>
-                  {notice?.kind === item.kind ? <span role="status" className={`mt-1 block text-[11.5px] ${notice.ok ? "text-positive" : "text-critical"}`}>{notice.text}</span> : null}
-                </th>
-                <td className="px-2 py-2.5">
-                  {item.fixed ? <span className="text-gray-muted">Always the owner&apos;s (fixed rule)</span> : <div className="flex flex-wrap items-center gap-2">
-                    <select aria-label={`Strelva's route for ${item.label}`} className={`${selectClass} min-w-[13rem] flex-1`} value={item.strelvaRoute} disabled={pending}
-                      onChange={event => save(item, event.target.value as LadderRoute)}>
-                      {item.strelvaChoices.map(route => <option key={route} value={route}>{routeLabel(route)}</option>)}
-                    </select>
-                    {!item.strelvaIsDefault ? <Button size="sm" variant="ghost" disabled={pending} onClick={() => save(item, null)} aria-label={`Reset Strelva's route for ${item.label} to the default`}>Reset</Button> : null}
-                  </div>}
-                </td>
-                <td className="whitespace-nowrap px-2 py-2.5 text-gray-muted">{item.ownerRoute ? routeLabel(item.ownerRoute) : "No setting"}</td>
-                <td className="px-[18px] py-2.5 text-warm-white">{routeLabel(item.route)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+  return <div className="space-y-6">
+    <StField label="Reason recorded with each change">
+      <select disabled={readOnly} id={reasonId} value={reason} onChange={event => setReason(event.target.value as typeof reason)}>
+        {STRELVA_REASONS.map(value => <option key={value} value={value}>{REASON_WORDS[value]}</option>)}
+      </select>
+    </StField>
+    <StCopy muted>Choices never fall below the fixed rule. The owner’s setting is read only here.</StCopy>
+    <StTable label="Strelva's route, the floor, the owner's setting and the route in force for each kind of change"
+      columns={[{ key: "kind", label: "Kind" }, { key: "strelva", label: "Strelva’s route" }, { key: "owner", label: "Owner" }, { key: "route", label: "In force" }]}
+      rows={view.kinds.map(item => ({ key: item.kind, cells: {
+        kind: <><span>{item.label}</span><div><StMono>{item.kind}</StMono></div><StCopy muted>Floor: {routeLabel(item.floor)}</StCopy>{notice?.kind === item.kind ? <span role={notice.ok ? "status" : "alert"}>{notice.text}</span> : null}</>,
+        strelva: item.fixed ? "Always the owner's (fixed rule)" : <div className="space-y-2"><StField label={`Strelva's route for ${item.label}`}><select value={item.strelvaRoute} disabled={pending || readOnly} onChange={event => save(item, event.target.value as LadderRoute)}>{item.strelvaChoices.map(route => <option key={route} value={route}>{routeLabel(route)}</option>)}</select></StField>{!item.strelvaIsDefault ? <StTextButton disabled={pending || readOnly} onClick={() => save(item, null)} aria-label={`Reset Strelva's route for ${item.label} to the default`}>Reset</StTextButton> : null}</div>,
+        owner: item.ownerRoute ? routeLabel(item.ownerRoute) : "No setting",
+        route: routeLabel(item.route),
+      } }))} />
+  </div>;
 }

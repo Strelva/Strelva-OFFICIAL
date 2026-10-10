@@ -6,6 +6,8 @@ import { getTenantSiteName } from "@/lib/tenant-display";
 import { AuditList, type AuditEventView } from "./AuditList";
 import { SiteAuditsBoard, type AuditRow } from "./SiteAuditsBoard";
 
+import { StHead, StPage, StSection } from "@/components/ui/strelva/Kit";
+
 export const dynamic = "force-dynamic";
 
 export default async function AuditPage() {
@@ -49,24 +51,9 @@ export default async function AuditPage() {
     tenant: e.tenant ?? "",
   }));
 
-  return (
-    <div className="max-w-6xl space-y-10">
-      <div>
-        <h1 className="font-display text-[26px] sm:text-[30px] font-medium tracking-[-0.02em] text-warm-white">Site audits</h1>
-        <p className="mt-1 text-sm text-gray-muted">
-          Run a health + SEO audit on any client&rsquo;s live site &mdash; grade, score, and what to fix first.
-        </p>
-      </div>
-
-      <SiteAuditsBoard initialRows={rows} />
-
-      <div className="space-y-4">
-        <div>
-          <h2 className="font-display text-[20px] font-medium tracking-[-0.01em] text-warm-white">Operator activity</h2>
-          <p className="mt-1 text-sm text-gray-muted">Every operator action across the portfolio, newest first.</p>
-        </div>
-        <AuditList events={view} />
-      </div>
-    </div>
-  );
+  return <StPage width="wide">
+    <StHead title="Site audits" meta="Check each live site’s health, search readiness and what to fix first." />
+    <SiteAuditsBoard initialRows={rows} />
+    <StSection title="Operator activity" meta="Newest first"><AuditList events={view} /></StSection>
+  </StPage>;
 }
