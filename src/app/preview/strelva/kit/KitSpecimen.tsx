@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { StBeacon, StComposerBar, StComposerDock, StEmpty, StInput, StGrid, StCell, StToggle, StSignedPage, StField, StSplit, StHead, StHold, StKbd, StLabel, StLedger, StMono, StNotice, StPage, StPill, StRow, StRows, StSection, StSegmented, StSkeleton, StStamp, StState, StSteps, StSurface, StTable, StTextButton, StToast } from "@/components/ui/strelva/Kit";
+import { StBeacon, StComposerBar, StComposerDock, StEmpty, StInput, StGrid, StCell, StToggle, StSignedPage, StField, StSplit, StHead, StHold, StKbd, StLabel, StLedger, StMono, StNotice, StPage, StPill, StPillLink, StRow, StRows, StSection, StSegmented, StSkeleton, StStamp, StState, StSteps, StSurface, StTable, StTextButton, StToast } from "@/components/ui/strelva/Kit";
 
 /** Fictional content only. Every kit piece in its states, light and dark. */
 export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
@@ -65,6 +65,8 @@ export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
       <StSection title="Objects, notices, empty, loading">
         <StPage><StLabel>Native page inside a System · shares its outer insets</StLabel><StSurface label="Embedded document">The object keeps the whole column, including on a phone.</StSurface></StPage>
         <StSurface tone="need" selected label="Draft reply"><StLabel>Your reply, written by Strelva</StLabel><p style={{ margin: "8px 0 12px", fontSize: 15, lineHeight: "24px" }}>Hi Dana, yes, Sheri mediates disputes between partners. You can ask for a session date here and Sheri will confirm it.</p><div style={{ display: "flex", gap: 16, alignItems: "center" }}><StTextButton>Edit</StTextButton><StTextButton>Not yet</StTextButton><span style={{ flex: 1 }} /><StPill>Send reply</StPill></div></StSurface>
+        <nav aria-label="Current link specimen"><StPillLink href="/preview/strelva/kit" variant="soft" current>Kit · selected</StPillLink></nav>
+        <StRows label="Outcome count specimen"><StRow lead={<StMono size="value">212</StMono>} title="Visits" detail="A recorded count; unavailable counts show a dash with words." /></StRows>
         <StNotice tone="need">Your hours changed on Oct 8. Strelva redoes the open dates before this becomes real.</StNotice>
         <StNotice tone="critical">Couldn’t load this client at 2:06. Showing Tuesday’s numbers. Strelva retries every 5 min.</StNotice>
         <StEmpty action={<StPill variant="soft">Rehearse the form</StPill>}>No inquiries yet. The form was checked at 7:00 and works.</StEmpty>

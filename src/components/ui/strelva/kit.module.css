@@ -167,6 +167,7 @@ a.row:hover, button.row:hover { background: var(--gray-bg-alt); }
 .mono[data-tone="critical"] { color: var(--st-critical); }
 .mono[data-tone="live"] { color: var(--st-live); }
 .mono[data-tone="text"] { color: var(--st-text); }
+.mono[data-size="value"] { min-width: 78px; font-size: 28px; font-weight: 500; line-height: 36px; color: var(--st-text); }
 
 /* ---------- Beacon ---------- */
 .beacon {

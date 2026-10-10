@@ -2,7 +2,7 @@ import { z } from "zod";
 import { getMonthlyRecaps, getWeeklyBriefs } from "@/lib/weekly-brief";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantSiteName } from "@/lib/tenant-display";
-import type { WeeklyBrief } from "@/lib/types";
+import type { WeeklyBrief, WeeklyInquiryOutcomeProof } from "@/lib/types";
 import { callReleaseFlagsRpc } from "@/platform/release-flags/store";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 
@@ -24,6 +24,10 @@ export interface RecapView {
   visits: number;
   visitsDelta: number;
   customerActions: number;
+  /** Saved proof only; absent on older recaps or while its existing flag was off. */
+  inquiryOutcome?: WeeklyInquiryOutcomeProof;
+  /** Count of recorded review events; the saved stat doesn't identify the provider. */
+  newReviews?: number | null;
   nextAction: { title: string; description: string } | null;
 }
 
@@ -50,6 +54,8 @@ export function recapView(brief: WeeklyBrief): RecapView {
     visits: stats.pageViews,
     visitsDelta: stats.pageViewsDelta,
     customerActions: stats.bookingClicks + (stats.phoneClicks ?? 0),
+    ...(stats.inquiryOutcomeProof ? { inquiryOutcome: stats.inquiryOutcomeProof } : {}),
+    newReviews: Number.isFinite(stats.reviewsReceived) ? stats.reviewsReceived : null,
     nextAction: brief.nextAction ? { title: brief.nextAction.title, description: brief.nextAction.description } : null,
   };
 }

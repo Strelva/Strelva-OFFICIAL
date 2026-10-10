@@ -1779,3 +1779,11 @@ expiry; certificate lifetime, form delivery and 30-day uptime remain unknown.
 
 Rendered proof is pending local browser access; do not treat source or test
 coverage as visual acceptance. See the [L8 handoff](./ui-1.0-l8-operator.md).
+### Strelva kit: recap values (L5, October 9)
+
+`StMono size="value"` is the kit's 28px/500 tabular count for open outcome
+rows. It reserves 78px so visits, inquiries, answers, bookings and reviews
+share an edge. Missing counts pair a dash with an explicit unavailable label;
+zero remains a recorded value. The kit specimen includes this count row.
+`StPillLink current` puts `aria-current="page"` on the actual link, including
+the recap period selector. Its current-link specimen is included too.
