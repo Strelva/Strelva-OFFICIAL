@@ -13,8 +13,9 @@ import { ownerNoticeUrl } from "@/lib/owner-notice-url";
  * reply), not-yet → "dismissed".
  *
  * Security:
- *  - The token is the ONLY authorization — the route is public (no session) so it
- *    works from an email client. Tampering the eventId/tenantId/action breaks the
+ *  - The signed token and current database authority authorize converted reviews.
+ *    The route is public (no session) so it works from an email client.
+ *    Tampering the eventId/tenantId/action breaks the
  *    HMAC; an expired token is rejected. The action is bound into the signature,
  *    so an "approve" link can't be edited into a different event or tenant.
  *  - **GET never mutates.** Approving posts a review reply to Google (a
@@ -27,10 +28,10 @@ import { ownerNoticeUrl } from "@/lib/owner-notice-url";
  *  - Idempotent: a re-submitted or replayed (unexpired) token hits an already-
  *    resolved event and renders a friendly "already handled" page, never a
  *    double action.
- *  - A tenant link binds no recipient, so it decides only for a site with no
- *    business. Once the site is converted, its owner decides in Strelva, where
- *    links go only to the trusted owner address (#524); an old tenant link,
- *    or one sent to an address an operator edited, does nothing.
+ *  - Old tenant links survive initial conversion only for review drafts whose
+ *    original recipient remains trusted and has never accepted or transferred
+ *    ownership. New converted review links bind recipient, workspace and a
+ *    rotating authority version; workspace publishing keeps its own token.
  */
 import { NextResponse } from "next/server";
 import { verifyAnyApproveToken, type ApproveLinkClaims, type WorkspaceApproveLinkClaims } from "@/lib/approve-link";
@@ -40,6 +41,7 @@ import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { ownerWebsitePreviewHref, ownerWebsitePreviewMayBeOn } from "@/app/api/owner-website-preview/links";
 import { legacyOwnerLinkAllowed } from "@/lib/owner-recipient";
+import { isManagedReviewApproval, reviewApprovalTokenAllowed } from "@/lib/review-approval-authority";
 
 export const dynamic = "force-dynamic";
 
@@ -243,8 +245,13 @@ async function getPage(request: Request): Promise<NextResponse> {
   const tenant = await getTenantConfig(claims.tenantId).catch(() => null);
   const businessName = tenant?.siteName || "your site";
   const dashboardUrl = tenant ? await ownerNoticeUrl(tenant, "/dashboard", getTenantDashboardUrl(tenant, "/dashboard")) : undefined;
-  if (!await legacyOwnerLinkAllowed({ id: claims.tenantId, ownerEmail: tenant?.ownerEmail })) {
+  if (!await reviewApprovalTokenAllowed(token, { id: claims.tenantId, ownerEmail: tenant?.ownerEmail })) {
     return noticePage({ status: 403, ...MOVED, dashboardUrl, buttonLabel: "Open your dashboard" });
+  }
+  const reviewOnly = verified.kind === "review" || !await legacyOwnerLinkAllowed({ id: claims.tenantId, ownerEmail: tenant?.ownerEmail });
+  if (reviewOnly) {
+    const event = await (await import("@/lib/events")).getEventRaw(claims.eventId).catch(() => null);
+    if (!event || !isManagedReviewApproval(event, claims.tenantId)) return noticePage({ status: 403, ...MOVED, dashboardUrl });
   }
   const isApprove = claims.action === "approve";
 
@@ -280,7 +287,7 @@ async function postPage(request: Request): Promise<NextResponse> {
   const businessName = tenant?.siteName || "your site";
   const dashboardUrl = tenant ? await ownerNoticeUrl(tenant, "/dashboard", getTenantDashboardUrl(tenant, "/dashboard")) : undefined;
   const workflowAction = claims.action === "approve" ? "approved" : "dismissed";
-  if (!await legacyOwnerLinkAllowed({ id: claims.tenantId, ownerEmail: tenant?.ownerEmail })) {
+  if (!await reviewApprovalTokenAllowed(token, { id: claims.tenantId, ownerEmail: tenant?.ownerEmail })) {
     return noticePage({ status: 403, ...MOVED, dashboardUrl, buttonLabel: "Open your dashboard" });
   }
 
@@ -290,10 +297,16 @@ async function postPage(request: Request): Promise<NextResponse> {
     // live emails working; new workspace publishing requires the ws2 link.
     const { getEventRaw } = await import("@/lib/events");
     const event = await getEventRaw(claims.eventId);
+    const reviewOnly = verified.kind === "review" || !await legacyOwnerLinkAllowed({ id: claims.tenantId, ownerEmail: tenant?.ownerEmail });
+    if (reviewOnly && (!event || !isManagedReviewApproval(event, claims.tenantId))) {
+      return noticePage({ status: 403, ...MOVED, dashboardUrl });
+    }
     if (event && ["workspace_collection_publish", "workspace_newsletter_issue", "workspace_google_listing_draft"].includes(String(event.metadata?.kind))) {
       return noticePage({ status: 403, heading: "Use the current approval link", body: "Open this item in Needs you, or use the recipient-bound approval link Strelva prepared for it." });
     }
-    result = await resolveEventAction(claims.tenantId, claims.eventId, workflowAction);
+    result = reviewOnly
+      ? await resolveEventAction(claims.tenantId, claims.eventId, workflowAction, "user", { reviewApprovalToken: token })
+      : await resolveEventAction(claims.tenantId, claims.eventId, workflowAction);
   } catch (err) {
     console.error(`[api/approve] resolveEventAction threw for ${claims.tenantId}/${claims.eventId}:`, err);
     return noticePage({

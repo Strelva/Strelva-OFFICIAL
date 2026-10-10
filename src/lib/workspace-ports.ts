@@ -146,10 +146,20 @@ export interface TenantBusinessContext {
 }
 
 export interface BusinessRecordPort {
+  readTenantReviewApprovalAuthority(tenantId: string): Promise<TenantReviewApprovalAuthority | null>;
   ownerNoticeWorkspaceUrl?(tenant: { id: string; stableId?: string }, path: string, legacyUrl: string): Promise<string>;
   /** The owner-recipient rule for one tenant. Server-only; sends nothing. */
   resolveTenantOwnerRecipient(tenantId: string): Promise<TenantOwnerRecipientRow | null>;
   readTenantBusinessContext(tenantId: string): Promise<TenantBusinessContext | null>;
+}
+
+export interface TenantReviewApprovalAuthority {
+  tenantId: string;
+  workspaceId: string | null;
+  recipient: string;
+  version: string;
+  conversionAt: string | null;
+  legacyAllowed: boolean;
 }
 
 // ── Google account bindings (src/platform/account-bindings) ────────────────────

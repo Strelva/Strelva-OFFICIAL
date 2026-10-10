@@ -35,7 +35,7 @@ interface ApproveLinkPayload extends ApproveLinkClaims {
 
 /** Approval links live longer than an OAuth handshake — an owner may not open
  *  the email for days — but not forever. */
-const APPROVE_LINK_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+export const APPROVE_LINK_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
 function getApproveLinkSecret(): string {
   const secret =
@@ -59,6 +59,12 @@ export function signApproveToken(claims: ApproveLinkClaims, now = Date.now()): s
 
 /** Verify a token, returning its claims or null when tampered/expired/malformed. */
 export function verifyApproveToken(token: string, now = Date.now()): ApproveLinkClaims | null {
+  const payload = verifyLegacyApprovePayload(token, now);
+  return payload ? { eventId: payload.eventId, tenantId: payload.tenantId, action: payload.action } : null;
+}
+
+/** Retain signed expiry for conversion cutoff checks; never decode unverified claims. */
+export function verifyLegacyApprovePayload(token: string, now = Date.now()): ApproveLinkPayload | null {
   // Split on the first '.' only, so a base64url payload that somehow contains
   // a '.' (e.g. from a future encoding change) doesn't silently truncate the
   // signature portion.
@@ -82,8 +88,8 @@ export function verifyApproveToken(token: string, now = Date.now()): ApproveLink
     if (typeof payload.eventId !== "string" || !payload.eventId.trim()) return null;
     if (typeof payload.tenantId !== "string" || !payload.tenantId.trim()) return null;
     if (payload.action !== "approve" && payload.action !== "not-yet") return null;
-    if (typeof payload.exp !== "number" || payload.exp < now) return null;
-    return { eventId: payload.eventId, tenantId: payload.tenantId, action: payload.action };
+    if (typeof payload.exp !== "number" || !Number.isFinite(payload.exp) || payload.exp < now || payload.exp > now + APPROVE_LINK_TTL_MS) return null;
+    return { eventId: payload.eventId, tenantId: payload.tenantId, action: payload.action, exp: payload.exp };
   } catch {
     return null;
   }
@@ -173,12 +179,47 @@ export function verifyWorkspaceApproveToken(token: string, now = Date.now()): Wo
 /** Which kind of approve link a token is, or null when it is neither. */
 export function verifyAnyApproveToken(token: string, now = Date.now()):
   | { kind: "tenant"; claims: ApproveLinkClaims }
+  | { kind: "review"; claims: ReviewApproveLinkClaims }
   | { kind: "workspace"; claims: WorkspaceApproveLinkClaims }
   | null {
   const workspace = verifyWorkspaceApproveToken(token, now);
   if (workspace) return { kind: "workspace", claims: workspace };
+  const review = verifyReviewApproveToken(token, now);
+  if (review) return { kind: "review", claims: review };
   const tenant = verifyApproveToken(token, now);
   return tenant ? { kind: "tenant", claims: tenant } : null;
+}
+
+/** Review-only links preserve the tenant/event resolver and bind current authority. */
+export interface ReviewApproveLinkClaims extends ApproveLinkClaims {
+  workspaceId: string;
+  recipient: string;
+  authorityVersion: string;
+}
+const REVIEW_LINK_DOMAIN = "review3.";
+export function signReviewApproveToken(claims: ReviewApproveLinkClaims, now = Date.now()): string {
+  const payload = { ...claims, recipient: claims.recipient.trim().toLowerCase(), v: 3, exp: now + APPROVE_LINK_TTL_MS };
+  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `${encoded}.${sign(REVIEW_LINK_DOMAIN + encoded)}`;
+}
+export function verifyReviewApproveToken(token: string, now = Date.now()): ReviewApproveLinkClaims | null {
+  const dot = token.indexOf(".");
+  if (dot < 1) return null;
+  const encoded = token.slice(0, dot), provided = Buffer.from(token.slice(dot + 1));
+  const expected = Buffer.from(sign(REVIEW_LINK_DOMAIN + encoded));
+  if (provided.length !== expected.length || !timingSafeEqual(provided, expected)) return null;
+  try {
+    const p = JSON.parse(Buffer.from(encoded, "base64url").toString());
+    if (p.v !== 3 || typeof p.tenantId !== "string" || !p.tenantId.trim() || typeof p.eventId !== "string" || !p.eventId.trim()
+      || typeof p.workspaceId !== "string" || !UUID.test(p.workspaceId) || typeof p.recipient !== "string"
+      || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(p.recipient) || p.recipient !== p.recipient.trim().toLowerCase()
+      || typeof p.authorityVersion !== "string" || !/^[0-9a-f]{64}$/.test(p.authorityVersion)
+      || !["approve", "not-yet"].includes(p.action) || !Number.isFinite(p.exp) || p.exp < now || p.exp > now + APPROVE_LINK_TTL_MS) return null;
+    return { tenantId: p.tenantId, eventId: p.eventId, action: p.action, workspaceId: p.workspaceId, recipient: p.recipient, authorityVersion: p.authorityVersion };
+  } catch { return null; }
+}
+export function buildReviewApproveUrl(origin: string, claims: ReviewApproveLinkClaims): string {
+  return `${origin.replace(/\/+$/, "")}/api/approve?token=${encodeURIComponent(signReviewApproveToken(claims))}`;
 }
 
 export function buildWorkspaceApproveUrl(baseOrigin: string, claims: WorkspaceApproveLinkClaims): string {

@@ -147,6 +147,7 @@ export async function resolveEventAction(
   eventId: string,
   action: EventWorkflowAction,
   actorId = "user",
+  authorization?: { reviewApprovalToken: string },
 ): Promise<{ changed: boolean; reason?: string }> {
   // Redis-authoritative read: this path EXECUTES the event's payload (the
   // external write), so it must see live metadata — an owner-edited review reply,
@@ -156,6 +157,12 @@ export async function resolveEventAction(
   if (!event) return { changed: false, reason: "not_found" };
   if (event.tenantId !== tenantId) return { changed: false, reason: "wrong_tenant" };
   if (event.status !== "pending") return { changed: false, reason: "already_resolved" };
+  if (authorization) {
+    const { isManagedReviewApproval, reviewApprovalTokenAllowed } = await import("./review-approval-authority");
+    if (!isManagedReviewApproval(event, tenantId) || !await reviewApprovalTokenAllowed(authorization.reviewApprovalToken, { id: tenantId }, { eventId, action })) {
+      return { changed: false, reason: "review_approval_authority_changed" };
+    }
+  }
 
   // A message review has a provider checkpoint in addition to its event. If a
   // process stopped after the provider accepted the message, recover the
@@ -288,6 +295,16 @@ export async function resolveEventAction(
     action === "approved" ? await shadowStartExecutionAttempt(eventId, claim.attemptId) : null;
 
   try {
+    if (authorization) {
+      const { isManagedReviewApproval, reviewApprovalTokenAllowed } = await import("./review-approval-authority");
+      const current = await getEventRaw(eventId);
+      if (!current || !isManagedReviewApproval(current, tenantId) || !await reviewApprovalTokenAllowed(authorization.reviewApprovalToken, { id: tenantId }, { eventId, action })) {
+        const result = { changed: false, reason: "review_approval_authority_changed" };
+        await finishEventAction(eventId, claim.attemptId, { state: "failed", reason: result.reason });
+        await shadowFinishExecutionAttempt(shadowAttemptId, { success: false, detail: result.reason });
+        return result;
+      }
+    }
     const result = await executeResolvedEventAction(tenantId, eventId, action, event, actorId, claim.attemptId);
     await finishEventAction(eventId, claim.attemptId, {
       state: result.changed ? "completed" : "failed",

@@ -270,6 +270,7 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
         review: { author: review.reviewer.displayName, rating, text: review.comment },
         reviewsUrl: await ownerNoticeUrl(tenant, "/dashboard/reviews", getTenantDashboardUrl(tenant, "/dashboard/reviews")),
         draftedReply,
+        reviewEventId: draftEventId,
         approveUrl,
         notYetUrl,
         logPrefix: "[cron poll-google-reviews]",
