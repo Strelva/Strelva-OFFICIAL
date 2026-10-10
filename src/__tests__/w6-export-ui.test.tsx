@@ -38,4 +38,20 @@ describe("business export screen", () => {
     expect((document.querySelector("button") as HTMLButtonElement).disabled).toBe(false);
     expect(document.body.textContent).toContain("Prepare a new export");
   });
+  it("names the omissions and avoids inventing record counts", async () => {
+    await act(async () => root.render(createElement(WorkspaceExport, { workspaceId, schema3: true })));
+    expect(document.body.textContent).toContain("Card details");
+    expect(document.body.textContent).toContain("Held by Stripe");
+    expect(document.body.textContent).toContain("Counts are not available on this page");
+    expect(document.querySelector('[aria-label="Export scope"]')).not.toBeNull();
+  });
+  it("shows owner permission failure as an alert and keeps retry available", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ error: "Only the confirmed owner can export." }, { status: 403 })));
+    await act(async () => root.render(createElement(WorkspaceExport, { workspaceId, schema3: true })));
+    await act(async () => (document.querySelector("button") as HTMLButtonElement).click());
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain("Only the confirmed owner");
+    expect((document.querySelector("button") as HTMLButtonElement).disabled).toBe(false);
+    expect(document.querySelector('a[href*="owner-download"]')).toBeNull();
+  });
+
 });

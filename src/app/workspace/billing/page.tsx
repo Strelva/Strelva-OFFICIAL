@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { notFound, redirect } from "next/navigation";
-import { Card } from "@/components/ui/Card";
+import { StPage, StHead, StNotice, StPillLink, StTextButton } from "@/components/ui/strelva/Kit";
+import { BusinessBillingView } from "@/experience/workspace/billing/BusinessBillingView";
 import { businessBillingEnabled, readAgencyBilling, readBusinessBilling } from "@/platform/business-billing";
 import { AgencyInvoiceAcceptance } from "@/experience/workspace/billing/AgencyInvoiceControls";
 import { AgencyBillingView } from "@/experience/workspace/billing/AgencyBillingView";
@@ -28,29 +30,15 @@ export default async function BusinessBillingPage({ searchParams }: { searchPara
   }
   let billing;
   try { billing = await readBusinessBilling(actor, workspaceId); }
-  catch { return <main className="mx-auto max-w-3xl px-6 py-12"><h1 className="font-display text-3xl">Business billing</h1><p role="alert" className="mt-6 text-gray-muted">Billing could not be loaded. Confirm your access and try again.</p><Link className="mt-6 inline-flex min-h-12 items-center underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}>Back to the business</Link></main>; }
-  return <main className="mx-auto max-w-3xl px-6 py-12 text-warm-black">
-    <Link className="inline-flex min-h-12 items-center text-gray-muted underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}>Back to the business</Link>
-    <h1 className="mt-6 font-display text-3xl font-medium">Business billing</h1>
-    {process.env.STRELVA_REVENUE_SPLITS === "1" ? <Link className="mt-4 inline-flex min-h-12 items-center underline" href={`/workspace/creator-maintenance?workspaceId=${encodeURIComponent(workspaceId)}`}>Creator maintenance</Link> : null}
-    {process.env.STRELVA_REVENUE_SPLITS === "1" ? <Link className="mt-4 inline-flex min-h-12 items-center underline" href={`/workspace/money-terms?workspaceId=${encodeURIComponent(workspaceId)}`}>Recorded money terms</Link> : null}
-    <nav aria-label="Payment and provider settings" className="mt-4 flex flex-wrap gap-4">{process.env.STRELVA_CONNECT === "1" ? <Link className="inline-flex min-h-12 items-center underline" href={`/workspace/payments?workspaceId=${encodeURIComponent(workspaceId)}`}>Payments and merchant account</Link> : null}{process.env.STRELVA_PROVIDER_CHANGE === "1" ? <Link className="inline-flex min-h-12 items-center underline" href={`/workspace/provider-change?workspaceId=${encodeURIComponent(workspaceId)}`}>Provider handoff</Link> : null}</nav>
-    {billing ? <Card className="mt-8" padding="lg">
-      <p className="text-lg font-medium">{billing.state === "grandfathered" ? "Your existing terms are kept" : billing.state === "comped" ? "Comped" : billing.state === "none" ? "Billing needs to be recorded" : billing.state === "custom" ? "Custom agreement" : "Subscription"}</p>
-      <p className="mt-3 text-sm">Payer: {billing.payerParty?.kind === "agency" ? billing.payerParty.name ?? "Your agency" : "This business"}</p>
-      <p className="mt-3 text-2xl font-medium tabular-nums">{billing.state === "none" ? "Price not recorded" : `$${(billing.monthlyCents / 100).toFixed(2)} / month`}</p>
-      <p className="mt-3 text-sm text-gray-muted">Payment: {billing.paymentStatus.replaceAll("_", " ")}{billing.paidThrough ? ` · Paid through ${billing.paidThrough.slice(0, 10)}` : ""}</p>
-      {billing.paymentStatus === "past_due" ? <p role="status" className="mt-6">{billing.payerParty?.kind === "agency" ? "Your agency’s payment needs attention. A business owner can choose direct payment for future work below." : "Your payment needs attention."} Your sites and inquiry capture keep working.</p> : null}
-      {billing.grandfatheredTerms ? <p className="mt-6 text-sm text-gray-muted">{billing.grandfatheredTerms}</p> : null}
-      <h2 className="mt-8 font-medium">Sites covered</h2>
-      <ul className="mt-3 space-y-3 text-sm">{billing.sites.map(site => <li key={site.tenantId}>{site.siteName}{billing.state === "none" ? "" : ` · $${(site.amountCents / 100).toFixed(2)} / month`}</li>)}</ul>
-      {billing.state === "none" ? <p className="mt-6 text-sm text-gray-muted">Billing terms still need to be recorded. No monthly price or plan is recorded.</p> : <>
-        <p className="mt-6 text-sm text-gray-muted">Moving into the business workspace does not change your amount, plan, card or payment cycle. Payment changes use your existing billing settings.</p>
-        <Link className="mt-6 inline-flex min-h-12 items-center underline" href="/dashboard/settings#plan">Open billing settings</Link>
-        {billing.payerParty?.kind === "agency" ? <p className="mt-4 text-sm text-gray-muted">This amount records the existing business agreement. Agency wholesale pricing and any separate retail invoice are shown in the agency’s billing records.</p> : null}
-      </>}
-    </Card> : <p className="mt-8 text-gray-muted">No billing record is attached to this business yet. The existing agreement and chosen payer need to be recorded.</p>}
+  catch { return <StrelvaShell title="" workspaceId={workspaceId} active="settings" systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}><StPage><StHead title="Plan and billing" /><StNotice tone="critical">Billing could not be loaded. Confirm your access and try again.</StNotice><StPillLink variant="soft" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}>Back to the business</StPillLink></StPage></StrelvaShell>; }
+  return <StrelvaShell title="" workspaceId={workspaceId} businessContext={workspace?.name} active="settings" systemsReleased={process.env.STRELVA_SYSTEMS_RELEASE === "1"}><StPage>
+    <BusinessBillingView billing={billing} businessName={workspace?.name} backHref={`/workspace/business-details?workspaceId=${encodeURIComponent(workspaceId)}`} />
+    <nav aria-label="Payment and provider settings" className="flex flex-wrap gap-4">
+      {process.env.STRELVA_REVENUE_SPLITS === "1" ? <><StTextButton href={`/workspace/creator-maintenance?workspaceId=${encodeURIComponent(workspaceId)}`}>Creator maintenance</StTextButton><StTextButton href={`/workspace/money-terms?workspaceId=${encodeURIComponent(workspaceId)}`}>Recorded money terms</StTextButton></> : null}
+      {process.env.STRELVA_CONNECT === "1" ? <StTextButton href={`/workspace/payments?workspaceId=${encodeURIComponent(workspaceId)}`}>Payments and merchant account</StTextButton> : null}
+      {process.env.STRELVA_PROVIDER_CHANGE === "1" ? <StTextButton href={`/workspace/provider-change?workspaceId=${encodeURIComponent(workspaceId)}`}>Provider handoff</StTextButton> : null}
+    </nav>
     {query.invoiceId ? <AgencyInvoiceAcceptance invoiceId={query.invoiceId} /> : null}
     <WorkspacePayerTransition key={workspaceId} workspaceId={workspaceId} canPropose={workspace?.role === "owner"} agencyChoices={workspaces.filter(item => item.kind === "agency").map(item => ({ id: item.id, name: item.name })).concat(billing?.payerParty?.kind === "agency" && billing.payerParty.workspaceId && !workspaces.some(item => item.id === billing.payerParty?.workspaceId) ? [{ id: billing.payerParty.workspaceId, name: billing.payerParty.name ?? "Current payer agency" }] : [])} providerChangeEnabled={process.env.STRELVA_PROVIDER_CHANGE === "1"} />
-  </main>;
+  </StPage></StrelvaShell>;
 }

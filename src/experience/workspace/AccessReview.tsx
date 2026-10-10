@@ -1,23 +1,22 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/Button";
+import { StPage, StHead, StSection, StRows, StRow, StTextButton, StEmpty, StNotice, StSkeleton, StState, StSegmented } from "@/components/ui/strelva/Kit";
 import { accessReviewSchema, type AccessReview, type AccessReviewRevoke, type AccessReviewScope } from "@/platform/access-review/contracts";
-const kindLabel = { member: "Member", delegation: "Read-only delegation", operational_assignment: "Operating assignment", agency_assignment: "Agency staff assignment", provider: "Provider of record", provider_seat: "Provider seat", agent_token: "Agent token" };
+const kindLabel = { member: "Member", delegation: "Read-only delegation", operational_assignment: "Operating assignment", agency_assignment: "Agency staff assignment", provider: "Provider of record", provider_seat: "Provider seat", agent_token: "Assistant connection" };
 export function AccessReviewView({ review, pending, notice, onRevoke }: { review: AccessReview; pending?: string | null; notice?: string; onRevoke: (input: AccessReviewRevoke) => void }) {
   return <div className="space-y-8">
-    {review.organization ? <p className="text-sm text-gray-muted">Includes this workspace and active mapped businesses where you are a current member. {review.inaccessibleUnits ? `${review.inaccessibleUnits} mapped business${review.inaccessibleUnits === 1 ? " is" : "es are"} unavailable to your account; their access details are excluded.` : "All mapped businesses are accessible to your account."} Mapping a business never grants access.</p> : null}
-    {notice ? <p role="status" className="text-sm text-gray-muted">{notice}</p> : null}
-    {review.units.map(unit => <section key={unit.workspaceId} aria-label={`${unit.name} access`}>
-      <h2 className="text-xl font-medium text-warm-black">{unit.name}</h2>
-      <p className="mt-2 text-sm text-gray-muted">Your role: {unit.role}. Owners are protected. {unit.role === "member" ? "Only an owner or administrator can revoke access." : "Revocations are recorded in audit."}</p>
-      {unit.entries.length ? <ul className="mt-4 divide-y divide-gray-border border-y border-gray-border">{unit.entries.map(entry => <li key={`${entry.kind}:${entry.id}`} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0"><p className="break-words text-sm font-medium text-warm-black">{entry.label}</p><p className="mt-1 text-sm text-gray-muted">{kindLabel[entry.kind]} · {entry.status}</p><p className="mt-1 text-xs text-gray-muted">Last use: {entry.lastUsedAt ? new Date(entry.lastUsedAt).toLocaleString() : "Not recorded"}</p>{entry.kind === "provider" && entry.status === "active" && unit.role === "owner" && !entry.canRevoke ? <a className="mt-2 inline-block text-sm text-accent-text underline" href={`/workspace/provider-change?workspaceId=${encodeURIComponent(unit.workspaceId)}`}>Review provider change notice</a> : null}</div>
-        {entry.canRevoke ? <Button variant="danger" size="lg" className="shrink-0" loading={pending === `${unit.workspaceId}:${entry.kind}:${entry.id}`} disabled={Boolean(pending)} aria-label={`Revoke ${kindLabel[entry.kind].toLowerCase()} for ${entry.label}`} onClick={() => onRevoke({ workspaceId: review.workspaceId, organization: review.organization, businessId: unit.workspaceId, kind: entry.kind, recordId: entry.id })}>Revoke</Button> : null}
-      </li>)}</ul> : <p className="mt-4 text-sm text-gray-muted">No access records.</p>}
-    </section>)}
-    <p className="text-xs text-gray-muted">Only tokens with current membership and an active native grant are listed. Last use is recorded for agent reads/proposals; other access types have no use tracking.</p>
+    {review.organization ? <StNotice>Includes this workspace and active mapped businesses where you are a current member. {review.inaccessibleUnits ? `${review.inaccessibleUnits} mapped business${review.inaccessibleUnits === 1 ? " is" : "es are"} unavailable to your account; their access details are excluded.` : "All mapped businesses are accessible to your account."} Mapping a business never grants access.</StNotice> : null}
+    {notice ? <StNotice><span role="status">{notice}</span></StNotice> : null}
+    {review.units.map(unit => <StSection key={unit.workspaceId} title={unit.name}>
+      <p className="text-sm text-gray-muted">Your role: {unit.role}. Owners are protected. {unit.role === "member" ? "Only an owner or administrator can revoke access." : "Revocations are recorded in audit."}</p>
+      {unit.entries.length ? <StRows>{unit.entries.map(entry => <StRow key={`${entry.kind}:${entry.id}`} title={entry.label} kind={kindLabel[entry.kind]} detail={`Last use: ${entry.lastUsedAt ? new Date(entry.lastUsedAt).toLocaleString() : "Not recorded"}`} end={<><StState kind={entry.status === "active" ? "live" : "draft"}>{entry.status}</StState>{entry.canRevoke ? <StTextButton tone="accent" disabled={Boolean(pending)} aria-label={`Revoke ${kindLabel[entry.kind].toLowerCase()} for ${entry.label}`} onClick={() => onRevoke({ workspaceId: review.workspaceId, organization: review.organization, businessId: unit.workspaceId, kind: entry.kind, recordId: entry.id })}>{pending === `${unit.workspaceId}:${entry.kind}:${entry.id}` ? "Revoking…" : "Revoke"}</StTextButton> : null}</>}>
+        {entry.kind === "provider" && entry.status === "active" && unit.role === "owner" && !entry.canRevoke ? <StTextButton href={`/workspace/provider-change?workspaceId=${encodeURIComponent(unit.workspaceId)}`} tone="accent">Review provider change notice</StTextButton> : null}
+      </StRow>)}</StRows> : <StEmpty>No access records.</StEmpty>}
+    </StSection>)}
+    <p className="text-sm text-gray-muted">Only connections with current membership and an active grant are listed. Last use is recorded for assistant reads and proposed changes; other access types have no use tracking.</p>
   </div>;
 }
+
 export function AccessReviewPage({ workspaceId }: { workspaceId: string }) {
   const [organization, setOrganization] = useState(false);
   const scopeKey = `${workspaceId}:${organization}`;
@@ -56,11 +55,10 @@ function AccessReviewLoader({ scope, onScopeChange }: { scope: AccessReviewScope
     } catch (cause) { if (alive.current) setError(cause instanceof Error ? cause.message : "Access could not be revoked."); }
     finally { if (alive.current) setPending(null); }
   }
-  return <main className="min-h-dvh bg-canvas px-6 py-10 text-warm-black sm:px-8"><div className="mx-auto max-w-4xl">
-    <a href={`/workspace?workspaceId=${encodeURIComponent(scope.workspaceId)}&view=access`} className="text-sm text-accent-text underline">Back to workspace</a>
-    <h1 className="mt-6 font-display text-3xl">People & access review</h1>
-    <div className="my-6 flex flex-wrap gap-3"><Button variant={scope.organization ? "secondary" : "primary"} disabled={Boolean(pending)} onClick={() => onScopeChange(false)}>This business</Button>{review?.units.find(unit => unit.workspaceId === scope.workspaceId)?.role !== "member" ? <Button variant={scope.organization ? "primary" : "secondary"} disabled={Boolean(pending)} onClick={() => onScopeChange(true)}>Organization & mapped businesses</Button> : null}</div>
-    {error ? <div className="mb-6"><p role="alert" className="text-sm text-critical">{error}</p><Button className="mt-3" variant="secondary" onClick={() => { void load().catch(cause => setError(cause instanceof Error ? cause.message : "Access review is unavailable.")); }}>Retry</Button></div> : null}
-    {review ? <AccessReviewView review={review} pending={pending} notice={notice} onRevoke={input => void revoke(input)} /> : !error ? <p role="status" className="text-sm text-gray-muted">Loading access review…</p> : null}
-  </div></main>;
+  return <StPage>
+    <StHead title="People & access" crumb={{label: "Back to workspace", href: `/workspace?workspaceId=${encodeURIComponent(scope.workspaceId)}&view=access`}} />
+    <StSegmented value={scope.organization ? "organization" : "business"} label="Access review scope" options={[{value: "business", label: "This business"}, {value: "organization", label: "Organization & mapped businesses"}]} disabledValues={pending ? ["business", "organization"] : review?.units.find(unit => unit.workspaceId === scope.workspaceId)?.role === "member" ? ["organization"] : []} disabledReason={pending ? "Wait for the current change." : "Only owners and administrators can review mapped businesses."} onChange={value => onScopeChange(value === "organization")} />
+    {error ? <div><StNotice tone="critical">{error}</StNotice><StTextButton onClick={() => { void load().catch(cause => setError(cause instanceof Error ? cause.message : "Access review is unavailable.")); }}>Retry</StTextButton></div> : null}
+    {review ? <AccessReviewView review={review} pending={pending} notice={notice} onRevoke={input => void revoke(input)} /> : !error ? <StSkeleton label="Loading access review" /> : null}
+  </StPage>;
 }

@@ -16,6 +16,7 @@
  */
 
 import Link from "next/link";
+import { LogoMark } from "@/components/Logo";
 import { Check, ChevronLeft, Circle, Loader2, X } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from "react";
 import styles from "./kit.module.css";
@@ -26,6 +27,21 @@ type Tone = "need" | "critical" | "live" | "text";
 
 export function StPage({ children, width = "column", className }: { children: ReactNode; width?: "column" | "wide"; className?: string }) {
   return <div className={`${styles.page}${className ? ` ${className}` : ""}`} data-width={width}><div className={styles.pageStack}>{children}</div></div>;
+}
+
+/** A primary object and its consequences, within the same calm column. */
+export function StSplit({ children, aside, balance = "main" }: { children: ReactNode; aside: ReactNode; balance?: "main" | "aside" }) {
+  return <div className={styles.split} data-balance={balance}><div>{children}</div><div>{aside}</div></div>;
+}
+
+/** Account entry uses the same paper and controls, at a focused reading width. */
+export function StEntry({ children, brand, host, width = "form", helpHref = "/workspace?view=help" }: { children: ReactNode; brand?: ReactNode; host?: string; width?: "form" | "account"; helpHref?: string }) {
+  return <main className={styles.entry} data-workspace-theme="linen"><header className={styles.entryHeader}><Link href="/" className={styles.entryBrand}>{brand ?? <><LogoMark className="size-6" />Strelva</>}</Link>{host ? <StMono>{host}</StMono> : <StTextButton href={helpHref}>Help</StTextButton>}</header><div className={styles.entryColumn} data-width={width}>{children}</div></main>;
+}
+
+/** Own field geometry while preserving native input semantics. */
+export function StField({ label, children, hint }: { label: ReactNode; children: ReactNode; hint?: ReactNode }) {
+  return <div className={styles.field}><label className={styles.fieldLabel}>{label}{children}</label>{hint ? <p className={styles.fieldHint}>{hint}</p> : null}</div>;
 }
 
 export function StHead({ crumb, title, meta, beacon, actions, titleId }: {
@@ -75,6 +91,7 @@ interface RowProps {
   detail?: ReactNode;
   lead?: ReactNode;
   end?: ReactNode;
+  value?: ReactNode;
   href?: string;
   onClick?: () => void;
   selected?: boolean;
@@ -84,8 +101,8 @@ interface RowProps {
 }
 
 /** One open row. With href or onClick the whole row is the control; put other actions in `end` only when the row itself isn't a link. */
-export function StRow({ kind, title, detail, lead, end, href, onClick, selected, align = "center", stackOnPhone = true, children }: RowProps) {
-  const body = <>{lead}<span className={styles.rowMain}>{kind ? <span className={styles.rowKind}>{kind}</span> : null}<span className={styles.rowTitle}>{title}</span>{detail ? <span className={styles.rowDetail}>{detail}</span> : null}{children}</span>{end ? <span className={styles.rowEnd}>{end}</span> : null}</>;
+export function StRow({ kind, title, detail, lead, value, end, href, onClick, selected, align = "center", stackOnPhone = true, children }: RowProps) {
+  const body = <>{lead}<span className={styles.rowMain}>{kind ? <span className={styles.rowKind}>{kind}</span> : null}<span className={styles.rowTitle}>{title}</span>{detail ? <span className={styles.rowDetail}>{detail}</span> : null}{children}</span>{value ? <span className={styles.rowValue}>{value}</span> : null}{end ? <span className={styles.rowEnd}>{end}</span> : null}</>;
   const shared = { className: styles.row, "data-selected": selected || undefined, "data-align": align, "data-stack": stackOnPhone || undefined } as const;
   if (href) return <li><Link {...shared} href={href} aria-current={selected ? "true" : undefined}>{body}</Link></li>;
   if (onClick) return <li><button {...shared} type="button" onClick={onClick} aria-pressed={selected || undefined}>{body}</button></li>;
@@ -130,16 +147,30 @@ export function StPillLink({ href, variant = "primary", size = "md", block, chil
   return <Link href={href} className={styles.pill} data-variant={variant} data-size={size} data-block={block || undefined}>{children}</Link>;
 }
 
-export function StTextButton({ tone, children, href, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { tone?: "accent" | "danger"; href?: string }) {
-  if (href) return <Link href={href} className={styles.textButton} data-tone={tone}>{children}</Link>;
+export function StTextButton({ tone, children, href, target, rel, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { tone?: "accent" | "danger"; href?: string; target?: string; rel?: string }) {
+  if (href) return <Link href={href} target={target} rel={rel} className={styles.textButton} data-tone={tone}>{children}</Link>;
   return <button type="button" {...rest} className={styles.textButton} data-tone={tone}>{children}</button>;
 }
 
 /** Two to four mutually exclusive choices. `disabledValues` dims choices that are not allowed, with the reason in `title`. */
 export function StSegmented<T extends string>({ value, options, onChange, label, disabledValues = [], disabledReason }: { value: T; options: readonly { value: T; label: string }[]; onChange?: (value: T) => void; label: string; disabledValues?: readonly T[]; disabledReason?: string }) {
+  const firstAvailable = options.find(option => !disabledValues.includes(option.value))?.value;
+  const tabValue = disabledValues.includes(value) ? firstAvailable : value;
   return <div className={styles.segmented} role="radiogroup" aria-label={label}>{options.map(option => {
     const disabled = disabledValues.includes(option.value);
-    return <button key={option.value} type="button" role="radio" aria-checked={value === option.value} className={styles.segment} disabled={disabled || !onChange} title={disabled ? disabledReason : undefined} onClick={() => onChange?.(option.value)}>{option.label}</button>;
+    return <button key={option.value} type="button" role="radio" aria-checked={value === option.value} tabIndex={option.value === tabValue ? 0 : -1} className={styles.segment} disabled={disabled || !onChange} title={disabled ? disabledReason : undefined} onClick={() => onChange?.(option.value)} onKeyDown={event => {
+      if (!onChange || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+      const available = options.filter(candidate => !disabledValues.includes(candidate.value));
+      if (!available.length) return;
+      event.preventDefault();
+      const index = available.findIndex(candidate => candidate.value === option.value);
+      const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? available.length - 1 : (index + (event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 1) + available.length) % available.length;
+      const next = available[nextIndex];
+      if (!next) return;
+      onChange(next.value);
+      const buttons = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('button[role="radio"]');
+      buttons?.[options.findIndex(candidate => candidate.value === next.value)]?.focus();
+    }}>{option.label}</button>;
   })}</div>;
 }
 
@@ -167,7 +198,7 @@ export function StLedger({ path, count, lines, action }: { path: ReactNode; coun
 
 /* ---------- Hold to accept ---------- */
 
-const HOLD_MS = 900;
+const HOLD_MS = 800;
 
 /**
  * For consequential yeses (publish, confirm a booking, leave). Press and hold
@@ -226,12 +257,12 @@ export function StToast({ children, onUndo, undoLabel = "Undo" }: { children: Re
 }
 
 /** A bordered surface. Only for real objects: a draft, a preview, a receipt, a form. Never to group a list. */
-export function StSurface({ children, tone, pad = true, label }: { children: ReactNode; tone?: "need"; pad?: boolean; label?: string }) {
-  return <div className={`${styles.surface}${pad ? ` ${styles.surfacePad}` : ""}`} data-tone={tone} role={label ? "group" : undefined} aria-label={label}>{children}</div>;
+export function StSurface({ children, tone, pad = true, label, selected }: { children: ReactNode; tone?: "need"; pad?: boolean; label?: string; selected?: boolean }) {
+  return <div className={`${styles.surface}${pad ? ` ${styles.surfacePad}` : ""}`} data-tone={tone} data-selected={selected || undefined} role={label ? "group" : undefined} aria-label={label}>{children}</div>;
 }
 
-export function StNotice({ children, tone, icon }: { children: ReactNode; tone?: "need" | "critical"; icon?: ReactNode }) {
-  return <div className={styles.notice} data-tone={tone} role={tone === "critical" ? "alert" : undefined}>{icon}<div>{children}</div></div>;
+export function StNotice({ children, tone, icon, action }: { children: ReactNode; tone?: "need" | "critical"; icon?: ReactNode; action?: ReactNode }) {
+  return <div className={styles.notice} data-tone={tone} role={tone === "critical" ? "alert" : undefined}>{icon}<div className={styles.noticeBody}>{children}</div>{action ? <div className={styles.noticeAction}>{action}</div> : null}</div>;
 }
 
 /** An empty state that says what is true and offers the next step. */

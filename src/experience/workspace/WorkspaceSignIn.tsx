@@ -1,19 +1,15 @@
+import type { ReactNode } from "react";
 import { SupabaseSignIn } from "@/components/auth/SupabaseSignIn";
 import { AuthDocumentTitle } from "@/components/AuthDocumentTitle";
-import Link from "next/link";
+import { StEntry, StHead, StNotice, StTextButton } from "@/components/ui/strelva/Kit";
 
-export function WorkspaceSignIn({ next = "/workspace", failed = false }: { next?: string; failed?: boolean }) {
-  return (
-    <main className="marketing-root min-h-dvh px-6 py-20">
-      <AuthDocumentTitle title="Your Strelva workspace" />
-      <div className="mx-auto max-w-md">
-        <Link href="/workspace" className="text-sm text-m-text-2">Strelva</Link>
-        <h1 className="mt-10 font-display text-4xl text-m-text">Your work starts here.</h1>
-        <p className="mb-8 mt-5 leading-relaxed text-m-text-2">Sign in or create an account to save private work. You do not need a managed website or a paid plan.</p>
-        <p className="mb-8 text-sm text-m-text-3">Accepting an agency handoff or saving a public scorecard? Use the email addressed to you. If your email opens a new tab, return to the handoff or scorecard and choose the action again.</p>
-        {failed && <p role="alert" className="mb-6 text-sm text-m-danger">Sign-in did not complete. Try again to return to your saved work.</p>}
-        <SupabaseSignIn next={next} />
-      </div>
-    </main>
-  );
+export function WorkspaceSignIn({ next = "/workspace", failed = false, title = "Sign in", description = "Use the email connected to your Strelva account.", prefillEmail = "", children, brand, host }: { next?: string; failed?: boolean; title?: string; description?: string; prefillEmail?: string; children?: ReactNode; brand?: ReactNode; host?: string }) {
+  return <StEntry brand={brand} host={host} helpHref="/workspace?view=help">
+    <AuthDocumentTitle title={title} />
+    {children}
+    {failed ? <StNotice tone="critical">Sign-in did not complete. Try again to return to your saved work.</StNotice> : null}
+    <SupabaseSignIn next={next} prefillEmail={prefillEmail} heading={<StHead title={title} meta={description} />} />
+    {brand ? <p className="text-sm text-gray-muted">Runs on Strelva. Same account as strelva.com.</p> : null}
+    <StTextButton href={`/sign-up?next=${encodeURIComponent(next)}`}>New here? Create an account</StTextButton>
+  </StEntry>;
 }

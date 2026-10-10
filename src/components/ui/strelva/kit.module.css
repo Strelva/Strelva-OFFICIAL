@@ -258,7 +258,7 @@ a.row:hover, button.row:hover { background: var(--gray-bg-alt); }
 }
 
 /* ---------- Segmented ---------- */
-.segmented { display: inline-flex; align-self: flex-start; gap: 2px; padding: 3px; border-radius: 10px; background: var(--st-inset); }
+.segmented { max-width: 100%; flex-wrap: wrap; display: inline-flex; align-self: flex-start; gap: 2px; padding: 3px; border-radius: 10px; background: var(--st-inset); }
 
 .segment {
   min-height: 30px;
@@ -448,3 +448,35 @@ a.row:hover, button.row:hover { background: var(--gray-bg-alt); }
 .composer:focus-within { border-color: color-mix(in srgb, var(--st-accent) 40%, var(--st-line)); }
 .composerDock { position: sticky; bottom: 20px; z-index: 20; display: flex; justify-content: center; pointer-events: none; }
 .composerDock > * { pointer-events: auto; }
+
+/* Object with an adjacent explanation, never a dashboard card grid. */
+.split { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 40px; align-items: start; }
+.split[data-balance="aside"] { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+.split > div { min-width: 0; display: flex; flex-direction: column; gap: 24px; }
+.rowValue { flex: 1; min-width: 0; font-size: 14px; line-height: 22px; overflow-wrap: anywhere; }
+.noticeBody { flex: 1; min-width: 0; }
+.noticeAction { flex-shrink: 0; align-self: center; }
+.field { display: flex; flex-direction: column; gap: 8px; }
+.fieldLabel { display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 20px; color: var(--st-text); }
+.field input, .field textarea, .field select { box-sizing: border-box; width: 100%; min-height: 44px; border: 1px solid var(--st-line); border-radius: var(--st-r-md, 12px); background: var(--st-surface); padding: 10px 12px; color: var(--st-text); font: inherit; font-size: 14px; line-height: 22px; }
+.field input:read-only, .field textarea:read-only { background: var(--st-inset); }
+.field input:focus-visible, .field textarea:focus-visible, .field select:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
+.fieldHint { margin: 0; color: var(--st-text-2); font-size: 13px; line-height: 20px; }
+.entry { min-height: 100dvh; background: var(--st-canvas); color: var(--st-text); font-family: var(--font-workspace), sans-serif; }
+.entryHeader { display: flex; justify-content: space-between; align-items: center; padding: 20px 32px; gap: 24px; }
+.entryBrand { display: flex; align-items: center; gap: 12px; color: var(--st-text); font-size: 16px; text-decoration: none; }
+.entryColumn { width: min(400px, calc(100% - 40px)); margin: 88px auto 0; padding-bottom: 64px; display: flex; flex-direction: column; gap: 24px; }
+.entryColumn[data-width="account"] { width: min(816px, 100%); margin-top: 40px; }
+.entryColumn h1 { font-size: 22px; line-height: 30px; font-weight: 600; letter-spacing: 0; }
+@media (max-width: 767px) {
+  .split, .split[data-balance="aside"] { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  .rowValue { flex-basis: 100%; }
+  .notice { flex-wrap: wrap; }
+  .noticeAction { margin-left: auto; }
+  .entryHeader { padding: 20px; }
+  .entryColumn { margin-top: 56px; }
+}
+
+@media (pointer: coarse) { .segment, .textButton { min-height: 44px; } }
+
+.surface[data-selected="true"] { border-color: var(--st-accent); box-shadow: inset 0 0 0 1px var(--st-accent); }
