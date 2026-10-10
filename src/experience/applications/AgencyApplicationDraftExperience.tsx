@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/Button";
+import { StEmpty, StHead, StNotice, StPage, StPill, StSkeleton } from "@/components/ui/strelva/Kit";
+import { StandaloneApplicationShell } from "./StandaloneApplicationShell";
+import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import { BoundedWorkExperience } from "@/experience/operations/BoundedWorkExperience";
 import { agencyApplicationDraftGrantSchema, type AgencyApplicationDraftGrant } from "@/platform/offerings/agency-application-draft-contracts";
 
@@ -11,6 +13,7 @@ function message(body: unknown): string {
 }
 
 export function AgencyApplicationDraftExperience({ workId }: { workId: string }) {
+  const request = useWorkspaceRequest();
   const [grant, setGrant] = useState<AgencyApplicationDraftGrant | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
@@ -26,7 +29,7 @@ export function AgencyApplicationDraftExperience({ workId }: { workId: string })
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`/api/agency-application-draft-access?workId=${encodeURIComponent(workId)}`, { cache: "no-store", signal: controller.signal })
+    request(`/api/agency-application-draft-access?workId=${encodeURIComponent(workId)}`, { cache: "no-store", signal: controller.signal })
       .then(async response => {
         const body = await response.json() as unknown;
         if (!response.ok) throw new Error(message(body));
@@ -38,20 +41,14 @@ export function AgencyApplicationDraftExperience({ workId }: { workId: string })
       .catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Draft access could not be confirmed."); })
       .finally(() => { if (!controller.signal.aborted) setBusy(false); });
     return () => controller.abort();
-  }, [reload, workId]);
+  }, [request, reload, workId]);
 
   const active = now !== null && grant?.status === "active" && Number.isFinite(Date.parse(grant.expiresAt)) && Date.parse(grant.expiresAt) > now;
-  return <main className="min-h-screen bg-surface">
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-8">
-      <header className="mb-6 space-y-2">
-        <p className="text-sm text-gray-muted">Assigned application draft</p>
-        <h1 className="font-display text-3xl">Agency work</h1>
-        <p className="max-w-2xl text-sm text-gray-muted">This page is limited to the exact application named by the client’s accepted delivery and assignment.</p>
-      </header>
-      {busy ? <p role="status">Checking the current draft permission…</p> : null}
-      {error ? <div role="alert" className="mb-5 space-y-2 text-sm text-critical"><p>{error}</p><Button variant="secondary" onClick={() => { setBusy(true); setError(""); setReload(value => value + 1); }}>Reload permission</Button></div> : null}
-      {!busy && !error && !active ? <p role="status" className="mb-5 max-w-2xl rounded-xl border border-gray-border p-4 text-sm text-gray-muted">The client has not granted draft editing for this application, or the grant has expired or been revoked. You can inspect the assigned work when its delivery is active, but you cannot save a draft revision.</p> : null}
-      {!busy ? <BoundedWorkExperience workspaceId="assigned" workId={workId} productId="applications" readOnly={!active} draftEditOnly={active} canEdit={active} sources={[]} onSaved={() => undefined} /> : null}
-    </div>
-  </main>;
+  return <StandaloneApplicationShell><StPage>
+    {busy ? <><StHead title="Opening application draft…" /><StSkeleton label="Checking the current draft permission" /></> : null}
+    {error ? <><div role="alert"><StNotice tone="critical">{error}</StNotice></div><div><StPill variant="soft" onClick={() => { setBusy(true); setError(""); setReload(value => value + 1); }}>Reload permission</StPill></div></> : null}
+    {!busy && !error && !active ? <StNotice tone="need">The client has not granted draft editing for this application, or the grant has expired or been revoked. You can inspect the assigned work when its delivery is active, but you cannot save a draft revision.</StNotice> : null}
+    {!busy ? <BoundedWorkExperience workspaceId="assigned" workId={workId} productId="applications" standaloneApplication readOnly={!active} draftEditOnly={active} canEdit={active} sources={[]} onSaved={() => undefined} /> : null}
+    {!busy && !error && active ? <StEmpty>The client reviews and publishes changes. This access is limited to the application named by the accepted delivery and assignment.</StEmpty> : null}
+  </StPage></StandaloneApplicationShell>;
 }

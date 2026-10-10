@@ -1,5 +1,7 @@
 "use client";
 
+import { StCopy, StField, StHead, StMono, StNotice, StPill, StRow, StRows, StSection, StSkeleton, StState, StSurface, StTextButton, StTextField } from "@/components/ui/strelva/Kit";
+import { ApplicationUseRenderer } from "@/experience/applications/ApplicationUseRenderer";
 import { ApplicationDraftPreview } from "@/experience/applications/ApplicationDraftPreview";
 import { intentRequestFor, useWorkspaceIntent } from "@/experience/workspace/WorkspaceIntent";
 
@@ -24,7 +26,7 @@ type Investigation = z.infer<typeof investigationSchema>;
 type InvestigationSource = z.infer<typeof investigationSourceSchema>;
 type Spec = z.infer<typeof applicationSpecSchema>;
 type Saved = { id: string; payload: Application | Schedule | Investigation };
-type Props = { initialRequest?: string; workspaceId: string; workId?: string; productId: Product; readOnly?: boolean; canManage?: boolean; canEdit?: boolean; draftEditOnly?: boolean; workspaceStopped?: boolean; calendarRecoveryAllowed?: boolean; sources: WorkspaceWork[]; onSaved: (id: string) => void };
+type Props = { standaloneApplication?: boolean; initialRequest?: string; workspaceId: string; workId?: string; productId: Product; readOnly?: boolean; canManage?: boolean; canEdit?: boolean; draftEditOnly?: boolean; workspaceStopped?: boolean; calendarRecoveryAllowed?: boolean; sources: WorkspaceWork[]; onSaved: (id: string) => void };
 type Command = (command: Record<string, unknown>, action?: "command" | "run") => Promise<boolean>;
 const labels = { applications: "Internal tool", scheduling: "Reservations", investigations: "Website monitoring" };
 const control = "block w-full rounded-xl border border-gray-border bg-surface px-3 py-2 text-sm min-h-11";
@@ -43,11 +45,18 @@ function SelectOptionsEditor({
   field,
   disabled,
   onChange,
+  standaloneApplication = false,
 }: {
+  standaloneApplication?: boolean;
   field: Extract<Spec["fields"][number], { type: "select" }>;
   disabled: boolean;
   onChange: (options: string[]) => void;
 }) {
+  if (standaloneApplication) return <StSection title="Allowed options">
+    {field.options.map((option, index) => <div key={`${field.id}-option-${index}`} className="flex items-end gap-3"><StTextField label={`Option ${index + 1} for ${field.label}`} value={option} maxLength={80} required disabled={disabled} onChange={event => onChange(field.options.map((item, optionIndex) => optionIndex === index ? event.target.value : item))} /><StTextButton disabled={disabled || field.options.length <= 1} onClick={() => onChange(field.options.filter((_, optionIndex) => optionIndex !== index))}>Remove<span className="sr-only"> option {index + 1}</span></StTextButton></div>)}
+    <StTextButton disabled={disabled || field.options.length >= 20} onClick={() => onChange([...field.options, `Option ${field.options.length + 1}`])}>Add option</StTextButton>
+    <StCopy muted>People can choose one of these options. Keep an option in place while records use it; publishing checks existing records before changing the list.</StCopy>
+  </StSection>;
   return <div className="space-y-3 sm:col-span-3">
     <p className="text-sm font-medium">Allowed options</p>
     <div className="space-y-3">
@@ -87,7 +96,7 @@ export function BoundedWorkExperience(props: Props) {
   const onSaved = props.workId ? props.onSaved : (id: string) => { intent.spend(props.productId); props.onSaved(id); };
   return <Session key={`${props.workspaceId}:${props.workId ?? "new"}:${props.productId}`} {...props} onSaved={onSaved} initialRequest={props.initialRequest || (!props.workId ? intentRequestFor(intent, props.productId) : undefined)} />;
 }
-function Session({ initialRequest, workspaceId, workId, productId, readOnly = false, draftEditOnly = false, canManage = !readOnly || draftEditOnly, canEdit = draftEditOnly, workspaceStopped = false, calendarRecoveryAllowed = false, sources, onSaved }: Props) {
+function Session({ standaloneApplication = false, initialRequest, workspaceId, workId, productId, readOnly = false, draftEditOnly = false, canManage = !readOnly || draftEditOnly, canEdit = draftEditOnly, workspaceStopped = false, calendarRecoveryAllowed = false, sources, onSaved }: Props) {
   const request = useWorkspaceRequest();
   const [saved, setSaved] = useState<Saved | null>(null);
   const [busy, setBusy] = useState(false);
@@ -134,16 +143,16 @@ function Session({ initialRequest, workspaceId, workId, productId, readOnly = fa
   const displayTitle = saved && productId === "applications"
     ? ((saved.payload as Application).status !== "retired" && (saved.payload as Application).release?.spec.title) || saved.payload.title
     : saved?.payload.title;
-  return <section className="mx-auto max-w-4xl space-y-6 p-4 sm:p-8" aria-busy={busy}>
-    <header><p className="text-sm text-gray-muted">{labels[productId]}</p><h1 className="font-display text-3xl">{displayTitle || (productId === "applications" ? "Make a place for your team’s work" : productId === "scheduling" ? "Keep a time available" : "Monitor a public page")}</h1></header>
+  return <section className={standaloneApplication ? "space-y-6" : "mx-auto max-w-4xl space-y-6 p-4 sm:p-8"} aria-busy={busy}>
+    {standaloneApplication ? <StHead title={displayTitle || (error ? "This application could not be opened" : busy ? "Opening application…" : "Application")} meta={saved ? <><StState kind={(saved.payload as Application).status === "retired" || !(saved.payload as Application).release ? "draft" : "live"}>{(saved.payload as Application).status === "retired" ? "Retired" : (saved.payload as Application).release ? "Live" : "Draft"}</StState> · internal tool · <StState kind={draftEditOnly ? "need" : "draft"}>{draftEditOnly ? "Draft editing only" : "Read-only access"}</StState></> : undefined} /> : <header><p className="text-sm text-gray-muted">{labels[productId]}</p><h1 className="font-display text-3xl">{displayTitle || (productId === "applications" ? "Make a place for your team’s work" : productId === "scheduling" ? "Keep a time available" : "Monitor a public page")}</h1></header>}
     {initialRequest && !saved ? <details className="text-sm"><summary className="cursor-pointer">Your original request</summary><p className="mt-3 whitespace-pre-wrap">{initialRequest}</p></details> : null}
     {readOnly ? <p role="status" className="text-sm text-gray-muted">{workspaceStopped ? "Work in this workspace has stopped. Existing records remain available for review." : "You can inspect this work. Changes require workspace membership."}</p> : null}
     {draftEditOnly ? <p role="status" className="text-sm text-gray-muted">You can revise this exact application draft and run its checks. The client reviews and publishes it.</p> : null}
-    {error ? <div role="alert" className="space-y-2 text-sm text-critical"><p>{error}</p>{workId ? <Button variant="secondary" disabled={busy} onClick={() => setReload(value => value + 1)}>Reload current work</Button> : null}</div> : null}
+    {error ? standaloneApplication ? <div role="alert" className="space-y-3"><StNotice tone="critical">{error}</StNotice>{workId ? <StPill variant="soft" disabled={busy} onClick={() => setReload(value => value + 1)}>Reload current work</StPill> : null}</div> : <div role="alert" className="space-y-2 text-sm text-critical"><p>{error}</p>{workId ? <Button variant="secondary" disabled={busy} onClick={() => setReload(value => value + 1)}>Reload current work</Button> : null}</div> : null}
     {notice ? <p role="status" className="text-sm">{notice}</p> : null}
-    {handingOff && saved ? <p role="status" className="text-sm text-gray-muted">Saved. Opening your work before the next change. <a className="underline underline-offset-4" href={`?workspaceId=${encodeURIComponent(workspaceId)}&view=${productId}&work=${encodeURIComponent(saved.id)}`}>Open saved work</a></p> : workId && !saved ? <p role="status">{busy ? "Loading your work…" : "No result is available to display."}</p> : saved ? <>
-      {productId === "applications" ? <ApplicationResult value={saved.payload as Application} workId={saved.id} canManage={canManage} canEdit={canEdit} draftEditOnly={draftEditOnly} disabled={disabled} command={command} /> : productId === "scheduling" ? <ScheduleResult value={saved.payload as Schedule} canManage={canManage} disabled={disabled} calendarRecoveryAllowed={calendarRecoveryAllowed} command={command} workspaceId={workspaceId} workId={saved.id} onChanged={() => setReload(value => value + 1)} /> : <InvestigationResult value={saved.payload as Investigation} disabled={disabled} command={command} sources={sources} workspaceId={workspaceId} />}
-      <details className={group}><summary className="cursor-pointer text-sm">History and responsibility</summary><p className="text-sm text-gray-muted">Revision {saved.payload.revision}. Created {time(saved.payload.createdAt)}.</p>{productId === "applications" ? <p className="break-all text-sm">Maintenance owner: {(saved.payload as Application).spec.maintenanceOwner}</p> : null}<ol className="space-y-2 text-sm">{saved.payload.history.slice().reverse().map(item => <li key={item.revision}>{item.kind.replaceAll("_", " ")} · {time(item.at)}<span className="block break-all text-gray-muted">Recorded actor: {item.actorId}</span></li>)}</ol></details>
+    {handingOff && saved ? <p role="status" className="text-sm text-gray-muted">Saved. Opening your work before the next change. <a className="underline underline-offset-4" href={`?workspaceId=${encodeURIComponent(workspaceId)}&view=${productId}&work=${encodeURIComponent(saved.id)}`}>Open saved work</a></p> : workId && !saved ? <p role="status">{busy && standaloneApplication ? <StSkeleton label="Loading your work" /> : busy ? "Loading your work…" : "No result is available to display."}</p> : saved ? <>
+      {productId === "applications" ? <ApplicationResult standaloneApplication={standaloneApplication} value={saved.payload as Application} workId={saved.id} canManage={canManage} canEdit={canEdit} draftEditOnly={draftEditOnly} disabled={disabled} command={command} /> : productId === "scheduling" ? <ScheduleResult value={saved.payload as Schedule} canManage={canManage} disabled={disabled} calendarRecoveryAllowed={calendarRecoveryAllowed} command={command} workspaceId={workspaceId} workId={saved.id} onChanged={() => setReload(value => value + 1)} /> : <InvestigationResult value={saved.payload as Investigation} disabled={disabled} command={command} sources={sources} workspaceId={workspaceId} />}
+      {standaloneApplication ? <StSection title="History and responsibility"><StRows><StRow title="Current revision" value={<StMono>{saved.payload.revision}</StMono>} detail={<>Created <StMono as="time" dateTime={saved.payload.createdAt}>{time(saved.payload.createdAt)}</StMono></>} /><StRow title="Maintenance owner" value={<StMono>{(saved.payload as Application).spec.maintenanceOwner}</StMono>} />{saved.payload.history.slice().reverse().map(item => <StRow key={item.revision} title={item.kind.replaceAll("_", " ")} detail={<>Recorded actor: <StMono>{item.actorId}</StMono></>} end={<StMono as="time" dateTime={item.at}>{time(item.at)}</StMono>} />)}</StRows></StSection> : <details className={group}><summary className="cursor-pointer text-sm">History and responsibility</summary><p className="text-sm text-gray-muted">Revision {saved.payload.revision}. Created {time(saved.payload.createdAt)}.</p>{productId === "applications" ? <p className="break-all text-sm">Maintenance owner: {(saved.payload as Application).spec.maintenanceOwner}</p> : null}<ol className="space-y-2 text-sm">{saved.payload.history.slice().reverse().map(item => <li key={item.revision}>{item.kind.replaceAll("_", " ")} · {time(item.at)}<span className="block break-all text-gray-muted">Recorded actor: {item.actorId}</span></li>)}</ol></details>}
     </> : !readOnly && canManage && (productId !== "applications" || canEdit) ? <>{productId === "applications" ? <CopyApplication sources={sources} disabled={disabled} copy={sourceWorkId => write({ action: "from_source", workspaceId, sourceWorkId })} /> : null}<Create productId={productId} sources={sources} disabled={disabled} create={input => write({ action: "create", workspaceId, input })} /></> : !readOnly && canManage && productId === "applications" ? <p className="text-sm text-gray-muted">Ask your agency to create or copy an internal tool.</p> : null}
   </section>;
 }
@@ -306,7 +315,7 @@ function recordImpact(value: Application, candidateVersion: number): string {
   return check.passed ? "Passed. Record compatibility check passed for this proposal. Publishing checks the latest records again and does not delete them." : "Failed. One or more existing records do not fit this proposal.";
 }
 
-function ApplicationReview({ value, command, disabled, canPublish = true, canEdit = false }: { value: Application; command: Command; disabled: boolean; canPublish?: boolean; canEdit?: boolean }) {
+function ApplicationReview({ standaloneApplication = false, value, command, disabled, canPublish = true, canEdit = false }: { standaloneApplication?: boolean; value: Application; command: Command; disabled: boolean; canPublish?: boolean; canEdit?: boolean }) {
   const id = useId();
   const liveRelease = value.status === "retired" ? null : value.release ?? null;
   const proposed = value.candidate?.spec ?? value.spec;
@@ -316,6 +325,13 @@ function ApplicationReview({ value, command, disabled, canPublish = true, canEdi
   const rehearsal = value.rehearsal?.specVersion === proposedVersion ? value.rehearsal : null;
   const checksPassed = Boolean(rehearsal?.checks.length && rehearsal.checks.every(check => check.passed));
   const groups = applicationChangeGroups(liveRelease?.spec ?? null, proposed);
+  if (standaloneApplication) return <StSection title="Review changes" meta={<StState kind={checksPassed ? "live" : "need"}>{checksPassed ? "Checks passed" : "Needs checks"}</StState>}>
+    <StCopy muted>{liveRelease ? `Draft ${proposedVersion} compared with live release ${liveRelease.version}.` : "This is the first proposed draft. Review it before publishing."}</StCopy>
+    <StRows>{groups.map(groupItem => <StRow key={groupItem.heading} title={groupItem.heading} detail={groupItem.items.map(item => <span key={item} className="block">{item}</span>)} />)}<StRow title="Existing records" detail={recordImpact(value, proposedVersion)} /></StRows>
+    {rehearsal ? <StRows label={`Checks for draft ${proposedVersion}`}>{rehearsal.checks.map(check => <StRow key={check.name} title={check.name} end={<StState kind={check.passed ? "live" : "down"}>{check.passed ? "Passed" : "Failed"}</StState>} />)}</StRows> : null}
+    {canEdit && !checksPassed ? <div><StPill variant="soft" disabled={disabled} onClick={() => void command({ kind: "rehearse", expectedDesignRevision: value.candidate?.designRevision ?? value.designRevision ?? 0 })}>{rehearsal ? "Run checks again" : "Check proposed change"}</StPill></div> : null}
+    {canPublish ? <div><StPill disabled={disabled || !checksPassed} onClick={() => void command({ kind: "publish", expectedCandidateRevision: value.candidate?.designRevision ?? value.designRevision ?? 0, expectedReleaseVersion: liveRelease?.version ?? null })}>Publish</StPill></div> : <StCopy muted>{checksPassed ? "Checks passed. Return this draft to the client for review and publication." : "The client can publish after every check passes."}</StCopy>}
+  </StSection>;
   return <details open={value.status === "draft"} className={group}>
     <summary className="cursor-pointer text-sm">Review changes</summary>
     <div className="mt-4 space-y-5">
@@ -333,7 +349,7 @@ function ApplicationReview({ value, command, disabled, canPublish = true, canEdi
   </details>;
 }
 
-function ApplicationResult({ value, workId, canManage, canEdit, draftEditOnly = false, command, disabled }: { value: Application; workId: string; canManage: boolean; canEdit: boolean; draftEditOnly?: boolean; command: Command; disabled: boolean }) {
+function ApplicationResult({ standaloneApplication = false, value, workId, canManage, canEdit, draftEditOnly = false, command, disabled }: { value: Application; workId: string; canManage: boolean; canEdit: boolean; draftEditOnly?: boolean; standaloneApplication?: boolean; command: Command; disabled: boolean }) {
   const [section, setSection] = useState(draftEditOnly ? "edit" : "use");
   const [values, setValues] = useState<Record<string, string | number | boolean>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -359,6 +375,17 @@ function ApplicationResult({ value, workId, canManage, canEdit, draftEditOnly = 
     : liveRelease
       ? `Release ${liveRelease.version} is live.${value.status === "draft" ? " You are editing a draft; live use continues while you check the next draft." : " Available to members of this workspace."}`
       : "No release is live yet. Check the draft before publishing it.";
+  const inspectRecords = <ApplicationUseRenderer presentation="preview" snapshot={{ workId, title: useSpec.title, releaseVersion: liveRelease?.version ?? 0,
+    views: useSpec.components.filter(component => component.kind !== "form").map(component => ({ kind: component.kind, fields: component.fields.flatMap(fieldId => { const field = useSpec.fields.find(item => item.id === fieldId); return field ? [field] : []; }) })),
+    records: value.records,
+    access: { views: useSpec.components.filter(component => component.kind !== "form").map(component => component.kind), recordRead: "all", recordEdit: "none", recordSubmit: false, expiresAt: "" },
+  }} draft={{ values: {}, recordId: "", idempotencyKey: "" }} onDraftChange={() => undefined} onSubmit={() => undefined} />;
+  if (standaloneApplication) return <>
+    {canEdit ? <EditApplicationSpec key={value.specVersion} standaloneApplication value={value} command={command} disabled={disabled} /> : liveRelease || value.status === "retired" ? inspectRecords : <ApplicationDraftPreview spec={useSpec} />}
+    {canEdit && (liveRelease || value.records.length > 0) ? <details className="space-y-4"><summary className="cursor-pointer text-sm">Current records</summary>{inspectRecords}</details> : null}
+    <ApplicationReview standaloneApplication value={value} command={command} disabled={disabled} canPublish={false} canEdit={canEdit} />
+    <StCopy muted>{availability} This is a private tool, with no public deployment.</StCopy>
+  </>;
   return <>
     <p className="text-sm text-gray-muted">{availability} This is a private tool, with no public deployment.</p>
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -479,7 +506,7 @@ function applicationViewLabel(kind: ApplicationViewKind): string {
   return kind === "form" ? "Entry form" : kind === "list" ? "Record list" : kind === "detail" ? "Record details" : "Record document";
 }
 
-function EditApplicationSpec({ value, command, disabled }: { value: Application; command: Command; disabled: boolean }) {
+function EditApplicationSpec({ standaloneApplication = false, value, command, disabled }: { standaloneApplication?: boolean; value: Application; command: Command; disabled: boolean }) {
   const [title, setTitle] = useState(value.spec.title);
   const [fields, setFields] = useState<Spec["fields"]>(() => value.spec.fields.map(field => ({ ...field })));
   const [components, setComponents] = useState<Spec["components"]>(() => value.spec.components.map(component => ({ ...component, fields: [...component.fields] })));
@@ -569,6 +596,22 @@ function EditApplicationSpec({ value, command, disabled }: { value: Application;
 
   const addableKinds = applicationViewKinds.filter(kind => !components.some(component => component.kind === kind));
   const selectedAddKind = addableKinds.includes(newViewKind) ? newViewKind : addableKinds[0] ?? "";
+  if (standaloneApplication) return <>
+    <ApplicationDraftPreview spec={{ title, fields, components }} />
+    <StSection title="Edit proposed app">
+      <StSurface><form className="space-y-6" onSubmit={event => { event.preventDefault(); setEditorError(""); void command({ kind: "revise", expectedDesignRevision: value.candidate?.designRevision ?? value.designRevision ?? 0, spec: { ...value.spec, title, fields, components } }); }}>
+        <StCopy muted>Changing the app creates a new draft. Existing records remain, and the current live release keeps working while you check the draft.</StCopy>
+        <StTextField label="App name" value={title} maxLength={160} required disabled={disabled} onChange={event => { setEditorError(""); setTitle(event.target.value); }} />
+        <StSection title="Fields"><div className="space-y-5">{fields.map((field, index) => <fieldset key={field.id} className="space-y-3 border-t border-gray-border pt-4"><legend className="sr-only">Field {index + 1}</legend><div className="grid gap-3 sm:grid-cols-[1fr_150px]">
+          <StTextField label={`Label for ${field.label}`} value={field.label} maxLength={80} required disabled={disabled} onChange={event => updateField(field.id, { label: event.target.value })} />
+          <StField label="Type"><select aria-label={`Type for ${field.label}`} value={field.type} disabled={disabled} onChange={event => updateFieldType(field.id, event.target.value as Spec["fields"][number]["type"])}><option value="text">Text</option><option value="number">Number</option><option value="boolean">Yes or no</option><option value="date">Date</option><option value="select">Choose one</option></select></StField>
+        </div><div className="flex flex-wrap items-center justify-between gap-3"><label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" aria-label={`Required for ${field.label}`} checked={field.required} disabled={disabled} onChange={event => updateField(field.id, { required: event.target.checked })} />Required</label><StTextButton disabled={disabled || fields.length <= 1} onClick={() => removeField(field.id)}>Remove field<span className="sr-only"> {index + 1}</span></StTextButton></div>{field.type === "select" ? <SelectOptionsEditor standaloneApplication field={field} disabled={disabled} onChange={options => updateField(field.id, { options })} /> : null}</fieldset>)}</div><StTextButton disabled={disabled || fields.length >= 30} onClick={addField}>Add field</StTextButton></StSection>
+        <StSection title="Views"><StCopy muted>Choose which fields each view shows. Views use the same fixed app behavior as the live app.</StCopy><div className="space-y-5">{components.map((component, index) => <fieldset key={`${component.kind}-${index}`} className="space-y-3 border-t border-gray-border pt-4"><legend className="text-sm font-medium">{applicationViewLabel(component.kind)}</legend><div className="grid gap-2 sm:grid-cols-2">{fields.map(field => <label key={field.id} className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" aria-label={`Show ${field.label} in ${component.kind} view`} checked={component.fields.includes(field.id)} disabled={disabled} onChange={event => toggleViewField(index, field.id, event.target.checked)} />{field.label}</label>)}</div><div className="flex flex-wrap gap-4"><StTextButton disabled={disabled || index === 0} onClick={() => moveView(index, -1)}>Move up</StTextButton><StTextButton disabled={disabled || index === components.length - 1} onClick={() => moveView(index, 1)}>Move down</StTextButton><StTextButton disabled={disabled || components.length <= 1} onClick={() => removeView(index)}>Remove view</StTextButton></div></fieldset>)}</div>{addableKinds.length ? <div className="flex flex-wrap items-end gap-4"><StField label="View to add"><select aria-label="View to add" value={selectedAddKind} disabled={disabled} onChange={event => setNewViewKind(event.target.value as ApplicationViewKind)}>{addableKinds.map(kind => <option key={kind} value={kind}>{applicationViewLabel(kind)}</option>)}</select></StField><StTextButton disabled={disabled || !selectedAddKind} onClick={addView}>Add view</StTextButton></div> : <StCopy muted>All supported views are included.</StCopy>}</StSection>
+        {editorError ? <div role="alert"><StNotice tone="critical">{editorError}</StNotice></div> : null}
+        <StPill type="submit" disabled={disabled || !changed}>Save new draft</StPill>
+      </form></StSurface>
+    </StSection>
+  </>;
   return <details className={group}><summary className="cursor-pointer text-sm">Edit proposed app</summary><form className="space-y-5" onSubmit={event => { event.preventDefault(); setEditorError(""); void command({ kind: "revise", expectedDesignRevision: value.candidate?.designRevision ?? value.designRevision ?? 0, spec: { ...value.spec, title, fields, components } }); }}><p className="text-sm text-gray-muted">Changing the app creates a new draft. Existing records remain, and the current live release keeps working while you check the draft.</p><TextInput label="App name" value={title} maxLength={160} required disabled={disabled} onChange={event => { setEditorError(""); setTitle(event.target.value); }} /><fieldset className={group}><legend className="font-medium">Fields</legend><div className="space-y-4">{fields.map((field, index) => <div key={field.id} className="space-y-3 rounded-lg border border-gray-border p-3"><div className="grid gap-3 sm:grid-cols-[1fr_150px_auto_auto]"><TextInput label={`Label for ${field.label}`} value={field.label} maxLength={80} required disabled={disabled} onChange={event => updateField(field.id, { label: event.target.value })} /><label className="text-sm">Type<select aria-label={`Type for ${field.label}`} className={control} value={field.type} disabled={disabled} onChange={event => updateFieldType(field.id, event.target.value as Spec["fields"][number]["type"])}><option value="text">Text</option><option value="number">Number</option><option value="boolean">Yes or no</option><option value="date">Date</option><option value="select">Choose one</option></select></label><label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" aria-label={`Required for ${field.label}`} checked={field.required} disabled={disabled} onChange={event => updateField(field.id, { required: event.target.checked })} />Required</label><Button type="button" variant="secondary" disabled={disabled || fields.length <= 1} onClick={() => removeField(field.id)}>Remove field<span className="sr-only"> {index + 1}</span></Button>{field.type === "select" ? <SelectOptionsEditor field={field} disabled={disabled} onChange={options => updateField(field.id, { options })} /> : null}</div></div>)}</div><Button type="button" variant="secondary" disabled={disabled || fields.length >= 30} onClick={addField}>Add field</Button></fieldset><fieldset className={group}><legend className="font-medium">Views</legend><p className="text-sm text-gray-muted">Choose which fields each view shows. Views use the same fixed app behavior as the live app.</p><div className="space-y-4">{components.map((component, index) => <fieldset key={`${component.kind}-${index}`} className="space-y-3 rounded-lg border border-gray-border p-3"><legend className="font-medium">{applicationViewLabel(component.kind)}</legend><div className="grid gap-2 sm:grid-cols-2">{fields.map(field => <label key={field.id} className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" aria-label={`Show ${field.label} in ${component.kind} view`} checked={component.fields.includes(field.id)} disabled={disabled} onChange={event => toggleViewField(index, field.id, event.target.checked)} />{field.label}</label>)}</div><div className="flex flex-wrap gap-2"><Button type="button" variant="secondary" disabled={disabled || index === 0} onClick={() => moveView(index, -1)}>Move up</Button><Button type="button" variant="secondary" disabled={disabled || index === components.length - 1} onClick={() => moveView(index, 1)}>Move down</Button><Button type="button" variant="secondary" disabled={disabled || components.length <= 1} onClick={() => removeView(index)}>Remove view</Button></div></fieldset>)}</div>{addableKinds.length ? <div className="flex flex-wrap items-end gap-3"><label className="text-sm">View to add<select aria-label="View to add" className={control} value={selectedAddKind} disabled={disabled} onChange={event => setNewViewKind(event.target.value as ApplicationViewKind)}>{addableKinds.map(kind => <option key={kind} value={kind}>{applicationViewLabel(kind)}</option>)}</select></label><Button type="button" variant="secondary" disabled={disabled || !selectedAddKind} onClick={addView}>Add view</Button></div> : <p className="text-sm text-gray-muted">All supported views are included.</p>}</fieldset>{editorError ? <p role="alert" className="text-sm text-critical">{editorError}</p> : null}<Button type="submit" disabled={disabled || !changed}>Save new draft</Button></form><ApplicationDraftPreview spec={{ title, fields, components }} /></details>;
 }
 

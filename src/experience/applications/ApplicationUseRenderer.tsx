@@ -1,9 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useId, useMemo, useRef, useState } from "react";
-import { StEmpty, StHead, StLabel, StMono, StNotice, StPage, StPill, StRows, StRow, StSection, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
+import { StCopy, StEmpty, StField, StHead, StLabel, StMono, StNotice, StPage, StPill, StRows, StRow, StSection, StState, StSurface, StTextButton, StTextField } from "@/components/ui/strelva/Kit";
 import styles from "./application-use.module.css";
-import { TextInput } from "@/components/ui/TextInput";
 import type { ApplicationUseSnapshot, ApplicationViewKind } from "@/products/applications/client";
 
 export interface ApplicationUseDraft {
@@ -128,19 +127,16 @@ export function ApplicationUseRenderer({
 
   const selectedRecord = snapshot.records.find(record => record.id === selectedId) ?? snapshot.records[0];
   const formOpen = presentation === "preview" || adding || editing || snapshot.records.length === 0 || recordViews.length === 0 || snapshot.access.recordRead === "none" || Boolean(submitError);
-  const Container = presentation === "preview" ? StSurface : StPage;
+  const Container = presentation === "preview" ? "div" : StPage;
   return (
     <Container>
-      {presentation === "preview" ? <StLabel as="h3">{snapshot.title}</StLabel> : <StHead title={snapshot.title} meta={<><StState kind="live">Live</StState> · version <StMono>{snapshot.releaseVersion}</StMono> · internal tool</>}
+      {presentation === "preview" ? <StLabel as="h3">{snapshot.title}</StLabel> : <StHead title={snapshot.title} meta={<><StState kind="live">Live</StState> · release <StMono>{snapshot.releaseVersion}</StMono> · internal tool</>}
         actions={formView && snapshot.access.recordSubmit && !formOpen ? <StPill onClick={() => setAdding(true)}>Add a record</StPill> : undefined} />}
       {submitMessage ? <div role="status"><StNotice>{submitMessage}</StNotice></div> : null}
-      <StNotice>No check result is available for this tool yet, so Strelva can’t say it’s working.</StNotice>
       {formView && formOpen && (snapshot.access.recordSubmit || (editAllowed && editing)) ? (
         <StSurface>
-          <div className="mb-6 space-y-2">
-            <h2 id={`${instanceId}-application-form-heading`} className={styles.formTitle}>{draft.editingRecordId ? "Correct a record" : viewLabel("form")}</h2>
-            <p className="text-sm leading-6 text-gray-fg">{draft.editingRecordId ? "Save a correction to the record. If someone changed it first, your correction stays here so you can review it." : "Enter the details below. Keep this tab open if you need to retry."}</p>
-          </div>
+          <StSection title={draft.editingRecordId ? "Correct a record" : viewLabel("form")}>
+            <StCopy muted>{draft.editingRecordId ? "Save a correction to the record. If someone changed it first, your correction stays here so you can review it." : "Enter the details below. Keep this tab open if you need to retry."}</StCopy>
           <form ref={formRef} className="space-y-5" onSubmit={submit} aria-busy={busy}>
             <div className="grid gap-5 sm:grid-cols-2">
               {formView.fields.map(field => {
@@ -153,7 +149,7 @@ export function ApplicationUseRenderer({
                       <legend className="block text-xs text-gray-muted">{field.label}{field.required ? " *" : ""}</legend>
                       <div className="flex flex-wrap gap-2">
                         {[true, false].map(option => (
-                          <label key={String(option)} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-gray-border px-3.5 py-2 text-sm text-warm-black">
+                          <label key={String(option)} className="inline-flex min-h-11 items-center gap-2 text-sm">
                             <input
                               id={`${instanceId}-app-field-${field.id}-${option ? "yes" : "no"}`}
                               name={`${instanceId}-app-field-${field.id}`}
@@ -174,12 +170,10 @@ export function ApplicationUseRenderer({
                 }
                 if (field.type === "select") {
                   return (
-                    <label key={field.id} className="block text-sm text-warm-black">
-                      <span className="block text-xs text-gray-muted">{field.label}{field.required ? " *" : ""}</span>
+                    <StField key={field.id} label={`${field.label}${field.required ? " *" : ""}`}>
                       <select
                         id={`${instanceId}-app-field-${field.id}`}
                         name={`${instanceId}-app-field-${field.id}`}
-                        className="mt-1 block min-h-11 w-full rounded-xl border border-gray-border bg-surface px-3 py-2 text-sm"
                         aria-label={field.label}
                         value={value === undefined ? "" : String(value)}
                         required={field.required}
@@ -189,18 +183,18 @@ export function ApplicationUseRenderer({
                         <option value="">Choose an option</option>
                         {field.options?.map(option => <option key={option} value={option}>{option}</option>)}
                       </select>
-                    </label>
+                    </StField>
                   );
                 }
                 return (
-                  <TextInput
+                  <StTextField
                     key={field.id}
                     id={`${instanceId}-app-field-${field.id}`}
                     label={`${field.label}${field.required ? " *" : ""}`}
                     aria-label={field.label}
                     type={fieldInputType(field.type)}
                     placeholder={savedLink ? savedLabel ?? "Current link (unchanged)" : fieldPlaceholder(field.type)}
-                    helperText={savedLink ? `${savedLabel ? `Currently linked: ${savedLabel}.` : field.type === "assigned_person" ? "A staff member is already linked." : "A contact is already linked."} ${field.type === "assigned_person" ? "Enter another staff email to change it." : "Enter another email or phone to change it."}` : undefined}
+                    description={savedLink ? `${savedLabel ? `Currently linked: ${savedLabel}.` : field.type === "assigned_person" ? "A staff member is already linked." : "A contact is already linked."} ${field.type === "assigned_person" ? "Enter another staff email to change it." : "Enter another email or phone to change it."}` : undefined}
                     inputMode={field.type === "number" ? "decimal" : undefined}
                     value={savedLink || value === undefined ? "" : String(value)}
                     required={field.required && !savedLink}
@@ -210,13 +204,14 @@ export function ApplicationUseRenderer({
                 );
               })}
             </div>
-            {submitError ? <p id={`${instanceId}-application-submit-error`} role="alert" className="rounded-lg border border-terra/30 bg-terra/5 px-3 py-2 text-sm text-terra">{submitError}</p> : null}
+            {submitError ? <div id={`${instanceId}-application-submit-error`} role="alert"><StNotice tone="critical">{submitError}</StNotice></div> : null}
             <div className="flex flex-wrap items-center gap-3">
-              <StPill type="submit" busy={busy} disabled={busy} aria-describedby={submitError ? `${instanceId}-application-submit-error` : undefined}>{draft.editingRecordId ? "Save correction" : "Submit record"}</StPill>
+              <StPill type="submit" variant={presentation === "preview" ? "soft" : "primary"} busy={busy} disabled={busy} aria-describedby={submitError ? `${instanceId}-application-submit-error` : undefined}>{draft.editingRecordId ? "Save correction" : "Submit record"}</StPill>
               {draft.editingRecordId ? <StPill type="button" variant="soft" disabled={busy} onClick={cancelEdit}>Cancel correction</StPill> : null}
               {onReload && submitError ? <StPill type="button" variant="soft" disabled={busy} onClick={onReload}>Reload application</StPill> : null}
             </div>
           </form>
+          </StSection>
         </StSurface>
       ) : null}
 
@@ -242,6 +237,7 @@ export function ApplicationUseRenderer({
           </StSurface> : null}
         </div>
       ) : null}
+      {presentation !== "preview" ? <StSection title="Access and checks"><StRows><StRow title="Access expires" value={<StMono as="time" dateTime={snapshot.access.expiresAt}>{new Date(snapshot.access.expiresAt).toLocaleString()}</StMono>} /><StRow title="Latest checks" detail="No check result is available for this tool yet, so Strelva can’t say it’s working." end={<StState kind="draft">Not checked</StState>} /></StRows></StSection> : null}
       {snapshot.access.recordEdit === "none" && !snapshot.access.recordSubmit ? <StNotice>You have read-only access. You can open records; the owner controls changes.</StNotice> : null}
     </Container>
   );

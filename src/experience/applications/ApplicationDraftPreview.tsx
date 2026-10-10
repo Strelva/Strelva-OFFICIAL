@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { Button } from "@/components/ui/Button";
+import { StCopy, StSection, StTextButton } from "@/components/ui/strelva/Kit";
 import { ApplicationUseRenderer, type ApplicationUseDraft } from "./ApplicationUseRenderer";
 import type { ApplicationUseSnapshot } from "@/products/applications/client";
 import type { ApplicationDraftSpec } from "./app-templates";
@@ -26,13 +26,13 @@ function PreviewSession({ spec }: { spec: ApplicationDraftSpec }) {
   const [records, setRecords] = useState<ApplicationUseSnapshot["records"]>([]);
   const [draft, setDraft] = useState<ApplicationUseDraft>({ values: {}, recordId: `${id}-0`, idempotencyKey: `${id}-0` });
   const [message, setMessage] = useState("");
-  return <section aria-label="Interactive app preview" className="min-w-0 overflow-hidden rounded-3xl border border-gray-border bg-surface-base">
-    <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-border px-6 py-4"><div><strong className="text-sm font-medium">Try your app</strong><p className="mt-1 text-xs leading-5 text-gray-muted">Preview only. Test records are not saved or shared.</p></div><Button type="button" variant="ghost" size="sm" onClick={() => { setRecords([]); setMessage(""); setDraft({ values: {}, recordId: `${id}-0`, idempotencyKey: `${id}-0` }); }}>Reset preview</Button></header>
+  return <StSection title="Try your app" action={<StTextButton onClick={() => { setRecords([]); setMessage(""); setDraft({ values: {}, recordId: `${id}-0`, idempotencyKey: `${id}-0` }); }}>Reset preview</StTextButton>}>
+    <StCopy muted>Preview only. Test records are not saved or shared.</StCopy>
     <ApplicationUseRenderer presentation="preview" snapshot={applicationPreviewSnapshot(spec, records)} draft={draft} onDraftChange={setDraft} busy={records.length >= 20} submitMessage={message} onSubmit={value => {
       if (records.length >= 20) return;
       setRecords(current => [...current, { id: value.recordId, values: { ...value.values } }]);
       setDraft({ values: {}, recordId: `${id}-${records.length + 1}`, idempotencyKey: `${id}-${records.length + 1}` });
       setMessage(records.length === 19 ? "Preview limit reached. Reset to try again." : "Test record added. Nothing was saved or shared.");
     }} />
-  </section>;
+  </StSection>;
 }
