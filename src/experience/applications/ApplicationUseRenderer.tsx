@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent, useEffect, useId, useMemo, useRef } from "react";
-import { Button } from "@/components/ui/Button";
+import { FormEvent, useEffect, useId, useMemo, useRef, useState } from "react";
+import { StEmpty, StHead, StLabel, StMono, StNotice, StPage, StPill, StRows, StRow, StSection, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
+import styles from "./application-use.module.css";
 import { TextInput } from "@/components/ui/TextInput";
 import type { ApplicationUseSnapshot, ApplicationViewKind } from "@/products/applications/client";
 
@@ -15,6 +16,7 @@ export interface ApplicationUseDraft {
 
 export interface ApplicationUseRendererProps {
   presentation?: "preview";
+  recordSummaryField?: string;
   snapshot: ApplicationUseSnapshot;
   draft: ApplicationUseDraft;
   busy?: boolean;
@@ -61,6 +63,7 @@ function nextIdempotencyKey(): string {
 
 export function ApplicationUseRenderer({
   presentation,
+  recordSummaryField,
   snapshot,
   draft,
   busy = false,
@@ -71,6 +74,8 @@ export function ApplicationUseRenderer({
   onSubmit,
 }: ApplicationUseRendererProps) {
   const instanceId = useId();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const formView = snapshot.views.find(view => view.kind === "form");
   const editAllowed = snapshot.access.recordEdit === "own" || snapshot.access.recordEdit === "all";
@@ -105,6 +110,7 @@ export function ApplicationUseRenderer({
 
   function beginEdit(record: ApplicationUseSnapshot["records"][number]) {
     if (record.revision === undefined) return;
+    setAdding(true);
     const editableFields = new Set(formView?.fields.map(field => field.id) ?? []);
     onDraftChange({
       values: Object.fromEntries(Object.entries(record.values).filter(([fieldId]) => editableFields.has(fieldId))),
@@ -116,21 +122,23 @@ export function ApplicationUseRenderer({
   }
 
   function cancelEdit() {
+    setAdding(false);
     onDraftChange({ values: {}, recordId: nextIdempotencyKey(), idempotencyKey: nextIdempotencyKey() });
   }
 
+  const selectedRecord = snapshot.records.find(record => record.id === selectedId) ?? snapshot.records[0];
+  const formOpen = presentation === "preview" || adding || editing || snapshot.records.length === 0 || recordViews.length === 0 || snapshot.access.recordRead === "none" || Boolean(submitError);
+  const Container = presentation === "preview" ? StSurface : StPage;
   return (
-    <div className={presentation === "preview" ? "flex min-w-0 flex-col gap-6 p-4 sm:p-6" : "mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12 lg:px-8"}>
-      <header className="max-w-3xl space-y-3">
-        {presentation === "preview" ? <h3 className="text-xl font-medium text-warm-black">{snapshot.title}</h3> : <h1 className="font-display text-3xl font-medium leading-tight text-warm-black sm:text-4xl">{snapshot.title}</h1>}
-      </header>
-
-      {submitMessage ? <p role="status" className="rounded-lg border border-sage/30 bg-sage/5 px-3 py-2 text-sm text-sage-dark">{submitMessage}</p> : null}
-
-      {formView && (snapshot.access.recordSubmit || (editAllowed && editing)) ? (
-        <section aria-labelledby={`${instanceId}-application-form-heading`} className="rounded-2xl border border-gray-border bg-surface p-5 shadow-sm sm:p-7">
+    <Container>
+      {presentation === "preview" ? <StLabel as="h3">{snapshot.title}</StLabel> : <StHead title={snapshot.title} meta={<><StState kind="live">Live</StState> · version <StMono>{snapshot.releaseVersion}</StMono> · internal tool</>}
+        actions={formView && snapshot.access.recordSubmit && !formOpen ? <StPill onClick={() => setAdding(true)}>Add a record</StPill> : undefined} />}
+      {submitMessage ? <div role="status"><StNotice>{submitMessage}</StNotice></div> : null}
+      <StNotice>No check result is available for this tool yet, so Strelva can’t say it’s working.</StNotice>
+      {formView && formOpen && (snapshot.access.recordSubmit || (editAllowed && editing)) ? (
+        <StSurface>
           <div className="mb-6 space-y-2">
-            <h2 id={`${instanceId}-application-form-heading`} className="font-display text-2xl font-medium text-warm-black">{draft.editingRecordId ? "Correct a record" : viewLabel("form")}</h2>
+            <h2 id={`${instanceId}-application-form-heading`} className={styles.formTitle}>{draft.editingRecordId ? "Correct a record" : viewLabel("form")}</h2>
             <p className="text-sm leading-6 text-gray-fg">{draft.editingRecordId ? "Save a correction to the record. If someone changed it first, your correction stays here so you can review it." : "Enter the details below. Keep this tab open if you need to retry."}</p>
           </div>
           <form ref={formRef} className="space-y-5" onSubmit={submit} aria-busy={busy}>
@@ -204,41 +212,37 @@ export function ApplicationUseRenderer({
             </div>
             {submitError ? <p id={`${instanceId}-application-submit-error`} role="alert" className="rounded-lg border border-terra/30 bg-terra/5 px-3 py-2 text-sm text-terra">{submitError}</p> : null}
             <div className="flex flex-wrap items-center gap-3">
-              <Button type="submit" loading={busy} disabled={busy} aria-describedby={submitError ? `${instanceId}-application-submit-error` : undefined}>{draft.editingRecordId ? "Save correction" : "Submit record"}</Button>
-              {draft.editingRecordId ? <Button type="button" variant="secondary" disabled={busy} onClick={cancelEdit}>Cancel correction</Button> : null}
-              {onReload && submitError ? <Button type="button" variant="secondary" disabled={busy} onClick={onReload}>Reload application</Button> : null}
+              <StPill type="submit" busy={busy} disabled={busy} aria-describedby={submitError ? `${instanceId}-application-submit-error` : undefined}>{draft.editingRecordId ? "Save correction" : "Submit record"}</StPill>
+              {draft.editingRecordId ? <StPill type="button" variant="soft" disabled={busy} onClick={cancelEdit}>Cancel correction</StPill> : null}
+              {onReload && submitError ? <StPill type="button" variant="soft" disabled={busy} onClick={onReload}>Reload application</StPill> : null}
             </div>
           </form>
-        </section>
+        </StSurface>
       ) : null}
 
       {recordViews.length > 0 && snapshot.access.recordRead !== "none" ? (
-        <section aria-labelledby={`${instanceId}-application-records-heading`} className="space-y-4">
-          <div className="space-y-2">
-            <h2 id={`${instanceId}-application-records-heading`} className="font-display text-2xl font-medium text-warm-black">{recordsHeading}</h2>
-          </div>
-          {snapshot.records.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-gray-border bg-surface-inset px-5 py-8 text-sm text-gray-muted">There are no records to show yet.</p>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {snapshot.records.map((record, index) => (
-                <article key={record.id} aria-label={`Record ${index + 1}`} className="rounded-2xl border border-gray-border bg-surface p-5 shadow-sm">
-                  <h3 className="mb-4 text-sm font-medium text-warm-black">Record {index + 1}</h3>
-                  <dl className="grid gap-3 sm:grid-cols-2">
-                    {recordFields.map(field => (
-                      <div key={field.id} className="min-w-0">
-                        <dt className="text-xs uppercase tracking-[0.1em] text-gray-muted">{field.label}</dt>
-                        <dd className="mt-1 break-words text-sm text-warm-black">{record.linkLabels?.[field.id] ?? displayValue(record.values[field.id])}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                  {formView && editAllowed && record.revision !== undefined ? <Button type="button" variant="secondary" className="mt-5" onClick={() => beginEdit(record)}>Edit record</Button> : null}
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
+        <div className={styles.recordsLayout}>
+          <StSection title={recordsHeading} meta={<StMono>{snapshot.records.length}</StMono>}>
+            {snapshot.records.length === 0 ? <StEmpty>There are no records to show yet.</StEmpty> : <StRows label={recordsHeading}>
+              {snapshot.records.map((record, index) => <StRow key={record.id} selected={selectedRecord?.id === record.id}
+                title={record.linkLabels?.[(recordFields[0]?.id ?? "")] ?? displayValue(record.values[(recordFields[0]?.id ?? "")])}
+                detail={record.linkLabels?.[(recordSummaryField ?? recordFields[1]?.id ?? "")] ?? displayValue(record.values[(recordSummaryField ?? recordFields[1]?.id ?? "")])}
+                onClick={() => setSelectedId(record.id)}><span className="sr-only">Record {index + 1}</span></StRow>)}
+            </StRows>}
+          </StSection>
+          {selectedRecord ? <StSurface>
+            <article aria-label={`Record ${snapshot.records.indexOf(selectedRecord) + 1}`}>
+              <div className={styles.recordHead}><span>Record details</span>
+                {formView && editAllowed && selectedRecord.revision !== undefined ? <StTextButton onClick={() => beginEdit(selectedRecord)}>Edit record</StTextButton> : null}
+              </div>
+              <dl className={styles.fields}>{recordFields.map(field => <div key={field.id}>
+                <dt>{field.label}</dt><dd>{selectedRecord.linkLabels?.[field.id] ?? displayValue(selectedRecord.values[field.id])}</dd>
+              </div>)}</dl>
+            </article>
+          </StSurface> : null}
+        </div>
       ) : null}
-    </div>
+      {snapshot.access.recordEdit === "none" && !snapshot.access.recordSubmit ? <StNotice>You have read-only access. You can open records; the owner controls changes.</StNotice> : null}
+    </Container>
   );
 }

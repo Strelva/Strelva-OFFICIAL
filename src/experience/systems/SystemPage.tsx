@@ -33,6 +33,11 @@ import { SystemCreator } from "./SystemCreator";
 import { WebsiteSystemCanvas } from "./WebsiteSystemCanvas";
 import canvasStyles from "./website-system-canvas.module.css";
 import styles from "./systems.module.css";
+import { StEmpty, StHead, StMono, StNotice, StPage, StPill, StPillLink, StRows, StRow, StSection, StSkeleton, StState, StTextButton } from "@/components/ui/strelva/Kit";
+import { ConnectionDetail, connectionDetailData } from "./ConnectionDetail";
+import { MakeRealProgress } from "./MakeRealProgress";
+import { PossibilityComparison } from "./PossibilityComparison";
+import paper from "./system-page.module.css";
 
 export interface SystemPageProps {
   system: SystemView | undefined;
@@ -83,8 +88,8 @@ export function SystemPage(props: SystemPageProps) {
   const websiteDetail = props.websiteDetail ?? fetchedDetail;
   const siteHref = props.operator && system && system.surface.kind === "website" && system.surface.editing ? (tab: "connections" | "google") => workspaceSiteHref({ workspaceId: props.workspaceId, systemId: system.id, tab }, props.appBase || "") : undefined;
   const back = <button type="button" className={styles.back} onClick={onHome}><ArrowLeft size={16} aria-hidden="true" />Home</button>;
-  if (loading && !system) return <div className={styles.page}>{back}<p role="status" className="mt-6 text-sm text-gray-muted">Opening this system…</p></div>;
-  if (!system) return <div className={styles.page}>{back}<div className={styles.notFound}><h1 className="font-display">This system isn’t available here.</h1><p>It may belong to another business, or your access may have changed. Nothing about it was changed.</p></div></div>;
+  if (loading && !system) return <StPage><StHead crumb={{ label: "Home", onClick: onHome }} title="Opening this system…" /><StSkeleton label="Opening this system" /><StSkeleton width="60%" /></StPage>;
+  if (!system) return <StPage><StHead crumb={{ label: "Home", onClick: onHome }} title="This system isn’t available here." /><StEmpty>It may belong to another business, or your access may have changed. Nothing about it was changed.</StEmpty></StPage>;
   // Website panels and the site's own editor links count as context too.
   const filesRequests = system.kind === "website" && system.surface.kind === "website" && Boolean(system.surface.editing) && !readOnly;
   const showAside = hasContext(system) || (system.kind === "website" && hasWebsiteDetail(websiteDetail)) || Boolean(siteHref) || (filesRequests && askingChange);
@@ -100,6 +105,26 @@ export function SystemPage(props: SystemPageProps) {
     setCompareId(possibility.id);
     setMode("both");
   }
+
+  if (system.surface.kind !== "website") return <StPage className={paper.page}>
+    <div aria-busy={loading || undefined} className={paper.stack}>
+      {titled ? <StHead crumb={{ label: "Home", onClick: onHome }} title={system.name} meta={<><StState kind={system.lifecycle === "live" ? "live" : "draft"}>{LIFECYCLE_LABEL[system.lifecycle]}</StState> · {SYSTEM_KIND_LABEL[system.kind]}{system.detail ? ` · ${system.detail}` : ""}</>} actions={<StTextButton disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={askForChange}>Ask for a change</StTextButton>} />
+        : <div className={paper.workMeta}><StTextButton onClick={onHome}>← Home</StTextButton><StState kind={system.lifecycle === "live" ? "live" : "draft"}>{LIFECYCLE_LABEL[system.lifecycle]}</StState><StTextButton disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={askForChange}>Ask for a change</StTextButton></div>}
+      <StNotice tone={system.health.state === "blocked" ? "critical" : system.health.state === "degraded" ? "need" : undefined}>{HEALTH_LABEL[system.health.state]}. {system.health.summary}</StNotice>
+      {readOnly && readOnlyReason ? <StNotice>{readOnlyReason}</StNotice> : null}
+      {system.operatedBy ? <p className={paper.meta}>Agency of record: {system.operatedBy}</p> : system.providerIdentityStatus === "unavailable" ? <p className={paper.meta}>Agency identity could not be loaded</p> : null}
+      {system.lifecycle === "paused" ? <p className={paper.meta} role="note">{PAUSED_KEEPS[system.kind] ?? "Paused. Its records are kept."}</p> : null}
+      <section className={paper.object} aria-label={`${system.name}, the actual ${SYSTEM_KIND_LABEL[system.kind].toLowerCase()}`}><SystemSurface {...props} system={system} /></section>
+      {showAside ? <div className={paper.context} aria-label={`About ${system.name}`}>
+        {system.activations?.length ? <ActivationsPanel system={system} /> : null}
+        {system.possibilities.length || system.storedVersionId ? <PossibilitiesPanel key={`${props.workspaceId}:${system.id}`} systemHref={props.systemHref} versionReadOnly={props.versionReadOnly} system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={compareId} onCompare={compare} onAsk={onAsk} /> : null}
+        {system.connections.length || system.offers?.length ? <ConnectionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} /> : null}
+        {system.versions.length ? <VersionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} /> : null}
+        {system.storedVersionId ? <StSection title="Version draft"><SystemVersionManagement key={`${props.workspaceId}:${system.id}`} workspaceId={props.workspaceId} systemId={system.id} versionId={system.storedVersionId} readOnly={props.versionReadOnly ?? readOnly} /><SystemCreator workspaceId={props.workspaceId} systemId={system.id} /></StSection> : null}
+        {system.history?.length ? <HistoryPanel system={system} /> : null}
+      </div> : <StTextButton disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={() => onAsk(`What else could ${system.name} become? `)}>Ask what else {system.name} could become.</StTextButton>}
+    </div>
+  </StPage>;
 
   const website = system.kind === "website" && system.surface.kind === "website";
   const Page = website ? StPage : "div";
@@ -179,13 +204,7 @@ export function hasContext(system: SystemView): boolean {
 function ActivationsPanel({ system }: { system: SystemView }) {
   const activations = system.activations ?? [];
   return <Panel id={`${system.id}-making-live`} title="Making it live" count={activations.length} intro="What landed stays. Strelva tells you when it settles.">
-    <ul className={styles.panelList}>{activations.map(activation => <li key={activation.id}>
-      <span><strong>{activation.title}</strong></span>
-      <small role="status">{activation.headline}{activation.partlyLive ? "" : ` · ${activation.done} of ${activation.total} done`}</small>
-      <ul className={styles.stepList} aria-label={`Steps of ${activation.title}`}>{activation.lines.map(line => <li key={line.label} data-state={line.state}>
-        <span>{line.label}</span><small>{line.state}{line.detail ? `: ${line.detail}` : ""}</small>
-      </li>)}</ul>
-    </li>)}</ul>
+    <StRows>{activations.map(activation => <StRow key={activation.id} title={activation.title}><MakeRealProgress activation={activation} /></StRow>)}</StRows>
   </Panel>;
 }
 
@@ -196,7 +215,7 @@ function HistoryPanel({ system }: { system: SystemView }) {
     return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   };
   return <Panel id={`${system.id}-history`} title="History" count={0} intro="The last changes, newest first.">
-    <ul className={styles.panelList}>{rows.map(row => <li key={row.id}><span>{row.sentence}</span>{actorPresentation(row.actor).credit ? <small>{actorPresentation(row.actor).credit}</small> : null}<small><time dateTime={row.at}>{when(row.at)}</time></small></li>)}</ul>
+    <StRows>{rows.map(row => <StRow key={row.id} title={row.sentence} detail={actorPresentation(row.actor).credit} end={<StMono as="time" dateTime={row.at}>{when(row.at)}</StMono>} />)}</StRows>
   </Panel>;
 }
 
@@ -279,16 +298,15 @@ function ConnectionsPanel({ system, systemHref, onOpenSystem, siteHref }: { syst
   // Anything disconnected or unconfirmed shows in full; connected ones fold into one line.
   const attention = system.connections.filter(connection => connection.status !== "connected");
   const working = system.connections.filter(connection => connection.status === "connected");
-  const item = (connection: SystemConnection) => <li key={connection.id}>
-    <span>{connection.sentence}</span>
-    <small>{(connection.direction === "in" ? INCOMING_CONNECTION_LABEL : CONNECTION_KIND_LABEL)[connection.kind]} <SystemLink id={connection.systemId} label={connection.target} systemHref={systemHref} onOpenSystem={onOpenSystem} />{connection.status === "connected" ? "" : connection.status === "not_connected" ? " · Not connected" : " · Not confirmed"}</small>
+  const item = (connection: SystemConnection) => <StRow key={connection.id} title={connection.sentence} detail={<>{(connection.direction === "in" ? INCOMING_CONNECTION_LABEL : CONNECTION_KIND_LABEL)[connection.kind]} <SystemLink id={connection.systemId} label={connection.target} systemHref={systemHref} onOpenSystem={onOpenSystem} />{connection.status === "connected" ? "" : connection.status === "not_connected" ? " · Not connected" : " · Not confirmed"}</>}>
+    {system.surface.kind !== "website" ? <details><summary className="cursor-pointer py-2 text-sm">Open Connection details</summary><ConnectionDetail detail={connectionDetailData(connection, system.name)} embedded /></details> : null}
     {connection.contract ? <><small>Source: {connection.contract.sourceOfTruth}</small><small>{connection.contract.authority}</small><small>{connection.contract.freshness}</small><small>{connection.contract.failureBehavior}</small></> : null}
-  </li>;
+  </StRow>;
   return <Panel id={`${system.id}-connections`} title="Connections" count={system.connections.length} intro="What it works with.">
-    {attention.length ? <ul className={styles.panelList}>{attention.map(item)}</ul> : null}
+    {attention.length ? <StRows>{attention.map(item)}</StRows> : null}
     {working.length ? <details className={styles.fold}>
       <summary>Works with {working.length} {working.length === 1 ? "thing" : "things"}</summary>
-      <ul className={styles.panelList}>{working.map(item)}</ul>
+      <StRows>{working.map(item)}</StRows>
     </details> : null}
     {system.offers?.map(offer => <p key={offer.kind} className="mt-3">{offer.label}. <Link className="underline" href={siteHref ? siteHref("google") : "/dashboard/google"}>Connect Google</Link></p>)}
     {siteHref ? <p className="mt-3"><Link className="underline" href={siteHref("connections")}>Accounts and sources this site uses</Link></p> : null}
@@ -348,7 +366,7 @@ function PossibilitiesPanel({ systemHref, versionReadOnly, system, systems, work
   const [needsReload, setNeedsReload] = useState(false);
   const [versionCount, setVersionCount] = useState(0);
   async function makeReal(possibility: SystemPossibility) {
-    if (inFlight.current || needsReload || !canMakeReal || readOnly || possibility.status !== "ready") return;
+    if (inFlight.current || needsReload || !canMakeReal || readOnly || possibility.status !== "ready" || possibility.staleReason) return;
     inFlight.current = true;
     setRunning(possibility.id);
     setOutcome(null);
@@ -359,24 +377,27 @@ function PossibilitiesPanel({ systemHref, versionReadOnly, system, systems, work
     setRunning(null);
   }
   return <Panel id={`${system.id}-possibilities`} title="Possibilities" count={system.possibilities.length + versionCount} intro="Alternatives you can open and compare before anything changes.">
-    {system.possibilities.length ? <ul className={styles.panelList}>{system.possibilities.map(possibility => {
+    {system.possibilities.length ? <StRows>{system.possibilities.map(possibility => {
       const scope = possibilityScope(possibility, systems);
-      const blockedReason = readOnly || !canMakeReal ? makeRealReason || readOnlyReason || "Only an owner of this business can make a possibility real." : possibility.status !== "ready" ? "Still being explored. It can be made real once it is ready." : needsReload ? "Reload this System to check the current outcome before making another change." : running ? "Wait for the current Make real request to finish." : undefined;
-      return <li key={possibility.id}>
-        <span className={styles.possibilityHead}><strong>{possibility.title}</strong><span className={styles.lifecycle} data-lifecycle={possibility.status === "ready" ? "live" : "draft"}>{POSSIBILITY_STATUS_LABEL[possibility.status]}</span></span>
-        <small>{possibility.summary}</small>
+      const blockedReason = readOnly || !canMakeReal ? makeRealReason || readOnlyReason || "Only an owner of this business can make a possibility real." : possibility.staleReason ? "Refresh this Possibility before making it real." : possibility.status !== "ready" ? "Still being explored. It can be made real once it is ready." : needsReload ? "Reload this System to check the current outcome before making another change." : running ? "Wait for the current Make real request to finish." : undefined;
+      return <StRow key={possibility.id} title={possibility.title} detail={possibility.summary}>
+        <StState kind="draft">{POSSIBILITY_STATUS_LABEL[possibility.status]}</StState>
         {possibility.staleReason ? <small role="note">{possibility.staleReason} Strelva is refreshing it.</small> : null}
         {possibility.evidence ? <small>{possibility.evidence}</small> : null}
         <small>Changes: {scope.join(", ")}</small>
         <span className={styles.possibilityActions}>
-          {onCompare && possibility.previewSrc ? <Button size="sm" variant="secondary" aria-pressed={comparingId === possibility.id} onClick={() => onCompare(possibility)}>Compare</Button> : null}
-          {possibility.openHref ? <a className={styles.linkAction} href={`${appBase}${possibility.openHref}`}>Open</a> : null}
-          <Button size="sm" disabled={Boolean(blockedReason)} loading={running === possibility.id} title={blockedReason} onClick={() => void makeReal(possibility)}>{running === possibility.id ? "Making real…" : "Make real"}</Button>
+          {onCompare && possibility.previewSrc ? <StPill variant="soft" aria-pressed={comparingId === possibility.id} onClick={() => onCompare(possibility)}>Compare</StPill> : null}
+          {possibility.openHref ? <StPillLink variant="soft" href={`${appBase}${possibility.openHref}`}>{possibility.tryHref ? "Try it as a visitor" : "Open"}</StPillLink> : null}
+          <StPill variant={system.possibilities.length === 1 || comparingId === possibility.id ? "primary" : "soft"} disabled={Boolean(blockedReason)} busy={running === possibility.id} title={blockedReason} onClick={() => void makeReal(possibility)}>{running === possibility.id ? "Making real…" : "Make real"}</StPill>
         </span>
+        {comparingId === possibility.id && possibility.previewSrc && system.surface.kind !== "website" ? <PossibilityComparison title={possibility.title}
+          live={<StEmpty>The current System is open above. A visitor preview has not been recorded.</StEmpty>}
+          candidate={<iframe title={`${possibility.title}, not live`} src={possibility.previewSrc} sandbox="" referrerPolicy="no-referrer" />}
+          staleReason={possibility.staleReason} scope={scope.join(", ")} /> : null}
         {readOnly || !canMakeReal ? <small>{blockedReason}</small> : null}
         {outcome?.id === possibility.id ? <MakeRealState outcome={outcome.outcome} onAsk={onAsk} title={possibility.title} /> : null}
-      </li>;
-    })}</ul> : system.storedVersionId ? null : <p className="mt-3">No alternatives are being explored. <button type="button" className="underline" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={() => onAsk(`What else could ${system.name} become? `)}>Ask what else it could become</button></p>}
+      </StRow>;
+    })}</StRows> : system.storedVersionId ? null : <p className="mt-3">No alternatives are being explored. <button type="button" className="underline" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={() => onAsk(`What else could ${system.name} become? `)}>Ask what else it could become</button></p>}
     {needsReload ? <a className={styles.linkAction} href={systemHref(system.id)}>Reload this System</a> : null}
     {system.storedVersionId ? <SystemVersionImprovements key={`${workspaceId}:${system.id}:${system.storedVersionId}`} workspaceId={workspaceId} systemId={system.id} versionId={system.storedVersionId} readOnly={versionReadOnly ?? readOnly} canMakeReal={canMakeReal} onCount={setVersionCount} /> : null}
   </Panel>;
@@ -395,10 +416,7 @@ function AuditsPanel({ system, workspaceId, appBase }: { system: SystemView; wor
 
 function VersionsPanel({ system, systemHref, onOpenSystem }: { system: SystemView; systemHref: (id: string) => string; onOpenSystem?: (id: string) => void }) {
   return <Panel id={`${system.id}-versions`} title="Versions" count={system.versions.length} intro="The same system, adapted for another location or client. Records and access never carry over.">
-    {system.versions.length ? <ul className={styles.panelList}>{system.versions.map(version => <li key={version.id}>
-      <span>{version.relation === "source" ? "Source · " : ""}<SystemLink id={version.systemId} label={version.title} systemHref={systemHref} onOpenSystem={onOpenSystem} /></span>
-      <small>{version.context}</small>
-      <small>{version.lineage}</small>
+    {system.versions.length ? <StRows>{system.versions.map(version => <StRow key={version.id} title={<>{version.relation === "source" ? "Source · " : ""}<SystemLink id={version.systemId} label={version.title} systemHref={systemHref} onOpenSystem={onOpenSystem} /></>} detail={<>{version.context} · {version.lineage}</>}>
       {version.relation === "version" ? version.comparison?.state === "ready" ? version.comparison.changes.length ? <details className="min-w-0 w-full">
         <summary className="cursor-pointer py-3">What changed here · {version.comparison.changes.length}</summary>
         <p className="mb-3 text-gray-muted">Local draft changes over this Version’s source baseline.</p>
@@ -410,6 +428,6 @@ function VersionsPanel({ system, systemHref, onOpenSystem }: { system: SystemVie
           </dl>
         </li>)}</ul>
       </details> : <small>No local definition changes.</small> : <small>Definition changes: Not verified.</small> : null}
-    </li>)}</ul> : <p className="mt-3">It runs in one context today.</p>}
+    </StRow>)}</StRows> : <p className="mt-3">It runs in one context today.</p>}
   </Panel>;
 }

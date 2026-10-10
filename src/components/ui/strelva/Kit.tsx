@@ -18,7 +18,7 @@
 import Link from "next/link";
 import { LogoMark } from "@/components/Logo";
 import { Check, ChevronLeft, Circle, Loader2, X } from "lucide-react";
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type HTMLAttributeAnchorTarget, type ReactNode, type Ref } from "react";
+import { createContext, useContext, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type HTMLAttributeAnchorTarget, type ReactNode, type Ref } from "react";
 import styles from "./kit.module.css";
 
 type Tone = "need" | "critical" | "live" | "text";
@@ -31,8 +31,12 @@ export function StSignedPage({ children, footer, label }: { children: ReactNode;
   return <main className={styles.signed} aria-label={label}><div className={styles.signedBody}>{children}</div>{footer ? <footer className={styles.signedFooter}>{footer}</footer> : null}</main>;
 }
 
+const StPageContext = createContext(false);
+
+/** A System can contain its existing native page. Keep one set of page insets. */
 export function StPage({ children, width = "column", className }: { children: ReactNode; width?: "column" | "wide"; className?: string }) {
-  return <div className={`${styles.page}${className ? ` ${className}` : ""}`} data-width={width}><div className={styles.pageStack}>{children}</div></div>;
+  const nested = useContext(StPageContext);
+  return <StPageContext.Provider value={true}><div className={`${styles.page}${className ? ` ${className}` : ""}`} data-width={width} data-nested={nested || undefined}><div className={styles.pageStack}>{children}</div></div></StPageContext.Provider>;
 }
 
 /** A primary object and its consequences, within the same calm column. */
@@ -199,12 +203,12 @@ export function StSegmented<T extends string>({ value, options, onChange, label,
 
 /* ---------- Steps ---------- */
 
-export type StepState = "done" | "active" | "pending" | "failed";
+export type StepState = "done" | "active" | "pending" | "failed" | "unverified";
 
 export function StSteps({ steps, label }: { label: string; steps: readonly { title: ReactNode; state: StepState; time?: ReactNode; detail?: ReactNode }[] }) {
   return <ol className={styles.steps} aria-label={label}>{steps.map((step, index) => <li key={index} className={styles.step} data-state={step.state} aria-current={step.state === "active" ? "step" : undefined}>
     <span className={styles.stepMark} aria-hidden="true">{step.state === "done" ? <Check size={13} strokeWidth={2.4} /> : step.state === "active" ? <Loader2 size={13} /> : step.state === "failed" ? <X size={13} strokeWidth={2.4} /> : <Circle size={7} fill="currentColor" />}</span>
-    <span className={styles.stepTitle}>{step.title}<span className="sr-only">{step.state === "done" ? ", done" : step.state === "active" ? ", in progress" : step.state === "failed" ? ", failed" : ", not started"}</span></span>
+    <span className={styles.stepTitle}>{step.title}<span className="sr-only">{step.state === "done" ? ", done" : step.state === "active" ? ", in progress" : step.state === "failed" ? ", failed" : step.state === "unverified" ? ", not yet confirmed" : ", not started"}</span></span>
     {step.time ? <StMono>{step.time}</StMono> : <span />}
     {step.detail ? <span className={styles.stepDetail}>{step.detail}</span> : null}
   </li>)}</ol>;

@@ -58,6 +58,15 @@ serialize the light paper roles in `platform/infra/email/paper-tokens.ts` for
 mail clients through the existing `renderEmailHtml` / `renderEmailText`
 boundary. [L9 handoff](./ui-1.0-l9-email.md) records scope and proof limits.
 
+L3 integration: a nested `StPage` shares the containing page's insets instead
+of adding a second set of padding. Native tools and documents can keep their
+owned page inside the System composition. The specimen includes this case;
+this extension has source and component-test evidence only. Its rendered
+desktop/mobile verification remains blocked by local browser access.
+`StSteps` also accepts `unverified`: an amber mark and “not yet confirmed”
+screen-reader state. Accepted writes awaiting read-back, and unknown outcomes,
+keep their exact detail instead of being labelled failed or not started.
+
 ## Party billing, October 7, 2026 (local)
 
 [AgencyBillingView](../../src/experience/workspace/billing/AgencyBillingView.tsx)

@@ -1,0 +1,8 @@
+.recordsLayout { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: 32px; align-items: start; }
+.recordHead { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: var(--st-text-3); font-size: 13px; margin-bottom: 24px; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.fields > :nth-child(n + 3) { grid-column: 1 / -1; }
+.fields dt { color: var(--st-text-3); font-size: 13px; line-height: 20px; }
+.fields dd { margin: 4px 0 0; color: var(--st-text); overflow-wrap: anywhere; font-size: 16px; line-height: 24px; }
+.formTitle { color: var(--st-text); font-size: 16px; font-weight: 600; line-height: 24px; }
+@media (max-width: 767px) { .recordsLayout { grid-template-columns: minmax(0, 1fr); gap: 24px; } .fields { grid-template-columns: minmax(0, 1fr); gap: 20px; } }
