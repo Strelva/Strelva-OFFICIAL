@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { StBeacon, StComposerBar, StComposerDock, StEmpty, StField, StSplit, StHead, StHold, StKbd, StLabel, StLedger, StMono, StNotice, StPage, StPill, StRow, StRows, StSection, StSegmented, StSkeleton, StStamp, StState, StSteps, StSurface, StTable, StTextButton, StToast } from "@/components/ui/strelva/Kit";
+import { StBeacon, StComposerBar, StComposerDock, StEmpty, StSignedPage, StField, StSplit, StHead, StHold, StKbd, StLabel, StLedger, StMono, StNotice, StPage, StPill, StRow, StRows, StSection, StSegmented, StSkeleton, StStamp, StState, StSteps, StSurface, StTable, StTextButton, StToast } from "@/components/ui/strelva/Kit";
 
 /** Fictional content only. Every kit piece in its states, light and dark. */
 export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
@@ -14,6 +14,7 @@ export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
   return <div data-dashboard data-workspace-theme="linen" data-workspace-mode={mode} style={{ minHeight: "100dvh", background: "radial-gradient(circle at 1px 1px, var(--st-dot) 1px, transparent 1.4px) 0 0 / 24px 24px, var(--st-canvas)", fontFamily: "var(--font-workspace), system-ui, sans-serif" }}>
     <StPage>
       <StHead headingRef={titleRef} crumb={{ label: "Preview", href: "/preview/strelva" }} title="Strelva 1.0 kit" meta="Fictional content · every piece in its states" actions={<StTextButton href={`/preview/strelva/kit?mode=${mode === "dark" ? "light" : "dark"}`}>{mode === "dark" ? "Light" : "Dark"}</StTextButton>} />
+      <details><summary>Standalone entry specimen</summary><StSignedPage label="Standalone entry" footer={<StPill variant="soft">Open Strelva</StPill>}><StHead title="Review before sending" meta="Opening a link does nothing by itself." /><StSurface label="Draft">The exact reply goes here.</StSurface></StSignedPage></details>
       <StSection title="Needs you" meta="open rows, one primary each">
         <StRows label="Needs you">
           <StRow lead={<StBeacon kind="need" pulse />} kind="Google review reply" title="Reply to M. Patel’s 5-star review" detail="“Thank you for helping us settle this without court.” Reply drafted." end={<><StTextButton>Not yet</StTextButton><StTextButton>Open</StTextButton><StPill>Post reply</StPill></>} />

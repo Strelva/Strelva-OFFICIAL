@@ -25,6 +25,12 @@ type Tone = "need" | "critical" | "live" | "text";
 
 /* ---------- Page and head ---------- */
 
+/** Narrow standalone entry or signed-link page. The footer stays in document
+ * flow and follows short content to the bottom. */
+export function StSignedPage({ children, footer, label }: { children: ReactNode; footer?: ReactNode; label: string }) {
+  return <main className={styles.signed} aria-label={label}><div className={styles.signedBody}>{children}</div>{footer ? <footer className={styles.signedFooter}>{footer}</footer> : null}</main>;
+}
+
 export function StPage({ children, width = "column", className }: { children: ReactNode; width?: "column" | "wide"; className?: string }) {
   return <div className={`${styles.page}${className ? ` ${className}` : ""}`} data-width={width}><div className={styles.pageStack}>{children}</div></div>;
 }
