@@ -9,7 +9,18 @@
 import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import type { LeadRecord } from "../src/lib/leads";
 import type { LeadMirrorResult } from "../src/lib/lead-mirror";
-import { isLocalDatabaseUrl } from "./tenant-conversion";
+const LOOPBACK = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+/** True only for a loopback database host. Anything else is production-like. */
+export function isLocalDatabaseUrl(value: string | undefined): boolean {
+  if (!value) return false;
+  try {
+    const host = new URL(value).hostname.toLowerCase();
+    return LOOPBACK.has(host) || host.endsWith(".localhost");
+  } catch {
+    return false;
+  }
+}
 
 export interface BackfillTenant {
   id: string;
