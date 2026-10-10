@@ -1192,3 +1192,15 @@ button.row:hover {
 .outcome {
   margin-bottom: 16px;
 }
+
+/* October 9 A1: open paper composition; retained dusk above is release-off. */
+.paperScroll { flex: 1; min-height: 0; overflow-y: auto; color: var(--st-text); }
+.paperLower { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
+.paperSecondary { display: flex; flex-direction: column; gap: 24px; }
+.paperNote { margin-top: 12px; color: var(--st-text-2); font-size: 13px; line-height: 20px; }
+.paperNote a { color: var(--st-accent); text-decoration: underline; text-underline-offset: 3px; }
+.systemStates { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; color: var(--st-text-2); font-size: 13px; }
+.paperDetails { font-size: 13px; color: var(--st-text-2); }
+.paperDetails summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
+.receiptAction { float: right; position: relative; z-index: 1; }
+@media (max-width: 767px) { .paperLower { display: flex; flex-direction: column; gap: 28px; } .systemStates { gap: 8px; } }

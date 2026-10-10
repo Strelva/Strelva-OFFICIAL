@@ -1,0 +1,6 @@
+.detailColumns { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 36px; align-items: start; }
+.detailStack { display: flex; min-width: 0; flex-direction: column; gap: 24px; }
+.scope { display: flex; flex-direction: column; gap: 16px; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+.scope dt { color: var(--st-text-2); font-size: 13px; margin-bottom: 4px; }
+.scope dd { margin: 0; }
+@media (max-width: 767px) { .detailColumns { grid-template-columns: minmax(0, 1fr); gap: 28px; } }

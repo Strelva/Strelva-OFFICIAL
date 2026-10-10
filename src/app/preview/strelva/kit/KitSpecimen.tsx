@@ -1,16 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { StBeacon, StComposerBar, StComposerDock, StEmpty, StHead, StHold, StKbd, StLabel, StLedger, StMono, StNotice, StPage, StPill, StRow, StRows, StSection, StSegmented, StSkeleton, StStamp, StState, StSteps, StSurface, StTextButton, StToast } from "@/components/ui/strelva/Kit";
 
 /** Fictional content only. Every kit piece in its states, light and dark. */
 export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
   const [who, setWho] = useState<"handles" | "after" | "ask">("ask");
   const [ask, setAsk] = useState("");
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [accepted, setAccepted] = useState(false);
   return <div data-dashboard data-workspace-theme="linen" data-workspace-mode={mode} style={{ minHeight: "100dvh", background: "radial-gradient(circle at 1px 1px, var(--st-dot) 1px, transparent 1.4px) 0 0 / 24px 24px, var(--st-canvas)", fontFamily: "var(--font-workspace), system-ui, sans-serif" }}>
     <StPage>
-      <StHead crumb={{ label: "Preview", href: "/preview/strelva" }} title="Strelva 1.0 kit" meta="Fictional content · every piece in its states" actions={<StTextButton href={`/preview/strelva/kit?mode=${mode === "dark" ? "light" : "dark"}`}>{mode === "dark" ? "Light" : "Dark"}</StTextButton>} />
+      <StHead crumb={{ label: "Preview", href: "/preview/strelva" }} title="Strelva 1.0 kit" titleRef={titleRef} meta="Fictional content · every piece in its states" actions={<StTextButton href={`/preview/strelva/kit?mode=${mode === "dark" ? "light" : "dark"}`}>{mode === "dark" ? "Light" : "Dark"}</StTextButton>} />
       <StSection title="Needs you" meta="open rows, one primary each">
         <StRows label="Needs you">
           <StRow lead={<StBeacon kind="need" pulse />} kind="Google review reply" title="Reply to M. Patel’s 5-star review" detail="“Thank you for helping us settle this without court.” Reply drafted." end={<><StTextButton>Not yet</StTextButton><StTextButton>Open</StTextButton><StPill>Post reply</StPill></>} />
@@ -30,13 +33,19 @@ export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
       <StSection title="A change, and the yes">
         <StLedger path="attymooney.com/fees" count="2 lines" lines={[{ sign: "-", text: "Half-day: [2026 fee]" }, { sign: "+", text: "Half-day: [2027 fee]" }]} />
         <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
-          <StHold label={accepted ? "Published" : "Hold to publish"} onAccept={() => setAccepted(true)} />
+          <StHold aria-label="Publish the fictional fees change" label={accepted ? "Published" : "Hold to publish"} onAccept={() => setAccepted(true)} />
           <StTextButton>Not yet</StTextButton>
           {accepted ? <StToast onUndo={() => setAccepted(false)}>Published · attymooney.com/fees</StToast> : null}
         </div>
       </StSection>
       <StSection title="Who decides" meta="only stricter than Strelva’s default">
         <StSegmented label="Fixing a broken link" value={who} onChange={setWho} options={[{ value: "handles", label: "Strelva handles it" }, { value: "after", label: "Tell me after" }, { value: "ask", label: "Ask me first" }]} disabledValues={["handles"]} disabledReason="Looser than Strelva allows for this kind" />
+      </StSection>
+      <StSection title="Composer states" meta="Scoped context is not a Live claim">
+        <StComposerBar scope="The Mooney Firm" inputRef={inputRef} maxLength={3000} placeholder="Ask Strelva to change something" value={ask} onChange={setAsk} onSubmit={() => setAsk("")} />
+        <StComposerBar multiline textareaRef={textareaRef} maxLength={20000} placeholder="Enter sends · Shift + Enter adds a line" value={ask} onChange={setAsk} onSubmit={() => setAsk("")} />
+        <StComposerBar disabled placeholder="Shared for review · ask the owner to make changes" value="" onChange={setAsk} onSubmit={() => {}} />
+        <StTextButton ref={undefined} onClick={() => inputRef.current?.focus()}>Focus the composer</StTextButton>
       </StSection>
       <StSection title="Objects, notices, empty, loading">
         <StSurface tone="need" label="Draft reply"><StLabel>Your reply, written by Strelva</StLabel><p style={{ margin: "8px 0 12px", fontSize: 15, lineHeight: "24px" }}>Hi Dana, yes, Sheri mediates disputes between partners. You can ask for a session date here and Sheri will confirm it.</p><div style={{ display: "flex", gap: 16, alignItems: "center" }}><StTextButton>Edit</StTextButton><StTextButton>Not yet</StTextButton><span style={{ flex: 1 }} /><StPill>Send reply</StPill></div></StSurface>

@@ -448,3 +448,7 @@ a.row:hover, button.row:hover { background: var(--gray-bg-alt); }
 .composer:focus-within { border-color: color-mix(in srgb, var(--st-accent) 40%, var(--st-line)); }
 .composerDock { position: sticky; bottom: 20px; z-index: 20; display: flex; justify-content: center; pointer-events: none; }
 .composerDock > * { pointer-events: auto; }
+
+textarea.composerInput { resize: none; max-height: 144px; }
+
+@media (max-width: 767px) { .composerDock { bottom: calc(80px + env(safe-area-inset-bottom)); } .composerScope { display: none; } }

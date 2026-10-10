@@ -2,7 +2,7 @@
 
 import { ArrowUpRight, Search, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { IconButton } from "@/components/ui/Button";
+import { StEmpty, StKbd, StMono, StTextButton } from "@/components/ui/strelva/Kit";
 import { searchWorkspaceItems, type WorkspaceSearchItem } from "./workspace-search";
 import styles from "./workspace-search.module.css";
 
@@ -60,14 +60,14 @@ export function WorkspaceSearchDialog({ open, items, scopeName, storageKey, onCl
           }
           if (event.key === "Enter" && results[activeIndex]) { event.preventDefault(); choose(results[activeIndex]); }
         }} />
-        <IconButton label="Close search" variant="ghost" onClick={onClose}><X size={18} /></IconButton>
+        <StTextButton aria-label="Close search" onClick={onClose}><span className={styles.desktopEscape}><StKbd>Esc</StKbd></span><X className={styles.phoneClose} size={18} aria-hidden="true" /></StTextButton>
       </header>
-      <div className={styles.meta}><h2 id={`${id}-title`}>{scopeName}</h2><span role="status" aria-live="polite">{results.length} {results.length === 1 ? "result" : "results"}</span></div>
+      <div className={styles.meta}><h2 id={`${id}-title`}>{scopeName}</h2><span role="status" aria-live="polite"><StMono>{results.length}</StMono> {results.length === 1 ? "result" : "results"}</span></div>
       <div id={`${id}-results`} role="listbox" aria-label="Search results" className={styles.results}>
-        {results.map((item, index) => <button key={item.id} id={`${id}-result-${index}`} type="button" role="option" tabIndex={-1} aria-selected={index === activeIndex} className={styles.result} onMouseMove={() => setSelected(index)} onClick={() => choose(item)}><span><strong>{item.title}</strong><small>{item.detail}</small></span><ArrowUpRight size={16} aria-hidden="true" /></button>)}
+        {results.map((item, index) => <button key={item.id} id={`${id}-result-${index}`} type="button" role="option" tabIndex={-1} aria-selected={index === activeIndex} className={styles.result} onMouseMove={() => setSelected(index)} onClick={() => choose(item)}><span><strong>{item.title}</strong><small>{item.detail}</small></span><span className={styles.resultEnd}>{index === activeIndex ? <span className={styles.openHint}><StMono>Enter to open</StMono></span> : null}<ArrowUpRight size={16} aria-hidden="true" /></span></button>)}
       </div>
-      {!results.length ? <div className={styles.empty}><strong>{query ? "No matching work" : "No saved work yet"}</strong><p>{query ? "Try a different name or a shorter search." : systemsReleased ? "Your systems, documents and files will be searchable here." : "Your saved apps, documents, and work will be searchable here."}</p></div> : null}
-      <footer className={styles.footer}>Use ↑ ↓ to choose, Enter to open, and Esc to close.</footer>
+      {!results.length ? <div className={styles.empty}><StEmpty><strong>{query ? "No matching work" : "No saved work yet"}</strong><p>{query ? "Try a different name or a shorter search." : systemsReleased ? "Your systems, documents and files will be searchable here." : "Your saved apps, documents, and work will be searchable here."}</p></StEmpty></div> : null}
+      <footer className={styles.footer}><span><StKbd>↑ ↓</StKbd> Choose</span><span><StKbd>Enter</StKbd> Open</span><span><StKbd>Esc</StKbd> Close</span></footer>
     </div>
   </dialog>;
 }

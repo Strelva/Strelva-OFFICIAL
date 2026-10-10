@@ -17,7 +17,7 @@
 
 import Link from "next/link";
 import { Check, ChevronLeft, Circle, Loader2, X } from "lucide-react";
-import { useCallback, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type ReactNode, type Ref } from "react";
 import styles from "./kit.module.css";
 
 type Tone = "need" | "critical" | "live" | "text";
@@ -28,13 +28,14 @@ export function StPage({ children, width = "column", className }: { children: Re
   return <div className={`${styles.page}${className ? ` ${className}` : ""}`} data-width={width}><div className={styles.pageStack}>{children}</div></div>;
 }
 
-export function StHead({ crumb, title, meta, beacon, actions, titleId }: {
+export function StHead({ crumb, title, meta, beacon, actions, titleId, titleRef }: {
   crumb?: { label: string; href?: string; onClick?: () => void };
   title: ReactNode;
   meta?: ReactNode;
   beacon?: BeaconKind;
   actions?: ReactNode;
   titleId?: string;
+  titleRef?: Ref<HTMLHeadingElement>;
 }) {
   const crumbNode = crumb ? (crumb.href
     ? <Link className={styles.crumb} href={crumb.href} onClick={crumb.onClick}><ChevronLeft size={14} aria-hidden="true" />{crumb.label}</Link>
@@ -43,7 +44,7 @@ export function StHead({ crumb, title, meta, beacon, actions, titleId }: {
   return <header className={styles.headRow}>
     <div className={styles.head}>
       {crumbNode}
-      <div className={styles.titleRow}>{beacon ? <StBeacon kind={beacon} /> : null}<h1 id={titleId} className={styles.title}>{title}</h1></div>
+      <div className={styles.titleRow}>{beacon ? <StBeacon kind={beacon} /> : null}<h1 ref={titleRef} tabIndex={titleRef ? -1 : undefined} id={titleId} className={styles.title}>{title}</h1></div>
       {meta ? <p className={styles.meta}>{meta}</p> : null}
     </div>
     {actions ? <div className={styles.headActions}>{actions}</div> : null}
@@ -87,7 +88,10 @@ interface RowProps {
 export function StRow({ kind, title, detail, lead, end, href, onClick, selected, align = "center", stackOnPhone = true, children }: RowProps) {
   const body = <>{lead}<span className={styles.rowMain}>{kind ? <span className={styles.rowKind}>{kind}</span> : null}<span className={styles.rowTitle}>{title}</span>{detail ? <span className={styles.rowDetail}>{detail}</span> : null}{children}</span>{end ? <span className={styles.rowEnd}>{end}</span> : null}</>;
   const shared = { className: styles.row, "data-selected": selected || undefined, "data-align": align, "data-stack": stackOnPhone || undefined } as const;
-  if (href) return <li><Link {...shared} href={href} aria-current={selected ? "true" : undefined}>{body}</Link></li>;
+  if (href) return <li><Link {...shared} href={href} aria-current={selected ? "true" : undefined} onClick={onClick ? event => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    event.preventDefault(); onClick();
+  } : undefined}>{body}</Link></li>;
   if (onClick) return <li><button {...shared} type="button" onClick={onClick} aria-pressed={selected || undefined}>{body}</button></li>;
   return <li {...shared}>{body}</li>;
 }
@@ -130,7 +134,7 @@ export function StPillLink({ href, variant = "primary", size = "md", block, chil
   return <Link href={href} className={styles.pill} data-variant={variant} data-size={size} data-block={block || undefined}>{children}</Link>;
 }
 
-export function StTextButton({ tone, children, href, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { tone?: "accent" | "danger"; href?: string }) {
+export function StTextButton({ tone, children, href, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { tone?: "accent" | "danger"; href?: string; ref?: Ref<HTMLButtonElement> }) {
   if (href) return <Link href={href} className={styles.textButton} data-tone={tone}>{children}</Link>;
   return <button type="button" {...rest} className={styles.textButton} data-tone={tone}>{children}</button>;
 }
@@ -174,7 +178,7 @@ const HOLD_MS = 900;
  * with pointer, Space or Enter; Command/Ctrl + Enter while focused accepts at
  * once. Reduced motion keeps the hold, without the moving fill.
  */
-export function StHold({ label, onAccept, disabled, block, hint = "⌘ Enter" }: { label: string; onAccept: () => void; disabled?: boolean; block?: boolean; hint?: string }) {
+export function StHold({ label, onAccept, disabled, block, hint = "⌘ Enter", "aria-label": ariaLabel }: { "aria-label"?: string; label: string; onAccept: () => void; disabled?: boolean; block?: boolean; hint?: string }) {
   const [progress, setProgress] = useState(0);
   const frame = useRef<number | null>(null);
   const start = useRef<number | null>(null);
@@ -203,12 +207,12 @@ export function StHold({ label, onAccept, disabled, block, hint = "⌘ Enter" }:
 
   useEffect(() => () => { if (frame.current) cancelAnimationFrame(frame.current); }, []);
 
-  return <button type="button" className={styles.hold} data-block={block || undefined} disabled={disabled} aria-describedby={hintId}
+  return <button type="button" className={styles.hold} aria-label={ariaLabel} data-block={block || undefined} disabled={disabled} aria-describedby={hintId}
     style={{ "--hold-progress": progress } as CSSProperties}
     onPointerDown={event => { event.currentTarget.setPointerCapture(event.pointerId); begin(); }}
-    onPointerUp={stop} onPointerCancel={stop} onPointerLeave={stop}
+    onPointerUp={stop} onPointerCancel={stop} onPointerLeave={stop} onBlur={stop}
     onKeyDown={event => {
-      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") { event.preventDefault(); done.current = true; onAccept(); return; }
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && !event.repeat) { event.preventDefault(); done.current = true; stop(); onAccept(); return; }
       if ((event.key === " " || event.key === "Enter") && !event.repeat) { event.preventDefault(); begin(); }
     }}
     onKeyUp={event => { if (event.key === " " || event.key === "Enter") stop(); }}
@@ -246,10 +250,12 @@ export function StSkeleton({ width = "100%", label = "Loading" }: { width?: stri
 /* ---------- Composer ---------- */
 
 /** The floating Ask Strelva bar. Visual only: the caller owns submission and authority. */
-export function StComposerBar({ scope, placeholder, value, onChange, onSubmit, disabled, inputLabel = "Ask Strelva" }: { scope?: string; placeholder: string; value: string; onChange: (value: string) => void; onSubmit: () => void; disabled?: boolean; inputLabel?: string }) {
-  return <form className={styles.composer} onSubmit={event => { event.preventDefault(); if (value.trim()) onSubmit(); }}>
-    {scope ? <span className={styles.composerScope}><StBeacon kind="live" />{scope}</span> : null}
-    <input className={styles.composerInput} aria-label={inputLabel} placeholder={placeholder} value={value} onChange={event => onChange(event.target.value)} disabled={disabled} />
+export function StComposerBar({ scope, placeholder, value, onChange, onSubmit, disabled, inputLabel = "Ask Strelva", inputRef, maxLength, multiline, textareaRef }: { scope?: string; placeholder: string; value: string; onChange: (value: string) => void; onSubmit: () => void; disabled?: boolean; inputLabel?: string; inputRef?: Ref<HTMLInputElement>; maxLength?: number; multiline?: boolean; textareaRef?: Ref<HTMLTextAreaElement> }) {
+  return <form className={styles.composer} onSubmit={event => { event.preventDefault(); if (!disabled && value.trim()) onSubmit(); }}>
+    {scope ? <span className={styles.composerScope}>{scope}</span> : null}
+    {multiline ? <textarea ref={textareaRef} rows={1} maxLength={maxLength} className={styles.composerInput} aria-label={inputLabel} placeholder={placeholder} value={value} onChange={event => onChange(event.target.value)} disabled={disabled} onKeyDown={event => {
+      if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
+    }} /> : <input ref={inputRef} maxLength={maxLength} className={styles.composerInput} aria-label={inputLabel} placeholder={placeholder} value={value} onChange={event => onChange(event.target.value)} disabled={disabled} />}
     <button className={styles.composerSend} type="submit" aria-label="Send" disabled={disabled || !value.trim()}><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg></button>
   </form>;
 }

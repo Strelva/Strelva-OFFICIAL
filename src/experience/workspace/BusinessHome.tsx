@@ -1,19 +1,22 @@
 "use client";
 
-import { useRef, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { ArrowRight, Check, Circle, FileText, LayoutGrid, LoaderCircle, Plus, ShieldCheck, TriangleAlert } from "lucide-react";
+import { StPage, StHead, StSection, StRows, StRow, StBeacon, StState, StMono, StTextButton, StEmpty, StNotice, StSkeleton, StComposerDock, StSteps } from "@/components/ui/strelva/Kit";
 import { Button } from "@/components/ui/Button";
 import { actorPresentation } from "@/platform/presentation/actor";
 import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
 import { StrelvaShell, pinnedApps, pinnedSystems, pinnedWebsites, type StrelvaSection } from "@/experience/app-frame/StrelvaShell";
 import { SystemList } from "@/experience/systems/SystemList";
-import { SYSTEMS_LABEL, SYSTEMS_LIST_LABEL, type SystemView } from "@/experience/systems/model";
+import { SYSTEMS_LABEL, SYSTEMS_LIST_LABEL, HEALTH_LABEL, LIFECYCLE_LABEL, type SystemView } from "@/experience/systems/model";
 import type { OfferingWebsiteBinding, OfferingWebsiteBindingCommand } from "@/platform/offerings";
 import type { WorkspaceSnapshot, WorkspaceSystemActivation, WorkspaceWork } from "./contracts";
 import type { ManagedWorkSummary } from "./workspace-discovery";
 import type { WorkspaceSearchItem } from "./workspace-search";
 import { BusinessOfferingSummary, WebsiteAssignmentHandoff, type WorkspaceOfferingState } from "./WorkspaceOfferings";
 import { WorkspaceAllowanceSummary } from "./WorkspaceAllowanceSummary";
+import { OwnerPhoneNavigation } from "./OwnerPhoneNavigation";
+import { WorkspaceBusinessSwitcher } from "./WorkspaceBusinessSwitcher";
 import { WorkspaceComposer } from "./WorkspaceComposer";
 import { requestDraftKey } from "./request-draft";
 import { useBusinessDeliveries } from "./useBusinessDeliveries";
@@ -89,6 +92,10 @@ function subscribeMinute(onChange: () => void) {
 const minuteNow = () => Math.floor(Date.now() / 60_000);
 const noMinute = () => null;
 
+export function ownerSystemRank(system: SystemView): number {
+  return system.health.state === "blocked" || system.health.state === "degraded" ? 0 : system.lifecycle !== "live" ? 1 : 2;
+}
+
 function greetingFor(minute: number | null): { greeting: string; line: string | null } {
   if (minute === null) return { greeting: "Welcome back.", line: null };
   const at = new Date(minute * 60_000);
@@ -126,6 +133,8 @@ function liveChips(siteSummary: SiteSummaryState, systems: readonly SystemView[]
 
 /** The start and return surface, using the same frame as every saved result. */
 export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignmentsKnown, offerings, busy, notice, onOpen, onStart, onCreateWebsite, onRequest, onDraftChange, onNavigate, onWorkspace, onOfferings, appBase = "", accountHref, signOut, managedWorkUnavailable, onWebsiteCommand, onRetryWebsiteAssignments, files, systemHref, onOpenSystem, systemsLoading = false, systemsUnavailable = false, systems: knownSystems = [], systemsReleased = false, view = "home" }: Props) {
+  const [handledWorkspaceId, setHandledWorkspaceId] = useState<string | null>(null);
+  const showHandled = handledWorkspaceId === snapshot.workspaceId;
   const needsYouHeading = useRef<HTMLHeadingElement>(null);
   // An incomplete list would misplace a System; show none until it loads.
   const systems = systemsReleased && !systemsLoading ? knownSystems : [];
@@ -323,22 +332,62 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
     <details className={styles.details} aria-label="Usage and connected services"><summary>Usage and connected services</summary><div className={styles.connections}>{customer && !readOnly ? <WorkspaceAllowanceSummary businessId={snapshot.workspaceId} enabled compact onOpenSettings={() => onNavigate("settings")} /> : null}<BusinessOfferingSummary state={offerings} work={snapshot.work} onOpen={onOfferings} systemsReleased={systemsReleased} /></div></details>
   </div>;
 
-  // ---- The Needs you place: one card per decision, shaped for it.
-  const deckCards = home.attention.map(({ work, reason }) => <li key={work.id} className={styles.decisionCard} data-shape="plain"><div className={styles.cardBody}><p className={styles.cardMeta}><span className={styles.dot} aria-hidden="true" />{workspaceWorkLabel(work)}</p><h3>{work.title}</h3><p>{reason}</p></div><div className={styles.decisionActions}><Button size="sm" onClick={() => onOpen(work.id)} aria-label={`Open ${work.title}`}>Open</Button></div></li>);
-  const needsYouPage = <div className={styles.home} aria-busy={busy || undefined}>
-    <header className={`${styles.pageHeader} ${styles.reveal}`}>
-      <h1 ref={needsYouHeading} tabIndex={-1} className="font-display">Needs you</h1>
-      <p>{decisionsWaiting === null ? `Decisions only you can make for ${name}.` : decisionsWaiting ? `${decisionCount(decisionsWaiting)} only you can make.` : "Nothing is waiting on you."}</p>
-    </header>
-    <NeedsYouSection retryFocusTarget={needsYouHeading} variant="deck" state={needsYou.state} pending={needsYou.pending} notices={needsYou.notices} onDecide={needsYou.decide} onRetry={needsYou.refresh} appBase={appBase}
-      extraCount={home.attention.length} extra={home.attention.length ? deckCards : null}
-      empty={<div className={styles.deckEmpty}><Check size={20} aria-hidden="true" /><div><h2>Nothing needs you.</h2><p>When Strelva needs your yes, it shows here first, with what happens either way.</p></div><Button variant="secondary" size="sm" onClick={() => onNavigate("home")}>Back to Home</Button></div>} />
-    {policy}
+  const paperReceipts = <StrelvaHandledSection state={needsYou.state} pending={needsYou.pending} notices={needsYou.receiptNotices} onUndo={needsYou.undo}
+    fallback={receipts.length ? receiptList : undefined} />;
+  const paperHome = <div className={styles.paperScroll} aria-busy={busy || undefined}>
+    <StPage>
+      <StHead title={showHandled ? "Strelva handled" : name} titleId="business-start-title"
+        meta={showHandled ? "Last 7 days · what changed and who did it" : readOnly ? `${name} shared this with your agency to review.` : [decisionsWaiting === null ? "" : `${decisionsWaiting} need you`, live ? `${live} live` : "", drafts ? `${drafts} in draft` : "", paused ? `${paused} paused` : ""].filter(Boolean).join(" · ")}
+        crumb={showHandled ? { label: "Home", onClick: () => setHandledWorkspaceId(null) } : undefined} />
+      {showHandled ? paperReceipts : <>
+        {decisions}
+        <StSection title={SYSTEMS_LABEL} id="home-systems" meta="Not working first" action={systems.length ? <StTextButton onClick={() => onNavigate("apps")}>{SYSTEMS_LIST_LABEL}</StTextButton> : undefined}>
+          {busy || systemsLoading ? <StSkeleton label="Loading your systems" /> : systemsUnavailable ? <StNotice tone="critical">Your systems could not be loaded just now. Nothing about them has changed.</StNotice> : systems.length ? <StRows label={`${name} systems`}>
+            {[...systems].sort((a, b) => ownerSystemRank(a) - ownerSystemRank(b) || a.name.localeCompare(b.name)).map(system => <StRow key={system.id} title={system.name} detail={system.detail}
+              href={openSystemHref(system.id)} onClick={onOpenSystem ? () => onOpenSystem(system.id) : undefined}
+              lead={<StBeacon kind={system.health.state === "blocked" || system.health.state === "degraded" ? "down" : system.lifecycle === "live" ? "live" : "draft"} />}
+              end={<span className={styles.systemStates}><StState kind={system.lifecycle === "live" ? "live" : "draft"}>{LIFECYCLE_LABEL[system.lifecycle]}</StState><span>{HEALTH_LABEL[system.health.state]}</span>{system.health.lastVerifiedAt ? <StMono>Checked {new Date(system.health.lastVerifiedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</StMono> : null}</span>} />)}
+          </StRows> : <StEmpty><strong>{readOnly ? "Nothing has been shared here yet." : "Nothing is running yet."}</strong>{readOnly ? "Systems the owner shares will appear here." : "Your website, inquiries, bookings and the tools your team uses will appear here once Strelva builds them. Tell Strelva what you need below."}</StEmpty>}
+          {connectSiteHref && !busy && !systemsLoading ? <p className={styles.paperNote} data-home-connect-site>{snapshot.releases?.websiteRebuild === true ? <>Your next website: <a href={connectSiteHref}>Open website options</a>.</> : systems.some(item => item.kind === "website") ? <>Have another website? <a href={connectSiteHref}>Connect it</a>. It stays where it is.</> : <>Already have a website? <a href={connectSiteHref}>Bring it into Strelva</a>. It stays where it is; Strelva takes its inquiries.</>}</p> : null}
+        </StSection>
+        <div className={styles.paperLower}>
+          <div>{needsYouReleased ? <><div className={styles.receiptAction}><StTextButton onClick={() => setHandledWorkspaceId(snapshot.workspaceId)}>All receipts</StTextButton></div>{paperReceipts}</> : <StSection title="Strelva handled" meta="Last 7 days" id="home-handled">{receipts.length ? receiptList : <StEmpty>Nothing this week. When something changes for you, it shows here with what changed and how to undo it.</StEmpty>}</StSection>}</div>
+          <div className={styles.paperSecondary}>
+            <StSection title="In progress" action={<StTextButton onClick={() => onNavigate("requests")}>All requests</StTextButton>}>
+              {making.length || inProgress.length ? <StRows>{making.map(activation => <StRow key={activation.id} title={activation.partlyLive ? `${activation.title}: Partly live` : activation.headline} detail={`${activation.done} of ${activation.total} done`}>
+                {activation.lines.length ? <StSteps label={`${activation.title} steps`} steps={activation.lines.map(line => ({ title: line.label, detail: line.detail, state: stepState(line) === "done" ? "done" : stepState(line) === "now" ? "active" : stepState(line) === "attention" ? "failed" : "pending" }))} /> : null}
+              </StRow>)}{inProgress.slice(0, 5).map(row => <StRow key={row.id} title={row.title} detail={row.detail} href={row.href} onClick={!row.href && row.workId ? () => onOpen(row.workId!) : undefined} />)}</StRows> : progressChecking ? <StSkeleton label="Checking your requests" /> : deliveryUnavailable ? null : <StEmpty>Nothing is in progress.</StEmpty>}
+              {deliveryUnavailable ? <StNotice>Requests could not be checked. <StTextButton onClick={deliveries.refresh}>Check again</StTextButton></StNotice> : null}
+            </StSection>
+            <StSection title="Files and results" action={<StTextButton onClick={() => onNavigate("work")}>All files</StTextButton>}>
+              {busy ? <StSkeleton label="Loading saved files" /> : results.length ? <StRows>{results.slice(0, 6).map(work => <StRow key={work.id} title={work.title} detail={workspaceWorkLabel(work)} onClick={() => onOpen(work.id)} />)}</StRows> : <StEmpty>No saved files yet. Checks, reports and plans Strelva makes for you are kept here.</StEmpty>}
+            </StSection>
+          </div>
+        </div>
+        {managedWorkUnavailable ? <StNotice>Some websites could not be loaded. <a href={accountHref}>Check website access</a></StNotice> : null}
+        {policy}
+        {outcomes ? <LoopRibbon {...outcomes.loop} /> : null}
+        <details className={styles.paperDetails}><summary>Website results and connected services</summary><SiteSummarySection state={siteSummary.state} workspaceId={snapshot.workspaceId} appBase={appBase} onRetry={siteSummary.retry} />{customer && !readOnly ? <WorkspaceAllowanceSummary businessId={snapshot.workspaceId} enabled compact onOpenSettings={() => onNavigate("settings")} /> : null}<BusinessOfferingSummary state={offerings} work={snapshot.work} onOpen={onOfferings} systemsReleased={systemsReleased} />{!readOnly && onCreateWebsite ? <StTextButton onClick={onCreateWebsite} disabled={busy}>Start a private website draft</StTextButton> : null}</details>
+        {unassignedSites.length ? <details className={styles.paperDetails}><summary>Websites available to your account</summary><WebsiteAssignmentHandoff businessName={name} state={managedWorkUnavailable ? { status: "unavailable", reason: "Linked website access is unavailable right now." } : offerings} sites={unassignedSites} onRetry={onRetryWebsiteAssignments} onCommand={onWebsiteCommand} /></details> : null}
+      </>}
+    </StPage>
+    {!readOnly ? <StComposerDock><WorkspaceComposer tone="dock" scope={name} draftKey={requestDraftKey({ actorEmail: snapshot.actor.email, workspaceId: snapshot.workspaceId })} disabled={busy} onSubmit={request} onEdited={onDraftChange} placeholder="Ask Strelva to change or make something" systemsReleased={systemsReleased} /></StComposerDock> : null}
   </div>;
 
-  return <StrelvaShell active={view === "needs-you" ? "needs-you" : "home"} title={view === "needs-you" ? "Needs you" : name} appBase={appBase} workspaceId={snapshot.workspaceId} accountName={snapshot.actor.email.split("@")[0] || "Your account"} accountDetail={snapshot.actor.email} signOut={signOut} onNavigate={onNavigate} onStart={onStart} startDisabled={readOnly || busy} searchItems={searchItems} searchScopeName={name} recentWork={recentWork} pinned={systemsReleased ? pinnedSystems(systems, openSystemHref, onOpenSystem) : [...pinnedWebsites(sites), ...pinnedApps(snapshot.work, workHref, onOpen)]} systemsReleased={systemsReleased} notice={notice} contentId="business-home-main"
+  // ---- The Needs you place: one card per decision, shaped for it.
+  const deckCards = home.attention.map(({ work, reason }) => <StRow key={work.id} kind={workspaceWorkLabel(work)} title={work.title} detail={reason} end={<StTextButton onClick={() => onOpen(work.id)} aria-label={`Open ${work.title}`}>Open</StTextButton>} />);
+  const needsYouPage = <div className={styles.paperScroll} aria-busy={busy || undefined}><StPage>
+    <StHead title="Needs you" titleRef={needsYouHeading} meta={decisionsWaiting === null ? `Decisions only you can make for ${name}.` : decisionsWaiting ? `${decisionCount(decisionsWaiting)} only you can make.` : "Nothing is waiting on you."} />
+    <NeedsYouSection retryFocusTarget={needsYouHeading} variant="deck" state={needsYou.state} pending={needsYou.pending} notices={needsYou.notices} onDecide={needsYou.decide} onRetry={needsYou.refresh} appBase={appBase}
+      extraCount={home.attention.length} extra={home.attention.length ? deckCards : null}
+      empty={<StEmpty action={<StTextButton onClick={() => onNavigate("home")}>Back to Home</StTextButton>}><strong>Nothing needs you.</strong>When Strelva needs your yes, it shows here first, with what happens either way.</StEmpty>} />
+    {policy}
+  </StPage></div>;
+
+  return <StrelvaShell active={view === "needs-you" ? "needs-you" : "home"} title={view === "needs-you" ? "Needs you" : name} appBase={appBase} workspaceId={snapshot.workspaceId} accountName={snapshot.actor.email.split("@")[0] || "Your account"} accountDetail={snapshot.actor.email} signOut={signOut} onNavigate={place => { setHandledWorkspaceId(null); onNavigate(place); }} onStart={onStart} startDisabled={readOnly || busy} searchItems={searchItems} searchScopeName={name} recentWork={recentWork} pinned={systemsReleased ? pinnedSystems(systems, openSystemHref, onOpenSystem) : [...pinnedWebsites(sites), ...pinnedApps(snapshot.work, workHref, onOpen)]} systemsReleased={systemsReleased} notice={notice} contentId="business-home-main"
     needsYou={needsYouReleased ? { count: decisionsWaiting } : undefined}
-    businessContext={<label><span className={styles.srOnly}>Current workspace</span><select aria-label="Current workspace" value={snapshot.workspaceId} disabled={busy} onChange={event => onWorkspace(event.target.value)}>{snapshot.workspaces.map(workspace => <option key={workspace.id} value={workspace.id}>{workspace.name}{workspace.access === "delegated_read" ? " · Read-only" : ""}</option>)}</select></label>}>
-    {view === "needs-you" && needsYouReleased ? needsYouPage : homePage}
+    businessContext={business ? <WorkspaceBusinessSwitcher snapshot={snapshot} busy={busy} onWorkspace={onWorkspace} onNavigate={onNavigate} /> : <label><span className={styles.srOnly}>Current workspace</span><select aria-label="Current workspace" value={snapshot.workspaceId} disabled={busy} onChange={event => onWorkspace(event.target.value)}>{snapshot.workspaces.map(workspace => <option key={workspace.id} value={workspace.id}>{workspace.name}{workspace.access === "delegated_read" ? " · Read-only" : ""}</option>)}</select></label>}>
+    {view === "needs-you" && needsYouReleased ? needsYouPage : business ? paperHome : homePage}
+    {business ? <OwnerPhoneNavigation active={view === "needs-you" ? "needs-you" : "home"} onNavigate={place => { setHandledWorkspaceId(null); onNavigate(place); }} askReleased={snapshot.releases?.ask === true} /> : null}
   </StrelvaShell>;
 }

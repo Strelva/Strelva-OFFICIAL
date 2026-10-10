@@ -15,7 +15,20 @@ in `src/app/styles/workspace-paper.css`. Specimen: `/preview/strelva/kit`
 `StRows`/`StRow`, `StBeacon`, `StState`, `StMono`, `StKbd`, `StStamp`,
 `StPill`, `StPillLink`, `StTextButton`, `StSegmented`, `StSteps`, `StLedger`,
 `StHold`, `StToast`, `StSurface`, `StNotice`, `StEmpty`, `StSkeleton`,
-`StComposerBar`, `StComposerDock`. Rules and adoption lanes:
+`StComposerBar`, `StComposerDock`.
+
+L1 owner keeps modified-click navigation on `StRow` links even when a caller
+handles ordinary opening locally. It extends `StHead` with a heading focus ref for recovery,
+`StTextButton` with a button ref, `StHold` with a contextual accessible label
+(and cancellation on blur), and `StComposerBar` with input/textarea refs,
+length bounds and optional multiline entry. Enter sends; Shift + Enter keeps
+a line in multiline mode. The scope names context without claiming it is Live.
+The specimen includes scoped, multiline and permission-disabled composers.
+Owner Home adopts the open kit behind the existing Systems release flag;
+release-off Home retains its earlier composition. L1 extension behavior is code
+tested; its rendered comparison is pending local browser permission.
+
+Rules and adoption lanes:
 [ui-1.0-integration.md](./ui-1.0-integration.md). Proven: rendered locally in
 both modes on October 9; consumers are added lane by lane.
 

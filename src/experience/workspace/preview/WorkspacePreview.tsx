@@ -120,7 +120,7 @@ export function WorkspacePreview({ scenario, systems, needsYou = false, ask = nu
   const inquiry = useMemo(() => scenario.startsWith("mooney")
     ? { tenantId: MOONEY_TENANT, label: "The Mooney Firm", adapter: createPreviewInquiryAdapter("business", scenario === "mooney-shared" ? "read-only" : scenario, MOONEY_INQUIRY_PROFILE) }
     : { tenantId: "buffalo-realty", label: "Buffalo Realty", adapter: createPreviewInquiryAdapter("business", scenario) }, [scenario]);
-  return <div ref={previewRef} data-dashboard className={styles.preview}>
+  return <div ref={previewRef} data-dashboard data-workspace-theme="linen" data-workspace-mode={searchParams.get("mode") === "dark" ? "dark" : undefined} className={styles.preview}>
     <aside ref={controlsRef} className={styles.controls} aria-label="Local preview controls">
       <div><strong>Local interface preview</strong><span>Fictional data · changes reset on reload · no live actions</span></div>
       <label>Example<select value={scenario} onChange={event => { router.push(previewHref(event.target.value, releaseParam)); }}>{PREVIEW_SCENARIOS.map(item => <option key={item} value={item}>{item === "read-only" ? "Shared, read-only" : item.replace(/^./, letter => letter.toUpperCase())}</option>)}</select></label>
