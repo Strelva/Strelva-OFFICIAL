@@ -21,6 +21,14 @@ function Harness({ onSubmit }: { onSubmit: (draft: ApplicationUseDraft) => void 
   return createElement(ApplicationUseRenderer, { snapshot, draft, onDraftChange: setDraft, onSubmit });
 }
 describe("correcting saved contact links", () => {
+  it("keeps the form available for another record inside an interactive preview", async () => {
+    await act(async () => root.render(createElement(ApplicationUseRenderer, {
+      presentation: "preview", snapshot: { ...snapshot, access: { ...snapshot.access, recordSubmit: true } },
+      draft: { values: {}, recordId: "another", idempotencyKey: "another" }, onDraftChange: vi.fn(), onSubmit: vi.fn(),
+    })));
+    expect(container.querySelector("form")).not.toBeNull();
+    expect(button("Submit record")).toBeDefined();
+  });
   it("shows human names and addresses in the record list", async () => {
     await act(async () => root.render(createElement(Harness, { onSubmit: vi.fn() })));
     expect(container.textContent).toContain("Acme · client@example.test");

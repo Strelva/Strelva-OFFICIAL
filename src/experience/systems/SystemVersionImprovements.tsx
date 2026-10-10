@@ -3,7 +3,7 @@ import { STRELVA_HANDLED_LABEL } from "@/platform/presentation/place-labels";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import {versionPreparationResultReceiptSchema,nativeVersionConflictSchema} from "@/platform/system-versions/native-preparation-contracts";
-import { Button } from "@/components/ui/Button";
+import { StEmpty, StLedger, StMono, StNotice, StPill, StPillLink, StRows, StRow, StSkeleton, StState } from "@/components/ui/strelva/Kit";
 import { SelectInput, TextArea } from "@/components/ui/TextInput";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import { ownerDecisionSchema } from "@/platform/needs-you/contracts";
@@ -148,30 +148,30 @@ function ScopedSystemVersionImprovements({ workspaceId, systemId, versionId, rea
   }
 
   return <div className="space-y-4 text-sm" aria-label="Version possibilities">
-    {!view && !error ? <p role="status">Reading Version possibilities…</p> : null}
+    {!view && !error ? <div className="space-y-3"><p role="status">Reading Version possibilities…</p><StSkeleton label="Reading Version possibilities" /><StSkeleton width="70%" /></div> : null}
     {error ? <p role="alert" className="text-critical">{error}</p> : null}
-    {!view && error ? <Button size="lg" variant="secondary" onClick={() => { setError(""); setAttempt(value => value + 1); }}>Retry</Button> : null}
-    {view && !offer && !view.pendingRelease && !success ? <p className="text-gray-muted">This Version has no alternatives waiting.</p> : null}
-    {offer && !success && !prepared && !released ? <><p><strong>{offer.title}</strong> · {offer.status === "ready" ? "Ready" : "Exploring"}</p><p>{offer.summary}</p>
-      <details><summary>Compare with the current draft</summary><ul className="my-3 space-y-2">{offer.changes.map(change => <li key={change.path} className="break-words">{change.path}: {valueLabel(change.before)} → {valueLabel(change.after)}</li>)}</ul><VersionAlternative definition={offer.preview} label="Alternative definition" /></details>
-      {offer.missingAccounts.length ? <p role="status">Connect {offer.missingAccounts.join(", ")} in this business before preparing the improvement.</p> : null}
-      {offer.conflicts.map(conflict => <div key={conflict.path} className="space-y-2 min-w-0"><p className="break-words">{conflict.path}</p><p className="break-words text-gray-muted">Here: {valueLabel(conflict.local)}</p><p className="break-words text-gray-muted">Source: {valueLabel(conflict.upstream)}</p>
+    {!view && error ? <StPill variant="soft" onClick={() => { setError(""); setAttempt(value => value + 1); }}>Retry</StPill> : null}
+    {view && !offer && !view.pendingRelease && !success ? <StEmpty>This Version has no alternatives waiting.</StEmpty> : null}
+    {offer && !success && !prepared && !released ? <><StRows><StRow title={offer.title} detail={offer.summary} end={<StState kind={offer.status === "ready" ? "need" : "draft"}>{offer.status === "ready" ? "Ready for review" : "Exploring"}</StState>} /></StRows>
+      <details><summary>Compare with the current draft</summary><div className="my-3 space-y-3">{offer.changes.map(change => <StLedger key={change.path} path={change.path} lines={[{ sign: "-", text: valueLabel(change.before) }, { sign: "+", text: valueLabel(change.after) }]} />)}</div><VersionAlternative definition={offer.preview} label="Alternative definition" /></details>
+      {offer.missingAccounts.length ? <StNotice tone="need"><p role="status">Connect {offer.missingAccounts.join(", ")} in this business before preparing the improvement.</p></StNotice> : null}
+      {offer.conflicts.map(conflict => <div key={conflict.path} className="space-y-2 min-w-0"><p className="break-words"><StMono tone="text">{conflict.path}</StMono></p><p className="break-words text-gray-muted">Here: {valueLabel(conflict.local)}</p><p className="break-words text-gray-muted">Source: {valueLabel(conflict.upstream)}</p>
         {!readOnly && view?.canManage ? <SelectInput label={`Choice for ${conflict.path}`} disabled={locked} value={choices[conflict.path] ?? ""} onChange={event => setChoices(previous => ({ ...previous, [conflict.path]: event.target.value as "keep_local" | "take_upstream" }))} options={[{ value: "", label: "Choose what to keep" }, ...(!conflict.locked ? [{ value: "keep_local", label: "Keep our value" }] : []), { value: "take_upstream", label: "Take the source value" }]} /> : null}
       </div>)}
-      {!readOnly && view?.canManage && !success ? pending.current ? <Button size="lg" disabled={busy} loading={busy} onClick={() => void prepare(pending.current!.action)}>Retry the same choice</Button> : <>
-        <Button size="lg" disabled={busy || Boolean(offer.missingAccounts.length) || offer.conflicts.some(conflict => !choices[conflict.path])} onClick={() => void prepare("adopt")}>Prepare for review</Button>
-        <TextArea label="Reason to decline" rows={2} maxLength={500} value={reason} onChange={event => setReason(event.target.value)} /><Button size="lg" variant="secondary" disabled={busy || !reason.trim()} onClick={() => void prepare("decline")}>Decline improvement</Button>
-      </> : readOnly || !view?.canManage ? <p className="text-gray-muted">An owner or admin can prepare or decline this improvement.</p> : null}
+      {!readOnly && view?.canManage && !success ? pending.current ? <StPill disabled={busy} busy={busy} onClick={() => void prepare(pending.current!.action)}>Retry the same choice</StPill> : <>
+        <StPill disabled={busy || Boolean(offer.missingAccounts.length) || offer.conflicts.some(conflict => !choices[conflict.path])} onClick={() => void prepare("adopt")}>Prepare for review</StPill>
+        <TextArea label="Reason to decline" rows={2} maxLength={500} value={reason} onChange={event => setReason(event.target.value)} /><StPill variant="soft" disabled={busy || !reason.trim()} onClick={() => void prepare("decline")}>Decline improvement</StPill>
+      </> : readOnly || !view?.canManage ? <StNotice>An owner or admin can prepare or decline this improvement.</StNotice> : null}
     </> : null}
     {(prepared || view?.pendingRelease) && !released && (!success || prepared) ? <div className="space-y-3">
-      <p><strong>{prepared ? "Prepared Version improvement" : view?.pendingRelease?.title}</strong> · Ready</p>
+      <StRows><StRow title={prepared ? "Prepared Version improvement" : view?.pendingRelease?.title} end={<StState kind="need">Ready for review</StState>} /></StRows>
       {view?.pendingRelease && (!prepared || prepared.rowRevision === view.pendingRelease.rowRevision) ? <details><summary>Compare the release and alternative</summary><p className="my-3">Current release</p><VersionAlternative definition={view.pendingRelease.current} label="Current release preview" /><p className="my-3">Alternative</p><VersionAlternative definition={view.pendingRelease.preview} label="Prepared alternative preview" /></details> : prepared ? <p role="status">Reading the prepared alternative…</p> : null}
       <p>This changes only this business&apos;s System. Records and accounts stay here.</p>
-      {!readOnly && view?.canManage && !prepared && !view.nativeRuntime ? <Button size="lg" variant="secondary" disabled={busy || Boolean(pending.current) || Boolean(success)} onClick={() => void prepare("prepare_release")}>Prepare this alternative for review</Button> : null}
-      {prepared && "kind" in prepared ? <a className="inline-flex min-h-11 items-center text-brand underline" href={prepared.reviewHref}>Review in this business’s Needs you</a> : <Button size="lg" disabled={!(view?.nativeRuntime ? canPrepareNative : allowed) || busy} loading={busy} onClick={() => void (view?.nativeRuntime ? prepare("prepare_release") : makeReal())}>{view?.nativeRuntime ? "Prepare native draft for review" : approval.current ? "Retry Make real" : "Make real"}</Button>}
+      {!readOnly && view?.canManage && !prepared && !view.nativeRuntime ? <StPill variant="soft" disabled={busy || Boolean(pending.current) || Boolean(success)} onClick={() => void prepare("prepare_release")}>Prepare this alternative for review</StPill> : null}
+      {prepared && "kind" in prepared ? <StPillLink href={prepared.reviewHref}>Review in this business’s Needs you</StPillLink> : <StPill disabled={!(view?.nativeRuntime ? canPrepareNative : allowed) || busy} busy={busy} onClick={() => void (view?.nativeRuntime ? prepare("prepare_release") : makeReal())}>{view?.nativeRuntime ? "Prepare native draft for review" : approval.current ? "Retry Make real" : "Make real"}</StPill>}
       {view?.nativeRuntime ? !canPrepareNative ? <p className="text-gray-muted">An owner or admin can prepare this native draft for review. The owner approves publication.</p> : null : !allowed ? <p className="text-gray-muted">Only this business&apos;s owner can make it real. An admin can prepare it for review.</p> : null}
     </div> : null}
-    {nativeConflict ? <div className="space-y-3"><p>Local work overlaps this source update. Choose what to keep; nothing went live.</p>{nativeConflict.conflicts.map(c=><div key={c.path}><p className="break-words">{nativeConflict.nativeKind === "website_section" ? "FAQ section" : "Inquiry pattern"}</p><p className="break-words">Local: {nativeValueLabel(c.local)} · Source: {nativeValueLabel(c.source)}</p><SelectInput label="Choose which content to keep" disabled={busy || !canPrepareNative} value={nativeChoices[c.path]??""} options={[{value:"",label:"Choose what to keep"},{value:"local",label:"Keep local"},{value:"source",label:"Use source"}]} onChange={e=>setNativeChoices(current=>({...current,[c.path]:e.target.value as "local"|"source"}))}/></div>)}<Button size="lg" disabled={busy || !canPrepareNative || nativeConflict.conflicts.some(c=>!nativeChoices[c.path])} onClick={()=>void prepare("prepare_release")}>Stage the chosen native draft</Button></div>:null}
+    {nativeConflict ? <div className="space-y-3"><p>Local work overlaps this source update. Choose what to keep; nothing went live.</p>{nativeConflict.conflicts.map(c=><div key={c.path}><p className="break-words">{nativeConflict.nativeKind === "website_section" ? "FAQ section" : "Inquiry pattern"}</p><p className="break-words">Local: {nativeValueLabel(c.local)} · Source: {nativeValueLabel(c.source)}</p><SelectInput label="Choose which content to keep" disabled={busy || !canPrepareNative} value={nativeChoices[c.path]??""} options={[{value:"",label:"Choose what to keep"},{value:"local",label:"Keep local"},{value:"source",label:"Use source"}]} onChange={e=>setNativeChoices(current=>({...current,[c.path]:e.target.value as "local"|"source"}))}/></div>)}<StPill disabled={busy || !canPrepareNative || nativeConflict.conflicts.some(c=>!nativeChoices[c.path])} onClick={()=>void prepare("prepare_release")}>Stage the chosen native draft</StPill></div>:null}
     {success ? <p role="status">{success}</p> : null}
   </div>;
 }

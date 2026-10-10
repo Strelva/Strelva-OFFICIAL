@@ -1,0 +1,6 @@
+.shell { min-height: 100dvh; background: var(--st-canvas); color: var(--st-text); font-family: var(--font-workspace, system-ui), sans-serif; }
+.topBar { display: flex; align-items: center; gap: 20px; padding: 12px 24px; background: var(--st-surface); border-bottom: 1px solid var(--st-line); }
+.topBar > div { flex: 1; min-width: 0; }
+.topBar strong { font-size: 14px; font-weight: 600; line-height: 20px; }
+.topBar p { margin: 2px 0 0; color: var(--st-text-2); font-size: 13px; line-height: 20px; }
+@media (max-width: 767px) { .topBar { flex-wrap: wrap; gap: 12px; padding: 16px 20px; } .topBar > div { flex-basis: calc(100% - 48px); } .topBar > button { margin-left: 36px; } }

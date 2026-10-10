@@ -1,0 +1,20 @@
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.comparison { min-width: 0; }
+.heading { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 14px; padding: 0 0 24px; }
+.heading > .values { grid-column: 2; }
+.values { display: grid; width: 650px; max-width: 100%; grid-template-columns: repeat(var(--version-columns, 2), minmax(0, 1fr)); gap: 32px; }
+.versionHead { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.value { display: flex; min-width: 0; flex-direction: column; gap: 4px; color: var(--st-text); font-size: 14px; line-height: 22px; overflow-wrap: anywhere; }
+.value[data-local="true"] { color: var(--st-need); }
+.phoneLabel { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); color: var(--st-text-3); font-size: 12px; }
+.offerVersions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+.offerFooter { display: flex; gap: 20px; justify-content: space-between; align-items: center; color: var(--st-text-3); font-size: 13px; line-height: 20px; }
+.actions { display: flex; gap: 18px; align-items: center; flex-shrink: 0; }
+@media (max-width: 1200px) { .values { width: 520px; gap: 24px; } .heading { grid-template-columns: 180px minmax(0, 1fr); } }
+@media (max-width: 767px) {
+  .heading { display: none; }
+  .values { width: 100%; grid-template-columns: repeat(var(--version-columns, 2), minmax(0, 1fr)); gap: 20px; }
+  .phoneLabel { position: static; width: auto; height: auto; overflow: visible; clip-path: none; }
+  .offerVersions { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .offerFooter { flex-direction: column; align-items: flex-start; gap: 12px; }
+}

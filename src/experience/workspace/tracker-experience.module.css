@@ -1,0 +1,4 @@
+.mappingHead, .mappingRow { display: grid; grid-template-columns: minmax(100px, .7fr) minmax(160px, 1.2fr) minmax(220px, 1fr) minmax(80px, .4fr); align-items: center; gap: 24px; width: 100%; }
+.mappingHead { font-size: 13px; color: var(--st-text-3); padding-bottom: 16px; }
+.sample { color: var(--st-text-2); font-size: 14px; font-weight: 400; overflow-wrap: anywhere; }
+@media (max-width: 767px) { .mappingHead { display: none; } .mappingRow { grid-template-columns: minmax(0, 1fr); gap: 12px; } }

@@ -1,0 +1,32 @@
+.browserBar { display: flex; align-items: center; gap: 16px; padding: 12px 14px; border-bottom: 1px solid var(--st-line); background: var(--st-surface); }
+.browserBar > span:first-child { color: var(--st-line); font-size: 12px; }
+.clientPage { display: flex; flex-direction: column; gap: 16px; min-height: 376px; padding: 32px; background: var(--st-canvas); }
+.clientPage h2 { font-family: Georgia, serif; font-size: 22px; font-weight: 400; line-height: 30px; }
+.clientPage p { margin: 0; color: var(--st-text-2); font-size: 14px; line-height: 22px; }
+.formLine, .formMessage { height: 36px; border: 1px solid var(--st-line); border-radius: var(--st-r-sm); }
+.formMessage { height: 72px; }
+.dateChoices { display: flex; gap: 8px; }
+.dateChoices button, .month button { min-height: 40px; padding: 8px 12px; border-radius: var(--st-r-sm); background: var(--st-inset); color: var(--st-text); font-size: 13px; }
+.dateChoices button[aria-checked="true"], .month button[aria-pressed="true"] { background: var(--st-accent); color: var(--st-on-accent); }
+.requestLine { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; font-size: 13px; }
+.progressColumns { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 40px; }
+.sideNote { display: flex; flex-direction: column; gap: 16px; }
+.clientHeader { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+.clientHeader strong { font-size: 22px; font-weight: 600; }
+.clientHeader span { color: var(--st-text-2); font-size: 13px; }
+.visitorColumns { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.7fr) minmax(0, 1fr); gap: 24px; }
+.visitorColumns h2 { margin-block: 16px; font-size: 22px; font-weight: 500; line-height: 30px; }
+.visitorColumns p { font-size: 14px; line-height: 22px; }
+.muted { margin-block: 14px; color: var(--st-text-2); font-size: 13px; line-height: 20px; }
+.durationChoices { display: grid; gap: 12px; margin-top: 16px; }
+.durationChoices button { min-height: 58px; border: 1px solid var(--st-line); border-radius: var(--st-r-sm); padding: 8px 12px; text-align: left; font-size: 14px; }
+.durationChoices button[aria-checked="true"] { border-color: var(--st-accent); }
+.durationChoices span { display: block; margin-top: 2px; color: var(--st-text-2); font-size: 12px; }
+.month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin-top: 16px; text-align: center; }
+.month button { padding-inline: 0; background: transparent; }
+.month button:not(:disabled) { background: var(--st-inset); }
+.month button[aria-pressed="true"] { background: var(--st-accent); }
+.month button:disabled { color: var(--st-text-3); }
+:is(.dateChoices, .durationChoices, .month) button:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
+@media (pointer: coarse) { :is(.dateChoices, .durationChoices, .month) button { min-height: 44px; } }
+@media (max-width: 767px) { .clientPage { padding: 24px; } .progressColumns, .visitorColumns { grid-template-columns: minmax(0, 1fr); gap: 24px; } .month { max-width: 400px; } .month .muted { font-size: 12px; } }

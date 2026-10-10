@@ -1,0 +1,9 @@
+.comparison { display: grid; gap: 28px; min-width: 0; }
+.compareGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
+.preview { display: grid; align-content: start; gap: 10px; min-width: 0; }
+.preview iframe { display: block; width: 100%; min-height: 420px; border: 0; background: var(--st-surface); }
+.noticeLine, .footer, .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.footer { justify-content: space-between; color: var(--st-text-2); font-size: 13px; line-height: 20px; }
+.actions { margin-left: auto; }
+.phoneChoice { display: none; }
+@media (max-width: 767px) { .compareGrid { grid-template-columns: minmax(0, 1fr); gap: 24px; } .phoneChoice { display: block; } .actions { margin-left: 0; } }

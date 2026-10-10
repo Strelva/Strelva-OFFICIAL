@@ -20,6 +20,9 @@
   max-width: calc(var(--st-column-wide, 1120px) + 2 * var(--st-page-pad, 48px));
 }
 
+/* Native tools/documents retain their own page when opened inside a System. */
+.page[data-nested="true"] { max-width: none; margin: 0; padding: 0; }
+
 .pageStack {
   display: flex;
   flex-direction: column;
@@ -308,6 +311,7 @@ a.row:hover, button.row:hover { background: var(--gray-bg-alt); }
 
 .step[data-state="done"] .stepMark { background: var(--st-accent); color: var(--st-on-accent); }
 .step[data-state="active"] .stepMark { background: var(--st-need-ring); color: var(--st-need); }
+.step[data-state="unverified"] .stepMark { background: var(--st-need-ring); color: var(--st-need); }
 .step[data-state="failed"] .stepMark { background: var(--st-critical-ring); color: var(--st-critical); }
 
 .stepTitle { color: var(--st-text); font-size: 14px; font-weight: 600; line-height: 24px; }

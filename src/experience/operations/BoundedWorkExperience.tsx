@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { Tabs, TabsPanel } from "@/components/ui/Tabs";
 import { TextInput } from "@/components/ui/TextInput";
 import { ApplicationAccessControls } from "@/experience/applications/ApplicationAccessControls";
+import { SchedulingCalendar } from "@/experience/scheduling/SchedulingCalendar";
 import { ScheduleCalendarControls } from "@/experience/scheduling/ScheduleCalendarControls";
 import { applicationSchema, type applicationSpecSchema } from "@/products/applications/contracts";
 import { scheduleSchema } from "@/products/scheduling/contracts";
@@ -419,6 +420,7 @@ function ScheduleResult({ value, command, disabled, canManage, calendarRecoveryA
   }
   return <>
     <p className="text-sm text-gray-muted">Reservations are held in this workspace first, then can be synced to a connected calendar. Times use your device’s timezone.</p>
+    <SchedulingCalendar availability={value.availability} reservations={value.reservations} />
     <section className={group}><h2 className="font-display text-xl">Available windows</h2><ul className="space-y-2 text-sm">{value.availability.map((slot, index) => <li key={index}>{time(slot.start)} to {time(slot.end)}</li>)}</ul></section>
     <section className={group}><h2 className="font-display text-xl">Reservations</h2>{value.reservations.length ? <ul className="space-y-4">{value.reservations.map(reservation => <li key={reservation.requestId} className="space-y-2 text-sm"><strong>{reservation.title}</strong><p>{time(reservation.start)} to {time(reservation.end)}</p><p>{reservation.status === "reserved" ? "Reserved in workspace" : reservation.status === "cancelled" ? "Cancelled" : reservation.status === "accepted" ? `${scheduleProviderLabel(reservation.provider)} confirmed this reservation${reservation.verification === "verified" ? "." : "; check the calendar to confirm it."}` : "The calendar could not confirm this reservation. Check the calendar before trying again."}</p>{reservation.status === "reserved" ? <>
       <div className="flex flex-wrap gap-2"><Button variant="secondary" disabled={disabled} onClick={() => setReschedule({ requestId: reservation.requestId, start: localDateTime(reservation.start), end: localDateTime(reservation.end), error: "" })}>Change time for {reservation.title}</Button><Button variant="secondary" disabled={disabled} onClick={() => void command({ kind: "cancel", requestId: reservation.requestId })}>Cancel {reservation.title}</Button></div>

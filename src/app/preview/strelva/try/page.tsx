@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { strelvaUiPreviewEnabled } from "@/experience/workspace/preview/enabled";
-import { PossibilityTry, type PossibilityTryState } from "@/experience/systems/PossibilityTry";
+import { SessionsVisitorTryFixture } from "@/experience/workspace/preview/PossibilityCanonPreview";
+import { PossibilityTry, PossibilityTryLoading, type PossibilityTryState } from "@/experience/systems/PossibilityTry";
 import { composeAskPageSet, existingWebsitePageOperations, prepareSitePatch } from "@/products/websites/index";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,8 @@ export const metadata: Metadata = { title: "Try it interface fixture", robots: {
 export default async function TryPreview({ searchParams }: { searchParams: Promise<{ state?: string }> }) {
   if (!strelvaUiPreviewEnabled()) notFound();
   const { state } = await searchParams;
+  if (state === "loading") return <PossibilityTryLoading />;
+  if (state === "sessions") return <SessionsVisitorTryFixture />;
   const fixture: PossibilityTryState = state === "changed" ? { kind: "changed" } : state === "expired" ? { kind: "expired" } : {
     kind: "ready",
     view: {

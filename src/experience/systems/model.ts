@@ -69,6 +69,8 @@ export interface SystemPossibility {
   previewSrc?: string;
   /** Where the alternative can be opened and used in full. */
   openHref?: string;
+  /** Recorded signed visitor link. An editor/review link does not supply one. */
+  tryHref?: string;
   /** Why it went back to Exploring, in plain words. */
   staleReason?: string;
 }

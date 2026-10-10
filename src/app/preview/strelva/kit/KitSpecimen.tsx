@@ -25,7 +25,7 @@ export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
         </StRows>
       </StSection>
       <StSection title="Steps" meta="Make real, item by item">
-        <StSteps label="Making it real" steps={[{ title: "Session page built", state: "done", time: "0:12", detail: "Hidden from visitors until the last step." }, { title: "Rehearsing a request end to end", state: "active", time: "1:05" }, { title: "Your confirmation email", state: "pending", detail: "Needs your OK on the wording." }, { title: "Calendar read", state: "failed", detail: "Google stopped answering. Nothing is live." }]} />
+        <StSteps label="Making it real" steps={[{ title: "Session page built", state: "done", time: "0:12", detail: "Hidden from visitors until the last step." }, { title: "Rehearsing a request end to end", state: "active", time: "1:05" }, { title: "Your confirmation email", state: "pending", detail: "Needs your OK on the wording." }, { title: "Page accepted by provider", state: "unverified", detail: "Done, not yet confirmed. Strelva checks the page without publishing it again." }, { title: "Calendar read", state: "failed", detail: "Google stopped answering. Nothing is live." }]} />
       </StSection>
       <StSection title="A change, and the yes">
         <StLedger path="attymooney.com/fees" count="2 lines" lines={[{ sign: "-", text: "Half-day: [2026 fee]" }, { sign: "+", text: "Half-day: [2027 fee]" }]} />
@@ -39,6 +39,7 @@ export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
         <StSegmented label="Fixing a broken link" value={who} onChange={setWho} options={[{ value: "handles", label: "Strelva handles it" }, { value: "after", label: "Tell me after" }, { value: "ask", label: "Ask me first" }]} disabledValues={["handles"]} disabledReason="Looser than Strelva allows for this kind" />
       </StSection>
       <StSection title="Objects, notices, empty, loading">
+        <StPage><StLabel>Native page inside a System · shares its outer insets</StLabel><StSurface label="Embedded document">The object keeps the whole column, including on a phone.</StSurface></StPage>
         <StSurface tone="need" label="Draft reply"><StLabel>Your reply, written by Strelva</StLabel><p style={{ margin: "8px 0 12px", fontSize: 15, lineHeight: "24px" }}>Hi Dana, yes, Sheri mediates disputes between partners. You can ask for a session date here and Sheri will confirm it.</p><div style={{ display: "flex", gap: 16, alignItems: "center" }}><StTextButton>Edit</StTextButton><StTextButton>Not yet</StTextButton><span style={{ flex: 1 }} /><StPill>Send reply</StPill></div></StSurface>
         <StNotice tone="need">Your hours changed on Oct 8. Strelva redoes the open dates before this becomes real.</StNotice>
         <StNotice tone="critical">Couldn’t load this client at 2:06. Showing Tuesday’s numbers. Strelva retries every 5 min.</StNotice>
