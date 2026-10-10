@@ -3,8 +3,8 @@
  * console. Server-safe presentation over the measure; the log and void controls
  * are client islands that call re-verified server actions.
  */
-import { Chip, Panel, PanelCount, Vital } from "../console";
-import { DataAvailabilityNotice } from "../DataAvailabilityNotice";
+import { Panel, PanelCount, Vital } from "../console";
+import { StMono, StNotice, StRow, StRows, StSection, StState } from "@/components/ui/strelva/Kit";
 import type { BusinessEffortMeasure, EffortDirection, PortfolioMonth } from "@/platform/business-effort/measure";
 import type { BusinessEffortLoad } from "./effort-data";
 import { EffortLogForm } from "./EffortLogForm";
@@ -33,15 +33,15 @@ function Coverage({ period }: { period: PortfolioMonth }) {
 
 function DirectionChip({ direction }: { direction: EffortDirection }) {
   const { label, tone } = DIRECTION[direction];
-  return <Chip tone={tone}>{label}</Chip>;
+  return <StState kind={tone === "good" ? "live" : tone === "warn" ? "need" : "draft"}>{label}</StState>;
 }
 
 function NotReady({ load }: { load: Exclude<BusinessEffortLoad, { state: "ready" }> }) {
   if (load.state === "unavailable") {
     return (
       <>
-        <DataAvailabilityNotice sources={["human minutes"]} />
-        <p className="text-[12px] leading-5 text-gray-muted">
+        <StNotice tone="critical"><span role="alert">Live counts are paused for human minutes.</span></StNotice>
+        <p className="text-sm leading-5 text-gray-muted">
           The human-minute ledger could not be read. No totals are shown rather than an unverified zero.
         </p>
       </>
@@ -49,44 +49,33 @@ function NotReady({ load }: { load: Exclude<BusinessEffortLoad, { state: "ready"
   }
   if (load.state === "denied") {
     return (
-      <p className="text-[12px] leading-5 text-gray-muted">
+      <p className="text-sm leading-5 text-gray-muted">
         Your session could not be verified as an active super admin for human minutes. Sign in again with a verified operator account.
       </p>
     );
   }
   return (
-    <p className="text-[12px] leading-5 text-gray-muted">
+    <p className="text-sm leading-5 text-gray-muted">
       Human minutes are recorded against client businesses, which are unavailable while the workspace release is off.
     </p>
   );
 }
 
 function BusinessRows({ rows, latestMonth }: { rows: BusinessEffortMeasure[]; latestMonth: string }) {
-  return (
-    <ul className="divide-y divide-glass-border" aria-label={`Human minutes by business, ${monthLabel(latestMonth)}`}>
-      {rows.map((row) => (
-        <li key={row.businessId} className="grid grid-cols-3 items-center gap-x-4 gap-y-1 py-3 md:grid-cols-[minmax(0,1fr)_90px_90px_90px_130px]">
-          <span className="col-span-3 min-w-0 text-[13px] font-semibold text-warm-white md:col-span-1">
-            {row.name ?? "Unlisted business"}
-            {row.tenantIds.length > 0 && <span className="ml-2 text-[11px] font-normal text-gray-faint">{row.tenantIds.join(", ")}</span>}
-          </span>
-          <span className="text-[12px] tabular-nums text-gray-muted"><span className="md:sr-only">Previous </span>{minutesText(row.previous?.minutes)}</span>
-          <span className="text-[12px] tabular-nums text-warm-white"><span className="md:sr-only">Latest </span>{minutesText(row.latest?.minutes)}</span>
-          <span className="text-[12px] tabular-nums text-gray-muted"><span className="md:sr-only">This month </span>{minutesText(row.monthToDate?.minutes)}</span>
-          <span className="col-span-3 md:col-span-1"><DirectionChip direction={row.direction} /></span>
-        </li>
-      ))}
-    </ul>
-  );
+  return <StRows label={`Human minutes by business, ${monthLabel(latestMonth)}`}>
+    {rows.map(row => <StRow key={row.businessId} title={row.name ?? "Unlisted business"}
+      detail={<>{row.tenantIds.length ? <StMono>{row.tenantIds.join(", ")} · </StMono> : null}Previous {minutesText(row.previous?.minutes)} · Latest {minutesText(row.latest?.minutes)} · This month {minutesText(row.monthToDate?.minutes)}</>}
+      end={<DirectionChip direction={row.direction} />} />)}
+  </StRows>;
 }
 
 /** Portfolio view for /admin/work. */
-export function BusinessEffortPortfolio({ load }: { load: BusinessEffortLoad }) {
+export function BusinessEffortPortfolio({ load, readOnly = false }: { load: BusinessEffortLoad; readOnly?: boolean }) {
   if (load.state !== "ready") {
     return (
-      <Panel title="Human minutes per business" className="lg:col-span-2" bodyClassName="px-[18px] pb-[18px]">
+      <StSection title="Human minutes per business">
         <NotReady load={load} />
-      </Panel>
+      </StSection>
     );
   }
   const { overview, today } = load;
@@ -99,71 +88,55 @@ export function BusinessEffortPortfolio({ load }: { load: BusinessEffortLoad }) 
     id: b.id,
     label: b.tenantIds.length > 0 ? `${b.name} (${b.tenantIds.join(", ")})` : b.name,
   }));
-  const portfolioDirection = DIRECTION[measure.portfolio.direction];
   const queueMinutes = operatorQueueReleaseEnabled() ? measureQueueEffort(overview.entries, measure.currentMonth) : [];
 
   return (
-    <Panel
-      title="Human minutes per business"
-      trailing={<PanelCount>{monthLabel(measure.latestMonth)}</PanelCount>}
-      className="lg:col-span-2"
-      bodyClassName="space-y-5 px-[18px] pb-[18px]"
-    >
-      <p className="max-w-3xl text-[12px] leading-5 text-gray-muted">
+    <StSection title="Human minutes per business" meta={<StMono>{monthLabel(measure.latestMonth)}</StMono>}>
+      <p className="max-w-3xl text-sm leading-5 text-gray-muted">
         The factory test: human minutes needed per business each month must fall. Months are UTC calendar months; the latest month is the last complete one. Every client business counts. A month without a non-voided entry is not logged; record 0 explicitly to confirm no human work. Portfolio medians and averages require logs for every business.
       </p>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Vital
-          label="Median per business"
-          value={latest.medianMinutesPerBusiness === null ? "Not enough data" : minutesText(latest.medianMinutesPerBusiness)}
-          suffix={latest.medianMinutesPerBusiness === null ? undefined : "min"}
-          delta={measure.portfolio.direction === "insufficient_data" ? undefined : portfolioDirection.label}
-          deltaTone={portfolioDirection.tone}
-          verdict={`Across ${latest.businessCount} businesses. ${monthLabel(previous.month)}: ${previous.medianMinutesPerBusiness === null ? "Not enough data" : minutesText(previous.medianMinutesPerBusiness)}${previous.medianMinutesPerBusiness === null ? "" : " min"} (${previous.businessCount} businesses)`}
-        />
-        <Vital label="Average per business" value={latest.averageMinutesPerBusiness === null ? "Not enough data" : minutesText(latest.averageMinutesPerBusiness)} suffix={latest.averageMinutesPerBusiness === null ? undefined : "min"} verdict={`Across ${latest.businessCount} businesses`} />
-        <Vital label="Logged minutes" value={latest.loggedBusinessCount === 0 ? "Not logged" : latest.loggedMinutes} suffix={latest.loggedBusinessCount === 0 ? undefined : "min"} verdict={`${latest.loggedBusinessCount} of ${latest.businessCount} businesses logged; ${latest.unloggedBusinessCount} not logged`} />
-        <Vital label="Month to date · logged" value={monthToDate.loggedBusinessCount === 0 ? "Not logged" : monthToDate.loggedMinutes} suffix={monthToDate.loggedBusinessCount === 0 ? undefined : "min"} verdict={`${monthToDate.loggedBusinessCount} of ${monthToDate.businessCount} businesses logged; ${monthToDate.unloggedBusinessCount} not logged`} />
-      </div>
+      <StRows label="Human-minute summary">
+        <StRow title="Median per business" detail={`Across ${latest.businessCount} businesses. ${monthLabel(previous.month)}: ${previous.medianMinutesPerBusiness === null ? "Not enough data" : minutesText(previous.medianMinutesPerBusiness)}${previous.medianMinutesPerBusiness === null ? "" : " min"} (${previous.businessCount} businesses)`}
+          end={<><StMono>{latest.medianMinutesPerBusiness === null ? "Not enough data" : `${minutesText(latest.medianMinutesPerBusiness)} min`}</StMono>{measure.portfolio.direction !== "insufficient_data" ? <DirectionChip direction={measure.portfolio.direction} /> : null}</>} />
+        <StRow title="Average per business" detail={`Across ${latest.businessCount} businesses`} end={<StMono>{latest.averageMinutesPerBusiness === null ? "Not enough data" : `${minutesText(latest.averageMinutesPerBusiness)} min`}</StMono>} />
+        <StRow title="Logged minutes" detail={`${latest.loggedBusinessCount} of ${latest.businessCount} businesses logged; ${latest.unloggedBusinessCount} not logged`} end={<StMono>{latest.loggedBusinessCount === 0 ? "Not logged" : `${latest.loggedMinutes} min`}</StMono>} />
+        <StRow title="Month to date · logged" detail={`${monthToDate.loggedBusinessCount} of ${monthToDate.businessCount} businesses logged; ${monthToDate.unloggedBusinessCount} not logged`} end={<StMono>{monthToDate.loggedBusinessCount === 0 ? "Not logged" : `${monthToDate.loggedMinutes} min`}</StMono>} />
+      </StRows>
 
-      <p className="text-[12px] leading-5 text-gray-muted" aria-label="Monthly log coverage">
+      <p className="text-sm leading-5 text-gray-muted" aria-label="Monthly log coverage">
         <Coverage period={previous} /> · <Coverage period={latest} /> · <Coverage period={monthToDate} />
       </p>
 
       <section aria-labelledby="effort-by-business">
-        <h3 id="effort-by-business" className="mb-1 text-[12.5px] font-semibold text-warm-white">By business</h3>
-        <div className="hidden text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-faint md:grid md:grid-cols-[minmax(0,1fr)_90px_90px_90px_130px] md:gap-x-4" aria-hidden="true">
-          <span>Business</span><span>{monthLabel(measure.previousMonth).split(" ")[0]}</span><span>{monthLabel(measure.latestMonth).split(" ")[0]}</span><span>This month</span><span>Direction</span>
-        </div>
+        <h3 id="effort-by-business" className="mb-1 text-base font-semibold text-warm-white">By business</h3>
         {measured.length > 0 ? (
           <BusinessRows rows={measured} latestMonth={measure.latestMonth} />
         ) : (
-          <p className="py-3 text-[12px] leading-5 text-gray-muted">No client businesses exist yet. Every business will appear here, including those not logged.</p>
+          <p className="py-3 text-sm leading-5 text-gray-muted">No client businesses exist yet. Every business will appear here, including those not logged.</p>
         )}
       </section>
 
       <section aria-labelledby="effort-log">
         {operatorQueueReleaseEnabled() && <div className="mb-5">
-          <h3 className="text-[12.5px] font-semibold text-warm-white">This month by queue kind and System</h3>
-          {queueMinutes.length ? <ul className="mt-2 divide-y divide-glass-border">
-            {queueMinutes.map((row) => <li key={JSON.stringify([row.businessId, row.kind, row.systemId, row.systemLabel])} className="flex flex-wrap justify-between gap-2 py-2 text-[12px] text-gray-muted">
-              <span>{names[row.businessId] ?? "Business"} · {row.systemLabel ?? "Not attached"} · {row.kind.replaceAll("_", " ")}</span><span className="tabular-nums">{row.minutes} min</span>
-            </li>)}
-          </ul> : <p className="mt-2 text-[12px] text-gray-muted">No attributed queue minutes this month. Manual minutes stay in the business totals.</p>}
+          <h3 className="text-base font-semibold text-warm-white">This month by queue kind and System</h3>
+          {queueMinutes.length ? <StRows label="This month by queue kind and System">
+            {queueMinutes.map(row => <StRow key={JSON.stringify([row.businessId, row.kind, row.systemId, row.systemLabel])}
+              title={names[row.businessId] ?? "Business"} detail={`${row.systemLabel ?? "Not attached"} · ${row.kind.replaceAll("_", " ")}`} end={<StMono>{row.minutes} min</StMono>} />)}
+          </StRows> : <p className="mt-2 text-sm text-gray-muted">No attributed queue minutes this month. Manual minutes stay in the business totals.</p>}
         </div>}
-        <h3 id="effort-log" className="mb-3 text-[12.5px] font-semibold text-warm-white">Record human minutes</h3>
+        <h3 id="effort-log" className="mb-3 text-base font-semibold text-warm-white">Record human minutes</h3>
         {options.length > 0 ? (
-          <EffortLogForm businesses={options} today={today} />
+          readOnly ? <StNotice>Preview only. Recording minutes is unavailable here.</StNotice> : <EffortLogForm businesses={options} today={today} />
         ) : (
-          <p className="text-[12px] leading-5 text-gray-muted">No client businesses exist yet. Minutes are recorded against a client business.</p>
+          <p className="text-sm leading-5 text-gray-muted">No client businesses exist yet. Minutes are recorded against a client business.</p>
         )}
       </section>
 
       <section aria-labelledby="effort-recent">
-        <h3 id="effort-recent" className="mb-1 text-[12.5px] font-semibold text-warm-white">Recent entries</h3>
-        <EffortEntries entries={overview.entries.slice(0, 15)} businessNames={names} />
+        <h3 id="effort-recent" className="mb-1 text-base font-semibold text-warm-white">Recent entries</h3>
+        <EffortEntries entries={overview.entries.slice(0, 15)} businessNames={names} readOnly={readOnly} />
       </section>
-    </Panel>
+    </StSection>
   );
 }
 

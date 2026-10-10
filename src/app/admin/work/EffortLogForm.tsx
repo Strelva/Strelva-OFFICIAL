@@ -2,8 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/Button";
-import { SelectInput, TextInput } from "@/components/ui/TextInput";
+import { StField, StPill, StSurface, StTextField } from "@/components/ui/strelva/Kit";
 import {
   BUSINESS_EFFORT_CATEGORIES, BUSINESS_EFFORT_CATEGORY_LABELS, EARLIEST_EFFORT_DATE,
   MAX_EFFORT_MINUTES, MAX_EFFORT_TEXT, type BusinessEffortCategory,
@@ -50,37 +49,26 @@ export function EffortLogForm({ businesses, today }: { businesses: EffortBusines
   }
 
   return (
-    <form onSubmit={submit} className="grid gap-3" aria-label="Record human minutes">
+    <StSurface label="Record human minutes"><form onSubmit={submit} className="grid gap-3" aria-label="Record human minutes">
       <div className="grid gap-3 sm:grid-cols-2">
         {fixedBusiness ? (
           <p className="text-[12px] leading-5 text-gray-muted sm:col-span-2">
             Business: <span className="font-semibold text-warm-white">{fixedBusiness.label}</span>
           </p>
         ) : (
-          <SelectInput
-            label="Business"
-            value={businessId}
-            onChange={(event) => setBusinessId(event.target.value)}
-            options={[{ value: "", label: "Choose a business" }, ...businesses.map((b) => ({ value: b.id, label: b.label }))]}
-            required
-          />
+          <StField label="Business"><select value={businessId} onChange={event => setBusinessId(event.target.value)} required><option value="">Choose a business</option>{businesses.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}</select></StField>
         )}
-        <TextInput
+        <StTextField
           label="Minutes"
           inputMode="numeric"
           value={minutes}
           onChange={(event) => setMinutes(event.target.value.trim())}
           error={minutes && !minutesValid ? `Enter whole minutes from 0 to ${MAX_EFFORT_MINUTES}.` : undefined}
-          helperText="Human time only. Record 0 to confirm no human work for this UTC month; it does not replace other entries."
+          description="Human time only. Record 0 to confirm no human work for this UTC month; it does not replace other entries."
           required
         />
-        <SelectInput
-          label="Kind of work"
-          value={category}
-          onChange={(event) => setCategory(event.target.value as BusinessEffortCategory)}
-          options={BUSINESS_EFFORT_CATEGORIES.map((value) => ({ value, label: BUSINESS_EFFORT_CATEGORY_LABELS[value] }))}
-        />
-        <TextInput
+        <StField label="Kind of work"><select value={category} onChange={event => setCategory(event.target.value as BusinessEffortCategory)}>{BUSINESS_EFFORT_CATEGORIES.map(value => <option key={value} value={value}>{BUSINESS_EFFORT_CATEGORY_LABELS[value]}</option>)}</select></StField>
+        <StTextField
           label="Date (UTC)"
           type="date"
           value={occurredOn}
@@ -90,7 +78,7 @@ export function EffortLogForm({ businesses, today }: { businesses: EffortBusines
           required
         />
         <div className="sm:col-span-2">
-          <TextInput
+          <StTextField
             label="Note (optional)"
             value={note}
             maxLength={MAX_EFFORT_TEXT}
@@ -100,15 +88,15 @@ export function EffortLogForm({ businesses, today }: { businesses: EffortBusines
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" variant="primary" size="md" loading={pending} disabled={!canSubmit}>
+        <StPill type="submit" disabled={!canSubmit} aria-busy={pending}>
           Record minutes
-        </Button>
+        </StPill>
         {result && (
           <p role={result.ok ? "status" : "alert"} className={`text-[12px] leading-5 ${result.ok ? "text-positive" : "text-critical"}`}>
             {result.message}
           </p>
         )}
       </div>
-    </form>
+    </form></StSurface>
   );
 }

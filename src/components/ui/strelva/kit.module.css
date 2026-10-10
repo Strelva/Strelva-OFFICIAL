@@ -93,7 +93,7 @@
 /* ---------- Section ---------- */
 .section { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 
-.sectionHead { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.sectionHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; min-width: 0; }
 
 .sectionTitle {
   margin: 0;
@@ -104,7 +104,7 @@
 }
 
 .sectionMeta { color: var(--st-text-3); font-size: 13px; line-height: 20px; }
-.sectionAction { margin-left: auto; }
+.sectionAction { margin-left: auto; min-width: 0; max-width: 100%; }
 
 .label {
   margin: 0;

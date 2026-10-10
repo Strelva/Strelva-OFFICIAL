@@ -2,19 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { QueueEventDetail } from "@/components/dashboard/QueueEventDetail";
+import { StNotice, StPill, StTextButton } from "@/components/ui/strelva/Kit";
+import { DraftChangePreview } from "./DraftChangePreview";
 import type { QueueEventLike } from "@/components/dashboard/QueueEventDetail";
 
 export function DraftActions({
   tenant,
   section,
   preview,
+  readOnly = false,
 }: {
   tenant: string;
   section: string;
   /** Minimal event shape used to render the draft preview above the action
    *  buttons (the exact content / diff that will go live on approval). */
   preview?: QueueEventLike;
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState<"approve" | "reject" | null>(null);
@@ -45,6 +48,7 @@ export function DraftActions({
   }
 
   async function handleAction(action: "approve" | "reject") {
+    if (readOnly) return;
     setConfirmReject(false);
     setLoading(action);
     setError(null);
@@ -67,32 +71,12 @@ export function DraftActions({
     }
   }
 
-  return (
-    <div className="flex flex-col gap-3 w-full">
-      {preview && (
-        <QueueEventDetail event={preview} className="" />
-      )}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => handleAction("approve")}
-          disabled={loading !== null}
-          className="flex-1 min-h-[44px] px-5 py-2.5 rounded-lg text-sm font-medium bg-positive hover:bg-positive0 text-on-positive transition-colors disabled:opacity-50"
-        >
-          {loading === "approve" ? "Approving…" : "Approve"}
-        </button>
-        <button
-          onClick={handleRejectClick}
-          disabled={loading !== null}
-          className={`flex-1 min-h-[44px] px-5 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
-            confirmReject
-              ? "bg-critical0/15 border border-critical0/30 text-critical hover:bg-critical0/25"
-              : "bg-gray-bg hover:bg-gray-bg-hover text-gray-muted hover:text-warm-white"
-          }`}
-        >
-          {loading === "reject" ? "Rejecting…" : confirmReject ? "Confirm reject?" : "Reject"}
-        </button>
-      </div>
-      {error && <p role="status" aria-live="polite" className="text-[11px] text-critical">{error}</p>}
+  return <div className="flex w-full flex-col gap-4 pt-4">
+    <DraftChangePreview event={preview} />
+    <div className="flex flex-wrap items-center gap-4">
+      <StPill variant="soft" onClick={() => void handleAction("approve")} disabled={readOnly || loading !== null} busy={loading === "approve"}>{loading === "approve" ? "Approving…" : "Approve"}</StPill>
+      <StTextButton tone="danger" onClick={handleRejectClick} disabled={readOnly || loading !== null}>{loading === "reject" ? "Rejecting…" : confirmReject ? "Confirm reject?" : "Reject"}</StTextButton>
     </div>
-  );
+    {error ? <StNotice tone="critical">{error}</StNotice> : null}
+  </div>;
 }
