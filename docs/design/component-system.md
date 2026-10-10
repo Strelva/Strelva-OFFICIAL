@@ -1651,3 +1651,12 @@ This consolidation instead retains the newer ordinary-agency selection and
 restricted delivery controls from the private integration. Full combined native
 and authenticated qualification remains separate. Revocation reason copy maps
 the legacy stored reason at display time; commands retain that stored value.
+
+### Strelva kit: recap values (L5, October 9)
+
+`StMono size="value"` is the kit's 28px/500 tabular count for open outcome
+rows. It reserves 78px so visits, inquiries, answers, bookings and reviews
+share an edge. Missing counts pair a dash with an explicit unavailable label;
+zero remains a recorded value. The kit specimen includes this count row.
+`StPillLink current` puts `aria-current="page"` on the actual link, including
+the recap period selector. Its current-link specimen is included too.

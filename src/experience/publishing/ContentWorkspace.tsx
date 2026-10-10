@@ -2,6 +2,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { TextInput, TextArea, SelectInput } from "@/components/ui/TextInput";
+import { StHead, StLabel, StNotice, StPage, StPill, StSkeleton, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
+import { NewsletterSurface, type NewsletterContext } from "./NewsletterSurface";
+import styles from "./publishing.module.css";
 
 interface Entry { slug: string; status: string; data: Record<string, unknown> }
 interface Draft { id: string; title: string; body: string; status: string; metadata?: { publishing?: Record<string, unknown> } }
@@ -10,7 +13,7 @@ export interface ContentWorkspaceData {
   content: { entries: Array<{ type: string; entries: Entry[] }>; drafts: Draft[]; outputs: Issue[]; receipts?: Array<{ id: string; subject: string; createdAt: string; providerRef: string | null; request: Record<string, unknown>; beforeState: unknown; actor: string; readbackDetail: string | null; undoLabel: string }>; sendingEnabled: false };
   permissions: { canCompose: boolean; canApprove: boolean };
 }
-export function ContentWorkspace({ workspaceId, systemId, kind, readOnly = false, initial, request = fetch }: { workspaceId: string; systemId: string; kind: "website" | "newsletter"; readOnly?: boolean; initial?: ContentWorkspaceData; request?: typeof fetch }) {
+export function ContentWorkspace({ workspaceId, systemId, kind, readOnly = false, initial, newsletterContext, standalone = false, request = fetch }: { workspaceId: string; systemId: string; kind: "website" | "newsletter"; readOnly?: boolean; initial?: ContentWorkspaceData; newsletterContext?: NewsletterContext; standalone?: boolean; request?: typeof fetch }) {
   const [loaded, setLoaded] = useState(initial); const [loading, setLoading] = useState(!initial); const [error, setError] = useState(""); const [busy, setBusy] = useState(false);
   const [type, setType] = useState("blog"); const [slug, setSlug] = useState(""); const [fields, setFields] = useState<Record<string, string>>({}); const [composing, setComposing] = useState(false);
   const [message, setMessage] = useState("");
@@ -51,7 +54,7 @@ export function ContentWorkspace({ workspaceId, systemId, kind, readOnly = false
     const Component = multiline ? TextArea : TextInput;
     return <Component key={key} label={label} value={fields[key] || ""} disabled={busy} onChange={event => setFields(old => ({ ...old, [key]: event.target.value }))} />;
   };
-  return <section className="grid gap-4 p-6" aria-label={kind === "newsletter" ? "Newsletter issues" : "Website content"} aria-busy={loading || busy}>
+  const websiteSurface = <section className="grid gap-4 p-6" aria-label={kind === "newsletter" ? "Newsletter issues" : "Website content"} aria-busy={loading || busy}>
     <div><h2 className="text-sm font-semibold">{kind === "newsletter" ? "Newsletter" : "Blog and collections"}</h2><p className="mt-2 text-sm text-gray-muted">{kind === "newsletter" ? "Compose and approve each issue here. Its receipts show whether email was sent." : "Draft content here, then review the exact words before publishing."}</p></div>
     {loading ? <p role="status">Loading publishing…</p> : null}
     {error ? <div role="alert"><p>{error}</p><Button variant="ghost" onClick={() => void load()}>Reload publishing</Button></div> : null}
@@ -72,4 +75,18 @@ export function ContentWorkspace({ workspaceId, systemId, kind, readOnly = false
     {loaded?.content.receipts?.map(receipt => <article key={receipt.id} className="grid gap-2 border-t border-gray-border pt-4"><h3 className="text-sm font-semibold">{receipt.subject}</h3><p className="text-sm text-gray-muted">{receipt.readbackDetail}</p><p className="text-sm text-gray-muted">Approved by {receipt.actor}. {receipt.undoLabel}</p>{canCompose ? <Button variant="secondary" disabled={busy} onClick={() => void command("restore", undefined, receipt.id)}>Prepare restore or unpublish</Button> : null}{receipt.providerRef ? <a className="text-sm underline" href={receipt.providerRef} target="_blank" rel="noopener noreferrer">Open published content</a> : null}<details><summary className="cursor-pointer text-sm">Before and after</summary><p className="mt-2 whitespace-pre-wrap break-words text-sm">Before: {JSON.stringify(receipt.beforeState)}{ "\n" }After: {JSON.stringify(receipt.request.data)}</p></details></article>)}
     {loaded?.content.outputs.map(issue => <article key={issue.id} className="grid gap-2 border-t border-gray-border pt-4"><h3 className="text-sm font-semibold">{issue.subject}</h3><p className="text-sm text-gray-muted">Approved {new Date(issue.approved_at).toLocaleDateString()}. {issue.delivery ? ({ accepted: "Provider accepted.", send_unconfirmed: "Send outcome unconfirmed. Strelva must reconcile before retrying.", sending_pending: "Waiting to send.", not_sent_gated: "Sending paused.", not_sent_suppressed: "Not sent: no active subscribers." }[issue.delivery.state] || "Sending status unknown.") : "Sending paused."} Provider accepted: {issue.delivery?.accepted ?? issue.accepted_count}. Suppressed: {issue.delivery?.suppressed ?? issue.suppressed_count}. Unconfirmed batches: {issue.delivery?.unconfirmedBatches ?? issue.failure_count}. Delivered: unknown.</p>{issue.delivery?.receipts.map(receipt => <p key={receipt.id} className="text-sm text-gray-muted">{receipt.detail} Accepted: {receipt.accepted}. Suppressed: {receipt.suppressed}.</p>)}<details><summary className="cursor-pointer text-sm">Approved issue</summary><p className="mt-2 whitespace-pre-wrap break-words text-sm">{issue.body}</p></details></article>)}
   </section>;
+  if (kind === "newsletter") return <section aria-label="Newsletter issues" aria-busy={loading || busy}><StPage>
+    {standalone ? <StHead crumb={{ label: "Systems", href: `/workspace?workspaceId=${encodeURIComponent(workspaceId)}` }} title="Newsletter" beacon={loaded?.content.drafts.some(draft => draft.status === "pending") ? "need" : undefined} meta={newsletterContext ? `${newsletterContext.subscribers} subscribers · each issue waits for your approval` : "Strelva drafts each issue. You review the exact words before approving."} /> : <StLabel as="h3">Newsletter issues</StLabel>}
+    {canCompose && !composing ? <StTextButton disabled={busy || loading} onClick={() => { setComposing(true); setFields({}); }}>Compose an issue</StTextButton> : null}
+    {loading ? <><StSkeleton width="70%" label="Loading publishing" /><StSkeleton /></> : null}
+    {error ? <StNotice tone="critical"><p>{error}</p><StTextButton disabled={busy || loading} onClick={() => void load()}>Reload publishing</StTextButton></StNotice> : null}
+    {message ? <p role="status" className={styles.copy}>{message}</p> : null}
+    {loaded && !canCompose ? <StNotice>Publishing is read only for your account or this System.</StNotice> : null}
+    {composing ? <StSurface label="Compose an issue"><form className={styles.stack} onSubmit={event => { event.preventDefault(); void command("compose"); }}>
+      {field("subject", "Subject")}{field("body", "Message", true)}
+      <div className={styles.actions}><StPill type="submit" busy={busy}>Save for approval</StPill><StTextButton disabled={busy} onClick={() => setComposing(false)}>Cancel</StTextButton></div>
+    </form></StSurface> : null}
+    {loaded && !loading ? <NewsletterSurface data={loaded} context={newsletterContext} busy={busy} canApprove={Boolean(canApprove) && !composing && !error} command={(action, eventId) => void command(action, eventId)} /> : null}
+  </StPage></section>;
+  return websiteSurface;
 }

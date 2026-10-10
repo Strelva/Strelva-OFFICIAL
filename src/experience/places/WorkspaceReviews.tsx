@@ -1,25 +1,17 @@
-import { Card } from "@/components/ui/Card";
 import { buildGoogleReviewLink, buildReviewShareMessage } from "@/lib/reviews/reputation";
 import type { ReviewView, SiteReviews, WorkspaceReviews } from "@/products/google-listing/linked-reviews";
-import { NoSiteCard, SiteHeading, WorkspacePlace, whenLabel, type PlaceState } from "./WorkspacePlace";
+import { StEmpty, StLabel, StMono, StNotice, StRow, StRows, StSection, StState, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
+import { PublishingPage, type PublishingState } from "@/experience/publishing/PublishingPage";
+import styles from "@/experience/publishing/publishing.module.css";
+import { whenLabel } from "./WorkspacePlace";
 import { ReviewReplyForm } from "./ReviewReplyForm";
-
-/**
- * Reviews on the Google listing, in the workspace: the home of
- * /dashboard/reviews. Each review with its reply, the reply Strelva drafted
- * when one is waiting, and a way to reply.
- */
 
 const SOURCE: Record<ReviewView["source"], string> = { google: "Google", yelp: "Yelp", manual: "Added by hand" };
 
 export function reviewSummary(reviews: readonly ReviewView[]): { count: number; average: number | null; waiting: number } {
-  const rated = reviews.filter((review) => review.rating > 0);
+  const rated = reviews.filter(review => review.rating > 0);
   const average = rated.length ? Math.round((rated.reduce((sum, review) => sum + review.rating, 0) / rated.length) * 10) / 10 : null;
-  return { count: reviews.length, average, waiting: reviews.filter((review) => !review.reply).length };
-}
-
-function Stars({ rating }: { rating: number }) {
-  return <span aria-label={`${rating} out of 5 stars`} className="tracking-[0.1em]">{"★".repeat(rating)}<span className="text-gray-border">{"★".repeat(5 - rating)}</span></span>;
+  return { count: reviews.length, average, waiting: reviews.filter(review => !review.reply).length };
 }
 
 function draftLine(review: ReviewView, mode: SiteReviews["replyMode"]): string {
@@ -28,83 +20,35 @@ function draftLine(review: ReviewView, mode: SiteReviews["replyMode"]): string {
   return "Strelva drafted this reply. It waits for your okay here or in Needs you.";
 }
 
-function ReviewCard({ workspaceId, site, review, publishing }: { workspaceId: string; site: SiteReviews; review: ReviewView; publishing: boolean }) {
-  const postsToGoogle = review.source === "google" && site.googleConnected;
-  return (
-    <Card padding="md">
-      <article aria-labelledby={`review-${review.id}`}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 id={`review-${review.id}`} className="truncate text-[15px] font-medium">{review.author}</h3>
-            <p className="mt-1 text-xs text-gray-muted"><Stars rating={review.rating} /> · {SOURCE[review.source]} · <time dateTime={review.date}>{whenLabel(review.date)}</time></p>
-          </div>
-        </div>
-        {review.text ? <p className="mt-3 whitespace-pre-line text-sm leading-6">{review.text}</p> : <p className="mt-3 text-sm text-gray-muted">A rating with no written review.</p>}
-        {review.reply ? (
-          <div className="mt-4 rounded-lg border border-gray-border p-3">
-            <p className="text-xs font-medium text-gray-muted">Your reply{review.repliedAt ? ` · ${whenLabel(review.repliedAt)}` : ""}</p>
-            <p className="mt-1 whitespace-pre-line text-sm leading-6">{review.reply}</p>
-            {publishing && review.source === "google" && review.externalId ? <a className="mt-2 inline-block text-sm underline" href={`/workspace/google?${new URLSearchParams({ workspaceId, reviewId: review.externalId, replyText: review.reply })}`}>Edit or withdraw on Google</a> : null}
-          </div>
-        ) : (
-          <>
-            {review.draft ? <p className="mt-4 text-xs text-gray-muted">{draftLine(review, site.replyMode)}</p> : null}
-            <ReviewReplyForm workspaceId={workspaceId} tenantId={site.tenantId} reviewId={review.id} author={review.author} initial={review.draft?.reply ?? ""} postsToGoogle={postsToGoogle} />
-          </>
-        )}
-      </article>
-    </Card>
-  );
+/** Used by both the listing System and its complete reviews place. */
+export function ReviewRows({ workspaceId, site, publishing = false, readOnly = false, request }: { workspaceId: string; site: SiteReviews; publishing?: boolean; readOnly?: boolean; request?: typeof fetch }) {
+  if (site.unavailable) return <StNotice tone="critical">Reviews for {site.siteName} couldn&apos;t be read right now. Nothing changed on your listing.</StNotice>;
+  if (!site.reviews.length) return <StEmpty>No reviews yet. {site.googleConnected ? "New Google reviews appear here after Strelva reads them." : "Once your Google listing is connected, reviews show up here with a drafted reply. Ask Strelva to connect it."}</StEmpty>;
+  const firstPending = site.reviews.find(review => !review.reply)?.id;
+  return <StRows label={`Reviews for ${site.siteName}`}>{site.reviews.map(review => <StRow key={review.id} align="start" title={<span className={styles.reviewHead}><span>{review.author}</span><span aria-label={`${review.rating} out of 5 stars`}>{"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}</span><StMono as="time" dateTime={review.date}>{whenLabel(review.date)}</StMono></span>}>
+    <article aria-label={`${SOURCE[review.source]} review by ${review.author}`} className={styles.stack}>
+      <p className={styles.copy}>{review.text || "A rating with no written review."}</p>
+      {review.reply ? <div className={styles.draft}><StLabel>Your reply{review.repliedAt ? ` · ${whenLabel(review.repliedAt)}` : ""}</StLabel><p className={styles.copy}>{review.reply}</p>{publishing && review.source === "google" && review.externalId ? <StTextButton href={`/workspace/google?${new URLSearchParams({ workspaceId, reviewId: review.externalId, replyText: review.reply })}`}>Edit or withdraw on Google</StTextButton> : null}</div> : <>
+        {review.draft?.autoPostAt && site.replyMode === "auto" ? <p className={styles.copy}>{draftLine(review, site.replyMode)}</p> : null}
+        <ReviewReplyForm workspaceId={workspaceId} tenantId={site.tenantId} reviewId={review.id} author={review.author} initial={review.draft?.reply ?? ""} postsToGoogle={review.source === "google" && site.googleConnected} readOnly={readOnly} primary={review.id === firstPending} request={request} />
+      </>}
+    </article>
+  </StRow>)}</StRows>;
 }
 
-function ReviewLink({ placeId }: { placeId: string | null }) {
-  const url = buildGoogleReviewLink(placeId);
-  if (!url) return null;
-  return (
-    <Card padding="md" className="mb-4">
-      <h3 className="text-sm font-medium">Get more reviews</h3>
-      <p className="mt-1 text-sm leading-6 text-gray-muted">Send a happy customer this message. The link opens straight to your Google review form.</p>
-      <p className="mt-2 rounded-lg border border-gray-border px-3 py-2 text-sm leading-6">{buildReviewShareMessage(url)}</p>
-      <a className="mt-2 block truncate text-xs text-gray-muted underline-offset-4 hover:underline" href={url} target="_blank" rel="noopener noreferrer">{url}</a>
-    </Card>
-  );
-}
-
-export function WorkspaceReviewsView({ workspaceId, state, publishing = false }: { workspaceId: string; state: PlaceState<WorkspaceReviews>; publishing?: boolean }) {
+export function WorkspaceReviewsView({ workspaceId, state, publishing = false }: { workspaceId: string; state: PublishingState<WorkspaceReviews>; publishing?: boolean }) {
   const data = state.kind === "ready" ? state.data : null;
-  return (
-    <WorkspacePlace workspaceId={workspaceId} eyebrow="Google listing" title="Reviews"
-      intro="What customers said about you, with your replies. Strelva drafts a reply for each new review."
-      state={state} denied={data?.denied.map((site) => site.siteName)}
-      errorTitle="Reviews couldn't load" errorBody="Nothing changed on your listing. Reload the page to try again.">
-      {data && data.sites.length === 0 && data.denied.length === 0 ? <NoSiteCard body="Reviews show here once Strelva runs a site and its Google listing for this business." /> : null}
-      {data?.sites.map((site) => {
-        const summary = reviewSummary(site.reviews);
-        return (
-          <section key={site.tenantId} className="mt-8" aria-labelledby={`site-${site.tenantId}`}>
-            <SiteHeading id={`site-${site.tenantId}`} name={site.siteName} multiple={data.sites.length > 1} />
-            {site.unavailable ? (
-              <Card padding="lg" role="status"><p className="text-sm leading-6 text-gray-muted">Reviews for {site.siteName} couldn&apos;t be read right now. Nothing changed on your listing.</p></Card>
-            ) : (
-              <>
-                <p className="mb-4 text-sm text-gray-muted">
-                  {summary.count ? `${summary.average ?? "No"} average from ${summary.count} ${summary.count === 1 ? "review" : "reviews"} · ${summary.waiting} without a reply` : "No reviews yet"}
-                  {" · "}{site.googleConnected ? "Google listing connected" : "Google listing not connected"}
-                </p>
-                <ReviewLink placeId={site.googlePlaceId} />
-                {site.reviews.length === 0 ? (
-                  <Card padding="lg">
-                    <h3 className="text-base font-medium">No reviews yet</h3>
-                    <p className="mt-2 text-sm leading-6 text-gray-muted">{site.googleConnected ? "New Google reviews show up here within a day, each with a drafted reply." : "Once your Google listing is connected, reviews show up here with a drafted reply. Ask Strelva to connect it."}</p>
-                  </Card>
-                ) : (
-                  <div className="grid gap-3">{site.reviews.map((review) => <ReviewCard publishing={publishing} key={review.id} workspaceId={workspaceId} site={site} review={review} />)}</div>
-                )}
-              </>
-            )}
-          </section>
-        );
-      })}
-    </WorkspacePlace>
-  );
+  return <PublishingPage workspaceId={workspaceId} title="Reviews" meta="What customers said about you, with your replies. Strelva drafts a reply for each new review." state={state} errorTitle="Reviews couldn't load" errorBody="Nothing changed on your listing. Reload the page to try again.">
+    {data?.denied.length ? <StNotice>Your account can&apos;t open {data.denied.map(site => site.siteName).join(", ")} yet. Ask the owner to finish adding you.</StNotice> : null}
+    {data && !data.sites.length && !data.denied.length ? <StEmpty>No site is connected to this business yet. Reviews show here once Strelva runs a site and its Google listing for this business.</StEmpty> : null}
+    {data?.sites.map(site => {
+      const summary = reviewSummary(site.reviews);
+      const url = buildGoogleReviewLink(site.googlePlaceId);
+      return <StSection key={site.tenantId} title={site.siteName} meta={site.unavailable ? "Read unavailable" : summary.count ? `${summary.average ?? "No"} average from ${summary.count} reviews · ${summary.waiting} without a reply` : "No reviews yet"}>
+        <StState kind={site.googleConnected ? "live" : "down"}>{site.googleConnected ? "Google listing connected" : "Google listing not connected"}</StState>
+        <ReviewRows workspaceId={workspaceId} site={site} publishing={publishing} />
+        {url ? <details className={styles.disclosure}><summary>Get more reviews</summary><StSurface label="Review invitation"><p className={styles.copy}>{buildReviewShareMessage(url)}</p><a href={url} target="_blank" rel="noopener noreferrer">Open your Google review form</a></StSurface></details> : null}
+      </StSection>;
+    })}
+  </PublishingPage>;
 }

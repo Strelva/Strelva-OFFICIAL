@@ -106,8 +106,8 @@ export function StState({ kind, children }: { kind: BeaconKind; children: ReactN
   return <span className={styles.state}><StBeacon kind={kind} />{children}</span>;
 }
 
-export function StMono({ children, tone, as: As = "span", dateTime }: { children: ReactNode; tone?: Tone; as?: "span" | "time"; dateTime?: string }) {
-  return <As className={styles.mono} data-tone={tone} dateTime={As === "time" ? dateTime : undefined}>{children}</As>;
+export function StMono({ children, tone, size, as: As = "span", dateTime }: { children: ReactNode; tone?: Tone; size?: "value"; as?: "span" | "time"; dateTime?: string }) {
+  return <As className={styles.mono} data-tone={tone} data-size={size} dateTime={As === "time" ? dateTime : undefined}>{children}</As>;
 }
 
 export function StKbd({ children }: { children: ReactNode }) {
@@ -126,8 +126,8 @@ export function StPill({ variant = "primary", size = "md", block, busy, children
   return <button type="button" {...rest} className={styles.pill} data-variant={variant} data-size={size} data-block={block || undefined} disabled={disabled || busy} aria-busy={busy || undefined}>{busy ? <Loader2 size={16} className="motion-safe:animate-spin" aria-hidden="true" /> : null}{children}</button>;
 }
 
-export function StPillLink({ href, variant = "primary", size = "md", block, children }: { href: string; variant?: "primary" | "soft"; size?: "md" | "lg"; block?: boolean; children: ReactNode }) {
-  return <Link href={href} className={styles.pill} data-variant={variant} data-size={size} data-block={block || undefined}>{children}</Link>;
+export function StPillLink({ href, variant = "primary", size = "md", block, current, children }: { href: string; variant?: "primary" | "soft"; size?: "md" | "lg"; block?: boolean; current?: boolean; children: ReactNode }) {
+  return <Link href={href} className={styles.pill} data-variant={variant} data-size={size} data-block={block || undefined} aria-current={current ? "page" : undefined}>{children}</Link>;
 }
 
 export function StTextButton({ tone, children, href, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { tone?: "accent" | "danger"; href?: string }) {

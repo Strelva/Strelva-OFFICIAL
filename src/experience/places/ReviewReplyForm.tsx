@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/Button";
+import { TextArea } from "@/components/ui/TextInput";
+import { StLabel, StNotice, StPill, StState, StTextButton } from "@/components/ui/strelva/Kit";
+import styles from "@/experience/publishing/publishing.module.css";
 
 /**
  * Reply to one review from the workspace. Posts to
@@ -25,32 +27,36 @@ export function replyErrorMessage(status: number, body: { error?: string } | nul
   return body?.error ? `${body.error} Nothing was posted.` : "The reply didn't go through. Nothing was posted.";
 }
 
-export function ReviewReplyForm({ workspaceId, tenantId, reviewId, author, initial, postsToGoogle }: {
+export function ReviewReplyForm({ workspaceId, tenantId, reviewId, author, initial, postsToGoogle, readOnly = false, primary = true, request = fetch }: {
   workspaceId: string;
   tenantId: string;
   reviewId: string;
   author: string;
   initial: string;
   postsToGoogle: boolean;
+  readOnly?: boolean;
+  primary?: boolean;
+  request?: typeof fetch;
 }) {
   const [text, setText] = useState(initial);
   const [outcome, setOutcome] = useState<ReplyOutcome>({ kind: "idle" });
+  const [editing, setEditing] = useState(!initial);
 
   if (outcome.kind === "done") {
     return (
-      <div className="mt-4 rounded-lg border border-gray-border p-3" role="status">
-        <p className="text-xs font-medium text-gray-muted">{outcome.published ? "Posted on Google" : "Your reply, saved. Copy it into the review site to post it."}</p>
-        <p className="mt-1 whitespace-pre-line text-sm leading-6">{outcome.reply}</p>
-      </div>
+      <div className={styles.draft} role="status"><StNotice><div className={styles.stack}>
+        <StLabel>{outcome.published ? "Posted on Google" : "Your reply, saved. Copy it into the review site to post it."}</StLabel>
+        <p className={styles.copy}>{outcome.reply}</p>
+      </div></StNotice></div>
     );
   }
 
   async function send() {
     const reply = text.trim();
-    if (!reply) return;
+    if (!reply || readOnly || outcome.kind === "sending") return;
     setOutcome({ kind: "sending" });
     try {
-      const response = await fetch("/api/workspace/reviews/reply", {
+      const response = await request("/api/workspace/reviews/reply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
@@ -64,18 +70,17 @@ export function ReviewReplyForm({ workspaceId, tenantId, reviewId, author, initi
     }
   }
 
-  const id = `reply-${reviewId}`;
   return (
-    <div className="mt-4">
-      <label htmlFor={id} className="text-xs font-medium text-gray-muted">Your reply to {author}</label>
-      <textarea id={id} value={text} onChange={(event) => setText(event.target.value)} rows={3} maxLength={4000}
-        className="mt-1 w-full rounded-lg border border-gray-border bg-surface px-3 py-2 text-sm leading-6 focus-visible:outline focus-visible:outline-2" />
-      <div className="mt-2 flex flex-wrap items-center gap-3">
-        <Button size="sm" disabled={!text.trim() || outcome.kind === "sending"} onClick={() => void send()}>
-          {outcome.kind === "sending" ? "Sending…" : postsToGoogle ? "Reply on Google" : "Save reply"}
-        </Button>
-        {outcome.kind === "error" ? <p role="alert" className="text-sm text-critical">{outcome.message}</p> : null}
-      </div>
-    </div>
+    <div className={styles.draft}><StNotice><div className={styles.stack}>
+      <StState kind={initial ? "need" : "draft"}>{initial ? "Reply drafted · not posted" : "Your reply · not posted"}</StState>
+      {editing ? <TextArea label={`Your reply to ${author}`} value={text} disabled={readOnly || outcome.kind === "sending"} onChange={event => setText(event.target.value)} rows={3} maxLength={4000} /> : <p className={styles.copy}>{text}</p>}
+      {readOnly ? <p className={styles.copy}>Only an authorized owner can post this reply.</p> : <div className={styles.actions}>
+        <StTextButton disabled={outcome.kind === "sending"} onClick={() => setEditing(!editing)}>{editing ? "Preview reply" : "Edit"}</StTextButton>
+        <StPill variant={primary ? "primary" : "soft"} title={postsToGoogle ? "Reply on Google" : "Save reply"} busy={outcome.kind === "sending"} disabled={!text.trim()} onClick={() => void send()}>
+          {outcome.kind === "sending" ? "Sending…" : postsToGoogle ? "Post reply" : "Save reply"}
+        </StPill>
+      </div>}
+      {outcome.kind === "error" ? <StNotice tone="critical">{outcome.message}</StNotice> : null}
+    </div></StNotice></div>
   );
 }
