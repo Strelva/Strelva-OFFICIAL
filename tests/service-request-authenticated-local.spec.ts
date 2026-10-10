@@ -36,7 +36,8 @@ test("persists, reopens, and reviews a service request through local Auth and Po
     await customerPage.goto(`/workspace?workspaceId=${encodeURIComponent(businessId)}&view=help`, { waitUntil: "domcontentloaded" });
     await expect(customerPage.getByRole("heading", { name: "What do you need?", exact: true })).toBeVisible();
     const provider = customerPage.getByLabel("Who should review this?", { exact: true });
-    await expect(provider.locator("option")).toHaveText(["Strelva", agencyName]);
+    await expect(provider.locator("option")).toHaveText(["Choose an agency", agencyName]);
+    await expect(customerPage.getByRole("button", { name: "Save request", exact: true })).toBeDisabled();
     await provider.selectOption({ label: agencyName });
     await customerPage.getByLabel("What are you trying to do?", { exact: true }).fill("Prepare a private request flow.");
 
