@@ -17,10 +17,22 @@
 
 import Link from "next/link";
 import { Check, ChevronLeft, Circle, Loader2, X } from "lucide-react";
-import { useCallback, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from "react";
+import { forwardRef, useCallback, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type InputHTMLAttributes, type ReactNode, type Ref } from "react";
 import styles from "./kit.module.css";
 
 type Tone = "need" | "critical" | "live" | "text";
+
+/** Native field: labels, descriptions and errors stay attached to the input. */
+export const StField = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & { label: string; description?: string; error?: string }>(function StField({ label, description, error, id: suppliedId, "aria-describedby": describedBy, ...props }, ref) {
+  const generatedId = useId();
+  const id = suppliedId || generatedId;
+  const messageId = description || error ? `${id}-message` : undefined;
+  return <div className={styles.field}><label htmlFor={id}>{label}</label><input {...props} id={id} ref={ref} className={styles.fieldInput} aria-invalid={error ? true : props["aria-invalid"]} aria-describedby={[describedBy, messageId].filter(Boolean).join(" ") || undefined} />{messageId ? <p id={messageId} className={styles.fieldMessage} data-error={!!error} role={error ? "alert" : undefined}>{error || description}</p> : null}</div>;
+});
+
+export function StCopy({ children, muted = false }: { children: ReactNode; muted?: boolean }) {
+  return <p className={styles.copy} data-muted={muted || undefined}>{children}</p>;
+}
 
 /* ---------- Page and head ---------- */
 
@@ -28,13 +40,14 @@ export function StPage({ children, width = "column", className }: { children: Re
   return <div className={`${styles.page}${className ? ` ${className}` : ""}`} data-width={width}><div className={styles.pageStack}>{children}</div></div>;
 }
 
-export function StHead({ crumb, title, meta, beacon, actions, titleId }: {
+export function StHead({ crumb, title, meta, beacon, actions, titleId, titleRef }: {
   crumb?: { label: string; href?: string; onClick?: () => void };
   title: ReactNode;
   meta?: ReactNode;
   beacon?: BeaconKind;
   actions?: ReactNode;
   titleId?: string;
+  titleRef?: Ref<HTMLHeadingElement>;
 }) {
   const crumbNode = crumb ? (crumb.href
     ? <Link className={styles.crumb} href={crumb.href} onClick={crumb.onClick}><ChevronLeft size={14} aria-hidden="true" />{crumb.label}</Link>
@@ -43,7 +56,7 @@ export function StHead({ crumb, title, meta, beacon, actions, titleId }: {
   return <header className={styles.headRow}>
     <div className={styles.head}>
       {crumbNode}
-      <div className={styles.titleRow}>{beacon ? <StBeacon kind={beacon} /> : null}<h1 id={titleId} className={styles.title}>{title}</h1></div>
+      <div className={styles.titleRow}>{beacon ? <StBeacon kind={beacon} /> : null}<h1 id={titleId} ref={titleRef} tabIndex={titleRef ? -1 : undefined} className={styles.title}>{title}</h1></div>
       {meta ? <p className={styles.meta}>{meta}</p> : null}
     </div>
     {actions ? <div className={styles.headActions}>{actions}</div> : null}

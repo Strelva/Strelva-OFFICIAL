@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
-import { Button } from "@/components/ui/Button";
+import { StEmpty, StMono, StNotice, StPill, StRow, StRows, StSection, StSkeleton, StState } from "@/components/ui/strelva/Kit";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
 
 const connectionSchema = z.object({
@@ -61,18 +61,16 @@ function AssistantConnectionsForWorkspace({ workspaceId, canManage }: { workspac
       if (current === generation.current) { setConnections([]); setError("Disconnect could not be confirmed. Reload to check current access before trying again."); }
     } finally { if (current <= generation.current) setPending(null); }
   }
-  return <section aria-labelledby="assistant-connections-heading" className="space-y-4">
-    <h2 id="assistant-connections-heading" className="text-base font-medium text-warm-black">Connected assistants</h2>
+  return <StSection id="assistant-connections-heading" title="Connected assistants">
     <p className="text-sm leading-relaxed text-gray-muted">Assistants use only the permissions you grant for this business. Website changes stay in Strelva for owner review.</p>
-    {!canManage ? <p className="text-sm text-gray-muted">Only a business owner can manage assistant connections.</p> : <>
+    {!canManage ? <StNotice>Only a business owner can manage assistant connections.</StNotice> : <>
       {notice && <p role="status" className="text-sm text-warm-black">{notice}</p>}
-      {loading ? <p role="status" className="text-sm text-gray-muted">Loading assistant access…</p> : error ? <div className="space-y-3"><p role="alert" className="text-sm text-critical">{error}</p><Button variant="secondary" onClick={() => void load()}>Reload connections</Button></div> : !connections.length ? <p className="text-sm text-gray-muted">No assistants are connected to this business. Add Strelva from Claude or Codex to get started.</p> : <ul className="divide-y divide-gray-border border-y border-gray-border">{connections.map(connection => <li key={connection.id} className="space-y-3 py-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2"><h3 className="text-sm font-medium text-warm-black break-words">{connection.clientName}</h3><span className="text-xs text-gray-muted">{statusLabels[connection.status]}</span></div>
-        <p className="break-all text-xs text-gray-muted">Client identity: {connection.clientId}</p>
-        <ul className="space-y-1 text-sm text-warm-black">{connection.scopes.map(scope => <li key={scope}>{permissionLabels[scope] || scope}</li>)}</ul>
-        <p className="text-xs text-gray-muted">Connected {date(connection.createdAt)} · Connection ends {date(connection.expiresAt)}{connection.lastUsedAt ? ` · Last renewed ${date(connection.lastUsedAt)}` : ""}</p>
-        {connection.revokedAt === null && (confirm === connection.id ? <div className="space-y-3"><p className="text-sm text-warm-black">Disconnect {connection.clientName}? It will need your approval to connect again. Saved website proposals stay in Strelva.</p><div className="flex flex-wrap gap-3"><Button variant="danger" disabled={pending !== null} loading={pending === connection.id} onClick={() => void disconnect(connection)}>Confirm disconnect</Button><Button variant="secondary" disabled={pending !== null} onClick={() => setConfirm(null)}>Keep connected</Button></div></div> : <Button variant="secondary" disabled={pending !== null} onClick={() => setConfirm(connection.id)}>Disconnect {connection.clientName}</Button>)}
-      </li>)}</ul>}
+      {loading ? <div className="space-y-3"><p role="status" className="text-sm text-gray-muted">Loading assistant access…</p><StSkeleton /><StSkeleton width="70%" /></div> : error ? <div className="space-y-3"><StNotice tone="critical">{error}</StNotice><StPill variant="soft" onClick={() => void load()}>Reload connections</StPill></div> : !connections.length ? <StEmpty>No assistants are connected to this business. Add Strelva from Claude or Codex to get started.</StEmpty> : <div className="space-y-8">{connections.map(connection => <StSection key={connection.id} title={connection.clientName} meta={<StState kind={connection.status === "active" ? "live" : "draft"}>{statusLabels[connection.status]}</StState>}>
+        <p className="break-all text-xs text-gray-muted">Client identity: <StMono>{connection.clientId}</StMono></p>
+        <StRows label={`Permissions for ${connection.clientName}`}>{connection.scopes.map(scope => <StRow key={scope} title={permissionLabels[scope] || scope} />)}</StRows>
+        <p className="text-xs text-gray-muted">Connected <StMono>{date(connection.createdAt)}</StMono> · Connection ends <StMono>{date(connection.expiresAt)}</StMono>{connection.lastUsedAt ? <> · Last renewed <StMono>{date(connection.lastUsedAt)}</StMono></> : null}</p>
+        {connection.revokedAt === null && (confirm === connection.id ? <div className="space-y-3"><p className="text-sm text-warm-black">Disconnect {connection.clientName}? It will need your approval to connect again. Saved website proposals stay in Strelva.</p><div className="flex flex-wrap gap-3"><StPill disabled={pending !== null} busy={pending === connection.id} onClick={() => void disconnect(connection)}>Confirm disconnect</StPill><StPill variant="soft" disabled={pending !== null} onClick={() => setConfirm(null)}>Keep connected</StPill></div></div> : <div><StPill variant="soft" disabled={pending !== null} onClick={() => setConfirm(connection.id)}>Disconnect {connection.clientName}</StPill></div>)}
+      </StSection>)}</div>}
     </>}
-  </section>;
+  </StSection>;
 }

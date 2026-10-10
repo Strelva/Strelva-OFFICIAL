@@ -16,8 +16,24 @@ in `src/app/styles/workspace-paper.css`. Specimen: `/preview/strelva/kit`
 `StPill`, `StPillLink`, `StTextButton`, `StSegmented`, `StSteps`, `StLedger`,
 `StHold`, `StToast`, `StSurface`, `StNotice`, `StEmpty`, `StSkeleton`,
 `StComposerBar`, `StComposerDock`. Rules and adoption lanes:
-[ui-1.0-integration.md](./ui-1.0-integration.md). Proven: rendered locally in
-both modes on October 9; consumers are added lane by lane.
+[ui-1.0-integration.md](./ui-1.0-integration.md). The baseline kit was rendered
+locally in both modes on October 9; consumers are added lane by lane.
+
+L10 adds `StField` (native labeled input with linked description/error),
+`StCopy` (body copy), and `StHead.titleRef` for focus on the visible heading.
+Fields and dense comparisons are added to the light/dark specimen. Source and
+DOM checks pass; L10 rendered verification remains blocked as recorded in
+[the lane handoff](./ui-1.0-l10-public.md).
+
+`StTable` in `src/components/ui/strelva/Table.tsx` and `table.module.css`
+extends the kit for dense comparisons: native caption, column and row headers,
+open hairline rows, and a keyboard-focusable region that bounds horizontal
+scrolling on phone. L10 uses it for location coverage and access review; it
+renders supplied records only and leaves loading, empty, error and permission
+states to the caller. The location and quarterly-review canon data remains
+fictional in `/preview/strelva/locations`; live Units has no manager, health,
+standard-coverage or audit-export data. Live access review retains its existing
+scope and revoke contracts and shows unknown last use as “Not recorded”.
 
 ## Party billing, October 7, 2026 (local)
 

@@ -7,6 +7,17 @@
  */
 
 /* ---------- Page ---------- */
+.copy { margin: 0; color: var(--st-text); font-size: 14px; line-height: 22px; overflow-wrap: anywhere; }
+.copy[data-muted="true"] { color: var(--st-text-2); }
+.field { display: grid; gap: 6px; min-width: 0; }
+.field > label { color: var(--st-text-2); font-size: 13px; line-height: 20px; }
+.fieldInput { box-sizing: border-box; width: 100%; min-width: 0; min-height: 48px; padding: 10px 16px; border: 1px solid var(--st-line); border-radius: var(--st-r-md, 12px); background: var(--st-surface); color: var(--st-text); font: inherit; font-size: 16px; line-height: 24px; }
+.fieldInput::placeholder { color: var(--st-text-3); }
+.fieldInput:focus-visible { outline: 2px solid var(--st-accent); outline-offset: 2px; }
+.fieldInput[aria-invalid="true"] { border-color: var(--st-critical); }
+.fieldInput:disabled { opacity: 0.5; cursor: not-allowed; }
+.fieldMessage { margin: 0; font-size: 12px; line-height: 20px; color: var(--st-text-3); }
+.fieldMessage[data-error="true"] { color: var(--st-critical); }
 .page {
   box-sizing: border-box;
   width: 100%;
@@ -14,6 +25,7 @@
   margin-inline: auto;
   padding: 48px var(--st-page-pad, 48px) 144px;
   color: var(--st-text);
+  font-family: var(--font-workspace), system-ui, sans-serif;
 }
 
 .page[data-width="wide"] {

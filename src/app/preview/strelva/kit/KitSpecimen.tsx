@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { StBeacon, StComposerBar, StComposerDock, StEmpty, StHead, StHold, StKbd, StLabel, StLedger, StMono, StNotice, StPage, StPill, StRow, StRows, StSection, StSegmented, StSkeleton, StStamp, StState, StSteps, StSurface, StTextButton, StToast } from "@/components/ui/strelva/Kit";
+import { StTable } from "@/components/ui/strelva/Table";
+import { StBeacon, StComposerBar, StComposerDock, StEmpty, StField, StCopy, StHead, StHold, StKbd, StLabel, StLedger, StMono, StNotice, StPage, StPill, StRow, StRows, StSection, StSegmented, StSkeleton, StStamp, StState, StSteps, StSurface, StTextButton, StToast } from "@/components/ui/strelva/Kit";
 
 /** Fictional content only. Every kit piece in its states, light and dark. */
 export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
@@ -38,6 +39,8 @@ export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
       <StSection title="Who decides" meta="only stricter than Strelva’s default">
         <StSegmented label="Fixing a broken link" value={who} onChange={setWho} options={[{ value: "handles", label: "Strelva handles it" }, { value: "after", label: "Tell me after" }, { value: "ask", label: "Ask me first" }]} disabledValues={["handles"]} disabledReason="Looser than Strelva allows for this kind" />
       </StSection>
+      <StSection title="Dense comparison"><StTable label="Example locations" rows={[{ id: "elmwood", name: "Elmwood", state: "Live" }, { id: "downtown", name: "Downtown", state: "Draft" }]} rowKey={row => row.id} columns={[{ key: "name", label: "Location", render: row => row.name }, { key: "state", label: "State", render: row => <StState kind={row.state === "Live" ? "live" : "draft"}>{row.state}</StState> }]} /></StSection>
+      <StSection title="Fields"><StField label="Website" placeholder="example.com" description="A public website address." /><StField label="Email" type="email" error="Enter a valid email address." /><StField label="Unavailable field" disabled value="Read only" readOnly /><StCopy muted>Native fields keep labels and errors connected.</StCopy></StSection>
       <StSection title="Objects, notices, empty, loading">
         <StSurface tone="need" label="Draft reply"><StLabel>Your reply, written by Strelva</StLabel><p style={{ margin: "8px 0 12px", fontSize: 15, lineHeight: "24px" }}>Hi Dana, yes, Sheri mediates disputes between partners. You can ask for a session date here and Sheri will confirm it.</p><div style={{ display: "flex", gap: 16, alignItems: "center" }}><StTextButton>Edit</StTextButton><StTextButton>Not yet</StTextButton><span style={{ flex: 1 }} /><StPill>Send reply</StPill></div></StSurface>
         <StNotice tone="need">Your hours changed on Oct 8. Strelva redoes the open dates before this becomes real.</StNotice>

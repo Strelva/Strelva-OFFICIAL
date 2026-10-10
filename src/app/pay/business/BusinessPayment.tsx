@@ -1,13 +1,75 @@
 "use client";
-import {formatMoney} from "@/platform/connect/money-format";
-import {useEffect,useState,useRef} from "react";
-import {Button} from "@/components/ui/Button";
-import {Card} from "@/components/ui/Card";
-import {paymentRequestSchema,type PaymentRequest} from "@/platform/connect/contracts";
-export default function BusinessPayment({token,initialRequest}:{token:string;initialRequest?:PaymentRequest}) {
- const active=useRef(true);useEffect(()=>{active.current=true;return()=>{active.current=false;};},[]);
- const [request,setRequest]=useState<PaymentRequest|null>(initialRequest??null);const [error,setError]=useState<string|null>(null);const [busy,setBusy]=useState(false);const [loading,setLoading]=useState(!initialRequest);
- useEffect(()=>{if(initialRequest)return;const controller=new AbortController();fetch(`/api/v1/payments?token=${encodeURIComponent(token)}`,{signal:controller.signal}).then(async r=>{if(!r.ok)throw Error("This payment link is unavailable. Ask the business for a current link.");setRequest(paymentRequestSchema.parse(await r.json()));}).catch(()=>{if(!controller.signal.aborted)setError("Payment details could not be loaded. Ask the business for a current link.");}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});return()=>controller.abort();},[token,initialRequest]);
- async function pay(){setBusy(true);setError(null);try{const response=await fetch("/api/v1/payments",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token})});const result=await response.json().catch(()=>({}));if(!active.current)return;if(!response.ok)throw Error(result.error??"Payment could not be started.");if(result.status==="paid"){setRequest(r=>r?{...r,paid:true,status:"paid"}:r);return;}if(typeof result.url!=="string")throw Error("Payment could not be started. Try again.");const url=new URL(result.url);if(url.protocol!=="https:"||url.hostname!=="checkout.stripe.com")throw Error("The payment provider returned an invalid link.");window.location.assign(url.toString());}catch(e){setError(e instanceof Error?e.message:"Payment could not be started.");}finally{setBusy(false);}}
- return <main className="mx-auto max-w-xl px-6 py-12 text-warm-black"><h1 className="font-display text-2xl font-medium">{request?.kind==="deposit"?"Your booking deposit":"Your quote"}</h1>{loading?<p role="status" className="mt-6">Loading payment details…</p>:null}{error?<p role="alert" className="mt-6">{error}</p>:null}{request?<Card className="mt-8" padding="md"><ul className="space-y-4">{request.lines.map((line,i)=><li key={i} className="flex justify-between gap-4"><span>{line.name} × {line.quantity}</span><span className="tabular-nums">{formatMoney(line.quantity*line.unitCents,request.currency)}</span></li>)}</ul>{request.acceptedTerms?<p className="mt-6 whitespace-pre-wrap">{request.acceptedTerms}</p>:null}<p className="mt-6 text-2xl font-medium tabular-nums">{formatMoney(request.amountCents,request.currency)}</p><p className="mt-4">{request.status==="paid"?"Payment received.":request.status==="expired"?"This payment link has expired.":request.status==="cancelled"?"This request was cancelled.":`Valid until ${new Date(request.expiresAt).toLocaleString()}.`}</p>{request.status==="unpaid"?<Button size="lg" className="mt-6" disabled={busy} onClick={pay}>{busy?"Opening secure payment…":"Accept and pay"}</Button>:null}<p className="mt-6 text-sm text-gray-muted">Payment goes to the business through Stripe. The business handles refunds and cancellation terms.</p></Card>:null}</main>;
+
+import { useEffect, useRef, useState } from "react";
+import { Lock } from "lucide-react";
+import { StEmpty, StHead, StMono, StNotice, StPill, StRow, StRows, StSkeleton, StState, StSurface } from "@/components/ui/strelva/Kit";
+import { PaymentLayout, PaymentSplit } from "@/experience/product/public-payment/PaymentLayout";
+import styles from "@/experience/product/public-payment/payment.module.css";
+import { paymentRequestSchema, type PaymentRequest } from "@/platform/connect/contracts";
+import { formatMoney } from "@/platform/connect/money-format";
+
+export default function BusinessPayment({ token, initialRequest }: { token: string; initialRequest?: PaymentRequest }) {
+  const active = useRef(true);
+  useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
+  const [request, setRequest] = useState<PaymentRequest | null>(initialRequest ?? null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(!initialRequest);
+
+  useEffect(() => {
+    if (initialRequest) return;
+    const controller = new AbortController();
+    fetch(`/api/v1/payments?token=${encodeURIComponent(token)}`, { signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) throw Error("This payment link is unavailable. Ask the business for a current link.");
+        setRequest(paymentRequestSchema.parse(await response.json()));
+      })
+      .catch(() => { if (!controller.signal.aborted) setError("Payment details could not be loaded. Ask the business for a current link."); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [token, initialRequest]);
+
+  async function pay() {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/v1/payments", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!active.current) return;
+      if (!response.ok) throw Error(result.error ?? "Payment could not be started.");
+      if (result.status === "paid") {
+        setRequest(current => current ? { ...current, paid: true, status: "paid" } : current);
+        return;
+      }
+      if (typeof result.url !== "string") throw Error("Payment could not be started. Try again.");
+      const url = new URL(result.url);
+      if (url.protocol !== "https:" || url.hostname !== "checkout.stripe.com") throw Error("The payment provider returned an invalid link.");
+      window.location.assign(url.toString());
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Payment could not be started.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const title = request?.kind === "deposit" ? "Your booking deposit" : "Your quote";
+  return <PaymentLayout><PaymentSplit description={<>
+    <StHead title={title} meta="Review the agreed details before paying." />
+    {loading ? <div className={styles.state} role="status" aria-label="Loading payment details"><StSkeleton width="75%" /><StSkeleton width="50%" /><span>Loading payment details…</span></div> : null}
+    {request ? <>
+      {request.lines.length ? <StRows label="Payment details">{request.lines.map((line, index) => <StRow key={index} title={line.name} detail={<>Quantity <StMono>{line.quantity}</StMono></>} end={<StMono tone="text">{formatMoney(line.quantity * line.unitCents, request.currency)}</StMono>} />)}</StRows> : <StEmpty>No item details supplied. The business has not added item details to this request.</StEmpty>}
+      {request.acceptedTerms ? <p className={styles.term}>{request.acceptedTerms}</p> : null}
+    </> : null}
+  </>}>
+    {error ? <StNotice tone="critical">{error}</StNotice> : null}
+    {request ? <StSurface pad={false}><div className={styles.form}>
+      <h2 className={styles.formTitle}>{request.kind === "deposit" ? "Your deposit" : "Your payment"}</h2>
+      <span className={styles.amountValue}>{formatMoney(request.amountCents, request.currency)}</span>
+      {request.status === "paid" ? <StState kind="live">Payment received.</StState> : request.status === "expired" ? <StState kind="down">This payment link has expired.</StState> : request.status === "cancelled" ? <StState kind="draft">This request was cancelled.</StState> : <p className={styles.caption}>Valid until <StMono as="time" dateTime={request.expiresAt}>{new Date(request.expiresAt).toLocaleString()}</StMono>.</p>}
+      {request.status === "unpaid" ? <StPill size="lg" block busy={busy} onClick={pay}>{busy ? "Opening secure payment…" : "Accept and pay"}</StPill> : null}
+      <p className={`${styles.caption} ${styles.security}`}><Lock size={12} aria-hidden="true" />Payment goes to the business through Stripe. The business handles refunds and cancellation terms.</p>
+    </div></StSurface> : !loading && !error ? <StEmpty>Payment details are unavailable. Ask the business for a current payment link.</StEmpty> : null}
+  </PaymentSplit></PaymentLayout>;
 }

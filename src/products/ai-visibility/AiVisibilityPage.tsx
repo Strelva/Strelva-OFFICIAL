@@ -3,7 +3,8 @@ import { OwnerBrandIdentity } from "@/components/brand/OwnerBrandIdentity";
 import { STRELVA_BRAND } from "@/platform/infra/agency-brand";
 
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { StPage, StHead, StPill, StField, StCopy, StNotice, StSteps, StSection } from "@/components/ui/strelva/Kit";
+import styles from "./answer-check.module.css";
 import { AiVisibilityResultView } from "./AiVisibilityResultView";
 import type { AgencyAttribution } from "@/platform/infra/agency-attribution";
 import type { AiVisibilityResult } from "./contracts";
@@ -64,7 +65,7 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
     setInvalidField(null);
     const name = business.trim();
     if (!name) {
-      setError("Enter your business name to run the audit.");
+      setError("Enter your business name to run the check.");
       setInvalidField("business");
       return;
     }
@@ -100,7 +101,7 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
       });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        throw new Error(body?.error || `Audit failed (${response.status})`);
+        throw new Error(body?.error || `Check failed (${response.status})`);
       }
 
       const data: AuditResponse = await response.json();
@@ -118,7 +119,7 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
       setShareUrl(data.shareUrl);
       setState("done");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Audit failed. Try again.");
+      setError(cause instanceof Error ? cause.message : "Check failed. Try again.");
       setState("error");
     }
   }
@@ -137,62 +138,20 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
     setInvalidField(null);
   }
 
-  return (
-    <div className="product-surface px-6 py-8 md:px-12">
-      <div className="relative z-10 mx-auto max-w-[760px] pb-16">
-        {agency && state !== "done" && <OwnerBrandIdentity brand={{ ...STRELVA_BRAND, agencyId: agency.workspaceId, name: agency.name, logoUrl: agency.brand.logoUrl, accentColor: agency.brand.accentColor ?? STRELVA_BRAND.accentColor, replyTo: agency.replyTo ?? null }} />}
-        {(state === "idle" || state === "error") && (
-          <div className="motion-rise">
-            <p className="text-[14px] font-medium text-m-text-3">Free AI visibility audit</p>
-            <h1 className="mt-4 font-display text-[32px] font-medium leading-[1.15] text-m-text sm:text-[40px]">
-              Can AI understand and surface your business?
-            </h1>
-            <p className="mt-5 max-w-[620px] text-[17px] leading-[1.7] text-m-text-2">
-              Check how clearly your website explains your business to AI systems. When available, the result also includes one live Gemini citation check.
-            </p>
-
-            <form onSubmit={handleScan} aria-describedby={error ? errorId : undefined} className="mt-8 grid gap-3 sm:grid-cols-2">
-              <label className="block">
-                <span className="mb-2 block text-sm text-m-text-2">Business name</span>
-                <input id="business-name" ref={businessRef} type="text" required aria-invalid={invalidField === "business" || undefined} aria-describedby={error && invalidField !== "url" ? errorId : undefined} value={business} onChange={(event) => setBusiness(event.target.value)} placeholder="Business name" autoComplete="organization" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-sm text-m-text-2">Website</span>
-                <input id="website" type="text" aria-invalid={invalidField === "url" || undefined} aria-describedby={invalidField === "url" ? errorId : undefined} value={url} onChange={(event) => setUrl(event.target.value)} placeholder="example.com" autoComplete="url" inputMode="url" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-sm text-m-text-2">Business category</span>
-                <input id="business-category" type="text" value={category} onChange={(event) => setCategory(event.target.value)} placeholder="Category (e.g. HVAC, dentist)" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
-              </label>
-              <label className="block">
-                <span className="mb-2 block text-sm text-m-text-2">City and state</span>
-                <input id="city-state" type="text" value={city} onChange={(event) => setCity(event.target.value)} placeholder="City (e.g. Buffalo, NY)" autoComplete="address-level2" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
-              </label>
-              <button type="submit" className="marketing-button-primary h-14 px-8 text-[15px] sm:col-span-2">
-                Run my AI audit <ArrowRight className="size-4" />
-              </button>
-            </form>
-
-            {error && <p id={errorId} role="alert" className="mt-4 rounded-lg border px-4 py-3 text-[13px]" style={{ color: "var(--m-danger)", borderColor: "color-mix(in oklch, var(--m-danger) 38%, transparent)", background: "color-mix(in oklch, var(--m-danger) 10%, transparent)" }}>{error}</p>}
-            <p className="mt-4 text-[13px] text-m-text-3">Free. No signup required. Add your website for AI-readiness signals.</p>
-          </div>
-        )}
-
-        {state === "scanning" && (
-          <div className="motion-rise">
-            <p className="text-[14px] font-medium text-m-text-3">Auditing</p>
-            <h2 ref={headingRef} tabIndex={-1} className="mt-4 text-3xl font-semibold text-m-text sm:text-4xl">Checking AI visibility for {business}...</h2>
-            <div role="status" className="mt-10 flex items-center gap-3 rounded-2xl border border-m-rule-soft bg-m-panel p-6">
-              <Loader2 aria-hidden="true" className="size-5 shrink-0 animate-spin text-m-accent motion-reduce:animate-none" />
-              <span className="text-[14px] text-m-text-2">Reading your site and checking AI-crawler access. A live Gemini result will be included when available.</span>
-            </div>
-          </div>
-        )}
-
-        {state === "done" && result && (
-          <AiVisibilityResultView headingRef={headingRef} result={result} scanId={scanId} shareUrl={shareUrl} workspaceEnabled={workspaceEnabled} onReset={handleReset} />
-        )}
-      </div>
-    </div>
-  );
+  return <StPage width={state === "done" ? "wide" : "column"} className={state === "idle" || state === "error" ? styles.entry : undefined}>
+    {agency && state !== "done" ? <OwnerBrandIdentity brand={{ ...STRELVA_BRAND, agencyId: agency.workspaceId, name: agency.name, logoUrl: agency.brand.logoUrl, accentColor: agency.brand.accentColor ?? STRELVA_BRAND.accentColor, replyTo: agency.replyTo ?? null }} /> : null}
+    {(state === "idle" || state === "error") ? <>
+      <StHead title="Ask Gemini about your business." meta="See whether it names your business, and what your website makes readable. Free, no account." />
+      <form onSubmit={handleScan} className={styles.form} aria-describedby={error ? errorId : undefined}>
+        <div className={styles.address}><StField label="Website" id="website" inputMode="url" autoComplete="url" value={url} onChange={event => setUrl(event.target.value)} placeholder="example.com" aria-invalid={invalidField === "url" || undefined} aria-describedby={invalidField === "url" ? errorId : undefined} /><StPill type="submit" size="lg">Check</StPill></div>
+        <StField label="Business name" id="business-name" ref={businessRef} required autoComplete="organization" value={business} onChange={event => setBusiness(event.target.value)} aria-invalid={invalidField === "business" || undefined} aria-describedby={error && invalidField !== "url" ? errorId : undefined} description="Gemini needs your business name to check whether it appears in an answer." />
+        <details><summary>Make the question more specific</summary><div className={styles.details}><StField label="Business category" value={category} onChange={event => setCategory(event.target.value)} placeholder="Your service" /><StField label="City and state" autoComplete="address-level2" value={city} onChange={event => setCity(event.target.value)} /></div></details>
+        {error ? <div id={errorId}><StNotice tone="critical">{error}</StNotice></div> : null}
+        <StCopy muted>Strelva reads your website and asks Gemini once when the live check is available. The result says which checks completed.</StCopy>
+      </form>
+      <StSection title="What you get back"><StCopy>What your website makes readable, whether Gemini names you in one sampled answer, and the one fix to start with.</StCopy></StSection>
+    </> : null}
+    {state === "scanning" ? <><StHead titleRef={headingRef} title={`Checking ${business}`} meta="Your website stays unchanged." /><StSteps label="Business check" steps={[{ title: "Reading the public website", state: "active" }, { title: "Checking one Gemini answer when available", state: "pending" }, { title: "Finding the first fix", state: "pending" }]} /></> : null}
+    {state === "done" && result ? <AiVisibilityResultView headingRef={headingRef} result={result} scanId={scanId} shareUrl={shareUrl} workspaceEnabled={workspaceEnabled} onReset={handleReset} /> : null}
+  </StPage>;
 }
