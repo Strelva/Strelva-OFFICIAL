@@ -8,8 +8,7 @@ import { registerWorkspacePorts, type WorkspacePorts } from "@/lib/workspace-por
 import { workspacePortLoaders } from "@/server/workspace-ports";
 import { registerTenantPublishingPorts } from "@/platform/infra/tenant-publishing";
 
-import { registerCalendarBusyProviderRead } from "@/platform/bookings/calendar-busy";
-import { registerBookingRequestNotifier } from "@/platform/bookings/updates";
+import { registerCalendarBusyProviderRead, registerBookingRequestNotifier } from "@/platform/bookings/runtime-ports";
 
 const ports: WorkspacePorts = workspacePortLoaders;
 registerWorkspacePorts(ports);
