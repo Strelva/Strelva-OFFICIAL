@@ -7,6 +7,8 @@ export const metadata: Metadata = { title: "Choose a booking time", robots: { in
 export default async function Page({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<{ error?: string }> }) {
   if (!bookingInquiryOffersEnabled()) notFound();
   const { token } = await params, query = await searchParams;
-  const offer = await readInquiryBookingOffer(token).catch(() => null);
-  return <InquiryBookingOffer offer={offer} actionUrl={`/book-inquiry/${encodeURIComponent(token)}/action`} error={!!query.error}/>;
+  const { offer, unavailable } = await readInquiryBookingOffer(token)
+    .then(offer => ({ offer, unavailable: false }))
+    .catch(() => ({ offer: null, unavailable: true }));
+  return <InquiryBookingOffer offer={offer} actionUrl={`/book-inquiry/${encodeURIComponent(token)}/action`} error={!!query.error} unavailable={unavailable}/>;
 }

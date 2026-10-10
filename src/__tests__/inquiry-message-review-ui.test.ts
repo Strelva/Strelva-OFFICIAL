@@ -36,7 +36,7 @@ describe("InquiryMessageReview", () => {
     expect(html).toContain("customer@example.com");
     expect(html).toContain("We received your message for Alder Realty");
     expect(html).toContain("Hi Sam,\n\nAlder Realty received your message.");
-    expect(html).toContain("Send this message");
+    expect(html).toContain("Send reply");
     expect(html).toContain("Prepare again");
     expect(html).toContain("data-review-recipient");
     expect(html).toContain("data-review-subject");
@@ -50,7 +50,7 @@ describe("InquiryMessageReview", () => {
       autoPrepare: false,
     }));
     expect(html).toContain("Review current message");
-    expect(html).not.toContain("Send this message");
+    expect(html).not.toContain("Send reply");
   });
 
   it("does not render a review from another inquiry", () => {

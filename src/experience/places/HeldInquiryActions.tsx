@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { beginFocusRecovery, type FocusRecovery } from "@/experience/websites/focus-recovery";
-import { Button } from "@/components/ui/Button";
+import { StPill, StTextButton } from "@/components/ui/strelva/Kit";
 
 /**
  * The owner's review of one message held as spam: Release (it becomes a
@@ -90,19 +90,19 @@ export function HeldInquiryActions({ workspaceId, rowId, name, mode }: { workspa
     <div ref={sectionRef} className="mt-3 flex min-w-0 flex-wrap items-center gap-2">
       {mode === "held" ? (
         <>
-          <Button className="max-w-full whitespace-normal break-words" size="sm" disabled={saving || unconfirmed} onClick={() => void decide("release")} aria-label={`Release the message from ${name}`}>
+          <StPill variant="soft" disabled={saving || unconfirmed} onClick={() => void decide("release")} aria-label={`Release the message from ${name}`}>
             {saving && outcome.decision === "release" ? "Releasing…" : "Not spam, release it"}
-          </Button>
-          <Button className="max-w-full whitespace-normal break-words" size="sm" variant="secondary" disabled={saving || unconfirmed} onClick={() => void decide("confirm_spam")} aria-label={`Confirm the message from ${name} is spam`}>
+          </StPill>
+          <StTextButton disabled={saving || unconfirmed} onClick={() => void decide("confirm_spam")} aria-label={`Confirm the message from ${name} is spam`}>
             {saving && outcome.decision === "confirm_spam" ? "Saving…" : "It's spam"}
-          </Button>
+          </StTextButton>
         </>
       ) : (
-        <Button className="max-w-full whitespace-normal break-words" size="sm" variant="secondary" disabled={saving || unconfirmed} onClick={() => void decide("hold")} aria-label={`Move the message from ${name} back to held`}>
+        <StTextButton disabled={saving || unconfirmed} onClick={() => void decide("hold")} aria-label={`Move the message from ${name} back to held`}>
           {saving ? "Moving…" : "Move back to held"}
-        </Button>
+        </StTextButton>
       )}
-      {unconfirmed ? <Button className="max-w-full whitespace-normal break-words" ref={reloadRef} size="sm" variant="secondary" onClick={() => window.location.reload()}>Reload inquiries</Button> : null}
+      {unconfirmed ? <StPill ref={reloadRef} variant="soft" onClick={() => window.location.reload()}>Reload inquiries</StPill> : null}
       {outcome.kind === "error" ? <p role="alert" className="text-sm text-critical">{outcome.message}</p> : null}
     </div>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { Button } from "@/components/ui/Button";
+import { StPill, StSurface } from "@/components/ui/strelva/Kit";
 import { proposalOptionsSchema, type InquiryProposalOptions, type InquiryProposalDelivery } from "@/products/bookings/contracts";
 
 type Phase = "idle" | "loading" | "ready" | "sending" | "permission" | "error" | InquiryProposalDelivery;
@@ -52,7 +52,7 @@ export function ProposeBookingTimes({ workspaceId, tenantId, inquiryId, customer
       setPhase(body.delivery);
     } catch (cause) { setPhase("error"); setError(cause instanceof Error ? cause.message : "Email delivery couldn't be confirmed. Check the inquiry before trying again."); }
   }
-  if (phase === "idle") return <div className="mt-3"><Button className="max-sm:min-h-11" size="sm" variant="secondary" onClick={() => void load()}>Propose booking times</Button></div>;
+  if (phase === "idle") return <div className="mt-3"><StPill className="max-sm:min-h-11" variant="soft" onClick={() => void load()}>Propose booking times</StPill></div>;
   return <section className="mt-5 border-t border-gray-border pt-4" aria-labelledby={labelId}>
     <h4 id={labelId} className="break-words text-sm font-medium">Propose times for {customerName}</h4>
     <p className="mt-1 text-sm leading-6 text-gray-muted">Choose up to three open times. They choose one to request it; the business confirms the booking.</p>
@@ -79,16 +79,16 @@ export function ProposeBookingTimes({ workspaceId, tenantId, inquiryId, customer
               <span>{slotLabel(slot.start)}</span>
             </label>
           ))}</div>
-          {visible < options.slots.length ? <Button className="mt-2 max-sm:min-h-11" size="sm" variant="ghost" onClick={() => setVisible((count) => count + 12)}>Show more open times</Button> : null}
+          {visible < options.slots.length ? <StPill className="mt-2 max-sm:min-h-11" variant="soft" onClick={() => setVisible((count) => count + 12)}>Show more open times</StPill> : null}
         </fieldset>}
-        {selected.length ? <div className="mt-4 rounded-md border border-gray-border p-3 text-sm leading-6">
+        {selected.length ? <div className="mt-4 text-sm leading-6"><StSurface label="Suggested times reply">
           <p className="break-words font-medium">Reply to {options.customer.name} · {options.customer.email}</p>
           <p className="mt-1 text-gray-muted">The business suggested these times. Choose one to request it. The business will confirm your request.</p>
           <ul className="mt-2">{selected.map((start) => <li key={start}>{slotLabel(start)}</li>)}</ul>
-          <Button className="mt-3 max-sm:min-h-11" size="sm" loading={phase === "sending"} disabled={busy} onClick={() => void send()}>Send suggested times</Button>
-        </div> : null}
+          <StPill className="mt-3 max-sm:min-h-11" busy={phase === "sending"} disabled={busy} onClick={() => void send()}>Send suggested times</StPill>
+        </StSurface></div> : null}
       </>}
     </> : null}
-    {(phase === "error" || phase === "ready") && !busy && !complete ? <Button className="mt-3 max-sm:min-h-11" size="sm" variant="ghost" onClick={() => void load(options?.serviceId ?? undefined)}>Reload open times</Button> : null}
+    {(phase === "error" || phase === "ready") && !busy && !complete ? <StPill className="mt-3 max-sm:min-h-11" variant="soft" onClick={() => void load(options?.serviceId ?? undefined)}>Reload open times</StPill> : null}
   </section>;
 }

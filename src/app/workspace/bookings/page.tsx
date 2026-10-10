@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/platform/infra/db/server-client";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
-import { readWorkspaceBookings, type BookingView } from "@/products/bookings/server";
+import { readWorkspaceBookings, bookingSettingsEnabled, type BookingView } from "@/products/bookings/server";
 import { WorkspaceBookings, type WorkspaceBookingsState } from "@/experience/bookings/WorkspaceBookings";
 
 export const dynamic = "force-dynamic";
@@ -35,5 +35,5 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
       state = { kind: "error" };
     }
   }
-  return <WorkspaceBookings workspaceId={workspaceId} state={state} view={view} />;
+  return <WorkspaceBookings workspaceId={workspaceId} state={state} view={view} rulesEnabled={state.kind === "ready" && !state.bookings.readOnly && await bookingSettingsEnabled()} />;
 }

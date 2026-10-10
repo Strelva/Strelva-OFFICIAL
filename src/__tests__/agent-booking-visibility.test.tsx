@@ -105,10 +105,10 @@ describe("owner and provider presentation", () => {
  const render = (readOnly = false, source: "all" | "agent" = "all") => renderToStaticMarkup(createElement(WorkspaceBookings, { workspaceId: WS, view: "week", state: { kind: "ready", bookings: { view: "week", from: "2026-11-02", to: "2026-11-08", agentVisibility: true, readOnly, source, sites: [site] } } }));
  it("escapes attribution, filters agents and preserves source/date in navigation", () => {
    const html = render(false, "agent"); expect(html).toContain("Booked through Claude &lt;script&gt;"); expect(html).not.toContain("Site customer");
-   expect(html).toContain("1 agent request for this week"); expect(html).toContain("source=agent"); expect(html).toContain("date=2026-10-26");
+   expect(html).toContain("1 assistant request for this week"); expect(html).toContain("source=agent"); expect(html).toContain("date=2026-10-26");
  });
  it("provider detail names the source and removes every mutation", () => {
-   const html = render(true); expect(html).toContain("Booking details"); expect(html).toContain("Agent names are supplied at booking");
+   const html = render(true); expect(html).toContain("Booking details"); expect(html).toContain("Assistant names are supplied at booking");
    expect(html).not.toContain(">Cancel<"); expect(html).not.toContain("Check in"); expect(html).toContain("The owner decides booking requests");
  });
  it("preserves filtered sign-in return and rejects unknown or duplicate source", () => {

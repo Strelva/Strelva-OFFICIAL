@@ -45,6 +45,8 @@ import { phaseForWork, phaseLabel, requestStateLabel } from "./contracts";
 import { useInquiry } from "./context";
 import { InquiryAttentionView, InquiryPatternsView } from "./InquiryPortfolioViews";
 import styles from "./inquiry.module.css";
+import recordStyles from "./record-canon.module.css";
+import { StEmpty, StHead, StMono, StNotice, StPage, StPill, StRows, StRow, StSection, StState, StSteps, StSurface, StTextButton, StToast } from "@/components/ui/strelva/Kit";
 import { RecordMessageReview } from "./RecordMessageReview";
 
 export function ViewRouter() {
@@ -670,18 +672,17 @@ function RecordList({ records }: { records: InquiryRecord[] }) {
     }
   }
   const allSelected = records.length > 0 && selectedIds.length === records.length;
-  return <div className={styles.page}>
-    <PageIntro eyebrow="RECORDS" title="Customer records with their history." action={<button className={styles.backButton} type="button" onClick={() => navigate("home")}><ArrowLeft size={15} aria-hidden="true" />Home</button>}>Records stay attached to the capability version and preserve their factual timeline.</PageIntro>
-    {bulkMessage ? <div className={styles.bulkResult} role="status"><CheckCircle2 size={16} aria-hidden="true" /><span>{bulkMessage}</span>{lastBulkIds.length > 0 ? <button type="button" className={styles.textButton} onClick={() => void undoBulk()} disabled={pending || !can("canManageRecords")}>Undo this group</button> : null}</div> : null}
-    <section className={styles.recordListPanel} aria-labelledby="record-list-title">
-      <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>INQUIRY RECORDS</span><h2 id="record-list-title" className="font-display">{records.length > 0 ? "Select records to inspect or update." : "No records yet."}</h2></div></div>
+  return <div data-workspace-theme="linen"><StPage>
+    <StHead title="Inquiries" crumb={{ label: "Home", onClick: () => navigate("home") }} meta="Customer records and their recorded history." />
+    {bulkMessage ? <StToast>{bulkMessage}{lastBulkIds.length > 0 ? <StTextButton onClick={() => void undoBulk()} disabled={pending || !can("canManageRecords")}>Undo this group</StTextButton> : null}</StToast> : null}
+    <StSection title="Inquiries received">
       {records.length > 0 ? <>
-        <div className={styles.bulkToolbar}><label><input type="checkbox" checked={allSelected} onChange={() => setSelectedIds(allSelected ? [] : records.map((record) => record.id))} aria-label="Select all records in this business" /> Select all records in this scope</label>{selectedIds.length > 0 ? <><span>{selectedIds.length} selected</span><button type="button" className={styles.secondaryButton} onClick={() => setBulkAction("assign")} disabled={!can("canManageRecords")}>Assign</button><button type="button" className={styles.secondaryButton} onClick={() => setBulkAction("mark_handled")} disabled={!can("canManageRecords")}>Mark handled</button></> : null}</div>
-        <div className={styles.recordRows}>{records.map((record) => <div className={styles.recordRow} key={record.id}><label className={styles.recordSelect}><input type="checkbox" checked={selectedIds.includes(record.id)} onChange={() => toggle(record.id)} aria-label={`Select ${record.id}`} /><span className={styles.srOnly}>{record.id}</span></label><button type="button" className={styles.rowMain} onClick={() => navigate("record", { inquiryId: record.id })}><span className={styles.rowTitle}>{record.fields.name || record.id}</span><span className={styles.rowMeta}>{record.id} · {record.status} · version {record.capabilityVersion}</span></button><span className={styles.rowQuiet}>{formatDate(record.receivedAt)}</span><button type="button" className={styles.rowAction} onClick={() => navigate("record", { inquiryId: record.id })} aria-label={`Inspect ${record.id}`}><ChevronRight size={17} aria-hidden="true" /></button></div>)}</div>
-      </> : <EmptySection text="A submitted inquiry will appear here with its received facts and timeline." />}
-    </section>
+        <div className={recordStyles.bulkControls}><label><input type="checkbox" checked={allSelected} onChange={() => setSelectedIds(allSelected ? [] : records.map((record) => record.id))} aria-label="Select all records in this business" /> Select all records in this scope</label>{selectedIds.length > 0 ? <><StMono>{selectedIds.length} selected</StMono><StPill variant="soft" onClick={() => setBulkAction("assign")} disabled={!can("canManageRecords")}>Assign</StPill><StPill variant="soft" onClick={() => setBulkAction("mark_handled")} disabled={!can("canManageRecords")}>Mark handled</StPill></> : null}</div>
+        <StRows label="Inquiry records">{records.map((record) => <StRow key={record.id} lead={<label className={recordStyles.select}><input type="checkbox" checked={selectedIds.includes(record.id)} onChange={() => toggle(record.id)} aria-label={`Select ${record.id}`} /><span className={styles.srOnly}>{record.id}</span></label>} title={<StTextButton onClick={() => navigate("record", { inquiryId: record.id })}>{record.fields.name || record.id}</StTextButton>} detail={<><StMono>{record.id}</StMono> · {humanize(record.status)} · form version <StMono>{record.capabilityVersion}</StMono></>} end={<><StMono>{formatDate(record.receivedAt)}</StMono><StTextButton onClick={() => navigate("record", { inquiryId: record.id })} aria-label={`Inspect ${record.id}`}>Open</StTextButton></>} />)}</StRows>
+      </> : <StEmpty>A submitted inquiry will appear here with its received facts and timeline.</StEmpty>}
+    </StSection>
     {bulkAction ? <BulkConfirm action={bulkAction} recordIds={selectedIds} onCancel={() => setBulkAction(null)} onConfirm={() => void executeBulk()} pending={pending} /> : null}
-  </div>;
+  </StPage></div>;
 }
 
 function BulkConfirm({ action, recordIds, onCancel, onConfirm, pending }: { action: "assign" | "mark_handled"; recordIds: string[]; onCancel: () => void; onConfirm: () => void; pending: boolean }) {
@@ -698,13 +699,18 @@ function RecordDetail({ record, onBack }: { record: InquiryRecord; onBack: () =>
     const result = await perform({ kind: "bulk-record", recordIds: [record.id], action, actorId: snapshot.business.role === "agency_member" ? "agency-member" : "business-owner" });
     if (result) setBulkMessage(result.message || "The record was updated. Its receipt is in the timeline.");
   }
-  return <div className={styles.page}>
-    <PageIntro eyebrow="RECORD · INSPECTOR" title={record.fields.name || record.id} action={<button className={styles.backButton} type="button" onClick={onBack}><ArrowLeft size={15} aria-hidden="true" />All records</button>}>Received {formatDate(record.receivedAt)}</PageIntro>
-    {bulkMessage ? <div className={styles.bulkResult} role="status"><CheckCircle2 size={16} aria-hidden="true" />{bulkMessage}</div> : null}
-    <div className={styles.recordDetailGrid}><section className={styles.recordDetailPanel} aria-labelledby="record-facts-title"><div className={styles.panelHeading}><div><span className={styles.eyebrow}>FACTS</span><h2 id="record-facts-title" className="font-display">The submitted input</h2></div><span className={styles.stateTag} data-state={record.status}>{record.status.replaceAll("_", " ")}</span></div><dl className={styles.detailList}>{Object.entries(record.fields).map(([key, value]) => <div key={key}><dt>{humanize(key)}</dt><dd>{value || "Nothing recorded"}</dd></div>)}</dl><div className={styles.recordMeta}><span>Form version {record.capabilityVersion}</span><span>{capability?.live?.name || snapshot.state.requests.find((work) => work.capabilityId === record.capabilityId)?.draft?.name || "Inquiry form"}</span><span>{record.assigneeId ? `Assigned to ${record.assigneeId}` : "Unassigned"}</span></div><div className={styles.recordActions}><button type="button" className={styles.secondaryButton} onClick={() => void mark("assign")} disabled={pending || !can("canManageRecords")}>Assign to me</button><button type="button" className={styles.primaryButton} onClick={() => void mark("mark_handled")} disabled={pending || !can("canManageRecords")}>Mark handled</button></div></section><aside className={styles.recordDetailAside}><OnThisInput record={record} /><button type="button" className={styles.whyLink} onClick={() => navigate("why", { inquiryId: record.id })}><CircleHelp size={16} aria-hidden="true" /><span>Ask Why from recorded evidence</span><ChevronRight size={15} aria-hidden="true" /></button></aside></div>
+  return <div data-workspace-theme="linen"><StPage>
+    <StHead title={record.fields.name || record.id} crumb={{ label: "All records", onClick: onBack }} meta={<>Received <StMono>{formatDate(record.receivedAt)}</StMono></>} />
+    {bulkMessage ? <StToast>{bulkMessage}</StToast> : null}
+    <div className={recordStyles.layout}><StSurface label="Submitted inquiry facts"><div className={recordStyles.stack}>
+      <StState kind={record.status === "blocked" ? "down" : record.status === "follow_up_pending" ? "need" : record.status === "new" ? "draft" : "live"}>{humanize(record.status)}</StState>
+      <dl className={recordStyles.facts}>{Object.entries(record.fields).map(([key, value]) => <div key={key}><dt>{humanize(key)}</dt><dd>{value || "Nothing recorded"}</dd></div>)}</dl>
+      <div className={recordStyles.meta}><span>Form version <StMono>{record.capabilityVersion}</StMono></span><span>{capability?.live?.name || snapshot.state.requests.find((work) => work.capabilityId === record.capabilityId)?.draft?.name || "Inquiry form"}</span><span>{record.assigneeId ? <>Assigned to <StMono>{record.assigneeId}</StMono></> : "Unassigned"}</span></div>
+      <div className={recordStyles.actions}><StPill variant="soft" onClick={() => void mark("assign")} disabled={pending || !can("canManageRecords")}>Assign to me</StPill><StPill variant="soft" onClick={() => void mark("mark_handled")} disabled={pending || !can("canManageRecords")}>Mark handled</StPill></div>
+    </div></StSurface><RecordTimeline events={timeline} /></div>
     <RecordMessageReview record={record} />
-    <RecordTimeline events={timeline} />
-  </div>;
+    <div className={recordStyles.stack}><OnThisInput record={record} /><StTextButton onClick={() => navigate("why", { inquiryId: record.id })}>Ask Why from recorded evidence</StTextButton></div>
+  </StPage></div>;
 }
 
 function OnThisInput({ record }: { record: InquiryRecord }) {
@@ -722,7 +728,15 @@ function OnThisInput({ record }: { record: InquiryRecord }) {
 
 function RecordTimeline({ events }: { events: InquirySurfaceSnapshot["state"]["timeline"] }) {
   const { snapshot } = useInquiry();
-  return <section className={styles.timelineBlock} aria-labelledby="record-timeline-title"><div className={styles.sectionHeading}><div><span className={styles.eyebrow}>RECORD TIMELINE</span><h2 id="record-timeline-title" className="font-display">Facts and outcomes</h2></div></div>{snapshot.deliveryEvidence?.available === false ? <p className={styles.readOnlyCopy} role="status">Delivery evidence is unavailable right now. Provider outcomes may be missing from this timeline.</p> : null}{events.length > 0 ? <ol className={styles.eventList}>{events.map((event) => <li key={event.id}><span className={styles.eventDot} aria-hidden="true" /><div><strong>{event.type.replaceAll("_", " ")}</strong><p>{event.summary}</p><small>{event.actor.label || event.actor.id} · {formatDate(event.at)} · {event.outcome}{event.receiptId ? ` · receipt ${event.receiptId}` : ""}</small>{event.evidence.length > 0 ? <small>Evidence: {event.evidence.join(" · ")}</small> : null}</div></li>)}</ol> : <EmptySection text="No timeline events are recorded for this inquiry." />}</section>;
+  return <StSection title="What happened" meta="Recorded events">
+    {snapshot.deliveryEvidence?.available === false ? <StNotice tone="need">Delivery evidence is unavailable right now. Provider outcomes may be missing from this timeline.</StNotice> : null}
+    {events.length > 0 ? <StSteps label="Inquiry history" steps={events.map((event) => ({
+      title: humanize(event.type),
+      state: event.outcome === "failed" || event.outcome === "blocked" ? "failed" : "done",
+      time: Number.isFinite(Date.parse(event.at)) ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(event.at)) : "Time not recorded",
+      detail: <><span>{event.summary}</span><span className={recordStyles.eventMeta}>{event.actor.label || event.actor.id} · {humanize(event.outcome)}{event.receiptId ? <> · receipt <StMono>{event.receiptId}</StMono></> : null}</span>{event.evidence.length > 0 ? <span className={recordStyles.eventMeta}>Evidence: {event.evidence.join(" · ")}</span> : null}</>,
+    }))} /> : <StEmpty>No timeline events are recorded for this inquiry.</StEmpty>}
+  </StSection>;
 }
 
 function WhyView() {

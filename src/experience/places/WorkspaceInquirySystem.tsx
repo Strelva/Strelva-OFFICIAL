@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/Button";
+import { StPage, StHead, StPill, StSkeleton } from "@/components/ui/strelva/Kit";
 import { WorkspaceInquiries } from "./WorkspaceInquiries";
 import { InquirySystemDetails } from "./InquirySystemDetails";
 import type { WorkspaceLeads } from "@/products/inquiries";
@@ -25,7 +25,7 @@ export function WorkspaceInquirySystem({ workspaceId }: { workspaceId: string })
   // A business switch must hide the previous records and any open reply
   // before the next fetch completes, including its loading and error states.
   const state = loaded?.workspaceId === workspaceId ? loaded.state : null;
-  if (!state) return <p role="status" className="p-6 text-sm text-gray-muted">Opening inquiries…</p>;
-  const records = <><WorkspaceInquiries key={workspaceId} workspaceId={workspaceId} state={state} embedded />{state.kind === "error" ? <div className="px-6 pb-6"><Button variant="secondary" onClick={() => { setLoaded(null); setRetry(value => value + 1); }}>Try again</Button></div> : null}</>;
+  if (!state) return <StPage><StHead title="Inquiries" meta="Opening inquiries…" /><StSkeleton label="Opening inquiries" /><StSkeleton width="70%" /></StPage>;
+  const records = <><WorkspaceInquiries key={workspaceId} workspaceId={workspaceId} state={state} embedded />{state.kind === "error" ? <div className="px-6 pb-6"><StPill variant="soft" onClick={() => { setLoaded(null); setRetry(value => value + 1); }}>Try again</StPill></div> : null}</>;
   return state.kind === "ready" ? <InquirySystemDetails key={workspaceId} workspaceId={workspaceId} records={records} /> : records;
 }
