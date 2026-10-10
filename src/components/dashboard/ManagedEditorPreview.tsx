@@ -1,7 +1,7 @@
 "use client";
 
 import { ContentWorkspace } from "./ContentWorkspace";
-import type { SectionData } from "@/products/managed-presence/contracts";
+import type { SectionData } from "@/platform/infra/section-summary";
 
 const EDITOR_SECTION_DATA: Record<string, SectionData> = {
   hero: {

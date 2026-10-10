@@ -1,4 +1,4 @@
-import type { SectionData } from "@/products/managed-presence/contracts";
+import type { SectionData } from "@/platform/infra/section-summary";
 import { truncate, getFreshness } from "@/lib/utils";
 import type { ContentMap } from "@/lib/types";
 
