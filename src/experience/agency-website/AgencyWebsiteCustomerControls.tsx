@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
-import { Button } from "@/components/ui/Button";
+import { StEmpty, StNotice, StPill, StSection, StSkeleton, StState, StTextButton } from "@/components/ui/strelva/Kit";
 import { agencyManagedWebsiteDraftGrantSchema, type AgencyManagedWebsiteDraftGrant } from "@/platform/offerings/agency-website-draft-contracts";
 
 function message(value: unknown, fallback: string): string {
@@ -70,14 +69,13 @@ export function AgencyWebsiteCustomerControls({ deliveryId, bindingId, customerW
     }
   }
 
-  return <section className="rounded-xl border border-gray-border bg-white p-5" aria-labelledby="agency-website-permission-title">
-    <h2 id="agency-website-permission-title" className="text-base font-medium text-warm-black">Agency website preparation</h2>
-    <p className="mt-2 text-sm leading-relaxed text-gray-muted">Allow the operator assigned to this delivery to prepare website changes. Publishing still requires your approval. This does not grant business membership.</p>
-    {state === "loading" ? <p role="status" className="mt-4 text-sm text-gray-muted">Checking the current permission…</p> : null}
-    {state === "error" ? <div className="mt-4 space-y-3"><p role="alert" className="text-sm text-critical">{error}</p><Button variant="secondary" onClick={() => setReload((value) => value + 1)}>Retry</Button></div> : null}
-    {state === "ready" && grant && active ? <div className="mt-4 space-y-3"><p className="text-sm text-warm-black">Draft preparation is enabled for the named operator. It expires at {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(grant.expiresAt))}.</p><Button variant="secondary" disabled={busy} onClick={() => void change("revoke")}>Remove draft access</Button>{websiteHref ? <Link className="block text-sm text-warm-black underline underline-offset-4" href={websiteHref}>Review and publish in website editor</Link> : null}</div> : null}
-    {state === "ready" && grant && !active ? <div className="mt-4 space-y-3"><p className="text-sm text-gray-muted">Draft preparation is revoked or expired. Existing website history remains recorded.</p><Button className="mt-1" disabled={busy} onClick={() => void change("grant")}>Allow website draft changes</Button></div> : null}
-    {state === "ready" && !grant ? <Button className="mt-4" disabled={busy} onClick={() => void change("grant")}>Allow website draft changes</Button> : null}
-    {error && state === "ready" ? <p role="alert" className="mt-3 text-sm text-critical">{error}</p> : null}
-  </section>;
+  return <StSection title="Agency website preparation" id="agency-website-permission-title">
+    <p className="m-0 text-sm leading-relaxed text-gray-muted">Allow the operator assigned to this delivery to prepare website changes. Publishing still requires your approval. This does not grant business membership.</p>
+    {state === "loading" ? <StSkeleton label="Checking the current permission" width="65%" /> : null}
+    {state === "error" ? <><StNotice tone="critical">{error}</StNotice><StTextButton onClick={() => setReload((value) => value + 1)}>Retry</StTextButton></> : null}
+    {state === "ready" && grant && active ? <><StState kind="live">Draft preparation is enabled</StState><p className="m-0 text-sm text-gray-muted">The named operator can prepare drafts until {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(grant.expiresAt))}.</p><div className="flex flex-wrap items-center gap-4"><StPill variant="soft" busy={busy} onClick={() => void change("revoke")}>Remove draft access</StPill>{websiteHref ? <StTextButton href={websiteHref}>Review and publish in website editor</StTextButton> : null}</div></> : null}
+    {state === "ready" && grant && !active ? <><StNotice tone="need">Draft preparation is revoked or expired. Existing website history remains recorded.</StNotice><StPill busy={busy} onClick={() => void change("grant")}>Allow website draft changes</StPill></> : null}
+    {state === "ready" && !grant ? <StEmpty action={<StPill busy={busy} onClick={() => void change("grant")}>Allow website draft changes</StPill>}>The named operator does not have draft preparation access.</StEmpty> : null}
+    {error && state === "ready" ? <StNotice tone="critical">{error}</StNotice> : null}
+  </StSection>;
 }

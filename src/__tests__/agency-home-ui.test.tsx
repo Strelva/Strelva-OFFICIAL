@@ -107,7 +107,7 @@ describe("agency home on the batched read", () => {
     const request = router({ clients: () => Response.json(page(Array.from({ length: 50 }, (_, index) => row(index + 1)))) });
     const { node } = await render(request);
     expect(clientCalls(request)).toHaveLength(1);
-    expect(node.querySelectorAll('[aria-label="Clients"] > li')).toHaveLength(50);
+    expect(node.querySelectorAll('table[aria-label="Clients"] tbody > tr')).toHaveLength(50);
     expect(node.textContent).toContain("50 clients");
     expect(node.textContent).not.toContain("Show more clients");
   });
@@ -129,6 +129,22 @@ describe("agency home on the batched read", () => {
     expect(node.textContent).not.toContain("could not be loaded");
     await act(async () => { button(node, /^Twin Trees/).click(); });
     expect(onWorkspace).toHaveBeenCalledWith(row(1).workspaceId);
+  });
+
+  it("keeps a last good read visibly stale after a client read fails", async () => {
+    let reads = 0;
+    const request = router({ clients: () => {
+      reads += 1;
+      return Response.json(page([row(1, { name: "Known business", status: reads === 1 ? "ready" : "unavailable", openRequests: reads === 1 ? 3 : 0, systems: reads === 1 ? row(1).systems : [] })]));
+    } });
+    const { node } = await render(request);
+    expect(node.textContent).toContain("3 open requests");
+    await act(async () => { button(node, "Refresh").click(); });
+    await settle();
+    expect(node.textContent).toContain("Known business could not be loaded.");
+    expect(node.textContent).toContain("Showing the last good read");
+    expect(node.textContent).toContain("3 open requests");
+    expect(node.textContent).toContain("client1.example");
   });
 
   it("shows Show more clients only when the server returns a cursor", async () => {
