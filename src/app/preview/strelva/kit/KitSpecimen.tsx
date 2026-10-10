@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { StBeacon, StComposerBar, StComposerDock, StEmpty, StHead, StHold, StKbd, StLabel, StLedger, StMono, StNotice, StPage, StPill, StRow, StRows, StSection, StSegmented, StSkeleton, StStamp, StState, StSteps, StSurface, StTextButton, StToast } from "@/components/ui/strelva/Kit";
+import { StBeacon, StComposerBar, StComposerDock, StEmpty, StHead, StHold, StKbd, StLabel, StLedger, StMono, StNotice, StPage, StPill, StRow, StRows, StSection, StSegmented, StSkeleton, StStamp, StState, StSteps, StSurface, StTable, StTextButton, StToast } from "@/components/ui/strelva/Kit";
 
 /** Fictional content only. Every kit piece in its states, light and dark. */
 export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
@@ -23,6 +23,9 @@ export function KitSpecimen({ mode }: { mode: "light" | "dark" }) {
           <StRow href="#" title="attymooney.com" detail="10 pages · last change Oct 7" end={<><StState kind="live">Live</StState><StMono>checked 2m ago</StMono></>} />
           <StRow href="#" title="Mediation sessions" detail="Attorneys request a session date" end={<StState kind="draft">Possibility</StState>} />
         </StRows>
+      </StSection>
+      <StSection title="Client comparison" meta="open table, labeled records on phones">
+        <StTable label="Fictional clients" columns={[{ key: "client", label: "Client" }, { key: "health", label: "Health" }, { key: "revision", label: "Revision", mono: true }]} rows={[{ key: "harbor", cells: { client: "Harbor Dental", health: <StState kind="live">Latest checks passed</StState>, revision: "r12" } }, { key: "north", cells: { client: "North Coast Realty", health: <StState kind="down">Form failing</StState>, revision: "r11" } }]} />
       </StSection>
       <StSection title="Steps" meta="Make real, item by item">
         <StSteps label="Making it real" steps={[{ title: "Session page built", state: "done", time: "0:12", detail: "Hidden from visitors until the last step." }, { title: "Rehearsing a request end to end", state: "active", time: "1:05" }, { title: "Your confirmation email", state: "pending", detail: "Needs your OK on the wording." }, { title: "Calendar read", state: "failed", detail: "Google stopped answering. Nothing is live." }]} />

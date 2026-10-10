@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/Button";
+import { StEmpty, StHold, StNotice, StPill, StRow, StRows, StSection, StSkeleton, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
 import { TextInput, SelectInput } from "@/components/ui/TextInput";
 import { useWorkspaceRequest } from "../WorkspaceRequest";
 import { parseAgencyTeam, teamRequest, type AgencyTeam, type AgencyTeamAction } from "../agency-team";
 
 const roles = [{ value: "member", label: "Member" }, { value: "admin", label: "Admin" }];
-const note = "text-xs leading-4 text-gray-muted";
+const note = "text-[13px] leading-relaxed text-gray-muted";
 const check = "flex min-h-11 items-center gap-3 text-sm text-warm-black";
 
 export function AgencyTeamView({ workspaceId }: { workspaceId: string }) {
@@ -69,25 +69,25 @@ export function AgencyTeamView({ workspaceId }: { workspaceId: string }) {
   const toggle = (values: string[], value: string) => values.includes(value) ? values.filter(item => item !== value) : [...values, value];
   const disabled = busy || stale;
 
-  if (!current) return <p role="status" className="py-5 text-sm text-gray-muted">Loading team…</p>;
-  if (!team) return <div role="alert" className="flex flex-wrap items-center justify-between gap-4 border-y border-gray-border py-5"><p className="text-sm">{current.error}</p><Button variant="secondary" onClick={reload}>Retry team</Button></div>;
+  if (!current) return <div className="space-y-4"><p role="status" className={note}>Loading team…</p><StSkeleton label="Loading team members" /><StSkeleton width="70%" label="Loading client assignments" /></div>;
+  if (!team) return <StNotice tone="critical"><p>{current.error}</p><StTextButton onClick={reload}>Retry team</StTextButton></StNotice>;
 
   return <div aria-busy={busy || undefined} className="space-y-6">
     <div className="flex flex-wrap items-start justify-between gap-4">
       <p className={`${note} max-w-xl`}>Assigned staff with a confirmed email can act as client operators while the agency has an active agency seat and they remain on this team. Clients can end the agency’s access.</p>
-      <Button variant="secondary" size="sm" disabled={busy} onClick={reload}>Reload team</Button>
+      <StTextButton disabled={busy} onClick={reload}>Reload team</StTextButton>
     </div>
-    {!team.canManage ? <p className={note}>Only agency owners and admins can invite people or change client assignments.</p> : null}
+    {!team.canManage ? <StNotice>Only agency owners and admins can invite people or change client assignments.</StNotice> : null}
     {message ? <p role="status" className="text-sm text-positive">{message}</p> : null}
-    {error ? <p role="alert" className="text-sm text-critical">{error}</p> : null}
-    {team.canManage ? <form className="grid items-end gap-4 border-y border-gray-border py-6 sm:grid-cols-[minmax(0,1fr)_160px_auto]" onSubmit={event => { event.preventDefault(); void mutate({ action: "invite", workspaceId, recipientEmail: email, role: inviteRole as "admin" | "member" }, "Invitation created. Share the link with this person."); }}>
+    {error ? <StNotice tone="critical">{error}</StNotice> : null}
+    {team.canManage ? <StSurface label="Invite a teammate"><h3 className="mb-3 text-sm font-medium">Invite a teammate</h3><form className="grid items-end gap-4 sm:grid-cols-[minmax(0,1fr)_160px_auto]" onSubmit={event => { event.preventDefault(); void mutate({ action: "invite", workspaceId, recipientEmail: email, role: inviteRole as "admin" | "member" }, "Invitation created. Share the link with this person."); }}>
       <TextInput label="Staff email" type="email" required maxLength={254} value={email} disabled={disabled} onChange={event => setEmail(event.target.value)} />
       <SelectInput label="Invitation role" options={roles} value={inviteRole} disabled={disabled} onChange={event => setInviteRole(event.target.value)} />
-      <Button type="submit" disabled={disabled || !email.trim()} loading={busy}>Create invitation</Button>
+      <StPill type="submit" disabled={disabled || !email.trim()} busy={busy}>Create invitation</StPill>
       <p className={`${note} sm:col-span-3`}>The person accepts with this email before you assign clients. Creating a link does not send an email.</p>
-    </form> : null}
+    </form></StSurface> : null}
     {link ? <div className="space-y-2"><TextInput label="Invitation link" readOnly value={link} onFocus={event => event.target.select()} /><p className={note}>Share this private link with the invited person. It expires in seven days.</p></div> : null}
-    {team.canManage && team.invitations.length ? <section aria-label="Pending invitations"><h3 className="text-sm font-medium">Pending invitations</h3><ul className="mt-3 divide-y divide-gray-border border-y border-gray-border">{team.invitations.map(invitation => <li key={invitation.id} className="flex flex-wrap items-center justify-between gap-4 py-4"><span className="min-w-0 break-words text-sm">{invitation.recipientEmail}<small className={`${note} mt-1 block`}>{invitation.role} · Expires {new Date(invitation.expiresAt).toLocaleDateString()}</small></span>{invitation.role !== "owner" ? <Button variant="ghost" disabled={disabled} onClick={() => void mutate({ action: "revoke_invitation", workspaceId, invitationId: invitation.id }, "Invitation revoked.")}>Revoke invitation</Button> : null}</li>)}</ul></section> : null}
+    {team.canManage && team.invitations.length ? <section aria-label="Pending invitations"><StSection title="Pending invitations"><StRows>{team.invitations.map(invitation => <StRow key={invitation.id} title={invitation.recipientEmail} detail={`${invitation.role} · Expires ${new Date(invitation.expiresAt).toLocaleDateString()}`} end={invitation.role !== "owner" ? <StTextButton disabled={disabled} onClick={() => void mutate({ action: "revoke_invitation", workspaceId, invitationId: invitation.id }, "Invitation revoked.")}>Revoke invitation</StTextButton> : null} />)}</StRows></StSection></section> : null}
     {team.canManage && team.members.length && team.clients.length ? <details className="border-y border-gray-border py-4">
       <summary className="min-h-11 cursor-pointer text-sm font-medium">Assign several people or clients</summary>
       <div className="mt-4 grid gap-6 sm:grid-cols-2">
@@ -95,20 +95,20 @@ export function AgencyTeamView({ workspaceId }: { workspaceId: string }) {
         <fieldset disabled={disabled}><legend className={note}>Clients with active seats</legend>{team.clients.map(client => <label key={client.customerWorkspaceId} className={check}><input type="checkbox" checked={selectedClients.includes(client.customerWorkspaceId)} onChange={() => setSelectedClients(toggle(selectedClients, client.customerWorkspaceId))} />{client.name}</label>)}</fieldset>
       </div>
       <p className={`${note} my-4`}>{selectedStaff.length} people · {selectedClients.length} clients. Up to 200 assignments at once. The whole selection succeeds or nothing changes.</p>
-      <div className="flex flex-wrap gap-3">{[true, false].map(active => <Button key={String(active)} variant={active ? "primary" : "secondary"} disabled={disabled || !selectedStaff.length || !selectedClients.length || selectedStaff.length * selectedClients.length > 200} onClick={() => void mutate({ action: "assign", workspaceId, userIds: selectedStaff, clientIds: selectedClients, active }, active ? "Selected client assignments added." : "Selected client assignments removed.")}>{active ? "Assign selected" : "Unassign selected"}</Button>)}</div>
+      <div className="flex flex-wrap gap-3">{[true, false].map(active => <StPill key={String(active)} variant="soft" disabled={disabled || !selectedStaff.length || !selectedClients.length || selectedStaff.length * selectedClients.length > 200} onClick={() => void mutate({ action: "assign", workspaceId, userIds: selectedStaff, clientIds: selectedClients, active }, active ? "Selected client assignments added." : "Selected client assignments removed.")}>{active ? "Assign selected" : "Unassign selected"}</StPill>)}</div>
     </details> : null}
-    {!team.clients.length ? <p className={note}>No clients have an active agency seat. A client must choose this agency before staff can be assigned.</p> : null}
-    {!team.members.length ? <p className={note}>No team members are listed for this agency.</p> : <ul aria-label="Agency team" className="divide-y divide-gray-border border-y border-gray-border">{team.members.map(member => {
+    {!team.clients.length ? <StEmpty>No clients have an active agency seat. A client must choose this agency before staff can be assigned.</StEmpty> : null}
+    <StSection title="People" meta={`${team.members.length} ${team.members.length === 1 ? "person" : "people"}`}>{!team.members.length ? <StEmpty>No team members are listed for this agency.</StEmpty> : <StRows label="Agency team">{team.members.map(member => {
       const clients = team.clients.filter(client => client.staff.some(staff => staff.userId === member.userId));
       const protectedMember = member.role === "owner" || member.userId === team.actorUserId;
-      return <li key={member.userId} className="space-y-4 py-6">
+      return <StRow key={member.userId} title={member.email} detail={`${member.role === "owner" ? "Owner" : member.role === "admin" ? "Admin" : "Member"}${member.userId === team.actorUserId ? " · You" : ""}`} align="start"><div className="space-y-4 pt-3">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0 flex-1"><h3 className="break-all text-sm font-medium">{member.email}</h3><p className={`${note} mt-1`}>{member.role === "owner" ? "Owner" : member.role === "admin" ? "Admin" : "Member"}{member.userId === team.actorUserId ? " · You" : ""}</p><p className={`${note} mt-2`}>{clients.length ? `Client operator: ${clients.map(client => client.name).join(", ")}` : "No assigned clients"}</p></div>
-          {team.canManage && !protectedMember ? <div className="flex w-full flex-wrap items-end gap-3 sm:w-auto"><SelectInput label={`Agency role for ${member.email}`} value={member.role} options={roles} disabled={disabled} onChange={event => void mutate({ action: "set_role", workspaceId, userId: member.userId, role: event.target.value as "admin" | "member" }, "Agency role updated.")} /><Button variant="ghost" disabled={disabled} onClick={() => setRemoving(member.userId)}>Remove staff</Button></div> : null}
+          <div className="min-w-0 flex-1"><p className={`${note} mt-2`}>{clients.length ? `Client operator: ${clients.map(client => client.name).join(", ")}` : "No assigned clients"}</p></div>
+          {team.canManage && !protectedMember ? <div className="flex w-full flex-wrap items-end gap-3 sm:w-auto"><SelectInput label="Agency role" aria-label={`Agency role for ${member.email}`} value={member.role} options={roles} disabled={disabled} onChange={event => void mutate({ action: "set_role", workspaceId, userId: member.userId, role: event.target.value as "admin" | "member" }, "Agency role updated.")} /><StPill variant="soft" disabled={disabled} onClick={() => setRemoving(member.userId)}>Remove staff</StPill></div> : null}
         </div>
-        {removing === member.userId ? <div className="space-y-3" role="group" aria-label={`Confirm removal of ${member.email}`}><p className="text-sm">Remove {member.email} from this agency? All their client assignments will end.</p><div className="flex flex-wrap gap-3"><Button variant="danger" disabled={disabled} onClick={() => void mutate({ action: "remove", workspaceId, userId: member.userId }, "Staff removed. Their client assignments have ended.")}>Confirm removal</Button><Button variant="secondary" disabled={busy} onClick={() => setRemoving(null)}>Cancel removal</Button></div></div> : null}
-        {team.canManage && team.clients.length ? <details><summary className="min-h-11 cursor-pointer text-sm">Client assignments for {member.email}</summary><fieldset disabled={disabled} className="mt-2"><legend className="sr-only">Clients for {member.email}</legend>{team.clients.map(client => <label key={client.customerWorkspaceId} className={check}><input type="checkbox" checked={client.staff.some(staff => staff.userId === member.userId)} onChange={event => void mutate({ action: "assign", workspaceId, userIds: [member.userId], clientIds: [client.customerWorkspaceId], active: event.target.checked }, "Client assignment updated.")} />{client.name}</label>)}</fieldset></details> : null}
-      </li>;
-    })}</ul>}
+        {removing === member.userId ? <div className="space-y-3" role="group" aria-label={`Confirm removal of ${member.email}`}><p className="text-sm">Remove {member.email} from this agency? All their client assignments will end.</p><div className="flex flex-wrap gap-3"><StHold label="Confirm removal" disabled={disabled} onAccept={() => void mutate({ action: "remove", workspaceId, userId: member.userId }, "Staff removed. Their client assignments have ended.")} /><StPill variant="soft" disabled={busy} onClick={() => setRemoving(null)}>Cancel removal</StPill></div></div> : null}
+        {team.canManage && team.clients.length ? <details><summary className="min-h-11 cursor-pointer break-all text-sm">Client assignments for {member.email}</summary><fieldset disabled={disabled} className="mt-2"><legend className="sr-only">Clients for {member.email}</legend>{team.clients.map(client => <label key={client.customerWorkspaceId} className={check}><input type="checkbox" checked={client.staff.some(staff => staff.userId === member.userId)} onChange={event => void mutate({ action: "assign", workspaceId, userIds: [member.userId], clientIds: [client.customerWorkspaceId], active: event.target.checked }, "Client assignment updated.")} />{client.name}</label>)}</fieldset></details> : null}
+      </div></StRow>;
+    })}</StRows>}</StSection>
   </div>;
 }

@@ -25,12 +25,25 @@ import { AgencyTeamView } from "./agency/AgencyTeamView";
 import { AgencyLibraryView } from "./agency/AgencyLibraryView";
 import { AgencyVersionCreate } from "./agency/AgencyVersionCreate";
 
+import { StComposerBar, StComposerDock, StHead, StMono, StNotice, StPage, StPillLink, StTextButton } from "@/components/ui/strelva/Kit";
+import type { AgencyLastGoodRead } from "./agency/AgencyViews";
+
 type ClientsState =
   | { status: "loading" }
   | { status: "error" }
   | { status: "ready"; pages: AgencyLoadedPage[]; loadingMore: boolean; moreError: boolean; retrying: ReadonlySet<number> };
 
-type AgencyView = "clients" | "queue" | "library" | "team" | "build" | "package";
+export type AgencyView = "clients" | "queue" | "library" | "team" | "build" | "package";
+
+/** Last successful rows are held in component state and never cross agency scope. */
+function rememberReads(previous: ReadonlyMap<string, AgencyLastGoodRead>, pages: readonly AgencyLoadedPage[]): Map<string, AgencyLastGoodRead> {
+  const reads = new Map(previous);
+  const readAt = new Date().toISOString();
+  for (const { page } of pages) for (const client of page.clients) if (client.status === "ready") {
+    if (reads.get(client.workspaceId)?.client !== client) reads.set(client.workspaceId, { client, readAt });
+  }
+  return reads;
+}
 
 function workLabel(work: WorkspaceWork, systemsReleased: boolean): string {
   if (work.productId === "applications") return systemsReleased ? "Internal tool" : "Application";
@@ -61,13 +74,17 @@ export function AgencyHome({
   onOpenClientWork,
   onOpenWork,
   onStart,
+  view: controlledView,
+  onViewChange,
 }: {
   snapshot: WorkspaceSnapshot;
   busy: boolean;
   onWorkspace: (workspaceId: string) => void;
   onOpenClientWork: (workspaceId: string, workId: string) => void;
   onOpenWork: (workId: string) => void;
-  onStart: () => void;
+  onStart: (request?: string) => void;
+  view?: AgencyView;
+  onViewChange?: (view: AgencyView) => void;
 }) {
   const request = useWorkspaceRequest();
   const id = useId().replace(/:/g, "");
@@ -79,13 +96,19 @@ export function AgencyHome({
   // Off, the page reads as it did, with clients from the same batched read.
   const released = systemsReleased(snapshot);
   const [now] = useState(() => Date.now());
-  const [view, setView] = useState<AgencyView>("clients");
+  const [localView, setView] = useState<AgencyView>(() => {
+    if (typeof window === "undefined") return "clients";
+    const selected = new URLSearchParams(window.location.search).get("agencyView");
+    return ["clients", "queue", "library", "team", "build", "package"].includes(selected || "") ? selected as AgencyView : "clients";
+  });
+  const view = controlledView ?? localView;
+  const [ask, setAsk] = useState("");
   const [libraryOpened, setLibraryOpened] = useState(false);
   const [attempt, setAttempt] = useState(0);
   // Every read below is stored with the key it was made for, so a change of
   // agency or a retry shows loading without resetting state inside an effect.
   const clientsKey = `${snapshot.workspaceId}:${attempt}`;
-  const [storedClients, setStoredClients] = useState<{ key: string; state: ClientsState } | null>(null);
+  const [storedClients, setStoredClients] = useState<{ key: string; state: ClientsState; lastGoodReads: Map<string, AgencyLastGoodRead> } | null>(null);
   const [storedCredits, setStoredCredits] = useState<{ key: string; periods: AgencyCreditPeriod[] } | null>(null);
   const [storedApplications, setStoredApplications] = useState<{ key: string; drafts: AgencyApplicationDraftWork[] | null; error: string } | null>(null);
   const [storedWebsites, setStoredWebsites] = useState<{ key: string; drafts: AgencyManagedWebsiteDraftWork[] | null; error: string } | null>(null);
@@ -98,7 +121,11 @@ export function AgencyHome({
 
   /** Changes the ready client state only while it still belongs to the current read. */
   const updateClients = (key: string, change: (state: Extract<ClientsState, { status: "ready" }>) => ClientsState) => {
-    setStoredClients((stored) => stored?.key === key && stored.state.status === "ready" ? { key, state: change(stored.state) } : stored);
+    setStoredClients(stored => {
+      if (stored?.key !== key || stored.state.status !== "ready") return stored;
+      const state = change(stored.state);
+      return { key, state, lastGoodReads: state.status === "ready" ? rememberReads(stored.lastGoodReads, state.pages) : stored.lastGoodReads };
+    });
   };
 
   // One request for the first page of every client. Later pages only on "Show more clients".
@@ -106,9 +133,9 @@ export function AgencyHome({
     const controller = new AbortController();
     if (!canUseTools) return () => controller.abort();
     void loadAgencyClients(request, snapshot.workspaceId, { signal: controller.signal }).then((page) => {
-      if (!controller.signal.aborted) setStoredClients({ key: clientsKey, state: { status: "ready", pages: [{ cursor: null, page }], loadingMore: false, moreError: false, retrying: new Set() } });
+      if (!controller.signal.aborted) setStoredClients(stored => ({ key: clientsKey, state: { status: "ready", pages: [{ cursor: null, page }], loadingMore: false, moreError: false, retrying: new Set() }, lastGoodReads: rememberReads(stored?.key.startsWith(`${snapshot.workspaceId}:`) ? stored.lastGoodReads : new Map(), [{ cursor: null, page }]) }));
     }).catch(() => {
-      if (!controller.signal.aborted) setStoredClients({ key: clientsKey, state: { status: "error" } });
+      if (!controller.signal.aborted) setStoredClients(stored => ({ key: clientsKey, state: { status: "error" }, lastGoodReads: stored?.key.startsWith(`${snapshot.workspaceId}:`) ? stored.lastGoodReads : new Map() }));
     });
     return () => controller.abort();
   }, [request, snapshot.workspaceId, canUseTools, clientsKey]);
@@ -211,6 +238,7 @@ export function AgencyHome({
         clients={combined!.clients}
         agencyWorkspaceId={snapshot.workspaceId}
         request={request}
+        lastGoodReads={storedClients?.key.startsWith(`${snapshot.workspaceId}:`) ? storedClients.lastGoodReads : undefined}
         total={combined!.total}
         agencyName={agencyName}
         hasMore={Boolean(combined!.nextCursor)}
@@ -256,7 +284,7 @@ export function AgencyHome({
   const privateWork = <section className="mt-12" aria-labelledby={`${id}-private`}>
     <div className="flex flex-wrap items-end justify-between gap-4 border-b border-gray-border pb-3">
       <div><h2 id={`${id}-private`} className={sectionTitle}>Private agency work</h2><p className={sectionNote}>Drafts and methods stay in {agencyName} until you hand specific work to a client.</p></div>
-      <button type="button" onClick={onStart} className="inline-flex min-h-11 items-center gap-2 text-[13px] font-medium text-warm-black">Start private work<ArrowRight size={15} aria-hidden="true" /></button>
+      <button type="button" onClick={() => onStart()} className="inline-flex min-h-11 items-center gap-2 text-[13px] font-medium text-warm-black">Start private work<ArrowRight size={15} aria-hidden="true" /></button>
     </div>
     {snapshot.work.length ? <ul>{snapshot.work.slice(0, 6).map((work) => <li key={work.id} className="border-b border-gray-border">
       <button type="button" className="flex min-h-16 w-full items-center gap-4 px-2 py-4 text-left hover:bg-surface" onClick={() => onOpenWork(work.id)}>
@@ -290,6 +318,7 @@ export function AgencyHome({
   </header>;
 
   if (!canUseTools) {
+    if (released) return <StPage><StHead title="Clients" meta={agencyName} /><StNotice>{agencyName} shared some work with you to read. Clients, the queue and agency tools are for members of {agencyName}.</StNotice>{privateWork}</StPage>;
     return <div className="mx-auto w-full max-w-5xl px-6 py-10 sm:px-8 lg:px-12" aria-busy={busy || undefined}>
       {header}
       <p className="border-b border-gray-border py-5 text-[13px] leading-relaxed text-gray-muted">{agencyName} shared some work with you to read. Clients, the queue and agency tools are for members of {agencyName}.</p>
@@ -332,10 +361,15 @@ export function AgencyHome({
     const next = value as AgencyView;
     if (next === "library") setLibraryOpened(true);
     setView(next);
+    onViewChange?.(next);
   };
 
-  return <div className="mx-auto w-full max-w-5xl px-6 py-10 sm:px-8 lg:px-12" aria-busy={busy || clients.status === "loading" || undefined}>
-    {header}
+  return <div aria-busy={busy || clients.status === "loading" || undefined}><StPage width={view === "clients" ? "wide" : "column"}>
+    <StHead title={view === "clients" ? "Clients" : view === "queue" ? "Queue" : view === "library" ? "Library" : view === "team" ? "Team" : view === "build" ? "Build for a client" : "Package a revision"} meta={<>{agencyName}{combined ? <> · <StMono>{combined.total} clients · {combined.queue.length} waiting</StMono></> : null}</>} actions={<>
+      {snapshot.releases?.agencyAddClient ? <StPillLink variant={view === "clients" ? "primary" : "soft"} href={`/workspace/agency/clients/new?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Add a client</StPillLink> : null}
+      {snapshot.releases?.agencySetup ? <StTextButton href={`/workspace/agency/start?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Verification</StTextButton> : null}
+      {snapshot.releases?.agencyProspecting ? <StTextButton href={`/workspace/prospects?workspace=${encodeURIComponent(snapshot.workspaceId)}`}>Prospects</StTextButton> : null}
+    </>} />
     <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
       <Tabs
         aria-label="Agency views"
@@ -358,7 +392,7 @@ export function AgencyHome({
     </TabsPanel>
 
     <TabsPanel id={tab("queue").panelId} tabId={tab("queue").id} active={view === "queue"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
-      <p className="mb-4 text-[12px] text-gray-muted">Oldest first. Each item opens the client’s own System or work, never a copy.</p>
+      <p className="mb-4 text-sm text-gray-muted">Oldest first within each kind. Open the client’s own System or work.</p>
       {queueList}
         <ProviderClientQueue workspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} />
       {combined?.queueGaps.length ? <div role="alert" className="mt-4 text-sm text-critical"><p>This Queue is incomplete. Some sources could not be read.</p><ul className="mt-2 list-disc pl-5">{combined.queueGaps.map(gap => <li key={gap}>{gap}</li>)}</ul></div> : null}
@@ -371,8 +405,8 @@ export function AgencyHome({
 
     <TabsPanel id={tab("library").panelId} tabId={tab("library").id} active={view === "library"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
       <p className="mb-6 max-w-2xl text-[12px] leading-relaxed text-gray-muted">Sources {agencyName} keeps, and where each client’s Version stands against the latest revision. Nothing reaches a client until its owner approves.</p>
-      {libraryOpened ? <AgencyLibraryView request={request} agencyWorkspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} /> : null}
-      {libraryOpened && (current?.role === "owner" || current?.role === "admin") ? <AgencyVersionCreate request={request} agencyWorkspaceId={snapshot.workspaceId} clients={combined?.clients ?? []} /> : null}
+      {libraryOpened || view === "library" ? <AgencyLibraryView request={request} agencyWorkspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} /> : null}
+      {(libraryOpened || view === "library") && (current?.role === "owner" || current?.role === "admin") ? <AgencyVersionCreate request={request} agencyWorkspaceId={snapshot.workspaceId} clients={combined?.clients ?? []} /> : null}
     </TabsPanel>
 
     <TabsPanel id={tab("team").panelId} tabId={tab("team").id} active={view === "team"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
@@ -383,5 +417,5 @@ export function AgencyHome({
     {(view === "build" || view === "package") && (current?.role === "owner" || current?.role === "admin") ? <TabsPanel id={tab(view).panelId} tabId={tab(view).id} active className="mt-6"><AgencyAuthoring request={request} snapshot={snapshot} clients={combined?.clients ?? []} kind={view} onOpenClientWork={onOpenClientWork} /></TabsPanel> : null}
     {privateWork}
     {creditSection}
-  </div>;
+  </StPage><StComposerDock><StComposerBar scope={agencyName} placeholder="Bring a client need, Strelva builds it with you" value={ask} onChange={setAsk} onSubmit={() => { onStart(ask); setAsk(""); }} /></StComposerDock></div>;
 }

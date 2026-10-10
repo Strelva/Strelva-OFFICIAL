@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
-import { Button } from "@/components/ui/Button";
+import { StEmpty, StNotice, StPill, StSkeleton, StSurface, StTextButton } from "@/components/ui/strelva/Kit";
 import { SelectInput, TextInput } from "@/components/ui/TextInput";
 import type { AgencyClientRow } from "../agency-clients";
 const uuid = z.string().uuid();
@@ -56,13 +56,14 @@ export function AgencyVersionCreate({ request, agencyWorkspaceId, clients }: { r
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Creation could not be confirmed."); }
     finally { inFlight.current = false; setBusy(false); }
   }
-  return <details className="mb-8"><summary className="cursor-pointer text-sm font-medium">Create a client Version</summary><div className="mt-4 max-w-xl space-y-4 text-sm">
+  return <details className="mb-8"><summary className="cursor-pointer text-sm font-medium">Create a client Version</summary><div className="mt-4 max-w-xl"><StSurface label="Create a client Version"><div className="space-y-4 text-sm">
     <p className="text-gray-muted">Copy a source’s reusable definition into this business as a separate Draft System. Its accounts, data and permissions start empty.</p>
-    {!sources && !error ? <p role="status">Reading source revisions…</p> : null}
+    {!sources && !error ? <StSkeleton label="Reading source revisions" /> : null}
     {grantError ? <p role="status" className="text-gray-muted">{grantError}</p> : null}
-    {error ? <p role="alert" className="text-critical">{error}</p> : null}
-    {!sources && error ? <Button variant="secondary" size="sm" onClick={() => setAttempt(value => value + 1)}>Retry sources</Button> : null}
-    {sources ? <><SelectInput label="Source" disabled={locked} value={sourceId} onChange={event => setSourceId(event.target.value)} options={[{ value: "", label: "Choose a source" }, ...sources.filter(item => item.revisions.length).map(item => ({ value: item.systemId, label: `${item.name} · revision ${item.revisions.at(-1)!.source.number}` }))]} /><SelectInput label="Client business" disabled={locked} value={client} onChange={event => setClient(event.target.value)} options={[{ value: "", label: "Choose a client" }, ...targets.map(item => ({ value: item.workspaceId, label: item.name }))]} /><TextInput label="New System name" value={name} maxLength={160} disabled={locked} onChange={event => setName(event.target.value)} /><SelectInput label="Version context" value={context} disabled={locked} onChange={event => setContext(event.target.value)} options={[{ value: "agency_client", label: "Agency client" }, { value: "location", label: "Location" }, { value: "customer_segment", label: "Customer segment" }, { value: "franchise", label: "Franchise" }]} /><TextInput label="Context name" value={label} maxLength={200} disabled={locked} onChange={event => setLabel(event.target.value)} /><Button size="sm" loading={busy} disabled={busy || Boolean(result) || !selected || !client || (delegated && !installCommandId) || !name.trim() || !label.trim()} onClick={() => void create()}>{pending.current && !result ? "Retry this Version" : "Create Draft Version"}</Button></> : null}
+    {error ? <StNotice tone="critical">{error}</StNotice> : null}
+    {!sources && error ? <StTextButton onClick={() => setAttempt(value => value + 1)}>Retry sources</StTextButton> : null}
+    {sources && !sources.length ? <StEmpty>No source revisions yet. Package a source before creating a client Version.</StEmpty> : null}
+    {sources ? <><SelectInput label="Source" disabled={locked} value={sourceId} onChange={event => setSourceId(event.target.value)} options={[{ value: "", label: "Choose a source" }, ...sources.filter(item => item.revisions.length).map(item => ({ value: item.systemId, label: `${item.name} · revision ${item.revisions.at(-1)!.source.number}` }))]} /><SelectInput label="Client business" disabled={locked} value={client} onChange={event => setClient(event.target.value)} options={[{ value: "", label: "Choose a client" }, ...targets.map(item => ({ value: item.workspaceId, label: item.name }))]} /><TextInput label="New System name" value={name} maxLength={160} disabled={locked} onChange={event => setName(event.target.value)} /><SelectInput label="Version context" value={context} disabled={locked} onChange={event => setContext(event.target.value)} options={[{ value: "agency_client", label: "Agency client" }, { value: "location", label: "Location" }, { value: "customer_segment", label: "Customer segment" }, { value: "franchise", label: "Franchise" }]} /><TextInput label="Context name" value={label} maxLength={200} disabled={locked} onChange={event => setLabel(event.target.value)} /><StPill busy={busy} disabled={busy || Boolean(result) || !selected || !client || (delegated && !installCommandId) || !name.trim() || !label.trim()} onClick={() => void create()}>{pending.current && !result ? "Retry this Version" : "Create Draft Version"}</StPill></> : null}
     {result ? <p role="status">The client Version is ready as a draft. <a className="underline underline-offset-2" href={`/workspace?view=system&system=${result.systemId}&workspaceId=${result.workspaceId}`}>Open its System</a> to bind accounts and prepare a release.</p> : null}
-  </div></details>;
+  </div></StSurface></div></details>;
 }

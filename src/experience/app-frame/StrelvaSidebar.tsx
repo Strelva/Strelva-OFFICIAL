@@ -4,7 +4,7 @@ import type { OwnerBrand } from "@/platform/infra/agency-brand";
 
 import Link from "next/link";
 import type { MouseEvent, ReactNode } from "react";
-import { AppWindow, Building2, CalendarDays, CircleAlert, CircleHelp, FileText, Globe2, Home, Inbox, KeyRound, ListChecks, Mail, MapPin, MessageSquareText, Repeat, Search, Sheet, UserPlus, X, type LucideIcon } from "lucide-react";
+import { AppWindow, Building2, CalendarDays, CircleAlert, CircleHelp, FileText, Globe2, Home, Inbox, KeyRound, Library, ListChecks, Mail, MapPin, MessageSquareText, Repeat, Search, Sheet, UserPlus, Users, X, type LucideIcon } from "lucide-react";
 import { SYSTEMS_LABEL, SYSTEMS_LIST_LABEL } from "@/experience/systems/model";
 import { LogoMark } from "@/components/Logo";
 import { WorkspaceSignOutButton } from "@/experience/workspace/WorkspaceSignOutButton";
@@ -15,6 +15,12 @@ import { placeForSection, sectionTitle, workspaceSectionHref, type StrelvaPinned
 export { placeForSection, workspaceSectionHref, type StrelvaPinnedItem, type StrelvaSection } from "./workspace-places";
 
 type NavigableSection = Exclude<StrelvaSection, "account">;
+
+export interface AgencyNavigation {
+  active: "clients" | "queue" | "library";
+  onNavigate?: (view: AgencyNavigation["active"]) => void;
+  hrefs?: Record<AgencyNavigation["active"], string>;
+}
 
 const PRIMARY_ITEMS: readonly { id: NavigableSection; icon: LucideIcon }[] = [
   { id: "home", icon: Home },
@@ -30,6 +36,7 @@ const BUSINESS_ITEMS: readonly { id: NavigableSection; icon: LucideIcon }[] = [
 ];
 
 interface Props {
+  agencyNavigation?: AgencyNavigation;
   ownerBrand?: OwnerBrand;
   active?: StrelvaSection;
   appBase?: string;
@@ -64,7 +71,7 @@ function navigateInPlace(event: MouseEvent<HTMLAnchorElement>, action: (() => vo
 }
 
 /** One navigation contract for owners, agencies, account and managed work. */
-export function StrelvaSidebar({ ownerBrand, active, appBase = "", workspaceId, accountName, accountDetail, businessContext, contextualNavigation, recentWork = [], pinned = [], mobileOpen = false, onCloseMobile, onNavigate, onSearch, onStart, startDisabled = false, signedIn = true, signInHref, signOut, standalone = false, systemsReleased = false, needsYou }: Props) {
+export function StrelvaSidebar({ agencyNavigation, ownerBrand, active, appBase = "", workspaceId, accountName, accountDetail, businessContext, contextualNavigation, recentWork = [], pinned = [], mobileOpen = false, onCloseMobile, onNavigate, onSearch, onStart, startDisabled = false, signedIn = true, signInHref, signOut, standalone = false, systemsReleased = false, needsYou }: Props) {
   const pinnedLabel = systemsReleased ? SYSTEMS_LABEL : "Website and apps";
   const listLabel = systemsReleased ? SYSTEMS_LIST_LABEL : "All apps and files";
   const href = (section: StrelvaSection) => workspaceSectionHref(section, appBase, workspaceId);
@@ -93,7 +100,7 @@ export function StrelvaSidebar({ ownerBrand, active, appBase = "", workspaceId, 
         {onStart ? <button type="button" className={styles.newAction} disabled={startDisabled} onClick={() => { onCloseMobile?.(); onStart(); }}><MessageSquareText size={18} aria-hidden="true" /><span>Ask Strelva</span></button> : <Link className={styles.newAction} href={newHref} aria-disabled={startDisabled || undefined} tabIndex={startDisabled ? -1 : undefined} onClick={event => { if (startDisabled) event.preventDefault(); onCloseMobile?.(); }}><MessageSquareText size={18} aria-hidden="true" /><span>Ask Strelva</span></Link>}
         {onSearch ? <button type="button" className={styles.navItem} onClick={() => { onCloseMobile?.(); onSearch(); }} title="Search (Ctrl or Command + K)"><Search size={18} aria-hidden="true" /><span>Search</span></button> : <Link className={styles.navItem} href={searchHref} onClick={onCloseMobile}><Search size={18} aria-hidden="true" /><span>Search</span></Link>}
       </div>
-      <nav className={styles.primary} aria-label="Main">{primaryItems.map(item)}</nav>
+      <nav className={styles.primary} aria-label="Main">{agencyNavigation ? ([{ view: "clients", label: "Clients", icon: Users }, { view: "queue", label: "Queue", icon: Inbox }, { view: "library", label: "Library", icon: Library }] as const).map(({ view, label, icon: Icon }) => <Link key={view} className={styles.navItem} href={agencyNavigation.hrefs?.[view] || `${href("home")}&agencyView=${view}`} aria-current={agencyNavigation.active === view ? "page" : undefined} onClick={event => { navigateInPlace(event, agencyNavigation.onNavigate ? () => { onCloseMobile?.(); agencyNavigation.onNavigate?.(view); } : undefined); if (!agencyNavigation.onNavigate) onCloseMobile?.(); }}><Icon size={18} strokeWidth={1.6} aria-hidden="true" /><span>{label}</span></Link>) : primaryItems.map(item)}</nav>
       {pinned.length ? <section className={styles.recent} aria-label={pinnedLabel}><h2>{pinnedLabel}</h2>{pinned.map(entry => {
         const Icon = PINNED_ICONS[entry.kind || "website"];
         return <Link key={entry.id} className={styles.pinned} href={entry.href} title={entry.title} aria-current={entry.current ? "page" : undefined} onClick={event => navigateInPlace(event, entry.onOpen ? () => { onCloseMobile?.(); entry.onOpen?.(); } : undefined)}><Icon size={15} strokeWidth={1.6} aria-hidden="true" /><span>{entry.title}</span></Link>;

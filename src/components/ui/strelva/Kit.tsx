@@ -69,6 +69,21 @@ export function StRows({ children, label }: { children: ReactNode; label?: strin
   return <ul className={styles.rows} aria-label={label}>{children}</ul>;
 }
 
+/** Open comparison table. On phones each record keeps its labels beside its values. */
+export function StTable({ columns, rows, label }: {
+  columns: readonly { key: string; label: ReactNode; mono?: boolean }[];
+  rows: readonly { key: string; cells: Readonly<Record<string, ReactNode>>; label?: string }[];
+  label: string;
+}) {
+  return <table className={styles.table} role="table" aria-label={label}>
+    <thead><tr>{columns.map(column => <th key={column.key} scope="col">{column.label}</th>)}</tr></thead>
+    <tbody>{rows.map(row => <tr key={row.key} aria-label={row.label}>{columns.map((column, index) => {
+      const value = <><span className={styles.cellLabel} aria-hidden="true">{column.label}</span><div className={styles.cellValue}>{column.mono ? <StMono>{row.cells[column.key]}</StMono> : row.cells[column.key]}</div></>;
+      return index === 0 ? <th key={column.key} scope="row">{value}</th> : <td key={column.key}>{value}</td>;
+    })}</tr>)}</tbody>
+  </table>;
+}
+
 interface RowProps {
   kind?: ReactNode;
   title: ReactNode;

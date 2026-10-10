@@ -66,7 +66,10 @@ it("requires explicit removal confirmation and removes the person after success"
   await click(button(node, "Remove staff")); expect(writes(request)).toHaveLength(0);
   expect(node.textContent).toContain("All their client assignments will end");
   await click(button(node, "Cancel removal")); expect(writes(request)).toHaveLength(0);
-  await click(button(node, "Remove staff")); await click(button(node, "Confirm removal"));
+  await click(button(node, "Remove staff"));
+  const confirmation = [...node.querySelectorAll("button")].find(item => item.textContent?.startsWith("Confirm removal"))!;
+  await click(confirmation); expect(writes(request)).toHaveLength(0);
+  await act(async () => confirmation.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, bubbles: true })));
   expect(writes(request)[0]).toEqual({ action: "remove", workspaceId: TEAM_AGENCY, userId: TEAM_STAFF });
   expect(node.textContent).not.toContain("sam@agency.example.test");
 });

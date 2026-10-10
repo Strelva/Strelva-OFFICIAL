@@ -1651,3 +1651,41 @@ This consolidation instead retains the newer ordinary-agency selection and
 restricted delivery controls from the private integration. Full combined native
 and authenticated qualification remains separate. Revocation reason copy maps
 the legacy stored reason at display time; commands retain that stored value.
+
+
+### Strelva 1.0 agency composition — L7, October 9, 2026
+
+`StTable` in [Kit.tsx](../../src/components/ui/strelva/Kit.tsx) adds open,
+hairline comparison tables with sentence-case column labels. The first cell is
+a row header; on phones the other cells retain their own label beside the value.
+Mono is opt-in per data column. [The specimen](../../src/app/preview/strelva/kit/KitSpecimen.tsx)
+shows healthy and failing fictional client rows in both themes. No surface box
+or page-specific table styling is introduced. Rendered comparison is outstanding.
+
+[StrelvaShell](../../src/experience/app-frame/StrelvaShell.tsx) and
+[StrelvaSidebar](../../src/experience/app-frame/StrelvaSidebar.tsx) accept optional
+`agencyNavigation`: Clients, Queue, Library, caller-owned selection/hrefs.
+[WorkspaceLayout](../../src/experience/workspace/WorkspaceLayout.tsx) supplies it
+only for agency members with the Systems release enabled. Owner navigation
+retains its existing default. `agencyView` persists the selected agency surface
+in the URL and restores it on Back.
+
+[AgencyHome](../../src/experience/workspace/AgencyHome.tsx) uses `StPage`,
+`StHead`, the responsive table and a scoped `StComposerBar`. Queue rows group
+by kind, oldest first within each group. Responsibility/availability controls
+remain available in each provider client's disclosure. A failed client read
+shows its last successful row from this mounted agency session, visibly stale;
+without a last read it says so and reports Unknown. Cache entries never become
+extra client rows or cross agency scope. No cross-navigation durable cache or
+automatic retry interval is claimed.
+
+Library revisions, selected-ready bulk offers, Version overrides/accounts/releases,
+team, effect verification, owner review and provider-change controls now compose
+on kit pieces while retaining existing transports and gates. Build's existing
+work-plan experience remains the executable surface. Unsupported draft/rehearsal,
+source comparison, run-cost and portfolio reporting content is explicitly fictional
+in the owned preview components. Rates remain placeholders.
+
+The [L7 handoff](./ui-1.0-l7-agency-handoff.md) records routes, files, exact local
+checks, spec conflicts and the blocked rendered proof. No visual, hosted,
+provider or production qualification follows from this composition.
